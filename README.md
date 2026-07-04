@@ -17,6 +17,7 @@ Everyone's list is saved in **their own browser** (localStorage). The same `frie
 ## Features
 
 - **Track anything** — anime, TV shows, movies, books — with three statuses: 📋 Plan · ▶ Watching · ✓ Done
+- **Official cover art** — every entry shows its real poster (MyAnimeList / TVMaze / Open Library). Covers are found automatically in the background for existing entries and captured during autofill; a wrong match can be removed in Edit and stays removed
 - **✦ Autofill** — type a title and the app fills in episodes, total hours, genres, notes, and a full **watch order** (sequels in order, optional OVAs, skippable recaps). Powered by free public databases, works for everyone with no setup:
   - [Jikan](https://jikan.moe) (MyAnimeList) for anime — walks the whole franchise graph
   - [TVMaze](https://www.tvmaze.com/api) for live-action TV — per-season episode breakdown

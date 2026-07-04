@@ -122,6 +122,10 @@ input,textarea,select{font-family:inherit;}
 .bar-pln{background:var(--b3);}
 .poster{width:44px;height:62px;border-radius:8px;object-fit:cover;flex-shrink:0;background:var(--bg4);border:1px solid var(--b1);}
 .poster-ph{width:44px;height:62px;border-radius:8px;flex-shrink:0;background:var(--bg4);border:1px solid var(--b1);display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:800;color:var(--t3);}
+.tswatch{position:relative;}
+.tdel{position:absolute;top:4px;right:4px;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,0.55);color:#fff;font-size:10px;display:flex;align-items:center;justify-content:center;}
+.cpick{width:46px;height:36px;border:1px solid var(--b2);border-radius:8px;background:var(--bg3);padding:2px;-webkit-appearance:none;appearance:none;}
+.cpick-lbl{display:flex;flex-direction:column;gap:5px;font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:0.08em;align-items:center;}
 .card-body{flex:1;min-width:0;}
 .card-title{font-size:14px;font-weight:600;line-height:1.3;letter-spacing:-0.1px;}
 .card-tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px;}
@@ -424,11 +428,13 @@ input,textarea,select{font-family:inherit;}
     <label class="flabel">Title *</label>
     <input class="finput" id="fTitle" placeholder="e.g. Attack on Titan" autocomplete="off" autocorrect="off">
   </div>
-  <div class="fgroup" id="coverPrev" style="display:none">
+  <div class="fgroup" id="coverPrev">
     <label class="flabel">Cover</label>
     <div style="display:flex;align-items:center;gap:10px;">
-      <img id="coverImg" alt="" style="width:44px;height:62px;border-radius:8px;object-fit:cover;border:1px solid var(--b1);">
-      <button class="dact danger" type="button" onclick="clearCover()">Remove</button>
+      <img id="coverImg" alt="" style="width:44px;height:62px;border-radius:8px;object-fit:cover;border:1px solid var(--b1);display:none">
+      <button class="dact" type="button" onclick="document.getElementById('coverFile').click()">📷 Upload</button>
+      <button class="dact danger" type="button" id="coverRemoveBtn" onclick="clearCover()" style="display:none">Remove</button>
+      <input type="file" id="coverFile" accept="image/*" style="display:none" onchange="coverFileChosen(this)">
     </div>
   </div>
   <div class="fgroup">
@@ -535,6 +541,18 @@ input,textarea,select{font-family:inherit;}
     <button class="sheet-cancel" onclick="closeAll()">Done</button>
   </div>
   <div class="theme-grid" id="themeGrid"></div>
+  <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--b1);">
+    <div class="flabel" style="margin-bottom:10px">Make your own</div>
+    <div style="display:flex;gap:8px;margin-bottom:12px;">
+      <input class="finput" id="ctName" placeholder="Theme name…" maxlength="14" style="flex:1" autocomplete="off">
+      <input class="finput" id="ctEmoji" placeholder="✨" maxlength="2" style="width:56px;text-align:center" autocomplete="off">
+    </div>
+    <div style="display:flex;gap:16px;align-items:flex-end;">
+      <label class="cpick-lbl">Accent<input type="color" class="cpick" id="ctAccent" value="#e03d55"></label>
+      <label class="cpick-lbl">Background<input type="color" class="cpick" id="ctBg" value="#111114"></label>
+      <button class="ai-run-btn" style="flex:1" onclick="saveCustomTheme()">Save &amp; Apply</button>
+    </div>
+  </div>
 </div>
 
 <!-- CONFIRM DELETE -->
@@ -560,7 +578,8 @@ let anime=[],tab='all',expandedId=null,editingId=null,curStatus='plan',deleteId=
 // ─── STORAGE ───────────────────────────────────────────────────────────────
 function store(){try{localStorage.setItem('_t','1');localStorage.removeItem('_t');return localStorage;}catch{return null;}}
 function load(){try{const s=store(),d=s&&s.getItem('animelist_friends_v4');anime=d?JSON.parse(d):JSON.parse(JSON.stringify(DEFAULT_DATA));}catch{anime=JSON.parse(JSON.stringify(DEFAULT_DATA));}}
-function save(){try{const s=store();if(s)s.setItem('animelist_friends_v4',JSON.stringify(anime));}catch{}}
+let saveWarned=false;
+function save(){try{const s=store();if(s)s.setItem('animelist_friends_v4',JSON.stringify(anime));saveWarned=false;}catch{if(!saveWarned){saveWarned=true;toast('⚠️ Storage full — remove some uploaded covers');}}}
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2);}
 
 // ─── THEMES ────────────────────────────────────────────────────────────────
@@ -573,20 +592,58 @@ const THEMES=[
   {id:'zoro',    name:'Zoro',    emoji:'⚔️', bg:'#0a140c', accent:'#26a040'},
   {id:'chopper', name:'Chopper', emoji:'🦌', bg:'#150f1c', accent:'#d84872'},
 ];
+// custom themes: user-named color pairs, all other vars generated from them
+function customThemes(){try{const s=store();return JSON.parse((s&&s.getItem('custom_themes'))||'[]');}catch{return[];}}
+function setCustomThemes(l){try{const s=store();if(s)s.setItem('custom_themes',JSON.stringify(l));}catch{}}
+function allThemes(){return THEMES.concat(customThemes().map(t=>({...t,custom:true})));}
+function hex2rgb(h){h=h.replace('#','');if(h.length===3)h=h.split('').map(c=>c+c).join('');const n=parseInt(h,16);return[n>>16&255,n>>8&255,n&255];}
+function mix(h1,h2,w){const a=hex2rgb(h1),b=hex2rgb(h2);return'#'+a.map((v,i)=>Math.round(v*(1-w)+b[i]*w).toString(16).padStart(2,'0')).join('');}
+function rgba(h,al){const[r,g,b]=hex2rgb(h);return`rgba(${r},${g},${b},${al})`;}
+const CUSTOM_VARS=['--bg','--bg2','--bg3','--bg4','--bg5','--b1','--b2','--b3','--t1','--t2','--t3','--a','--a2','--ag','--glow','--topgrad'];
+function applyCustomVars(t){
+  const st=document.documentElement.style;
+  const v={
+    '--bg':t.bg,'--bg2':mix(t.bg,'#ffffff',0.04),'--bg3':mix(t.bg,'#ffffff',0.08),'--bg4':mix(t.bg,'#ffffff',0.12),'--bg5':mix(t.bg,'#ffffff',0.16),
+    '--b1':rgba(t.accent,0.07),'--b2':rgba(t.accent,0.14),'--b3':rgba(t.accent,0.25),
+    '--t1':mix('#ffffff',t.accent,0.06),'--t2':mix('#8a8a8a',t.accent,0.3),'--t3':mix('#4a4a4a',t.accent,0.25),
+    '--a':t.accent,'--a2':mix(t.accent,'#ffffff',0.25),'--ag':rgba(t.accent,0.14),'--glow':rgba(t.accent,0.22),
+    '--topgrad':`linear-gradient(180deg,${mix(t.accent,'#000000',0.82)} 0%,${t.bg} 100%)`
+  };
+  CUSTOM_VARS.forEach(k=>st.setProperty(k,v[k]));
+}
+function clearCustomVars(){const st=document.documentElement.style;CUSTOM_VARS.forEach(k=>st.removeProperty(k));}
 function loadTheme(){try{const s=store();curTheme=(s&&s.getItem('animetheme'))||'default';}catch{curTheme='default';}applyTheme(curTheme,false);}
-function applyTheme(id,save=true){
-  curTheme=id;
-  document.documentElement.setAttribute('data-theme',id==='default'?'':id);
-  if(save){try{const s=store();if(s)s.setItem('animetheme',id);}catch{}}
+function applyTheme(id,persist=true){
+  const t=allThemes().find(x=>x.id===id)||THEMES[0];
+  curTheme=t.id;
+  clearCustomVars();
+  document.documentElement.setAttribute('data-theme',(t.custom||t.id==='default')?'':t.id);
+  if(t.custom)applyCustomVars(t);
+  if(persist){try{const s=store();if(s)s.setItem('animetheme',t.id);}catch{}}
   renderThemeGrid();
+}
+function saveCustomTheme(){
+  const name=(document.getElementById('ctName').value.trim()||'Custom').replace(/[<>"'&]/g,'').slice(0,14);
+  const emoji=(document.getElementById('ctEmoji').value.trim()||'✨').replace(/[<>"'&]/g,'').slice(0,4);
+  const t={id:'c'+uid(),name,emoji,accent:document.getElementById('ctAccent').value,bg:document.getElementById('ctBg').value};
+  setCustomThemes([...customThemes(),t]);
+  document.getElementById('ctName').value='';
+  applyTheme(t.id);
+  toast(`🎨 ${name} saved & applied`);
+}
+function deleteCustomTheme(id){
+  setCustomThemes(customThemes().filter(t=>t.id!==id));
+  if(curTheme===id)applyTheme('default');else renderThemeGrid();
+  toast('Theme deleted');
 }
 function renderThemeGrid(){
   const g=document.getElementById('themeGrid');if(!g)return;
-  g.innerHTML=THEMES.map(t=>`
+  g.innerHTML=allThemes().map(t=>`
     <button class="topt${curTheme===t.id?' on':''}" onclick="applyTheme('${t.id}')">
       <div class="tswatch" style="background:linear-gradient(135deg,${t.bg} 0%,${t.bg}dd 100%)">
         <span>${t.emoji}</span>
         <div class="taccent-bar" style="background:${t.accent}"></div>
+        ${t.custom?`<div class="tdel" onclick="event.stopPropagation();deleteCustomTheme('${t.id}')">✕</div>`:''}
       </div>
       <div class="tname">${t.name}</div>
     </button>`).join('');
@@ -765,11 +822,28 @@ function closeAll(){
 let pendingImg='';
 function setCoverPreview(url){
   pendingImg=url||'';
-  const w=document.getElementById('coverPrev');
-  if(pendingImg){document.getElementById('coverImg').src=pendingImg;w.style.display='block';}
-  else w.style.display='none';
+  const img=document.getElementById('coverImg'),rm=document.getElementById('coverRemoveBtn');
+  if(pendingImg){img.src=pendingImg;img.style.display='block';rm.style.display='inline-flex';}
+  else{img.style.display='none';rm.style.display='none';}
 }
 function clearCover(){setCoverPreview('');}
+function coverFileChosen(inp){
+  const f=inp.files&&inp.files[0];inp.value='';
+  if(!f)return;
+  const img=new Image();
+  img.onload=()=>{
+    // downscale to poster size so it fits comfortably in on-device storage
+    const sc=Math.min(240/img.width,340/img.height,1);
+    const c=document.createElement('canvas');
+    c.width=Math.round(img.width*sc);c.height=Math.round(img.height*sc);
+    c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+    URL.revokeObjectURL(img.src);
+    setCoverPreview(c.toDataURL('image/jpeg',0.82));
+    toast('📷 Cover added');
+  };
+  img.onerror=()=>{URL.revokeObjectURL(img.src);toast('Could not read that image');};
+  img.src=URL.createObjectURL(f);
+}
 function setStatus(s){
   curStatus=s;
   ['plan','watching','finished'].forEach(x=>{

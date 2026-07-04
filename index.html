@@ -99,7 +99,7 @@ input,textarea,select{font-family:inherit;}
 .scard-lbl{font-size:10px;color:var(--t3);font-weight:600;text-transform:uppercase;letter-spacing:0.06em;}
 
 /* ── LIST ── */
-.list{flex:1;overflow-y:auto;padding:8px 16px calc(var(--safe-b) + 16px);scroll-behavior:smooth;}
+.list{flex:1;overflow-y:auto;padding:8px 16px calc(var(--safe-b) + 90px);scroll-behavior:smooth;}
 .list::-webkit-scrollbar{display:none;}
 .group-head{
   font-size:10px;font-weight:700;color:var(--t3);
@@ -126,6 +126,19 @@ input,textarea,select{font-family:inherit;}
 .tdel{position:absolute;top:2px;right:2px;width:22px;height:22px;border-radius:50%;background:rgba(0,0,0,0.6);color:#fff;font-size:11px;display:flex;align-items:center;justify-content:center;z-index:2;}
 .cpick{width:46px;height:36px;border:1px solid var(--b2);border-radius:8px;background:var(--bg3);padding:2px;-webkit-appearance:none;appearance:none;}
 .cpick-lbl{display:flex;flex-direction:column;gap:5px;font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:0.08em;align-items:center;}
+.films-acc{margin-top:10px;}
+.films-acc summary{font-size:12px;font-weight:600;color:var(--t2);padding:7px 0;cursor:pointer;user-select:none;}
+.films-acc[open] summary{color:var(--a);}
+.films-acc .order-list{margin-top:6px;}
+.ai-fab{
+  position:fixed;right:16px;bottom:calc(20px + var(--safe-b));
+  width:54px;height:54px;border-radius:50%;border:none;
+  background:var(--a);color:#fff;font-size:22px;
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 6px 22px var(--glow),0 2px 8px rgba(0,0,0,0.35);
+  z-index:40;cursor:pointer;transition:transform 0.15s;
+}
+.ai-fab:active{transform:scale(0.9);}
 .card-body{flex:1;min-width:0;}
 .card-title{font-size:14px;font-weight:600;line-height:1.3;letter-spacing:-0.1px;}
 .card-tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px;}
@@ -384,7 +397,6 @@ input,textarea,select{font-family:inherit;}
     </div>
     <div class="header-right">
       <button class="hbtn" onclick="openSheet('importSheet')" title="Import list">📋</button>
-      <button class="hbtn" onclick="openSheet('aiSheet')" title="AI features">✦</button>
       <button class="hbtn" onclick="openSheet('themeSheet')" title="Theme">🎨</button>
       <button class="hbtn primary" onclick="openSheet('addSheet')" title="Add">+</button>
     </div>
@@ -410,6 +422,9 @@ input,textarea,select{font-family:inherit;}
   <div class="list" id="listEl"></div>
 
 </div>
+
+<!-- AI FLOATING BUTTON -->
+<button class="ai-fab" onclick="openSheet('aiSheet')" title="AI features">✦</button>
 
 <!-- OVERLAY -->
 <div class="overlay" id="overlay" onclick="closeAll()"></div>
@@ -731,21 +746,28 @@ function cardHTML(a){
     const hasNotes=a.notes&&a.notes.trim();
     let orderHTML='';
     if(hasOrder){
+      const li=(step,strip)=>{
+        const s=step.toLowerCase();
+        let cls='ob-tv',lbl='TV';
+        if(s.startsWith('skip:'))      {cls='ob-skip';lbl='SKIP';}
+        else if(s.startsWith('key:'))  {cls='ob-key'; lbl='KEY';}
+        else if(s.startsWith('ova:'))  {cls='ob-ova'; lbl='OVA';}
+        else if(s.startsWith('movie:')){cls='ob-movie';lbl='FILM';}
+        else if(s.startsWith('special:')||s.startsWith('web:')||s.startsWith('live action:')){cls='ob-special';lbl='SPEC';}
+        let text=step.replace(/^[^:]+:\s*/,'');
+        if(strip)text=text.replace(/\s*—\s*side film.*$/i,'');
+        return `<li class="order-item"><span class="order-badge ${cls}">${lbl}</span>${text}</li>`;
+      };
+      // 3+ side films collapse into their own section so the main path stays readable
+      const isFilm=s=>/^movie:/i.test(s)&&/side film/i.test(s);
+      const films=a.order.filter(isFilm);
+      const grouped=films.length>=3;
+      const main=grouped?a.order.filter(s=>!isFilm(s)):a.order;
+      const filmsHTML=grouped?`<details class="films-acc"><summary>🎬 ${films.length} side films — optional, watch any time</summary><ol class="order-list">${films.map(s=>li(s,true)).join('')}</ol></details>`:'';
       orderHTML=`<div class="detail-section">
         <div class="detail-label">Watch Order</div>
-        <ol class="order-list">
-          ${a.order.map(step=>{
-            const s=step.toLowerCase();
-            let cls='ob-tv',lbl='TV';
-            if(s.startsWith('skip:'))      {cls='ob-skip';lbl='SKIP';}
-            else if(s.startsWith('key:'))  {cls='ob-key'; lbl='KEY';}
-            else if(s.startsWith('ova:'))  {cls='ob-ova'; lbl='OVA';}
-            else if(s.startsWith('movie:')){cls='ob-movie';lbl='FILM';}
-            else if(s.startsWith('special:')||s.startsWith('web:')||s.startsWith('live action:')){cls='ob-special';lbl='SPEC';}
-            const text=step.replace(/^[^:]+:\s*/,'');
-            return `<li class="order-item"><span class="order-badge ${cls}">${lbl}</span>${text}</li>`;
-          }).join('')}
-        </ol>
+        <ol class="order-list">${main.map(s=>li(s,false)).join('')}</ol>
+        ${filmsHTML}
       </div>`;
     }
     const notesHTML=hasNotes?`<div class="detail-section"><div class="detail-label">Notes</div><div class="detail-note">${a.notes}</div></div>`:'';
@@ -1077,10 +1099,11 @@ async function lookupAnime(title){
   }));
   const order=[];
   if(chain.length>1||films.length||ovas.length)chain.forEach(n=>order.push(`${typeTag(n.type)}: ${n.title_english||n.title} — ${n.type==='Movie'?'movie':(n.episodes?n.episodes+' eps':'TBA')}`));
-  films.slice(0,15).forEach(n=>order.push(`MOVIE: ${n} — side film, optional`));
-  if(films.length>15)order.push(`MOVIE: …plus ${films.length-15} more side films`);
-  ovas.slice(0,3).forEach(n=>order.push(`OVA: ${n} — side story, optional`));
-  recaps.slice(0,2).forEach(n=>order.push(`SKIP: ${n} — recap, skippable`));
+  const short=n=>n.length>44?n.slice(0,42).replace(/\s+\S*$/,'')+'…':n;
+  films.slice(0,15).forEach(n=>order.push(`MOVIE: ${short(n)} — side film`));
+  if(films.length>15)order.push(`MOVIE: …plus ${films.length-15} more — side film`);
+  ovas.slice(0,3).forEach(n=>order.push(`OVA: ${short(n)} — optional`));
+  recaps.slice(0,2).forEach(n=>order.push(`SKIP: ${short(n)} — recap`));
   const totMin=chain.reduce((s,n)=>{const per=durMins(n.duration);return s+(n.type==='Movie'?per:per*(n.episodes||0));},0);
   const filmCount=chain.filter(n=>n.type==='Movie').length+films.length;
   const tvEps=chain.reduce((s,n)=>s+(n.type==='Movie'?0:(n.episodes||0)),0);

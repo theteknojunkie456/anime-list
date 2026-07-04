@@ -1065,24 +1065,33 @@ async function lookupAnime(title){
     after.push(node);
   }
   const chain=[...before,cur,...after];
-  const order=chain.length>1?chain.map(n=>`${typeTag(n.type)}: ${n.title_english||n.title} — ${n.type==='Movie'?'movie':(n.episodes?n.episodes+' eps':'TBA')}`):[];
-  (cur.relations||[]).forEach(r=>{
-    if(r.relation==='Side Story'||r.relation==='Spin-Off'){
-      r.entry.filter(e=>e.type==='anime'&&!/picture drama/i.test(e.name)).slice(0,2).forEach(e=>order.push(`OVA: ${e.name} — side story, optional`));
-    }else if(r.relation==='Summary'){
-      r.entry.filter(e=>e.type==='anime').slice(0,1).forEach(e=>order.push(`SKIP: ${e.name} — recap, skippable`));
-    }
-  });
+  // gather side movies/OVAs/recaps from EVERY entry in the chain (franchises like
+  // Naruto and One Piece hang a dozen+ films off their Side Story relations)
+  const exSeen=new Set(),films=[],ovas=[],recaps=[];
+  chain.forEach(n=>(n.relations||[]).forEach(r=>{
+    r.entry.forEach(e=>{
+      if(e.type!=='anime'||seen.has(e.mal_id)||exSeen.has(e.mal_id)||/picture drama/i.test(e.name))return;
+      if(r.relation==='Side Story'||r.relation==='Spin-Off'){exSeen.add(e.mal_id);(/movie|film/i.test(e.name)?films:ovas).push(e.name);}
+      else if(r.relation==='Summary'){exSeen.add(e.mal_id);recaps.push(e.name);}
+    });
+  }));
+  const order=[];
+  if(chain.length>1||films.length||ovas.length)chain.forEach(n=>order.push(`${typeTag(n.type)}: ${n.title_english||n.title} — ${n.type==='Movie'?'movie':(n.episodes?n.episodes+' eps':'TBA')}`));
+  films.slice(0,15).forEach(n=>order.push(`MOVIE: ${n} — side film, optional`));
+  if(films.length>15)order.push(`MOVIE: …plus ${films.length-15} more side films`);
+  ovas.slice(0,3).forEach(n=>order.push(`OVA: ${n} — side story, optional`));
+  recaps.slice(0,2).forEach(n=>order.push(`SKIP: ${n} — recap, skippable`));
   const totMin=chain.reduce((s,n)=>{const per=durMins(n.duration);return s+(n.type==='Movie'?per:per*(n.episodes||0));},0);
-  const movies=chain.filter(n=>n.type==='Movie').length;
+  const filmCount=chain.filter(n=>n.type==='Movie').length+films.length;
   const tvEps=chain.reduce((s,n)=>s+(n.type==='Movie'?0:(n.episodes||0)),0);
   let eps;
-  if(chain.length===1)eps=cur.type==='Movie'?'1 movie':(cur.episodes?cur.episodes+' eps':'TBA');
-  else eps=`${tvEps} eps${movies?` + ${movies} movie${movies>1?'s':''}`:''}`;
+  if(chain.length===1&&cur.type==='Movie')eps='1 movie';
+  else eps=`${tvEps||cur.episodes||'?'} eps${filmCount?` + ${filmCount} movie${filmCount>1?'s':''}`:''}`;
   const bits=[];
   if(cur.score)bits.push(`★ ${cur.score} on MAL`);
   if(cur.status)bits.push(cur.status);
-  if(chain.length>1)bits.push(`${chain.length}-part franchise`);
+  if(chain.length>1)bits.push(`${chain.length}-part series`);
+  if(films.length)bits.push(`${films.length} side films`);
   return{
     eps,
     time:totMin?`~${Math.max(1,Math.round(totMin/60))} hrs`:'—',

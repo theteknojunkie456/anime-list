@@ -504,10 +504,10 @@ input,textarea,select{font-family:inherit;}
     <div class="ai-resp" id="rankResp"></div>
   </div>
   <div style="display:flex;gap:8px;margin-top:20px;padding-top:16px;border-top:1px solid var(--b1);">
-    <input class="ai-prompt-in" id="apiKeyIn" type="password" placeholder="Anthropic API key (sk-ant-…)" autocomplete="off">
+    <input class="ai-prompt-in" id="apiKeyIn" type="password" placeholder="Gemini (AIza…) or Anthropic (sk-ant-…) key" autocomplete="off">
     <button class="ai-run-btn" onclick="saveKey()">Save</button>
   </div>
-  <p class="ai-desc" style="margin-top:8px">Suggest, Ask &amp; Rank need an AI key — it stays on this device only. Get one at console.anthropic.com. Autofill works for everyone, no key needed.</p>
+  <p class="ai-desc" style="margin-top:8px">Suggest, Ask &amp; Rank need an AI key — it stays on this device only. Get a <strong style="color:var(--t1)">free</strong> Gemini key at aistudio.google.com, or a Claude key at console.anthropic.com. Autofill works for everyone, no key needed.</p>
 </div>
 
 <!-- IMPORT SHEET -->
@@ -908,12 +908,18 @@ function saveKey(){
 }
 function aiErrorHTML(e){
   return e===NO_KEY
-    ?'This needs an AI key — scroll down and add yours (it stays on this device only).'
+    ?'This needs an AI key — scroll down and add one. Gemini keys are free at aistudio.google.com (the key stays on this device only).'
     :'Connection error — check your key and try again.';
 }
 async function callAI(prompt){
   const key=getKey();
   if(!key)throw NO_KEY;
+  if(key.startsWith('AIza')){ // Google Gemini key (free at aistudio.google.com)
+    const res=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{maxOutputTokens:1000}})});
+    if(!res.ok)throw new Error('API '+res.status);
+    const data=await res.json();
+    return data.candidates?.[0]?.content?.parts?.[0]?.text||'No response.';
+  }
   const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-5',max_tokens:1000,messages:[{role:'user',content:prompt}]})});
   if(!res.ok)throw new Error('API '+res.status);
   const data=await res.json();

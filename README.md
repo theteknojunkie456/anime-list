@@ -23,7 +23,7 @@ Everyone's list is saved in **their own browser** (localStorage). The same `frie
   - [TVMaze](https://www.tvmaze.com/api) for live-action TV — per-season episode breakdown
   - [Open Library](https://openlibrary.org/developers/api) for books — page count and reading time
 - **📋 Import** — paste a plain-text list from Notes or anywhere (one title per line, optional `- watching` / `- finished` tags) and bulk-import with a preview
-- **✦ AI panel** — Suggest what to watch next, Ask questions about your list, and Rank your plan-to-watch queue. Uses the Claude API and needs an [Anthropic API key](https://console.anthropic.com) pasted into the panel — the key is stored only on that device. Everything else works without one.
+- **✦ AI panel** — Suggest what to watch next, Ask questions about your list, and Rank your plan-to-watch queue. Paste an API key into the panel — either a **free Gemini key** ([aistudio.google.com](https://aistudio.google.com), no card needed) or a Claude key ([console.anthropic.com](https://console.anthropic.com)). The app auto-detects which kind it is; the key is stored only on that device. Everything else works without one.
 - **🎨 Themes** — character-inspired color themes
 - **Works offline** — service worker caches the app; your list lives on-device anyway
 

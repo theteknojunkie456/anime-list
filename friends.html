@@ -1,0 +1,955 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Watchlist">
+<meta name="theme-color" content="#0a0a0c">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Watchlist</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* ── THEMES ───────────────────────────────────────────────── */
+:root{
+  --bg:#0a0a0c;--bg2:#111114;--bg3:#18181c;--bg4:#202025;--bg5:#28282e;
+  --b1:rgba(255,255,255,0.05);--b2:rgba(255,255,255,0.09);--b3:rgba(255,255,255,0.16);
+  --t1:#f0ecea;--t2:#7e7b86;--t3:#44424a;
+  --a:#e03d55;--a2:#ff6070;--ag:rgba(224,61,85,0.14);--glow:rgba(224,61,85,0.18);
+  --fin:#34c472;--finbg:rgba(52,196,114,0.12);
+  --wat:#f5a623;--watbg:rgba(245,166,35,0.12);
+  --pln:#5b9cf6;--plnbg:rgba(91,156,246,0.12);
+  --safe-t:env(safe-area-inset-top,0px);--safe-b:env(safe-area-inset-bottom,0px);
+  --r:12px;--r2:9px;--r3:6px;
+  --topgrad:linear-gradient(180deg,#160408 0%,#0a0a0c 100%);
+}
+[data-theme=naruto]{--bg:#08090e;--bg2:#0e0f18;--bg3:#151720;--bg4:#1c1f2a;--bg5:#232734;--b1:rgba(255,140,0,0.06);--b2:rgba(255,140,0,0.12);--b3:rgba(255,140,0,0.22);--t1:#fff6e8;--t2:#a8966a;--t3:#5e5230;--a:#f57800;--a2:#ffaa33;--ag:rgba(245,120,0,0.13);--glow:rgba(245,120,0,0.22);--fin:#5ed47a;--finbg:rgba(94,212,122,0.11);--wat:#ffcc00;--watbg:rgba(255,204,0,0.11);--pln:#4a9eff;--plnbg:rgba(74,158,255,0.11);--topgrad:linear-gradient(180deg,#1c0e00 0%,#08090e 100%);}
+[data-theme=sasuke]{--bg:#06060d;--bg2:#0b0b18;--bg3:#101022;--bg4:#16162c;--bg5:#1c1c36;--b1:rgba(130,90,255,0.06);--b2:rgba(130,90,255,0.13);--b3:rgba(130,90,255,0.24);--t1:#e6e2f8;--t2:#8e88b4;--t3:#4a4668;--a:#7730e8;--a2:#a07af8;--ag:rgba(119,48,232,0.15);--glow:rgba(119,48,232,0.28);--fin:#4ecba8;--finbg:rgba(78,203,168,0.11);--wat:#c084fc;--watbg:rgba(192,132,252,0.11);--pln:#818cf8;--plnbg:rgba(129,140,248,0.11);--topgrad:linear-gradient(180deg,#0a0420 0%,#06060d 100%);}
+[data-theme=luffy]{--bg:#060c16;--bg2:#0b1420;--bg3:#101c2c;--bg4:#152438;--bg5:#1a2c44;--b1:rgba(210,50,50,0.06);--b2:rgba(210,50,50,0.13);--b3:rgba(210,50,50,0.24);--t1:#eeeae4;--t2:#8898a8;--t3:#3e5464;--a:#d03838;--a2:#ff6060;--ag:rgba(208,56,56,0.13);--glow:rgba(208,56,56,0.22);--fin:#4ecb82;--finbg:rgba(78,203,130,0.11);--wat:#f5c842;--watbg:rgba(245,200,66,0.11);--pln:#3b9eff;--plnbg:rgba(59,158,255,0.11);--topgrad:linear-gradient(180deg,#140608 0%,#060c16 100%);}
+[data-theme=sanji]{--bg:#06080c;--bg2:#0c1016;--bg3:#121820;--bg4:#18202a;--bg5:#1e2834;--b1:rgba(200,154,14,0.06);--b2:rgba(200,154,14,0.13);--b3:rgba(200,154,14,0.24);--t1:#f6f0e2;--t2:#9a8e68;--t3:#565030;--a:#c89a0e;--a2:#f0c030;--ag:rgba(200,154,14,0.12);--glow:rgba(200,154,14,0.22);--fin:#5ed47a;--finbg:rgba(94,212,122,0.11);--wat:#ff8c42;--watbg:rgba(255,140,66,0.11);--pln:#4a80c4;--plnbg:rgba(74,128,196,0.11);--topgrad:linear-gradient(180deg,#120e00 0%,#06080c 100%);}
+[data-theme=zoro]{--bg:#050e07;--bg2:#0a140c;--bg3:#0f1c12;--bg4:#142418;--bg5:#192c1e;--b1:rgba(38,158,64,0.07);--b2:rgba(38,158,64,0.14);--b3:rgba(38,158,64,0.26);--t1:#e6f4e8;--t2:#6ea878;--t3:#325a3a;--a:#26a040;--a2:#46c860;--ag:rgba(38,160,64,0.13);--glow:rgba(38,160,64,0.22);--fin:#4ecb82;--finbg:rgba(78,203,130,0.11);--wat:#e85050;--watbg:rgba(232,80,80,0.11);--pln:#5b9cf6;--plnbg:rgba(91,156,246,0.11);--topgrad:linear-gradient(180deg,#020e04 0%,#050e07 100%);}
+[data-theme=chopper]{--bg:#0c080f;--bg2:#150f1c;--bg3:#1c1428;--bg4:#231934;--bg5:#2a1e40;--b1:rgba(214,72,114,0.07);--b2:rgba(214,72,114,0.14);--b3:rgba(214,72,114,0.26);--t1:#fceef6;--t2:#b878a0;--t3:#74486a;--a:#d84872;--a2:#f87098;--ag:rgba(216,72,114,0.13);--glow:rgba(216,72,114,0.24);--fin:#60d4a0;--finbg:rgba(96,212,160,0.11);--wat:#f5a040;--watbg:rgba(245,160,64,0.11);--pln:#7ab4f5;--plnbg:rgba(122,180,245,0.11);--topgrad:linear-gradient(180deg,#1a0610 0%,#0c080f 100%);}
+
+/* ── RESET ── */
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;background:var(--bg);color:var(--t1);font-family:'Inter',system-ui,sans-serif;overflow:hidden;-webkit-font-smoothing:antialiased;}
+#app{display:flex;flex-direction:column;height:100vh;height:100dvh;}
+button{font-family:inherit;cursor:pointer;}
+input,textarea,select{font-family:inherit;}
+
+/* ── HEADER ── */
+.header{
+  padding:calc(var(--safe-t) + 16px) 20px 16px;
+  background:var(--topgrad);
+  border-bottom:1px solid var(--b2);
+  flex-shrink:0;position:sticky;top:0;z-index:20;
+  display:flex;align-items:center;justify-content:space-between;
+  gap:12px;
+}
+.header-left{display:flex;flex-direction:column;gap:2px;min-width:0;}
+.header-title{font-size:20px;font-weight:800;letter-spacing:-0.4px;line-height:1;white-space:nowrap;}
+.header-title em{font-style:normal;color:var(--a);}
+.header-sub{font-size:11px;color:var(--t3);font-weight:500;letter-spacing:0.03em;}
+.header-right{display:flex;align-items:center;gap:6px;flex-shrink:0;}
+.hbtn{
+  width:36px;height:36px;border-radius:var(--r2);
+  border:1px solid var(--b2);background:var(--bg3);
+  color:var(--t2);font-size:16px;
+  display:flex;align-items:center;justify-content:center;
+  transition:all 0.14s;
+}
+.hbtn:active{opacity:0.55;transform:scale(0.92);}
+.hbtn.primary{background:var(--a);border-color:var(--a);color:#fff;font-size:22px;font-weight:300;box-shadow:0 4px 16px var(--glow);}
+
+/* ── SEARCH ── */
+.search-row{padding:12px 16px 0;flex-shrink:0;}
+.search-wrap{position:relative;}
+.search-ico{position:absolute;left:13px;top:50%;transform:translateY(-50%);font-size:14px;color:var(--t3);pointer-events:none;}
+.search-in{
+  width:100%;padding:10px 14px 10px 38px;
+  background:var(--bg3);border:1px solid var(--b2);border-radius:var(--r2);
+  color:var(--t1);font-size:14px;outline:none;transition:border-color 0.18s;
+}
+.search-in:focus{border-color:var(--a);}
+.search-in::placeholder{color:var(--t3);}
+
+/* ── FILTER TABS ── */
+.filter-row{padding:10px 16px 0;flex-shrink:0;}
+.filter-tabs{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding-bottom:1px;}
+.filter-tabs::-webkit-scrollbar{display:none;}
+.ftab{
+  padding:6px 14px;border-radius:99px;border:1px solid var(--b2);
+  background:transparent;font-size:12px;font-weight:600;
+  color:var(--t3);white-space:nowrap;transition:all 0.14s;flex-shrink:0;
+  letter-spacing:0.01em;
+}
+.ftab.on{background:var(--a);color:#fff;border-color:var(--a);box-shadow:0 3px 12px var(--glow);}
+.ftab:not(.on):active{background:var(--bg3);}
+
+/* ── STATS ── */
+.stats-row{display:flex;gap:8px;padding:10px 16px 0;flex-shrink:0;}
+.scard{
+  flex:1;background:var(--bg2);border:1px solid var(--b1);
+  border-radius:var(--r2);padding:10px 12px;
+  display:flex;flex-direction:column;gap:3px;
+}
+.scard-val{font-size:20px;font-weight:700;line-height:1;}
+.scard-lbl{font-size:10px;color:var(--t3);font-weight:600;text-transform:uppercase;letter-spacing:0.06em;}
+
+/* ── LIST ── */
+.list{flex:1;overflow-y:auto;padding:8px 16px calc(var(--safe-b) + 16px);scroll-behavior:smooth;}
+.list::-webkit-scrollbar{display:none;}
+.group-head{
+  font-size:10px;font-weight:700;color:var(--t3);
+  text-transform:uppercase;letter-spacing:0.1em;
+  padding:16px 0 8px;display:flex;align-items:center;gap:8px;
+}
+.group-head::after{content:'';flex:1;height:1px;background:var(--b1);}
+
+/* ── CARD ── */
+.card{
+  background:var(--bg2);border:1px solid var(--b1);
+  border-radius:var(--r);margin-bottom:8px;overflow:hidden;
+  transition:border-color 0.18s,box-shadow 0.18s;
+}
+.card.open{border-color:var(--a);box-shadow:0 0 0 1px var(--ag),0 6px 24px rgba(0,0,0,0.4);}
+.card-row{display:flex;align-items:center;gap:10px;padding:13px 14px;cursor:pointer;user-select:none;}
+.card-bar{width:3px;border-radius:2px;flex-shrink:0;align-self:stretch;min-height:32px;}
+.bar-fin{background:var(--fin);}
+.bar-wat{background:var(--wat);}
+.bar-pln{background:var(--b3);}
+.card-body{flex:1;min-width:0;}
+.card-title{font-size:14px;font-weight:600;line-height:1.3;letter-spacing:-0.1px;}
+.card-tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px;}
+.tag{font-size:10px;font-weight:600;padding:2px 7px;border-radius:99px;letter-spacing:0.02em;}
+.tag-genre{background:var(--bg4);color:var(--t2);}
+.tag-fin{background:var(--finbg);color:var(--fin);}
+.tag-wat{background:var(--watbg);color:var(--wat);}
+.tag-pln{background:var(--plnbg);color:var(--pln);}
+.card-right{display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0;text-align:right;}
+.card-eps{font-size:12px;font-weight:600;color:var(--t1);}
+.card-time{font-size:11px;color:var(--t3);}
+.card-chevron{font-size:11px;color:var(--t3);margin-top:2px;transition:transform 0.2s;}
+.card.open .card-chevron{transform:rotate(180deg);}
+
+/* ── DETAIL PANEL ── */
+.detail{display:none;border-top:1px solid var(--b1);background:var(--bg3);}
+.card.open .detail{display:block;}
+.detail-inner{padding:14px 16px;}
+.detail-section{margin-bottom:14px;}
+.detail-label{font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:7px;}
+.order-list{list-style:none;display:flex;flex-direction:column;gap:4px;}
+.order-item{display:flex;align-items:flex-start;gap:8px;font-size:13px;color:var(--t2);line-height:1.4;}
+.order-pip{width:6px;height:6px;border-radius:50%;flex-shrink:0;margin-top:4px;background:var(--b3);}
+.order-badge{font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;flex-shrink:0;margin-top:1px;letter-spacing:0.02em;}
+.ob-tv{background:rgba(91,156,246,0.15);color:#5b9cf6;}
+.ob-ova{background:rgba(52,196,114,0.15);color:#34c472;}
+.ob-movie{background:rgba(167,139,250,0.15);color:#a78bfa;}
+.ob-special{background:rgba(245,166,35,0.15);color:#f5a623;}
+.ob-skip{background:var(--bg4);color:var(--t3);}
+.ob-key{background:rgba(224,61,85,0.15);color:var(--a2);}
+.detail-note{
+  font-size:12px;color:var(--t2);line-height:1.5;
+  background:var(--bg4);border-radius:var(--r3);
+  padding:9px 12px;border-left:2px solid var(--a);
+}
+.ai-insight-box{
+  background:linear-gradient(135deg,var(--bg4) 0%,var(--bg3) 100%);
+  border:1px solid var(--b2);border-radius:var(--r2);
+  padding:10px 12px;font-size:13px;color:var(--t2);line-height:1.5;
+}
+.ai-badge{
+  display:inline-flex;align-items:center;gap:4px;
+  font-size:10px;font-weight:700;color:var(--a);
+  text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;
+}
+.detail-actions{display:flex;gap:6px;padding-top:4px;}
+.dact{
+  flex:1;padding:9px 10px;border-radius:var(--r2);border:1px solid var(--b2);
+  background:var(--bg4);color:var(--t2);font-size:12px;font-weight:600;
+  transition:all 0.14s;display:flex;align-items:center;justify-content:center;gap:5px;
+}
+.dact:active{opacity:0.6;}
+.dact.danger{color:var(--a);border-color:var(--ag);}
+.dact.ai-act{color:var(--a);border-color:var(--ag);background:var(--ag);}
+
+/* ── AUTOFILL BTN ── */
+.autofill-btn{
+  width:100%;padding:11px;border-radius:var(--r2);
+  background:linear-gradient(135deg,var(--ag) 0%,transparent 100%);
+  border:1px solid var(--a);color:var(--a);
+  font-size:13px;font-weight:700;letter-spacing:0.02em;
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  transition:all 0.15s;margin-bottom:14px;
+}
+.autofill-btn:active{opacity:0.7;}
+.autofill-btn.loading{opacity:0.5;pointer-events:none;}
+
+/* ── SHEETS (bottom drawer) ── */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,0.72);z-index:50;opacity:0;pointer-events:none;transition:opacity 0.28s;backdrop-filter:blur(4px);}
+.overlay.on{opacity:1;pointer-events:all;}
+.sheet{
+  position:fixed;bottom:0;left:0;right:0;z-index:51;
+  background:var(--bg2);border-radius:20px 20px 0 0;
+  border-top:1px solid var(--b2);
+  padding:0 20px calc(var(--safe-b) + 28px);
+  transform:translateY(102%);transition:transform 0.32s cubic-bezier(0.34,1.06,0.64,1);
+  max-height:92dvh;overflow-y:auto;
+}
+.sheet::-webkit-scrollbar{display:none;}
+.sheet.on{transform:translateY(0);}
+.sheet-handle{width:36px;height:4px;background:var(--bg5);border-radius:2px;margin:14px auto 18px;}
+.sheet-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;}
+.sheet-title{font-size:18px;font-weight:800;letter-spacing:-0.3px;}
+.sheet-cancel{padding:6px 14px;border-radius:var(--r2);border:1px solid var(--b2);background:var(--bg3);color:var(--t2);font-size:13px;font-weight:600;}
+.sheet-cancel:active{opacity:0.6;}
+
+/* ── FORM ── */
+.fgroup{margin-bottom:14px;}
+.flabel{font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:0.06em;display:block;margin-bottom:6px;}
+.finput,.fselect,.ftextarea{
+  width:100%;padding:11px 13px;
+  background:var(--bg3);border:1px solid var(--b2);border-radius:var(--r2);
+  color:var(--t1);font-size:14px;outline:none;
+  transition:border-color 0.16s;-webkit-appearance:none;
+}
+.finput:focus,.fselect:focus,.ftextarea:focus{border-color:var(--a);}
+.finput::placeholder,.ftextarea::placeholder{color:var(--t3);}
+.ftextarea{min-height:88px;resize:vertical;line-height:1.5;}
+.frow2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+
+/* STATUS PICKER */
+.status-pick{display:flex;gap:6px;}
+.spick{
+  flex:1;padding:10px 8px;border-radius:var(--r2);border:1px solid var(--b2);
+  background:var(--bg3);color:var(--t3);font-size:12px;font-weight:700;
+  text-align:center;transition:all 0.14s;letter-spacing:0.01em;
+}
+.spick:active{opacity:0.7;}
+.spick.on-plan{background:var(--plnbg);border-color:var(--pln);color:var(--pln);}
+.spick.on-watching{background:var(--watbg);border-color:var(--wat);color:var(--wat);}
+.spick.on-finished{background:var(--finbg);border-color:var(--fin);color:var(--fin);}
+
+.submit-btn{
+  width:100%;padding:14px;border-radius:var(--r);
+  background:var(--a);border:none;color:#fff;
+  font-size:15px;font-weight:700;letter-spacing:0.01em;
+  margin-top:6px;box-shadow:0 4px 20px var(--glow);
+  transition:opacity 0.14s;
+}
+.submit-btn:active{opacity:0.78;}
+
+/* ── AI SHEET ── */
+.ai-tabs{display:flex;gap:6px;margin-bottom:18px;}
+.aitab{
+  flex:1;padding:9px 6px;border-radius:var(--r2);border:1px solid var(--b2);
+  background:var(--bg3);color:var(--t3);font-size:12px;font-weight:700;
+  text-align:center;transition:all 0.14s;letter-spacing:0.01em;
+}
+.aitab.on{background:var(--ag);border-color:var(--a);color:var(--a);}
+.aipanel{display:none;}
+.aipanel.on{display:block;}
+.ai-prompt-row{display:flex;gap:8px;margin-bottom:10px;}
+.ai-prompt-in{
+  flex:1;padding:10px 13px;background:var(--bg3);border:1px solid var(--b2);
+  border-radius:var(--r2);color:var(--t1);font-size:14px;outline:none;
+}
+.ai-prompt-in:focus{border-color:var(--a);}
+.ai-prompt-in::placeholder{color:var(--t3);}
+.ai-run-btn{
+  padding:10px 16px;border-radius:var(--r2);background:var(--a);
+  border:none;color:#fff;font-size:13px;font-weight:700;
+  white-space:nowrap;box-shadow:0 4px 12px var(--glow);
+  transition:opacity 0.14s;
+}
+.ai-run-btn:active{opacity:0.72;}
+.ai-run-btn.loading{opacity:0.5;pointer-events:none;}
+.ai-resp{
+  display:none;background:var(--bg3);border:1px solid var(--b2);
+  border-radius:var(--r2);padding:14px;font-size:13px;color:var(--t2);
+  line-height:1.6;margin-top:4px;
+}
+.ai-resp.on{display:block;}
+.ai-resp strong{color:var(--t1);}
+.ai-desc{font-size:13px;color:var(--t2);line-height:1.5;margin-bottom:12px;}
+
+/* ── IMPORT SHEET ── */
+.import-paste{
+  width:100%;min-height:120px;padding:12px 13px;
+  background:var(--bg3);border:1px solid var(--b2);border-radius:var(--r2);
+  color:var(--t1);font-size:14px;outline:none;resize:vertical;line-height:1.5;
+  transition:border-color 0.16s;
+}
+.import-paste:focus{border-color:var(--a);}
+.import-paste::placeholder{color:var(--t3);}
+.parse-btn{
+  width:100%;padding:12px;border-radius:var(--r2);
+  background:var(--bg4);border:1px solid var(--b2);color:var(--t1);
+  font-size:14px;font-weight:700;margin:10px 0;transition:all 0.14s;
+}
+.parse-btn:active{opacity:0.7;}
+.preview-list{display:flex;flex-direction:column;gap:5px;margin:10px 0;}
+.preview-item{
+  display:flex;align-items:center;gap:10px;padding:10px 12px;
+  background:var(--bg3);border:1px solid var(--b2);border-radius:var(--r2);
+  cursor:pointer;transition:border-color 0.14s;
+}
+.preview-item.sel{border-color:var(--a);}
+.prev-check{
+  width:20px;height:20px;border-radius:6px;border:1.5px solid var(--b3);
+  background:transparent;display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;font-size:12px;font-weight:700;transition:all 0.14s;
+}
+.preview-item.sel .prev-check{background:var(--a);border-color:var(--a);color:#fff;}
+.prev-name{flex:1;font-size:13px;font-weight:600;color:var(--t1);}
+.prev-status{font-size:10px;font-weight:700;padding:2px 7px;border-radius:99px;}
+.ps-plan{background:var(--plnbg);color:var(--pln);}
+.ps-watching{background:var(--watbg);color:var(--wat);}
+.ps-finished{background:var(--finbg);color:var(--fin);}
+.import-actions{display:flex;gap:8px;margin-top:4px;}
+.imp-all{flex:0 0 auto;padding:12px 16px;border-radius:var(--r2);border:1px solid var(--b2);background:var(--bg4);color:var(--t2);font-size:13px;font-weight:700;}
+
+/* ── THEME SHEET ── */
+.theme-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
+.topt{
+  border-radius:var(--r2);border:2px solid transparent;overflow:hidden;
+  background:none;padding:0;transition:border-color 0.15s;
+  display:flex;flex-direction:column;
+}
+.topt.on{border-color:var(--a);}
+.tswatch{
+  height:52px;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:3px;font-size:20px;
+  position:relative;overflow:hidden;
+}
+.tswatch::after{content:'';position:absolute;inset:0;background:linear-gradient(to bottom,transparent 40%,rgba(0,0,0,0.5));}
+.tswatch span{position:relative;z-index:1;}
+.taccent-bar{width:20px;height:2.5px;border-radius:2px;position:relative;z-index:1;}
+.tname{font-size:10px;font-weight:700;text-align:center;padding:6px 2px;color:var(--t2);background:var(--bg3);text-transform:uppercase;letter-spacing:0.04em;}
+.topt.on .tname{color:var(--a);}
+
+/* ── CONFIRM ── */
+.confirm-box{
+  position:fixed;bottom:0;left:0;right:0;z-index:60;
+  background:var(--bg2);border-radius:20px 20px 0 0;border-top:1px solid var(--b2);
+  padding:20px 20px calc(var(--safe-b) + 24px);
+  transform:translateY(102%);transition:transform 0.28s cubic-bezier(0.34,1.06,0.64,1);
+}
+.confirm-box.on{transform:translateY(0);}
+.confirm-title{font-size:16px;font-weight:800;margin-bottom:5px;}
+.confirm-msg{font-size:13px;color:var(--t2);margin-bottom:18px;line-height:1.4;}
+.confirm-btns{display:flex;gap:8px;}
+.cbtn{flex:1;padding:13px;border-radius:var(--r2);font-size:14px;font-weight:700;border:none;}
+.cbtn.cancel{background:var(--bg4);color:var(--t2);}
+.cbtn.del{background:var(--a);color:#fff;}
+
+/* ── DOTS ANIMATION ── */
+.dots span{animation:blink 1.2s infinite;}
+.dots span:nth-child(2){animation-delay:.2s;}
+.dots span:nth-child(3){animation-delay:.4s;}
+@keyframes blink{0%,80%,100%{opacity:.2;}40%{opacity:1;}}
+
+/* ── TOAST ── */
+.toast{
+  position:fixed;bottom:calc(var(--safe-b) + 30px);left:50%;
+  transform:translateX(-50%) translateY(16px);
+  background:var(--bg4);border:1px solid var(--b2);border-radius:99px;
+  padding:9px 20px;font-size:13px;font-weight:600;z-index:100;
+  opacity:0;transition:all 0.26s;pointer-events:none;white-space:nowrap;
+}
+.toast.on{opacity:1;transform:translateX(-50%) translateY(0);}
+
+/* ── EMPTY ── */
+.empty{text-align:center;padding:60px 20px;color:var(--t3);}
+.empty-icon{font-size:44px;margin-bottom:12px;opacity:0.6;}
+.empty p{font-size:14px;line-height:1.6;}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="header-left">
+      <div class="header-title">Watch<em>list</em></div>
+      <div class="header-sub" id="headerSub">Loading…</div>
+    </div>
+    <div class="header-right">
+      <button class="hbtn" onclick="openSheet('importSheet')" title="Import list">📋</button>
+      <button class="hbtn" onclick="openSheet('aiSheet')" title="AI features">✦</button>
+      <button class="hbtn" onclick="openSheet('themeSheet')" title="Theme">🎨</button>
+      <button class="hbtn primary" onclick="openSheet('addSheet')" title="Add">+</button>
+    </div>
+  </div>
+
+  <!-- SEARCH -->
+  <div class="search-row">
+    <div class="search-wrap">
+      <span class="search-ico">🔍</span>
+      <input class="search-in" type="search" id="searchIn" placeholder="Search titles, genres…" oninput="render()">
+    </div>
+  </div>
+
+  <!-- FILTER TABS -->
+  <div class="filter-row">
+    <div class="filter-tabs" id="filterTabs"></div>
+  </div>
+
+  <!-- STATS -->
+  <div class="stats-row" id="statsRow"></div>
+
+  <!-- LIST -->
+  <div class="list" id="listEl"></div>
+
+</div>
+
+<!-- OVERLAY -->
+<div class="overlay" id="overlay" onclick="closeAll()"></div>
+
+<!-- ADD/EDIT SHEET -->
+<div class="sheet" id="addSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <div class="sheet-title" id="addSheetTitle">Add to List</div>
+    <button class="sheet-cancel" onclick="closeAll()">Cancel</button>
+  </div>
+  <button class="autofill-btn" id="autofillBtn" onclick="aiAutofill()">
+    <span>✦</span> AI Autofill — just type the title above
+  </button>
+  <div class="fgroup">
+    <label class="flabel">Title *</label>
+    <input class="finput" id="fTitle" placeholder="e.g. Attack on Titan" autocomplete="off" autocorrect="off">
+  </div>
+  <div class="fgroup">
+    <label class="flabel">Status</label>
+    <div class="status-pick">
+      <button class="spick" id="sp-plan"     onclick="setStatus('plan')"    >📋 Plan</button>
+      <button class="spick" id="sp-watching" onclick="setStatus('watching')">▶ Watching</button>
+      <button class="spick" id="sp-finished" onclick="setStatus('finished')">✓ Done</button>
+    </div>
+  </div>
+  <div class="frow2">
+    <div class="fgroup">
+      <label class="flabel">Episodes</label>
+      <input class="finput" id="fEps" placeholder="e.g. 24 eps">
+    </div>
+    <div class="fgroup">
+      <label class="flabel">Duration</label>
+      <input class="finput" id="fTime" placeholder="e.g. ~10 hrs">
+    </div>
+  </div>
+  <div class="fgroup">
+    <label class="flabel">Genre / Tags</label>
+    <input class="finput" id="fGenre" placeholder="e.g. Action, Romance, Isekai">
+  </div>
+  <div class="fgroup">
+    <label class="flabel">Watch Order (one step per line)</label>
+    <textarea class="ftextarea" id="fOrder" placeholder="TV: Season 1 — 12 eps&#10;OVA: Side story — after S1&#10;TV: Season 2 — 12 eps"></textarea>
+  </div>
+  <div class="fgroup">
+    <label class="flabel">Notes</label>
+    <textarea class="ftextarea" id="fNotes" placeholder="Tips, warnings, spoiler-free thoughts…" style="min-height:60px"></textarea>
+  </div>
+  <button class="submit-btn" id="submitBtn" onclick="submitForm()">Add to List</button>
+</div>
+
+<!-- AI SHEET -->
+<div class="sheet" id="aiSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <div class="sheet-title">✦ AI Features</div>
+    <button class="sheet-cancel" onclick="closeAll()">Done</button>
+  </div>
+  <div class="ai-tabs">
+    <button class="aitab on" id="at-rec"  onclick="setAITab('rec')">💡 Suggest</button>
+    <button class="aitab"    id="at-chat" onclick="setAITab('chat')">💬 Ask</button>
+    <button class="aitab"    id="at-rank" onclick="setAITab('rank')">🏆 Rank</button>
+  </div>
+  <!-- Recommend -->
+  <div class="aipanel on" id="ap-rec">
+    <p class="ai-desc">AI recommends what to watch next based on your entire list.</p>
+    <div class="ai-prompt-row">
+      <input class="ai-prompt-in" id="recPrompt" placeholder="Optional mood or genre…">
+      <button class="ai-run-btn" id="recBtn" onclick="runRecommend()">Go</button>
+    </div>
+    <div class="ai-resp" id="recResp"></div>
+  </div>
+  <!-- Chat -->
+  <div class="aipanel" id="ap-chat">
+    <p class="ai-desc">Ask anything about your list — pacing, what to watch when sad, hidden gems, etc.</p>
+    <div class="ai-prompt-row">
+      <input class="ai-prompt-in" id="chatPrompt" placeholder="e.g. What's shortest on my list?">
+      <button class="ai-run-btn" id="chatBtn" onclick="runChat()">Ask</button>
+    </div>
+    <div class="ai-resp" id="chatResp"></div>
+  </div>
+  <!-- Rank -->
+  <div class="aipanel" id="ap-rank">
+    <p class="ai-desc">AI sorts your Plan to Watch list into the best viewing order.</p>
+    <div class="ai-prompt-row">
+      <input class="ai-prompt-in" id="rankPrompt" placeholder="Priority? e.g. shortest first">
+      <button class="ai-run-btn" id="rankBtn" onclick="runRank()">Rank</button>
+    </div>
+    <div class="ai-resp" id="rankResp"></div>
+  </div>
+</div>
+
+<!-- IMPORT SHEET -->
+<div class="sheet" id="importSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <div class="sheet-title">📋 Import List</div>
+    <button class="sheet-cancel" onclick="closeAll()">Cancel</button>
+  </div>
+  <p class="ai-desc">Paste your list from Notes, messages, or anywhere. One title per line. Add <strong style="color:var(--t1)"> - watching</strong> or <strong style="color:var(--t1)"> - finished</strong> after a title to set status.</p>
+  <textarea class="import-paste" id="importPaste" placeholder="Attack on Titan&#10;Demon Slayer - watching&#10;Fullmetal Alchemist - finished&#10;One Piece&#10;..."></textarea>
+  <button class="parse-btn" onclick="parseImport()">Preview Import</button>
+  <div class="preview-list" id="previewList"></div>
+  <div class="import-actions" id="importActions" style="display:none">
+    <button class="imp-all" onclick="toggleAllImport()">Toggle All</button>
+    <button class="submit-btn" style="margin:0;flex:1" onclick="doImport()">Import Selected</button>
+  </div>
+</div>
+
+<!-- THEME SHEET -->
+<div class="sheet" id="themeSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <div class="sheet-title">🎨 Theme</div>
+    <button class="sheet-cancel" onclick="closeAll()">Done</button>
+  </div>
+  <div class="theme-grid" id="themeGrid"></div>
+</div>
+
+<!-- CONFIRM DELETE -->
+<div class="confirm-box" id="confirmBox">
+  <div class="confirm-title">Remove from list?</div>
+  <div class="confirm-msg" id="confirmMsg"></div>
+  <div class="confirm-btns">
+    <button class="cbtn cancel" onclick="closeConfirm()">Cancel</button>
+    <button class="cbtn del" onclick="doDelete()">Remove</button>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ─── DATA ──────────────────────────────────────────────────────────────────
+const DEFAULT_DATA=[];
+
+// ─── STATE ─────────────────────────────────────────────────────────────────
+let anime=[],tab='all',expandedId=null,editingId=null,curStatus='plan',deleteId=null,importItems=[],curAITab='rec',curTheme='default';
+
+// ─── STORAGE ───────────────────────────────────────────────────────────────
+function store(){try{localStorage.setItem('_t','1');localStorage.removeItem('_t');return localStorage;}catch{return null;}}
+function load(){try{const s=store(),d=s&&s.getItem('animelist_friends_v4');anime=d?JSON.parse(d):JSON.parse(JSON.stringify(DEFAULT_DATA));}catch{anime=JSON.parse(JSON.stringify(DEFAULT_DATA));}}
+function save(){try{const s=store();if(s)s.setItem('animelist_friends_v4',JSON.stringify(anime));}catch{}}
+function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2);}
+
+// ─── THEMES ────────────────────────────────────────────────────────────────
+const THEMES=[
+  {id:'default', name:'Default', emoji:'🌑', bg:'#111114', accent:'#e03d55'},
+  {id:'naruto',  name:'Naruto',  emoji:'🍥', bg:'#0e0f18', accent:'#f57800'},
+  {id:'sasuke',  name:'Sasuke',  emoji:'⚡', bg:'#0b0b18', accent:'#7730e8'},
+  {id:'luffy',   name:'Luffy',   emoji:'🏴‍☠️',bg:'#0b1420', accent:'#d03838'},
+  {id:'sanji',   name:'Sanji',   emoji:'🔥', bg:'#0c1016', accent:'#c89a0e'},
+  {id:'zoro',    name:'Zoro',    emoji:'⚔️', bg:'#0a140c', accent:'#26a040'},
+  {id:'chopper', name:'Chopper', emoji:'🦌', bg:'#150f1c', accent:'#d84872'},
+];
+function loadTheme(){try{const s=store();curTheme=(s&&s.getItem('animetheme'))||'default';}catch{curTheme='default';}applyTheme(curTheme,false);}
+function applyTheme(id,save=true){
+  curTheme=id;
+  document.documentElement.setAttribute('data-theme',id==='default'?'':id);
+  if(save){try{const s=store();if(s)s.setItem('animetheme',id);}catch{}}
+  renderThemeGrid();
+}
+function renderThemeGrid(){
+  const g=document.getElementById('themeGrid');if(!g)return;
+  g.innerHTML=THEMES.map(t=>`
+    <button class="topt${curTheme===t.id?' on':''}" onclick="applyTheme('${t.id}')">
+      <div class="tswatch" style="background:linear-gradient(135deg,${t.bg} 0%,${t.bg}dd 100%)">
+        <span>${t.emoji}</span>
+        <div class="taccent-bar" style="background:${t.accent}"></div>
+      </div>
+      <div class="tname">${t.name}</div>
+    </button>`).join('');
+}
+
+// ─── RENDER ────────────────────────────────────────────────────────────────
+function filtered(){
+  const q=document.getElementById('searchIn').value.toLowerCase().trim();
+  let list=tab==='all'?anime:anime.filter(a=>a.status===tab);
+  if(q)list=list.filter(a=>(a.title+' '+(a.genre||'')+' '+(a.notes||'')).toLowerCase().includes(q));
+  return list;
+}
+
+function render(){
+  renderTabs();renderStats();renderList();
+  const total=anime.length;
+  const fin=anime.filter(a=>a.status==='finished').length;
+  document.getElementById('headerSub').textContent=`${total} titles · ${fin} finished`;
+}
+
+function renderTabs(){
+  const counts={all:anime.length,finished:0,watching:0,plan:0};
+  anime.forEach(a=>counts[a.status]++);
+  const labels=[
+    {id:'all',    label:`All ${counts.all}`},
+    {id:'finished',label:`✓ Done ${counts.finished}`},
+    {id:'watching',label:`▶ Watching ${counts.watching}`},
+    {id:'plan',   label:`📋 Plan ${counts.plan}`},
+  ];
+  document.getElementById('filterTabs').innerHTML=labels.map(t=>
+    `<button class="ftab${tab===t.id?' on':''}" onclick="setTab('${t.id}')">${t.label}</button>`
+  ).join('');
+}
+
+function renderStats(){
+  const list=filtered();
+  const fin=list.filter(a=>a.status==='finished').length;
+  const wat=list.filter(a=>a.status==='watching').length;
+  const pln=list.filter(a=>a.status==='plan').length;
+  document.getElementById('statsRow').innerHTML=`
+    <div class="scard"><div class="scard-val" style="color:var(--fin)">${fin}</div><div class="scard-lbl">Finished</div></div>
+    <div class="scard"><div class="scard-val" style="color:var(--wat)">${wat}</div><div class="scard-lbl">Watching</div></div>
+    <div class="scard"><div class="scard-val" style="color:var(--pln)">${pln}</div><div class="scard-lbl">Planned</div></div>
+  `;
+}
+
+function setTab(t){tab=t;expandedId=null;render();}
+
+function renderList(){
+  const list=filtered();
+  const el=document.getElementById('listEl');
+  if(!list.length){
+    el.innerHTML=`<div class="empty"><div class="empty-icon">🎌</div><p>Nothing here yet.<br>Tap <strong>+</strong> to add something!</p></div>`;
+    return;
+  }
+  let html='';
+  if(tab==='all'){
+    const groups=[
+      {key:'watching',label:'▶ Currently Watching'},
+      {key:'finished',label:'✓ Finished'},
+      {key:'plan',label:'📋 Plan to Watch'},
+    ];
+    for(const g of groups){
+      const items=list.filter(a=>a.status===g.key);
+      if(!items.length)continue;
+      html+=`<div class="group-head">${g.label} <span style="color:var(--t3);font-weight:500">${items.length}</span></div>`;
+      html+=items.map(cardHTML).join('');
+    }
+  }else{
+    html=list.map(cardHTML).join('');
+  }
+  el.innerHTML=html;
+}
+
+function cardHTML(a){
+  const isOpen=expandedId===a.id;
+  const barCls=a.status==='finished'?'bar-fin':a.status==='watching'?'bar-wat':'bar-pln';
+  const tagCls=a.status==='finished'?'tag-fin':a.status==='watching'?'tag-wat':'tag-pln';
+  const tagLbl=a.status==='finished'?'Done':a.status==='watching'?'Watching':'Plan';
+  const genres=(a.genre||'').split(',').slice(0,2).map(g=>`<span class="tag tag-genre">${g.trim()}</span>`).join('');
+
+  let detail='';
+  if(isOpen){
+    const hasOrder=a.order&&a.order.length>0;
+    const hasNotes=a.notes&&a.notes.trim();
+    let orderHTML='';
+    if(hasOrder){
+      orderHTML=`<div class="detail-section">
+        <div class="detail-label">Watch Order</div>
+        <ol class="order-list">
+          ${a.order.map(step=>{
+            const s=step.toLowerCase();
+            let cls='ob-tv',lbl='TV';
+            if(s.startsWith('skip:'))      {cls='ob-skip';lbl='SKIP';}
+            else if(s.startsWith('key:'))  {cls='ob-key'; lbl='KEY';}
+            else if(s.startsWith('ova:'))  {cls='ob-ova'; lbl='OVA';}
+            else if(s.startsWith('movie:')){cls='ob-movie';lbl='FILM';}
+            else if(s.startsWith('special:')||s.startsWith('web:')||s.startsWith('live action:')){cls='ob-special';lbl='SPEC';}
+            const text=step.replace(/^[^:]+:\s*/,'');
+            return `<li class="order-item"><span class="order-badge ${cls}">${lbl}</span>${text}</li>`;
+          }).join('')}
+        </ol>
+      </div>`;
+    }
+    const notesHTML=hasNotes?`<div class="detail-section"><div class="detail-label">Notes</div><div class="detail-note">${a.notes}</div></div>`:'';
+    const aiHTML=`<div class="detail-section"><div id="ai-box-${a.id}"></div></div>`;
+
+    detail=`<div class="detail"><div class="detail-inner">
+      ${orderHTML}${notesHTML}${aiHTML}
+      <div class="detail-actions">
+        <button class="dact ai-act" onclick="aiCardInsight('${a.id}');event.stopPropagation()">✦ AI Insight</button>
+        <button class="dact" onclick="cycleStatus('${a.id}');event.stopPropagation()">🔄 Status</button>
+        <button class="dact" onclick="editItem('${a.id}');event.stopPropagation()">✏️ Edit</button>
+        <button class="dact danger" onclick="confirmDelete('${a.id}');event.stopPropagation()">🗑</button>
+      </div>
+    </div></div>`;
+  }
+
+  return `<div class="card${isOpen?' open':''}" id="card-${a.id}">
+    <div class="card-row" onclick="toggleCard('${a.id}')">
+      <div class="card-bar ${barCls}"></div>
+      <div class="card-body">
+        <div class="card-title">${a.title}</div>
+        <div class="card-tags">
+          <span class="tag ${tagCls}">${tagLbl}</span>
+          ${genres}
+        </div>
+      </div>
+      <div class="card-right">
+        <div class="card-eps">${a.eps||'—'}</div>
+        <div class="card-time">${a.time||''}</div>
+        <div class="card-chevron">▾</div>
+      </div>
+    </div>
+    ${detail}
+  </div>`;
+}
+
+function toggleCard(id){
+  expandedId=expandedId===id?null:id;
+  render();
+  if(expandedId){setTimeout(()=>{const el=document.getElementById(`card-${id}`);if(el)el.scrollIntoView({behavior:'smooth',block:'nearest'});},60);}
+}
+
+function cycleStatus(id){
+  const order=['plan','watching','finished'];
+  const a=anime.find(x=>x.id===id);if(!a)return;
+  a.status=order[(order.indexOf(a.status)+1)%3];
+  save();render();
+  toast(`→ ${a.status==='plan'?'Plan to Watch':a.status==='watching'?'Watching':'Finished'}`);
+}
+
+// ─── SHEETS ────────────────────────────────────────────────────────────────
+let openSheetId=null;
+function openSheet(id){
+  closeAll();
+  openSheetId=id;
+  document.getElementById('overlay').classList.add('on');
+  document.getElementById(id).classList.add('on');
+  if(id==='addSheet')document.getElementById('fTitle').focus();
+  if(id==='themeSheet')renderThemeGrid();
+}
+function closeAll(){
+  document.querySelectorAll('.sheet').forEach(s=>s.classList.remove('on'));
+  document.getElementById('overlay').classList.remove('on');
+  openSheetId=null;
+}
+
+// ─── ADD / EDIT ─────────────────────────────────────────────────────────────
+function setStatus(s){
+  curStatus=s;
+  ['plan','watching','finished'].forEach(x=>{
+    const b=document.getElementById(`sp-${x}`);
+    b.className=`spick${x===s?` on-${x}`:''}`;
+  });
+}
+function openSheet_add(){
+  editingId=null;
+  document.getElementById('addSheetTitle').textContent='Add to List';
+  document.getElementById('submitBtn').textContent='Add to List';
+  document.getElementById('fTitle').value='';
+  document.getElementById('fEps').value='';
+  document.getElementById('fTime').value='';
+  document.getElementById('fGenre').value='';
+  document.getElementById('fOrder').value='';
+  document.getElementById('fNotes').value='';
+  setStatus('plan');
+  openSheet('addSheet');
+}
+function editItem(id){
+  const a=anime.find(x=>x.id===id);if(!a)return;
+  editingId=id;
+  closeAll();
+  document.getElementById('addSheetTitle').textContent='Edit Entry';
+  document.getElementById('submitBtn').textContent='Save Changes';
+  document.getElementById('fTitle').value=a.title;
+  document.getElementById('fEps').value=a.eps||'';
+  document.getElementById('fTime').value=a.time||'';
+  document.getElementById('fGenre').value=a.genre||'';
+  document.getElementById('fOrder').value=a.order?a.order.join('\n'):'';
+  document.getElementById('fNotes').value=a.notes||'';
+  setStatus(a.status);
+  setTimeout(()=>openSheet('addSheet'),50);
+}
+function submitForm(){
+  const title=document.getElementById('fTitle').value.trim();
+  if(!title){toast('Enter a title first');return;}
+  const orderRaw=document.getElementById('fOrder').value.trim();
+  const data={title,status:curStatus,
+    eps:document.getElementById('fEps').value.trim()||'—',
+    time:document.getElementById('fTime').value.trim()||'—',
+    genre:document.getElementById('fGenre').value.trim(),
+    order:orderRaw?orderRaw.split('\n').map(l=>l.trim()).filter(Boolean):[],
+    notes:document.getElementById('fNotes').value.trim()};
+  if(editingId){
+    const i=anime.findIndex(a=>a.id===editingId);
+    if(i!==-1)anime[i]={...anime[i],...data};
+    toast('Saved!');
+  }else{
+    anime.unshift({id:uid(),...data});
+    toast('Added!');
+  }
+  save();closeAll();render();
+}
+
+// ─── DELETE ─────────────────────────────────────────────────────────────────
+function confirmDelete(id){
+  const a=anime.find(x=>x.id===id);if(!a)return;
+  deleteId=id;
+  document.getElementById('confirmMsg').textContent=`"${a.title}" will be removed from your list.`;
+  document.getElementById('confirmBox').classList.add('on');
+}
+function closeConfirm(){deleteId=null;document.getElementById('confirmBox').classList.remove('on');}
+function doDelete(){
+  if(!deleteId)return;
+  anime=anime.filter(a=>a.id!==deleteId);
+  if(expandedId===deleteId)expandedId=null;
+  save();closeConfirm();render();toast('Removed');
+}
+
+// ─── IMPORT ─────────────────────────────────────────────────────────────────
+function parseImport(){
+  const raw=document.getElementById('importPaste').value.trim();
+  if(!raw){toast('Paste something first');return;}
+  const lines=raw.split('\n').map(l=>l.trim()).filter(l=>l.length>2);
+  importItems=lines.map((line,i)=>{
+    let title=line.replace(/^[\d\-\*\•\.]+\s*/,'').trim();
+    let status='plan';
+    const m=title.match(/[-–—]\s*(watching|watch|current|ongoing|wip)/i);
+    const m2=title.match(/[-–—]\s*(finished|done|completed|watched|complete)/i);
+    if(m){status='watching';title=title.slice(0,m.index).trim();}
+    else if(m2){status='finished';title=title.slice(0,m2.index).trim();}
+    return{id:i,title,status,selected:true};
+  }).filter(x=>x.title.length>0);
+  renderPreview();
+  document.getElementById('importActions').style.display=importItems.length?'flex':'none';
+}
+function renderPreview(){
+  const existing=new Set(anime.map(a=>a.title.toLowerCase().trim()));
+  document.getElementById('previewList').innerHTML=importItems.map(item=>{
+    const dup=existing.has(item.title.toLowerCase().trim());
+    return`<div class="preview-item${item.selected&&!dup?' sel':''}" onclick="toggleImport(${item.id})">
+      <div class="prev-check">${item.selected&&!dup?'✓':''}</div>
+      <div class="prev-name">${item.title}${dup?' <span style="color:var(--t3);font-size:10px">(already added)</span>':''}</div>
+      <span class="prev-status ps-${item.status}">${item.status}</span>
+    </div>`;
+  }).join('');
+}
+function toggleImport(id){const item=importItems.find(x=>x.id===id);if(item)item.selected=!item.selected;renderPreview();}
+function toggleAllImport(){const allOn=importItems.every(x=>x.selected);importItems.forEach(x=>x.selected=!allOn);renderPreview();}
+function doImport(){
+  const existing=new Set(anime.map(a=>a.title.toLowerCase().trim()));
+  const toAdd=importItems.filter(x=>x.selected&&!existing.has(x.title.toLowerCase().trim()));
+  toAdd.forEach(item=>anime.unshift({id:uid(),title:item.title,status:item.status,eps:'—',time:'—',genre:'',order:[],notes:''}));
+  save();closeAll();render();
+  toast(`Added ${toAdd.length} title${toAdd.length!==1?'s':''}!`);
+}
+
+// ─── AI ─────────────────────────────────────────────────────────────────────
+function setAITab(t){
+  curAITab=t;
+  ['rec','chat','rank'].forEach(x=>{
+    document.getElementById(`at-${x}`).classList.toggle('on',x===t);
+    document.getElementById(`ap-${x}`).classList.toggle('on',x===t);
+  });
+}
+function listSummary(){
+  const fin=anime.filter(a=>a.status==='finished').map(a=>a.title).join(', ')||'none';
+  const wat=anime.filter(a=>a.status==='watching').map(a=>a.title).join(', ')||'none';
+  const pln=anime.filter(a=>a.status==='plan').map(a=>a.title).join(', ')||'none';
+  return`My list:\nFinished: ${fin}\nWatching: ${wat}\nPlan to watch: ${pln}`;
+}
+async function callAI(prompt){
+  const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1000,messages:[{role:'user',content:prompt}]})});
+  const data=await res.json();
+  return data.content?.[0]?.text||'No response.';
+}
+function setLoading(btnId,respId,on){
+  const btn=document.getElementById(btnId),resp=document.getElementById(respId);
+  btn.classList.toggle('loading',on);
+  if(on){resp.className='ai-resp on';resp.innerHTML=`Thinking<span class="dots"><span>.</span><span>.</span><span>.</span></span>`;}
+}
+async function runRecommend(){
+  const pref=document.getElementById('recPrompt').value.trim();
+  setLoading('recBtn','recResp',true);
+  try{
+    const text=await callAI(`${listSummary()}\n\nBased on this list, recommend 4-5 titles I should watch next${pref?` (preference: ${pref})`:''}. For each, give the title and a 1-2 sentence reason tied to what I've already watched. Format as:\n**[Title]** — [reason]`);
+    const r=document.getElementById('recResp');r.className='ai-resp on';
+    r.innerHTML=`<div class="ai-badge">✦ Recommendations</div>${text.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>')}`;
+  }catch{document.getElementById('recResp').innerHTML='Connection error. Try again.';}
+  document.getElementById('recBtn').classList.remove('loading');
+}
+async function runChat(){
+  const q=document.getElementById('chatPrompt').value.trim();
+  if(!q){toast('Type a question first');return;}
+  setLoading('chatBtn','chatResp',true);
+  try{
+    const text=await callAI(`${listSummary()}\n\nQuestion: ${q}\n\nAnswer helpfully and concisely, referencing my list when relevant.`);
+    const r=document.getElementById('chatResp');r.className='ai-resp on';
+    r.innerHTML=`<div class="ai-badge">✦ Answer</div>${text.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>')}`;
+  }catch{document.getElementById('chatResp').innerHTML='Connection error. Try again.';}
+  document.getElementById('chatBtn').classList.remove('loading');
+}
+async function runRank(){
+  const pref=document.getElementById('rankPrompt').value.trim();
+  setLoading('rankBtn','rankResp',true);
+  try{
+    const pln=anime.filter(a=>a.status==='plan').map(a=>a.title);
+    if(!pln.length){document.getElementById('rankResp').innerHTML='Nothing in Plan to Watch yet!';document.getElementById('rankBtn').classList.remove('loading');return;}
+    const text=await callAI(`${listSummary()}\n\nRank my Plan to Watch list in the best viewing order${pref?` (priority: ${pref})`:''}. Consider variety, length, and mood progression. Numbered list with one-sentence reason per entry.`);
+    const r=document.getElementById('rankResp');r.className='ai-resp on';
+    r.innerHTML=`<div class="ai-badge">✦ Ranked Order</div>${text.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>')}`;
+  }catch{document.getElementById('rankResp').innerHTML='Connection error. Try again.';}
+  document.getElementById('rankBtn').classList.remove('loading');
+}
+async function aiAutofill(){
+  const title=document.getElementById('fTitle').value.trim();
+  if(!title){toast('Enter a title first');return;}
+  const btn=document.getElementById('autofillBtn');
+  btn.classList.add('loading');btn.innerHTML='<span>✦</span> Looking up…';
+  try{
+    const text=await callAI(`For "${title}", return ONLY valid JSON (no markdown) in this exact format:\n{"eps":"e.g. 24 eps","time":"e.g. ~10 hrs","genre":"e.g. Action, Romance","order":["TV: Season 1 — X eps","OVA: ..."],"notes":"one helpful tip"}\nKeep order:[] if standalone with no OVAs/movies. Notes max one sentence.`);
+    const data=JSON.parse(text.replace(/```json|```/g,'').trim());
+    if(data.eps)document.getElementById('fEps').value=data.eps;
+    if(data.time)document.getElementById('fTime').value=data.time;
+    if(data.genre)document.getElementById('fGenre').value=data.genre;
+    if(data.order&&data.order.length)document.getElementById('fOrder').value=data.order.join('\n');
+    if(data.notes)document.getElementById('fNotes').value=data.notes;
+    toast('✦ Autofilled!');
+  }catch{toast('Could not autofill — fill in manually.');}
+  btn.classList.remove('loading');btn.innerHTML='<span>✦</span> AI Autofill — just type the title above';
+}
+async function aiCardInsight(id){
+  const a=anime.find(x=>x.id===id);if(!a)return;
+  const box=document.getElementById(`ai-box-${id}`);
+  box.innerHTML=`<div class="ai-insight-box"><div class="ai-badge">✦ AI Insight</div><div class="dots"><span>.</span><span>.</span><span>.</span></div></div>`;
+  try{
+    const text=await callAI(`${listSummary()}\n\nThe user is looking at "${a.title}" (${a.genre||'anime'}, ${a.eps||'unknown length'}).\n\nGive one short personalized insight (2-3 sentences). Why they'd love it based on their list, what mood it's best for, or a key thing to know. Be specific and reference their actual list.`);
+    box.innerHTML=`<div class="ai-insight-box"><div class="ai-badge">✦ AI Insight</div>${text}</div>`;
+  }catch{box.innerHTML='';}
+}
+
+// ─── TOAST ──────────────────────────────────────────────────────────────────
+let toastT;
+function toast(msg){const el=document.getElementById('toast');el.textContent=msg;el.classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>el.classList.remove('on'),2400);}
+
+// ─── SERVICE WORKER ──────────────────────────────────────────────────────────
+try{if('serviceWorker'in navigator&&!location.href.includes('claude.ai'))navigator.serviceWorker.register('./sw.js').catch(()=>{});}catch(e){}
+
+// ─── KEYBOARD ───────────────────────────────────────────────────────────────
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeAll();closeConfirm();}});
+
+// ─── ADD BUTTON WIRING ───────────────────────────────────────────────────────
+document.querySelector('.hbtn.primary').onclick=openSheet_add;
+
+// ─── INIT ───────────────────────────────────────────────────────────────────
+load();loadTheme();render();
+</script>
+</body>
+</html>

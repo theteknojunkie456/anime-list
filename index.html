@@ -322,11 +322,16 @@ input,textarea,select{font-family:inherit;}
   flex-shrink:0;font-size:12px;font-weight:700;transition:all 0.14s;
 }
 .preview-item.sel .prev-check{background:var(--a);border-color:var(--a);color:#fff;}
-.prev-name{flex:1;font-size:13px;font-weight:600;color:var(--t1);}
-.prev-status{font-size:10px;font-weight:700;padding:2px 7px;border-radius:99px;}
-.ps-plan{background:var(--plnbg);color:var(--pln);}
-.ps-watching{background:var(--watbg);color:var(--wat);}
-.ps-finished{background:var(--finbg);color:var(--fin);}
+.prev-main{flex:1;min-width:0;}
+.prev-name{font-size:13px;font-weight:600;color:var(--t1);}
+.prev-seg{display:flex;gap:5px;margin-top:7px;}
+.pseg{flex:1;padding:6px 0;font-size:10.5px;font-weight:700;border-radius:7px;border:1px solid var(--b2);background:var(--bg4);color:var(--t3);cursor:pointer;transition:all 0.12s;}
+.pseg.on-plan{background:var(--plnbg);border-color:var(--pln);color:var(--pln);}
+.pseg.on-watching{background:var(--watbg);border-color:var(--wat);color:var(--wat);}
+.pseg.on-finished{background:var(--finbg);border-color:var(--fin);color:var(--fin);}
+.bulk-row{display:flex;gap:5px;align-items:center;margin:10px 0 2px;font-size:11px;color:var(--t3);font-weight:700;}
+.bulk-row span{flex-shrink:0;}
+.bulk-row .pseg{padding:8px 0;font-size:11px;}
 .import-actions{display:flex;gap:8px;margin-top:4px;}
 .imp-all{flex:0 0 auto;padding:12px 16px;border-radius:var(--r2);border:1px solid var(--b2);background:var(--bg4);color:var(--t2);font-size:13px;font-weight:700;}
 
@@ -538,7 +543,7 @@ input,textarea,select{font-family:inherit;}
     <div class="sheet-title">📋 Import List</div>
     <button class="sheet-cancel" onclick="closeAll()">Cancel</button>
   </div>
-  <p class="ai-desc">Paste your list from Notes, messages, or anywhere. One title per line. Add <strong style="color:var(--t1)"> - watching</strong> or <strong style="color:var(--t1)"> - finished</strong> after a title to set status.</p>
+  <p class="ai-desc">Paste your list from Notes, messages, or anywhere — one title per line, as messy as you like. After previewing, tap a status on each title (or use Set&nbsp;all).</p>
   <textarea class="import-paste" id="importPaste" placeholder="Attack on Titan&#10;Demon Slayer - watching&#10;Fullmetal Alchemist - finished&#10;One Piece&#10;..."></textarea>
   <button class="parse-btn" onclick="parseImport()">Preview Import</button>
   <div class="preview-list" id="previewList"></div>
@@ -961,15 +966,24 @@ function parseImport(){
 }
 function renderPreview(){
   const existing=new Set(anime.map(a=>a.title.toLowerCase().trim()));
-  document.getElementById('previewList').innerHTML=importItems.map(item=>{
+  const seg=(item,s,lbl)=>`<button class="pseg${item.status===s?' on-'+s:''}" onclick="event.stopPropagation();setImportStatus(${item.id},'${s}')">${lbl}</button>`;
+  const bulk=importItems.length>1?`<div class="bulk-row"><span>Set all:</span>
+    <button class="pseg" onclick="setAllImportStatus('plan')">📋 Plan</button>
+    <button class="pseg" onclick="setAllImportStatus('watching')">▶ Watching</button>
+    <button class="pseg" onclick="setAllImportStatus('finished')">✓ Done</button></div>`:'';
+  document.getElementById('previewList').innerHTML=bulk+importItems.map(item=>{
     const dup=existing.has(item.title.toLowerCase().trim());
     return`<div class="preview-item${item.selected&&!dup?' sel':''}" onclick="toggleImport(${item.id})">
       <div class="prev-check">${item.selected&&!dup?'✓':''}</div>
-      <div class="prev-name">${item.title}${dup?' <span style="color:var(--t3);font-size:10px">(already added)</span>':''}</div>
-      <span class="prev-status ps-${item.status}">${item.status}</span>
+      <div class="prev-main">
+        <div class="prev-name">${item.title}${dup?' <span style="color:var(--t3);font-size:10px">(already added)</span>':''}</div>
+        ${dup?'':`<div class="prev-seg">${seg(item,'plan','📋 Plan')}${seg(item,'watching','▶ Watching')}${seg(item,'finished','✓ Done')}</div>`}
+      </div>
     </div>`;
   }).join('');
 }
+function setImportStatus(id,s){const it=importItems.find(x=>x.id===id);if(it){it.status=s;it.selected=true;renderPreview();}}
+function setAllImportStatus(s){importItems.forEach(x=>x.status=s);renderPreview();toast(`All set to ${s==='plan'?'Plan':s==='watching'?'Watching':'Finished'}`);}
 function toggleImport(id){const item=importItems.find(x=>x.id===id);if(item)item.selected=!item.selected;renderPreview();}
 function toggleAllImport(){const allOn=importItems.every(x=>x.selected);importItems.forEach(x=>x.selected=!allOn);renderPreview();}
 function doImport(){

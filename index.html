@@ -416,7 +416,7 @@ input,textarea,select{font-family:inherit;}
     <button class="sheet-cancel" onclick="closeAll()">Cancel</button>
   </div>
   <button class="autofill-btn" id="autofillBtn" onclick="aiAutofill()">
-    <span>✦</span> AI Autofill — just type the title above
+    <span>✦</span> Autofill — finds episodes, genre &amp; watch order
   </button>
   <div class="fgroup">
     <label class="flabel">Title *</label>
@@ -494,6 +494,11 @@ input,textarea,select{font-family:inherit;}
     </div>
     <div class="ai-resp" id="rankResp"></div>
   </div>
+  <div style="display:flex;gap:8px;margin-top:20px;padding-top:16px;border-top:1px solid var(--b1);">
+    <input class="ai-prompt-in" id="apiKeyIn" type="password" placeholder="Anthropic API key (sk-ant-…)" autocomplete="off">
+    <button class="ai-run-btn" onclick="saveKey()">Save</button>
+  </div>
+  <p class="ai-desc" style="margin-top:8px">Suggest, Ask &amp; Rank need an AI key — it stays on this device only. Get one at console.anthropic.com. Autofill works for everyone, no key needed.</p>
 </div>
 
 <!-- IMPORT SHEET -->
@@ -865,8 +870,23 @@ function listSummary(){
   const pln=anime.filter(a=>a.status==='plan').map(a=>a.title).join(', ')||'none';
   return`My list:\nFinished: ${fin}\nWatching: ${wat}\nPlan to watch: ${pln}`;
 }
+const NO_KEY='NO_KEY';
+function getKey(){try{return localStorage.getItem('anthropic_key')||'';}catch{return'';}}
+function saveKey(){
+  const v=document.getElementById('apiKeyIn').value.trim();
+  try{if(v)localStorage.setItem('anthropic_key',v);else localStorage.removeItem('anthropic_key');}catch{}
+  toast(v?'🔑 Key saved on this device':'Key removed');
+}
+function aiErrorHTML(e){
+  return e===NO_KEY
+    ?'This needs an AI key — scroll down and add yours (it stays on this device only).'
+    :'Connection error — check your key and try again.';
+}
 async function callAI(prompt){
-  const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1000,messages:[{role:'user',content:prompt}]})});
+  const key=getKey();
+  if(!key)throw NO_KEY;
+  const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-5',max_tokens:1000,messages:[{role:'user',content:prompt}]})});
+  if(!res.ok)throw new Error('API '+res.status);
   const data=await res.json();
   return data.content?.[0]?.text||'No response.';
 }
@@ -882,7 +902,7 @@ async function runRecommend(){
     const text=await callAI(`${listSummary()}\n\nBased on this list, recommend 4-5 titles I should watch next${pref?` (preference: ${pref})`:''}. For each, give the title and a 1-2 sentence reason tied to what I've already watched. Format as:\n**[Title]** — [reason]`);
     const r=document.getElementById('recResp');r.className='ai-resp on';
     r.innerHTML=`<div class="ai-badge">✦ Recommendations</div>${text.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>')}`;
-  }catch{document.getElementById('recResp').innerHTML='Connection error. Try again.';}
+  }catch(e){const r=document.getElementById('recResp');r.className='ai-resp on';r.innerHTML=aiErrorHTML(e);}
   document.getElementById('recBtn').classList.remove('loading');
 }
 async function runChat(){
@@ -893,7 +913,7 @@ async function runChat(){
     const text=await callAI(`${listSummary()}\n\nQuestion: ${q}\n\nAnswer helpfully and concisely, referencing my list when relevant.`);
     const r=document.getElementById('chatResp');r.className='ai-resp on';
     r.innerHTML=`<div class="ai-badge">✦ Answer</div>${text.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>')}`;
-  }catch{document.getElementById('chatResp').innerHTML='Connection error. Try again.';}
+  }catch(e){const r=document.getElementById('chatResp');r.className='ai-resp on';r.innerHTML=aiErrorHTML(e);}
   document.getElementById('chatBtn').classList.remove('loading');
 }
 async function runRank(){
@@ -905,25 +925,109 @@ async function runRank(){
     const text=await callAI(`${listSummary()}\n\nRank my Plan to Watch list in the best viewing order${pref?` (priority: ${pref})`:''}. Consider variety, length, and mood progression. Numbered list with one-sentence reason per entry.`);
     const r=document.getElementById('rankResp');r.className='ai-resp on';
     r.innerHTML=`<div class="ai-badge">✦ Ranked Order</div>${text.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>')}`;
-  }catch{document.getElementById('rankResp').innerHTML='Connection error. Try again.';}
+  }catch(e){const r=document.getElementById('rankResp');r.className='ai-resp on';r.innerHTML=aiErrorHTML(e);}
   document.getElementById('rankBtn').classList.remove('loading');
+}
+// ── AUTOFILL — free public databases, works for everyone, no key ─────────────
+const pause=ms=>new Promise(r=>setTimeout(r,ms));
+async function jikan(path){const r=await fetch('https://api.jikan.moe/v4'+path);if(!r.ok)throw new Error('jikan '+r.status);return(await r.json()).data;}
+function durMins(d){if(!d)return 0;const h=/(\d+)\s*hr/.exec(d),m=/(\d+)\s*min/.exec(d);return(h?+h[1]*60:0)+(m?+m[1]:0);}
+function typeTag(t){return{TV:'TV',Movie:'MOVIE',OVA:'OVA',ONA:'ONA',Special:'SPECIAL','TV Special':'SPECIAL'}[t]||'TV';}
+function relEntry(full,kind){const r=(full.relations||[]).find(x=>x.relation===kind);return r&&r.entry.find(e=>e.type==='anime')||null;}
+async function lookupAnime(title){
+  const results=await jikan(`/anime?q=${encodeURIComponent(title)}&limit=5&sfw`);
+  if(!results||!results.length)return null;
+  const low=title.toLowerCase();
+  const best=results.find(a=>(a.title_english||'').toLowerCase()===low||a.title.toLowerCase()===low)||results[0];
+  const seen=new Set([best.mal_id]);
+  let cur;try{cur=await jikan(`/anime/${best.mal_id}/full`);}catch{cur=best;}
+  const before=[];let node=cur;
+  for(let i=0;i<3;i++){
+    const p=relEntry(node,'Prequel');if(!p||seen.has(p.mal_id))break;
+    seen.add(p.mal_id);await pause(450);
+    try{node=await jikan(`/anime/${p.mal_id}/full`);}catch{break;}
+    before.unshift(node);
+  }
+  const after=[];node=cur;
+  for(let i=0;i<5;i++){
+    const s=relEntry(node,'Sequel');if(!s||seen.has(s.mal_id))break;
+    seen.add(s.mal_id);await pause(450);
+    try{node=await jikan(`/anime/${s.mal_id}/full`);}catch{break;}
+    after.push(node);
+  }
+  const chain=[...before,cur,...after];
+  const order=chain.length>1?chain.map(n=>`${typeTag(n.type)}: ${n.title_english||n.title} — ${n.type==='Movie'?'movie':(n.episodes?n.episodes+' eps':'TBA')}`):[];
+  (cur.relations||[]).forEach(r=>{
+    if(r.relation==='Side Story'||r.relation==='Spin-Off'){
+      r.entry.filter(e=>e.type==='anime'&&!/picture drama/i.test(e.name)).slice(0,2).forEach(e=>order.push(`OVA: ${e.name} — side story, optional`));
+    }else if(r.relation==='Summary'){
+      r.entry.filter(e=>e.type==='anime').slice(0,1).forEach(e=>order.push(`SKIP: ${e.name} — recap, skippable`));
+    }
+  });
+  const totMin=chain.reduce((s,n)=>{const per=durMins(n.duration);return s+(n.type==='Movie'?per:per*(n.episodes||0));},0);
+  const movies=chain.filter(n=>n.type==='Movie').length;
+  const tvEps=chain.reduce((s,n)=>s+(n.type==='Movie'?0:(n.episodes||0)),0);
+  let eps;
+  if(chain.length===1)eps=cur.type==='Movie'?'1 movie':(cur.episodes?cur.episodes+' eps':'TBA');
+  else eps=`${tvEps} eps${movies?` + ${movies} movie${movies>1?'s':''}`:''}`;
+  const bits=[];
+  if(cur.score)bits.push(`★ ${cur.score} on MAL`);
+  if(cur.status)bits.push(cur.status);
+  if(chain.length>1)bits.push(`${chain.length}-part franchise`);
+  return{
+    eps,
+    time:totMin?`~${Math.max(1,Math.round(totMin/60))} hrs`:'—',
+    genre:[...(cur.genres||[]),...(cur.themes||[]),...(cur.demographics||[])].map(g=>g.name).slice(0,3).join(', '),
+    order,
+    notes:bits.join(' · ')
+  };
+}
+async function lookupShow(title){
+  const r=await fetch(`https://api.tvmaze.com/singlesearch/shows?q=${encodeURIComponent(title)}&embed=episodes`);
+  if(!r.ok)return null;
+  const d=await r.json();
+  const eps=(d._embedded&&d._embedded.episodes)||[];
+  const seasons={};eps.forEach(e=>{seasons[e.season]=(seasons[e.season]||0)+1;});
+  const sNums=Object.keys(seasons);
+  return{
+    eps:eps.length?`${eps.length} eps`:'TBA',
+    time:d.averageRuntime&&eps.length?`~${Math.round(d.averageRuntime*eps.length/60)} hrs`:'—',
+    genre:(d.genres||[]).slice(0,3).join(', '),
+    order:sNums.length>1?sNums.map(s=>`TV: Season ${s} — ${seasons[s]} eps`):[],
+    notes:[d.status,(d.premiered||'').slice(0,4)].filter(Boolean).join(' · ')
+  };
+}
+async function lookupBook(title){
+  const r=await fetch(`https://openlibrary.org/search.json?title=${encodeURIComponent(title)}&limit=1&fields=title,author_name,first_publish_year,subject,number_of_pages_median`);
+  if(!r.ok)return null;
+  const doc=(await r.json()).docs[0];if(!doc)return null;
+  const pg=doc.number_of_pages_median;
+  return{
+    eps:pg?`${pg} pages`:'book',
+    time:pg?`~${Math.max(1,Math.round(pg/40))} hrs read`:'—',
+    genre:(doc.subject||[]).slice(0,3).join(', '),
+    order:[],
+    notes:['by '+(doc.author_name?doc.author_name[0]:'unknown'),doc.first_publish_year].filter(Boolean).join(' · ')
+  };
 }
 async function aiAutofill(){
   const title=document.getElementById('fTitle').value.trim();
   if(!title){toast('Enter a title first');return;}
   const btn=document.getElementById('autofillBtn');
-  btn.classList.add('loading');btn.innerHTML='<span>✦</span> Looking up…';
-  try{
-    const text=await callAI(`For "${title}", return ONLY valid JSON (no markdown) in this exact format:\n{"eps":"e.g. 24 eps","time":"e.g. ~10 hrs","genre":"e.g. Action, Romance","order":["TV: Season 1 — X eps","OVA: ..."],"notes":"one helpful tip"}\nKeep order:[] if standalone with no OVAs/movies. Notes max one sentence.`);
-    const data=JSON.parse(text.replace(/```json|```/g,'').trim());
+  btn.classList.add('loading');btn.innerHTML='<span>✦</span> Searching databases…';
+  let data=null,src='';
+  try{data=await lookupAnime(title);src='MyAnimeList';}catch{}
+  if(!data){try{data=await lookupShow(title);src='TVMaze';}catch{}}
+  if(!data){try{data=await lookupBook(title);src='Open Library';}catch{}}
+  if(data){
     if(data.eps)document.getElementById('fEps').value=data.eps;
     if(data.time)document.getElementById('fTime').value=data.time;
     if(data.genre)document.getElementById('fGenre').value=data.genre;
     if(data.order&&data.order.length)document.getElementById('fOrder').value=data.order.join('\n');
     if(data.notes)document.getElementById('fNotes').value=data.notes;
-    toast('✦ Autofilled!');
-  }catch{toast('Could not autofill — fill in manually.');}
-  btn.classList.remove('loading');btn.innerHTML='<span>✦</span> AI Autofill — just type the title above';
+    toast(`✦ Found on ${src}`);
+  }else toast('No match found — fill in manually.');
+  btn.classList.remove('loading');btn.innerHTML='<span>✦</span> Autofill — finds episodes, genre &amp; watch order';
 }
 async function aiCardInsight(id){
   const a=anime.find(x=>x.id===id);if(!a)return;
@@ -932,7 +1036,7 @@ async function aiCardInsight(id){
   try{
     const text=await callAI(`${listSummary()}\n\nThe user is looking at "${a.title}" (${a.genre||'anime'}, ${a.eps||'unknown length'}).\n\nGive one short personalized insight (2-3 sentences). Why they'd love it based on their list, what mood it's best for, or a key thing to know. Be specific and reference their actual list.`);
     box.innerHTML=`<div class="ai-insight-box"><div class="ai-badge">✦ AI Insight</div>${text}</div>`;
-  }catch{box.innerHTML='';}
+  }catch(e){box.innerHTML=`<div class="ai-insight-box"><div class="ai-badge">✦ AI Insight</div>${aiErrorHTML(e)}</div>`;}
 }
 
 // ─── TOAST ──────────────────────────────────────────────────────────────────
@@ -950,6 +1054,7 @@ document.querySelector('.hbtn.primary').onclick=openSheet_add;
 
 // ─── INIT ───────────────────────────────────────────────────────────────────
 load();loadTheme();render();
+try{document.getElementById('apiKeyIn').value=getKey();}catch{}
 </script>
 </body>
 </html>

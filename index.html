@@ -1270,33 +1270,47 @@ async function lookupBook(title){
   };
 }
 
-// ── COVER + DETAILS FETCHER — background fill for entries missing info ──
+// ── COVER + DETAILS FETCHER — batched via AniList (≈25 titles per request) ──
 let coverRunning=false;
-const coverSkip=new Set();
+function coverNeedy(){return anime.filter(a=>(!a.img&&!a.imgTried)||(!a.eps&&!a.detTried));}
 async function fetchCovers(){
   if(coverRunning)return;coverRunning=true;
+  let netFails=0;
   try{
-    for(;;){
-      const a=anime.find(x=>(!x.img&&!x.imgTried&&!coverSkip.has(x.id))||(!x.eps&&!x.detTried&&!coverSkip.has(x.id)));
-      if(!a)break;
+    while(true){
+      const needy=coverNeedy();
+      if(!needy.length)break;
+      // most-visible first so the hero + Watching row fill almost instantly
+      const rank={watching:0,plan:1,finished:2,dropped:3};
+      needy.sort((a,b)=>(rank[a.status]??9)-(rank[b.status]??9));
+      const batch=needy.slice(0,25);
+      const q='{'+batch.map((a,i)=>`a${i}:Page(perPage:1){media(search:${JSON.stringify(String(a.title))},type:ANIME){coverImage{large} episodes duration genres}}`).join(' ')+'}';
+      let data=null,failed=false;
       try{
-        const res=await jikan(`/anime?q=${encodeURIComponent(a.title)}&limit=1&sfw`);
-        const hit=res&&res[0];
-        if(hit){
-          if(!a.img&&!a.imgTried)a.img=hit.images?.jpg?.large_image_url||hit.images?.jpg?.image_url||'';
+        const r=await fetch('https://graphql.anilist.co',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({query:q})});
+        if(r.status===429){await pause(5000);continue;} // rate limited — wait and retry same batch
+        if(!r.ok)failed=true;else data=(await r.json()).data;
+      }catch{failed=true;}
+      if(failed||!data){ // network hiccup: back off, retry a few times, then leave the rest for next launch (don't mark tried)
+        if(++netFails>=3)break;
+        await pause(3000);continue;
+      }
+      netFails=0;
+      batch.forEach((a,i)=>{
+        const node=data['a'+i],m=node&&node.media&&node.media[0];
+        if(m){
+          if(!a.img&&!a.imgTried)a.img=(m.coverImage&&m.coverImage.large)||'';
           if(!a.eps){
-            if(hit.episodes){a.eps=`${hit.episodes} eps`;a.epTotal=hit.episodes;}
-            const per=durMins(hit.duration);
-            if(!a.time&&per&&hit.episodes)a.time=`~${Math.max(1,Math.round(per*hit.episodes/60))} hrs`;
-            if(!a.genre)a.genre=[...(hit.genres||[]),...(hit.themes||[])].map(g=>g.name).slice(0,3).join(', ');
+            if(m.episodes){a.eps=`${m.episodes} eps`;a.epTotal=m.episodes;}
+            if(!a.time&&m.duration&&m.episodes)a.time=`~${Math.max(1,Math.round(m.duration*m.episodes/60))} hrs`;
+            if(!a.genre&&m.genres&&m.genres.length)a.genre=m.genres.slice(0,3).join(', ');
           }
         }
         if(!a.img)a.imgTried=true;
         a.detTried=true;
-        save();
-        renderHome();
-      }catch{coverSkip.add(a.id);}
-      await pause(1400);
+      });
+      save();renderHome();
+      await pause(1000); // stay comfortably under AniList's per-minute limit
     }
   }finally{coverRunning=false;}
 }

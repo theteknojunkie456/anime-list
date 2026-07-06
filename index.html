@@ -1325,8 +1325,26 @@ async function aiAutofill(){
 let toastT;
 function toast(msg){const el=document.getElementById('toast');el.textContent=msg;el.classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>el.classList.remove('on'),2400);}
 
-// ─── SERVICE WORKER ──────────────────────────────────────────────────────────
-try{if('serviceWorker'in navigator&&!location.href.includes('claude.ai'))navigator.serviceWorker.register('./sw.js').catch(()=>{});}catch(e){}
+// ─── SERVICE WORKER + SEAMLESS AUTO-UPDATE ───────────────────────────────────
+try{
+  if('serviceWorker'in navigator&&!location.href.includes('claude.ai')){
+    const hadController=!!navigator.serviceWorker.controller;
+    let reloading=false;
+    navigator.serviceWorker.addEventListener('controllerchange',()=>{
+      // a new version took over — reload once so the fresh app shows immediately.
+      // guard against the very first install (no prior controller) and reload loops.
+      if(reloading||!hadController)return;
+      reloading=true;
+      try{sessionStorage.setItem('justUpdated','1');}catch{}
+      location.reload();
+    });
+    navigator.serviceWorker.register('./sw.js').then(reg=>{
+      reg.update();
+      // re-check for a new version whenever the app is brought back to the foreground
+      document.addEventListener('visibilitychange',()=>{if(!document.hidden)reg.update().catch(()=>{});});
+    }).catch(()=>{});
+  }
+}catch(e){}
 
 // ─── KEYBOARD ───────────────────────────────────────────────────────────────
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeAll();closeConfirm();}});
@@ -1334,6 +1352,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeAll();closeCon
 // ─── INIT ───────────────────────────────────────────────────────────────────
 load();loadTheme();render();
 try{document.getElementById('apiKeyIn').value=getKey();}catch{}
+try{if(sessionStorage.getItem('justUpdated')){sessionStorage.removeItem('justUpdated');setTimeout(()=>toast('✨ Updated to the latest version'),700);}}catch{}
 setTimeout(fetchCovers,1200);
 </script>
 </body>

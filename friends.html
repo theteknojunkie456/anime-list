@@ -313,6 +313,7 @@ img{-webkit-user-drag:none;}
 .bulk-row .pseg{padding:8px 0;font-size:10.5px;}
 .import-actions{display:flex;gap:8px;margin-top:6px;}
 .imp-all{flex:0 0 auto;padding:12px 15px;border-radius:13px;border:1px solid var(--b2);background:var(--bg4);color:var(--t2);font-size:12px;font-weight:800;}
+.synccode{font-family:ui-monospace,Menlo,monospace;font-size:16px;font-weight:700;letter-spacing:2px;text-align:center;background:var(--bg4);border:1px solid var(--b2);border-radius:12px;padding:12px;color:var(--a2);user-select:all;-webkit-user-select:all;word-break:break-all;}
 
 /* ── STATS ── */
 .stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
@@ -525,6 +526,7 @@ img{-webkit-user-drag:none;}
   <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--b1);">
     <button class="parse-btn" style="margin-top:0" onclick="exportList()">📤 Copy my list to clipboard</button>
   </div>
+  <div id="syncBox" style="margin-top:16px;padding-top:14px;border-top:1px solid var(--b1);"></div>
 </div>
 
 <!-- STATS SHEET -->
@@ -586,16 +588,94 @@ const STATUS_META={
 };
 
 // ─── STORAGE ───────────────────────────────────────────────────────────────
+const LSKEY='animelist_friends_v4';
+const SYNC_URL='https://watchlist-sync.muhammad-dac.workers.dev';
 function store(){try{localStorage.setItem('_t','1');localStorage.removeItem('_t');return localStorage;}catch{return null;}}
 function parseEpTotal(s){const m=/(\d+)\s*eps?/i.exec(s||'');return m?+m[1]:0;}
 function migrate(list){
-  return list.map(a=>({ep:0,rating:0,fav:false,upd:0,epTotal:parseEpTotal(a.eps),img:'',order:[],notes:'',genre:'',eps:'',time:'',...a}));
+  return (Array.isArray(list)?list:[]).map(a=>({ep:0,rating:0,fav:false,upd:0,epTotal:parseEpTotal(a.eps),img:'',order:[],notes:'',genre:'',eps:'',time:'',...a}));
 }
-function load(){try{const s=store(),d=s&&s.getItem('animelist_friends_v4');anime=migrate(d?JSON.parse(d):JSON.parse(JSON.stringify(DEFAULT_DATA)));}catch{anime=migrate(JSON.parse(JSON.stringify(DEFAULT_DATA)));}}
+function load(){try{const s=store(),d=s&&s.getItem(LSKEY);anime=migrate(d?JSON.parse(d):JSON.parse(JSON.stringify(DEFAULT_DATA)));}catch{anime=migrate(JSON.parse(JSON.stringify(DEFAULT_DATA)));}}
 let saveWarned=false;
-function save(){try{const s=store();if(s)s.setItem('animelist_friends_v4',JSON.stringify(anime));saveWarned=false;}catch{if(!saveWarned){saveWarned=true;toast('⚠️ Storage full — remove some uploaded covers');}}}
+function writeLocal(){try{const s=store();if(s)s.setItem(LSKEY,JSON.stringify(anime));saveWarned=false;}catch{if(!saveWarned){saveWarned=true;toast('⚠️ Storage full — remove some uploaded covers');}}}
+function save(){writeLocal();schedulePush();}
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2);}
 function touch(a){a.upd=Date.now();}
+
+// ─── CLOUD SYNC (Cloudflare Worker + KV) ────────────────────────────────────
+function syncCode(){try{return localStorage.getItem('sync_'+LSKEY)||'';}catch{return'';}}
+function setSyncCode(c){try{if(c)localStorage.setItem('sync_'+LSKEY,c);else localStorage.removeItem('sync_'+LSKEY);}catch{}}
+function syncAt(){try{return +localStorage.getItem('syncat_'+LSKEY)||0;}catch{return 0;}}
+function setSyncAt(t){try{localStorage.setItem('syncat_'+LSKEY,String(t||0));}catch{}}
+function genCode(){let s='';const c='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';for(let i=0;i<20;i++)s+=c[Math.floor(Math.random()*c.length)];return s;}
+let pushT;
+function schedulePush(){if(!syncCode()||!SYNC_URL)return;clearTimeout(pushT);pushT=setTimeout(syncPush,2500);}
+async function syncPush(){
+  const code=syncCode();if(!code||!SYNC_URL)return;
+  try{
+    const r=await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({op:'push',code,data:anime})});
+    const d=await r.json();if(d&&d.ok)setSyncAt(d.updatedAt);
+  }catch{}
+}
+async function syncPull(){
+  const code=syncCode();if(!code||!SYNC_URL)return null;
+  const r=await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({op:'pull',code})});
+  return await r.json();
+}
+async function syncOnOpen(){
+  if(!syncCode())return;
+  try{
+    const res=await syncPull();
+    if(res&&Array.isArray(res.data)&&res.updatedAt>syncAt()){ // another device wrote a newer copy — adopt it
+      anime=migrate(res.data);writeLocal();setSyncAt(res.updatedAt);render();renderSyncUI();toast('☁️ Synced from cloud');
+    }else{ // local is current or newer — make sure the cloud has it
+      syncPush();
+    }
+  }catch{}
+}
+function syncEnableNew(){
+  setSyncCode(genCode());setSyncAt(0);
+  syncPush().then(()=>{renderSyncUI();toast('☁️ Cloud backup is on');});
+  renderSyncUI();
+}
+async function syncRestore(){
+  const raw=(document.getElementById('syncCodeIn').value||'').replace(/\s+/g,'');
+  if(!/^[A-Za-z0-9]{10,64}$/.test(raw)){toast('That code looks off — check it');return;}
+  if(anime.length&&!confirm("This replaces this device's list with the backup for that code. Continue?"))return;
+  try{
+    setSyncCode(raw);
+    const res=await syncPull();
+    if(res&&Array.isArray(res.data)&&res.data.length){
+      anime=migrate(res.data);writeLocal();setSyncAt(res.updatedAt||Date.now());render();renderSyncUI();toast('☁️ Restored from cloud');
+    }else{ // nothing stored under that code yet — link this device and seed it
+      setSyncAt(0);syncPush();renderSyncUI();toast('Code linked — this device now backs up here');
+    }
+  }catch{setSyncCode('');toast('Could not reach cloud — try again');}
+}
+function syncOff(){setSyncCode('');renderSyncUI();toast('Backup off — data stays on this device');}
+function copySyncCode(){const c=syncCode();if(!c)return;const done=()=>toast('📋 Code copied');if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(c).then(done).catch(()=>fallbackCopy(c,done));else fallbackCopy(c,done);}
+function renderSyncUI(){
+  const box=document.getElementById('syncBox');if(!box)return;
+  const code=syncCode();
+  if(code){
+    const pretty=code.replace(/(.{4})/g,'$1 ').trim();
+    box.innerHTML=`<div class="dt-label">☁️ Cloud backup · ON</div>
+      <p class="ai-desc">Your list backs up automatically. On another device: install the app, open this panel, paste this code, and tap Use code.</p>
+      <div class="synccode">${pretty}</div>
+      <div style="display:flex;gap:8px;margin-top:10px;">
+        <button class="parse-btn" style="margin:0;flex:1" onclick="copySyncCode()">📋 Copy code</button>
+        <button class="imp-all" onclick="syncOff()">Turn off</button>
+      </div>`;
+  }else{
+    box.innerHTML=`<div class="dt-label">☁️ Cloud backup · OFF</div>
+      <p class="ai-desc">Back up your list to the cloud so it survives losing your phone and syncs across your devices. Private — only someone with your secret code can open it.</p>
+      <button class="parse-btn" style="margin-top:0" onclick="syncEnableNew()">Turn on cloud backup</button>
+      <div style="display:flex;gap:8px;margin-top:8px;">
+        <input class="ai-prompt-in" id="syncCodeIn" placeholder="…or paste a code to restore" autocomplete="off">
+        <button class="ai-run-btn" onclick="syncRestore()">Use code</button>
+      </div>`;
+  }
+}
 
 // ─── THEMES ────────────────────────────────────────────────────────────────
 const THEMES=[
@@ -854,6 +934,7 @@ function openSheet(id){
   document.getElementById(id).classList.add('on');
   if(id==='themeSheet')renderThemeGrid();
   if(id==='statsSheet')renderStatsSheet();
+  if(id==='importSheet')renderSyncUI();
 }
 function closeAll(){
   document.querySelectorAll('.sheet').forEach(s=>s.classList.remove('on'));
@@ -1368,6 +1449,8 @@ load();loadTheme();render();
 try{document.getElementById('apiKeyIn').value=getKey();}catch{}
 try{if(sessionStorage.getItem('justUpdated')){sessionStorage.removeItem('justUpdated');setTimeout(()=>toast('✨ Updated to the latest version'),700);}}catch{}
 setTimeout(fetchCovers,1200);
+setTimeout(syncOnOpen,300);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)syncOnOpen();});
 </script>
 </body>
 </html>

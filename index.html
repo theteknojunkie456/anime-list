@@ -41,44 +41,77 @@ input,textarea{user-select:text;-webkit-user-select:text;}
 button{font-family:inherit;border:none;background:none;color:inherit;cursor:pointer;}
 img{-webkit-user-drag:none;}
 ::-webkit-scrollbar{display:none;}
+::selection{background:var(--ag);color:var(--t1);}
+:focus-visible{outline:2px solid var(--a2);outline-offset:2px;border-radius:8px;}
+button{transition:transform .12s ease,background .16s ease,border-color .16s ease,color .16s ease,opacity .16s ease,box-shadow .16s ease;}
+@media(hover:hover){
+  .hbtn:hover{background:var(--bg4);border-color:var(--b3);}
+  .pcard:hover{transform:translateY(-5px);}
+  .pcard:hover .pcard-img{box-shadow:0 12px 28px rgba(0,0,0,0.5);border-color:var(--b3);}
+  .schip:hover,.nbtn:hover,.sort-row .schip:hover{color:var(--t1);}
+  .dact:hover,.spick:hover,.dpick:hover,.aitab:hover,.prog-btn:hover,.parse-btn:hover,.imp-all:hover{border-color:var(--b3);}
+  .submit-btn:hover,.autofill-btn:hover,.ai-run-btn:hover{filter:brightness(1.08);}
+  .hero:hover .hero-cta{transform:translateY(-1px);}
+  .cbtn:hover{filter:brightness(1.06);}
+}
+@media(prefers-reduced-motion:reduce){*{animation-duration:.001ms!important;transition-duration:.001ms!important;}}
 
 /* ── SHELL ── */
 #app{height:100vh;height:100dvh;display:flex;flex-direction:column;background:var(--topgrad);}
 .page{flex:1;overflow-y:auto;padding-bottom:calc(var(--safe-b) + 86px);}
 
 /* ── HEADER ── */
-.hdr{padding:calc(var(--safe-t) + 14px) 18px 4px;display:flex;align-items:center;justify-content:space-between;}
-.hdr-title{font-size:24px;font-weight:900;letter-spacing:-0.5px;}
-.hdr-sub{font-size:11.5px;color:var(--t2);font-weight:600;margin-top:2px;}
+.hdr{padding:calc(var(--safe-t) + 16px) 18px 4px;display:flex;align-items:center;justify-content:space-between;}
+.hdr-title{font-size:26px;font-weight:900;letter-spacing:-0.6px;display:flex;align-items:center;gap:8px;}
+.hdr-title::before{content:'';width:6px;height:22px;border-radius:99px;background:linear-gradient(180deg,var(--a2),var(--a));box-shadow:0 0 12px var(--glow);}
+.hdr-sub{font-size:11.5px;color:var(--t2);font-weight:600;margin-top:4px;padding-left:14px;}
 .hbtn{
-  width:38px;height:38px;border-radius:12px;font-size:17px;
+  width:40px;height:40px;border-radius:13px;font-size:17px;
   background:var(--bg3);border:1px solid var(--b2);
-  display:flex;align-items:center;justify-content:center;transition:transform .12s;
+  display:flex;align-items:center;justify-content:center;transition:transform .12s,background .16s,border-color .16s;
 }
 .hbtn:active{transform:scale(0.9);}
 .search-row{padding:12px 18px 2px;}
 .search-wrap{position:relative;}
 .search-ico{position:absolute;left:13px;top:50%;transform:translateY(-50%);font-size:13px;opacity:0.5;}
 .search-in{
-  width:100%;padding:11px 14px 11px 36px;border-radius:13px;font-size:14px;
+  width:100%;padding:12px 14px 12px 38px;border-radius:14px;font-size:14px;
   background:var(--bg3);border:1px solid var(--b2);color:var(--t1);outline:none;font-family:inherit;
+  transition:border-color .16s,box-shadow .16s,background .16s;
 }
-.search-in:focus{border-color:var(--a);}
+.search-in:focus{border-color:var(--a);box-shadow:0 0 0 3px var(--ag);background:var(--bg2);}
 .search-in::placeholder{color:var(--t3);}
-.sort-row{display:flex;gap:6px;padding:10px 18px 4px;overflow-x:auto;}
+.sort-row{display:flex;gap:7px;padding:11px 18px 4px;overflow-x:auto;}
 .schip{
-  flex-shrink:0;padding:6px 13px;border-radius:99px;font-size:11.5px;font-weight:700;
-  background:var(--bg3);border:1px solid var(--b2);color:var(--t2);transition:all .13s;
+  flex-shrink:0;padding:7px 14px;border-radius:99px;font-size:11.5px;font-weight:700;
+  background:var(--bg3);border:1px solid var(--b2);color:var(--t2);transition:all .15s;
 }
-.schip.on{background:var(--ag);border-color:var(--a);color:var(--a);}
+.schip.on{background:var(--ag);border-color:var(--a);color:var(--a);box-shadow:0 2px 10px -4px var(--glow);}
+.filt-row{display:flex;gap:7px;padding:9px 18px 0;overflow-x:auto;}
+.fchip{
+  flex-shrink:0;padding:7px 13px;border-radius:99px;font-size:11.5px;font-weight:700;
+  background:var(--bg3);border:1px solid var(--b2);color:var(--t2);
+  display:inline-flex;align-items:center;gap:6px;transition:all .15s;
+}
+.fchip .fn{font-size:9.5px;font-weight:800;opacity:0.65;font-variant-numeric:tabular-nums;}
+.fchip.on{background:var(--ag);border-color:var(--a);color:var(--a);}
+.fchip.on-watching{background:var(--watbg);border-color:var(--wat);color:var(--wat);}
+.fchip.on-plan{background:var(--plnbg);border-color:var(--pln);color:var(--pln);}
+.fchip.on-finished{background:var(--finbg);border-color:var(--fin);color:var(--fin);}
+.fchip.on-dropped{background:var(--drpbg);border-color:var(--drp);color:var(--drp);}
+.fchip.on .fn,.fchip[class*="on-"] .fn{opacity:0.85;}
 
 /* ── HERO ── */
 .hero{
-  margin:12px 18px 6px;border-radius:22px;overflow:hidden;position:relative;
-  min-height:210px;display:flex;align-items:flex-end;
+  margin:14px 18px 6px;border-radius:24px;overflow:hidden;position:relative;
+  min-height:216px;display:flex;align-items:flex-end;
   border:1px solid var(--b2);cursor:pointer;
+  box-shadow:0 14px 40px -12px rgba(0,0,0,0.6);
+  transition:transform .18s cubic-bezier(.32,.72,.28,1);
   animation:fadeUp .4s ease both;
 }
+.hero:active{transform:scale(0.985);}
+.hero-cta{transition:transform .16s,box-shadow .16s;}
 .hero-bg{position:absolute;inset:0;background-size:cover;background-position:center 22%;filter:saturate(1.05);}
 .hero-shade{position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,0.05) 0%,rgba(8,8,10,0.55) 55%,rgba(8,8,10,0.92) 100%);}
 .hero-body{position:relative;padding:16px 18px;width:100%;}
@@ -100,42 +133,45 @@ img{-webkit-user-drag:none;}
 .row-title{font-size:15px;font-weight:800;letter-spacing:-0.2px;}
 .row-count{font-size:11px;font-weight:700;color:var(--t3);}
 .row-scroll{display:flex;gap:10px;overflow-x:auto;padding:2px 18px 6px;scroll-padding:18px;}
-.pcard{flex:0 0 104px;cursor:pointer;transition:transform .15s;}
+.pcard{flex:0 0 104px;cursor:pointer;transition:transform .18s cubic-bezier(.32,.72,.28,1);}
 .pcard:active{transform:scale(0.94);}
 .pcard-img{
-  width:104px;height:148px;border-radius:14px;object-fit:cover;display:block;
+  width:104px;height:148px;border-radius:15px;object-fit:cover;display:block;
   background:var(--bg4);border:1px solid var(--b2);box-shadow:0 6px 18px rgba(0,0,0,0.35);
+  transition:box-shadow .18s,border-color .18s;
 }
 .pcard-ph{
-  width:104px;height:148px;border-radius:14px;background:linear-gradient(160deg,var(--bg4),var(--bg3));
+  width:104px;height:148px;border-radius:15px;background:linear-gradient(160deg,var(--bg4),var(--bg3));
   border:1px solid var(--b2);display:flex;align-items:center;justify-content:center;
-  font-size:30px;font-weight:900;color:var(--t3);
+  font-size:34px;font-weight:900;color:var(--t3);letter-spacing:-1px;
 }
 .pcard-wrap{position:relative;}
 .pcard-badge{
   position:absolute;top:7px;left:7px;font-size:8.5px;font-weight:800;letter-spacing:0.06em;
-  padding:3px 7px;border-radius:99px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
-  text-transform:uppercase;
+  padding:3.5px 8px;border-radius:99px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  text-transform:uppercase;box-shadow:0 2px 8px rgba(0,0,0,0.35);
 }
 .pcard-fav{position:absolute;top:5px;right:7px;font-size:13px;text-shadow:0 1px 6px rgba(0,0,0,0.6);}
 .b-watching{background:rgba(245,166,35,0.28);color:#ffd48a;}
 .b-finished{background:rgba(52,196,114,0.28);color:#8ef0b6;}
 .b-plan{background:rgba(91,156,246,0.28);color:#a9ccff;}
 .b-dropped{background:rgba(154,151,164,0.32);color:#d5d3dc;}
-.pcard .pbar{margin:7px 2px 0;}
+.pcard .pbar{margin:8px 2px 0;}
 .pcard-title{
-  font-size:11px;font-weight:700;line-height:1.25;margin-top:6px;color:var(--t1);
+  font-size:11.5px;font-weight:600;line-height:1.3;margin-top:7px;color:var(--t1);
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
 }
-.pbar{height:3.5px;border-radius:99px;background:rgba(255,255,255,0.14);overflow:hidden;}
-.pfill{height:100%;border-radius:99px;background:var(--a);transition:width .3s;}
+.pbar{height:4px;border-radius:99px;background:rgba(255,255,255,0.13);overflow:hidden;}
+.pfill{height:100%;border-radius:99px;background:linear-gradient(90deg,var(--a),var(--a2));transition:width .4s cubic-bezier(.32,.72,.28,1);}
 
 /* ── SEARCH GRID ── */
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:12px;padding:14px 18px;}
-.empty{text-align:center;padding:70px 30px;color:var(--t2);animation:fadeUp .4s ease both;}
-.empty-icon{font-size:44px;margin-bottom:14px;}
-.empty p{font-size:14px;line-height:1.6;}
-.empty .hero-cta{margin-top:18px;background:var(--a);color:#fff;}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:16px 12px;padding:16px 18px;}
+.grid .pcard{flex:none;width:100%;}
+.grid .pcard-img,.grid .pcard-ph{width:100%;height:auto;aspect-ratio:104/148;}
+.empty{text-align:center;padding:64px 34px;color:var(--t2);animation:fadeUp .4s ease both;}
+.empty-icon{font-size:52px;margin-bottom:16px;opacity:0.9;filter:drop-shadow(0 6px 16px var(--glow));}
+.empty p{font-size:14.5px;line-height:1.65;}
+.empty .hero-cta{margin-top:20px;background:var(--a);color:#fff;box-shadow:0 8px 22px var(--glow);}
 
 /* ── BOTTOM NAV ── */
 .nav{
@@ -155,9 +191,11 @@ img{-webkit-user-drag:none;}
 .nbtn small{font-size:9px;font-weight:800;letter-spacing:0.04em;}
 .nbtn.on{color:var(--a);}
 .nbtn.add{
-  width:52px;height:52px;border-radius:50%;background:var(--a);color:#fff;font-size:24px;
-  justify-content:center;margin-top:-22px;box-shadow:0 8px 22px var(--glow),0 3px 10px rgba(0,0,0,0.4);
+  width:54px;height:54px;border-radius:50%;background:linear-gradient(180deg,var(--a2),var(--a));color:#fff;font-size:25px;
+  justify-content:center;margin-top:-24px;box-shadow:0 10px 26px -4px var(--glow),0 3px 10px rgba(0,0,0,0.4);
+  border:1.5px solid rgba(255,255,255,0.14);
 }
+.nbtn.add:active{transform:scale(0.9) rotate(90deg);}
 
 /* ── SHEETS ── */
 .overlay{
@@ -166,18 +204,19 @@ img{-webkit-user-drag:none;}
 }
 .overlay.on{opacity:1;pointer-events:auto;}
 .sheet{
-  position:fixed;left:0;right:0;bottom:0;z-index:80;max-height:88dvh;overflow-y:auto;
-  background:var(--bg2);border-radius:24px 24px 0 0;border-top:1px solid var(--b3);
-  padding:10px 20px calc(var(--safe-b) + 22px);
-  transform:translateY(102%);transition:transform .3s cubic-bezier(.32,.72,.28,1);
+  position:fixed;left:0;right:0;bottom:0;z-index:80;max-height:90dvh;overflow-y:auto;
+  background:var(--bg2);border-radius:26px 26px 0 0;border-top:1px solid var(--b3);
+  padding:10px 22px calc(var(--safe-b) + 24px);
+  box-shadow:0 -20px 60px rgba(0,0,0,0.5);
+  transform:translateY(102%);transition:transform .34s cubic-bezier(.32,.72,.28,1);
 }
 @supports ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
   .sheet{background:color-mix(in srgb,var(--bg2) 82%,transparent);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);}
 }
 .sheet.on{transform:translateY(0);}
-.sheet-handle{width:38px;height:4.5px;border-radius:99px;background:var(--b3);margin:6px auto 12px;}
-.sheet-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
-.sheet-title{font-size:18px;font-weight:800;letter-spacing:-0.3px;}
+.sheet-handle{width:40px;height:5px;border-radius:99px;background:var(--b3);margin:8px auto 14px;}
+.sheet-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;}
+.sheet-title{font-size:19px;font-weight:800;letter-spacing:-0.35px;}
 .sheet-cancel{font-size:13.5px;font-weight:700;color:var(--a);padding:6px 2px;}
 
 /* ── DETAIL SHEET ── */
@@ -197,8 +236,8 @@ img{-webkit-user-drag:none;}
 .dpick.on-finished{background:var(--finbg);border-color:var(--fin);color:var(--fin);}
 .dpick.on-dropped{background:var(--drpbg);border-color:var(--drp);color:var(--drp);}
 .prog-row{display:flex;align-items:center;gap:14px;}
-.prog-btn{width:42px;height:42px;border-radius:13px;background:var(--bg4);border:1px solid var(--b2);font-size:19px;font-weight:800;color:var(--t1);display:flex;align-items:center;justify-content:center;}
-.prog-btn:active{background:var(--ag);border-color:var(--a);}
+.prog-btn{width:46px;height:46px;border-radius:14px;background:var(--bg4);border:1px solid var(--b2);font-size:20px;font-weight:800;color:var(--t1);display:flex;align-items:center;justify-content:center;transition:transform .12s,background .14s,border-color .14s;}
+.prog-btn:active{background:var(--ag);border-color:var(--a);transform:scale(0.92);}
 .prog-mid{flex:1;text-align:center;}
 .prog-num{font-size:17px;font-weight:900;}
 .prog-num span{color:var(--t3);font-weight:700;font-size:13px;}
@@ -236,34 +275,37 @@ img{-webkit-user-drag:none;}
 .dact.danger{color:#ff6b6b;flex:0 0 52px;}
 
 /* ── FORMS ── */
-.fgroup{margin-bottom:14px;}
-.flabel{display:block;font-size:10px;font-weight:800;color:var(--t3);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:7px;}
+.fgroup{margin-bottom:18px;}
+.flabel{display:block;font-size:10px;font-weight:800;color:var(--t2);text-transform:uppercase;letter-spacing:0.11em;margin-bottom:9px;}
 .finput,.ftextarea{
-  width:100%;padding:12px 13px;border-radius:12px;font-size:14px;font-family:inherit;
+  width:100%;padding:13px 14px;border-radius:13px;font-size:15px;font-family:inherit;
   background:var(--bg3);border:1px solid var(--b2);color:var(--t1);outline:none;
+  transition:border-color .16s,box-shadow .16s,background .16s;
 }
-.finput:focus,.ftextarea:focus{border-color:var(--a);}
+.finput:focus,.ftextarea:focus{border-color:var(--a);box-shadow:0 0 0 3px var(--ag);background:var(--bg2);}
 .finput::placeholder,.ftextarea::placeholder{color:var(--t3);}
-.ftextarea{min-height:84px;resize:vertical;}
-.frow2{display:flex;gap:10px;}
+.ftextarea{min-height:88px;resize:vertical;line-height:1.5;}
+.frow2{display:flex;gap:12px;}
 .frow2 .fgroup{flex:1;}
-.status-pick{display:flex;gap:6px;}
-.spick{flex:1;padding:10px 0;border-radius:11px;font-size:10.5px;font-weight:800;background:var(--bg3);border:1px solid var(--b2);color:var(--t3);}
+.status-pick{display:flex;gap:7px;}
+.spick{flex:1;padding:11px 0;border-radius:12px;font-size:10.5px;font-weight:800;background:var(--bg3);border:1px solid var(--b2);color:var(--t2);transition:all .14s;}
 .spick.on-plan{background:var(--plnbg);border-color:var(--pln);color:var(--pln);}
 .spick.on-watching{background:var(--watbg);border-color:var(--wat);color:var(--wat);}
 .spick.on-finished{background:var(--finbg);border-color:var(--fin);color:var(--fin);}
 .spick.on-dropped{background:var(--drpbg);border-color:var(--drp);color:var(--drp);}
 .submit-btn{
-  width:100%;padding:15px 0;margin-top:8px;border-radius:14px;font-size:14.5px;font-weight:800;
-  background:var(--a);color:#fff;box-shadow:0 6px 18px var(--glow);
+  width:100%;padding:16px 0;margin-top:10px;border-radius:15px;font-size:15px;font-weight:800;letter-spacing:-0.2px;
+  background:linear-gradient(180deg,var(--a2),var(--a));color:#fff;box-shadow:0 8px 22px -6px var(--glow);
 }
-.submit-btn:active{opacity:0.8;}
+.submit-btn:active{transform:scale(0.985);opacity:0.9;}
 .autofill-btn{
   width:100%;display:flex;align-items:center;justify-content:center;gap:8px;
-  padding:12px 0;margin-bottom:16px;border-radius:13px;font-size:12.5px;font-weight:800;
+  padding:13px 0;margin-bottom:18px;border-radius:14px;font-size:12.5px;font-weight:800;
   background:var(--ag);border:1px dashed var(--a);color:var(--a);
 }
-.autofill-btn.loading{opacity:0.5;pointer-events:none;}
+.autofill-btn.loading{opacity:0.65;pointer-events:none;}
+.autofill-btn.loading span:first-child{display:inline-block;animation:spin 0.9s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
 
 /* ── AI SHEET ── */
 .ai-tabs{display:flex;gap:6px;margin-bottom:16px;}
@@ -317,8 +359,8 @@ img{-webkit-user-drag:none;}
 
 /* ── STATS ── */
 .stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
-.stat-card{background:var(--bg3);border:1px solid var(--b2);border-radius:16px;padding:16px;}
-.stat-val{font-size:24px;font-weight:900;letter-spacing:-0.5px;}
+.stat-card{background:linear-gradient(160deg,var(--bg3),var(--bg2));border:1px solid var(--b2);border-radius:17px;padding:17px;}
+.stat-val{font-size:25px;font-weight:900;letter-spacing:-0.5px;}
 .stat-lbl{font-size:10.5px;font-weight:700;color:var(--t2);margin-top:4px;text-transform:uppercase;letter-spacing:0.06em;}
 .stat-bar-row{display:flex;align-items:center;gap:10px;margin-top:10px;}
 .stat-bar-row .lbl{font-size:11px;font-weight:700;color:var(--t2);width:70px;flex-shrink:0;}
@@ -380,6 +422,7 @@ img{-webkit-user-drag:none;}
       <input class="search-in" type="search" id="searchIn" placeholder="Search titles, genres…" oninput="renderHome()">
     </div>
   </div>
+  <div class="filt-row" id="filtRow"></div>
   <div class="sort-row" id="sortRow"></div>
   <div class="page" id="pageEl"></div>
 </div>
@@ -411,7 +454,7 @@ img{-webkit-user-drag:none;}
   </div>
   <div class="fgroup">
     <label class="flabel">Title *</label>
-    <input class="finput" id="fTitle" placeholder="e.g. Attack on Titan" autocomplete="off" autocorrect="off">
+    <input class="finput" id="fTitle" placeholder="e.g. Attack on Titan" autocomplete="off" autocorrect="off" enterkeyhint="search" onkeydown="if(event.key==='Enter'){event.preventDefault();aiAutofill();}">
   </div>
   <button class="autofill-btn" id="autofillBtn" onclick="aiAutofill()">
     <span>✦</span> Autofill — cover, episodes, genre &amp; watch order
@@ -579,7 +622,7 @@ img{-webkit-user-drag:none;}
 const DEFAULT_DATA=[{id:'f1',title:'Gachiakuta',status:'finished',eps:'13 eps',time:'~5 hrs',genre:'Action, Dark Fantasy',order:[],notes:'No OVAs yet. Season 2 announced.'},{id:'f2',title:"Masamune-kun's Revenge",status:'finished',eps:'25 eps + 1 OVA',time:'~11 hrs',genre:'Romance, Comedy',order:["TV: Season 1 — 12 eps","OVA: Masamune-kun's Revenge OVA — after S1","TV: Season 2 (R) — 12 eps"],notes:''},{id:'f3',title:'My Teen Romantic Comedy SNAFU',status:'finished',eps:'38 eps + 6 OVAs',time:'~18 hrs',genre:'Romance, Slice of Life',order:['TV: Season 1 — 13 eps','OVA: S1 OVA — after S1','TV: Season 2 (Zoku) — 13 eps','OVA: S2 OVAs (4 eps) — after S2','TV: Season 3 (Kan) — 12 eps','OVA: S3 OVA — after S3'],notes:''},{id:'w1',title:'Code Geass: Lelouch of the Rebellion',status:'watching',eps:'50 eps + OVAs + movies',time:'~29 hrs',genre:'Mecha, Sci-fi, Drama',order:['TV: Season 1 — 25 eps','SKIP: Black Rebellion Special — recap, skippable','TV: Season 2 R2 — 25 eps','OVA: Nunnally in Wonderland — fun non-canon parody','OVA: Akito the Exiled (5 parts) — spin-off between S1 & S2','KEY: Lelouch of the Re;surrection — sequel movie'],notes:'Core experience = S1 + S2 only. Everything else is optional.'},{id:'w2',title:'Record of Ragnarok',status:'watching',eps:'42 eps',time:'~18 hrs',genre:'Action, Mythology',order:['TV: Season 1 — 12 eps (Netflix)','TV: Season 2 Part 1 — 10 eps','TV: Season 2 Part 2 — 5 eps','TV: Season 3 — 15 eps'],notes:'No OVAs or movies.'},{id:'w3',title:'Soul Eater',status:'watching',eps:'51 eps + 1 special',time:'~22 hrs',genre:'Action, Dark Fantasy',order:['TV: Soul Eater — 51 eps','SPECIAL: Soul Eater: Late Show — comedy short, optional'],notes:'Anime-original ending differs from manga.'},{id:'w4',title:'Hero with No Class',status:'watching',eps:'12 eps',time:'~4 hrs',genre:'Isekai, Fantasy',order:[],notes:'Single season, no OVAs yet.'},{id:'w5',title:'Sentenced to Be a Hero',status:'watching',eps:'12 eps',time:'~4 hrs',genre:'Fantasy, Dark',order:[],notes:'Single season.'},{id:'w6',title:'Call of the Night',status:'watching',eps:'25 eps',time:'~10 hrs',genre:'Romance, Supernatural',order:['TV: Season 1 — 13 eps','TV: Season 2 — 12 eps (2025)'],notes:'No OVAs.'},{id:'w7',title:'The Stellar Sword Master',status:'watching',eps:'TBA',time:'—',genre:'Fantasy',order:[],notes:'Working title — ongoing.'},{id:'w8',title:'The Patrons of Villains',status:'watching',eps:'TBA',time:'—',genre:'Fantasy',order:[],notes:'Working title — ongoing.'},{id:'p1',title:'Fullmetal Alchemist: Brotherhood',status:'plan',eps:'64 eps + 4 OVAs + 1 movie',time:'~29 hrs',genre:'Action, Adventure, Drama',order:['TV: Brotherhood — 64 eps','OVA: OVA Collection (4 eps) — after main series','MOVIE: The Sacred Star of Milos — side story'],notes:'Watch main series straight through. OVAs and movie are non-canon side stories.'},{id:'p2',title:'Dr. Stone',status:'plan',eps:'~94 eps + 1 special',time:'~40 hrs',genre:'Sci-fi, Adventure, Shounen',order:['TV: Season 1 — 24 eps','SKIP: Stone Wars Eve Special — recap, skippable','TV: Season 2: Stone Wars — 11 eps','KEY: Special: Ryuusui — 1 hr, MUST watch before S3','TV: Season 3: New World Part 1 — 11 eps','TV: Season 3: New World Part 2 — 11 eps','TV: Season 4: Science Future — 37 eps (ongoing)'],notes:"Ryuusui special is required before Season 3 — don't skip it."},{id:'p3',title:'Ninja Kamui',status:'plan',eps:'13 eps',time:'~5 hrs',genre:'Action, Thriller',order:[],notes:'Standalone. No OVAs.'},{id:'p4',title:'Plastic Memories',status:'plan',eps:'13 eps',time:'~5 hrs',genre:'Romance, Sci-fi, Drama',order:[],notes:'Standalone. Prepare for emotional damage.'},{id:'p5',title:'The Magical Girl and the Evil Lieutenant Used to Be Archenemies',status:'plan',eps:'12 eps',time:'~5 hrs',genre:'Romance, Comedy, Magical Girl',order:[],notes:'No OVAs confirmed.'},{id:'p6',title:'Absolute Duo',status:'plan',eps:'12 eps + 2 OVAs',time:'~6 hrs',genre:'Action, Romance, Harem',order:['TV: Main series — 12 eps','OVA: OVAs (2 eps) — after main series'],notes:''},{id:'p7',title:'Seraph of the End',status:'plan',eps:'24 eps + 1 OVA',time:'~10 hrs',genre:'Action, Dark Fantasy, Vampire',order:['TV: Season 1 — 12 eps','SKIP: Beginning of the End recap — skippable','OVA: Vampire Shahal — between S1 and S2','TV: Season 2: Battle in Nagoya — 12 eps'],notes:''},{id:'p8',title:'Tokyo Revengers',status:'plan',eps:'50 eps + shorts',time:'~21 hrs',genre:'Action, Drama, Time Travel',order:['TV: Season 1 — 24 eps','TV: Season 2: Christmas Showdown — 13 eps','TV: Season 3: Tenjiku Arc — 13 eps','SPECIAL: Chibi Revengers — 24×2 min comedy shorts, any time'],notes:''},{id:'p9',title:'Working in a Godless World',status:'plan',eps:'12 eps',time:'~5 hrs',genre:'Slice of Life, Comedy',order:[],notes:''},{id:'p10',title:'Aesthetics of a Rogue Hero',status:'plan',eps:'12 eps + 2 OVAs',time:'~6 hrs',genre:'Action, Harem, Fantasy',order:['TV: Main series — 12 eps','OVA: OVAs (2 eps) — after main series'],notes:''},{id:'p11',title:'All Out',status:'plan',eps:'25 eps',time:'~10 hrs',genre:'Sports, Drama',order:[],notes:'Rugby anime. Complete standalone.'},{id:'p12',title:'Love of Kill',status:'plan',eps:'13 eps',time:'~5 hrs',genre:'Romance, Thriller, Action',order:[],notes:''},{id:'p13',title:'Unwanted Undead Adventurer',status:'plan',eps:'13 eps',time:'~5 hrs',genre:'Fantasy, Isekai',order:[],notes:'No OVAs. Season 2 likely.'},{id:'p14',title:'Date A Live',status:'plan',eps:'58 eps + 2 OVAs + 3 movies',time:'~28 hrs',genre:'Sci-fi, Romance, Harem',order:['TV: Season 1 — 12 eps','OVA: Date to Date OVA — after S1','TV: Season 2 — 10 eps','OVA: Kurumi Star Festival OVA — after S2','SKIP: Movie: Mayuri Judgement — non-canon, optional','TV: Season 3 — 12 eps','MOVIE: Date A Bullet: Dead or Bullet — after S3','MOVIE: Date A Bullet: Nightmare or Queen — sequel','TV: Season 4 — 12 eps','TV: Season 5 — 12 eps'],notes:''},{id:'p15',title:'Love Lies',status:'plan',eps:'12 eps',time:'~5 hrs',genre:'Romance, Drama',order:[],notes:''},{id:'p16',title:"Scum's Wish",status:'plan',eps:'12 eps + 1 special',time:'~5 hrs',genre:'Romance, Drama, Mature',order:["TV: Main series — 12 eps","SPECIAL: Scum's Wish: Decor — bonus ep after main series"],notes:'Mature themes.'},{id:'p17',title:'Clannad',status:'plan',eps:'47 eps + 2 OVAs + movie',time:'~21 hrs',genre:'Romance, Drama, Slice of Life',order:['TV: Clannad Season 1 — 23 eps','OVA: Another World: Tomoyo Chapter — after S1','TV: Clannad: After Story — 24 eps (DO NOT SKIP)','OVA: Another World: Kyou Chapter — after After Story','SKIP: Clannad Movie — recap, skippable'],notes:'After Story is the emotional core — never skip it. Have tissues.'},{id:'p18',title:'A Day Before Us',status:'plan',eps:'24 shorts (~6 min each)',time:'~2.5 hrs',genre:'Romance, Slice of Life',order:['Web: Season 1 — 12 shorts','Web: Season 2 — 12 shorts'],notes:'Korean webtoon-based shorts.'},{id:'p19',title:'Mushoku Tensei: Jobless Reincarnation',status:'plan',eps:'35 eps + 2 specials',time:'~15 hrs',genre:'Isekai, Fantasy, Drama',order:['TV: Season 1 Part 1 — 11 eps','TV: Season 1 Part 2 — 12 eps','OVA: Eris the Goblin Slayer — after S1 Pt2 ep4','SPECIAL: Guardian Fitz (S2 Ep0) — before S2','TV: Season 2 — 12 eps'],notes:'Season 3 coming 2026.'},{id:'p20',title:'Chitose Is in the Ramune Bottle',status:'plan',eps:'12 eps + OVA',time:'~5 hrs',genre:'Romance, Slice of Life',order:['TV: Main series — 12 eps','OVA: Bonus OVA — after main series'],notes:''},{id:'p21',title:'Wistoria: Wand and Sword',status:'plan',eps:'12 eps',time:'~5 hrs',genre:'Fantasy, Action, Magic',order:[],notes:''},{id:'p22',title:'May I Ask One Last Thing?',status:'plan',eps:'12 eps',time:'~5 hrs',genre:'Romance, Drama',order:[],notes:''},{id:'p23',title:'Summer Pockets',status:'plan',eps:'TBA',time:'—',genre:'Slice of Life, Romance',order:[],notes:'Upcoming.'},{id:'p24',title:'Convenience Store Gyaru',status:'plan',eps:'12 eps',time:'~5 hrs',genre:'Romance, Comedy',order:[],notes:''},{id:'p25',title:'Chained Soldier',status:'plan',eps:'12 eps',time:'~5 hrs',genre:'Action, Fantasy, Ecchi',order:[],notes:''},{id:'p26',title:'Kagurabachi',status:'plan',eps:'13 eps',time:'~5 hrs',genre:'Action, Supernatural, Dark',order:[],notes:'No OVAs. S2 likely.'},{id:'p27',title:'The Apothecary Diaries',status:'plan',eps:'37 eps',time:'~15 hrs',genre:'Mystery, Historical, Drama',order:['TV: Season 1 — 24 eps','TV: Season 2 — 13 eps'],notes:'No OVAs.'},{id:'p28',title:'Fate/Strange Fake',status:'plan',eps:'~7 eps (ongoing)',time:'~3 hrs+',genre:'Action, Fantasy, Fate',order:[],notes:'Standalone Fate entry. Fate/Zero recommended but not required.'},{id:'p29',title:'All Class Awakening',status:'plan',eps:'TBA',time:'—',genre:'Fantasy, Action',order:[],notes:'Working title.'},{id:'p30',title:'Serial Experiments Lain',status:'plan',eps:'13 eps',time:'~5 hrs',genre:'Psychological, Sci-fi, Mystery',order:[],notes:'Classic 1998 series. Go in completely blind.'},{id:'p31',title:'Jack of All Trades, Party of None',status:'plan',eps:'TBA',time:'—',genre:'Fantasy, Action',order:[],notes:''},{id:'p32',title:'Quarantine Zone: The Last Check',status:'plan',eps:'TBA',time:'—',genre:'Thriller, Survival',order:[],notes:'Manhwa-based.'},{id:'p33',title:'Kamisama Kiss',status:'plan',eps:'25 eps + 7 OVAs',time:'~13 hrs',genre:'Romance, Supernatural, Shoujo',order:['TV: Season 1 — 13 eps','OVA: God Gets Dumped — after S1','OVA: God Goes to a Hot Spring — after S1','TV: Season 2 — 12 eps','KEY: Kako-hen OVAs (4 eps) — story-essential, after S2','KEY: Final OVA: Kamisama Shiawase ni Naru — true ending'],notes:"Kako-hen OVAs and final OVA complete the story — don't skip them!"},{id:'p34',title:'Realm of Curses',status:'plan',eps:'TBA',time:'—',genre:'Fantasy, Action',order:[],notes:'Manhwa-based.'},{id:'p35',title:'Jormungand',status:'plan',eps:'24 eps',time:'~10 hrs',genre:'Action, Thriller',order:['TV: Jormungand — 12 eps','TV: Jormungand: Perfect Order — 12 eps (direct sequel)'],notes:"S2 is called 'Perfect Order' — continuation, not a remake."},{id:'p36',title:'Alice in Borderland',status:'plan',eps:'17 eps (live action)',time:'~17 hrs',genre:'Thriller, Survival, Mystery',order:['Live Action: Season 1 — 8 eps (Netflix)','Live Action: Season 2 — 8 eps (Netflix)','SPECIAL: Extra episode — after S2'],notes:'Netflix live action, not anime.'},{id:'p37',title:'Orb: On the Movements of the Earth',status:'plan',eps:'13 eps',time:'~5 hrs',genre:'Historical, Drama, Sci-fi',order:[],notes:'No OVAs.'},{id:'p38',title:'Monogatari Series',status:'plan',eps:'~103 eps + 3 movies',time:'~45+ hrs',genre:'Supernatural, Mystery, Romance',order:['TV: Bakemonogatari — 15 eps','MOVIE: Kizumonogatari I: Tekketsu — after Bake','MOVIE: Kizumonogatari II: Nekketsu','MOVIE: Kizumonogatari III: Reiketsu','TV: Nisemonogatari — 11 eps','TV: Nekomonogatari: Kuro — 4 eps','TV: Monogatari Second Season — 26 eps','TV: Hanamonogatari — 5 eps','TV: Tsukimonogatari — 4 eps','TV: Owarimonogatari — 13 eps','TV: Koyomimonogatari — 12×12-min eps','TV: Owarimonogatari 2nd Season — 7 eps','TV: Zoku Owarimonogatari — 6 eps','ONA: Off & Monster Season — ongoing'],notes:'Do NOT watch chronologically on first watch — release order is intentional. 100+ eps total.'},{id:'p39',title:'Hello World',status:'plan',eps:'1 movie (~1h 40m)',time:'~1.7 hrs',genre:'Romance, Sci-fi',order:[],notes:'Standalone sci-fi romance film.'},{id:'p40',title:'Too Many Heroes for the Demon World',status:'plan',eps:'1 movie (~1.5 hrs)',time:'~1.5 hrs',genre:'Comedy, Fantasy',order:[],notes:'Standalone film.'},{id:'p41',title:'No Game No Life',status:'plan',eps:'12 eps + 6 OVA shorts + 1 movie',time:'~7 hrs',genre:'Isekai, Fantasy, Game',order:['TV: Season 1 — 12 eps','OVA: Mini OVA specials — optional comedy shorts','MOVIE: No Game No Life: Zero — watch AFTER the series'],notes:'Watch Zero after the series even though it is a prequel.'},{id:'p42',title:'Heavenly Delusion',status:'plan',eps:'13 eps',time:'~5 hrs',genre:'Sci-fi, Mystery, Post-apocalyptic',order:[],notes:'No OVAs. Season 2 likely.'},{id:'p43',title:'Bat Family',status:'plan',eps:'TBA',time:'—',genre:'Action, Fantasy',order:[],notes:'Webtoon-based.'},{id:'p44',title:'Devilman Crybaby',status:'plan',eps:'10 eps',time:'~4 hrs',genre:'Dark Fantasy, Action, Horror',order:[],notes:'Netflix ONA. Complete standalone.'},{id:'p45',title:'Akame ga Kill',status:'plan',eps:'24 eps',time:'~10 hrs',genre:'Action, Dark Fantasy',order:[],notes:'Anime-original ending differs from manga.'},{id:'p46',title:'Terror in Resonance',status:'plan',eps:'11 eps',time:'~5 hrs',genre:'Thriller, Psychological',order:[],notes:'Complete standalone. Short but impactful.'},{id:'p47',title:'The Warrior Princess and the Barbaric Kin',status:'plan',eps:'TBA',time:'—',genre:'Fantasy, Action',order:[],notes:''}];
 
 // ─── STATE ─────────────────────────────────────────────────────────────────
-let anime=[],sortMode='recent',detailId=null,editingId=null,curStatus='plan',deleteId=null,importItems=[],curAITab='rec',curTheme='default';
+let anime=[],sortMode='recent',filterStatus='all',detailId=null,editingId=null,curStatus='plan',deleteId=null,importItems=[],curAITab='rec',curTheme='default';
 const STATUS_META={
   watching:{label:'Watching',icon:'▶',color:'var(--wat)'},
   plan:{label:'Plan to Watch',icon:'📋',color:'var(--pln)'},
@@ -756,9 +799,20 @@ function prog(a){return a.status==='finished'?1:(a.epTotal?Math.min(1,(a.ep||0)/
 function query(){return document.getElementById('searchIn').value.toLowerCase().trim();}
 
 function render(){
-  renderSortRow();renderHome();
+  renderFiltRow();renderSortRow();renderHome();
   const fin=anime.filter(a=>a.status==='finished').length;
   document.getElementById('headerSub').textContent=`${anime.length} titles · ${fin} finished`;
+}
+function renderFiltRow(){
+  const counts={all:anime.length,watching:0,plan:0,finished:0,dropped:0};
+  anime.forEach(a=>counts[a.status]!==undefined&&counts[a.status]++);
+  const filts=[['all','All'],['watching','▶ Watching'],['plan','📋 Plan'],['finished','✓ Finished'],['dropped','✕ Dropped']];
+  document.getElementById('filtRow').innerHTML=filts.map(([f,l])=>{
+    const on=filterStatus===f;
+    const cls=on?(f==='all'?'on':'on-'+f):'';
+    const n=counts[f]||0;
+    return`<button class="fchip${cls?' '+cls:''}" onclick="setFilter('${f}')">${l}<span class="fn">${n}</span></button>`;
+  }).join('');
 }
 function renderSortRow(){
   const modes=[['recent','🕐 Recent'],['az','A–Z'],['rating','★ Rating'],['progress','▶ Progress']];
@@ -766,7 +820,8 @@ function renderSortRow(){
     `<button class="schip${sortMode===m?' on':''}" onclick="setSort('${m}')">${l}</button>`).join('');
 }
 function setSort(m){sortMode=m;render();}
-function goHome(){document.getElementById('searchIn').value='';renderHome();document.getElementById('pageEl').scrollTo({top:0,behavior:'smooth'});}
+function setFilter(f){filterStatus=f;renderFiltRow();renderHome();document.getElementById('pageEl').scrollTo({top:0,behavior:'smooth'});}
+function goHome(){document.getElementById('searchIn').value='';filterStatus='all';render();document.getElementById('pageEl').scrollTo({top:0,behavior:'smooth'});}
 
 function posterCard(a){
   const img=a.img
@@ -801,11 +856,16 @@ function heroHTML(a){
 function renderHome(){
   const el=document.getElementById('pageEl');
   const q=query();
-  if(q){
-    const hits=sorted(anime.filter(a=>(a.title+' '+(a.genre||'')+' '+(a.notes||'')).toLowerCase().includes(q)));
-    el.innerHTML=hits.length
-      ?`<div class="grid">${hits.map(posterCard).join('')}</div>`
-      :`<div class="empty"><div class="empty-icon">🔍</div><p>No matches for “${q}”</p></div>`;
+  if(q||filterStatus!=='all'){
+    let list=anime;
+    if(filterStatus!=='all')list=list.filter(a=>a.status===filterStatus);
+    if(q)list=list.filter(a=>(a.title+' '+(a.genre||'')+' '+(a.notes||'')).toLowerCase().includes(q));
+    const hits=sorted(list);
+    if(hits.length){el.innerHTML=`<div class="grid">${hits.map(posterCard).join('')}</div>`;return;}
+    const msg=q
+      ?`No matches for “${q}”${filterStatus!=='all'?` in ${STATUS_META[filterStatus].label}`:''}`
+      :`Nothing in ${STATUS_META[filterStatus].label} yet`;
+    el.innerHTML=`<div class="empty"><div class="empty-icon">${q?'🔍':STATUS_META[filterStatus].icon}</div><p>${msg}</p></div>`;
     return;
   }
   if(!anime.length){
@@ -981,6 +1041,7 @@ function openSheet_add(){
   setCoverPreview('');
   setStatus('plan');
   openSheet('addSheet');
+  setTimeout(()=>{const t=document.getElementById('fTitle');if(t)try{t.focus({preventScroll:true});}catch{t.focus();}},360);
 }
 function editItem(id){
   const a=anime.find(x=>x.id===id);if(!a)return;
@@ -1004,9 +1065,12 @@ function submitForm(){
   if(!title){toast('Enter a title first');return;}
   const orderRaw=document.getElementById('fOrder').value.trim();
   const epsStr=document.getElementById('fEps').value.trim();
+  const epTotal=parseEpTotal(epsStr);
+  let ep=Math.max(0,parseInt(document.getElementById('fEp').value)||0);
+  if(epTotal&&ep>epTotal)ep=epTotal;
   const data={title,status:curStatus,
-    eps:epsStr,epTotal:parseEpTotal(epsStr),
-    ep:Math.max(0,parseInt(document.getElementById('fEp').value)||0),
+    eps:epsStr,epTotal,
+    ep,
     time:document.getElementById('fTime').value.trim(),
     genre:document.getElementById('fGenre').value.trim(),
     order:orderRaw?orderRaw.split('\n').map(l=>l.trim()).filter(Boolean):[],

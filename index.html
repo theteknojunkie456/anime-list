@@ -403,6 +403,38 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 }
 .toast.on{opacity:1;transform:translateX(-50%) translateY(0);}
 
+/* ── KIND VIEW SWITCH (Watch / Read) ── */
+.kind-seg{display:flex;gap:6px;padding:12px 18px 2px;}
+.kseg{
+  flex:1;padding:10px 0;border-radius:13px;font-size:12.5px;font-weight:800;letter-spacing:-0.1px;
+  background:var(--bg3);border:1px solid var(--b2);color:var(--t2);
+  transition:background .16s,border-color .16s,color .16s,transform .12s;
+}
+.kseg:active{transform:scale(0.97);}
+.kseg.on{background:var(--ag);border-color:var(--a);color:var(--a);box-shadow:0 2px 12px -4px var(--glow);}
+.kseg .fn{font-size:9.5px;font-weight:800;opacity:0.6;font-variant-numeric:tabular-nums;margin-left:2px;}
+
+/* ── AIRING SCHEDULE ── */
+.pcard-air{font-size:9.5px;font-weight:700;color:var(--wat);margin-top:4px;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.hero-air{display:inline-flex;align-items:center;gap:5px;margin-top:9px;font-size:11px;font-weight:700;color:#ffd9a0;background:rgba(245,166,35,0.18);border:1px solid rgba(245,166,35,0.34);padding:5px 11px;border-radius:99px;}
+.dt-air{display:inline-flex;align-items:center;gap:6px;margin-top:10px;font-size:11.5px;font-weight:700;color:var(--wat);background:var(--watbg);border:1px solid var(--wat);padding:7px 12px;border-radius:99px;align-self:flex-start;}
+
+/* ── ADD FORM: KIND TOGGLE + POLISH ── */
+.kind-toggle{display:flex;gap:8px;}
+.kbtn{
+  flex:1;display:flex;align-items:center;justify-content:center;gap:7px;
+  padding:14px 0;border-radius:14px;font-size:13.5px;font-weight:800;letter-spacing:-0.1px;
+  background:var(--bg3);border:1px solid var(--b2);color:var(--t2);
+  transition:background .16s,border-color .16s,color .16s,transform .12s,box-shadow .16s;
+}
+.kbtn:active{transform:scale(0.97);}
+.kbtn.on{background:var(--ag);border-color:var(--a);color:var(--a);box-shadow:0 3px 14px -5px var(--glow);}
+.field-hint{font-size:11px;font-weight:600;color:var(--t3);margin-top:7px;line-height:1.45;}
+#addSheet .sheet-header{margin-bottom:14px;}
+#addSheet .sheet-title{font-size:21px;letter-spacing:-0.4px;}
+#addSheet .flabel{margin-bottom:8px;}
+#addSheet .submit-btn{font-size:15.5px;padding:17px 0;box-shadow:0 10px 26px -7px var(--glow);}
+
 @keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
 </style>
 </head>
@@ -422,6 +454,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
       <input class="search-in" type="search" id="searchIn" placeholder="Search titles, genres…" oninput="renderHome()">
     </div>
   </div>
+  <div class="kind-seg" id="kindSeg"></div>
   <div class="filt-row" id="filtRow"></div>
   <div class="sort-row" id="sortRow"></div>
   <div class="page" id="pageEl"></div>
@@ -453,6 +486,14 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
     <button class="sheet-cancel" onclick="closeAll()">Cancel</button>
   </div>
   <div class="fgroup">
+    <label class="flabel">What is it?</label>
+    <div class="kind-toggle">
+      <button type="button" class="kbtn" id="kf-watch" onclick="setKind('watch')">▶ Watch</button>
+      <button type="button" class="kbtn" id="kf-read" onclick="setKind('read')">📖 Read</button>
+    </div>
+    <div class="field-hint" id="kindHint">Anime, TV shows &amp; movies.</div>
+  </div>
+  <div class="fgroup">
     <label class="flabel">Title *</label>
     <input class="finput" id="fTitle" placeholder="e.g. Attack on Titan" autocomplete="off" autocorrect="off" enterkeyhint="search" onkeydown="if(event.key==='Enter'){event.preventDefault();aiAutofill();}">
   </div>
@@ -479,11 +520,11 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
   </div>
   <div class="frow2">
     <div class="fgroup">
-      <label class="flabel">Episodes</label>
+      <label class="flabel" id="lblEps">Episodes</label>
       <input class="finput" id="fEps" placeholder="e.g. 24 eps">
     </div>
     <div class="fgroup">
-      <label class="flabel">Watched (ep #)</label>
+      <label class="flabel" id="lblEp">Watched (ep #)</label>
       <input class="finput" id="fEp" type="number" min="0" inputmode="numeric" placeholder="0">
     </div>
   </div>
@@ -498,7 +539,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
     </div>
   </div>
   <div class="fgroup">
-    <label class="flabel">Watch Order (one step per line)</label>
+    <label class="flabel" id="lblOrder">Watch Order (one step per line)</label>
     <textarea class="ftextarea" id="fOrder" placeholder="TV: Season 1 — 12 eps&#10;OVA: Side story — after S1&#10;TV: Season 2 — 12 eps"></textarea>
   </div>
   <div class="fgroup">
@@ -622,7 +663,8 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 const DEFAULT_DATA=[{id:'f1',title:'Gachiakuta',status:'finished',eps:'13 eps',time:'~5 hrs',genre:'Action, Dark Fantasy',order:[],notes:'No OVAs yet. Season 2 announced.'},{id:'f2',title:"Masamune-kun's Revenge",status:'finished',eps:'25 eps + 1 OVA',time:'~11 hrs',genre:'Romance, Comedy',order:["TV: Season 1 — 12 eps","OVA: Masamune-kun's Revenge OVA — after S1","TV: Season 2 (R) — 12 eps"],notes:''},{id:'f3',title:'My Teen Romantic Comedy SNAFU',status:'finished',eps:'38 eps + 6 OVAs',time:'~18 hrs',genre:'Romance, Slice of Life',order:['TV: Season 1 — 13 eps','OVA: S1 OVA — after S1','TV: Season 2 (Zoku) — 13 eps','OVA: S2 OVAs (4 eps) — after S2','TV: Season 3 (Kan) — 12 eps','OVA: S3 OVA — after S3'],notes:''},{id:'w1',title:'Code Geass: Lelouch of the Rebellion',status:'watching',eps:'50 eps + OVAs + movies',time:'~29 hrs',genre:'Mecha, Sci-fi, Drama',order:['TV: Season 1 — 25 eps','SKIP: Black Rebellion Special — recap, skippable','TV: Season 2 R2 — 25 eps','OVA: Nunnally in Wonderland — fun non-canon parody','OVA: Akito the Exiled (5 parts) — spin-off between S1 & S2','KEY: Lelouch of the Re;surrection — sequel movie'],notes:'Core experience = S1 + S2 only. Everything else is optional.'},{id:'w2',title:'Record of Ragnarok',status:'watching',eps:'42 eps',time:'~18 hrs',genre:'Action, Mythology',order:['TV: Season 1 — 12 eps (Netflix)','TV: Season 2 Part 1 — 10 eps','TV: Season 2 Part 2 — 5 eps','TV: Season 3 — 15 eps'],notes:'No OVAs or movies.'},{id:'w3',title:'Soul Eater',status:'watching',eps:'51 eps + 1 special',time:'~22 hrs',genre:'Action, Dark Fantasy',order:['TV: Soul Eater — 51 eps','SPECIAL: Soul Eater: Late Show — comedy short, optional'],notes:'Anime-original ending differs from manga.'},{id:'w4',title:'Hero with No Class',status:'watching',eps:'12 eps',time:'~4 hrs',genre:'Isekai, Fantasy',order:[],notes:'Single season, no OVAs yet.'},{id:'w5',title:'Sentenced to Be a Hero',status:'watching',eps:'12 eps',time:'~4 hrs',genre:'Fantasy, Dark',order:[],notes:'Single season.'},{id:'w6',title:'Call of the Night',status:'watching',eps:'25 eps',time:'~10 hrs',genre:'Romance, Supernatural',order:['TV: Season 1 — 13 eps','TV: Season 2 — 12 eps (2025)'],notes:'No OVAs.'},{id:'w7',title:'The Stellar Sword Master',status:'watching',eps:'TBA',time:'—',genre:'Fantasy',order:[],notes:'Working title — ongoing.'},{id:'w8',title:'The Patrons of Villains',status:'watching',eps:'TBA',time:'—',genre:'Fantasy',order:[],notes:'Working title — ongoing.'},{id:'p1',title:'Fullmetal Alchemist: Brotherhood',status:'plan',eps:'64 eps + 4 OVAs + 1 movie',time:'~29 hrs',genre:'Action, Adventure, Drama',order:['TV: Brotherhood — 64 eps','OVA: OVA Collection (4 eps) — after main series','MOVIE: The Sacred Star of Milos — side story'],notes:'Watch main series straight through. OVAs and movie are non-canon side stories.'},{id:'p2',title:'Dr. Stone',status:'plan',eps:'~94 eps + 1 special',time:'~40 hrs',genre:'Sci-fi, Adventure, Shounen',order:['TV: Season 1 — 24 eps','SKIP: Stone Wars Eve Special — recap, skippable','TV: Season 2: Stone Wars — 11 eps','KEY: Special: Ryuusui — 1 hr, MUST watch before S3','TV: Season 3: New World Part 1 — 11 eps','TV: Season 3: New World Part 2 — 11 eps','TV: Season 4: Science Future — 37 eps (ongoing)'],notes:"Ryuusui special is required before Season 3 — don't skip it."},{id:'p3',title:'Ninja Kamui',status:'plan',eps:'13 eps',time:'~5 hrs',genre:'Action, Thriller',order:[],notes:'Standalone. No OVAs.'},{id:'p4',title:'Plastic Memories',status:'plan',eps:'13 eps',time:'~5 hrs',genre:'Romance, Sci-fi, Drama',order:[],notes:'Standalone. Prepare for emotional damage.'},{id:'p5',title:'The Magical Girl and the Evil Lieutenant Used to Be Archenemies',status:'plan',eps:'12 eps',time:'~5 hrs',genre:'Romance, Comedy, Magical Girl',order:[],notes:'No OVAs confirmed.'},{id:'p6',title:'Absolute Duo',status:'plan',eps:'12 eps + 2 OVAs',time:'~6 hrs',genre:'Action, Romance, Harem',order:['TV: Main series — 12 eps','OVA: OVAs (2 eps) — after main series'],notes:''},{id:'p7',title:'Seraph of the End',status:'plan',eps:'24 eps + 1 OVA',time:'~10 hrs',genre:'Action, Dark Fantasy, Vampire',order:['TV: Season 1 — 12 eps','SKIP: Beginning of the End recap — skippable','OVA: Vampire Shahal — between S1 and S2','TV: Season 2: Battle in Nagoya — 12 eps'],notes:''},{id:'p8',title:'Tokyo Revengers',status:'plan',eps:'50 eps + shorts',time:'~21 hrs',genre:'Action, Drama, Time Travel',order:['TV: Season 1 — 24 eps','TV: Season 2: Christmas Showdown — 13 eps','TV: Season 3: Tenjiku Arc — 13 eps','SPECIAL: Chibi Revengers — 24×2 min comedy shorts, any time'],notes:''},{id:'p9',title:'Working in a Godless World',status:'plan',eps:'12 eps',time:'~5 hrs',genre:'Slice of Life, Comedy',order:[],notes:''},{id:'p10',title:'Aesthetics of a Rogue Hero',status:'plan',eps:'12 eps + 2 OVAs',time:'~6 hrs',genre:'Action, Harem, Fantasy',order:['TV: Main series — 12 eps','OVA: OVAs (2 eps) — after main series'],notes:''},{id:'p11',title:'All Out',status:'plan',eps:'25 eps',time:'~10 hrs',genre:'Sports, Drama',order:[],notes:'Rugby anime. Complete standalone.'},{id:'p12',title:'Love of Kill',status:'plan',eps:'13 eps',time:'~5 hrs',genre:'Romance, Thriller, Action',order:[],notes:''},{id:'p13',title:'Unwanted Undead Adventurer',status:'plan',eps:'13 eps',time:'~5 hrs',genre:'Fantasy, Isekai',order:[],notes:'No OVAs. Season 2 likely.'},{id:'p14',title:'Date A Live',status:'plan',eps:'58 eps + 2 OVAs + 3 movies',time:'~28 hrs',genre:'Sci-fi, Romance, Harem',order:['TV: Season 1 — 12 eps','OVA: Date to Date OVA — after S1','TV: Season 2 — 10 eps','OVA: Kurumi Star Festival OVA — after S2','SKIP: Movie: Mayuri Judgement — non-canon, optional','TV: Season 3 — 12 eps','MOVIE: Date A Bullet: Dead or Bullet — after S3','MOVIE: Date A Bullet: Nightmare or Queen — sequel','TV: Season 4 — 12 eps','TV: Season 5 — 12 eps'],notes:''},{id:'p15',title:'Love Lies',status:'plan',eps:'12 eps',time:'~5 hrs',genre:'Romance, Drama',order:[],notes:''},{id:'p16',title:"Scum's Wish",status:'plan',eps:'12 eps + 1 special',time:'~5 hrs',genre:'Romance, Drama, Mature',order:["TV: Main series — 12 eps","SPECIAL: Scum's Wish: Decor — bonus ep after main series"],notes:'Mature themes.'},{id:'p17',title:'Clannad',status:'plan',eps:'47 eps + 2 OVAs + movie',time:'~21 hrs',genre:'Romance, Drama, Slice of Life',order:['TV: Clannad Season 1 — 23 eps','OVA: Another World: Tomoyo Chapter — after S1','TV: Clannad: After Story — 24 eps (DO NOT SKIP)','OVA: Another World: Kyou Chapter — after After Story','SKIP: Clannad Movie — recap, skippable'],notes:'After Story is the emotional core — never skip it. Have tissues.'},{id:'p18',title:'A Day Before Us',status:'plan',eps:'24 shorts (~6 min each)',time:'~2.5 hrs',genre:'Romance, Slice of Life',order:['Web: Season 1 — 12 shorts','Web: Season 2 — 12 shorts'],notes:'Korean webtoon-based shorts.'},{id:'p19',title:'Mushoku Tensei: Jobless Reincarnation',status:'plan',eps:'35 eps + 2 specials',time:'~15 hrs',genre:'Isekai, Fantasy, Drama',order:['TV: Season 1 Part 1 — 11 eps','TV: Season 1 Part 2 — 12 eps','OVA: Eris the Goblin Slayer — after S1 Pt2 ep4','SPECIAL: Guardian Fitz (S2 Ep0) — before S2','TV: Season 2 — 12 eps'],notes:'Season 3 coming 2026.'},{id:'p20',title:'Chitose Is in the Ramune Bottle',status:'plan',eps:'12 eps + OVA',time:'~5 hrs',genre:'Romance, Slice of Life',order:['TV: Main series — 12 eps','OVA: Bonus OVA — after main series'],notes:''},{id:'p21',title:'Wistoria: Wand and Sword',status:'plan',eps:'12 eps',time:'~5 hrs',genre:'Fantasy, Action, Magic',order:[],notes:''},{id:'p22',title:'May I Ask One Last Thing?',status:'plan',eps:'12 eps',time:'~5 hrs',genre:'Romance, Drama',order:[],notes:''},{id:'p23',title:'Summer Pockets',status:'plan',eps:'TBA',time:'—',genre:'Slice of Life, Romance',order:[],notes:'Upcoming.'},{id:'p24',title:'Convenience Store Gyaru',status:'plan',eps:'12 eps',time:'~5 hrs',genre:'Romance, Comedy',order:[],notes:''},{id:'p25',title:'Chained Soldier',status:'plan',eps:'12 eps',time:'~5 hrs',genre:'Action, Fantasy, Ecchi',order:[],notes:''},{id:'p26',title:'Kagurabachi',status:'plan',eps:'13 eps',time:'~5 hrs',genre:'Action, Supernatural, Dark',order:[],notes:'No OVAs. S2 likely.'},{id:'p27',title:'The Apothecary Diaries',status:'plan',eps:'37 eps',time:'~15 hrs',genre:'Mystery, Historical, Drama',order:['TV: Season 1 — 24 eps','TV: Season 2 — 13 eps'],notes:'No OVAs.'},{id:'p28',title:'Fate/Strange Fake',status:'plan',eps:'~7 eps (ongoing)',time:'~3 hrs+',genre:'Action, Fantasy, Fate',order:[],notes:'Standalone Fate entry. Fate/Zero recommended but not required.'},{id:'p29',title:'All Class Awakening',status:'plan',eps:'TBA',time:'—',genre:'Fantasy, Action',order:[],notes:'Working title.'},{id:'p30',title:'Serial Experiments Lain',status:'plan',eps:'13 eps',time:'~5 hrs',genre:'Psychological, Sci-fi, Mystery',order:[],notes:'Classic 1998 series. Go in completely blind.'},{id:'p31',title:'Jack of All Trades, Party of None',status:'plan',eps:'TBA',time:'—',genre:'Fantasy, Action',order:[],notes:''},{id:'p32',title:'Quarantine Zone: The Last Check',status:'plan',eps:'TBA',time:'—',genre:'Thriller, Survival',order:[],notes:'Manhwa-based.'},{id:'p33',title:'Kamisama Kiss',status:'plan',eps:'25 eps + 7 OVAs',time:'~13 hrs',genre:'Romance, Supernatural, Shoujo',order:['TV: Season 1 — 13 eps','OVA: God Gets Dumped — after S1','OVA: God Goes to a Hot Spring — after S1','TV: Season 2 — 12 eps','KEY: Kako-hen OVAs (4 eps) — story-essential, after S2','KEY: Final OVA: Kamisama Shiawase ni Naru — true ending'],notes:"Kako-hen OVAs and final OVA complete the story — don't skip them!"},{id:'p34',title:'Realm of Curses',status:'plan',eps:'TBA',time:'—',genre:'Fantasy, Action',order:[],notes:'Manhwa-based.'},{id:'p35',title:'Jormungand',status:'plan',eps:'24 eps',time:'~10 hrs',genre:'Action, Thriller',order:['TV: Jormungand — 12 eps','TV: Jormungand: Perfect Order — 12 eps (direct sequel)'],notes:"S2 is called 'Perfect Order' — continuation, not a remake."},{id:'p36',title:'Alice in Borderland',status:'plan',eps:'17 eps (live action)',time:'~17 hrs',genre:'Thriller, Survival, Mystery',order:['Live Action: Season 1 — 8 eps (Netflix)','Live Action: Season 2 — 8 eps (Netflix)','SPECIAL: Extra episode — after S2'],notes:'Netflix live action, not anime.'},{id:'p37',title:'Orb: On the Movements of the Earth',status:'plan',eps:'13 eps',time:'~5 hrs',genre:'Historical, Drama, Sci-fi',order:[],notes:'No OVAs.'},{id:'p38',title:'Monogatari Series',status:'plan',eps:'~103 eps + 3 movies',time:'~45+ hrs',genre:'Supernatural, Mystery, Romance',order:['TV: Bakemonogatari — 15 eps','MOVIE: Kizumonogatari I: Tekketsu — after Bake','MOVIE: Kizumonogatari II: Nekketsu','MOVIE: Kizumonogatari III: Reiketsu','TV: Nisemonogatari — 11 eps','TV: Nekomonogatari: Kuro — 4 eps','TV: Monogatari Second Season — 26 eps','TV: Hanamonogatari — 5 eps','TV: Tsukimonogatari — 4 eps','TV: Owarimonogatari — 13 eps','TV: Koyomimonogatari — 12×12-min eps','TV: Owarimonogatari 2nd Season — 7 eps','TV: Zoku Owarimonogatari — 6 eps','ONA: Off & Monster Season — ongoing'],notes:'Do NOT watch chronologically on first watch — release order is intentional. 100+ eps total.'},{id:'p39',title:'Hello World',status:'plan',eps:'1 movie (~1h 40m)',time:'~1.7 hrs',genre:'Romance, Sci-fi',order:[],notes:'Standalone sci-fi romance film.'},{id:'p40',title:'Too Many Heroes for the Demon World',status:'plan',eps:'1 movie (~1.5 hrs)',time:'~1.5 hrs',genre:'Comedy, Fantasy',order:[],notes:'Standalone film.'},{id:'p41',title:'No Game No Life',status:'plan',eps:'12 eps + 6 OVA shorts + 1 movie',time:'~7 hrs',genre:'Isekai, Fantasy, Game',order:['TV: Season 1 — 12 eps','OVA: Mini OVA specials — optional comedy shorts','MOVIE: No Game No Life: Zero — watch AFTER the series'],notes:'Watch Zero after the series even though it is a prequel.'},{id:'p42',title:'Heavenly Delusion',status:'plan',eps:'13 eps',time:'~5 hrs',genre:'Sci-fi, Mystery, Post-apocalyptic',order:[],notes:'No OVAs. Season 2 likely.'},{id:'p43',title:'Bat Family',status:'plan',eps:'TBA',time:'—',genre:'Action, Fantasy',order:[],notes:'Webtoon-based.'},{id:'p44',title:'Devilman Crybaby',status:'plan',eps:'10 eps',time:'~4 hrs',genre:'Dark Fantasy, Action, Horror',order:[],notes:'Netflix ONA. Complete standalone.'},{id:'p45',title:'Akame ga Kill',status:'plan',eps:'24 eps',time:'~10 hrs',genre:'Action, Dark Fantasy',order:[],notes:'Anime-original ending differs from manga.'},{id:'p46',title:'Terror in Resonance',status:'plan',eps:'11 eps',time:'~5 hrs',genre:'Thriller, Psychological',order:[],notes:'Complete standalone. Short but impactful.'},{id:'p47',title:'The Warrior Princess and the Barbaric Kin',status:'plan',eps:'TBA',time:'—',genre:'Fantasy, Action',order:[],notes:''}];
 
 // ─── STATE ─────────────────────────────────────────────────────────────────
-let anime=[],sortMode='recent',filterStatus='all',detailId=null,editingId=null,curStatus='plan',deleteId=null,importItems=[],curAITab='rec',curTheme='default';
+let anime=[],sortMode='recent',filterStatus='all',detailId=null,editingId=null,curStatus='plan',deleteId=null,importItems=[],curAITab='rec',curTheme='default',viewKind='watch',curKind='watch';
+function kindOf(a){return (a&&a.kind)==='read'?'read':'watch';}
 const STATUS_META={
   watching:{label:'Watching',icon:'▶',color:'var(--wat)'},
   plan:{label:'Plan to Watch',icon:'📋',color:'var(--pln)'},
@@ -634,9 +676,10 @@ const STATUS_META={
 const LSKEY='animelist_v4';
 const SYNC_URL='https://watchlist-sync.muhammad-dac.workers.dev';
 function store(){try{localStorage.setItem('_t','1');localStorage.removeItem('_t');return localStorage;}catch{return null;}}
-function parseEpTotal(s){const m=/(\d+)\s*eps?/i.exec(s||'');return m?+m[1]:0;}
+function parseEpTotal(s){const m=/(\d+)\s*(?:eps?|chapters?|ch\b)/i.exec(s||'');return m?+m[1]:0;}
 function migrate(list){
-  return (Array.isArray(list)?list:[]).map(a=>({ep:0,rating:0,fav:false,upd:0,epTotal:parseEpTotal(a.eps),img:'',order:[],notes:'',genre:'',eps:'',time:'',...a}));
+  // add `kind` to every item (existing items default to "watch"); airing cache fields start empty
+  return (Array.isArray(list)?list:[]).map(a=>({ep:0,rating:0,fav:false,upd:0,epTotal:parseEpTotal(a.eps),img:'',order:[],notes:'',genre:'',eps:'',time:'',kind:'watch',...a}));
 }
 function load(){try{const s=store(),d=s&&s.getItem(LSKEY);anime=migrate(d?JSON.parse(d):JSON.parse(JSON.stringify(DEFAULT_DATA)));}catch{anime=migrate(JSON.parse(JSON.stringify(DEFAULT_DATA)));}}
 let saveWarned=false;
@@ -799,14 +842,36 @@ function prog(a){return a.status==='finished'?1:(a.epTotal?Math.min(1,(a.ep||0)/
 function query(){return document.getElementById('searchIn').value.toLowerCase().trim();}
 
 function render(){
-  renderFiltRow();renderSortRow();renderHome();
+  renderKindSeg();renderFiltRow();renderSortRow();renderHome();
   const fin=anime.filter(a=>a.status==='finished').length;
   document.getElementById('headerSub').textContent=`${anime.length} titles · ${fin} finished`;
 }
+function renderKindSeg(){
+  const el=document.getElementById('kindSeg');if(!el)return;
+  const cW=anime.filter(a=>kindOf(a)==='watch').length,cR=anime.filter(a=>kindOf(a)==='read').length;
+  const opts=[['watch','▶ Watching',cW],['read','📖 Reading',cR]];
+  el.innerHTML=opts.map(([k,l,n])=>`<button class="kseg${viewKind===k?' on':''}" onclick="setViewKind('${k}')">${l} <span class="fn">${n}</span></button>`).join('');
+}
+function setViewKind(k){
+  if(viewKind===k)return;
+  viewKind=k;filterStatus='all';
+  const s=document.getElementById('searchIn');if(s)s.value='';
+  render();document.getElementById('pageEl').scrollTo({top:0,behavior:'smooth'});
+}
+// ─── AIRING (AniList nextAiringEpisode, display-only) ───────────────────────
+function airingInfo(a){
+  if(kindOf(a)!=='watch'||!a.airAt)return null;
+  const ms=a.airAt*1000;
+  if(ms<Date.now())return null; // aired already — refreshed opportunistically by fetchCovers
+  const d=new Date(ms);
+  return{ep:a.airEp||0,day:d.toLocaleDateString([],{weekday:'short'}),time:d.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})};
+}
 function renderFiltRow(){
-  const counts={all:anime.length,watching:0,plan:0,finished:0,dropped:0};
-  anime.forEach(a=>counts[a.status]!==undefined&&counts[a.status]++);
-  const filts=[['all','All'],['watching','▶ Watching'],['plan','📋 Plan'],['finished','✓ Finished'],['dropped','✕ Dropped']];
+  const items=anime.filter(a=>kindOf(a)===viewKind);
+  const counts={all:items.length,watching:0,plan:0,finished:0,dropped:0};
+  items.forEach(a=>counts[a.status]!==undefined&&counts[a.status]++);
+  const isRead=viewKind==='read';
+  const filts=[['all','All'],['watching',isRead?'📖 Reading':'▶ Watching'],['plan',isRead?'📋 To Read':'📋 Plan'],['finished','✓ Finished'],['dropped','✕ Dropped']];
   document.getElementById('filtRow').innerHTML=filts.map(([f,l])=>{
     const on=filterStatus===f;
     const cls=on?(f==='all'?'on':'on-'+f):'';
@@ -829,6 +894,8 @@ function posterCard(a){
     :`<div class="pcard-ph">${((a.title||'?').trim()[0]||'?').toUpperCase().replace(/['"<&]/g,'?')}</div>`;
   const p=prog(a);
   const bar=(a.status==='watching'&&a.epTotal)?`<div class="pbar"><div class="pfill" style="width:${Math.round(p*100)}%"></div></div>`:'';
+  const air=airingInfo(a);
+  const airHTML=air?`<div class="pcard-air">📅 ${air.day} ${air.time}</div>`:'';
   return`<div class="pcard" onclick="openDetail('${a.id}')">
     <div class="pcard-wrap">
       ${img}
@@ -837,18 +904,22 @@ function posterCard(a){
     </div>
     ${bar}
     <div class="pcard-title">${a.title}</div>
+    ${airHTML}
   </div>`;
 }
 function heroHTML(a){
   const p=prog(a);
   const bg=a.img?`<div class="hero-bg" style="background-image:url('${a.img}')"></div>`:`<div class="hero-bg" style="background:linear-gradient(135deg,var(--bg4),var(--bg2))"></div>`;
+  const air=airingInfo(a);
+  const airHTML=air?`<div class="hero-air">📅 Ep ${air.ep} · airs ${air.day} ${air.time}</div>`:'';
   return`<div class="hero" onclick="openDetail('${a.id}')">
     ${bg}<div class="hero-shade"></div>
     <div class="hero-body">
-      <div class="hero-kicker">Continue watching</div>
+      <div class="hero-kicker">${kindOf(a)==='read'?'Continue reading':'Continue watching'}</div>
       <div class="hero-title">${a.title}</div>
       <div class="hero-meta">${[a.eps,a.time,(a.genre||'').split(',')[0]].filter(Boolean).join(' · ')}</div>
       ${a.epTotal?`<div class="hero-prog"><div class="pbar"><div class="pfill" style="width:${Math.round(p*100)}%"></div></div><span>${a.ep||0} / ${a.epTotal}</span></div>`:''}
+      ${airHTML}
       <div class="hero-cta">▶ &nbsp;Open</div>
     </div>
   </div>`;
@@ -856,36 +927,41 @@ function heroHTML(a){
 function renderHome(){
   const el=document.getElementById('pageEl');
   const q=query();
+  const isRead=viewKind==='read';
+  const pool=anime.filter(a=>kindOf(a)===viewKind);
   if(q||filterStatus!=='all'){
-    let list=anime;
+    let list=pool;
     if(filterStatus!=='all')list=list.filter(a=>a.status===filterStatus);
     if(q)list=list.filter(a=>(a.title+' '+(a.genre||'')+' '+(a.notes||'')).toLowerCase().includes(q));
     const hits=sorted(list);
     if(hits.length){el.innerHTML=`<div class="grid">${hits.map(posterCard).join('')}</div>`;return;}
+    const stLbl=filterStatus==='watching'?(isRead?'Reading':'Watching'):(STATUS_META[filterStatus]?STATUS_META[filterStatus].label:filterStatus);
     const msg=q
-      ?`No matches for “${q}”${filterStatus!=='all'?` in ${STATUS_META[filterStatus].label}`:''}`
-      :`Nothing in ${STATUS_META[filterStatus].label} yet`;
-    el.innerHTML=`<div class="empty"><div class="empty-icon">${q?'🔍':STATUS_META[filterStatus].icon}</div><p>${msg}</p></div>`;
+      ?`No matches for “${q}”${filterStatus!=='all'?` in ${stLbl}`:` in your ${isRead?'reading':'watch'} list`}`
+      :`Nothing in ${stLbl} yet`;
+    el.innerHTML=`<div class="empty"><div class="empty-icon">${q?'🔍':(STATUS_META[filterStatus]?STATUS_META[filterStatus].icon:(isRead?'📖':'🎌'))}</div><p>${msg}</p></div>`;
     return;
   }
-  if(!anime.length){
-    el.innerHTML=`<div class="empty"><div class="empty-icon">🎌</div><p>Your list is empty.<br>Add a title or import your whole list from Notes in one paste.</p><button class="hero-cta" onclick="openSheet('importSheet')">📋 Import a list</button></div>`;
+  if(!pool.length){
+    el.innerHTML=isRead
+      ?`<div class="empty"><div class="empty-icon">📖</div><p>Your reading list is empty.<br>Add a manhwa, webtoon, manga or light novel — tap ＋ and choose 📖 Read.</p><button class="hero-cta" onclick="openSheet_add()">＋ Add something to read</button></div>`
+      :`<div class="empty"><div class="empty-icon">🎌</div><p>Your list is empty.<br>Add a title or import your whole list from Notes in one paste.</p><button class="hero-cta" onclick="openSheet('importSheet')">📋 Import a list</button></div>`;
     return;
   }
-  const watching=sorted(anime.filter(a=>a.status==='watching'));
+  const watching=sorted(pool.filter(a=>a.status==='watching'));
   const hero=watching.find(a=>a.img)||watching[0];
   let html=hero?heroHTML(hero):'';
-  const rows=[
-    ['watching','▶ Watching'],['plan','📋 Plan to Watch'],['finished','✓ Finished'],['dropped','✕ Dropped'],
-  ];
+  const rows=isRead
+    ?[['watching','📖 Reading'],['plan','📋 Plan to Read'],['finished','✓ Finished'],['dropped','✕ Dropped']]
+    :[['watching','▶ Watching'],['plan','📋 Plan to Watch'],['finished','✓ Finished'],['dropped','✕ Dropped']];
   for(const[st,label]of rows){
-    let items=sorted(anime.filter(a=>a.status===st));
+    let items=sorted(pool.filter(a=>a.status===st));
     if(st==='watching'&&hero)items=items.filter(a=>a.id!==hero.id);
     if(!items.length)continue;
     html+=`<div class="row-sec"><div class="row-head"><div class="row-title">${label}</div><div class="row-count">${items.length}</div></div>
       <div class="row-scroll">${items.map(posterCard).join('')}</div></div>`;
   }
-  const favs=sorted(anime.filter(a=>a.fav));
+  const favs=sorted(pool.filter(a=>a.fav));
   if(favs.length)html+=`<div class="row-sec"><div class="row-head"><div class="row-title">❤️ Favorites</div><div class="row-count">${favs.length}</div></div>
     <div class="row-scroll">${favs.map(posterCard).join('')}</div></div>`;
   el.innerHTML=html;
@@ -899,13 +975,14 @@ function openDetail(id){
 }
 function renderDetail(){
   const a=anime.find(x=>x.id===detailId);if(!a)return;
+  const read=kindOf(a)==='read';
   const cover=a.img
     ?`<img class="dt-cover" src="${a.img}" alt="" onerror="this.remove()">`
     :`<div class="dt-cover-ph">${((a.title||'?').trim()[0]||'?').toUpperCase().replace(/['"<&]/g,'?')}</div>`;
   const statusBtns=Object.keys(STATUS_META).map(s=>
     `<button class="dpick${a.status===s?' on-'+s:''}" onclick="setDetailStatus('${s}')">${STATUS_META[s].icon} ${s==='plan'?'Plan':s==='watching'?'Watch':s==='finished'?'Done':'Drop'}</button>`).join('');
   const p=prog(a);
-  const progHTML=`<div class="dt-label">Episode progress</div>
+  const progHTML=`<div class="dt-label">${read?'Reading progress':'Episode progress'}</div>
     <div class="prog-row">
       <button class="prog-btn" onclick="bumpEp(-1)">−</button>
       <div class="prog-mid">
@@ -936,7 +1013,7 @@ function renderDetail(){
     const grouped=films.length>=3;
     const main=grouped?a.order.filter(s=>!isFilm(s)):a.order;
     const filmsHTML=grouped?`<details class="films-acc"><summary>🎬 ${films.length} side films — optional, watch any time</summary><ol class="order-list">${films.map(s=>li(s,true)).join('')}</ol></details>`:'';
-    orderHTML=`<div class="dt-label">Watch order</div><ol class="order-list">${main.map(s=>li(s,false)).join('')}</ol>${filmsHTML}`;
+    orderHTML=`<div class="dt-label">${read?'Read order':'Watch order'}</div><ol class="order-list">${main.map(s=>li(s,false)).join('')}</ol>${filmsHTML}`;
   }
   const notesHTML=(a.notes&&a.notes.trim())?`<div class="dt-label">Notes</div><div class="dt-note">${a.notes}</div>`:'';
   document.getElementById('detailBody').innerHTML=`
@@ -945,6 +1022,7 @@ function renderDetail(){
       <div class="dt-info">
         <div class="dt-title">${a.title}</div>
         <div class="dt-meta">${[a.eps,a.time].filter(Boolean).join(' · ')}</div>
+        ${(()=>{const air=airingInfo(a);return air?`<div class="dt-air">📅 Ep ${air.ep} · airs ${air.day} ${air.time}</div>`:'';})()}
         <button class="dt-fav${a.fav?' on':''}" onclick="toggleFav()">${a.fav?'❤️ Favorited':'🤍 Favorite'}</button>
       </div>
     </div>
@@ -1033,6 +1111,26 @@ function setStatus(s){
     if(b)b.className=`spick${x===s?` on-${x}`:''}`;
   });
 }
+function setKind(k){
+  curKind=(k==='read')?'read':'watch';
+  const w=document.getElementById('kf-watch'),r=document.getElementById('kf-read');
+  if(w)w.className=`kbtn${curKind==='watch'?' on':''}`;
+  if(r)r.className=`kbtn${curKind==='read'?' on':''}`;
+  formKindLabels();
+}
+function formKindLabels(){
+  const read=curKind==='read';
+  const set=(id,txt)=>{const e=document.getElementById(id);if(e)e.textContent=txt;};
+  set('lblEps',read?'Chapters':'Episodes');
+  set('lblEp',read?'Read (ch #)':'Watched (ep #)');
+  set('lblOrder',read?'Read Order (one step per line)':'Watch Order (one step per line)');
+  set('kindHint',read?'Manhwa, webtoon, manga & light novels.':'Anime, TV shows & movies.');
+  const fEps=document.getElementById('fEps');if(fEps)fEps.placeholder=read?'e.g. 120 chapters':'e.g. 24 eps';
+  const fEp=document.getElementById('fEp');if(fEp)fEp.placeholder='0';
+  const fOrder=document.getElementById('fOrder');if(fOrder)fOrder.placeholder=read?'Vol 1 — ch 1–10\nVol 2 — ch 11–20':'TV: Season 1 — 12 eps\nOVA: Side story — after S1\nTV: Season 2 — 12 eps';
+  const btn=document.getElementById('autofillBtn');
+  if(btn&&!btn.classList.contains('loading'))btn.innerHTML=read?'<span>✦</span> Autofill — cover, chapters, genre &amp; status':'<span>✦</span> Autofill — cover, episodes, genre &amp; watch order';
+}
 function openSheet_add(){
   editingId=null;
   document.getElementById('addSheetTitle').textContent='Add to List';
@@ -1040,6 +1138,7 @@ function openSheet_add(){
   ['fTitle','fEps','fEp','fTime','fGenre','fOrder','fNotes'].forEach(i=>document.getElementById(i).value='');
   setCoverPreview('');
   setStatus('plan');
+  setKind(viewKind); // default to whichever list (Watch/Read) is being viewed
   openSheet('addSheet');
   setTimeout(()=>{const t=document.getElementById('fTitle');if(t)try{t.focus({preventScroll:true});}catch{t.focus();}},360);
 }
@@ -1058,6 +1157,7 @@ function editItem(id){
   document.getElementById('fNotes').value=a.notes||'';
   setCoverPreview(a.img||'');
   setStatus(a.status);
+  setKind(kindOf(a));
   setTimeout(()=>openSheet('addSheet'),60);
 }
 function submitForm(){
@@ -1068,7 +1168,9 @@ function submitForm(){
   const epTotal=parseEpTotal(epsStr);
   let ep=Math.max(0,parseInt(document.getElementById('fEp').value)||0);
   if(epTotal&&ep>epTotal)ep=epTotal;
-  const data={title,status:curStatus,
+  const prev=editingId?anime.find(a=>a.id===editingId):null;
+  const kindChanged=!!prev&&kindOf(prev)!==curKind;
+  const data={title,status:curStatus,kind:curKind,
     eps:epsStr,epTotal,
     ep,
     time:document.getElementById('fTime').value.trim(),
@@ -1078,6 +1180,8 @@ function submitForm(){
     img:pendingImg,
     imgTried:!pendingImg&&!!editingId,
     upd:Date.now()};
+  if(curKind==='read'){data.airAt=0;data.airEp=0;data.airChk=0;} // reading items never carry airing data
+  if(kindChanged){data.imgTried=!!pendingImg;data.detTried=false;} // switched Watch⇄Read — re-fetch cover/details from the right AniList type
   if(editingId){
     const i=anime.findIndex(a=>a.id===editingId);
     if(i!==-1)anime[i]={...anime[i],...data};
@@ -1170,7 +1274,7 @@ function toggleAllImport(){const allOn=importItems.every(x=>x.selected);importIt
 function doImport(){
   const existing=new Set(anime.map(a=>a.title.toLowerCase().trim()));
   const toAdd=importItems.filter(x=>x.selected&&!existing.has(x.title.toLowerCase().trim()));
-  toAdd.forEach(item=>anime.unshift({id:uid(),title:item.title,status:item.status,ep:item.ep||0,rating:item.rating||0,fav:false,eps:'',epTotal:0,time:'',genre:'',order:[],notes:'',img:'',upd:Date.now()}));
+  toAdd.forEach(item=>anime.unshift({id:uid(),title:item.title,status:item.status,kind:viewKind,ep:item.ep||0,rating:item.rating||0,fav:false,eps:'',epTotal:0,time:'',genre:'',order:[],notes:'',img:'',upd:Date.now()}));
   save();closeAll();render();
   toast(`Added ${toAdd.length} title${toAdd.length!==1?'s':''}!`);
   setTimeout(fetchCovers,500);
@@ -1415,9 +1519,40 @@ async function lookupBook(title){
   };
 }
 
+async function lookupManga(title){
+  // AniList MANGA covers manhwa / webtoon / manga / light novels — the side the ANIME query misses.
+  const q=`{Media(search:${JSON.stringify(String(title))},type:MANGA){coverImage{large} chapters volumes genres status format countryOfOrigin averageScore startDate{year}}}`;
+  const r=await fetch('https://graphql.anilist.co',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({query:q})});
+  if(!r.ok)return null;
+  const j=await r.json();const m=j&&j.data&&j.data.Media;
+  if(!m)return null;
+  const eps=m.chapters?`${m.chapters} chapters`:(m.volumes?`${m.volumes} volumes`:'ongoing');
+  const fmtLabel={MANGA:'Manga',MANHWA:'Manhwa',MANHUA:'Manhua',NOVEL:'Light novel',ONE_SHOT:'One-shot'}[m.format]
+    ||(m.countryOfOrigin==='KR'?'Manhwa':m.countryOfOrigin==='CN'?'Manhua':'');
+  const bits=[];
+  if(fmtLabel)bits.push(fmtLabel);
+  if(m.averageScore)bits.push(`★ ${(m.averageScore/10).toFixed(1)} on AniList`);
+  if(m.status)bits.push(m.status.replace(/_/g,' ').toLowerCase());
+  if(m.startDate&&m.startDate.year)bits.push(String(m.startDate.year));
+  return{
+    eps,time:'',
+    genre:(m.genres||[]).slice(0,3).join(', '),
+    order:[],
+    notes:bits.join(' · '),
+    img:(m.coverImage&&m.coverImage.large)||''
+  };
+}
 // ── COVER + DETAILS FETCHER — batched via AniList (≈25 titles per request) ──
 let coverRunning=false;
-function coverNeedy(){return anime.filter(a=>(!a.img&&!a.imgTried)||(!a.eps&&!a.detTried));}
+// watch anime whose next-airing cache is missing/stale (aired already, or not checked in 6h)
+function airingNeedy(a){
+  if(kindOf(a)!=='watch')return false;
+  if(a.status!=='watching'&&a.status!=='plan')return false;
+  const now=Date.now();
+  if(a.airAt&&a.airAt*1000>now)return false; // still holding a valid upcoming-episode time
+  return !a.airChk||(now-a.airChk>6*3600*1000);
+}
+function coverNeedy(){return anime.filter(a=>(!a.img&&!a.imgTried)||(!a.eps&&!a.detTried)||airingNeedy(a));}
 async function fetchCovers(){
   if(coverRunning)return;coverRunning=true;
   let netFails=0;
@@ -1429,7 +1564,16 @@ async function fetchCovers(){
       const rank={watching:0,plan:1,finished:2,dropped:3};
       needy.sort((a,b)=>(rank[a.status]??9)-(rank[b.status]??9));
       const batch=needy.slice(0,25);
-      const q='{'+batch.map((a,i)=>`a${i}:Page(perPage:1){media(search:${JSON.stringify(String(a.title))},type:ANIME){coverImage{large} episodes duration genres}}`).join(' ')+'}';
+      // query the correct AniList type per item: MANGA for reading (manhwa/webtoon/manga/LN), ANIME otherwise.
+      // watch items also pull nextAiringEpisode so the card can show the real next-episode air time.
+      const q='{'+batch.map((a,i)=>{
+        const read=kindOf(a)==='read';
+        const type=read?'MANGA':'ANIME';
+        const fields=read
+          ?'coverImage{large} chapters volumes genres'
+          :'coverImage{large} episodes duration genres nextAiringEpisode{airingAt episode}';
+        return `a${i}:Page(perPage:1){media(search:${JSON.stringify(String(a.title))},type:${type}){${fields}}}`;
+      }).join(' ')+'}';
       let data=null,failed=false;
       try{
         const r=await fetch('https://graphql.anilist.co',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({query:q})});
@@ -1442,15 +1586,27 @@ async function fetchCovers(){
       }
       netFails=0;
       batch.forEach((a,i)=>{
+        const read=kindOf(a)==='read';
         const node=data['a'+i],m=node&&node.media&&node.media[0];
         if(m){
           if(!a.img&&!a.imgTried)a.img=(m.coverImage&&m.coverImage.large)||'';
           if(!a.eps){
-            if(m.episodes){a.eps=`${m.episodes} eps`;a.epTotal=m.episodes;}
-            if(!a.time&&m.duration&&m.episodes)a.time=`~${Math.max(1,Math.round(m.duration*m.episodes/60))} hrs`;
+            if(read){
+              if(m.chapters){a.eps=`${m.chapters} chapters`;a.epTotal=m.chapters;}
+              else if(m.volumes){a.eps=`${m.volumes} volumes`;}
+            }else{
+              if(m.episodes){a.eps=`${m.episodes} eps`;a.epTotal=m.episodes;}
+              if(!a.time&&m.duration&&m.episodes)a.time=`~${Math.max(1,Math.round(m.duration*m.episodes/60))} hrs`;
+            }
             if(!a.genre&&m.genres&&m.genres.length)a.genre=m.genres.slice(0,3).join(', ');
           }
+          if(!read){ // record (or clear) the upcoming-episode air time
+            const na=m.nextAiringEpisode;
+            if(na&&na.airingAt){a.airAt=na.airingAt;a.airEp=na.episode;}
+            else{a.airAt=0;a.airEp=0;}
+          }
         }
+        if(!read)a.airChk=Date.now(); // stamp even on a miss so we don't re-poll every launch
         if(!a.img)a.imgTried=true;
         a.detTried=true;
       });
@@ -1465,9 +1621,15 @@ async function aiAutofill(){
   const btn=document.getElementById('autofillBtn');
   btn.classList.add('loading');btn.innerHTML='<span>✦</span> Searching databases…';
   let data=null,src='';
-  try{data=await lookupAnime(title);src='MyAnimeList';}catch{}
-  if(!data){try{data=await lookupShow(title);src='TVMaze';}catch{}}
-  if(!data){try{data=await lookupBook(title);src='Open Library';}catch{}}
+  if(curKind==='read'){
+    // reading: AniList MANGA first (manhwa/webtoon/manga), then Open Library for light novels
+    try{data=await lookupManga(title);src='AniList (Manga)';}catch{}
+    if(!data){try{data=await lookupBook(title);src='Open Library';}catch{}}
+  }else{
+    try{data=await lookupAnime(title);src='MyAnimeList';}catch{}
+    if(!data){try{data=await lookupShow(title);src='TVMaze';}catch{}}
+    if(!data){try{data=await lookupBook(title);src='Open Library';}catch{}}
+  }
   if(data){
     if(data.eps)document.getElementById('fEps').value=data.eps;
     if(data.time)document.getElementById('fTime').value=data.time;
@@ -1477,7 +1639,7 @@ async function aiAutofill(){
     if(data.img)setCoverPreview(data.img);
     toast(`✦ Found on ${src}`);
   }else toast('No match found — fill in manually.');
-  btn.classList.remove('loading');btn.innerHTML='<span>✦</span> Autofill — cover, episodes, genre &amp; watch order';
+  btn.classList.remove('loading');formKindLabels();
 }
 
 // ─── TOAST ──────────────────────────────────────────────────────────────────

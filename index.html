@@ -611,6 +611,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
     <button class="parse-btn" style="margin-top:0" onclick="exportList()">📤 Copy my list to clipboard</button>
   </div>
   <div id="syncBox" style="margin-top:16px;padding-top:14px;border-top:1px solid var(--b1);"></div>
+  <div id="notifyBox" style="margin-top:16px;padding-top:14px;border-top:1px solid var(--b1);"></div>
 </div>
 
 <!-- STATS SHEET -->
@@ -675,6 +676,21 @@ const STATUS_META={
 // ─── STORAGE ───────────────────────────────────────────────────────────────
 const LSKEY='animelist_v4';
 const SYNC_URL='https://watchlist-sync.muhammad-dac.workers.dev';
+// Companion Web Push worker (see enableNotify/disableNotify/notifyUpdate below).
+// NOTE: this URL is a placeholder that may be corrected at deploy — it's the ONLY place it's defined.
+const NOTIFY_URL='https://watchlist-notify.muhammad-dac.workers.dev';
+const VAPID_PUBLIC='BFd59SP6lLx5EVs5QQds2HiZJNg2MO9EG8NRtlIlQcfqlP4tUCL5f6B_L8ov2liY2FkBp04TyliTn9t2fmvK43c';
+// Standard VAPID applicationServerKey decoder (URL-safe base64 → Uint8Array).
+function urlBase64ToUint8Array(b64){
+  try{
+    const padding='='.repeat((4-b64.length%4)%4);
+    const base64=(b64+padding).replace(/-/g,'+').replace(/_/g,'/');
+    const raw=atob(base64);
+    const out=new Uint8Array(raw.length);
+    for(let i=0;i<raw.length;i++)out[i]=raw.charCodeAt(i);
+    return out;
+  }catch{return new Uint8Array();}
+}
 function store(){try{localStorage.setItem('_t','1');localStorage.removeItem('_t');return localStorage;}catch{return null;}}
 function parseEpTotal(s){const m=/(\d+)\s*(?:eps?|chapters?|ch\b)/i.exec(s||'');return m?+m[1]:0;}
 function migrate(list){
@@ -684,7 +700,7 @@ function migrate(list){
 function load(){try{const s=store(),d=s&&s.getItem(LSKEY);anime=migrate(d?JSON.parse(d):JSON.parse(JSON.stringify(DEFAULT_DATA)));}catch{anime=migrate(JSON.parse(JSON.stringify(DEFAULT_DATA)));}}
 let saveWarned=false;
 function writeLocal(){try{const s=store();if(s)s.setItem(LSKEY,JSON.stringify(anime));saveWarned=false;}catch{if(!saveWarned){saveWarned=true;toast('⚠️ Storage full — remove some uploaded covers');}}}
-function save(){writeLocal();schedulePush();}
+function save(){writeLocal();schedulePush();scheduleNotifyUpdate();}
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2);}
 function touch(a){a.upd=Date.now();}
 
@@ -760,6 +776,74 @@ function renderSyncUI(){
         <input class="ai-prompt-in" id="syncCodeIn" placeholder="…or paste a code to restore" autocomplete="off">
         <button class="ai-run-btn" onclick="syncRestore()">Use code</button>
       </div>`;
+  }
+}
+
+// ─── PUSH NOTIFICATIONS (companion notify worker matches AniList media ids) ──
+function notifyOn(){try{return localStorage.getItem('notify_on')==='1';}catch{return false;}}
+function setNotifyOn(v){try{if(v)localStorage.setItem('notify_on','1');else localStorage.removeItem('notify_on');}catch{}}
+function pushSupported(){return ('Notification'in window)&&('PushManager'in window)&&('serviceWorker'in navigator);}
+// aniIds of the shows we want the worker to poll: Watching/Plan watch items that have a captured AniList id.
+function notifyAnimeIds(){return anime.filter(a=>kindOf(a)==='watch'&&(a.status==='watching'||a.status==='plan')&&a.aniId).map(a=>a.aniId);}
+async function getPushSub(){try{const reg=await navigator.serviceWorker.ready;return await reg.pushManager.getSubscription();}catch{return null;}}
+async function enableNotify(){
+  if(!pushSupported()){toast('📱 On iPhone: Add to Home Screen first (iOS 16.4+)');renderNotifyUI();return;}
+  try{
+    const perm=await Notification.requestPermission();
+    if(perm!=='granted'){toast('Notifications not allowed');renderNotifyUI();return;}
+    const reg=await navigator.serviceWorker.ready;
+    let sub=await reg.pushManager.getSubscription();
+    if(!sub)sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlBase64ToUint8Array(VAPID_PUBLIC)});
+    let ids=notifyAnimeIds();
+    if(!ids.length){ // ids not populated yet — trigger a cover fetch (it also captures aniIds), then recompute
+      toast('Loading show data…');
+      try{await fetchCovers();}catch{}
+      ids=notifyAnimeIds();
+    }
+    const r=await fetch(NOTIFY_URL+'/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({subscription:sub,animeIds:ids,tz:(Intl.DateTimeFormat().resolvedOptions().timeZone)||'UTC'})});
+    if(!r.ok)throw new Error('subscribe '+r.status);
+    setNotifyOn(true);
+    toast(ids.length?`🔔 Notifications on · tracking ${ids.length} show${ids.length!==1?'s':''}`:'🔔 Notifications on · open your shows so covers/ids load');
+  }catch(e){toast('Could not turn on notifications — try again');}
+  renderNotifyUI();
+}
+async function disableNotify(){
+  try{
+    const sub=await getPushSub();
+    if(sub){
+      try{await fetch(NOTIFY_URL+'/unsubscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({endpoint:sub.endpoint})});}catch{}
+      try{await sub.unsubscribe();}catch{}
+    }
+  }catch{}
+  setNotifyOn(false);toast('Notifications off');renderNotifyUI();
+}
+let notifyUpdT;
+function scheduleNotifyUpdate(){if(!notifyOn())return;clearTimeout(notifyUpdT);notifyUpdT=setTimeout(notifyUpdate,2500);}
+// Keep the worker's tracked list current (fire-and-forget).
+async function notifyUpdate(){
+  if(!notifyOn()||!pushSupported())return;
+  try{
+    const sub=await getPushSub();if(!sub)return;
+    await fetch(NOTIFY_URL+'/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({endpoint:sub.endpoint,animeIds:notifyAnimeIds()})});
+  }catch{}
+}
+function renderNotifyUI(){
+  const box=document.getElementById('notifyBox');if(!box)return;
+  if(!pushSupported()){
+    box.innerHTML=`<div class="dt-label">🔔 Episode notifications</div>
+      <p class="ai-desc">Get notified when a new episode of your Watching/Plan shows airs. <strong style="color:var(--t1)">On iPhone/iPad</strong> this needs Safari's <strong style="color:var(--t1)">Add to Home Screen</strong> (iOS 16.4+): install the app, open it from your Home Screen, then turn this on.</p>`;
+    return;
+  }
+  const granted=('Notification'in window)&&Notification.permission==='granted';
+  const on=notifyOn()&&granted;
+  if(on){
+    box.innerHTML=`<div class="dt-label">🔔 Episode notifications · ON</div>
+      <p class="ai-desc">You'll get a push when a new episode of your Watching/Plan shows airs.</p>
+      <button class="imp-all" style="width:100%" onclick="disableNotify()">Turn off notifications</button>`;
+  }else{
+    box.innerHTML=`<div class="dt-label">🔔 Episode notifications · OFF</div>
+      <p class="ai-desc">Get notified when a new episode of your Watching/Plan shows airs.</p>
+      <button class="parse-btn" style="margin-top:0" onclick="enableNotify()">Turn on notifications</button>`;
   }
 }
 
@@ -1072,7 +1156,7 @@ function openSheet(id){
   document.getElementById(id).classList.add('on');
   if(id==='themeSheet')renderThemeGrid();
   if(id==='statsSheet')renderStatsSheet();
-  if(id==='importSheet')renderSyncUI();
+  if(id==='importSheet'){renderSyncUI();renderNotifyUI();}
 }
 function closeAll(){
   document.querySelectorAll('.sheet').forEach(s=>s.classList.remove('on'));
@@ -1571,7 +1655,7 @@ async function fetchCovers(){
         const type=read?'MANGA':'ANIME';
         const fields=read
           ?'coverImage{large} chapters volumes genres'
-          :'coverImage{large} episodes duration genres nextAiringEpisode{airingAt episode}';
+          :'id coverImage{large} episodes duration genres nextAiringEpisode{airingAt episode}';
         return `a${i}:Page(perPage:1){media(search:${JSON.stringify(String(a.title))},type:${type}){${fields}}}`;
       }).join(' ')+'}';
       let data=null,failed=false;
@@ -1601,6 +1685,7 @@ async function fetchCovers(){
             if(!a.genre&&m.genres&&m.genres.length)a.genre=m.genres.slice(0,3).join(', ');
           }
           if(!read){ // record (or clear) the upcoming-episode air time
+            if(m.id)a.aniId=m.id; // AniList media id — the notify worker matches airing shows by this
             const na=m.nextAiringEpisode;
             if(na&&na.airingAt){a.airAt=na.airingAt;a.airEp=na.episode;}
             else{a.airAt=0;a.airEp=0;}
@@ -1676,6 +1761,8 @@ try{document.getElementById('apiKeyIn').value=getKey();}catch{}
 try{if(sessionStorage.getItem('justUpdated')){sessionStorage.removeItem('justUpdated');setTimeout(()=>toast('✨ Updated to the latest version'),700);}}catch{}
 setTimeout(fetchCovers,1200);
 setTimeout(syncOnOpen,300);
+// If notifications are on, re-sync the tracked show list with the worker on load (fire-and-forget).
+setTimeout(()=>{try{if(notifyOn())notifyUpdate();}catch{}},1600);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)syncOnOpen();});
 </script>
 </body>

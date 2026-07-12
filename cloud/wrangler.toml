@@ -1,0 +1,28 @@
+# WatchList — Web Push notification worker
+#
+# Independent from the sync worker. Deploy steps (you run these):
+#   1. Create the KV namespace and paste its id below:
+#        wrangler kv namespace create SUBS
+#      then replace REPLACE_ME with the returned id.
+#   2. Set the VAPID private key secret (base64url 32-byte P-256 scalar):
+#        wrangler secret put VAPID_PRIVATE_KEY
+#   3. Deploy:
+#        wrangler deploy
+#
+# VAPID_PUBLIC_KEY and VAPID_SUBJECT are plain vars (below).
+# VAPID_PRIVATE_KEY is a SECRET — never put it in this file.
+
+name = "watchlist-notify"
+main = "notify-worker.js"
+compatibility_date = "2025-06-01"
+
+[[kv_namespaces]]
+binding = "SUBS"
+id = "REPLACE_ME"  # <- from `wrangler kv namespace create SUBS`
+
+[triggers]
+crons = ["*/15 * * * *"]
+
+[vars]
+VAPID_PUBLIC_KEY = "BFd59SP6lLx5EVs5QQds2HiZJNg2MO9EG8NRtlIlQcfqlP4tUCL5f6B_L8ov2liY2FkBp04TyliTn9t2fmvK43c"
+VAPID_SUBJECT = "mailto:junaid@humblezone.com"

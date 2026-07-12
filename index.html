@@ -451,6 +451,82 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 #addSheet .submit-btn{font-size:15.5px;padding:17px 0;box-shadow:0 10px 26px -7px var(--glow);}
 
 @keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   RESPONSIVE — auto-adapts to orientation + width (no manual toggle).
+   Phone PORTRAIT is the base above and stays untouched (all rules below are
+   gated behind orientation:landscape / min-width and are false in phone
+   portrait). Landscape (short+wide rotated phone) and tablets/wide screens
+   genuinely use the horizontal space.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* Notch/safe-area on the LEFT or RIGHT edge (only relevant in landscape) */
+@media (orientation:landscape){
+  #app{padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right);}
+  .nav{padding-left:calc(10px + env(safe-area-inset-left));padding-right:calc(10px + env(safe-area-inset-right));}
+}
+
+/* LANDSCAPE (any short+wide phone) OR anything wider than a phone (tablet+):
+   fill the horizontal space instead of stretching the portrait column. */
+@media (orientation:landscape), (min-width:760px){
+  /* Poster rows: fluid grid instead of a tight horizontal scroll strip */
+  .row-scroll{
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(132px,1fr));
+    gap:18px 14px;overflow:visible;padding:2px 18px 10px;
+  }
+  .row-scroll .pcard{flex:none;width:100%;}
+  .row-scroll .pcard-img,.row-scroll .pcard-ph{width:100%;height:auto;aspect-ratio:104/148;}
+  /* Search-results grid gets roomier columns too */
+  .grid{grid-template-columns:repeat(auto-fill,minmax(132px,1fr));}
+  /* Hero: shorter-profile widescreen backdrop; text kept to a legible column */
+  .hero{min-height:200px;}
+  .hero-body{max-width:640px;}
+  .hero-title{font-size:24px;}
+
+  /* Add/Edit + Detail (and all) sheets → centered modal with own scroll */
+  .overlay{background:rgba(0,0,0,0.62);}
+  .sheet{
+    left:50%;right:auto;bottom:auto;top:50%;
+    width:min(560px,94vw);max-height:90dvh;
+    border-radius:24px;border:1px solid var(--b3);
+    padding:20px 24px calc(env(safe-area-inset-bottom) + 22px);
+    box-shadow:0 24px 70px rgba(0,0,0,0.6);
+    transform:translate(-50%,-46%) scale(.98);opacity:0;pointer-events:none;
+    transition:transform .3s cubic-bezier(.32,.72,.28,1),opacity .22s;
+  }
+  .sheet.on{transform:translate(-50%,-50%) scale(1);opacity:1;pointer-events:auto;}
+  .sheet-handle{display:none;}
+  /* keep the per-title banner header flush to the top of the modal */
+  .dt-banner{top:-20px;left:-24px;right:-24px;}
+}
+
+/* SHORT landscape (rotated phone): reclaim vertical space so the controls
+   don't dominate the tiny viewport height. */
+@media (orientation:landscape) and (max-height:560px){
+  .hdr{padding-top:calc(var(--safe-t) + 8px);padding-bottom:2px;}
+  .hdr-title{font-size:22px;}
+  .search-row{padding-top:8px;padding-bottom:0;}
+  .kind-seg{padding-top:8px;padding-bottom:0;}
+  .filt-row{padding-top:6px;}
+  .sort-row{padding-top:7px;padding-bottom:2px;}
+  .hero{min-height:150px;margin-top:10px;}
+  .hero-body{padding:12px 16px;}
+  .hero-title{font-size:21px;}
+}
+
+/* WIDE / tablet: center the content so lines & cards don't stretch absurdly,
+   and let the hero + poster grid breathe with more columns. */
+@media (min-width:900px){
+  .hdr,.search-row,.kind-seg,.filt-row,.sort-row,.page{
+    max-width:1180px;margin-left:auto;margin-right:auto;
+  }
+  .confirm-box{max-width:440px;margin-left:auto;margin-right:auto;}
+  .nav{justify-content:center;gap:46px;}
+  .grid,.row-scroll{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));}
+  .hero{min-height:264px;}
+  .hero-title{font-size:27px;}
+}
 </style>
 </head>
 <body>

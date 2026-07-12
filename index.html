@@ -434,6 +434,44 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 .hero-air{display:inline-flex;align-items:center;gap:5px;margin-top:9px;font-size:11px;font-weight:700;color:#ffd9a0;background:rgba(245,166,35,0.18);border:1px solid rgba(245,166,35,0.34);padding:5px 11px;border-radius:99px;}
 .dt-air{display:inline-flex;align-items:center;gap:6px;margin-top:10px;font-size:11.5px;font-weight:700;color:var(--wat);background:var(--watbg);border:1px solid var(--wat);padding:7px 12px;border-radius:99px;align-self:flex-start;}
 
+/* ── WEEKLY SCHEDULE ── */
+.sched-nav{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
+.sched-arrow{width:42px;height:42px;flex-shrink:0;border-radius:13px;background:var(--bg3);border:1px solid var(--b2);color:var(--t1);font-size:22px;font-weight:800;line-height:1;display:flex;align-items:center;justify-content:center;transition:transform .12s,background .16s,border-color .16s;}
+.sched-arrow:active{transform:scale(0.9);background:var(--bg4);}
+.sched-week{flex:1;text-align:center;min-width:0;}
+.sched-week-title{font-size:16.5px;font-weight:900;letter-spacing:-0.3px;}
+.sched-week-range{font-size:11.5px;font-weight:600;color:var(--t2);margin-top:2px;}
+.sched-toolbar{display:flex;justify-content:center;margin-bottom:16px;}
+.sched-today-btn{padding:8px 18px;border-radius:99px;font-size:11.5px;font-weight:800;background:color-mix(in srgb,var(--a) 18%,var(--bg3));border:1px solid transparent;color:var(--a2);box-shadow:0 3px 12px -5px var(--glow);transition:transform .12s,filter .16s;}
+.sched-today-btn:active{transform:scale(0.95);}
+.sched-days{display:flex;flex-direction:column;gap:14px;}
+.sched-day{border:1px solid var(--bn2);border-radius:16px;background:var(--bg3);overflow:hidden;transition:opacity .2s,border-color .2s;animation:fadeUp .35s ease both;}
+.sched-day.is-past{opacity:0.5;}
+.sched-day.is-today{border-color:var(--a);box-shadow:0 0 0 1px var(--a),0 8px 24px -12px var(--glow);background:linear-gradient(180deg,var(--ag),var(--bg3) 62%);}
+.sched-day-head{display:flex;align-items:baseline;gap:8px;padding:11px 14px 9px;}
+.sched-day.is-today .sched-day-name{color:var(--a2);}
+.sched-day-name{font-size:13.5px;font-weight:800;letter-spacing:-0.2px;}
+.sched-day-date{font-size:11px;font-weight:600;color:var(--t2);}
+.sched-today-pill{margin-left:auto;font-size:8.5px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:var(--a2);background:var(--ag);border:1px solid var(--a);padding:2.5px 9px;border-radius:99px;}
+.sched-day-body{display:flex;flex-direction:column;}
+.sched-row{display:flex;align-items:center;gap:11px;padding:9px 14px;min-height:44px;cursor:pointer;border-top:1px solid var(--bn2);transition:background .14s;}
+.sched-row:active{background:var(--bg4);}
+@media(hover:hover){.sched-row:hover{background:var(--bg4);}.sched-arrow:hover{border-color:var(--b3);}.sched-today-btn:hover{filter:brightness(1.08);}}
+.sched-thumb{width:34px;height:48px;border-radius:8px;object-fit:cover;background:var(--bg4);border:1px solid var(--b2);flex-shrink:0;}
+.sched-thumb-ph{width:34px;height:48px;border-radius:8px;background:linear-gradient(160deg,var(--bg4),var(--bg3));border:1px solid var(--b2);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:900;color:var(--t3);}
+.sched-row-main{flex:1;min-width:0;}
+.sched-row-title{font-size:13px;font-weight:700;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.sched-bell{font-size:10px;margin-left:4px;}
+.sched-row-sub{font-size:11px;font-weight:700;color:var(--wat);margin-top:3px;}
+.sched-empty-day{padding:11px 14px;font-size:12px;color:var(--t3);font-weight:600;border-top:1px solid var(--bn2);}
+.sched-loading,.sched-empty-all{text-align:center;padding:52px 26px;color:var(--t2);animation:fadeUp .35s ease both;}
+.sched-loading .sched-spin{font-size:30px;display:inline-block;animation:spin .9s linear infinite;margin-bottom:14px;}
+.sched-loading p,.sched-empty-all p{font-size:14px;line-height:1.6;}
+.sched-empty-all .empty-icon{font-size:46px;margin-bottom:14px;opacity:0.9;filter:drop-shadow(0 6px 16px var(--glow));}
+@media (orientation:landscape), (min-width:760px){
+  .sched-days{display:grid;grid-template-columns:repeat(auto-fill,minmax(224px,1fr));gap:14px;align-items:start;}
+}
+
 /* ── ADD FORM: KIND TOGGLE + POLISH ── */
 .kind-toggle{display:flex;gap:8px;}
 .kbtn{
@@ -538,6 +576,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
       <div class="hdr-sub" id="headerSub"></div>
     </div>
     <div class="hdr-actions">
+      <button class="hbtn" onclick="openSchedule()" title="Weekly airing schedule" aria-label="Weekly airing schedule">📅</button>
       <button class="hbtn" id="notifyBell" onclick="openNotifySheet()" title="Episode notifications" aria-label="Notifications">🔕</button>
       <button class="hbtn" onclick="openSheet('themeSheet')" title="Theme">🎨</button>
     </div>
@@ -758,6 +797,16 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
     <button class="sheet-cancel" onclick="closeAll()">Done</button>
   </div>
   <div id="notifyBoxHeader"></div>
+</div>
+
+<!-- SCHEDULE SHEET -->
+<div class="sheet" id="scheduleSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <div class="sheet-title">📅 Schedule</div>
+    <button class="sheet-cancel" onclick="closeAll()">Done</button>
+  </div>
+  <div id="scheduleBody"></div>
 </div>
 
 <!-- CONFIRM DELETE -->
@@ -1940,6 +1989,84 @@ async function aiAutofill(){
 
 // ─── TOAST ──────────────────────────────────────────────────────────────────
 let toastT;
+// ─── SCHEDULE (weekly airing calendar) ──────────────────────────────────────
+let schedOffset=0; const schedCache={};
+function schEsc(s){return String(s==null?'':s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+function schPh(ch){return '<div class="sched-thumb-ph">'+ch+'</div>';}
+function openSchedule(){schedOffset=0;openSheet('scheduleSheet');renderSchedule();}
+function schedWeekStart(off){const d=new Date();d.setHours(0,0,0,0);const dow=(d.getDay()+6)%7;d.setDate(d.getDate()-dow+off*7);return d;}
+function schedDayKey(d){return d.getFullYear()*10000+(d.getMonth()+1)*100+d.getDate();}
+function schedFmt(d){return d.toLocaleDateString([],{month:'short',day:'numeric'});}
+function schedLabel(off){return off===0?'This Week':off===-1?'Last Week':off===1?'Next Week':(off<0?(-off)+' weeks ago':'In '+off+' weeks');}
+function schedGo(dir){if(dir==='today')schedOffset=0;else schedOffset+=dir;renderSchedule();}
+function schedWatchItems(){return anime.filter(a=>kindOf(a)==='watch'&&(a.status==='watching'||a.status==='plan'));}
+function renderSchedule(){
+  const body=document.getElementById('scheduleBody');if(!body)return;
+  const ws=schedWeekStart(schedOffset),we=new Date(ws);we.setDate(we.getDate()+6);
+  body.innerHTML='<div class="sched-nav">'+
+      '<button class="sched-arrow" onclick="schedGo(-1)" aria-label="Previous week">‹</button>'+
+      '<div class="sched-week"><div class="sched-week-title">'+schedLabel(schedOffset)+'</div><div class="sched-week-range">'+schedFmt(ws)+' – '+schedFmt(we)+'</div></div>'+
+      '<button class="sched-arrow" onclick="schedGo(1)" aria-label="Next week">›</button></div>'+
+    (schedOffset!==0?'<div class="sched-toolbar"><button class="sched-today-btn" onclick="schedGo(\'today\')">Jump to this week</button></div>':'')+
+    '<div class="sched-days" id="schedDays"><div class="sched-loading"><div class="sched-spin">◍</div><p>Loading episodes…</p></div></div>';
+  loadSchedWeek(ws);
+}
+async function loadSchedWeek(ws){
+  const startSec=Math.floor(ws.getTime()/1000),endSec=startSec+7*86400;
+  let eps=schedCache[startSec];
+  if(!eps){try{eps=await fetchSchedEpisodes(startSec,endSec);}catch(e){eps=schedFallback(startSec,endSec);}schedCache[startSec]=eps;}
+  renderSchedDays(ws,eps);
+}
+function schedFallback(startSec,endSec){
+  const out=[];schedWatchItems().forEach(a=>{if(a.airAt&&a.airAt>=startSec&&a.airAt<endSec)out.push({id:a.id,title:a.title,img:a.img,episode:a.airEp||0,airingAt:a.airAt,aniId:a.aniId});});
+  return out.sort((x,y)=>x.airingAt-y.airingAt);
+}
+async function fetchSchedEpisodes(startSec,endSec){
+  const watch=schedWatchItems();const byAni={};watch.forEach(a=>{if(a.aniId)byAni[a.aniId]=a;});
+  const ids=Object.keys(byAni).map(Number);
+  if(!ids.length)return schedFallback(startSec,endSec);
+  const out=[],seen=new Set();
+  for(let i=0;i<ids.length;i+=50){
+    const chunk=ids.slice(i,i+50);
+    const q='{Page(perPage:50){airingSchedules(mediaId_in:['+chunk.join(',')+'],airingAt_greater:'+(startSec-1)+',airingAt_lesser:'+endSec+',sort:TIME){mediaId episode airingAt}}}';
+    try{
+      const r=await fetch('https://graphql.anilist.co',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({query:q})});
+      if(r.status===429){await pause(1500);i-=50;continue;}
+      const j=await r.json();const arr=(j&&j.data&&j.data.Page&&j.data.Page.airingSchedules)||[];
+      arr.forEach(s=>{const a=byAni[s.mediaId];if(!a)return;const k=s.mediaId+':'+s.episode;if(seen.has(k))return;seen.add(k);out.push({id:a.id,title:a.title,img:a.img,episode:s.episode,airingAt:s.airingAt,aniId:s.mediaId});});
+    }catch(e){/* network hiccup — remaining chunks + airAt fallback still populate */}
+    if(i+50<ids.length)await pause(700);
+  }
+  watch.forEach(a=>{if(!a.airAt||a.airAt<startSec||a.airAt>=endSec)return;const k=(a.aniId||a.id)+':'+(a.airEp||0);if(seen.has(k))return;seen.add(k);out.push({id:a.id,title:a.title,img:a.img,episode:a.airEp||0,airingAt:a.airAt,aniId:a.aniId});});
+  return out.sort((x,y)=>x.airingAt-y.airingAt);
+}
+function renderSchedDays(ws,eps){
+  const cont=document.getElementById('schedDays');if(!cont)return;
+  if(!eps.length){cont.innerHTML='<div class="sched-empty-all"><div class="empty-icon">◍</div><p>No episodes airing this week for your list.<br>Add a currently-airing show to <b>Watching</b> and it\'ll show up here.</p></div>';return;}
+  const notifSet=notifyOn()?new Set(notifyAnimeIds()):null;
+  const todayKey=schedDayKey(new Date());
+  let html='';
+  for(let i=0;i<7;i++){
+    const day=new Date(ws);day.setDate(day.getDate()+i);
+    const dk=schedDayKey(day);
+    const dEps=eps.filter(e=>schedDayKey(new Date(e.airingAt*1000))===dk);
+    const cls='sched-day'+(dk===todayKey?' is-today':'')+(dk<todayKey?' is-past':'');
+    const pill=dk===todayKey?'<span class="sched-today-pill">Today</span>':'';
+    let rows='';
+    if(dEps.length){
+      dEps.forEach(e=>{
+        const t=new Date(e.airingAt*1000).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
+        const ch=((e.title||'?').charAt(0)||'?').replace(/[^A-Za-z0-9]/g,'')||'?';
+        const thumb=e.img?'<img class="sched-thumb" src="'+e.img+'" alt="" loading="lazy" onerror="this.outerHTML=schPh(\''+ch+'\')">':schPh(ch);
+        const bell=notifSet&&e.aniId&&notifSet.has(e.aniId)?'<span class="sched-bell" title="Notifications on">•</span>':'';
+        rows+='<div class="sched-row" onclick="openDetail(\''+e.id+'\')">'+thumb+'<div class="sched-row-main"><div class="sched-row-title">'+schEsc(e.title)+bell+'</div><div class="sched-row-sub">Ep '+(e.episode||'?')+' · '+t+'</div></div></div>';
+      });
+    }else rows='<div class="sched-empty-day">—</div>';
+    html+='<div class="'+cls+'"><div class="sched-day-head"><span class="sched-day-name">'+day.toLocaleDateString([],{weekday:'long'})+'</span><span class="sched-day-date">'+schedFmt(day)+'</span>'+pill+'</div><div class="sched-day-body">'+rows+'</div></div>';
+  }
+  cont.innerHTML=html;
+}
+
 function toast(msg){const el=document.getElementById('toast');el.textContent=msg;el.classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>el.classList.remove('on'),2400);}
 
 // ─── SERVICE WORKER + SEAMLESS AUTO-UPDATE ───────────────────────────────────

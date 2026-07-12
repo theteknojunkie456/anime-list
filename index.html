@@ -24,6 +24,9 @@
   --topgrad:linear-gradient(180deg,#16070b 0%,#0a0a0c 100%);
   --safe-t:env(safe-area-inset-top,0px);--safe-b:env(safe-area-inset-bottom,0px);
   --r:16px;--r2:12px;
+  /* neutral, theme-independent hairlines + soft depth (kept out of the per-theme accent tint) */
+  --bn:rgba(255,255,255,0.09);--bn2:rgba(255,255,255,0.055);
+  --elev1:0 1px 2px rgba(0,0,0,0.28);--elev2:0 6px 20px -8px rgba(0,0,0,0.55);
 }
 [data-theme=naruto]{--bg:#08090e;--bg2:#0e0f18;--bg3:#151720;--bg4:#1c1f2a;--bg5:#232734;--b1:rgba(255,140,0,0.06);--b2:rgba(255,140,0,0.12);--b3:rgba(255,140,0,0.22);--t1:#fff6e8;--t2:#a8966a;--t3:#5e5230;--a:#f57800;--a2:#ffaa33;--ag:rgba(245,120,0,0.13);--glow:rgba(245,120,0,0.22);--fin:#5ed47a;--finbg:rgba(94,212,122,0.11);--wat:#ffcc00;--watbg:rgba(255,204,0,0.11);--pln:#4a9eff;--plnbg:rgba(74,158,255,0.11);--topgrad:linear-gradient(180deg,#1c0e00 0%,#08090e 100%);}
 [data-theme=sasuke]{--bg:#06060d;--bg2:#0b0b18;--bg3:#101022;--bg4:#16162c;--bg5:#1c1c36;--b1:rgba(130,90,255,0.06);--b2:rgba(130,90,255,0.13);--b3:rgba(130,90,255,0.24);--t1:#e6e2f8;--t2:#8e88b4;--t3:#4a4668;--a:#7730e8;--a2:#a07af8;--ag:rgba(119,48,232,0.15);--glow:rgba(119,48,232,0.28);--fin:#4ecba8;--finbg:rgba(78,203,168,0.11);--wat:#c084fc;--watbg:rgba(192,132,252,0.11);--pln:#818cf8;--plnbg:rgba(129,140,248,0.11);--topgrad:linear-gradient(180deg,#0a0420 0%,#06060d 100%);}
@@ -71,34 +74,36 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
   display:flex;align-items:center;justify-content:center;transition:transform .12s,background .16s,border-color .16s;
 }
 .hbtn:active{transform:scale(0.9);}
+.hbtn.bell-on{background:color-mix(in srgb,var(--a) 22%,var(--bg3));border-color:transparent;color:var(--a2);box-shadow:0 4px 14px -6px var(--glow);}
+.hdr-actions{display:flex;align-items:center;gap:8px;}
 .search-row{padding:12px 18px 2px;}
 .search-wrap{position:relative;}
 .search-ico{position:absolute;left:13px;top:50%;transform:translateY(-50%);font-size:13px;opacity:0.5;}
 .search-in{
   width:100%;padding:12px 14px 12px 38px;border-radius:14px;font-size:14px;
-  background:var(--bg3);border:1px solid var(--b2);color:var(--t1);outline:none;font-family:inherit;
-  transition:border-color .16s,box-shadow .16s,background .16s;
+  background:var(--bg3);border:1px solid var(--bn);color:var(--t1);outline:none;font-family:inherit;
+  transition:border-color .16s,box-shadow .16s,background .16s;box-shadow:var(--elev1);
 }
 .search-in:focus{border-color:var(--a);box-shadow:0 0 0 3px var(--ag);background:var(--bg2);}
 .search-in::placeholder{color:var(--t3);}
 .sort-row{display:flex;gap:7px;padding:11px 18px 4px;overflow-x:auto;}
 .schip{
   flex-shrink:0;padding:7px 14px;border-radius:99px;font-size:11.5px;font-weight:700;
-  background:var(--bg3);border:1px solid var(--b2);color:var(--t2);transition:all .15s;
+  background:var(--bg3);border:1px solid transparent;color:var(--t2);transition:all .15s;
 }
-.schip.on{background:var(--ag);border-color:var(--a);color:var(--a);box-shadow:0 2px 10px -4px var(--glow);}
+.schip.on{background:color-mix(in srgb,var(--a) 20%,var(--bg3));border-color:transparent;color:var(--a2);box-shadow:0 3px 12px -5px var(--glow);}
 .filt-row{display:flex;gap:7px;padding:9px 18px 0;overflow-x:auto;}
 .fchip{
   flex-shrink:0;padding:7px 13px;border-radius:99px;font-size:11.5px;font-weight:700;
-  background:var(--bg3);border:1px solid var(--b2);color:var(--t2);
+  background:var(--bg3);border:1px solid transparent;color:var(--t2);
   display:inline-flex;align-items:center;gap:6px;transition:all .15s;
 }
 .fchip .fn{font-size:9.5px;font-weight:800;opacity:0.65;font-variant-numeric:tabular-nums;}
-.fchip.on{background:var(--ag);border-color:var(--a);color:var(--a);}
-.fchip.on-watching{background:var(--watbg);border-color:var(--wat);color:var(--wat);}
-.fchip.on-plan{background:var(--plnbg);border-color:var(--pln);color:var(--pln);}
-.fchip.on-finished{background:var(--finbg);border-color:var(--fin);color:var(--fin);}
-.fchip.on-dropped{background:var(--drpbg);border-color:var(--drp);color:var(--drp);}
+.fchip.on{background:color-mix(in srgb,var(--a) 20%,var(--bg3));border-color:transparent;color:var(--a2);}
+.fchip.on-watching{background:color-mix(in srgb,var(--wat) 20%,var(--bg3));border-color:transparent;color:var(--wat);}
+.fchip.on-plan{background:color-mix(in srgb,var(--pln) 20%,var(--bg3));border-color:transparent;color:var(--pln);}
+.fchip.on-finished{background:color-mix(in srgb,var(--fin) 20%,var(--bg3));border-color:transparent;color:var(--fin);}
+.fchip.on-dropped{background:color-mix(in srgb,var(--drp) 22%,var(--bg3));border-color:transparent;color:var(--t1);}
 .fchip.on .fn,.fchip[class*="on-"] .fn{opacity:0.85;}
 
 /* ── HERO ── */
@@ -217,7 +222,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 .sheet-handle{width:40px;height:5px;border-radius:99px;background:var(--b3);margin:8px auto 14px;}
 .sheet-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;}
 .sheet-title{font-size:19px;font-weight:800;letter-spacing:-0.35px;}
-.sheet-cancel{font-size:13.5px;font-weight:700;color:var(--a);padding:6px 2px;}
+.sheet-cancel{font-size:13.5px;font-weight:700;color:var(--t2);padding:6px 2px;}
 
 /* ── DETAIL SHEET ── */
 .dt-top{display:flex;gap:16px;margin-bottom:16px;}
@@ -275,12 +280,12 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 .dact.danger{color:#ff6b6b;flex:0 0 52px;}
 
 /* ── FORMS ── */
-.fgroup{margin-bottom:18px;}
-.flabel{display:block;font-size:10px;font-weight:800;color:var(--t2);text-transform:uppercase;letter-spacing:0.11em;margin-bottom:9px;}
+.fgroup{margin-bottom:16px;}
+.flabel{display:block;font-size:10px;font-weight:700;color:color-mix(in srgb,var(--t2),#fff 16%);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:8px;}
 .finput,.ftextarea{
   width:100%;padding:13px 14px;border-radius:13px;font-size:15px;font-family:inherit;
-  background:var(--bg3);border:1px solid var(--b2);color:var(--t1);outline:none;
-  transition:border-color .16s,box-shadow .16s,background .16s;
+  background:var(--bg3);border:1px solid var(--bn);color:var(--t1);outline:none;
+  transition:border-color .16s,box-shadow .16s,background .16s;box-shadow:var(--elev1);
 }
 .finput:focus,.ftextarea:focus{border-color:var(--a);box-shadow:0 0 0 3px var(--ag);background:var(--bg2);}
 .finput::placeholder,.ftextarea::placeholder{color:var(--t3);}
@@ -288,11 +293,11 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 .frow2{display:flex;gap:12px;}
 .frow2 .fgroup{flex:1;}
 .status-pick{display:flex;gap:7px;}
-.spick{flex:1;padding:11px 0;border-radius:12px;font-size:10.5px;font-weight:800;background:var(--bg3);border:1px solid var(--b2);color:var(--t2);transition:all .14s;}
-.spick.on-plan{background:var(--plnbg);border-color:var(--pln);color:var(--pln);}
-.spick.on-watching{background:var(--watbg);border-color:var(--wat);color:var(--wat);}
-.spick.on-finished{background:var(--finbg);border-color:var(--fin);color:var(--fin);}
-.spick.on-dropped{background:var(--drpbg);border-color:var(--drp);color:var(--drp);}
+.spick{flex:1;padding:11px 0;border-radius:12px;font-size:10.5px;font-weight:800;background:var(--bg3);border:1px solid var(--bn);color:var(--t2);transition:all .14s;box-shadow:var(--elev1);}
+.spick.on-plan,.spick.on-watching,.spick.on-finished,.spick.on-dropped{
+  background:color-mix(in srgb,var(--a) 20%,var(--bg3));border-color:transparent;color:var(--a2);
+  box-shadow:0 3px 12px -5px var(--glow);
+}
 .submit-btn{
   width:100%;padding:16px 0;margin-top:10px;border-radius:15px;font-size:15px;font-weight:800;letter-spacing:-0.2px;
   background:linear-gradient(180deg,var(--a2),var(--a));color:#fff;box-shadow:0 8px 22px -6px var(--glow);
@@ -300,8 +305,9 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 .submit-btn:active{transform:scale(0.985);opacity:0.9;}
 .autofill-btn{
   width:100%;display:flex;align-items:center;justify-content:center;gap:8px;
-  padding:13px 0;margin-bottom:18px;border-radius:14px;font-size:12.5px;font-weight:800;
-  background:var(--ag);border:1px dashed var(--a);color:var(--a);
+  padding:13px 0;margin-bottom:16px;border-radius:14px;font-size:12.5px;font-weight:800;
+  background:color-mix(in srgb,var(--a) 14%,var(--bg3));border:1px solid transparent;color:var(--a2);
+  box-shadow:0 3px 12px -6px var(--glow);
 }
 .autofill-btn.loading{opacity:0.65;pointer-events:none;}
 .autofill-btn.loading span:first-child{display:inline-block;animation:spin 0.9s linear infinite;}
@@ -407,11 +413,11 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 .kind-seg{display:flex;gap:6px;padding:12px 18px 2px;}
 .kseg{
   flex:1;padding:10px 0;border-radius:13px;font-size:12.5px;font-weight:800;letter-spacing:-0.1px;
-  background:var(--bg3);border:1px solid var(--b2);color:var(--t2);
+  background:var(--bg3);border:1px solid transparent;color:var(--t2);
   transition:background .16s,border-color .16s,color .16s,transform .12s;
 }
 .kseg:active{transform:scale(0.97);}
-.kseg.on{background:var(--ag);border-color:var(--a);color:var(--a);box-shadow:0 2px 12px -4px var(--glow);}
+.kseg.on{background:color-mix(in srgb,var(--a) 20%,var(--bg3));border-color:transparent;color:var(--a2);box-shadow:0 3px 12px -5px var(--glow);}
 .kseg .fn{font-size:9.5px;font-weight:800;opacity:0.6;font-variant-numeric:tabular-nums;margin-left:2px;}
 
 /* ── AIRING SCHEDULE ── */
@@ -424,11 +430,11 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 .kbtn{
   flex:1;display:flex;align-items:center;justify-content:center;gap:7px;
   padding:14px 0;border-radius:14px;font-size:13.5px;font-weight:800;letter-spacing:-0.1px;
-  background:var(--bg3);border:1px solid var(--b2);color:var(--t2);
+  background:var(--bg3);border:1px solid var(--bn);color:var(--t2);box-shadow:var(--elev1);
   transition:background .16s,border-color .16s,color .16s,transform .12s,box-shadow .16s;
 }
 .kbtn:active{transform:scale(0.97);}
-.kbtn.on{background:var(--ag);border-color:var(--a);color:var(--a);box-shadow:0 3px 14px -5px var(--glow);}
+.kbtn.on{background:color-mix(in srgb,var(--a) 20%,var(--bg3));border-color:transparent;color:var(--a2);box-shadow:0 3px 14px -5px var(--glow);}
 .field-hint{font-size:11px;font-weight:600;color:var(--t3);margin-top:7px;line-height:1.45;}
 #addSheet .sheet-header{margin-bottom:14px;}
 #addSheet .sheet-title{font-size:21px;letter-spacing:-0.4px;}
@@ -446,7 +452,10 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
       <div class="hdr-title">Watchlist</div>
       <div class="hdr-sub" id="headerSub"></div>
     </div>
-    <button class="hbtn" onclick="openSheet('themeSheet')" title="Theme">🎨</button>
+    <div class="hdr-actions">
+      <button class="hbtn" id="notifyBell" onclick="openNotifySheet()" title="Episode notifications" aria-label="Notifications">🔕</button>
+      <button class="hbtn" onclick="openSheet('themeSheet')" title="Theme">🎨</button>
+    </div>
   </div>
   <div class="search-row">
     <div class="search-wrap">
@@ -646,6 +655,16 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
   </div>
 </div>
 
+<!-- NOTIFICATIONS SHEET -->
+<div class="sheet" id="notifySheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <div class="sheet-title">🔔 Notifications</div>
+    <button class="sheet-cancel" onclick="closeAll()">Done</button>
+  </div>
+  <div id="notifyBoxHeader"></div>
+</div>
+
 <!-- CONFIRM DELETE -->
 <div class="confirm-box" id="confirmBox">
   <div class="confirm-title">Remove from list?</div>
@@ -827,25 +846,39 @@ async function notifyUpdate(){
     await fetch(NOTIFY_URL+'/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({endpoint:sub.endpoint,animeIds:notifyAnimeIds()})});
   }catch{}
 }
-function renderNotifyUI(){
-  const box=document.getElementById('notifyBox');if(!box)return;
+function notifyUIHTML(){
   if(!pushSupported()){
-    box.innerHTML=`<div class="dt-label">🔔 Episode notifications</div>
+    return`<div class="dt-label">🔔 Episode notifications</div>
       <p class="ai-desc">Get notified when a new episode of your Watching/Plan shows airs. <strong style="color:var(--t1)">On iPhone/iPad</strong> this needs Safari's <strong style="color:var(--t1)">Add to Home Screen</strong> (iOS 16.4+): install the app, open it from your Home Screen, then turn this on.</p>`;
-    return;
   }
   const granted=('Notification'in window)&&Notification.permission==='granted';
   const on=notifyOn()&&granted;
   if(on){
-    box.innerHTML=`<div class="dt-label">🔔 Episode notifications · ON</div>
+    return`<div class="dt-label">🔔 Episode notifications · ON</div>
       <p class="ai-desc">You'll get a push when a new episode of your Watching/Plan shows airs.</p>
       <button class="imp-all" style="width:100%" onclick="disableNotify()">Turn off notifications</button>`;
-  }else{
-    box.innerHTML=`<div class="dt-label">🔔 Episode notifications · OFF</div>
-      <p class="ai-desc">Get notified when a new episode of your Watching/Plan shows airs.</p>
-      <button class="parse-btn" style="margin-top:0" onclick="enableNotify()">Turn on notifications</button>`;
   }
+  return`<div class="dt-label">🔔 Episode notifications · OFF</div>
+    <p class="ai-desc">Get notified when a new episode of your Watching/Plan shows airs.</p>
+    <button class="parse-btn" style="margin-top:0" onclick="enableNotify()">Turn on notifications</button>`;
 }
+// Bell in the app header mirrors the on/off state (accent + filled bell when ON, muted when OFF).
+function renderNotifyBell(){
+  const b=document.getElementById('notifyBell');if(!b)return;
+  const granted=('Notification'in window)&&Notification.permission==='granted';
+  const on=notifyOn()&&granted;
+  b.classList.toggle('bell-on',on);
+  b.textContent=on?'🔔':'🔕';
+  b.setAttribute('aria-label',on?'Episode notifications on':'Episode notifications off');
+  b.setAttribute('title',on?'Notifications on':'Turn on episode notifications');
+}
+// Render the same enable/disable flow into every surface that hosts it (import sheet + header sheet).
+function renderNotifyUI(){
+  const html=notifyUIHTML();
+  ['notifyBox','notifyBoxHeader'].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML=html;});
+  renderNotifyBell();
+}
+function openNotifySheet(){openSheet('notifySheet');renderNotifyUI();}
 
 // ─── THEMES ────────────────────────────────────────────────────────────────
 const THEMES=[
@@ -1757,6 +1790,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeAll();closeCon
 
 // ─── INIT ───────────────────────────────────────────────────────────────────
 load();loadTheme();render();
+try{renderNotifyBell();}catch{}
 try{document.getElementById('apiKeyIn').value=getKey();}catch{}
 try{if(sessionStorage.getItem('justUpdated')){sessionStorage.removeItem('justUpdated');setTimeout(()=>toast('✨ Updated to the latest version'),700);}}catch{}
 setTimeout(fetchCovers,1200);

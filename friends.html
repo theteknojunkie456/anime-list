@@ -24,6 +24,9 @@
   --topgrad:linear-gradient(180deg,#16070b 0%,#0a0a0c 100%);
   --safe-t:env(safe-area-inset-top,0px);--safe-b:env(safe-area-inset-bottom,0px);
   --r:16px;--r2:12px;
+  /* neutral, theme-independent hairlines + soft depth (kept out of the per-theme accent tint) */
+  --bn:rgba(255,255,255,0.09);--bn2:rgba(255,255,255,0.055);
+  --elev1:0 1px 2px rgba(0,0,0,0.28);--elev2:0 6px 20px -8px rgba(0,0,0,0.55);
 }
 [data-theme=naruto]{--bg:#08090e;--bg2:#0e0f18;--bg3:#151720;--bg4:#1c1f2a;--bg5:#232734;--b1:rgba(255,140,0,0.06);--b2:rgba(255,140,0,0.12);--b3:rgba(255,140,0,0.22);--t1:#fff6e8;--t2:#a8966a;--t3:#5e5230;--a:#f57800;--a2:#ffaa33;--ag:rgba(245,120,0,0.13);--glow:rgba(245,120,0,0.22);--fin:#5ed47a;--finbg:rgba(94,212,122,0.11);--wat:#ffcc00;--watbg:rgba(255,204,0,0.11);--pln:#4a9eff;--plnbg:rgba(74,158,255,0.11);--topgrad:linear-gradient(180deg,#1c0e00 0%,#08090e 100%);}
 [data-theme=sasuke]{--bg:#06060d;--bg2:#0b0b18;--bg3:#101022;--bg4:#16162c;--bg5:#1c1c36;--b1:rgba(130,90,255,0.06);--b2:rgba(130,90,255,0.13);--b3:rgba(130,90,255,0.24);--t1:#e6e2f8;--t2:#8e88b4;--t3:#4a4668;--a:#7730e8;--a2:#a07af8;--ag:rgba(119,48,232,0.15);--glow:rgba(119,48,232,0.28);--fin:#4ecba8;--finbg:rgba(78,203,168,0.11);--wat:#c084fc;--watbg:rgba(192,132,252,0.11);--pln:#818cf8;--plnbg:rgba(129,140,248,0.11);--topgrad:linear-gradient(180deg,#0a0420 0%,#06060d 100%);}
@@ -41,46 +44,83 @@ input,textarea{user-select:text;-webkit-user-select:text;}
 button{font-family:inherit;border:none;background:none;color:inherit;cursor:pointer;}
 img{-webkit-user-drag:none;}
 ::-webkit-scrollbar{display:none;}
+::selection{background:var(--ag);color:var(--t1);}
+:focus-visible{outline:2px solid var(--a2);outline-offset:2px;border-radius:8px;}
+button{transition:transform .12s ease,background .16s ease,border-color .16s ease,color .16s ease,opacity .16s ease,box-shadow .16s ease;}
+@media(hover:hover){
+  .hbtn:hover{background:var(--bg4);border-color:var(--b3);}
+  .pcard:hover{transform:translateY(-5px);}
+  .pcard:hover .pcard-img{box-shadow:0 12px 28px rgba(0,0,0,0.5);border-color:var(--b3);}
+  .schip:hover,.nbtn:hover,.sort-row .schip:hover{color:var(--t1);}
+  .dact:hover,.spick:hover,.dpick:hover,.aitab:hover,.prog-btn:hover,.parse-btn:hover,.imp-all:hover{border-color:var(--b3);}
+  .submit-btn:hover,.autofill-btn:hover,.ai-run-btn:hover{filter:brightness(1.08);}
+  .hero:hover .hero-cta{transform:translateY(-1px);}
+  .cbtn:hover{filter:brightness(1.06);}
+}
+@media(prefers-reduced-motion:reduce){*{animation-duration:.001ms!important;transition-duration:.001ms!important;}}
 
 /* ── SHELL ── */
 #app{height:100vh;height:100dvh;display:flex;flex-direction:column;background:var(--topgrad);}
 .page{flex:1;overflow-y:auto;padding-bottom:calc(var(--safe-b) + 86px);}
 
 /* ── HEADER ── */
-.hdr{padding:calc(var(--safe-t) + 14px) 18px 4px;display:flex;align-items:center;justify-content:space-between;}
-.hdr-title{font-size:24px;font-weight:900;letter-spacing:-0.5px;}
-.hdr-sub{font-size:11.5px;color:var(--t2);font-weight:600;margin-top:2px;}
+.hdr{padding:calc(var(--safe-t) + 16px) 18px 4px;display:flex;align-items:center;justify-content:space-between;}
+.hdr-title{font-size:26px;font-weight:900;letter-spacing:-0.6px;display:flex;align-items:center;gap:8px;}
+.hdr-title::before{content:'';width:6px;height:22px;border-radius:99px;background:linear-gradient(180deg,var(--a2),var(--a));box-shadow:0 0 12px var(--glow);}
+.hdr-sub{font-size:11.5px;color:var(--t2);font-weight:600;margin-top:4px;padding-left:14px;}
 .hbtn{
-  width:38px;height:38px;border-radius:12px;font-size:17px;
+  width:40px;height:40px;border-radius:13px;font-size:17px;
   background:var(--bg3);border:1px solid var(--b2);
-  display:flex;align-items:center;justify-content:center;transition:transform .12s;
+  display:flex;align-items:center;justify-content:center;transition:transform .12s,background .16s,border-color .16s;
 }
 .hbtn:active{transform:scale(0.9);}
+.hbtn.bell-on{background:color-mix(in srgb,var(--a) 22%,var(--bg3));border-color:transparent;color:var(--a2);box-shadow:0 4px 14px -6px var(--glow);}
+.hdr-actions{display:flex;align-items:center;gap:8px;}
 .search-row{padding:12px 18px 2px;}
 .search-wrap{position:relative;}
 .search-ico{position:absolute;left:13px;top:50%;transform:translateY(-50%);font-size:13px;opacity:0.5;}
 .search-in{
-  width:100%;padding:11px 14px 11px 36px;border-radius:13px;font-size:14px;
-  background:var(--bg3);border:1px solid var(--b2);color:var(--t1);outline:none;font-family:inherit;
+  width:100%;padding:12px 14px 12px 38px;border-radius:14px;font-size:14px;
+  background:var(--bg3);border:1px solid var(--bn);color:var(--t1);outline:none;font-family:inherit;
+  transition:border-color .16s,box-shadow .16s,background .16s;box-shadow:var(--elev1);
 }
-.search-in:focus{border-color:var(--a);}
+.search-in:focus{border-color:var(--a);box-shadow:0 0 0 3px var(--ag);background:var(--bg2);}
 .search-in::placeholder{color:var(--t3);}
-.sort-row{display:flex;gap:6px;padding:10px 18px 4px;overflow-x:auto;}
+.sort-row{display:flex;gap:7px;padding:11px 18px 4px;overflow-x:auto;}
 .schip{
-  flex-shrink:0;padding:6px 13px;border-radius:99px;font-size:11.5px;font-weight:700;
-  background:var(--bg3);border:1px solid var(--b2);color:var(--t2);transition:all .13s;
+  flex-shrink:0;padding:7px 14px;border-radius:99px;font-size:11.5px;font-weight:700;
+  background:var(--bg3);border:1px solid transparent;color:var(--t2);transition:all .15s;
 }
-.schip.on{background:var(--ag);border-color:var(--a);color:var(--a);}
+.schip.on{background:color-mix(in srgb,var(--a) 20%,var(--bg3));border-color:transparent;color:var(--a2);box-shadow:0 3px 12px -5px var(--glow);}
+.filt-row{display:flex;gap:7px;padding:9px 18px 0;overflow-x:auto;}
+.fchip{
+  flex-shrink:0;padding:7px 13px;border-radius:99px;font-size:11.5px;font-weight:700;
+  background:var(--bg3);border:1px solid transparent;color:var(--t2);
+  display:inline-flex;align-items:center;gap:6px;transition:all .15s;
+}
+.fchip .fn{font-size:9.5px;font-weight:800;opacity:0.65;font-variant-numeric:tabular-nums;}
+.fchip.on{background:color-mix(in srgb,var(--a) 20%,var(--bg3));border-color:transparent;color:var(--a2);}
+.fchip.on-watching{background:color-mix(in srgb,var(--wat) 20%,var(--bg3));border-color:transparent;color:var(--wat);}
+.fchip.on-plan{background:color-mix(in srgb,var(--pln) 20%,var(--bg3));border-color:transparent;color:var(--pln);}
+.fchip.on-finished{background:color-mix(in srgb,var(--fin) 20%,var(--bg3));border-color:transparent;color:var(--fin);}
+.fchip.on-dropped{background:color-mix(in srgb,var(--drp) 22%,var(--bg3));border-color:transparent;color:var(--t1);}
+.fchip.on .fn,.fchip[class*="on-"] .fn{opacity:0.85;}
 
 /* ── HERO ── */
 .hero{
-  margin:12px 18px 6px;border-radius:22px;overflow:hidden;position:relative;
-  min-height:210px;display:flex;align-items:flex-end;
+  margin:14px 18px 6px;border-radius:24px;overflow:hidden;position:relative;
+  min-height:216px;display:flex;align-items:flex-end;
   border:1px solid var(--b2);cursor:pointer;
+  box-shadow:0 14px 40px -12px rgba(0,0,0,0.6);
+  transition:transform .18s cubic-bezier(.32,.72,.28,1);
   animation:fadeUp .4s ease both;
 }
+.hero:active{transform:scale(0.985);}
+.hero-cta{transition:transform .16s,box-shadow .16s;}
 .hero-bg{position:absolute;inset:0;background-size:cover;background-position:center 22%;filter:saturate(1.05);}
-.hero-shade{position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,0.05) 0%,rgba(8,8,10,0.55) 55%,rgba(8,8,10,0.92) 100%);}
+/* per-title banner art rendered as an <img> so it lazy-loads + can gracefully drop on error (falls back to the gradient .hero-bg beneath it) */
+.hero-bg-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 30%;filter:saturate(1.05);}
+.hero-shade{position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,0.05) 0%,rgba(8,8,10,0.6) 55%,rgba(8,8,10,0.93) 100%);}
 .hero-body{position:relative;padding:16px 18px;width:100%;}
 .hero-kicker{font-size:10px;font-weight:800;letter-spacing:0.14em;text-transform:uppercase;color:var(--a2);margin-bottom:6px;}
 .hero-title{font-size:21px;font-weight:900;letter-spacing:-0.4px;line-height:1.15;text-shadow:0 2px 12px rgba(0,0,0,0.5);}
@@ -100,42 +140,45 @@ img{-webkit-user-drag:none;}
 .row-title{font-size:15px;font-weight:800;letter-spacing:-0.2px;}
 .row-count{font-size:11px;font-weight:700;color:var(--t3);}
 .row-scroll{display:flex;gap:10px;overflow-x:auto;padding:2px 18px 6px;scroll-padding:18px;}
-.pcard{flex:0 0 104px;cursor:pointer;transition:transform .15s;}
+.pcard{flex:0 0 104px;cursor:pointer;transition:transform .18s cubic-bezier(.32,.72,.28,1);}
 .pcard:active{transform:scale(0.94);}
 .pcard-img{
-  width:104px;height:148px;border-radius:14px;object-fit:cover;display:block;
+  width:104px;height:148px;border-radius:15px;object-fit:cover;display:block;
   background:var(--bg4);border:1px solid var(--b2);box-shadow:0 6px 18px rgba(0,0,0,0.35);
+  transition:box-shadow .18s,border-color .18s;
 }
 .pcard-ph{
-  width:104px;height:148px;border-radius:14px;background:linear-gradient(160deg,var(--bg4),var(--bg3));
+  width:104px;height:148px;border-radius:15px;background:linear-gradient(160deg,var(--bg4),var(--bg3));
   border:1px solid var(--b2);display:flex;align-items:center;justify-content:center;
-  font-size:30px;font-weight:900;color:var(--t3);
+  font-size:34px;font-weight:900;color:var(--t3);letter-spacing:-1px;
 }
 .pcard-wrap{position:relative;}
 .pcard-badge{
   position:absolute;top:7px;left:7px;font-size:8.5px;font-weight:800;letter-spacing:0.06em;
-  padding:3px 7px;border-radius:99px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
-  text-transform:uppercase;
+  padding:3.5px 8px;border-radius:99px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  text-transform:uppercase;box-shadow:0 2px 8px rgba(0,0,0,0.35);
 }
 .pcard-fav{position:absolute;top:5px;right:7px;font-size:13px;text-shadow:0 1px 6px rgba(0,0,0,0.6);}
 .b-watching{background:rgba(245,166,35,0.28);color:#ffd48a;}
 .b-finished{background:rgba(52,196,114,0.28);color:#8ef0b6;}
 .b-plan{background:rgba(91,156,246,0.28);color:#a9ccff;}
 .b-dropped{background:rgba(154,151,164,0.32);color:#d5d3dc;}
-.pcard .pbar{margin:7px 2px 0;}
+.pcard .pbar{margin:8px 2px 0;}
 .pcard-title{
-  font-size:11px;font-weight:700;line-height:1.25;margin-top:6px;color:var(--t1);
+  font-size:11.5px;font-weight:600;line-height:1.3;margin-top:7px;color:var(--t1);
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
 }
-.pbar{height:3.5px;border-radius:99px;background:rgba(255,255,255,0.14);overflow:hidden;}
-.pfill{height:100%;border-radius:99px;background:var(--a);transition:width .3s;}
+.pbar{height:4px;border-radius:99px;background:rgba(255,255,255,0.13);overflow:hidden;}
+.pfill{height:100%;border-radius:99px;background:linear-gradient(90deg,var(--a),var(--a2));transition:width .4s cubic-bezier(.32,.72,.28,1);}
 
 /* ── SEARCH GRID ── */
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:12px;padding:14px 18px;}
-.empty{text-align:center;padding:70px 30px;color:var(--t2);animation:fadeUp .4s ease both;}
-.empty-icon{font-size:44px;margin-bottom:14px;}
-.empty p{font-size:14px;line-height:1.6;}
-.empty .hero-cta{margin-top:18px;background:var(--a);color:#fff;}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:16px 12px;padding:16px 18px;}
+.grid .pcard{flex:none;width:100%;}
+.grid .pcard-img,.grid .pcard-ph{width:100%;height:auto;aspect-ratio:104/148;}
+.empty{text-align:center;padding:64px 34px;color:var(--t2);animation:fadeUp .4s ease both;}
+.empty-icon{font-size:52px;margin-bottom:16px;opacity:0.9;filter:drop-shadow(0 6px 16px var(--glow));}
+.empty p{font-size:14.5px;line-height:1.65;}
+.empty .hero-cta{margin-top:20px;background:var(--a);color:#fff;box-shadow:0 8px 22px var(--glow);}
 
 /* ── BOTTOM NAV ── */
 .nav{
@@ -155,9 +198,11 @@ img{-webkit-user-drag:none;}
 .nbtn small{font-size:9px;font-weight:800;letter-spacing:0.04em;}
 .nbtn.on{color:var(--a);}
 .nbtn.add{
-  width:52px;height:52px;border-radius:50%;background:var(--a);color:#fff;font-size:24px;
-  justify-content:center;margin-top:-22px;box-shadow:0 8px 22px var(--glow),0 3px 10px rgba(0,0,0,0.4);
+  width:54px;height:54px;border-radius:50%;background:linear-gradient(180deg,var(--a2),var(--a));color:#fff;font-size:25px;
+  justify-content:center;margin-top:-24px;box-shadow:0 10px 26px -4px var(--glow),0 3px 10px rgba(0,0,0,0.4);
+  border:1.5px solid rgba(255,255,255,0.14);
 }
+.nbtn.add:active{transform:scale(0.9) rotate(90deg);}
 
 /* ── SHEETS ── */
 .overlay{
@@ -166,22 +211,30 @@ img{-webkit-user-drag:none;}
 }
 .overlay.on{opacity:1;pointer-events:auto;}
 .sheet{
-  position:fixed;left:0;right:0;bottom:0;z-index:80;max-height:88dvh;overflow-y:auto;
-  background:var(--bg2);border-radius:24px 24px 0 0;border-top:1px solid var(--b3);
-  padding:10px 20px calc(var(--safe-b) + 22px);
-  transform:translateY(102%);transition:transform .3s cubic-bezier(.32,.72,.28,1);
+  position:fixed;left:0;right:0;bottom:0;z-index:80;max-height:90dvh;overflow-y:auto;
+  background:var(--bg2);border-radius:26px 26px 0 0;border-top:1px solid var(--b3);
+  padding:10px 22px calc(var(--safe-b) + 24px);
+  box-shadow:0 -20px 60px rgba(0,0,0,0.5);
+  transform:translateY(102%);transition:transform .34s cubic-bezier(.32,.72,.28,1);
 }
 @supports ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
   .sheet{background:color-mix(in srgb,var(--bg2) 82%,transparent);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);}
 }
 .sheet.on{transform:translateY(0);}
-.sheet-handle{width:38px;height:4.5px;border-radius:99px;background:var(--b3);margin:6px auto 12px;}
-.sheet-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
-.sheet-title{font-size:18px;font-weight:800;letter-spacing:-0.3px;}
-.sheet-cancel{font-size:13.5px;font-weight:700;color:var(--a);padding:6px 2px;}
+.sheet-handle{width:40px;height:5px;border-radius:99px;background:var(--b3);margin:8px auto 14px;}
+.sheet-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;}
+.sheet-title{font-size:19px;font-weight:800;letter-spacing:-0.35px;}
+.sheet-cancel{font-size:13.5px;font-weight:700;color:var(--t2);padding:6px 2px;}
 
 /* ── DETAIL SHEET ── */
 .dt-top{display:flex;gap:16px;margin-bottom:16px;}
+/* per-title banner header behind the cover+title. Bleeds to the sheet padding edges; scrim fades into the sheet bg so title/meta stay legible. */
+.dt-top.has-banner{position:relative;padding-top:82px;z-index:0;}
+.dt-banner{position:absolute;top:-10px;left:-22px;right:-22px;height:150px;overflow:hidden;z-index:0;}
+.dt-banner-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 28%;}
+.dt-banner-scrim{position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,0.12) 0%,rgba(0,0,0,0.42) 46%,color-mix(in srgb,var(--bg2) 94%,transparent) 100%);}
+.dt-top.has-banner .dt-cover,.dt-top.has-banner .dt-cover-ph,.dt-top.has-banner .dt-info{position:relative;z-index:1;}
+.dt-top.has-banner .dt-title{text-shadow:0 2px 12px rgba(0,0,0,0.55);}
 .dt-cover{width:110px;height:156px;border-radius:16px;object-fit:cover;background:var(--bg4);border:1px solid var(--b2);flex-shrink:0;box-shadow:0 8px 24px rgba(0,0,0,0.4);}
 .dt-cover-ph{width:110px;height:156px;border-radius:16px;background:var(--bg4);border:1px solid var(--b2);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:34px;font-weight:900;color:var(--t3);}
 .dt-info{flex:1;min-width:0;display:flex;flex-direction:column;}
@@ -197,8 +250,8 @@ img{-webkit-user-drag:none;}
 .dpick.on-finished{background:var(--finbg);border-color:var(--fin);color:var(--fin);}
 .dpick.on-dropped{background:var(--drpbg);border-color:var(--drp);color:var(--drp);}
 .prog-row{display:flex;align-items:center;gap:14px;}
-.prog-btn{width:42px;height:42px;border-radius:13px;background:var(--bg4);border:1px solid var(--b2);font-size:19px;font-weight:800;color:var(--t1);display:flex;align-items:center;justify-content:center;}
-.prog-btn:active{background:var(--ag);border-color:var(--a);}
+.prog-btn{width:46px;height:46px;border-radius:14px;background:var(--bg4);border:1px solid var(--b2);font-size:20px;font-weight:800;color:var(--t1);display:flex;align-items:center;justify-content:center;transition:transform .12s,background .14s,border-color .14s;}
+.prog-btn:active{background:var(--ag);border-color:var(--a);transform:scale(0.92);}
 .prog-mid{flex:1;text-align:center;}
 .prog-num{font-size:17px;font-weight:900;}
 .prog-num span{color:var(--t3);font-weight:700;font-size:13px;}
@@ -236,34 +289,38 @@ img{-webkit-user-drag:none;}
 .dact.danger{color:#ff6b6b;flex:0 0 52px;}
 
 /* ── FORMS ── */
-.fgroup{margin-bottom:14px;}
-.flabel{display:block;font-size:10px;font-weight:800;color:var(--t3);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:7px;}
+.fgroup{margin-bottom:16px;}
+.flabel{display:block;font-size:10px;font-weight:700;color:color-mix(in srgb,var(--t2),#fff 16%);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:8px;}
 .finput,.ftextarea{
-  width:100%;padding:12px 13px;border-radius:12px;font-size:14px;font-family:inherit;
-  background:var(--bg3);border:1px solid var(--b2);color:var(--t1);outline:none;
+  width:100%;padding:13px 14px;border-radius:13px;font-size:15px;font-family:inherit;
+  background:var(--bg3);border:1px solid var(--bn);color:var(--t1);outline:none;
+  transition:border-color .16s,box-shadow .16s,background .16s;box-shadow:var(--elev1);
 }
-.finput:focus,.ftextarea:focus{border-color:var(--a);}
+.finput:focus,.ftextarea:focus{border-color:var(--a);box-shadow:0 0 0 3px var(--ag);background:var(--bg2);}
 .finput::placeholder,.ftextarea::placeholder{color:var(--t3);}
-.ftextarea{min-height:84px;resize:vertical;}
-.frow2{display:flex;gap:10px;}
+.ftextarea{min-height:88px;resize:vertical;line-height:1.5;}
+.frow2{display:flex;gap:12px;}
 .frow2 .fgroup{flex:1;}
-.status-pick{display:flex;gap:6px;}
-.spick{flex:1;padding:10px 0;border-radius:11px;font-size:10.5px;font-weight:800;background:var(--bg3);border:1px solid var(--b2);color:var(--t3);}
-.spick.on-plan{background:var(--plnbg);border-color:var(--pln);color:var(--pln);}
-.spick.on-watching{background:var(--watbg);border-color:var(--wat);color:var(--wat);}
-.spick.on-finished{background:var(--finbg);border-color:var(--fin);color:var(--fin);}
-.spick.on-dropped{background:var(--drpbg);border-color:var(--drp);color:var(--drp);}
-.submit-btn{
-  width:100%;padding:15px 0;margin-top:8px;border-radius:14px;font-size:14.5px;font-weight:800;
-  background:var(--a);color:#fff;box-shadow:0 6px 18px var(--glow);
+.status-pick{display:flex;gap:7px;}
+.spick{flex:1;padding:11px 0;border-radius:12px;font-size:10.5px;font-weight:800;background:var(--bg3);border:1px solid var(--bn);color:var(--t2);transition:all .14s;box-shadow:var(--elev1);}
+.spick.on-plan,.spick.on-watching,.spick.on-finished,.spick.on-dropped{
+  background:color-mix(in srgb,var(--a) 20%,var(--bg3));border-color:transparent;color:var(--a2);
+  box-shadow:0 3px 12px -5px var(--glow);
 }
-.submit-btn:active{opacity:0.8;}
+.submit-btn{
+  width:100%;padding:16px 0;margin-top:10px;border-radius:15px;font-size:15px;font-weight:800;letter-spacing:-0.2px;
+  background:linear-gradient(180deg,var(--a2),var(--a));color:#fff;box-shadow:0 8px 22px -6px var(--glow);
+}
+.submit-btn:active{transform:scale(0.985);opacity:0.9;}
 .autofill-btn{
   width:100%;display:flex;align-items:center;justify-content:center;gap:8px;
-  padding:12px 0;margin-bottom:16px;border-radius:13px;font-size:12.5px;font-weight:800;
-  background:var(--ag);border:1px dashed var(--a);color:var(--a);
+  padding:13px 0;margin-bottom:16px;border-radius:14px;font-size:12.5px;font-weight:800;
+  background:color-mix(in srgb,var(--a) 14%,var(--bg3));border:1px solid transparent;color:var(--a2);
+  box-shadow:0 3px 12px -6px var(--glow);
 }
-.autofill-btn.loading{opacity:0.5;pointer-events:none;}
+.autofill-btn.loading{opacity:0.65;pointer-events:none;}
+.autofill-btn.loading span:first-child{display:inline-block;animation:spin 0.9s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
 
 /* ── AI SHEET ── */
 .ai-tabs{display:flex;gap:6px;margin-bottom:16px;}
@@ -317,8 +374,8 @@ img{-webkit-user-drag:none;}
 
 /* ── STATS ── */
 .stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
-.stat-card{background:var(--bg3);border:1px solid var(--b2);border-radius:16px;padding:16px;}
-.stat-val{font-size:24px;font-weight:900;letter-spacing:-0.5px;}
+.stat-card{background:linear-gradient(160deg,var(--bg3),var(--bg2));border:1px solid var(--b2);border-radius:17px;padding:17px;}
+.stat-val{font-size:25px;font-weight:900;letter-spacing:-0.5px;}
 .stat-lbl{font-size:10.5px;font-weight:700;color:var(--t2);margin-top:4px;text-transform:uppercase;letter-spacing:0.06em;}
 .stat-bar-row{display:flex;align-items:center;gap:10px;margin-top:10px;}
 .stat-bar-row .lbl{font-size:11px;font-weight:700;color:var(--t2);width:70px;flex-shrink:0;}
@@ -361,7 +418,190 @@ img{-webkit-user-drag:none;}
 }
 .toast.on{opacity:1;transform:translateX(-50%) translateY(0);}
 
+/* ── KIND VIEW SWITCH (Watch / Read) ── */
+.kind-seg{display:flex;gap:6px;padding:12px 18px 2px;}
+.kseg{
+  flex:1;padding:10px 0;border-radius:13px;font-size:12.5px;font-weight:800;letter-spacing:-0.1px;
+  background:var(--bg3);border:1px solid transparent;color:var(--t2);
+  transition:background .16s,border-color .16s,color .16s,transform .12s;
+}
+.kseg:active{transform:scale(0.97);}
+.kseg.on{background:color-mix(in srgb,var(--a) 20%,var(--bg3));border-color:transparent;color:var(--a2);box-shadow:0 3px 12px -5px var(--glow);}
+.kseg .fn{font-size:9.5px;font-weight:800;opacity:0.6;font-variant-numeric:tabular-nums;margin-left:2px;}
+
+/* ── AIRING SCHEDULE ── */
+.pcard-air{font-size:9.5px;font-weight:700;color:var(--wat);margin-top:4px;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.hero-air{display:inline-flex;align-items:center;gap:5px;margin-top:9px;font-size:11px;font-weight:700;color:#ffd9a0;background:rgba(245,166,35,0.18);border:1px solid rgba(245,166,35,0.34);padding:5px 11px;border-radius:99px;}
+.dt-air{display:inline-flex;align-items:center;gap:6px;margin-top:10px;font-size:11.5px;font-weight:700;color:var(--wat);background:var(--watbg);border:1px solid var(--wat);padding:7px 12px;border-radius:99px;align-self:flex-start;}
+
+/* ── WEEKLY SCHEDULE ── */
+.sched-nav{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
+.sched-arrow{width:42px;height:42px;flex-shrink:0;border-radius:13px;background:var(--bg3);border:1px solid var(--b2);color:var(--t1);font-size:22px;font-weight:800;line-height:1;display:flex;align-items:center;justify-content:center;transition:transform .12s,background .16s,border-color .16s;}
+.sched-arrow:active{transform:scale(0.9);background:var(--bg4);}
+.sched-week{flex:1;text-align:center;min-width:0;}
+.sched-week-title{font-size:16.5px;font-weight:900;letter-spacing:-0.3px;}
+.sched-week-range{font-size:11.5px;font-weight:600;color:var(--t2);margin-top:2px;}
+.sched-toolbar{display:flex;justify-content:center;margin-bottom:16px;}
+.sched-today-btn{padding:8px 18px;border-radius:99px;font-size:11.5px;font-weight:800;background:color-mix(in srgb,var(--a) 18%,var(--bg3));border:1px solid transparent;color:var(--a2);box-shadow:0 3px 12px -5px var(--glow);transition:transform .12s,filter .16s;}
+.sched-today-btn:active{transform:scale(0.95);}
+.sched-days{display:flex;flex-direction:column;gap:14px;}
+.sched-day{border:1px solid var(--bn2);border-radius:16px;background:var(--bg3);overflow:hidden;transition:opacity .2s,border-color .2s;animation:fadeUp .35s ease both;}
+.sched-day.is-past{opacity:0.5;}
+.sched-day.is-today{border-color:var(--a);box-shadow:0 0 0 1px var(--a),0 8px 24px -12px var(--glow);background:linear-gradient(180deg,var(--ag),var(--bg3) 62%);}
+.sched-day-head{display:flex;align-items:baseline;gap:8px;padding:11px 14px 9px;}
+.sched-day.is-today .sched-day-name{color:var(--a2);}
+.sched-day-name{font-size:13.5px;font-weight:800;letter-spacing:-0.2px;}
+.sched-day-date{font-size:11px;font-weight:600;color:var(--t2);}
+.sched-today-pill{margin-left:auto;font-size:8.5px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:var(--a2);background:var(--ag);border:1px solid var(--a);padding:2.5px 9px;border-radius:99px;}
+.sched-day-body{display:flex;flex-direction:column;}
+.sched-row{display:flex;align-items:center;gap:11px;padding:9px 14px;min-height:44px;cursor:pointer;border-top:1px solid var(--bn2);transition:background .14s;}
+.sched-row:active{background:var(--bg4);}
+@media(hover:hover){.sched-row:hover{background:var(--bg4);}.sched-arrow:hover{border-color:var(--b3);}.sched-today-btn:hover{filter:brightness(1.08);}}
+.sched-thumb{width:34px;height:48px;border-radius:8px;object-fit:cover;background:var(--bg4);border:1px solid var(--b2);flex-shrink:0;}
+.sched-thumb-ph{width:34px;height:48px;border-radius:8px;background:linear-gradient(160deg,var(--bg4),var(--bg3));border:1px solid var(--b2);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:900;color:var(--t3);}
+.sched-row-main{flex:1;min-width:0;}
+.sched-row-title{font-size:13px;font-weight:700;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.sched-bell{font-size:10px;margin-left:4px;}
+.sched-row-sub{font-size:11px;font-weight:700;color:var(--wat);margin-top:3px;}
+.sched-empty-day{padding:11px 14px;font-size:12px;color:var(--t3);font-weight:600;border-top:1px solid var(--bn2);}
+.sched-loading,.sched-empty-all{text-align:center;padding:52px 26px;color:var(--t2);animation:fadeUp .35s ease both;}
+.sched-loading .sched-spin{font-size:30px;display:inline-block;animation:spin .9s linear infinite;margin-bottom:14px;}
+.sched-loading p,.sched-empty-all p{font-size:14px;line-height:1.6;}
+.sched-empty-all .empty-icon{font-size:46px;margin-bottom:14px;opacity:0.9;filter:drop-shadow(0 6px 16px var(--glow));}
+@media (orientation:landscape), (min-width:760px){
+  .sched-days{display:grid;grid-template-columns:repeat(auto-fill,minmax(224px,1fr));gap:14px;align-items:start;}
+}
+
+/* ── ADD FORM: KIND TOGGLE + POLISH ── */
+.kind-toggle{display:flex;gap:8px;}
+.kbtn{
+  flex:1;display:flex;align-items:center;justify-content:center;gap:7px;
+  padding:14px 0;border-radius:14px;font-size:13.5px;font-weight:800;letter-spacing:-0.1px;
+  background:var(--bg3);border:1px solid var(--bn);color:var(--t2);box-shadow:var(--elev1);
+  transition:background .16s,border-color .16s,color .16s,transform .12s,box-shadow .16s;
+}
+.kbtn:active{transform:scale(0.97);}
+.kbtn.on{background:color-mix(in srgb,var(--a) 20%,var(--bg3));border-color:transparent;color:var(--a2);box-shadow:0 3px 14px -5px var(--glow);}
+.field-hint{font-size:11px;font-weight:600;color:var(--t3);margin-top:7px;line-height:1.45;}
+#addSheet .sheet-header{margin-bottom:14px;}
+#addSheet .sheet-title{font-size:21px;letter-spacing:-0.4px;}
+#addSheet .flabel{margin-bottom:8px;}
+#addSheet .submit-btn{font-size:15.5px;padding:17px 0;box-shadow:0 10px 26px -7px var(--glow);}
+
 @keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   RESPONSIVE — auto-adapts to orientation + width (no manual toggle).
+   Phone PORTRAIT is the base above and stays untouched (all rules below are
+   gated behind orientation:landscape / min-width and are false in phone
+   portrait). Landscape (short+wide rotated phone) and tablets/wide screens
+   genuinely use the horizontal space.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* Notch/safe-area on the LEFT or RIGHT edge (only relevant in landscape) */
+@media (orientation:landscape){
+  #app{padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right);}
+  .nav{padding-left:calc(10px + env(safe-area-inset-left));padding-right:calc(10px + env(safe-area-inset-right));}
+}
+
+/* LANDSCAPE (any short+wide phone) OR anything wider than a phone (tablet+):
+   fill the horizontal space instead of stretching the portrait column. */
+@media (orientation:landscape), (min-width:760px){
+  /* Poster rows: fluid grid instead of a tight horizontal scroll strip */
+  .row-scroll{
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(132px,1fr));
+    gap:18px 14px;overflow:visible;padding:2px 18px 10px;
+  }
+  .row-scroll .pcard{flex:none;width:100%;}
+  .row-scroll .pcard-img,.row-scroll .pcard-ph{width:100%;height:auto;aspect-ratio:104/148;}
+  /* Search-results grid gets roomier columns too */
+  .grid{grid-template-columns:repeat(auto-fill,minmax(132px,1fr));}
+  /* Hero: shorter-profile widescreen backdrop; text kept to a legible column */
+  .hero{min-height:200px;}
+  .hero-body{max-width:640px;}
+  .hero-title{font-size:24px;}
+
+  /* Add/Edit + Detail (and all) sheets → centered modal with own scroll */
+  .overlay{background:rgba(0,0,0,0.62);}
+  .sheet{
+    left:50%;right:auto;bottom:auto;top:50%;
+    width:min(560px,94vw);max-height:90dvh;
+    border-radius:24px;border:1px solid var(--b3);
+    padding:20px 24px calc(env(safe-area-inset-bottom) + 22px);
+    box-shadow:0 24px 70px rgba(0,0,0,0.6);
+    transform:translate(-50%,-46%) scale(.98);opacity:0;pointer-events:none;
+    transition:transform .3s cubic-bezier(.32,.72,.28,1),opacity .22s;
+  }
+  .sheet.on{transform:translate(-50%,-50%) scale(1);opacity:1;pointer-events:auto;}
+  .sheet-handle{display:none;}
+  /* keep the per-title banner header flush to the top of the modal */
+  .dt-banner{top:-20px;left:-24px;right:-24px;}
+}
+
+/* SHORT landscape (rotated phone): reclaim vertical space so the controls
+   don't dominate the tiny viewport height. */
+@media (orientation:landscape) and (max-height:560px){
+  .hdr{padding-top:calc(var(--safe-t) + 8px);padding-bottom:2px;}
+  .hdr-title{font-size:22px;}
+  .search-row{padding-top:8px;padding-bottom:0;}
+  .kind-seg{padding-top:8px;padding-bottom:0;}
+  .filt-row{padding-top:6px;}
+  .sort-row{padding-top:7px;padding-bottom:2px;}
+  .hero{min-height:150px;margin-top:10px;}
+  .hero-body{padding:12px 16px;}
+  .hero-title{font-size:21px;}
+}
+
+/* WIDE / tablet: center the content so lines & cards don't stretch absurdly,
+   and let the hero + poster grid breathe with more columns. */
+@media (min-width:900px){
+  .hdr,.search-row,.kind-seg,.filt-row,.sort-row,.page{
+    max-width:1180px;margin-left:auto;margin-right:auto;
+  }
+  .confirm-box{max-width:440px;margin-left:auto;margin-right:auto;}
+  .nav{justify-content:center;gap:46px;}
+  .grid,.row-scroll{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));}
+  .hero{min-height:264px;}
+  .hero-title{font-size:27px;}
+}
+
+/* ── INLINE ICONS ── */
+.ico{width:1.15em;height:1.15em;display:inline-block;vertical-align:-0.18em;stroke:currentColor;fill:none;flex:none;}
+.ico.fill{fill:currentColor;}
+.hbtn .ico,.nbtn .ico{width:1.25em;height:1.25em;vertical-align:middle;}
+.search-ico .ico{width:1.15em;height:1.15em;vertical-align:middle;}
+.star .ico{width:1em;height:1em;vertical-align:middle;}
+.star.on .ico{fill:currentColor;}
+.pcard-fav{color:#ff5a6e;}
+.pcard-fav .ico{fill:currentColor;}
+.dt-fav.on .ico{fill:currentColor;}
+.empty-icon .ico{width:1em;height:1em;vertical-align:-0.08em;}
+.sched-spin .ico{width:1em;height:1em;}
+.sched-bell .ico{width:1em;height:1em;vertical-align:-0.12em;}
+/* FOR YOU (recommendations) */
+.fy-intro{font-size:13px;line-height:1.55;color:var(--t2);margin:-4px 0 16px;}
+.fy-loading,.fy-empty{text-align:center;padding:52px 26px;color:var(--t2);animation:fadeUp .35s ease both;}
+.fy-loading .fy-spin{font-size:30px;display:inline-block;animation:spin .9s linear infinite;margin-bottom:14px;}
+.fy-loading p,.fy-empty p{font-size:14px;line-height:1.6;}
+.fy-spin .ico{width:1em;height:1em;}
+.fy-empty .empty-icon{font-size:46px;margin-bottom:14px;opacity:0.9;filter:drop-shadow(0 6px 16px var(--glow));}
+.fy-empty .fy-cta{margin-top:18px;display:inline-flex;align-items:center;gap:8px;padding:12px 20px;min-height:44px;border-radius:14px;background:var(--bg4);border:1px solid var(--b2);color:var(--t1);font-size:13.5px;font-weight:700;}
+.fy-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:18px 12px;padding:2px 0 8px;animation:fadeUp .35s ease both;}
+.fy-card{display:flex;flex-direction:column;animation:fadeUp .35s ease both;}
+.fy-card.leaving{opacity:0;transform:scale(.9);transition:opacity .28s,transform .28s;}
+.fy-wrap{position:relative;border-radius:15px;overflow:hidden;}
+.fy-img{width:100%;aspect-ratio:104/148;object-fit:cover;display:block;background:var(--bg4);}
+.fy-ph{width:100%;aspect-ratio:104/148;background:var(--bg4);border:1px solid var(--b2);display:flex;align-items:center;justify-content:center;font-size:34px;font-weight:900;color:var(--t3);border-radius:15px;}
+.fy-score{position:absolute;top:7px;left:7px;display:inline-flex;align-items:center;gap:3px;padding:3px 7px;border-radius:99px;font-size:10.5px;font-weight:800;background:rgba(0,0,0,0.62);color:#ffd85e;backdrop-filter:blur(6px);}
+.fy-score .ico{width:11px;height:11px;fill:currentColor;}
+.fy-title{font-size:13px;font-weight:700;line-height:1.3;margin-top:9px;color:var(--t1);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.fy-meta{font-size:11px;color:var(--t2);margin-top:4px;line-height:1.4;}
+.fy-because{font-size:10.5px;color:var(--t3);margin-top:5px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.fy-plan{margin-top:9px;width:100%;min-height:44px;border-radius:13px;background:var(--bg4);border:1px solid var(--b2);color:var(--t1);font-size:12.5px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;gap:6px;transition:transform .12s,background .14s,border-color .14s;}
+.fy-plan:hover{background:color-mix(in srgb,var(--bg4),#fff 6%);border-color:var(--b3);}
+.fy-plan:active{transform:scale(.96);}
+.fy-plan .ico{width:15px;height:15px;}
 </style>
 </head>
 <body>
@@ -372,25 +612,32 @@ img{-webkit-user-drag:none;}
       <div class="hdr-title">Watchlist</div>
       <div class="hdr-sub" id="headerSub"></div>
     </div>
-    <button class="hbtn" onclick="openSheet('themeSheet')" title="Theme">🎨</button>
+    <div class="hdr-actions">
+      <button class="hbtn" onclick="openForYou()" title="For You — tailored recommendations" aria-label="For You recommendations"><i data-ic="compass"></i></button>
+      <button class="hbtn" onclick="openSchedule()" title="Weekly airing schedule" aria-label="Weekly airing schedule"><i data-ic="calendar"></i></button>
+      <button class="hbtn" id="notifyBell" onclick="openNotifySheet()" title="Episode notifications" aria-label="Notifications"><i data-ic="bell-off"></i></button>
+      <button class="hbtn" onclick="openSheet('themeSheet')" title="Theme"><i data-ic="palette"></i></button>
+    </div>
   </div>
   <div class="search-row">
     <div class="search-wrap">
-      <span class="search-ico">🔍</span>
+      <span class="search-ico"><i data-ic="search"></i></span>
       <input class="search-in" type="search" id="searchIn" placeholder="Search titles, genres…" oninput="renderHome()">
     </div>
   </div>
+  <div class="kind-seg" id="kindSeg"></div>
+  <div class="filt-row" id="filtRow"></div>
   <div class="sort-row" id="sortRow"></div>
   <div class="page" id="pageEl"></div>
 </div>
 
 <!-- BOTTOM NAV -->
 <div class="nav">
-  <button class="nbtn on" id="nav-home" onclick="goHome()"><span>🏠</span><small>Home</small></button>
-  <button class="nbtn" onclick="openSheet('statsSheet')"><span>📊</span><small>Stats</small></button>
+  <button class="nbtn on" id="nav-home" onclick="goHome()"><span><i data-ic="home"></i></span><small>Home</small></button>
+  <button class="nbtn" onclick="openSheet('statsSheet')"><span><i data-ic="chart"></i></span><small>Stats</small></button>
   <button class="nbtn add" onclick="openSheet_add()">＋</button>
-  <button class="nbtn" onclick="openSheet('importSheet')"><span>📋</span><small>Import</small></button>
-  <button class="nbtn" onclick="openSheet('aiSheet')"><span>✦</span><small>AI</small></button>
+  <button class="nbtn" onclick="openSheet('importSheet')"><span><i data-ic="clipboard"></i></span><small>Import</small></button>
+  <button class="nbtn" onclick="openSheet('aiSheet')"><span><i data-ic="sparkles"></i></span><small>AI</small></button>
 </div>
 
 <!-- OVERLAY -->
@@ -410,37 +657,55 @@ img{-webkit-user-drag:none;}
     <button class="sheet-cancel" onclick="closeAll()">Cancel</button>
   </div>
   <div class="fgroup">
+    <label class="flabel">What is it?</label>
+    <div class="kind-toggle">
+      <button type="button" class="kbtn" id="kf-watch" onclick="setKind('watch')"><i data-ic="play"></i> Watch</button>
+      <button type="button" class="kbtn" id="kf-read" onclick="setKind('read')"><i data-ic="book"></i> Read</button>
+    </div>
+    <div class="field-hint" id="kindHint">Anime, TV shows &amp; movies.</div>
+  </div>
+  <div class="fgroup">
     <label class="flabel">Title *</label>
-    <input class="finput" id="fTitle" placeholder="e.g. Attack on Titan" autocomplete="off" autocorrect="off">
+    <input class="finput" id="fTitle" placeholder="e.g. Attack on Titan" autocomplete="off" autocorrect="off" enterkeyhint="search" onkeydown="if(event.key==='Enter'){event.preventDefault();aiAutofill();}">
   </div>
   <button class="autofill-btn" id="autofillBtn" onclick="aiAutofill()">
-    <span>✦</span> Autofill — cover, episodes, genre &amp; watch order
+    <span><i data-ic="sparkles"></i></span> Autofill — cover, episodes, genre &amp; watch order
   </button>
   <div class="fgroup" id="coverPrev">
     <label class="flabel">Cover</label>
     <div style="display:flex;align-items:center;gap:10px;">
       <img id="coverImg" alt="" style="width:44px;height:62px;border-radius:9px;object-fit:cover;border:1px solid var(--b1);display:none">
-      <button class="dact" type="button" style="flex:0 0 auto;padding:10px 14px" onclick="document.getElementById('coverFile').click()">📷 Upload</button>
+      <button class="dact" type="button" style="flex:0 0 auto;padding:10px 14px" onclick="document.getElementById('coverFile').click()"><i data-ic="camera"></i> Upload</button>
       <button class="dact danger" type="button" id="coverRemoveBtn" onclick="clearCover()" style="display:none;padding:10px 14px">Remove</button>
       <input type="file" id="coverFile" accept="image/*" style="display:none" onchange="coverFileChosen(this)">
     </div>
   </div>
+  <div class="fgroup" id="bgPrev">
+    <label class="flabel">Background photo</label>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <img id="bgImgPreview" alt="" style="width:70px;height:44px;border-radius:9px;object-fit:cover;border:1px solid var(--b1);display:none">
+      <button class="dact" type="button" style="flex:0 0 auto;padding:10px 14px" onclick="document.getElementById('bgFile').click()"><i data-ic="image"></i> Upload</button>
+      <button class="dact danger" type="button" id="bgRemoveBtn" onclick="clearBg()" style="display:none;padding:10px 14px">Remove</button>
+      <input type="file" id="bgFile" accept="image/*" style="display:none" onchange="bgFileChosen(this)">
+    </div>
+    <div class="field-hint">Sets a custom backdrop for this title's hero &amp; detail view — overrides the auto banner. Colors tint from it too.</div>
+  </div>
   <div class="fgroup">
     <label class="flabel">Status</label>
     <div class="status-pick">
-      <button class="spick" id="sp-plan" onclick="setStatus('plan')">📋 Plan</button>
-      <button class="spick" id="sp-watching" onclick="setStatus('watching')">▶ Watch</button>
-      <button class="spick" id="sp-finished" onclick="setStatus('finished')">✓ Done</button>
-      <button class="spick" id="sp-dropped" onclick="setStatus('dropped')">✕ Drop</button>
+      <button class="spick" id="sp-plan" onclick="setStatus('plan')"><i data-ic="clipboard"></i> Plan</button>
+      <button class="spick" id="sp-watching" onclick="setStatus('watching')"><i data-ic="play"></i> Watch</button>
+      <button class="spick" id="sp-finished" onclick="setStatus('finished')"><i data-ic="check"></i> Done</button>
+      <button class="spick" id="sp-dropped" onclick="setStatus('dropped')"><i data-ic="x"></i> Drop</button>
     </div>
   </div>
   <div class="frow2">
     <div class="fgroup">
-      <label class="flabel">Episodes</label>
+      <label class="flabel" id="lblEps">Episodes</label>
       <input class="finput" id="fEps" placeholder="e.g. 24 eps">
     </div>
     <div class="fgroup">
-      <label class="flabel">Watched (ep #)</label>
+      <label class="flabel" id="lblEp">Watched (ep #)</label>
       <input class="finput" id="fEp" type="number" min="0" inputmode="numeric" placeholder="0">
     </div>
   </div>
@@ -455,7 +720,7 @@ img{-webkit-user-drag:none;}
     </div>
   </div>
   <div class="fgroup">
-    <label class="flabel">Watch Order (one step per line)</label>
+    <label class="flabel" id="lblOrder">Watch Order (one step per line)</label>
     <textarea class="ftextarea" id="fOrder" placeholder="TV: Season 1 — 12 eps&#10;OVA: Side story — after S1&#10;TV: Season 2 — 12 eps"></textarea>
   </div>
   <div class="fgroup">
@@ -469,13 +734,13 @@ img{-webkit-user-drag:none;}
 <div class="sheet" id="aiSheet">
   <div class="sheet-handle"></div>
   <div class="sheet-header">
-    <div class="sheet-title">✦ AI Features</div>
+    <div class="sheet-title"><i data-ic="sparkles"></i> AI Features</div>
     <button class="sheet-cancel" onclick="closeAll()">Done</button>
   </div>
   <div class="ai-tabs">
-    <button class="aitab on" id="at-rec" onclick="setAITab('rec')">💡 Suggest</button>
-    <button class="aitab" id="at-chat" onclick="setAITab('chat')">💬 Ask</button>
-    <button class="aitab" id="at-rank" onclick="setAITab('rank')">🏆 Rank</button>
+    <button class="aitab on" id="at-rec" onclick="setAITab('rec')"><i data-ic="bulb"></i> Suggest</button>
+    <button class="aitab" id="at-chat" onclick="setAITab('chat')"><i data-ic="message"></i> Ask</button>
+    <button class="aitab" id="at-rank" onclick="setAITab('rank')"><i data-ic="trophy"></i> Rank</button>
   </div>
   <div class="aipanel on" id="ap-rec">
     <p class="ai-desc">AI recommends what to watch next based on your entire list.</p>
@@ -512,7 +777,7 @@ img{-webkit-user-drag:none;}
 <div class="sheet" id="importSheet">
   <div class="sheet-handle"></div>
   <div class="sheet-header">
-    <div class="sheet-title">📋 Import / Export</div>
+    <div class="sheet-title"><i data-ic="clipboard"></i> Import / Export</div>
     <button class="sheet-cancel" onclick="closeAll()">Done</button>
   </div>
   <p class="ai-desc">Paste your list from Notes, messages, or anywhere — one title per line, as messy as you like. After previewing, tap a status on each title (or use Set&nbsp;all). "Title | status | ep 5 | ★4" style lines are understood too.</p>
@@ -524,16 +789,17 @@ img{-webkit-user-drag:none;}
     <button class="submit-btn" style="margin:0;flex:1" onclick="doImport()">Import Selected</button>
   </div>
   <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--b1);">
-    <button class="parse-btn" style="margin-top:0" onclick="exportList()">📤 Copy my list to clipboard</button>
+    <button class="parse-btn" style="margin-top:0" onclick="exportList()"><i data-ic="upload"></i> Copy my list to clipboard</button>
   </div>
   <div id="syncBox" style="margin-top:16px;padding-top:14px;border-top:1px solid var(--b1);"></div>
+  <div id="notifyBox" style="margin-top:16px;padding-top:14px;border-top:1px solid var(--b1);"></div>
 </div>
 
 <!-- STATS SHEET -->
 <div class="sheet" id="statsSheet">
   <div class="sheet-handle"></div>
   <div class="sheet-header">
-    <div class="sheet-title">📊 Stats</div>
+    <div class="sheet-title"><i data-ic="chart"></i> Stats</div>
     <button class="sheet-cancel" onclick="closeAll()">Done</button>
   </div>
   <div id="statsBody"></div>
@@ -543,7 +809,7 @@ img{-webkit-user-drag:none;}
 <div class="sheet" id="themeSheet">
   <div class="sheet-handle"></div>
   <div class="sheet-header">
-    <div class="sheet-title">🎨 Theme</div>
+    <div class="sheet-title"><i data-ic="palette"></i> Theme</div>
     <button class="sheet-cancel" onclick="closeAll()">Done</button>
   </div>
   <div class="theme-grid" id="themeGrid"></div>
@@ -561,6 +827,39 @@ img{-webkit-user-drag:none;}
   </div>
 </div>
 
+<!-- NOTIFICATIONS SHEET -->
+<div class="sheet" id="notifySheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <div class="sheet-title"><i data-ic="bell"></i> Notifications</div>
+    <button class="sheet-cancel" onclick="closeAll()">Done</button>
+  </div>
+  <div id="notifyBoxHeader"></div>
+</div>
+
+<!-- SCHEDULE SHEET -->
+<div class="sheet" id="scheduleSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <div class="sheet-title"><i data-ic="calendar"></i> Schedule</div>
+    <button class="sheet-cancel" onclick="closeAll()">Done</button>
+  </div>
+  <div id="scheduleBody"></div>
+</div>
+
+<!-- FOR YOU SHEET -->
+<div class="sheet" id="forYouSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <div class="sheet-title"><i data-ic="compass"></i> For You</div>
+    <div style="display:flex;align-items:center;gap:6px;">
+      <button class="hbtn" onclick="refreshForYou()" title="Refresh recommendations" aria-label="Refresh recommendations"><i data-ic="loader"></i></button>
+      <button class="sheet-cancel" onclick="closeAll()">Done</button>
+    </div>
+  </div>
+  <div id="forYouBody"></div>
+</div>
+
 <!-- CONFIRM DELETE -->
 <div class="confirm-box" id="confirmBox">
   <div class="confirm-title">Remove from list?</div>
@@ -575,30 +874,86 @@ img{-webkit-user-drag:none;}
 <div class="toast" id="toast"></div>
 
 <script>
+// ─── ICONS — inline monochrome line icons (Feather/Lucide style, currentColor) ──
+const ICONS={
+calendar:'<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
+bell:'<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>',
+'bell-off':'<path d="M8.7 3A6 6 0 0 1 18 8c0 3 .5 5 1.3 6.5"/><path d="M17 17H3s3-2 3-9a4.67 4.67 0 0 1 .3-1.7"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/><path d="M2 2l20 20"/>',
+palette:'<circle cx="13.5" cy="6.5" r=".9"/><circle cx="17" cy="12" r=".9"/><circle cx="6" cy="12" r=".9"/><circle cx="8.5" cy="7.5" r=".9"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10a2 2 0 0 0 2-2 1.9 1.9 0 0 0-.5-1.3 1.9 1.9 0 0 1-.5-1.3 2 2 0 0 1 2-2h1.6a4.4 4.4 0 0 0 4.4-4.4C21.4 6 17.2 2 12 2z"/>',
+search:'<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
+home:'<path d="M3 9.5 12 3l9 6.5"/><path d="M5 10v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V10"/><path d="M9 21v-6h6v6"/>',
+chart:'<path d="M6 20v-6M12 20V4M18 20v-9"/>',
+clipboard:'<rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>',
+sparkles:'<path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 14l.7 1.9 1.8.6-1.8.7L19 19l-.7-1.8-1.8-.7 1.8-.6z"/>',
+play:'<path d="M7 4v16l13-8z"/>',
+book:'<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>',
+check:'<path d="M20 6 9 17l-5-5"/>',
+x:'<path d="M18 6 6 18M6 6l12 12"/>',
+camera:'<path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/>',
+image:'<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/>',
+bulb:'<path d="M9 18h6M10 22h4"/><path d="M15.1 14c.2-1 .6-1.7 1.4-2.5A4.6 4.6 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.8.8 1.2 1.5 1.4 2.5"/>',
+message:'<path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8z"/>',
+trophy:'<path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6M18 9h1.5a2.5 2.5 0 0 0 0-5H18M4 22h16"/><path d="M10 14.7V17c0 .6-.5 1-1 1.2C7.9 18.8 7 20.2 7 22M14 14.7V17c0 .6.5 1 1 1.2 1.1.6 2 2 2 3.8"/><path d="M18 2H6v7a6 6 0 0 0 12 0z"/>',
+cloud:'<path d="M18 10h-1.3A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/>',
+upload:'<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>',
+star:'<path d="M12 2.5l2.9 6.1 6.6.9-4.8 4.6 1.2 6.6L12 18.6 6.1 21.3l1.2-6.6L2.5 9.5l6.6-.9z"/>',
+heart:'<path d="M20.8 5.6a5.5 5.5 0 0 0-7.8 0L12 6.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21.2l7.8-6.8 1-1a5.5 5.5 0 0 0 0-7.8z"/>',
+edit:'<path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
+trash:'<path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6"/>',
+film:'<rect x="2.5" y="3" width="19" height="18" rx="2"/><path d="M7 3v18M17 3v18M2.5 8h4.5M2.5 16h4.5M17 8h4.5M17 16h4.5M2.5 12h19"/>',
+clock:'<circle cx="12" cy="12" r="9.5"/><path d="M12 7v5l3.5 2"/>',
+'chevron-left':'<path d="m15 18-6-6 6-6"/>',
+'chevron-right':'<path d="m9 18 6-6-6-6"/>',
+loader:'<path d="M12 3a9 9 0 1 0 9 9"/>',
+inbox:'<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5.1 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.9A2 2 0 0 0 16.8 4H7.2a2 2 0 0 0-1.7 1.1z"/>',
+plus:'<path d="M12 5v14M5 12h14"/>',
+compass:'<circle cx="12" cy="12" r="9.5"/><path d="m16 8-2 6-6 2 2-6z"/>'
+};
+function icon(name,cls){const p=ICONS[name];if(!p)return'';return `<svg class="ico${cls?' '+cls:''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`;}
+function hydrateIcons(root){(root||document).querySelectorAll('[data-ic]').forEach(el=>{const s=icon(el.getAttribute('data-ic'));if(s)el.outerHTML=s;});}
+
 // ─── DATA ──────────────────────────────────────────────────────────────────
 const DEFAULT_DATA=[];
 
 // ─── STATE ─────────────────────────────────────────────────────────────────
-let anime=[],sortMode='recent',detailId=null,editingId=null,curStatus='plan',deleteId=null,importItems=[],curAITab='rec',curTheme='default';
+let anime=[],sortMode='recent',filterStatus='all',detailId=null,editingId=null,curStatus='plan',deleteId=null,importItems=[],curAITab='rec',curTheme='default',viewKind='watch',curKind='watch';
+function kindOf(a){return (a&&a.kind)==='read'?'read':'watch';}
 const STATUS_META={
-  watching:{label:'Watching',icon:'▶',color:'var(--wat)'},
-  plan:{label:'Plan to Watch',icon:'📋',color:'var(--pln)'},
-  finished:{label:'Finished',icon:'✓',color:'var(--fin)'},
-  dropped:{label:'Dropped',icon:'✕',color:'var(--drp)'},
+  watching:{label:'Watching',icon:icon('play'),color:'var(--wat)'},
+  plan:{label:'Plan to Watch',icon:icon('clipboard'),color:'var(--pln)'},
+  finished:{label:'Finished',icon:icon('check'),color:'var(--fin)'},
+  dropped:{label:'Dropped',icon:icon('x'),color:'var(--drp)'},
 };
 
 // ─── STORAGE ───────────────────────────────────────────────────────────────
 const LSKEY='animelist_friends_v4';
 const SYNC_URL='https://watchlist-sync.muhammad-dac.workers.dev';
+// Companion Web Push worker (see enableNotify/disableNotify/notifyUpdate below).
+// NOTE: this URL is a placeholder that may be corrected at deploy — it's the ONLY place it's defined.
+const NOTIFY_URL='https://watchlist-notify.muhammad-dac.workers.dev';
+const VAPID_PUBLIC='BFd59SP6lLx5EVs5QQds2HiZJNg2MO9EG8NRtlIlQcfqlP4tUCL5f6B_L8ov2liY2FkBp04TyliTn9t2fmvK43c';
+// Standard VAPID applicationServerKey decoder (URL-safe base64 → Uint8Array).
+function urlBase64ToUint8Array(b64){
+  try{
+    const padding='='.repeat((4-b64.length%4)%4);
+    const base64=(b64+padding).replace(/-/g,'+').replace(/_/g,'/');
+    const raw=atob(base64);
+    const out=new Uint8Array(raw.length);
+    for(let i=0;i<raw.length;i++)out[i]=raw.charCodeAt(i);
+    return out;
+  }catch{return new Uint8Array();}
+}
 function store(){try{localStorage.setItem('_t','1');localStorage.removeItem('_t');return localStorage;}catch{return null;}}
-function parseEpTotal(s){const m=/(\d+)\s*eps?/i.exec(s||'');return m?+m[1]:0;}
+function parseEpTotal(s){const m=/(\d+)\s*(?:eps?|chapters?|ch\b)/i.exec(s||'');return m?+m[1]:0;}
 function migrate(list){
-  return (Array.isArray(list)?list:[]).map(a=>({ep:0,rating:0,fav:false,upd:0,epTotal:parseEpTotal(a.eps),img:'',order:[],notes:'',genre:'',eps:'',time:'',...a}));
+  // add `kind` to every item (existing items default to "watch"); airing cache fields start empty
+  // banner/aniColor = AniList per-title art + dominant color; bgImage/bgAccent = user's own background + its extracted color
+  return (Array.isArray(list)?list:[]).map(a=>({ep:0,rating:0,fav:false,upd:0,epTotal:parseEpTotal(a.eps),img:'',order:[],notes:'',genre:'',eps:'',time:'',kind:'watch',banner:'',aniColor:'',bgImage:'',bgAccent:'',bannerTried:false,...a}));
 }
 function load(){try{const s=store(),d=s&&s.getItem(LSKEY);anime=migrate(d?JSON.parse(d):JSON.parse(JSON.stringify(DEFAULT_DATA)));}catch{anime=migrate(JSON.parse(JSON.stringify(DEFAULT_DATA)));}}
 let saveWarned=false;
 function writeLocal(){try{const s=store();if(s)s.setItem(LSKEY,JSON.stringify(anime));saveWarned=false;}catch{if(!saveWarned){saveWarned=true;toast('⚠️ Storage full — remove some uploaded covers');}}}
-function save(){writeLocal();schedulePush();}
+function save(){writeLocal();schedulePush();scheduleNotifyUpdate();}
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2);}
 function touch(a){a.upd=Date.now();}
 
@@ -659,15 +1014,15 @@ function renderSyncUI(){
   const code=syncCode();
   if(code){
     const pretty=code.replace(/(.{4})/g,'$1 ').trim();
-    box.innerHTML=`<div class="dt-label">☁️ Cloud backup · ON</div>
+    box.innerHTML=`<div class="dt-label">${icon('cloud')} Cloud backup · ON</div>
       <p class="ai-desc">Your list backs up automatically. On another device: install the app, open this panel, paste this code, and tap Use code.</p>
       <div class="synccode">${pretty}</div>
       <div style="display:flex;gap:8px;margin-top:10px;">
-        <button class="parse-btn" style="margin:0;flex:1" onclick="copySyncCode()">📋 Copy code</button>
+        <button class="parse-btn" style="margin:0;flex:1" onclick="copySyncCode()">${icon('clipboard')} Copy code</button>
         <button class="imp-all" onclick="syncOff()">Turn off</button>
       </div>`;
   }else{
-    box.innerHTML=`<div class="dt-label">☁️ Cloud backup · OFF</div>
+    box.innerHTML=`<div class="dt-label">${icon('cloud')} Cloud backup · OFF</div>
       <p class="ai-desc">Back up your list to the cloud so it survives losing your phone and syncs across your devices. Private — only someone with your secret code can open it.</p>
       <button class="parse-btn" style="margin-top:0" onclick="syncEnableNew()">Turn on cloud backup</button>
       <div style="display:flex;gap:8px;margin-top:8px;">
@@ -676,6 +1031,88 @@ function renderSyncUI(){
       </div>`;
   }
 }
+
+// ─── PUSH NOTIFICATIONS (companion notify worker matches AniList media ids) ──
+function notifyOn(){try{return localStorage.getItem('notify_on')==='1';}catch{return false;}}
+function setNotifyOn(v){try{if(v)localStorage.setItem('notify_on','1');else localStorage.removeItem('notify_on');}catch{}}
+function pushSupported(){return ('Notification'in window)&&('PushManager'in window)&&('serviceWorker'in navigator);}
+// aniIds of the shows we want the worker to poll: Watching/Plan watch items that have a captured AniList id.
+function notifyAnimeIds(){return anime.filter(a=>kindOf(a)==='watch'&&(a.status==='watching'||a.status==='plan')&&a.aniId).map(a=>a.aniId);}
+async function getPushSub(){try{const reg=await navigator.serviceWorker.ready;return await reg.pushManager.getSubscription();}catch{return null;}}
+async function enableNotify(){
+  if(!pushSupported()){toast('📱 On iPhone: Add to Home Screen first (iOS 16.4+)');renderNotifyUI();return;}
+  try{
+    const perm=await Notification.requestPermission();
+    if(perm!=='granted'){toast('Notifications not allowed');renderNotifyUI();return;}
+    const reg=await navigator.serviceWorker.ready;
+    let sub=await reg.pushManager.getSubscription();
+    if(!sub)sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlBase64ToUint8Array(VAPID_PUBLIC)});
+    let ids=notifyAnimeIds();
+    if(!ids.length){ // ids not populated yet — trigger a cover fetch (it also captures aniIds), then recompute
+      toast('Loading show data…');
+      try{await fetchCovers();}catch{}
+      ids=notifyAnimeIds();
+    }
+    const r=await fetch(NOTIFY_URL+'/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({subscription:sub,animeIds:ids,tz:(Intl.DateTimeFormat().resolvedOptions().timeZone)||'UTC'})});
+    if(!r.ok)throw new Error('subscribe '+r.status);
+    setNotifyOn(true);
+    toast(ids.length?`🔔 Notifications on · tracking ${ids.length} show${ids.length!==1?'s':''}`:'🔔 Notifications on · open your shows so covers/ids load');
+  }catch(e){toast('Could not turn on notifications — try again');}
+  renderNotifyUI();
+}
+async function disableNotify(){
+  try{
+    const sub=await getPushSub();
+    if(sub){
+      try{await fetch(NOTIFY_URL+'/unsubscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({endpoint:sub.endpoint})});}catch{}
+      try{await sub.unsubscribe();}catch{}
+    }
+  }catch{}
+  setNotifyOn(false);toast('Notifications off');renderNotifyUI();
+}
+let notifyUpdT;
+function scheduleNotifyUpdate(){if(!notifyOn())return;clearTimeout(notifyUpdT);notifyUpdT=setTimeout(notifyUpdate,2500);}
+// Keep the worker's tracked list current (fire-and-forget).
+async function notifyUpdate(){
+  if(!notifyOn()||!pushSupported())return;
+  try{
+    const sub=await getPushSub();if(!sub)return;
+    await fetch(NOTIFY_URL+'/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({endpoint:sub.endpoint,animeIds:notifyAnimeIds()})});
+  }catch{}
+}
+function notifyUIHTML(){
+  if(!pushSupported()){
+    return`<div class="dt-label">${icon('bell')} Episode notifications</div>
+      <p class="ai-desc">Get notified when a new episode of your Watching/Plan shows airs. <strong style="color:var(--t1)">On iPhone/iPad</strong> this needs Safari's <strong style="color:var(--t1)">Add to Home Screen</strong> (iOS 16.4+): install the app, open it from your Home Screen, then turn this on.</p>`;
+  }
+  const granted=('Notification'in window)&&Notification.permission==='granted';
+  const on=notifyOn()&&granted;
+  if(on){
+    return`<div class="dt-label">${icon('bell')} Episode notifications · ON</div>
+      <p class="ai-desc">You'll get a push when a new episode of your Watching/Plan shows airs.</p>
+      <button class="imp-all" style="width:100%" onclick="disableNotify()">Turn off notifications</button>`;
+  }
+  return`<div class="dt-label">${icon('bell')} Episode notifications · OFF</div>
+    <p class="ai-desc">Get notified when a new episode of your Watching/Plan shows airs.</p>
+    <button class="parse-btn" style="margin-top:0" onclick="enableNotify()">Turn on notifications</button>`;
+}
+// Bell in the app header mirrors the on/off state (accent + filled bell when ON, muted when OFF).
+function renderNotifyBell(){
+  const b=document.getElementById('notifyBell');if(!b)return;
+  const granted=('Notification'in window)&&Notification.permission==='granted';
+  const on=notifyOn()&&granted;
+  b.classList.toggle('bell-on',on);
+  b.innerHTML=icon(on?'bell':'bell-off');
+  b.setAttribute('aria-label',on?'Episode notifications on':'Episode notifications off');
+  b.setAttribute('title',on?'Notifications on':'Turn on episode notifications');
+}
+// Render the same enable/disable flow into every surface that hosts it (import sheet + header sheet).
+function renderNotifyUI(){
+  const html=notifyUIHTML();
+  ['notifyBox','notifyBoxHeader'].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML=html;});
+  renderNotifyBell();
+}
+function openNotifySheet(){openSheet('notifySheet');renderNotifyUI();}
 
 // ─── THEMES ────────────────────────────────────────────────────────────────
 const THEMES=[
@@ -693,6 +1130,32 @@ function allThemes(){return THEMES.concat(customThemes().map(t=>({...t,custom:tr
 function hex2rgb(h){h=h.replace('#','');if(h.length===3)h=h.split('').map(c=>c+c).join('');const n=parseInt(h,16);return[n>>16&255,n>>8&255,n&255];}
 function mix(h1,h2,w){const a=hex2rgb(h1),b=hex2rgb(h2);return'#'+a.map((v,i)=>Math.round(v*(1-w)+b[i]*w).toString(16).padStart(2,'0')).join('');}
 function rgba(h,al){const[r,g,b]=hex2rgb(h);return`rgba(${r},${g},${b},${al})`;}
+// Lightweight canvas dominant-color extractor for USER-uploaded backgrounds (local data URLs → no CORS taint).
+// Downscales to 32×32, averages the vivid mid-tone pixels (skips near-black/white/gray) → a representative hex.
+function dominantColor(src,cb){
+  try{
+    const im=new Image();
+    im.onload=()=>{
+      try{
+        const c=document.createElement('canvas');c.width=32;c.height=32;
+        const ctx=c.getContext('2d');ctx.drawImage(im,0,0,32,32);
+        const d=ctx.getImageData(0,0,32,32).data;
+        let r=0,g=0,b=0,n=0;
+        for(let i=0;i<d.length;i+=4){
+          if(d[i+3]<125)continue;
+          const rr=d[i],gg=d[i+1],bb=d[i+2],mx=Math.max(rr,gg,bb),mn=Math.min(rr,gg,bb);
+          if(mx<30||mn>228||mx-mn<16)continue; // too dark / too light / too gray to be a good accent
+          r+=rr;g+=gg;b+=bb;n++;
+        }
+        if(!n){for(let i=0;i<d.length;i+=4){if(d[i+3]<125)continue;r+=d[i];g+=d[i+1];b+=d[i+2];n++;}} // fallback: plain average
+        if(!n){cb('');return;}
+        cb('#'+[r,g,b].map(v=>Math.round(v/n).toString(16).padStart(2,'0')).join(''));
+      }catch{cb('');}
+    };
+    im.onerror=()=>cb('');
+    im.src=src;
+  }catch{cb('');}
+}
 const CUSTOM_VARS=['--bg','--bg2','--bg3','--bg4','--bg5','--b1','--b2','--b3','--t1','--t2','--t3','--a','--a2','--ag','--glow','--topgrad'];
 function applyCustomVars(t){
   const st=document.documentElement.style;
@@ -723,7 +1186,7 @@ function saveCustomTheme(){
   setCustomThemes([...customThemes(),t]);
   document.getElementById('ctName').value='';
   applyTheme(t.id);
-  toast(`🎨 ${name} saved & applied`);
+  toast(`${name} saved & applied`);
 }
 function deleteCustomTheme(id){
   setCustomThemes(customThemes().filter(t=>t.id!==id));
@@ -737,7 +1200,7 @@ function renderThemeGrid(){
       <div class="tswatch" style="background:linear-gradient(135deg,${t.bg} 0%,${t.bg}dd 100%)">
         <span>${t.emoji}</span>
         <div class="taccent-bar" style="background:${t.accent}"></div>
-        ${t.custom?`<div class="tdel" onclick="event.stopPropagation();deleteCustomTheme('${t.id}')">✕</div>`:''}
+        ${t.custom?`<div class="tdel" onclick="event.stopPropagation();deleteCustomTheme('${t.id}')">${icon('x')}</div>`:''}
       </div>
       <div class="tname">${t.name}</div>
     </button>`).join('');
@@ -753,20 +1216,59 @@ function sorted(list){
   return l;
 }
 function prog(a){return a.status==='finished'?1:(a.epTotal?Math.min(1,(a.ep||0)/a.epTotal):0);}
+// per-title theming: user's own bg wins over AniList banner; accent follows the same source.
+function titleBg(a){return (a&&(a.bgImage||a.banner))||'';}
+function titleAccent(a){if(!a)return'';return (a.bgImage?(a.bgAccent||a.aniColor):a.aniColor)||'';}
+// scoped CSS-var override string that tints a title's own detail/hero accents without touching global chrome
+function accentVars(a){const ac=titleAccent(a);if(!ac||!/^#[0-9a-fA-F]{3,6}$/.test(ac))return'';try{return`--a:${ac};--a2:${mix(ac,'#ffffff',0.28)};--ag:${rgba(ac,0.15)};--glow:${rgba(ac,0.26)};`;}catch{return'';}}
 function query(){return document.getElementById('searchIn').value.toLowerCase().trim();}
 
 function render(){
-  renderSortRow();renderHome();
+  renderKindSeg();renderFiltRow();renderSortRow();renderHome();
   const fin=anime.filter(a=>a.status==='finished').length;
   document.getElementById('headerSub').textContent=`${anime.length} titles · ${fin} finished`;
 }
+function renderKindSeg(){
+  const el=document.getElementById('kindSeg');if(!el)return;
+  const cW=anime.filter(a=>kindOf(a)==='watch').length,cR=anime.filter(a=>kindOf(a)==='read').length;
+  const opts=[['watch',icon('play')+' Watching',cW],['read',icon('book')+' Reading',cR]];
+  el.innerHTML=opts.map(([k,l,n])=>`<button class="kseg${viewKind===k?' on':''}" onclick="setViewKind('${k}')">${l} <span class="fn">${n}</span></button>`).join('');
+}
+function setViewKind(k){
+  if(viewKind===k)return;
+  viewKind=k;filterStatus='all';
+  const s=document.getElementById('searchIn');if(s)s.value='';
+  render();document.getElementById('pageEl').scrollTo({top:0,behavior:'smooth'});
+}
+// ─── AIRING (AniList nextAiringEpisode, display-only) ───────────────────────
+function airingInfo(a){
+  if(kindOf(a)!=='watch'||!a.airAt)return null;
+  const ms=a.airAt*1000;
+  if(ms<Date.now())return null; // aired already — refreshed opportunistically by fetchCovers
+  const d=new Date(ms);
+  return{ep:a.airEp||0,day:d.toLocaleDateString([],{weekday:'short'}),time:d.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})};
+}
+function renderFiltRow(){
+  const items=anime.filter(a=>kindOf(a)===viewKind);
+  const counts={all:items.length,watching:0,plan:0,finished:0,dropped:0};
+  items.forEach(a=>counts[a.status]!==undefined&&counts[a.status]++);
+  const isRead=viewKind==='read';
+  const filts=[['all','All'],['watching',isRead?icon('book')+' Reading':icon('play')+' Watching'],['plan',isRead?icon('clipboard')+' To Read':icon('clipboard')+' Plan'],['finished',icon('check')+' Finished'],['dropped',icon('x')+' Dropped']];
+  document.getElementById('filtRow').innerHTML=filts.map(([f,l])=>{
+    const on=filterStatus===f;
+    const cls=on?(f==='all'?'on':'on-'+f):'';
+    const n=counts[f]||0;
+    return`<button class="fchip${cls?' '+cls:''}" onclick="setFilter('${f}')">${l}<span class="fn">${n}</span></button>`;
+  }).join('');
+}
 function renderSortRow(){
-  const modes=[['recent','🕐 Recent'],['az','A–Z'],['rating','★ Rating'],['progress','▶ Progress']];
+  const modes=[['recent',icon('clock')+' Recent'],['az','A–Z'],['rating',icon('star','fill')+' Rating'],['progress',icon('play')+' Progress']];
   document.getElementById('sortRow').innerHTML=modes.map(([m,l])=>
     `<button class="schip${sortMode===m?' on':''}" onclick="setSort('${m}')">${l}</button>`).join('');
 }
 function setSort(m){sortMode=m;render();}
-function goHome(){document.getElementById('searchIn').value='';renderHome();document.getElementById('pageEl').scrollTo({top:0,behavior:'smooth'});}
+function setFilter(f){filterStatus=f;renderFiltRow();renderHome();document.getElementById('pageEl').scrollTo({top:0,behavior:'smooth'});}
+function goHome(){document.getElementById('searchIn').value='';filterStatus='all';render();document.getElementById('pageEl').scrollTo({top:0,behavior:'smooth'});}
 
 function posterCard(a){
   const img=a.img
@@ -774,59 +1276,81 @@ function posterCard(a){
     :`<div class="pcard-ph">${((a.title||'?').trim()[0]||'?').toUpperCase().replace(/['"<&]/g,'?')}</div>`;
   const p=prog(a);
   const bar=(a.status==='watching'&&a.epTotal)?`<div class="pbar"><div class="pfill" style="width:${Math.round(p*100)}%"></div></div>`:'';
+  const air=airingInfo(a);
+  const airHTML=air?`<div class="pcard-air">${icon('calendar')} ${air.day} ${air.time}</div>`:'';
   return`<div class="pcard" onclick="openDetail('${a.id}')">
     <div class="pcard-wrap">
       ${img}
       <span class="pcard-badge b-${a.status}">${STATUS_META[a.status].icon} ${a.status==='plan'?'PLAN':a.status.toUpperCase().slice(0,5)}</span>
-      ${a.fav?'<span class="pcard-fav">❤️</span>':''}
+      ${a.fav?'<span class="pcard-fav">'+icon('heart','fill')+'</span>':''}
     </div>
     ${bar}
     <div class="pcard-title">${a.title}</div>
+    ${airHTML}
   </div>`;
 }
 function heroHTML(a){
   const p=prog(a);
-  const bg=a.img?`<div class="hero-bg" style="background-image:url('${a.img}')"></div>`:`<div class="hero-bg" style="background:linear-gradient(135deg,var(--bg4),var(--bg2))"></div>`;
-  return`<div class="hero" onclick="openDetail('${a.id}')">
+  // background priority: user's own photo → AniList wide banner art → cover → gradient. Banner/photo lazy-load as <img> and
+  // gracefully drop on error, revealing the gradient .hero-bg beneath. .hero-shade scrim keeps title/CTA legible over any art.
+  const art=titleBg(a);
+  let bg=`<div class="hero-bg" style="background:linear-gradient(135deg,var(--bg4),var(--bg2))"></div>`;
+  if(art)bg+=`<img class="hero-bg-img" src="${art}" loading="lazy" alt="" onerror="this.remove()">`;
+  else if(a.img)bg=`<div class="hero-bg" style="background-image:url('${a.img}')"></div>`;
+  const av=accentVars(a);
+  const air=airingInfo(a);
+  const airHTML=air?`<div class="hero-air">${icon('calendar')} Ep ${air.ep} · airs ${air.day} ${air.time}</div>`:'';
+  return`<div class="hero"${av?` style="${av}"`:''} onclick="openDetail('${a.id}')">
     ${bg}<div class="hero-shade"></div>
     <div class="hero-body">
-      <div class="hero-kicker">Continue watching</div>
+      <div class="hero-kicker">${kindOf(a)==='read'?'Continue reading':'Continue watching'}</div>
       <div class="hero-title">${a.title}</div>
       <div class="hero-meta">${[a.eps,a.time,(a.genre||'').split(',')[0]].filter(Boolean).join(' · ')}</div>
       ${a.epTotal?`<div class="hero-prog"><div class="pbar"><div class="pfill" style="width:${Math.round(p*100)}%"></div></div><span>${a.ep||0} / ${a.epTotal}</span></div>`:''}
-      <div class="hero-cta">▶ &nbsp;Open</div>
+      ${airHTML}
+      <div class="hero-cta">${icon('play')} &nbsp;Open</div>
     </div>
   </div>`;
 }
 function renderHome(){
   const el=document.getElementById('pageEl');
   const q=query();
-  if(q){
-    const hits=sorted(anime.filter(a=>(a.title+' '+(a.genre||'')+' '+(a.notes||'')).toLowerCase().includes(q)));
-    el.innerHTML=hits.length
-      ?`<div class="grid">${hits.map(posterCard).join('')}</div>`
-      :`<div class="empty"><div class="empty-icon">🔍</div><p>No matches for “${q}”</p></div>`;
+  const isRead=viewKind==='read';
+  const pool=anime.filter(a=>kindOf(a)===viewKind);
+  if(q||filterStatus!=='all'){
+    let list=pool;
+    if(filterStatus!=='all')list=list.filter(a=>a.status===filterStatus);
+    if(q)list=list.filter(a=>(a.title+' '+(a.genre||'')+' '+(a.notes||'')).toLowerCase().includes(q));
+    const hits=sorted(list);
+    if(hits.length){el.innerHTML=`<div class="grid">${hits.map(posterCard).join('')}</div>`;return;}
+    const stLbl=filterStatus==='watching'?(isRead?'Reading':'Watching'):(STATUS_META[filterStatus]?STATUS_META[filterStatus].label:filterStatus);
+    const msg=q
+      ?`No matches for “${q}”${filterStatus!=='all'?` in ${stLbl}`:` in your ${isRead?'reading':'watch'} list`}`
+      :`Nothing in ${stLbl} yet`;
+    el.innerHTML=`<div class="empty"><div class="empty-icon">${q?icon('search'):(STATUS_META[filterStatus]?STATUS_META[filterStatus].icon:(isRead?icon('book'):icon('inbox')))}</div><p>${msg}</p></div>`;
     return;
   }
-  if(!anime.length){
-    el.innerHTML=`<div class="empty"><div class="empty-icon">🎌</div><p>Your list is empty.<br>Add a title or import your whole list from Notes in one paste.</p><button class="hero-cta" onclick="openSheet('importSheet')">📋 Import a list</button></div>`;
+  if(!pool.length){
+    el.innerHTML=isRead
+      ?`<div class="empty"><div class="empty-icon">${icon('book')}</div><p>Your reading list is empty.<br>Add a manhwa, webtoon, manga or light novel — tap ＋ and choose Read.</p><button class="hero-cta" onclick="openSheet_add()">＋ Add something to read</button></div>`
+      :`<div class="empty"><div class="empty-icon">${icon('inbox')}</div><p>Your list is empty.<br>Add a title or import your whole list from Notes in one paste.</p><button class="hero-cta" onclick="openSheet('importSheet')">${icon('clipboard')} Import a list</button></div>`;
     return;
   }
-  const watching=sorted(anime.filter(a=>a.status==='watching'));
+  const watching=sorted(pool.filter(a=>a.status==='watching'));
   const hero=watching.find(a=>a.img)||watching[0];
   let html=hero?heroHTML(hero):'';
-  const rows=[
-    ['watching','▶ Watching'],['plan','📋 Plan to Watch'],['finished','✓ Finished'],['dropped','✕ Dropped'],
-  ];
+  const rows=isRead
+    ?[['watching',icon('book')+' Reading'],['plan',icon('clipboard')+' Plan to Read'],['finished',icon('check')+' Finished'],['dropped',icon('x')+' Dropped']]
+    :[['watching',icon('play')+' Watching'],['plan',icon('clipboard')+' Plan to Watch'],['finished',icon('check')+' Finished'],['dropped',icon('x')+' Dropped']];
   for(const[st,label]of rows){
-    let items=sorted(anime.filter(a=>a.status===st));
+    let items=sorted(pool.filter(a=>a.status===st));
     if(st==='watching'&&hero)items=items.filter(a=>a.id!==hero.id);
     if(!items.length)continue;
     html+=`<div class="row-sec"><div class="row-head"><div class="row-title">${label}</div><div class="row-count">${items.length}</div></div>
       <div class="row-scroll">${items.map(posterCard).join('')}</div></div>`;
   }
-  const favs=sorted(anime.filter(a=>a.fav));
-  if(favs.length)html+=`<div class="row-sec"><div class="row-head"><div class="row-title">❤️ Favorites</div><div class="row-count">${favs.length}</div></div>
+  const favs=sorted(pool.filter(a=>a.fav));
+  if(favs.length)html+=`<div class="row-sec"><div class="row-head"><div class="row-title">${icon('heart','fill')} Favorites</div><div class="row-count">${favs.length}</div></div>
     <div class="row-scroll">${favs.map(posterCard).join('')}</div></div>`;
   el.innerHTML=html;
 }
@@ -839,13 +1363,17 @@ function openDetail(id){
 }
 function renderDetail(){
   const a=anime.find(x=>x.id===detailId);if(!a)return;
+  const read=kindOf(a)==='read';
   const cover=a.img
     ?`<img class="dt-cover" src="${a.img}" alt="" onerror="this.remove()">`
     :`<div class="dt-cover-ph">${((a.title||'?').trim()[0]||'?').toUpperCase().replace(/['"<&]/g,'?')}</div>`;
+  // per-title banner header + accent tint (scoped to this sheet only, never the global chrome)
+  const art=titleBg(a);
+  const bannerHTML=art?`<div class="dt-banner"><img class="dt-banner-img" src="${art}" loading="lazy" alt="" onerror="this.closest('.dt-banner').remove()"><div class="dt-banner-scrim"></div></div>`:'';
   const statusBtns=Object.keys(STATUS_META).map(s=>
     `<button class="dpick${a.status===s?' on-'+s:''}" onclick="setDetailStatus('${s}')">${STATUS_META[s].icon} ${s==='plan'?'Plan':s==='watching'?'Watch':s==='finished'?'Done':'Drop'}</button>`).join('');
   const p=prog(a);
-  const progHTML=`<div class="dt-label">Episode progress</div>
+  const progHTML=`<div class="dt-label">${read?'Reading progress':'Episode progress'}</div>
     <div class="prog-row">
       <button class="prog-btn" onclick="bumpEp(-1)">−</button>
       <div class="prog-mid">
@@ -855,7 +1383,7 @@ function renderDetail(){
       <button class="prog-btn" onclick="bumpEp(1)">＋</button>
     </div>`;
   const stars=`<div class="dt-label">Your rating</div><div class="stars">${[1,2,3,4,5].map(n=>
-    `<button class="star${(a.rating||0)>=n?' on':''}" onclick="setRating(${n})">★</button>`).join('')}</div>`;
+    `<button class="star${(a.rating||0)>=n?' on':''}" onclick="setRating(${n})">${icon('star')}</button>`).join('')}</div>`;
   const chips=(a.genre||'').split(',').map(g=>g.trim()).filter(Boolean).map(g=>`<span class="chip">${g}</span>`).join('');
   const li=(step,strip)=>{
     const s=step.toLowerCase();
@@ -875,17 +1403,21 @@ function renderDetail(){
     const films=a.order.filter(isFilm);
     const grouped=films.length>=3;
     const main=grouped?a.order.filter(s=>!isFilm(s)):a.order;
-    const filmsHTML=grouped?`<details class="films-acc"><summary>🎬 ${films.length} side films — optional, watch any time</summary><ol class="order-list">${films.map(s=>li(s,true)).join('')}</ol></details>`:'';
-    orderHTML=`<div class="dt-label">Watch order</div><ol class="order-list">${main.map(s=>li(s,false)).join('')}</ol>${filmsHTML}`;
+    const filmsHTML=grouped?`<details class="films-acc"><summary>${icon('film')} ${films.length} side films — optional, watch any time</summary><ol class="order-list">${films.map(s=>li(s,true)).join('')}</ol></details>`:'';
+    orderHTML=`<div class="dt-label">${read?'Read order':'Watch order'}</div><ol class="order-list">${main.map(s=>li(s,false)).join('')}</ol>${filmsHTML}`;
   }
   const notesHTML=(a.notes&&a.notes.trim())?`<div class="dt-label">Notes</div><div class="dt-note">${a.notes}</div>`:'';
-  document.getElementById('detailBody').innerHTML=`
-    <div class="dt-top">
+  const body=document.getElementById('detailBody');
+  body.setAttribute('style',accentVars(a));
+  body.innerHTML=`
+    <div class="dt-top${art?' has-banner':''}">
+      ${bannerHTML}
       ${cover}
       <div class="dt-info">
         <div class="dt-title">${a.title}</div>
         <div class="dt-meta">${[a.eps,a.time].filter(Boolean).join(' · ')}</div>
-        <button class="dt-fav${a.fav?' on':''}" onclick="toggleFav()">${a.fav?'❤️ Favorited':'🤍 Favorite'}</button>
+        ${(()=>{const air=airingInfo(a);return air?`<div class="dt-air">${icon('calendar')} Ep ${air.ep} · airs ${air.day} ${air.time}</div>`:'';})()}
+        <button class="dt-fav${a.fav?' on':''}" onclick="toggleFav()">${a.fav?icon('heart','fill')+' Favorited':icon('heart')+' Favorite'}</button>
       </div>
     </div>
     <div class="dt-label">Status</div>
@@ -898,9 +1430,9 @@ function renderDetail(){
     <div class="dt-label" style="margin-top:18px"></div>
     <div id="ai-box-detail"></div>
     <div class="dt-actions">
-      <button class="dact ai-act" onclick="aiCardInsight('${a.id}')">✦ AI Insight</button>
-      <button class="dact" onclick="editItem('${a.id}')">✏️ Edit</button>
-      <button class="dact danger" onclick="confirmDelete('${a.id}')">🗑</button>
+      <button class="dact ai-act" onclick="aiCardInsight('${a.id}')">${icon('sparkles')} AI Insight</button>
+      <button class="dact" onclick="editItem('${a.id}')">${icon('edit')} Edit</button>
+      <button class="dact danger" onclick="confirmDelete('${a.id}')">${icon('trash')}</button>
     </div>`;
 }
 function setDetailStatus(s){
@@ -934,7 +1466,8 @@ function openSheet(id){
   document.getElementById(id).classList.add('on');
   if(id==='themeSheet')renderThemeGrid();
   if(id==='statsSheet')renderStatsSheet();
-  if(id==='importSheet')renderSyncUI();
+  if(id==='importSheet'){renderSyncUI();renderNotifyUI();}
+  if(id==='forYouSheet')renderForYou();
 }
 function closeAll(){
   document.querySelectorAll('.sheet').forEach(s=>s.classList.remove('on'));
@@ -942,7 +1475,7 @@ function closeAll(){
 }
 
 // ─── ADD / EDIT ─────────────────────────────────────────────────────────────
-let pendingImg='';
+let pendingImg='',pendingBg='',pendingBgAccent='';
 function setCoverPreview(url){
   pendingImg=url||'';
   const img=document.getElementById('coverImg'),rm=document.getElementById('coverRemoveBtn');
@@ -950,6 +1483,36 @@ function setCoverPreview(url){
   else{img.style.display='none';rm.style.display='none';}
 }
 function clearCover(){setCoverPreview('');}
+// ── CUSTOM PER-TITLE BACKGROUND PHOTO ──
+function setBgPreview(url){
+  const img=document.getElementById('bgImgPreview'),rm=document.getElementById('bgRemoveBtn');
+  if(!img||!rm)return;
+  if(url){img.src=url;img.style.display='block';rm.style.display='inline-flex';}
+  else{img.style.display='none';rm.style.display='none';}
+}
+function clearBg(){pendingBg='';pendingBgAccent='';setBgPreview('');}
+function bgFileChosen(inp){
+  const f=inp.files&&inp.files[0];inp.value='';
+  if(!f)return;
+  const img=new Image();
+  img.onload=()=>{
+    try{
+      // compress+resize: max ~1280px long edge, JPEG q0.8 → data URL (raw photos would blow past localStorage / the 3MB sync cap)
+      const sc=Math.min(1280/img.width,1280/img.height,1);
+      const c=document.createElement('canvas');
+      c.width=Math.max(1,Math.round(img.width*sc));c.height=Math.max(1,Math.round(img.height*sc));
+      c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+      URL.revokeObjectURL(img.src);
+      const url=c.toDataURL('image/jpeg',0.8);
+      if(Math.round(url.length*0.75)>2600000)toast('⚠️ Photo is large — cloud sync may reject it. Try a smaller image.');
+      pendingBg=url;setBgPreview(url);
+      dominantColor(url,hex=>{pendingBgAccent=hex||'';}); // derive accent from the uploaded image
+      toast('🖼 Background added');
+    }catch{toast('Could not process that image');}
+  };
+  img.onerror=()=>{URL.revokeObjectURL(img.src);toast('Could not read that image');};
+  img.src=URL.createObjectURL(f);
+}
 function coverFileChosen(inp){
   const f=inp.files&&inp.files[0];inp.value='';
   if(!f)return;
@@ -973,14 +1536,37 @@ function setStatus(s){
     if(b)b.className=`spick${x===s?` on-${x}`:''}`;
   });
 }
+function setKind(k){
+  curKind=(k==='read')?'read':'watch';
+  const w=document.getElementById('kf-watch'),r=document.getElementById('kf-read');
+  if(w)w.className=`kbtn${curKind==='watch'?' on':''}`;
+  if(r)r.className=`kbtn${curKind==='read'?' on':''}`;
+  formKindLabels();
+}
+function formKindLabels(){
+  const read=curKind==='read';
+  const set=(id,txt)=>{const e=document.getElementById(id);if(e)e.textContent=txt;};
+  set('lblEps',read?'Chapters':'Episodes');
+  set('lblEp',read?'Read (ch #)':'Watched (ep #)');
+  set('lblOrder',read?'Read Order (one step per line)':'Watch Order (one step per line)');
+  set('kindHint',read?'Manhwa, webtoon, manga & light novels.':'Anime, TV shows & movies.');
+  const fEps=document.getElementById('fEps');if(fEps)fEps.placeholder=read?'e.g. 120 chapters':'e.g. 24 eps';
+  const fEp=document.getElementById('fEp');if(fEp)fEp.placeholder='0';
+  const fOrder=document.getElementById('fOrder');if(fOrder)fOrder.placeholder=read?'Vol 1 — ch 1–10\nVol 2 — ch 11–20':'TV: Season 1 — 12 eps\nOVA: Side story — after S1\nTV: Season 2 — 12 eps';
+  const btn=document.getElementById('autofillBtn');
+  if(btn&&!btn.classList.contains('loading'))btn.innerHTML=read?'<span>'+icon('sparkles')+'</span> Autofill — cover, chapters, genre &amp; status':'<span>'+icon('sparkles')+'</span> Autofill — cover, episodes, genre &amp; watch order';
+}
 function openSheet_add(){
   editingId=null;
   document.getElementById('addSheetTitle').textContent='Add to List';
   document.getElementById('submitBtn').textContent='Add to List';
   ['fTitle','fEps','fEp','fTime','fGenre','fOrder','fNotes'].forEach(i=>document.getElementById(i).value='');
   setCoverPreview('');
+  clearBg();
   setStatus('plan');
+  setKind(viewKind); // default to whichever list (Watch/Read) is being viewed
   openSheet('addSheet');
+  setTimeout(()=>{const t=document.getElementById('fTitle');if(t)try{t.focus({preventScroll:true});}catch{t.focus();}},360);
 }
 function editItem(id){
   const a=anime.find(x=>x.id===id);if(!a)return;
@@ -996,7 +1582,9 @@ function editItem(id){
   document.getElementById('fOrder').value=a.order?a.order.join('\n'):'';
   document.getElementById('fNotes').value=a.notes||'';
   setCoverPreview(a.img||'');
+  pendingBg=a.bgImage||'';pendingBgAccent=a.bgAccent||'';setBgPreview(pendingBg);
   setStatus(a.status);
+  setKind(kindOf(a));
   setTimeout(()=>openSheet('addSheet'),60);
 }
 function submitForm(){
@@ -1004,16 +1592,25 @@ function submitForm(){
   if(!title){toast('Enter a title first');return;}
   const orderRaw=document.getElementById('fOrder').value.trim();
   const epsStr=document.getElementById('fEps').value.trim();
-  const data={title,status:curStatus,
-    eps:epsStr,epTotal:parseEpTotal(epsStr),
-    ep:Math.max(0,parseInt(document.getElementById('fEp').value)||0),
+  const epTotal=parseEpTotal(epsStr);
+  let ep=Math.max(0,parseInt(document.getElementById('fEp').value)||0);
+  if(epTotal&&ep>epTotal)ep=epTotal;
+  const prev=editingId?anime.find(a=>a.id===editingId):null;
+  const kindChanged=!!prev&&kindOf(prev)!==curKind;
+  const data={title,status:curStatus,kind:curKind,
+    eps:epsStr,epTotal,
+    ep,
     time:document.getElementById('fTime').value.trim(),
     genre:document.getElementById('fGenre').value.trim(),
     order:orderRaw?orderRaw.split('\n').map(l=>l.trim()).filter(Boolean):[],
     notes:document.getElementById('fNotes').value.trim(),
     img:pendingImg,
     imgTried:!pendingImg&&!!editingId,
+    bgImage:pendingBg,
+    bgAccent:pendingBg?(pendingBgAccent||(prev&&prev.bgAccent)||''):'',
     upd:Date.now()};
+  if(curKind==='read'){data.airAt=0;data.airEp=0;data.airChk=0;} // reading items never carry airing data
+  if(kindChanged){data.imgTried=!!pendingImg;data.detTried=false;} // switched Watch⇄Read — re-fetch cover/details from the right AniList type
   if(editingId){
     const i=anime.findIndex(a=>a.id===editingId);
     if(i!==-1)anime[i]={...anime[i],...data};
@@ -1085,16 +1682,16 @@ function renderPreview(){
   const existing=new Set(anime.map(a=>a.title.toLowerCase().trim()));
   const seg=(item,s,lbl)=>`<button class="pseg${item.status===s?' on-'+s:''}" onclick="event.stopPropagation();setImportStatus(${item.id},'${s}')">${lbl}</button>`;
   const bulk=importItems.length>1?`<div class="bulk-row"><span>Set all:</span>
-    <button class="pseg" onclick="setAllImportStatus('plan')">📋 Plan</button>
-    <button class="pseg" onclick="setAllImportStatus('watching')">▶ Watch</button>
-    <button class="pseg" onclick="setAllImportStatus('finished')">✓ Done</button></div>`:'';
+    <button class="pseg" onclick="setAllImportStatus('plan')">${icon('clipboard')} Plan</button>
+    <button class="pseg" onclick="setAllImportStatus('watching')">${icon('play')} Watch</button>
+    <button class="pseg" onclick="setAllImportStatus('finished')">${icon('check')} Done</button></div>`:'';
   document.getElementById('previewList').innerHTML=bulk+importItems.map(item=>{
     const dup=existing.has(item.title.toLowerCase().trim());
     return`<div class="preview-item${item.selected&&!dup?' sel':''}" onclick="toggleImport(${item.id})">
-      <div class="prev-check">${item.selected&&!dup?'✓':''}</div>
+      <div class="prev-check">${item.selected&&!dup?icon('check'):''}</div>
       <div class="prev-main">
         <div class="prev-name">${item.title}${item.ep?` <span style="color:var(--t3);font-size:10px">· ep ${item.ep}</span>`:''}${dup?' <span style="color:var(--t3);font-size:10px">(already added)</span>':''}</div>
-        ${dup?'':`<div class="prev-seg">${seg(item,'plan','📋 Plan')}${seg(item,'watching','▶ Watch')}${seg(item,'finished','✓ Done')}${seg(item,'dropped','✕ Drop')}</div>`}
+        ${dup?'':`<div class="prev-seg">${seg(item,'plan',icon('clipboard')+' Plan')}${seg(item,'watching',icon('play')+' Watch')}${seg(item,'finished',icon('check')+' Done')}${seg(item,'dropped',icon('x')+' Drop')}</div>`}
       </div>
     </div>`;
   }).join('');
@@ -1106,7 +1703,7 @@ function toggleAllImport(){const allOn=importItems.every(x=>x.selected);importIt
 function doImport(){
   const existing=new Set(anime.map(a=>a.title.toLowerCase().trim()));
   const toAdd=importItems.filter(x=>x.selected&&!existing.has(x.title.toLowerCase().trim()));
-  toAdd.forEach(item=>anime.unshift({id:uid(),title:item.title,status:item.status,ep:item.ep||0,rating:item.rating||0,fav:false,eps:'',epTotal:0,time:'',genre:'',order:[],notes:'',img:'',upd:Date.now()}));
+  toAdd.forEach(item=>anime.unshift({id:uid(),title:item.title,status:item.status,kind:viewKind,ep:item.ep||0,rating:item.rating||0,fav:false,eps:'',epTotal:0,time:'',genre:'',order:[],notes:'',img:'',upd:Date.now()}));
   save();closeAll();render();
   toast(`Added ${toAdd.length} title${toAdd.length!==1?'s':''}!`);
   setTimeout(fetchCovers,500);
@@ -1154,7 +1751,7 @@ function renderStatsSheet(){
       <div class="stat-card"><div class="stat-val">${counts.finished}</div><div class="stat-lbl">Finished</div></div>
       <div class="stat-card"><div class="stat-val">${epsWatched}</div><div class="stat-lbl">Episodes watched</div></div>
       <div class="stat-card"><div class="stat-val">${hrs?'~'+Math.round(hrs):'—'}</div><div class="stat-lbl">Hours watched</div></div>
-      <div class="stat-card"><div class="stat-val">★ ${avg}</div><div class="stat-lbl">Avg rating (${rated.length} rated)</div></div>
+      <div class="stat-card"><div class="stat-val">${icon('star','fill')} ${avg}</div><div class="stat-lbl">Avg rating (${rated.length} rated)</div></div>
       <div class="stat-card"><div class="stat-val">${anime.filter(a=>a.fav).length}</div><div class="stat-lbl">Favorites</div></div>
     </div>
     <div class="dt-label" style="margin-top:18px">Breakdown</div>
@@ -1182,7 +1779,7 @@ function saveKey(){
 }
 function aiErrorHTML(e){
   return e===NO_KEY
-    ?'This needs an AI key — open the ✦ tab, scroll down, and add one. Free keys at console.groq.com or aistudio.google.com (the key stays on this device only).'
+    ?'This needs an AI key — open the AI tab, scroll down, and add one. Free keys at console.groq.com or aistudio.google.com (the key stays on this device only).'
     :'Connection error — check your key and try again.';
 }
 async function callOpenAICompat(url,key,model,prompt){
@@ -1220,7 +1817,7 @@ async function runRecommend(){
   try{
     const text=await callAI(`${listSummary()}\n\nBased on this list, recommend 4-5 titles I should watch next${pref?` (preference: ${pref})`:''}. For each, give the title and a 1-2 sentence reason tied to what I've already watched. Format as:\n**[Title]** — [reason]`);
     const r=document.getElementById('recResp');r.className='ai-resp on';
-    r.innerHTML=`<div class="ai-badge">✦ Recommendations</div>${text.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>')}`;
+    r.innerHTML=`<div class="ai-badge">${icon('sparkles')} Recommendations</div>${text.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>')}`;
   }catch(e){const r=document.getElementById('recResp');r.className='ai-resp on';r.innerHTML=aiErrorHTML(e);}
   document.getElementById('recBtn').classList.remove('loading');
 }
@@ -1231,7 +1828,7 @@ async function runChat(){
   try{
     const text=await callAI(`${listSummary()}\n\nQuestion: ${q}\n\nAnswer helpfully and concisely, referencing my list when relevant.`);
     const r=document.getElementById('chatResp');r.className='ai-resp on';
-    r.innerHTML=`<div class="ai-badge">✦ Answer</div>${text.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>')}`;
+    r.innerHTML=`<div class="ai-badge">${icon('sparkles')} Answer</div>${text.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>')}`;
   }catch(e){const r=document.getElementById('chatResp');r.className='ai-resp on';r.innerHTML=aiErrorHTML(e);}
   document.getElementById('chatBtn').classList.remove('loading');
 }
@@ -1243,18 +1840,18 @@ async function runRank(){
     if(!pln.length){document.getElementById('rankResp').innerHTML='Nothing in Plan to Watch yet!';document.getElementById('rankBtn').classList.remove('loading');return;}
     const text=await callAI(`${listSummary()}\n\nRank my Plan to Watch list in the best viewing order${pref?` (priority: ${pref})`:''}. Consider variety, length, and mood progression. Numbered list with one-sentence reason per entry.`);
     const r=document.getElementById('rankResp');r.className='ai-resp on';
-    r.innerHTML=`<div class="ai-badge">✦ Ranked Order</div>${text.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>')}`;
+    r.innerHTML=`<div class="ai-badge">${icon('sparkles')} Ranked Order</div>${text.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>')}`;
   }catch(e){const r=document.getElementById('rankResp');r.className='ai-resp on';r.innerHTML=aiErrorHTML(e);}
   document.getElementById('rankBtn').classList.remove('loading');
 }
 async function aiCardInsight(id){
   const a=anime.find(x=>x.id===id);if(!a)return;
   const box=document.getElementById('ai-box-detail');if(!box)return;
-  box.innerHTML=`<div class="ai-insight-box"><div class="ai-badge">✦ AI Insight</div><div class="dots"><span>.</span><span>.</span><span>.</span></div></div>`;
+  box.innerHTML=`<div class="ai-insight-box"><div class="ai-badge">${icon('sparkles')} AI Insight</div><div class="dots"><span>.</span><span>.</span><span>.</span></div></div>`;
   try{
     const text=await callAI(`${listSummary()}\n\nThe user is looking at "${a.title}" (${a.genre||'anime'}, ${a.eps||'unknown length'}).\n\nGive one short personalized insight (2-3 sentences). Why they'd love it based on their list, what mood it's best for, or a key thing to know. Be specific and reference their actual list.`);
-    box.innerHTML=`<div class="ai-insight-box"><div class="ai-badge">✦ AI Insight</div>${text}</div>`;
-  }catch(e){box.innerHTML=`<div class="ai-insight-box"><div class="ai-badge">✦ AI Insight</div>${aiErrorHTML(e)}</div>`;}
+    box.innerHTML=`<div class="ai-insight-box"><div class="ai-badge">${icon('sparkles')} AI Insight</div>${text}</div>`;
+  }catch(e){box.innerHTML=`<div class="ai-insight-box"><div class="ai-badge">${icon('sparkles')} AI Insight</div>${aiErrorHTML(e)}</div>`;}
 }
 
 // ─── AUTOFILL — free public databases, works for everyone, no key ────────────
@@ -1351,9 +1948,40 @@ async function lookupBook(title){
   };
 }
 
+async function lookupManga(title){
+  // AniList MANGA covers manhwa / webtoon / manga / light novels — the side the ANIME query misses.
+  const q=`{Media(search:${JSON.stringify(String(title))},type:MANGA){coverImage{large} chapters volumes genres status format countryOfOrigin averageScore startDate{year}}}`;
+  const r=await fetch('https://graphql.anilist.co',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({query:q})});
+  if(!r.ok)return null;
+  const j=await r.json();const m=j&&j.data&&j.data.Media;
+  if(!m)return null;
+  const eps=m.chapters?`${m.chapters} chapters`:(m.volumes?`${m.volumes} volumes`:'ongoing');
+  const fmtLabel={MANGA:'Manga',MANHWA:'Manhwa',MANHUA:'Manhua',NOVEL:'Light novel',ONE_SHOT:'One-shot'}[m.format]
+    ||(m.countryOfOrigin==='KR'?'Manhwa':m.countryOfOrigin==='CN'?'Manhua':'');
+  const bits=[];
+  if(fmtLabel)bits.push(fmtLabel);
+  if(m.averageScore)bits.push(`★ ${(m.averageScore/10).toFixed(1)} on AniList`);
+  if(m.status)bits.push(m.status.replace(/_/g,' ').toLowerCase());
+  if(m.startDate&&m.startDate.year)bits.push(String(m.startDate.year));
+  return{
+    eps,time:'',
+    genre:(m.genres||[]).slice(0,3).join(', '),
+    order:[],
+    notes:bits.join(' · '),
+    img:(m.coverImage&&m.coverImage.large)||''
+  };
+}
 // ── COVER + DETAILS FETCHER — batched via AniList (≈25 titles per request) ──
 let coverRunning=false;
-function coverNeedy(){return anime.filter(a=>(!a.img&&!a.imgTried)||(!a.eps&&!a.detTried));}
+// watch anime whose next-airing cache is missing/stale (aired already, or not checked in 6h)
+function airingNeedy(a){
+  if(kindOf(a)!=='watch')return false;
+  if(a.status!=='watching'&&a.status!=='plan')return false;
+  const now=Date.now();
+  if(a.airAt&&a.airAt*1000>now)return false; // still holding a valid upcoming-episode time
+  return !a.airChk||(now-a.airChk>6*3600*1000);
+}
+function coverNeedy(){return anime.filter(a=>(!a.img&&!a.imgTried)||(!a.eps&&!a.detTried)||(!a.banner&&!a.bannerTried)||airingNeedy(a));}
 async function fetchCovers(){
   if(coverRunning)return;coverRunning=true;
   let netFails=0;
@@ -1365,7 +1993,17 @@ async function fetchCovers(){
       const rank={watching:0,plan:1,finished:2,dropped:3};
       needy.sort((a,b)=>(rank[a.status]??9)-(rank[b.status]??9));
       const batch=needy.slice(0,25);
-      const q='{'+batch.map((a,i)=>`a${i}:Page(perPage:1){media(search:${JSON.stringify(String(a.title))},type:ANIME){coverImage{large} episodes duration genres}}`).join(' ')+'}';
+      // query the correct AniList type per item: MANGA for reading (manhwa/webtoon/manga/LN), ANIME otherwise.
+      // watch items also pull nextAiringEpisode so the card can show the real next-episode air time.
+      const q='{'+batch.map((a,i)=>{
+        const read=kindOf(a)==='read';
+        const type=read?'MANGA':'ANIME';
+        // bannerImage = wide per-title scene art (may be null); coverImage.color = AniList's precomputed dominant hex
+        const fields=read
+          ?'coverImage{large extraLarge color} bannerImage chapters volumes genres'
+          :'id coverImage{large extraLarge color} bannerImage episodes duration genres nextAiringEpisode{airingAt episode}';
+        return `a${i}:Page(perPage:1){media(search:${JSON.stringify(String(a.title))},type:${type}){${fields}}}`;
+      }).join(' ')+'}';
       let data=null,failed=false;
       try{
         const r=await fetch('https://graphql.anilist.co',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({query:q})});
@@ -1378,16 +2016,33 @@ async function fetchCovers(){
       }
       netFails=0;
       batch.forEach((a,i)=>{
+        const read=kindOf(a)==='read';
         const node=data['a'+i],m=node&&node.media&&node.media[0];
         if(m){
           if(!a.img&&!a.imgTried)a.img=(m.coverImage&&m.coverImage.large)||'';
+          // per-title theming: wide banner art + AniList's dominant color (kept independent of any user-set bgImage/bgAccent)
+          if(m.bannerImage)a.banner=m.bannerImage;
+          if(m.coverImage&&m.coverImage.color)a.aniColor=m.coverImage.color;
           if(!a.eps){
-            if(m.episodes){a.eps=`${m.episodes} eps`;a.epTotal=m.episodes;}
-            if(!a.time&&m.duration&&m.episodes)a.time=`~${Math.max(1,Math.round(m.duration*m.episodes/60))} hrs`;
+            if(read){
+              if(m.chapters){a.eps=`${m.chapters} chapters`;a.epTotal=m.chapters;}
+              else if(m.volumes){a.eps=`${m.volumes} volumes`;}
+            }else{
+              if(m.episodes){a.eps=`${m.episodes} eps`;a.epTotal=m.episodes;}
+              if(!a.time&&m.duration&&m.episodes)a.time=`~${Math.max(1,Math.round(m.duration*m.episodes/60))} hrs`;
+            }
             if(!a.genre&&m.genres&&m.genres.length)a.genre=m.genres.slice(0,3).join(', ');
           }
+          if(!read){ // record (or clear) the upcoming-episode air time
+            if(m.id)a.aniId=m.id; // AniList media id — the notify worker matches airing shows by this
+            const na=m.nextAiringEpisode;
+            if(na&&na.airingAt){a.airAt=na.airingAt;a.airEp=na.episode;}
+            else{a.airAt=0;a.airEp=0;}
+          }
         }
+        if(!read)a.airChk=Date.now(); // stamp even on a miss so we don't re-poll every launch
         if(!a.img)a.imgTried=true;
+        a.bannerTried=true; // stamp even when bannerImage was null (some titles have none) so we don't refetch forever
         a.detTried=true;
       });
       save();renderHome();
@@ -1399,11 +2054,17 @@ async function aiAutofill(){
   const title=document.getElementById('fTitle').value.trim();
   if(!title){toast('Enter a title first');return;}
   const btn=document.getElementById('autofillBtn');
-  btn.classList.add('loading');btn.innerHTML='<span>✦</span> Searching databases…';
+  btn.classList.add('loading');btn.innerHTML='<span>'+icon('sparkles')+'</span> Searching databases…';
   let data=null,src='';
-  try{data=await lookupAnime(title);src='MyAnimeList';}catch{}
-  if(!data){try{data=await lookupShow(title);src='TVMaze';}catch{}}
-  if(!data){try{data=await lookupBook(title);src='Open Library';}catch{}}
+  if(curKind==='read'){
+    // reading: AniList MANGA first (manhwa/webtoon/manga), then Open Library for light novels
+    try{data=await lookupManga(title);src='AniList (Manga)';}catch{}
+    if(!data){try{data=await lookupBook(title);src='Open Library';}catch{}}
+  }else{
+    try{data=await lookupAnime(title);src='MyAnimeList';}catch{}
+    if(!data){try{data=await lookupShow(title);src='TVMaze';}catch{}}
+    if(!data){try{data=await lookupBook(title);src='Open Library';}catch{}}
+  }
   if(data){
     if(data.eps)document.getElementById('fEps').value=data.eps;
     if(data.time)document.getElementById('fTime').value=data.time;
@@ -1411,13 +2072,161 @@ async function aiAutofill(){
     if(data.order&&data.order.length)document.getElementById('fOrder').value=data.order.join('\n');
     if(data.notes)document.getElementById('fNotes').value=data.notes;
     if(data.img)setCoverPreview(data.img);
-    toast(`✦ Found on ${src}`);
+    toast(`Found on ${src}`);
   }else toast('No match found — fill in manually.');
-  btn.classList.remove('loading');btn.innerHTML='<span>✦</span> Autofill — cover, episodes, genre &amp; watch order';
+  btn.classList.remove('loading');formKindLabels();
 }
 
 // ─── TOAST ──────────────────────────────────────────────────────────────────
 let toastT;
+// ─── SCHEDULE (weekly airing calendar) ──────────────────────────────────────
+let schedOffset=0; const schedCache={};
+function schEsc(s){return String(s==null?'':s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+function schPh(ch){return '<div class="sched-thumb-ph">'+ch+'</div>';}
+function openSchedule(){schedOffset=0;openSheet('scheduleSheet');renderSchedule();}
+function schedWeekStart(off){const d=new Date();d.setHours(0,0,0,0);const dow=(d.getDay()+6)%7;d.setDate(d.getDate()-dow+off*7);return d;}
+function schedDayKey(d){return d.getFullYear()*10000+(d.getMonth()+1)*100+d.getDate();}
+function schedFmt(d){return d.toLocaleDateString([],{month:'short',day:'numeric'});}
+function schedLabel(off){return off===0?'This Week':off===-1?'Last Week':off===1?'Next Week':(off<0?(-off)+' weeks ago':'In '+off+' weeks');}
+function schedGo(dir){if(dir==='today')schedOffset=0;else schedOffset+=dir;renderSchedule();}
+function schedWatchItems(){return anime.filter(a=>kindOf(a)==='watch'&&(a.status==='watching'||a.status==='plan'));}
+function renderSchedule(){
+  const body=document.getElementById('scheduleBody');if(!body)return;
+  const ws=schedWeekStart(schedOffset),we=new Date(ws);we.setDate(we.getDate()+6);
+  body.innerHTML='<div class="sched-nav">'+
+      '<button class="sched-arrow" onclick="schedGo(-1)" aria-label="Previous week">'+icon('chevron-left')+'</button>'+
+      '<div class="sched-week"><div class="sched-week-title">'+schedLabel(schedOffset)+'</div><div class="sched-week-range">'+schedFmt(ws)+' – '+schedFmt(we)+'</div></div>'+
+      '<button class="sched-arrow" onclick="schedGo(1)" aria-label="Next week">'+icon('chevron-right')+'</button></div>'+
+    (schedOffset!==0?'<div class="sched-toolbar"><button class="sched-today-btn" onclick="schedGo(\'today\')">Jump to this week</button></div>':'')+
+    '<div class="sched-days" id="schedDays"><div class="sched-loading"><div class="sched-spin">'+icon('loader')+'</div><p>Loading episodes…</p></div></div>';
+  loadSchedWeek(ws);
+}
+async function loadSchedWeek(ws){
+  const startSec=Math.floor(ws.getTime()/1000),endSec=startSec+7*86400;
+  let eps=schedCache[startSec];
+  if(!eps){try{eps=await fetchSchedEpisodes(startSec,endSec);}catch(e){eps=schedFallback(startSec,endSec);}schedCache[startSec]=eps;}
+  renderSchedDays(ws,eps);
+}
+function schedFallback(startSec,endSec){
+  const out=[];schedWatchItems().forEach(a=>{if(a.airAt&&a.airAt>=startSec&&a.airAt<endSec)out.push({id:a.id,title:a.title,img:a.img,episode:a.airEp||0,airingAt:a.airAt,aniId:a.aniId});});
+  return out.sort((x,y)=>x.airingAt-y.airingAt);
+}
+async function fetchSchedEpisodes(startSec,endSec){
+  const watch=schedWatchItems();const byAni={};watch.forEach(a=>{if(a.aniId)byAni[a.aniId]=a;});
+  const ids=Object.keys(byAni).map(Number);
+  if(!ids.length)return schedFallback(startSec,endSec);
+  const out=[],seen=new Set();
+  for(let i=0;i<ids.length;i+=50){
+    const chunk=ids.slice(i,i+50);
+    const q='{Page(perPage:50){airingSchedules(mediaId_in:['+chunk.join(',')+'],airingAt_greater:'+(startSec-1)+',airingAt_lesser:'+endSec+',sort:TIME){mediaId episode airingAt}}}';
+    try{
+      const r=await fetch('https://graphql.anilist.co',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({query:q})});
+      if(r.status===429){await pause(1500);i-=50;continue;}
+      const j=await r.json();const arr=(j&&j.data&&j.data.Page&&j.data.Page.airingSchedules)||[];
+      arr.forEach(s=>{const a=byAni[s.mediaId];if(!a)return;const k=s.mediaId+':'+s.episode;if(seen.has(k))return;seen.add(k);out.push({id:a.id,title:a.title,img:a.img,episode:s.episode,airingAt:s.airingAt,aniId:s.mediaId});});
+    }catch(e){/* network hiccup — remaining chunks + airAt fallback still populate */}
+    if(i+50<ids.length)await pause(700);
+  }
+  watch.forEach(a=>{if(!a.airAt||a.airAt<startSec||a.airAt>=endSec)return;const k=(a.aniId||a.id)+':'+(a.airEp||0);if(seen.has(k))return;seen.add(k);out.push({id:a.id,title:a.title,img:a.img,episode:a.airEp||0,airingAt:a.airAt,aniId:a.aniId});});
+  return out.sort((x,y)=>x.airingAt-y.airingAt);
+}
+function renderSchedDays(ws,eps){
+  const cont=document.getElementById('schedDays');if(!cont)return;
+  if(!eps.length){cont.innerHTML='<div class="sched-empty-all"><div class="empty-icon">'+icon('calendar')+'</div><p>No episodes airing this week for your list.<br>Add a currently-airing show to <b>Watching</b> and it\'ll show up here.</p></div>';return;}
+  const notifSet=notifyOn()?new Set(notifyAnimeIds()):null;
+  const todayKey=schedDayKey(new Date());
+  let html='';
+  for(let i=0;i<7;i++){
+    const day=new Date(ws);day.setDate(day.getDate()+i);
+    const dk=schedDayKey(day);
+    const dEps=eps.filter(e=>schedDayKey(new Date(e.airingAt*1000))===dk);
+    const cls='sched-day'+(dk===todayKey?' is-today':'')+(dk<todayKey?' is-past':'');
+    const pill=dk===todayKey?'<span class="sched-today-pill">Today</span>':'';
+    let rows='';
+    if(dEps.length){
+      dEps.forEach(e=>{
+        const t=new Date(e.airingAt*1000).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
+        const ch=((e.title||'?').charAt(0)||'?').replace(/[^A-Za-z0-9]/g,'')||'?';
+        const thumb=e.img?'<img class="sched-thumb" src="'+e.img+'" alt="" loading="lazy" onerror="this.outerHTML=schPh(\''+ch+'\')">':schPh(ch);
+        const bell=notifSet&&e.aniId&&notifSet.has(e.aniId)?'<span class="sched-bell" title="Notifications on">'+icon('bell')+'</span>':'';
+        rows+='<div class="sched-row" onclick="openDetail(\''+e.id+'\')">'+thumb+'<div class="sched-row-main"><div class="sched-row-title">'+schEsc(e.title)+bell+'</div><div class="sched-row-sub">Ep '+(e.episode||'?')+' · '+t+'</div></div></div>';
+      });
+    }else rows='<div class="sched-empty-day">—</div>';
+    html+='<div class="'+cls+'"><div class="sched-day-head"><span class="sched-day-name">'+day.toLocaleDateString([],{weekday:'long'})+'</span><span class="sched-day-date">'+schedFmt(day)+'</span>'+pill+'</div><div class="sched-day-body">'+rows+'</div></div>';
+  }
+  cont.innerHTML=html;
+}
+
+// ─── FOR YOU (tailored recommendations — AniList recommendation graph) ───────
+let fyCache=null;
+function fyPh(ch){return '<div class="fy-ph">'+ch+'</div>';}
+function openForYou(){openSheet('forYouSheet');}
+function refreshForYou(){fyCache=null;renderForYou();}
+function renderForYou(){
+  const body=document.getElementById('forYouBody');if(!body)return;
+  const intro='<div class="fy-intro">Tailored to what you watch — community picks from AniList that aren\'t on your list yet.</div>';
+  if(fyCache){body.innerHTML=intro+fyGridHTML(fyCache);return;}
+  body.innerHTML=intro+'<div class="fy-loading"><div class="fy-spin">'+icon('loader')+'</div><p>Finding shows you\'ll love…</p></div>';
+  computeForYou().then(recs=>{fyCache=recs;const sh=document.getElementById('forYouSheet');if(sh&&sh.classList.contains('on'))renderForYou();}).catch(()=>{fyCache=[];renderForYou();});
+}
+function fyGridHTML(recs){
+  if(!recs||!recs.length)return '<div class="fy-empty"><div class="empty-icon">'+icon('compass')+'</div><p>No fresh picks yet. Add or finish a few shows under <b>Watching</b> and we\'ll tailor recommendations to your taste.</p></div>';
+  return '<div class="fy-grid">'+recs.map(x=>{
+    const r=x.rec,t=r.title.english||r.title.romaji||'?';
+    const ch=((t.charAt(0)||'?').replace(/[^A-Za-z0-9]/g,''))||'?';
+    const img=r.coverImage&&r.coverImage.large;
+    const score=r.averageScore?'<div class="fy-score">'+icon('star')+Math.round(r.averageScore)+'</div>':'';
+    const genres=(r.genres||[]).slice(0,2).join(' · ');
+    const srcs=[...x.srcs];
+    const because='Because you watched '+schEsc(srcs[0]||'')+(srcs.length>1?' +'+(srcs.length-1)+' more':'');
+    const cover=img?'<img class="fy-img" src="'+img+'" alt="" loading="lazy" onerror="this.outerHTML=fyPh(\''+ch+'\')">':fyPh(ch);
+    return '<div class="fy-card"><div class="fy-wrap">'+cover+score+'</div><div class="fy-title">'+schEsc(t)+'</div>'+(genres?'<div class="fy-meta">'+schEsc(genres)+'</div>':'')+'<div class="fy-because">'+because+'</div><button class="fy-plan" onclick="fyPlan('+r.id+',this)">'+icon('plus')+'Plan</button></div>';
+  }).join('')+'</div>';
+}
+async function computeForYou(){
+  const W={finished:3,watching:2,plan:1};
+  let sources=anime.filter(a=>kindOf(a)==='watch'&&a.aniId&&W[a.status]);
+  if(!sources.length){try{if(typeof fetchCovers==='function')await fetchCovers();}catch(e){}sources=anime.filter(a=>kindOf(a)==='watch'&&a.aniId&&W[a.status]);}
+  if(!sources.length)return [];
+  const top=sources.map(a=>({aniId:a.aniId,title:a.title,w:W[a.status]})).sort((a,b)=>b.w-a.w).slice(0,24);
+  const onList=new Set(anime.map(a=>a.aniId).filter(Boolean));
+  const agg={};
+  for(let i=0;i<top.length;i+=8){
+    const batch=top.slice(i,i+8);
+    const q='{'+batch.map((s,j)=>'m'+j+':Media(id:'+s.aniId+'){recommendations(sort:RATING_DESC,perPage:8){nodes{rating mediaRecommendation{id title{romaji english} coverImage{large} genres averageScore}}}}').join(' ')+'}';
+    try{
+      const r=await fetch('https://graphql.anilist.co',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({query:q})});
+      if(r.status===429){await pause(1500);i-=8;continue;}
+      const j=await r.json(),data=(j&&j.data)||{};
+      batch.forEach((s,idx)=>{
+        const md=data['m'+idx];if(!md||!md.recommendations)return;
+        (md.recommendations.nodes||[]).forEach(n=>{
+          const rec=n.mediaRecommendation;if(!rec||!rec.id||onList.has(rec.id))return;
+          if(!rec.coverImage||!rec.coverImage.large)return;
+          if(!agg[rec.id])agg[rec.id]={score:0,srcs:new Set(),rec};
+          agg[rec.id].score+=s.w*(n.rating>0?n.rating:1);
+          agg[rec.id].srcs.add(s.title);
+        });
+      });
+    }catch(e){}
+    if(i+8<top.length)await pause(650);
+  }
+  const arr=Object.values(agg);
+  arr.forEach(x=>{if(x.srcs.size>=2)x.score*=1.2;});
+  arr.sort((a,b)=>b.score-a.score);
+  return arr.slice(0,20);
+}
+function fyPlan(aniId,btn){
+  const x=(fyCache||[]).find(o=>o.rec.id===aniId);if(!x)return;
+  const r=x.rec;
+  anime.push({id:uid(),title:r.title.english||r.title.romaji,status:'plan',kind:'watch',aniId:r.id,img:(r.coverImage&&r.coverImage.large)||'',eps:'',time:'',genre:(r.genres||[]).join(', '),order:[],notes:''});
+  save();render();
+  if(typeof toast==='function')toast('Added to Plan');
+  fyCache=(fyCache||[]).filter(o=>o.rec.id!==aniId);
+  const card=btn&&btn.closest?btn.closest('.fy-card'):null;
+  if(card){card.classList.add('leaving');setTimeout(()=>{card.parentNode&&card.remove();},300);}
+}
+
 function toast(msg){const el=document.getElementById('toast');el.textContent=msg;el.classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>el.classList.remove('on'),2400);}
 
 // ─── SERVICE WORKER + SEAMLESS AUTO-UPDATE ───────────────────────────────────
@@ -1445,11 +2254,15 @@ try{
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeAll();closeConfirm();}});
 
 // ─── INIT ───────────────────────────────────────────────────────────────────
+try{hydrateIcons();}catch{}
 load();loadTheme();render();
+try{renderNotifyBell();}catch{}
 try{document.getElementById('apiKeyIn').value=getKey();}catch{}
 try{if(sessionStorage.getItem('justUpdated')){sessionStorage.removeItem('justUpdated');setTimeout(()=>toast('✨ Updated to the latest version'),700);}}catch{}
 setTimeout(fetchCovers,1200);
 setTimeout(syncOnOpen,300);
+// If notifications are on, re-sync the tracked show list with the worker on load (fire-and-forget).
+setTimeout(()=>{try{if(notifyOn())notifyUpdate();}catch{}},1600);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)syncOnOpen();});
 </script>
 </body>

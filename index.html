@@ -565,6 +565,20 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
   .hero{min-height:264px;}
   .hero-title{font-size:27px;}
 }
+
+/* ── INLINE ICONS ── */
+.ico{width:1.15em;height:1.15em;display:inline-block;vertical-align:-0.18em;stroke:currentColor;fill:none;flex:none;}
+.ico.fill{fill:currentColor;}
+.hbtn .ico,.nbtn .ico{width:1.25em;height:1.25em;vertical-align:middle;}
+.search-ico .ico{width:1.15em;height:1.15em;vertical-align:middle;}
+.star .ico{width:1em;height:1em;vertical-align:middle;}
+.star.on .ico{fill:currentColor;}
+.pcard-fav{color:#ff5a6e;}
+.pcard-fav .ico{fill:currentColor;}
+.dt-fav.on .ico{fill:currentColor;}
+.empty-icon .ico{width:1em;height:1em;vertical-align:-0.08em;}
+.sched-spin .ico{width:1em;height:1em;}
+.sched-bell .ico{width:1em;height:1em;vertical-align:-0.12em;}
 </style>
 </head>
 <body>
@@ -576,14 +590,14 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
       <div class="hdr-sub" id="headerSub"></div>
     </div>
     <div class="hdr-actions">
-      <button class="hbtn" onclick="openSchedule()" title="Weekly airing schedule" aria-label="Weekly airing schedule">📅</button>
-      <button class="hbtn" id="notifyBell" onclick="openNotifySheet()" title="Episode notifications" aria-label="Notifications">🔕</button>
-      <button class="hbtn" onclick="openSheet('themeSheet')" title="Theme">🎨</button>
+      <button class="hbtn" onclick="openSchedule()" title="Weekly airing schedule" aria-label="Weekly airing schedule"><i data-ic="calendar"></i></button>
+      <button class="hbtn" id="notifyBell" onclick="openNotifySheet()" title="Episode notifications" aria-label="Notifications"><i data-ic="bell-off"></i></button>
+      <button class="hbtn" onclick="openSheet('themeSheet')" title="Theme"><i data-ic="palette"></i></button>
     </div>
   </div>
   <div class="search-row">
     <div class="search-wrap">
-      <span class="search-ico">🔍</span>
+      <span class="search-ico"><i data-ic="search"></i></span>
       <input class="search-in" type="search" id="searchIn" placeholder="Search titles, genres…" oninput="renderHome()">
     </div>
   </div>
@@ -595,11 +609,11 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 
 <!-- BOTTOM NAV -->
 <div class="nav">
-  <button class="nbtn on" id="nav-home" onclick="goHome()"><span>🏠</span><small>Home</small></button>
-  <button class="nbtn" onclick="openSheet('statsSheet')"><span>📊</span><small>Stats</small></button>
+  <button class="nbtn on" id="nav-home" onclick="goHome()"><span><i data-ic="home"></i></span><small>Home</small></button>
+  <button class="nbtn" onclick="openSheet('statsSheet')"><span><i data-ic="chart"></i></span><small>Stats</small></button>
   <button class="nbtn add" onclick="openSheet_add()">＋</button>
-  <button class="nbtn" onclick="openSheet('importSheet')"><span>📋</span><small>Import</small></button>
-  <button class="nbtn" onclick="openSheet('aiSheet')"><span>✦</span><small>AI</small></button>
+  <button class="nbtn" onclick="openSheet('importSheet')"><span><i data-ic="clipboard"></i></span><small>Import</small></button>
+  <button class="nbtn" onclick="openSheet('aiSheet')"><span><i data-ic="sparkles"></i></span><small>AI</small></button>
 </div>
 
 <!-- OVERLAY -->
@@ -621,8 +635,8 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
   <div class="fgroup">
     <label class="flabel">What is it?</label>
     <div class="kind-toggle">
-      <button type="button" class="kbtn" id="kf-watch" onclick="setKind('watch')">▶ Watch</button>
-      <button type="button" class="kbtn" id="kf-read" onclick="setKind('read')">📖 Read</button>
+      <button type="button" class="kbtn" id="kf-watch" onclick="setKind('watch')"><i data-ic="play"></i> Watch</button>
+      <button type="button" class="kbtn" id="kf-read" onclick="setKind('read')"><i data-ic="book"></i> Read</button>
     </div>
     <div class="field-hint" id="kindHint">Anime, TV shows &amp; movies.</div>
   </div>
@@ -631,13 +645,13 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
     <input class="finput" id="fTitle" placeholder="e.g. Attack on Titan" autocomplete="off" autocorrect="off" enterkeyhint="search" onkeydown="if(event.key==='Enter'){event.preventDefault();aiAutofill();}">
   </div>
   <button class="autofill-btn" id="autofillBtn" onclick="aiAutofill()">
-    <span>✦</span> Autofill — cover, episodes, genre &amp; watch order
+    <span><i data-ic="sparkles"></i></span> Autofill — cover, episodes, genre &amp; watch order
   </button>
   <div class="fgroup" id="coverPrev">
     <label class="flabel">Cover</label>
     <div style="display:flex;align-items:center;gap:10px;">
       <img id="coverImg" alt="" style="width:44px;height:62px;border-radius:9px;object-fit:cover;border:1px solid var(--b1);display:none">
-      <button class="dact" type="button" style="flex:0 0 auto;padding:10px 14px" onclick="document.getElementById('coverFile').click()">📷 Upload</button>
+      <button class="dact" type="button" style="flex:0 0 auto;padding:10px 14px" onclick="document.getElementById('coverFile').click()"><i data-ic="camera"></i> Upload</button>
       <button class="dact danger" type="button" id="coverRemoveBtn" onclick="clearCover()" style="display:none;padding:10px 14px">Remove</button>
       <input type="file" id="coverFile" accept="image/*" style="display:none" onchange="coverFileChosen(this)">
     </div>
@@ -646,7 +660,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
     <label class="flabel">Background photo</label>
     <div style="display:flex;align-items:center;gap:10px;">
       <img id="bgImgPreview" alt="" style="width:70px;height:44px;border-radius:9px;object-fit:cover;border:1px solid var(--b1);display:none">
-      <button class="dact" type="button" style="flex:0 0 auto;padding:10px 14px" onclick="document.getElementById('bgFile').click()">🖼 Upload</button>
+      <button class="dact" type="button" style="flex:0 0 auto;padding:10px 14px" onclick="document.getElementById('bgFile').click()"><i data-ic="image"></i> Upload</button>
       <button class="dact danger" type="button" id="bgRemoveBtn" onclick="clearBg()" style="display:none;padding:10px 14px">Remove</button>
       <input type="file" id="bgFile" accept="image/*" style="display:none" onchange="bgFileChosen(this)">
     </div>
@@ -655,10 +669,10 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
   <div class="fgroup">
     <label class="flabel">Status</label>
     <div class="status-pick">
-      <button class="spick" id="sp-plan" onclick="setStatus('plan')">📋 Plan</button>
-      <button class="spick" id="sp-watching" onclick="setStatus('watching')">▶ Watch</button>
-      <button class="spick" id="sp-finished" onclick="setStatus('finished')">✓ Done</button>
-      <button class="spick" id="sp-dropped" onclick="setStatus('dropped')">✕ Drop</button>
+      <button class="spick" id="sp-plan" onclick="setStatus('plan')"><i data-ic="clipboard"></i> Plan</button>
+      <button class="spick" id="sp-watching" onclick="setStatus('watching')"><i data-ic="play"></i> Watch</button>
+      <button class="spick" id="sp-finished" onclick="setStatus('finished')"><i data-ic="check"></i> Done</button>
+      <button class="spick" id="sp-dropped" onclick="setStatus('dropped')"><i data-ic="x"></i> Drop</button>
     </div>
   </div>
   <div class="frow2">
@@ -696,13 +710,13 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 <div class="sheet" id="aiSheet">
   <div class="sheet-handle"></div>
   <div class="sheet-header">
-    <div class="sheet-title">✦ AI Features</div>
+    <div class="sheet-title"><i data-ic="sparkles"></i> AI Features</div>
     <button class="sheet-cancel" onclick="closeAll()">Done</button>
   </div>
   <div class="ai-tabs">
-    <button class="aitab on" id="at-rec" onclick="setAITab('rec')">💡 Suggest</button>
-    <button class="aitab" id="at-chat" onclick="setAITab('chat')">💬 Ask</button>
-    <button class="aitab" id="at-rank" onclick="setAITab('rank')">🏆 Rank</button>
+    <button class="aitab on" id="at-rec" onclick="setAITab('rec')"><i data-ic="bulb"></i> Suggest</button>
+    <button class="aitab" id="at-chat" onclick="setAITab('chat')"><i data-ic="message"></i> Ask</button>
+    <button class="aitab" id="at-rank" onclick="setAITab('rank')"><i data-ic="trophy"></i> Rank</button>
   </div>
   <div class="aipanel on" id="ap-rec">
     <p class="ai-desc">AI recommends what to watch next based on your entire list.</p>
@@ -739,7 +753,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 <div class="sheet" id="importSheet">
   <div class="sheet-handle"></div>
   <div class="sheet-header">
-    <div class="sheet-title">📋 Import / Export</div>
+    <div class="sheet-title"><i data-ic="clipboard"></i> Import / Export</div>
     <button class="sheet-cancel" onclick="closeAll()">Done</button>
   </div>
   <p class="ai-desc">Paste your list from Notes, messages, or anywhere — one title per line, as messy as you like. After previewing, tap a status on each title (or use Set&nbsp;all). "Title | status | ep 5 | ★4" style lines are understood too.</p>
@@ -751,7 +765,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
     <button class="submit-btn" style="margin:0;flex:1" onclick="doImport()">Import Selected</button>
   </div>
   <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--b1);">
-    <button class="parse-btn" style="margin-top:0" onclick="exportList()">📤 Copy my list to clipboard</button>
+    <button class="parse-btn" style="margin-top:0" onclick="exportList()"><i data-ic="upload"></i> Copy my list to clipboard</button>
   </div>
   <div id="syncBox" style="margin-top:16px;padding-top:14px;border-top:1px solid var(--b1);"></div>
   <div id="notifyBox" style="margin-top:16px;padding-top:14px;border-top:1px solid var(--b1);"></div>
@@ -761,7 +775,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 <div class="sheet" id="statsSheet">
   <div class="sheet-handle"></div>
   <div class="sheet-header">
-    <div class="sheet-title">📊 Stats</div>
+    <div class="sheet-title"><i data-ic="chart"></i> Stats</div>
     <button class="sheet-cancel" onclick="closeAll()">Done</button>
   </div>
   <div id="statsBody"></div>
@@ -771,7 +785,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 <div class="sheet" id="themeSheet">
   <div class="sheet-handle"></div>
   <div class="sheet-header">
-    <div class="sheet-title">🎨 Theme</div>
+    <div class="sheet-title"><i data-ic="palette"></i> Theme</div>
     <button class="sheet-cancel" onclick="closeAll()">Done</button>
   </div>
   <div class="theme-grid" id="themeGrid"></div>
@@ -793,7 +807,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 <div class="sheet" id="notifySheet">
   <div class="sheet-handle"></div>
   <div class="sheet-header">
-    <div class="sheet-title">🔔 Notifications</div>
+    <div class="sheet-title"><i data-ic="bell"></i> Notifications</div>
     <button class="sheet-cancel" onclick="closeAll()">Done</button>
   </div>
   <div id="notifyBoxHeader"></div>
@@ -803,7 +817,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 <div class="sheet" id="scheduleSheet">
   <div class="sheet-handle"></div>
   <div class="sheet-header">
-    <div class="sheet-title">📅 Schedule</div>
+    <div class="sheet-title"><i data-ic="calendar"></i> Schedule</div>
     <button class="sheet-cancel" onclick="closeAll()">Done</button>
   </div>
   <div id="scheduleBody"></div>
@@ -823,6 +837,42 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 <div class="toast" id="toast"></div>
 
 <script>
+// ─── ICONS — inline monochrome line icons (Feather/Lucide style, currentColor) ──
+const ICONS={
+calendar:'<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
+bell:'<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>',
+'bell-off':'<path d="M8.7 3A6 6 0 0 1 18 8c0 3 .5 5 1.3 6.5"/><path d="M17 17H3s3-2 3-9a4.67 4.67 0 0 1 .3-1.7"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/><path d="M2 2l20 20"/>',
+palette:'<circle cx="13.5" cy="6.5" r=".9"/><circle cx="17" cy="12" r=".9"/><circle cx="6" cy="12" r=".9"/><circle cx="8.5" cy="7.5" r=".9"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10a2 2 0 0 0 2-2 1.9 1.9 0 0 0-.5-1.3 1.9 1.9 0 0 1-.5-1.3 2 2 0 0 1 2-2h1.6a4.4 4.4 0 0 0 4.4-4.4C21.4 6 17.2 2 12 2z"/>',
+search:'<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
+home:'<path d="M3 9.5 12 3l9 6.5"/><path d="M5 10v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V10"/><path d="M9 21v-6h6v6"/>',
+chart:'<path d="M6 20v-6M12 20V4M18 20v-9"/>',
+clipboard:'<rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>',
+sparkles:'<path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 14l.7 1.9 1.8.6-1.8.7L19 19l-.7-1.8-1.8-.7 1.8-.6z"/>',
+play:'<path d="M7 4v16l13-8z"/>',
+book:'<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>',
+check:'<path d="M20 6 9 17l-5-5"/>',
+x:'<path d="M18 6 6 18M6 6l12 12"/>',
+camera:'<path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/>',
+image:'<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/>',
+bulb:'<path d="M9 18h6M10 22h4"/><path d="M15.1 14c.2-1 .6-1.7 1.4-2.5A4.6 4.6 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.8.8 1.2 1.5 1.4 2.5"/>',
+message:'<path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8z"/>',
+trophy:'<path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6M18 9h1.5a2.5 2.5 0 0 0 0-5H18M4 22h16"/><path d="M10 14.7V17c0 .6-.5 1-1 1.2C7.9 18.8 7 20.2 7 22M14 14.7V17c0 .6.5 1 1 1.2 1.1.6 2 2 2 3.8"/><path d="M18 2H6v7a6 6 0 0 0 12 0z"/>',
+cloud:'<path d="M18 10h-1.3A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/>',
+upload:'<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>',
+star:'<path d="M12 2.5l2.9 6.1 6.6.9-4.8 4.6 1.2 6.6L12 18.6 6.1 21.3l1.2-6.6L2.5 9.5l6.6-.9z"/>',
+heart:'<path d="M20.8 5.6a5.5 5.5 0 0 0-7.8 0L12 6.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21.2l7.8-6.8 1-1a5.5 5.5 0 0 0 0-7.8z"/>',
+edit:'<path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
+trash:'<path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6"/>',
+film:'<rect x="2.5" y="3" width="19" height="18" rx="2"/><path d="M7 3v18M17 3v18M2.5 8h4.5M2.5 16h4.5M17 8h4.5M17 16h4.5M2.5 12h19"/>',
+clock:'<circle cx="12" cy="12" r="9.5"/><path d="M12 7v5l3.5 2"/>',
+'chevron-left':'<path d="m15 18-6-6 6-6"/>',
+'chevron-right':'<path d="m9 18 6-6-6-6"/>',
+loader:'<path d="M12 3a9 9 0 1 0 9 9"/>',
+inbox:'<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5.1 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.9A2 2 0 0 0 16.8 4H7.2a2 2 0 0 0-1.7 1.1z"/>'
+};
+function icon(name,cls){const p=ICONS[name];if(!p)return'';return `<svg class="ico${cls?' '+cls:''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`;}
+function hydrateIcons(root){(root||document).querySelectorAll('[data-ic]').forEach(el=>{const s=icon(el.getAttribute('data-ic'));if(s)el.outerHTML=s;});}
+
 // ─── DATA ──────────────────────────────────────────────────────────────────
 const DEFAULT_DATA=[{id:'d1',title:'Frieren: Beyond Journey\'s End',status:'watching',eps:'28 eps',time:'~12 hrs',genre:'Adventure, Fantasy',order:[],notes:'',kind:'watch'},{id:'d2',title:'Attack on Titan',status:'finished',eps:'87 eps',time:'~35 hrs',genre:'Action, Drama',order:[],notes:'',kind:'watch'},{id:'d3',title:'Spy x Family',status:'plan',eps:'37 eps',time:'~15 hrs',genre:'Comedy, Action',order:[],notes:'',kind:'watch'},{id:'d4',title:'Solo Leveling',status:'plan',eps:'—',time:'—',genre:'Action, Fantasy',order:[],notes:'',kind:'read'}];
 
@@ -830,10 +880,10 @@ const DEFAULT_DATA=[{id:'d1',title:'Frieren: Beyond Journey\'s End',status:'watc
 let anime=[],sortMode='recent',filterStatus='all',detailId=null,editingId=null,curStatus='plan',deleteId=null,importItems=[],curAITab='rec',curTheme='default',viewKind='watch',curKind='watch';
 function kindOf(a){return (a&&a.kind)==='read'?'read':'watch';}
 const STATUS_META={
-  watching:{label:'Watching',icon:'▶',color:'var(--wat)'},
-  plan:{label:'Plan to Watch',icon:'📋',color:'var(--pln)'},
-  finished:{label:'Finished',icon:'✓',color:'var(--fin)'},
-  dropped:{label:'Dropped',icon:'✕',color:'var(--drp)'},
+  watching:{label:'Watching',icon:icon('play'),color:'var(--wat)'},
+  plan:{label:'Plan to Watch',icon:icon('clipboard'),color:'var(--pln)'},
+  finished:{label:'Finished',icon:icon('check'),color:'var(--fin)'},
+  dropped:{label:'Dropped',icon:icon('x'),color:'var(--drp)'},
 };
 
 // ─── STORAGE ───────────────────────────────────────────────────────────────
@@ -925,15 +975,15 @@ function renderSyncUI(){
   const code=syncCode();
   if(code){
     const pretty=code.replace(/(.{4})/g,'$1 ').trim();
-    box.innerHTML=`<div class="dt-label">☁️ Cloud backup · ON</div>
+    box.innerHTML=`<div class="dt-label">${icon('cloud')} Cloud backup · ON</div>
       <p class="ai-desc">Your list backs up automatically. On another device: install the app, open this panel, paste this code, and tap Use code.</p>
       <div class="synccode">${pretty}</div>
       <div style="display:flex;gap:8px;margin-top:10px;">
-        <button class="parse-btn" style="margin:0;flex:1" onclick="copySyncCode()">📋 Copy code</button>
+        <button class="parse-btn" style="margin:0;flex:1" onclick="copySyncCode()">${icon('clipboard')} Copy code</button>
         <button class="imp-all" onclick="syncOff()">Turn off</button>
       </div>`;
   }else{
-    box.innerHTML=`<div class="dt-label">☁️ Cloud backup · OFF</div>
+    box.innerHTML=`<div class="dt-label">${icon('cloud')} Cloud backup · OFF</div>
       <p class="ai-desc">Back up your list to the cloud so it survives losing your phone and syncs across your devices. Private — only someone with your secret code can open it.</p>
       <button class="parse-btn" style="margin-top:0" onclick="syncEnableNew()">Turn on cloud backup</button>
       <div style="display:flex;gap:8px;margin-top:8px;">
@@ -993,17 +1043,17 @@ async function notifyUpdate(){
 }
 function notifyUIHTML(){
   if(!pushSupported()){
-    return`<div class="dt-label">🔔 Episode notifications</div>
+    return`<div class="dt-label">${icon('bell')} Episode notifications</div>
       <p class="ai-desc">Get notified when a new episode of your Watching/Plan shows airs. <strong style="color:var(--t1)">On iPhone/iPad</strong> this needs Safari's <strong style="color:var(--t1)">Add to Home Screen</strong> (iOS 16.4+): install the app, open it from your Home Screen, then turn this on.</p>`;
   }
   const granted=('Notification'in window)&&Notification.permission==='granted';
   const on=notifyOn()&&granted;
   if(on){
-    return`<div class="dt-label">🔔 Episode notifications · ON</div>
+    return`<div class="dt-label">${icon('bell')} Episode notifications · ON</div>
       <p class="ai-desc">You'll get a push when a new episode of your Watching/Plan shows airs.</p>
       <button class="imp-all" style="width:100%" onclick="disableNotify()">Turn off notifications</button>`;
   }
-  return`<div class="dt-label">🔔 Episode notifications · OFF</div>
+  return`<div class="dt-label">${icon('bell')} Episode notifications · OFF</div>
     <p class="ai-desc">Get notified when a new episode of your Watching/Plan shows airs.</p>
     <button class="parse-btn" style="margin-top:0" onclick="enableNotify()">Turn on notifications</button>`;
 }
@@ -1013,7 +1063,7 @@ function renderNotifyBell(){
   const granted=('Notification'in window)&&Notification.permission==='granted';
   const on=notifyOn()&&granted;
   b.classList.toggle('bell-on',on);
-  b.textContent=on?'🔔':'🔕';
+  b.innerHTML=icon(on?'bell':'bell-off');
   b.setAttribute('aria-label',on?'Episode notifications on':'Episode notifications off');
   b.setAttribute('title',on?'Notifications on':'Turn on episode notifications');
 }
@@ -1097,7 +1147,7 @@ function saveCustomTheme(){
   setCustomThemes([...customThemes(),t]);
   document.getElementById('ctName').value='';
   applyTheme(t.id);
-  toast(`🎨 ${name} saved & applied`);
+  toast(`${name} saved & applied`);
 }
 function deleteCustomTheme(id){
   setCustomThemes(customThemes().filter(t=>t.id!==id));
@@ -1111,7 +1161,7 @@ function renderThemeGrid(){
       <div class="tswatch" style="background:linear-gradient(135deg,${t.bg} 0%,${t.bg}dd 100%)">
         <span>${t.emoji}</span>
         <div class="taccent-bar" style="background:${t.accent}"></div>
-        ${t.custom?`<div class="tdel" onclick="event.stopPropagation();deleteCustomTheme('${t.id}')">✕</div>`:''}
+        ${t.custom?`<div class="tdel" onclick="event.stopPropagation();deleteCustomTheme('${t.id}')">${icon('x')}</div>`:''}
       </div>
       <div class="tname">${t.name}</div>
     </button>`).join('');
@@ -1142,7 +1192,7 @@ function render(){
 function renderKindSeg(){
   const el=document.getElementById('kindSeg');if(!el)return;
   const cW=anime.filter(a=>kindOf(a)==='watch').length,cR=anime.filter(a=>kindOf(a)==='read').length;
-  const opts=[['watch','▶ Watching',cW],['read','📖 Reading',cR]];
+  const opts=[['watch',icon('play')+' Watching',cW],['read',icon('book')+' Reading',cR]];
   el.innerHTML=opts.map(([k,l,n])=>`<button class="kseg${viewKind===k?' on':''}" onclick="setViewKind('${k}')">${l} <span class="fn">${n}</span></button>`).join('');
 }
 function setViewKind(k){
@@ -1164,7 +1214,7 @@ function renderFiltRow(){
   const counts={all:items.length,watching:0,plan:0,finished:0,dropped:0};
   items.forEach(a=>counts[a.status]!==undefined&&counts[a.status]++);
   const isRead=viewKind==='read';
-  const filts=[['all','All'],['watching',isRead?'📖 Reading':'▶ Watching'],['plan',isRead?'📋 To Read':'📋 Plan'],['finished','✓ Finished'],['dropped','✕ Dropped']];
+  const filts=[['all','All'],['watching',isRead?icon('book')+' Reading':icon('play')+' Watching'],['plan',isRead?icon('clipboard')+' To Read':icon('clipboard')+' Plan'],['finished',icon('check')+' Finished'],['dropped',icon('x')+' Dropped']];
   document.getElementById('filtRow').innerHTML=filts.map(([f,l])=>{
     const on=filterStatus===f;
     const cls=on?(f==='all'?'on':'on-'+f):'';
@@ -1173,7 +1223,7 @@ function renderFiltRow(){
   }).join('');
 }
 function renderSortRow(){
-  const modes=[['recent','🕐 Recent'],['az','A–Z'],['rating','★ Rating'],['progress','▶ Progress']];
+  const modes=[['recent',icon('clock')+' Recent'],['az','A–Z'],['rating',icon('star','fill')+' Rating'],['progress',icon('play')+' Progress']];
   document.getElementById('sortRow').innerHTML=modes.map(([m,l])=>
     `<button class="schip${sortMode===m?' on':''}" onclick="setSort('${m}')">${l}</button>`).join('');
 }
@@ -1188,12 +1238,12 @@ function posterCard(a){
   const p=prog(a);
   const bar=(a.status==='watching'&&a.epTotal)?`<div class="pbar"><div class="pfill" style="width:${Math.round(p*100)}%"></div></div>`:'';
   const air=airingInfo(a);
-  const airHTML=air?`<div class="pcard-air">📅 ${air.day} ${air.time}</div>`:'';
+  const airHTML=air?`<div class="pcard-air">${icon('calendar')} ${air.day} ${air.time}</div>`:'';
   return`<div class="pcard" onclick="openDetail('${a.id}')">
     <div class="pcard-wrap">
       ${img}
       <span class="pcard-badge b-${a.status}">${STATUS_META[a.status].icon} ${a.status==='plan'?'PLAN':a.status.toUpperCase().slice(0,5)}</span>
-      ${a.fav?'<span class="pcard-fav">❤️</span>':''}
+      ${a.fav?'<span class="pcard-fav">'+icon('heart','fill')+'</span>':''}
     </div>
     ${bar}
     <div class="pcard-title">${a.title}</div>
@@ -1210,7 +1260,7 @@ function heroHTML(a){
   else if(a.img)bg=`<div class="hero-bg" style="background-image:url('${a.img}')"></div>`;
   const av=accentVars(a);
   const air=airingInfo(a);
-  const airHTML=air?`<div class="hero-air">📅 Ep ${air.ep} · airs ${air.day} ${air.time}</div>`:'';
+  const airHTML=air?`<div class="hero-air">${icon('calendar')} Ep ${air.ep} · airs ${air.day} ${air.time}</div>`:'';
   return`<div class="hero"${av?` style="${av}"`:''} onclick="openDetail('${a.id}')">
     ${bg}<div class="hero-shade"></div>
     <div class="hero-body">
@@ -1219,7 +1269,7 @@ function heroHTML(a){
       <div class="hero-meta">${[a.eps,a.time,(a.genre||'').split(',')[0]].filter(Boolean).join(' · ')}</div>
       ${a.epTotal?`<div class="hero-prog"><div class="pbar"><div class="pfill" style="width:${Math.round(p*100)}%"></div></div><span>${a.ep||0} / ${a.epTotal}</span></div>`:''}
       ${airHTML}
-      <div class="hero-cta">▶ &nbsp;Open</div>
+      <div class="hero-cta">${icon('play')} &nbsp;Open</div>
     </div>
   </div>`;
 }
@@ -1238,21 +1288,21 @@ function renderHome(){
     const msg=q
       ?`No matches for “${q}”${filterStatus!=='all'?` in ${stLbl}`:` in your ${isRead?'reading':'watch'} list`}`
       :`Nothing in ${stLbl} yet`;
-    el.innerHTML=`<div class="empty"><div class="empty-icon">${q?'🔍':(STATUS_META[filterStatus]?STATUS_META[filterStatus].icon:(isRead?'📖':'🎌'))}</div><p>${msg}</p></div>`;
+    el.innerHTML=`<div class="empty"><div class="empty-icon">${q?icon('search'):(STATUS_META[filterStatus]?STATUS_META[filterStatus].icon:(isRead?icon('book'):icon('inbox')))}</div><p>${msg}</p></div>`;
     return;
   }
   if(!pool.length){
     el.innerHTML=isRead
-      ?`<div class="empty"><div class="empty-icon">📖</div><p>Your reading list is empty.<br>Add a manhwa, webtoon, manga or light novel — tap ＋ and choose 📖 Read.</p><button class="hero-cta" onclick="openSheet_add()">＋ Add something to read</button></div>`
-      :`<div class="empty"><div class="empty-icon">🎌</div><p>Your list is empty.<br>Add a title or import your whole list from Notes in one paste.</p><button class="hero-cta" onclick="openSheet('importSheet')">📋 Import a list</button></div>`;
+      ?`<div class="empty"><div class="empty-icon">${icon('book')}</div><p>Your reading list is empty.<br>Add a manhwa, webtoon, manga or light novel — tap ＋ and choose Read.</p><button class="hero-cta" onclick="openSheet_add()">＋ Add something to read</button></div>`
+      :`<div class="empty"><div class="empty-icon">${icon('inbox')}</div><p>Your list is empty.<br>Add a title or import your whole list from Notes in one paste.</p><button class="hero-cta" onclick="openSheet('importSheet')">${icon('clipboard')} Import a list</button></div>`;
     return;
   }
   const watching=sorted(pool.filter(a=>a.status==='watching'));
   const hero=watching.find(a=>a.img)||watching[0];
   let html=hero?heroHTML(hero):'';
   const rows=isRead
-    ?[['watching','📖 Reading'],['plan','📋 Plan to Read'],['finished','✓ Finished'],['dropped','✕ Dropped']]
-    :[['watching','▶ Watching'],['plan','📋 Plan to Watch'],['finished','✓ Finished'],['dropped','✕ Dropped']];
+    ?[['watching',icon('book')+' Reading'],['plan',icon('clipboard')+' Plan to Read'],['finished',icon('check')+' Finished'],['dropped',icon('x')+' Dropped']]
+    :[['watching',icon('play')+' Watching'],['plan',icon('clipboard')+' Plan to Watch'],['finished',icon('check')+' Finished'],['dropped',icon('x')+' Dropped']];
   for(const[st,label]of rows){
     let items=sorted(pool.filter(a=>a.status===st));
     if(st==='watching'&&hero)items=items.filter(a=>a.id!==hero.id);
@@ -1261,7 +1311,7 @@ function renderHome(){
       <div class="row-scroll">${items.map(posterCard).join('')}</div></div>`;
   }
   const favs=sorted(pool.filter(a=>a.fav));
-  if(favs.length)html+=`<div class="row-sec"><div class="row-head"><div class="row-title">❤️ Favorites</div><div class="row-count">${favs.length}</div></div>
+  if(favs.length)html+=`<div class="row-sec"><div class="row-head"><div class="row-title">${icon('heart','fill')} Favorites</div><div class="row-count">${favs.length}</div></div>
     <div class="row-scroll">${favs.map(posterCard).join('')}</div></div>`;
   el.innerHTML=html;
 }
@@ -1294,7 +1344,7 @@ function renderDetail(){
       <button class="prog-btn" onclick="bumpEp(1)">＋</button>
     </div>`;
   const stars=`<div class="dt-label">Your rating</div><div class="stars">${[1,2,3,4,5].map(n=>
-    `<button class="star${(a.rating||0)>=n?' on':''}" onclick="setRating(${n})">★</button>`).join('')}</div>`;
+    `<button class="star${(a.rating||0)>=n?' on':''}" onclick="setRating(${n})">${icon('star')}</button>`).join('')}</div>`;
   const chips=(a.genre||'').split(',').map(g=>g.trim()).filter(Boolean).map(g=>`<span class="chip">${g}</span>`).join('');
   const li=(step,strip)=>{
     const s=step.toLowerCase();
@@ -1314,7 +1364,7 @@ function renderDetail(){
     const films=a.order.filter(isFilm);
     const grouped=films.length>=3;
     const main=grouped?a.order.filter(s=>!isFilm(s)):a.order;
-    const filmsHTML=grouped?`<details class="films-acc"><summary>🎬 ${films.length} side films — optional, watch any time</summary><ol class="order-list">${films.map(s=>li(s,true)).join('')}</ol></details>`:'';
+    const filmsHTML=grouped?`<details class="films-acc"><summary>${icon('film')} ${films.length} side films — optional, watch any time</summary><ol class="order-list">${films.map(s=>li(s,true)).join('')}</ol></details>`:'';
     orderHTML=`<div class="dt-label">${read?'Read order':'Watch order'}</div><ol class="order-list">${main.map(s=>li(s,false)).join('')}</ol>${filmsHTML}`;
   }
   const notesHTML=(a.notes&&a.notes.trim())?`<div class="dt-label">Notes</div><div class="dt-note">${a.notes}</div>`:'';
@@ -1327,8 +1377,8 @@ function renderDetail(){
       <div class="dt-info">
         <div class="dt-title">${a.title}</div>
         <div class="dt-meta">${[a.eps,a.time].filter(Boolean).join(' · ')}</div>
-        ${(()=>{const air=airingInfo(a);return air?`<div class="dt-air">📅 Ep ${air.ep} · airs ${air.day} ${air.time}</div>`:'';})()}
-        <button class="dt-fav${a.fav?' on':''}" onclick="toggleFav()">${a.fav?'❤️ Favorited':'🤍 Favorite'}</button>
+        ${(()=>{const air=airingInfo(a);return air?`<div class="dt-air">${icon('calendar')} Ep ${air.ep} · airs ${air.day} ${air.time}</div>`:'';})()}
+        <button class="dt-fav${a.fav?' on':''}" onclick="toggleFav()">${a.fav?icon('heart','fill')+' Favorited':icon('heart')+' Favorite'}</button>
       </div>
     </div>
     <div class="dt-label">Status</div>
@@ -1341,9 +1391,9 @@ function renderDetail(){
     <div class="dt-label" style="margin-top:18px"></div>
     <div id="ai-box-detail"></div>
     <div class="dt-actions">
-      <button class="dact ai-act" onclick="aiCardInsight('${a.id}')">✦ AI Insight</button>
-      <button class="dact" onclick="editItem('${a.id}')">✏️ Edit</button>
-      <button class="dact danger" onclick="confirmDelete('${a.id}')">🗑</button>
+      <button class="dact ai-act" onclick="aiCardInsight('${a.id}')">${icon('sparkles')} AI Insight</button>
+      <button class="dact" onclick="editItem('${a.id}')">${icon('edit')} Edit</button>
+      <button class="dact danger" onclick="confirmDelete('${a.id}')">${icon('trash')}</button>
     </div>`;
 }
 function setDetailStatus(s){
@@ -1464,7 +1514,7 @@ function formKindLabels(){
   const fEp=document.getElementById('fEp');if(fEp)fEp.placeholder='0';
   const fOrder=document.getElementById('fOrder');if(fOrder)fOrder.placeholder=read?'Vol 1 — ch 1–10\nVol 2 — ch 11–20':'TV: Season 1 — 12 eps\nOVA: Side story — after S1\nTV: Season 2 — 12 eps';
   const btn=document.getElementById('autofillBtn');
-  if(btn&&!btn.classList.contains('loading'))btn.innerHTML=read?'<span>✦</span> Autofill — cover, chapters, genre &amp; status':'<span>✦</span> Autofill — cover, episodes, genre &amp; watch order';
+  if(btn&&!btn.classList.contains('loading'))btn.innerHTML=read?'<span>'+icon('sparkles')+'</span> Autofill — cover, chapters, genre &amp; status':'<span>'+icon('sparkles')+'</span> Autofill — cover, episodes, genre &amp; watch order';
 }
 function openSheet_add(){
   editingId=null;
@@ -1592,16 +1642,16 @@ function renderPreview(){
   const existing=new Set(anime.map(a=>a.title.toLowerCase().trim()));
   const seg=(item,s,lbl)=>`<button class="pseg${item.status===s?' on-'+s:''}" onclick="event.stopPropagation();setImportStatus(${item.id},'${s}')">${lbl}</button>`;
   const bulk=importItems.length>1?`<div class="bulk-row"><span>Set all:</span>
-    <button class="pseg" onclick="setAllImportStatus('plan')">📋 Plan</button>
-    <button class="pseg" onclick="setAllImportStatus('watching')">▶ Watch</button>
-    <button class="pseg" onclick="setAllImportStatus('finished')">✓ Done</button></div>`:'';
+    <button class="pseg" onclick="setAllImportStatus('plan')">${icon('clipboard')} Plan</button>
+    <button class="pseg" onclick="setAllImportStatus('watching')">${icon('play')} Watch</button>
+    <button class="pseg" onclick="setAllImportStatus('finished')">${icon('check')} Done</button></div>`:'';
   document.getElementById('previewList').innerHTML=bulk+importItems.map(item=>{
     const dup=existing.has(item.title.toLowerCase().trim());
     return`<div class="preview-item${item.selected&&!dup?' sel':''}" onclick="toggleImport(${item.id})">
-      <div class="prev-check">${item.selected&&!dup?'✓':''}</div>
+      <div class="prev-check">${item.selected&&!dup?icon('check'):''}</div>
       <div class="prev-main">
         <div class="prev-name">${item.title}${item.ep?` <span style="color:var(--t3);font-size:10px">· ep ${item.ep}</span>`:''}${dup?' <span style="color:var(--t3);font-size:10px">(already added)</span>':''}</div>
-        ${dup?'':`<div class="prev-seg">${seg(item,'plan','📋 Plan')}${seg(item,'watching','▶ Watch')}${seg(item,'finished','✓ Done')}${seg(item,'dropped','✕ Drop')}</div>`}
+        ${dup?'':`<div class="prev-seg">${seg(item,'plan',icon('clipboard')+' Plan')}${seg(item,'watching',icon('play')+' Watch')}${seg(item,'finished',icon('check')+' Done')}${seg(item,'dropped',icon('x')+' Drop')}</div>`}
       </div>
     </div>`;
   }).join('');
@@ -1661,7 +1711,7 @@ function renderStatsSheet(){
       <div class="stat-card"><div class="stat-val">${counts.finished}</div><div class="stat-lbl">Finished</div></div>
       <div class="stat-card"><div class="stat-val">${epsWatched}</div><div class="stat-lbl">Episodes watched</div></div>
       <div class="stat-card"><div class="stat-val">${hrs?'~'+Math.round(hrs):'—'}</div><div class="stat-lbl">Hours watched</div></div>
-      <div class="stat-card"><div class="stat-val">★ ${avg}</div><div class="stat-lbl">Avg rating (${rated.length} rated)</div></div>
+      <div class="stat-card"><div class="stat-val">${icon('star','fill')} ${avg}</div><div class="stat-lbl">Avg rating (${rated.length} rated)</div></div>
       <div class="stat-card"><div class="stat-val">${anime.filter(a=>a.fav).length}</div><div class="stat-lbl">Favorites</div></div>
     </div>
     <div class="dt-label" style="margin-top:18px">Breakdown</div>
@@ -1689,7 +1739,7 @@ function saveKey(){
 }
 function aiErrorHTML(e){
   return e===NO_KEY
-    ?'This needs an AI key — open the ✦ tab, scroll down, and add one. Free keys at console.groq.com or aistudio.google.com (the key stays on this device only).'
+    ?'This needs an AI key — open the AI tab, scroll down, and add one. Free keys at console.groq.com or aistudio.google.com (the key stays on this device only).'
     :'Connection error — check your key and try again.';
 }
 async function callOpenAICompat(url,key,model,prompt){
@@ -1727,7 +1777,7 @@ async function runRecommend(){
   try{
     const text=await callAI(`${listSummary()}\n\nBased on this list, recommend 4-5 titles I should watch next${pref?` (preference: ${pref})`:''}. For each, give the title and a 1-2 sentence reason tied to what I've already watched. Format as:\n**[Title]** — [reason]`);
     const r=document.getElementById('recResp');r.className='ai-resp on';
-    r.innerHTML=`<div class="ai-badge">✦ Recommendations</div>${text.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>')}`;
+    r.innerHTML=`<div class="ai-badge">${icon('sparkles')} Recommendations</div>${text.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>')}`;
   }catch(e){const r=document.getElementById('recResp');r.className='ai-resp on';r.innerHTML=aiErrorHTML(e);}
   document.getElementById('recBtn').classList.remove('loading');
 }
@@ -1738,7 +1788,7 @@ async function runChat(){
   try{
     const text=await callAI(`${listSummary()}\n\nQuestion: ${q}\n\nAnswer helpfully and concisely, referencing my list when relevant.`);
     const r=document.getElementById('chatResp');r.className='ai-resp on';
-    r.innerHTML=`<div class="ai-badge">✦ Answer</div>${text.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>')}`;
+    r.innerHTML=`<div class="ai-badge">${icon('sparkles')} Answer</div>${text.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>')}`;
   }catch(e){const r=document.getElementById('chatResp');r.className='ai-resp on';r.innerHTML=aiErrorHTML(e);}
   document.getElementById('chatBtn').classList.remove('loading');
 }
@@ -1750,18 +1800,18 @@ async function runRank(){
     if(!pln.length){document.getElementById('rankResp').innerHTML='Nothing in Plan to Watch yet!';document.getElementById('rankBtn').classList.remove('loading');return;}
     const text=await callAI(`${listSummary()}\n\nRank my Plan to Watch list in the best viewing order${pref?` (priority: ${pref})`:''}. Consider variety, length, and mood progression. Numbered list with one-sentence reason per entry.`);
     const r=document.getElementById('rankResp');r.className='ai-resp on';
-    r.innerHTML=`<div class="ai-badge">✦ Ranked Order</div>${text.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>')}`;
+    r.innerHTML=`<div class="ai-badge">${icon('sparkles')} Ranked Order</div>${text.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>')}`;
   }catch(e){const r=document.getElementById('rankResp');r.className='ai-resp on';r.innerHTML=aiErrorHTML(e);}
   document.getElementById('rankBtn').classList.remove('loading');
 }
 async function aiCardInsight(id){
   const a=anime.find(x=>x.id===id);if(!a)return;
   const box=document.getElementById('ai-box-detail');if(!box)return;
-  box.innerHTML=`<div class="ai-insight-box"><div class="ai-badge">✦ AI Insight</div><div class="dots"><span>.</span><span>.</span><span>.</span></div></div>`;
+  box.innerHTML=`<div class="ai-insight-box"><div class="ai-badge">${icon('sparkles')} AI Insight</div><div class="dots"><span>.</span><span>.</span><span>.</span></div></div>`;
   try{
     const text=await callAI(`${listSummary()}\n\nThe user is looking at "${a.title}" (${a.genre||'anime'}, ${a.eps||'unknown length'}).\n\nGive one short personalized insight (2-3 sentences). Why they'd love it based on their list, what mood it's best for, or a key thing to know. Be specific and reference their actual list.`);
-    box.innerHTML=`<div class="ai-insight-box"><div class="ai-badge">✦ AI Insight</div>${text}</div>`;
-  }catch(e){box.innerHTML=`<div class="ai-insight-box"><div class="ai-badge">✦ AI Insight</div>${aiErrorHTML(e)}</div>`;}
+    box.innerHTML=`<div class="ai-insight-box"><div class="ai-badge">${icon('sparkles')} AI Insight</div>${text}</div>`;
+  }catch(e){box.innerHTML=`<div class="ai-insight-box"><div class="ai-badge">${icon('sparkles')} AI Insight</div>${aiErrorHTML(e)}</div>`;}
 }
 
 // ─── AUTOFILL — free public databases, works for everyone, no key ────────────
@@ -1964,7 +2014,7 @@ async function aiAutofill(){
   const title=document.getElementById('fTitle').value.trim();
   if(!title){toast('Enter a title first');return;}
   const btn=document.getElementById('autofillBtn');
-  btn.classList.add('loading');btn.innerHTML='<span>✦</span> Searching databases…';
+  btn.classList.add('loading');btn.innerHTML='<span>'+icon('sparkles')+'</span> Searching databases…';
   let data=null,src='';
   if(curKind==='read'){
     // reading: AniList MANGA first (manhwa/webtoon/manga), then Open Library for light novels
@@ -1982,7 +2032,7 @@ async function aiAutofill(){
     if(data.order&&data.order.length)document.getElementById('fOrder').value=data.order.join('\n');
     if(data.notes)document.getElementById('fNotes').value=data.notes;
     if(data.img)setCoverPreview(data.img);
-    toast(`✦ Found on ${src}`);
+    toast(`Found on ${src}`);
   }else toast('No match found — fill in manually.');
   btn.classList.remove('loading');formKindLabels();
 }
@@ -2004,11 +2054,11 @@ function renderSchedule(){
   const body=document.getElementById('scheduleBody');if(!body)return;
   const ws=schedWeekStart(schedOffset),we=new Date(ws);we.setDate(we.getDate()+6);
   body.innerHTML='<div class="sched-nav">'+
-      '<button class="sched-arrow" onclick="schedGo(-1)" aria-label="Previous week">‹</button>'+
+      '<button class="sched-arrow" onclick="schedGo(-1)" aria-label="Previous week">'+icon('chevron-left')+'</button>'+
       '<div class="sched-week"><div class="sched-week-title">'+schedLabel(schedOffset)+'</div><div class="sched-week-range">'+schedFmt(ws)+' – '+schedFmt(we)+'</div></div>'+
-      '<button class="sched-arrow" onclick="schedGo(1)" aria-label="Next week">›</button></div>'+
+      '<button class="sched-arrow" onclick="schedGo(1)" aria-label="Next week">'+icon('chevron-right')+'</button></div>'+
     (schedOffset!==0?'<div class="sched-toolbar"><button class="sched-today-btn" onclick="schedGo(\'today\')">Jump to this week</button></div>':'')+
-    '<div class="sched-days" id="schedDays"><div class="sched-loading"><div class="sched-spin">◍</div><p>Loading episodes…</p></div></div>';
+    '<div class="sched-days" id="schedDays"><div class="sched-loading"><div class="sched-spin">'+icon('loader')+'</div><p>Loading episodes…</p></div></div>';
   loadSchedWeek(ws);
 }
 async function loadSchedWeek(ws){
@@ -2042,7 +2092,7 @@ async function fetchSchedEpisodes(startSec,endSec){
 }
 function renderSchedDays(ws,eps){
   const cont=document.getElementById('schedDays');if(!cont)return;
-  if(!eps.length){cont.innerHTML='<div class="sched-empty-all"><div class="empty-icon">◍</div><p>No episodes airing this week for your list.<br>Add a currently-airing show to <b>Watching</b> and it\'ll show up here.</p></div>';return;}
+  if(!eps.length){cont.innerHTML='<div class="sched-empty-all"><div class="empty-icon">'+icon('calendar')+'</div><p>No episodes airing this week for your list.<br>Add a currently-airing show to <b>Watching</b> and it\'ll show up here.</p></div>';return;}
   const notifSet=notifyOn()?new Set(notifyAnimeIds()):null;
   const todayKey=schedDayKey(new Date());
   let html='';
@@ -2058,7 +2108,7 @@ function renderSchedDays(ws,eps){
         const t=new Date(e.airingAt*1000).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
         const ch=((e.title||'?').charAt(0)||'?').replace(/[^A-Za-z0-9]/g,'')||'?';
         const thumb=e.img?'<img class="sched-thumb" src="'+e.img+'" alt="" loading="lazy" onerror="this.outerHTML=schPh(\''+ch+'\')">':schPh(ch);
-        const bell=notifSet&&e.aniId&&notifSet.has(e.aniId)?'<span class="sched-bell" title="Notifications on">•</span>':'';
+        const bell=notifSet&&e.aniId&&notifSet.has(e.aniId)?'<span class="sched-bell" title="Notifications on">'+icon('bell')+'</span>':'';
         rows+='<div class="sched-row" onclick="openDetail(\''+e.id+'\')">'+thumb+'<div class="sched-row-main"><div class="sched-row-title">'+schEsc(e.title)+bell+'</div><div class="sched-row-sub">Ep '+(e.episode||'?')+' · '+t+'</div></div></div>';
       });
     }else rows='<div class="sched-empty-day">—</div>';
@@ -2094,6 +2144,7 @@ try{
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeAll();closeConfirm();}});
 
 // ─── INIT ───────────────────────────────────────────────────────────────────
+try{hydrateIcons();}catch{}
 load();loadTheme();render();
 try{renderNotifyBell();}catch{}
 try{document.getElementById('apiKeyIn').value=getKey();}catch{}

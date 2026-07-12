@@ -579,6 +579,29 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 .empty-icon .ico{width:1em;height:1em;vertical-align:-0.08em;}
 .sched-spin .ico{width:1em;height:1em;}
 .sched-bell .ico{width:1em;height:1em;vertical-align:-0.12em;}
+/* FOR YOU (recommendations) */
+.fy-intro{font-size:13px;line-height:1.55;color:var(--t2);margin:-4px 0 16px;}
+.fy-loading,.fy-empty{text-align:center;padding:52px 26px;color:var(--t2);animation:fadeUp .35s ease both;}
+.fy-loading .fy-spin{font-size:30px;display:inline-block;animation:spin .9s linear infinite;margin-bottom:14px;}
+.fy-loading p,.fy-empty p{font-size:14px;line-height:1.6;}
+.fy-spin .ico{width:1em;height:1em;}
+.fy-empty .empty-icon{font-size:46px;margin-bottom:14px;opacity:0.9;filter:drop-shadow(0 6px 16px var(--glow));}
+.fy-empty .fy-cta{margin-top:18px;display:inline-flex;align-items:center;gap:8px;padding:12px 20px;min-height:44px;border-radius:14px;background:var(--bg4);border:1px solid var(--b2);color:var(--t1);font-size:13.5px;font-weight:700;}
+.fy-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:18px 12px;padding:2px 0 8px;animation:fadeUp .35s ease both;}
+.fy-card{display:flex;flex-direction:column;animation:fadeUp .35s ease both;}
+.fy-card.leaving{opacity:0;transform:scale(.9);transition:opacity .28s,transform .28s;}
+.fy-wrap{position:relative;border-radius:15px;overflow:hidden;}
+.fy-img{width:100%;aspect-ratio:104/148;object-fit:cover;display:block;background:var(--bg4);}
+.fy-ph{width:100%;aspect-ratio:104/148;background:var(--bg4);border:1px solid var(--b2);display:flex;align-items:center;justify-content:center;font-size:34px;font-weight:900;color:var(--t3);border-radius:15px;}
+.fy-score{position:absolute;top:7px;left:7px;display:inline-flex;align-items:center;gap:3px;padding:3px 7px;border-radius:99px;font-size:10.5px;font-weight:800;background:rgba(0,0,0,0.62);color:#ffd85e;backdrop-filter:blur(6px);}
+.fy-score .ico{width:11px;height:11px;fill:currentColor;}
+.fy-title{font-size:13px;font-weight:700;line-height:1.3;margin-top:9px;color:var(--t1);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.fy-meta{font-size:11px;color:var(--t2);margin-top:4px;line-height:1.4;}
+.fy-because{font-size:10.5px;color:var(--t3);margin-top:5px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.fy-plan{margin-top:9px;width:100%;min-height:44px;border-radius:13px;background:var(--bg4);border:1px solid var(--b2);color:var(--t1);font-size:12.5px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;gap:6px;transition:transform .12s,background .14s,border-color .14s;}
+.fy-plan:hover{background:color-mix(in srgb,var(--bg4),#fff 6%);border-color:var(--b3);}
+.fy-plan:active{transform:scale(.96);}
+.fy-plan .ico{width:15px;height:15px;}
 </style>
 </head>
 <body>
@@ -590,6 +613,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
       <div class="hdr-sub" id="headerSub"></div>
     </div>
     <div class="hdr-actions">
+      <button class="hbtn" onclick="openForYou()" title="For You — tailored recommendations" aria-label="For You recommendations"><i data-ic="compass"></i></button>
       <button class="hbtn" onclick="openSchedule()" title="Weekly airing schedule" aria-label="Weekly airing schedule"><i data-ic="calendar"></i></button>
       <button class="hbtn" id="notifyBell" onclick="openNotifySheet()" title="Episode notifications" aria-label="Notifications"><i data-ic="bell-off"></i></button>
       <button class="hbtn" onclick="openSheet('themeSheet')" title="Theme"><i data-ic="palette"></i></button>
@@ -823,6 +847,19 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
   <div id="scheduleBody"></div>
 </div>
 
+<!-- FOR YOU SHEET -->
+<div class="sheet" id="forYouSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <div class="sheet-title"><i data-ic="compass"></i> For You</div>
+    <div style="display:flex;align-items:center;gap:6px;">
+      <button class="hbtn" onclick="refreshForYou()" title="Refresh recommendations" aria-label="Refresh recommendations"><i data-ic="loader"></i></button>
+      <button class="sheet-cancel" onclick="closeAll()">Done</button>
+    </div>
+  </div>
+  <div id="forYouBody"></div>
+</div>
+
 <!-- CONFIRM DELETE -->
 <div class="confirm-box" id="confirmBox">
   <div class="confirm-title">Remove from list?</div>
@@ -868,7 +905,9 @@ clock:'<circle cx="12" cy="12" r="9.5"/><path d="M12 7v5l3.5 2"/>',
 'chevron-left':'<path d="m15 18-6-6 6-6"/>',
 'chevron-right':'<path d="m9 18 6-6-6-6"/>',
 loader:'<path d="M12 3a9 9 0 1 0 9 9"/>',
-inbox:'<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5.1 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.9A2 2 0 0 0 16.8 4H7.2a2 2 0 0 0-1.7 1.1z"/>'
+inbox:'<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5.1 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.9A2 2 0 0 0 16.8 4H7.2a2 2 0 0 0-1.7 1.1z"/>',
+plus:'<path d="M12 5v14M5 12h14"/>',
+compass:'<circle cx="12" cy="12" r="9.5"/><path d="m16 8-2 6-6 2 2-6z"/>'
 };
 function icon(name,cls){const p=ICONS[name];if(!p)return'';return `<svg class="ico${cls?' '+cls:''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`;}
 function hydrateIcons(root){(root||document).querySelectorAll('[data-ic]').forEach(el=>{const s=icon(el.getAttribute('data-ic'));if(s)el.outerHTML=s;});}
@@ -1428,6 +1467,7 @@ function openSheet(id){
   if(id==='themeSheet')renderThemeGrid();
   if(id==='statsSheet')renderStatsSheet();
   if(id==='importSheet'){renderSyncUI();renderNotifyUI();}
+  if(id==='forYouSheet')renderForYou();
 }
 function closeAll(){
   document.querySelectorAll('.sheet').forEach(s=>s.classList.remove('on'));
@@ -2115,6 +2155,76 @@ function renderSchedDays(ws,eps){
     html+='<div class="'+cls+'"><div class="sched-day-head"><span class="sched-day-name">'+day.toLocaleDateString([],{weekday:'long'})+'</span><span class="sched-day-date">'+schedFmt(day)+'</span>'+pill+'</div><div class="sched-day-body">'+rows+'</div></div>';
   }
   cont.innerHTML=html;
+}
+
+// ─── FOR YOU (tailored recommendations — AniList recommendation graph) ───────
+let fyCache=null;
+function fyPh(ch){return '<div class="fy-ph">'+ch+'</div>';}
+function openForYou(){openSheet('forYouSheet');}
+function refreshForYou(){fyCache=null;renderForYou();}
+function renderForYou(){
+  const body=document.getElementById('forYouBody');if(!body)return;
+  const intro='<div class="fy-intro">Tailored to what you watch — community picks from AniList that aren\'t on your list yet.</div>';
+  if(fyCache){body.innerHTML=intro+fyGridHTML(fyCache);return;}
+  body.innerHTML=intro+'<div class="fy-loading"><div class="fy-spin">'+icon('loader')+'</div><p>Finding shows you\'ll love…</p></div>';
+  computeForYou().then(recs=>{fyCache=recs;const sh=document.getElementById('forYouSheet');if(sh&&sh.classList.contains('on'))renderForYou();}).catch(()=>{fyCache=[];renderForYou();});
+}
+function fyGridHTML(recs){
+  if(!recs||!recs.length)return '<div class="fy-empty"><div class="empty-icon">'+icon('compass')+'</div><p>No fresh picks yet. Add or finish a few shows under <b>Watching</b> and we\'ll tailor recommendations to your taste.</p></div>';
+  return '<div class="fy-grid">'+recs.map(x=>{
+    const r=x.rec,t=r.title.english||r.title.romaji||'?';
+    const ch=((t.charAt(0)||'?').replace(/[^A-Za-z0-9]/g,''))||'?';
+    const img=r.coverImage&&r.coverImage.large;
+    const score=r.averageScore?'<div class="fy-score">'+icon('star')+Math.round(r.averageScore)+'</div>':'';
+    const genres=(r.genres||[]).slice(0,2).join(' · ');
+    const srcs=[...x.srcs];
+    const because='Because you watched '+schEsc(srcs[0]||'')+(srcs.length>1?' +'+(srcs.length-1)+' more':'');
+    const cover=img?'<img class="fy-img" src="'+img+'" alt="" loading="lazy" onerror="this.outerHTML=fyPh(\''+ch+'\')">':fyPh(ch);
+    return '<div class="fy-card"><div class="fy-wrap">'+cover+score+'</div><div class="fy-title">'+schEsc(t)+'</div>'+(genres?'<div class="fy-meta">'+schEsc(genres)+'</div>':'')+'<div class="fy-because">'+because+'</div><button class="fy-plan" onclick="fyPlan('+r.id+',this)">'+icon('plus')+'Plan</button></div>';
+  }).join('')+'</div>';
+}
+async function computeForYou(){
+  const W={finished:3,watching:2,plan:1};
+  let sources=anime.filter(a=>kindOf(a)==='watch'&&a.aniId&&W[a.status]);
+  if(!sources.length){try{if(typeof fetchCovers==='function')await fetchCovers();}catch(e){}sources=anime.filter(a=>kindOf(a)==='watch'&&a.aniId&&W[a.status]);}
+  if(!sources.length)return [];
+  const top=sources.map(a=>({aniId:a.aniId,title:a.title,w:W[a.status]})).sort((a,b)=>b.w-a.w).slice(0,24);
+  const onList=new Set(anime.map(a=>a.aniId).filter(Boolean));
+  const agg={};
+  for(let i=0;i<top.length;i+=8){
+    const batch=top.slice(i,i+8);
+    const q='{'+batch.map((s,j)=>'m'+j+':Media(id:'+s.aniId+'){recommendations(sort:RATING_DESC,perPage:8){nodes{rating mediaRecommendation{id title{romaji english} coverImage{large} genres averageScore}}}}').join(' ')+'}';
+    try{
+      const r=await fetch('https://graphql.anilist.co',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({query:q})});
+      if(r.status===429){await pause(1500);i-=8;continue;}
+      const j=await r.json(),data=(j&&j.data)||{};
+      batch.forEach((s,idx)=>{
+        const md=data['m'+idx];if(!md||!md.recommendations)return;
+        (md.recommendations.nodes||[]).forEach(n=>{
+          const rec=n.mediaRecommendation;if(!rec||!rec.id||onList.has(rec.id))return;
+          if(!rec.coverImage||!rec.coverImage.large)return;
+          if(!agg[rec.id])agg[rec.id]={score:0,srcs:new Set(),rec};
+          agg[rec.id].score+=s.w*(n.rating>0?n.rating:1);
+          agg[rec.id].srcs.add(s.title);
+        });
+      });
+    }catch(e){}
+    if(i+8<top.length)await pause(650);
+  }
+  const arr=Object.values(agg);
+  arr.forEach(x=>{if(x.srcs.size>=2)x.score*=1.2;});
+  arr.sort((a,b)=>b.score-a.score);
+  return arr.slice(0,20);
+}
+function fyPlan(aniId,btn){
+  const x=(fyCache||[]).find(o=>o.rec.id===aniId);if(!x)return;
+  const r=x.rec;
+  anime.push({id:uid(),title:r.title.english||r.title.romaji,status:'plan',kind:'watch',aniId:r.id,img:(r.coverImage&&r.coverImage.large)||'',eps:'',time:'',genre:(r.genres||[]).join(', '),order:[],notes:''});
+  save();render();
+  if(typeof toast==='function')toast('Added to Plan');
+  fyCache=(fyCache||[]).filter(o=>o.rec.id!==aniId);
+  const card=btn&&btn.closest?btn.closest('.fy-card'):null;
+  if(card){card.classList.add('leaving');setTimeout(()=>{card.parentNode&&card.remove();},300);}
 }
 
 function toast(msg){const el=document.getElementById('toast');el.textContent=msg;el.classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>el.classList.remove('on'),2400);}

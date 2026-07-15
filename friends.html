@@ -775,6 +775,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
     <div class="lock-sub" id="lockSub">Enter your password to open your list.</div>
     <input id="lockPw" class="lock-in" type="password" placeholder="Password" autocomplete="current-password" onkeydown="if(event.key==='Enter')tryUnlock()">
     <button class="lock-btn" id="lockBtn" onclick="tryUnlock()">Unlock</button>
+    <button class="lock-btn2" id="lockFace" style="display:none" onclick="tryUnlockFaceID()">Unlock with Face ID</button>
     <div class="lock-err" id="lockErr"></div>
     <a class="lock-alt" id="lockAlt" onclick="toggleLockMode()">Forgot password? Use recovery key</a>
   </div>
@@ -1239,7 +1240,7 @@ function writeLocal(){
   if(cryptoKey&&envWraps){                       // password set → persist ciphertext only
     const snap=JSON.stringify(anime);
     _writeChain=_writeChain.then(async()=>{
-      try{const {iv,ct}=await encList(snap,cryptoKey);s.setItem(LSKEY,JSON.stringify({v:2,enc:1,iv,ct,pw:envWraps.pw,rec:envWraps.rec}));saveWarned=false;}
+      try{const {iv,ct}=await encList(snap,cryptoKey);s.setItem(LSKEY,JSON.stringify({v:2,enc:1,iv,ct,pw:envWraps.pw,rec:envWraps.rec,pfk:envWraps.pfk}));saveWarned=false;}
       catch{if(!saveWarned){saveWarned=true;toast('⚠️ Storage full — remove some uploaded covers');}}
     });
     return _writeChain;
@@ -1288,7 +1289,7 @@ async function decryptData(env,key){                 // v1 legacy: list was encr
 }
 async function buildEnvelope(){
   const {iv,ct}=await encList(JSON.stringify(anime),cryptoKey);
-  return {v:2,enc:1,iv,ct,pw:envWraps.pw,rec:envWraps.rec};
+  return {v:2,enc:1,iv,ct,pw:envWraps.pw,rec:envWraps.rec,pfk:envWraps.pfk};
 }
 function genRecoveryKey(){const c='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';let s='';for(let i=0;i<24;i++)s+=c[Math.floor(Math.random()*c.length)];return s.replace(/(.{4})(?=.)/g,'$1-');}
 function normRecovery(x){return (x||'').toUpperCase().replace(/[^A-Z0-9]/g,'');}
@@ -1335,12 +1336,20 @@ async function upgradeToV2(pw){                        // migrate an older (v1) 
   showRecovery(rec,'Security upgraded — save your recovery key');
 }
 let lockRecMode=false;
-function showLock(){appLocked=true;lockRecMode=false;const el=document.getElementById('lockScreen');if(el){el.classList.add('on');setLockMode(false);const i=document.getElementById('lockPw');if(i){i.value='';setTimeout(()=>i.focus(),60);}}}
+function showLock(){
+  appLocked=true;lockRecMode=false;
+  const el=document.getElementById('lockScreen');if(!el)return;
+  el.classList.add('on');setLockMode(false);
+  const f=document.getElementById('lockFace');if(f)f.style.display=faceIDOn()?'block':'none';
+  const i=document.getElementById('lockPw');if(i){i.value='';setTimeout(()=>i.focus(),60);}
+}
 function hideLock(){appLocked=false;const el=document.getElementById('lockScreen');if(el)el.classList.remove('on');}
 function setLockMode(rec){
   lockRecMode=rec;
   const t=document.getElementById('lockTitle'),s=document.getElementById('lockSub'),i=document.getElementById('lockPw'),b=document.getElementById('lockBtn'),l=document.getElementById('lockAlt'),e=document.getElementById('lockErr');
-  if(e)e.textContent='';if(!i)return;i.value='';
+  if(e)e.textContent='';
+  const f=document.getElementById('lockFace');if(f)f.style.display=(!rec&&faceIDOn())?'block':'none'; // no Face ID while entering a recovery key
+  if(!i)return;i.value='';
   if(rec){
     t.textContent='Enter recovery key';s.textContent='Use the recovery key you saved when you set your password.';
     i.type='text';i.placeholder='XXXX-XXXX-XXXX-…';i.setAttribute('onkeydown',"if(event.key==='Enter')tryUnlockRecovery()");
@@ -1362,7 +1371,7 @@ async function tryUnlock(){                            // unlock with the passwo
     const env=JSON.parse(store().getItem(LSKEY));if(!isEnvelope(env))throw 0;
     if(env.v===2&&env.pw){                            // master-key envelope
       cryptoKey=await unwrapMaster(env.pw,pw);        // throws if wrong password
-      envWraps={pw:env.pw,rec:env.rec};
+      envWraps={pw:env.pw,rec:env.rec,pfk:env.pfk};
       anime=migrate(JSON.parse(await decList(env,cryptoKey)));
       finishUnlock();
     }else{                                            // v1 legacy → decrypt, then upgrade to master+recovery
@@ -1380,7 +1389,7 @@ async function tryUnlockRecovery(){                    // unlock with the recove
     const env=JSON.parse(store().getItem(LSKEY));
     if(!(env&&env.v===2&&env.rec))throw 0;
     cryptoKey=await unwrapMaster(env.rec,code);       // throws if wrong recovery key
-    envWraps={pw:env.pw,rec:env.rec};
+    envWraps={pw:env.pw,rec:env.rec,pfk:env.pfk};
     anime=migrate(JSON.parse(await decList(env,cryptoKey)));
     finishUnlock();
     toast('Unlocked with recovery key — set a new password below');
@@ -1399,6 +1408,90 @@ function copyRecovery(){
   else{try{const t=document.createElement('textarea');t.value=c;document.body.appendChild(t);t.select();document.execCommand('copy');t.remove();done();}catch{}}
 }
 function closeRecovery(){const sc=document.getElementById('recoveryScreen');if(sc)sc.classList.remove('on');}
+// Only offered once a password exists — Face ID unwraps the master key, so
+// there has to be one to unwrap. Hidden entirely where the platform can't do it.
+async function renderFaceIDUI(){
+  const box=document.getElementById('faceBox');if(!box)return;
+  if(!await faceIDPossible()){box.innerHTML='';return;}
+  box.innerHTML=faceIDOn()
+    ? `<div class="dt-label" style="margin-top:16px">${icon('key')} Face ID · ON</div>
+       <p class="ai-desc">Unlock with Face ID instead of typing your password. Your password and recovery key still work.</p>
+       <button class="imp-all" style="width:100%" onclick="disableFaceID()">Turn off Face ID unlock</button>`
+    : `<div class="dt-label" style="margin-top:16px">${icon('key')} Face ID</div>
+       <p class="ai-desc">Skip typing your password — unlock with Face ID. It derives a key from your passkey, so your list stays just as encrypted.</p>
+       <button class="parse-btn" style="margin-top:0" onclick="enableFaceID()">Turn on Face ID unlock</button>`;
+}
+
+// ─── FACE ID UNLOCK (WebAuthn passkey + PRF) ────────────────────────────────
+// Face ID doesn't "know" the password. Instead the passkey's PRF extension
+// derives a stable 32-byte secret (iOS 18.4+/iCloud Keychain), and we wrap the
+// SAME master key with it — a third wrap beside the password and recovery key.
+// So this is real encryption, not a key parked in localStorage behind a check.
+const PRF_SALT=new TextEncoder().encode('watchlist-prf-v1');
+function passkeyAPI(){return !!(window.PublicKeyCredential&&navigator.credentials&&navigator.credentials.create);}
+async function faceIDPossible(){
+  if(!passkeyAPI())return false;
+  try{return await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();}catch{return false;}
+}
+function faceIDOn(){try{const e=JSON.parse(store().getItem(LSKEY));return !!(e&&e.pfk);}catch{return false;}}
+async function passkeyCreate(){
+  const c=await navigator.credentials.create({publicKey:{
+    challenge:crypto.getRandomValues(new Uint8Array(32)),
+    rp:{name:'WatchList',id:location.hostname},
+    user:{id:crypto.getRandomValues(new Uint8Array(16)),name:'watchlist',displayName:'WatchList'},
+    pubKeyCredParams:[{type:'public-key',alg:-7},{type:'public-key',alg:-257}],
+    authenticatorSelection:{authenticatorAttachment:'platform',residentKey:'required',userVerification:'required'},
+    extensions:{prf:{}},timeout:60000,
+  }});
+  if(!c)throw new Error('cancelled');
+  return c;
+}
+// discoverable credential → no stored credential id, and it rides iCloud Keychain to your other devices
+async function passkeySecret(){
+  const a=await navigator.credentials.get({publicKey:{
+    challenge:crypto.getRandomValues(new Uint8Array(32)),
+    rpId:location.hostname,userVerification:'required',
+    extensions:{prf:{eval:{first:PRF_SALT}}},timeout:60000,
+  }});
+  if(!a)throw new Error('cancelled');
+  const r=a.getClientExtensionResults&&a.getClientExtensionResults();
+  const first=r&&r.prf&&r.prf.results&&r.prf.results.first;
+  if(!first)throw new Error('no-prf');
+  return _b64(first);
+}
+async function enableFaceID(){
+  if(!cryptoKey||!envWraps){toast('Set a password first');return;}
+  try{
+    await passkeyCreate();
+    const secret=await passkeySecret();          // PRF results aren't guaranteed at create time — read them here
+    envWraps={pw:envWraps.pw,rec:envWraps.rec,pfk:await wrapMaster(cryptoKey,secret)};
+    await writeLocal();schedulePush();
+    toast('Face ID unlock is on');renderLockUI();
+  }catch(e){
+    const m=e&&e.message;
+    toast(m==='no-prf'?'This device can’t derive a key from Face ID yet (needs iOS 18.4+)':'Face ID setup cancelled');
+  }
+}
+async function disableFaceID(){
+  if(!envWraps)return;
+  envWraps={pw:envWraps.pw,rec:envWraps.rec};
+  await writeLocal();schedulePush();
+  toast('Face ID unlock removed');renderLockUI();
+}
+async function tryUnlockFaceID(){
+  const err=document.getElementById('lockErr');if(err)err.textContent='';
+  try{
+    const env=JSON.parse(store().getItem(LSKEY));
+    if(!(env&&env.v===2&&env.pfk))throw new Error('none');
+    const secret=await passkeySecret();
+    cryptoKey=await unwrapMaster(env.pfk,secret);   // throws unless Face ID produced the right secret
+    envWraps={pw:env.pw,rec:env.rec,pfk:env.pfk};
+    anime=migrate(JSON.parse(await decList(env,cryptoKey)));
+    finishUnlock();
+  }catch(e){
+    if(err)err.textContent=(e&&e.message==='cancelled')?'':'Face ID didn’t work — use your password';
+  }
+}
 function renderLockUI(){
   const box=document.getElementById('lockBox');if(!box)return;
   if(encEnabled()){
@@ -1411,7 +1504,9 @@ function renderLockUI(){
       <div style="display:flex;gap:8px;margin-top:8px;">
         <button class="parse-btn" style="margin:0;flex:1" onclick="regenRecovery()">New recovery key</button>
         <button class="imp-all" onclick="removeAppPassword()">Remove</button>
-      </div>`;
+      </div>
+      <div id="faceBox"></div>`;
+    renderFaceIDUI();
   }else{
     box.innerHTML=`<div class="dt-label">${icon('lock')} Password · OFF</div>
       <p class="ai-desc">Set a password to encrypt your whole list — scrambled on this device and in the cloud, unreadable without the password. You'll get a one-time <b>recovery key</b> to save; it's the only way in if you forget the password. <b>Lose both and the list can't be recovered.</b></p>
@@ -1455,7 +1550,7 @@ async function syncOnOpen(){
       if(res.data&&res.data.v===2){
         if(!cryptoKey)return;                  // encrypted remote — can't read until unlocked
         try{arr=JSON.parse(await decList(res.data,cryptoKey));}catch{return;} // wrong master / corrupt → leave local intact
-        envWraps={pw:res.data.pw||(envWraps&&envWraps.pw),rec:res.data.rec||(envWraps&&envWraps.rec)};
+        envWraps={pw:res.data.pw||(envWraps&&envWraps.pw),rec:res.data.rec||(envWraps&&envWraps.rec),pfk:res.data.pfk||(envWraps&&envWraps.pfk)};
       }else if(Array.isArray(res.data)){arr=res.data;}
       if(arr){anime=migrate(arr);writeLocal();setSyncAt(res.updatedAt);render();renderSyncUI();toast('☁️ Synced from cloud');return;}
     }

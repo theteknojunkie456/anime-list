@@ -795,15 +795,29 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
     </div>
     <div class="ai-resp" id="rankResp"></div>
   </div>
-  <div style="display:flex;gap:8px;margin-top:20px;padding-top:16px;border-top:1px solid var(--b1);">
-    <input class="ai-prompt-in" id="apiKeyIn" type="password" placeholder="AI key — Groq, Gemini, OpenRouter, or Claude" autocomplete="off">
-    <button class="ai-run-btn" onclick="saveKey()">Save</button>
+  <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--b1);">
+    <button class="ai-run-btn" id="keyBtn" style="width:100%" onclick="openKeySheet()"><i data-ic="key"></i> Add AI Key</button>
   </div>
-  <div style="display:flex;gap:8px;margin-top:9px;align-items:center;">
+  <div style="display:flex;gap:8px;margin-top:10px;align-items:center;">
     <span class="ai-desc" style="margin:0;flex-shrink:0;">Model</span>
     <select class="model-sel" id="modelSel" onchange="setModelSel(this.value)" style="display:none;"></select>
   </div>
-  <p class="ai-desc" style="margin-top:8px">Suggest, Chat &amp; Rank need an AI key — it stays on this device only. <strong style="color:var(--t1)">Free</strong> keys: console.groq.com (gsk_…), aistudio.google.com (AIza…), or openrouter.ai (sk-or-…). Claude keys (sk-ant-…) also work. Autofill needs no key at all.</p>
+  <p class="ai-desc" style="margin-top:8px">Suggest, Chat &amp; Rank need an AI key; Autofill works without one.</p>
+</div>
+
+<!-- AI KEY SHEET -->
+<div class="sheet" id="keySheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <div class="sheet-title"><i data-ic="key"></i> AI Key</div>
+    <button class="sheet-cancel" onclick="closeKeySheet()">Done</button>
+  </div>
+  <div style="display:flex;gap:8px;">
+    <input class="ai-prompt-in" id="apiKeyIn" type="password" placeholder="Paste your AI key…" autocomplete="off">
+    <button class="ai-run-btn" onclick="saveKeyAndClose()">Save</button>
+  </div>
+  <button class="chat-clear" onclick="removeKey()" style="margin-top:10px"><i data-ic="trash"></i> Remove key</button>
+  <p class="ai-desc" style="margin-top:12px">Your key stays on this device only. <strong style="color:var(--t1)">Free</strong> keys: console.groq.com (gsk_…), aistudio.google.com (AIza…), or openrouter.ai (sk-or-…). Claude keys (sk-ant-…) also work.</p>
 </div>
 
 <!-- IMPORT SHEET -->
@@ -1502,7 +1516,7 @@ function openSheet(id){
   if(id==='statsSheet')renderStatsSheet();
   if(id==='importSheet'){renderSyncUI();renderNotifyUI();}
   if(id==='forYouSheet')renderForYou();
-  if(id==='aiSheet')renderModelPicker();
+  if(id==='aiSheet'){renderModelPicker();updateKeyBtn();}
 }
 function closeAll(){
   document.querySelectorAll('.sheet').forEach(s=>s.classList.remove('on'));
@@ -1926,6 +1940,11 @@ const AI_MODELS={groq:['llama-3.3-70b-versatile','llama-3.1-8b-instant'],openrou
 function aiProvider(){const k=getKey();if(k.startsWith('gsk_'))return'groq';if(k.startsWith('sk-or-'))return'openrouter';if(k.startsWith('AIza'))return'gemini';if(k)return'claude';return'';}
 function getModel(){const p=aiProvider();if(!p)return'';try{return localStorage.getItem('ai_model_'+p)||AI_MODELS[p][0];}catch{return AI_MODELS[p][0];}}
 function setModelSel(v){const p=aiProvider();if(p){try{localStorage.setItem('ai_model_'+p,v);}catch{}}}
+function updateKeyBtn(){const b=document.getElementById('keyBtn');if(b)b.innerHTML=icon('key')+' '+(getKey()?'Change AI Key':'Add AI Key');}
+function openKeySheet(){const inp=document.getElementById('apiKeyIn');if(inp)inp.value=getKey();openSheet('keySheet');}
+function closeKeySheet(){openSheet('aiSheet');setAITab('chat');}
+function saveKeyAndClose(){saveKey();closeKeySheet();}
+function removeKey(){try{localStorage.removeItem('anthropic_key');}catch{}const inp=document.getElementById('apiKeyIn');if(inp)inp.value='';renderModelPicker();updateKeyBtn();toast('Key removed');}
 function renderModelPicker(){
   const sel=document.getElementById('modelSel');if(!sel)return;
   const p=aiProvider();

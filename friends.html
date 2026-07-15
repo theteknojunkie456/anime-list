@@ -155,7 +155,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 /* ── TUTORIAL (reuses the .statsview full-screen shell) ── */
 .tut-intro{font-size:13.5px;line-height:1.6;color:var(--t2);padding:2px 18px 4px;}
 .tut-step{display:flex;gap:13px;align-items:flex-start;margin:0 18px;padding:15px 0;border-top:1px solid var(--bn2);}
-.tut-ico{width:36px;height:36px;flex-shrink:0;border-radius:11px;background:var(--bg3);border:1px solid var(--b2);display:flex;align-items:center;justify-content:center;color:var(--a2);}
+.tut-ico{width:36px;height:36px;flex-shrink:0;border-radius:11px;background:var(--bg3);border:1px solid var(--b2);display:flex;align-items:center;justify-content:center;color:var(--rc,var(--a2));}
 .tut-ico .ico{width:17px;height:17px;}
 .tut-h{font-size:14px;font-weight:800;color:var(--t1);margin-bottom:3px;letter-spacing:-.2px;}
 .tut-p{font-size:12.5px;color:var(--t2);line-height:1.6;}
@@ -180,7 +180,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 .set-row{display:flex;align-items:center;gap:13px;width:100%;padding:13px 0;border-top:1px solid var(--bn2);text-align:left;}
 .set-row:first-child{border-top:none;padding-top:2px;}
 .set-row:active{transform:scale(.985);}
-.set-ico{width:36px;height:36px;flex-shrink:0;border-radius:11px;background:var(--bg3);border:1px solid var(--b2);display:flex;align-items:center;justify-content:center;color:var(--a2);}
+.set-ico{width:36px;height:36px;flex-shrink:0;border-radius:11px;background:var(--bg3);border:1px solid var(--b2);display:flex;align-items:center;justify-content:center;color:var(--rc,var(--a2));}
 .set-ico .ico{width:16px;height:16px;}
 .set-txt{flex:1;min-width:0;}
 .set-h{font-size:14px;font-weight:700;color:var(--t1);letter-spacing:-.2px;}
@@ -238,6 +238,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 .row-sec{margin-top:16px;animation:fadeUp .4s ease both;}
 .row-head{display:flex;align-items:baseline;gap:8px;padding:0 18px 10px;}
 .row-title{font-size:15px;font-weight:800;letter-spacing:-0.2px;}
+.row-title .ico{color:var(--rc,var(--t2));}
 .row-count{font-size:11px;font-weight:700;color:var(--t3);}
 .row-scroll{display:flex;gap:10px;overflow-x:auto;padding:2px 18px 6px;scroll-padding:18px;}
 .pcard{flex:0 0 104px;cursor:pointer;transition:transform .18s cubic-bezier(.32,.72,.28,1);}
@@ -1032,19 +1033,19 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
   <p class="tut-intro">Everything you watch and read, in one place — with covers, air times and progress filled in for you.</p>
 
   <div class="tut-step">
-    <div class="tut-ico"><i data-ic="plus"></i></div>
+    <div class="tut-ico" style="--rc:var(--a2)"><i data-ic="plus"></i></div>
     <div><div class="tut-h">Add anything</div><div class="tut-p">Tap <b>+</b> and type a title. <b>Autofill</b> pulls the real cover, episode count, genres and watch order — anime, TV, movies, manga, manhwa and webtoons. No setup, no API key.</div></div>
   </div>
   <div class="tut-step">
-    <div class="tut-ico"><i data-ic="book"></i></div>
+    <div class="tut-ico" style="--rc:var(--pln)"><i data-ic="book"></i></div>
     <div><div class="tut-h">Watch or Read</div><div class="tut-p">The switch beside the search box flips between your <b>watch</b> list and your <b>reading</b> list. They're kept completely separate.</div></div>
   </div>
   <div class="tut-step">
-    <div class="tut-ico"><i data-ic="calendar"></i></div>
+    <div class="tut-ico" style="--rc:var(--wat)"><i data-ic="calendar"></i></div>
     <div><div class="tut-h">Never miss an episode</div><div class="tut-p">The <b>calendar</b> shows what airs this week for the shows you follow, in your own time zone — and it tracks delays. Turn on the <b>bell</b> to get a notification the moment one drops.</div></div>
   </div>
   <div class="tut-step">
-    <div class="tut-ico"><i data-ic="compass"></i></div>
+    <div class="tut-ico" style="--rc:var(--fin)"><i data-ic="compass"></i></div>
     <div><div class="tut-h">Find your next one</div><div class="tut-p">The <b>compass</b> suggests titles you don't have yet, picked from what you already watch — real community recommendations, not guesses.</div></div>
   </div>
 
@@ -1057,7 +1058,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
     </div>
   </div>
   <div class="tut-step">
-    <div class="tut-ico"><i data-ic="lock"></i></div>
+    <div class="tut-ico" style="--rc:var(--drp)"><i data-ic="lock"></i></div>
     <div><div class="tut-h">Lock it (optional)</div><div class="tut-p">A password encrypts your whole list — unreadable without it, here and in the cloud. You'll get a one-time <b>recovery key</b>; it's the only way back in if you forget the password. Save both. Lose both and the list is gone for good — there's no backdoor.</div></div>
   </div>
 
@@ -1898,18 +1899,21 @@ function renderHome(){
   const spotlight=spot.slice(0,5),spotSet=new Set(spotlight.map(a=>a.id));
   heroAmb=spotlight[0]?titleAccent(spotlight[0]):'';setAmbient(heroAmb);
   let html=nudgeHTML()+(spotlight.length?billboardHTML(spotlight):'');
+  // each section wears its own status colour (STATUS_META) rather than the one
+  // theme accent — the palette already exists, it was just unused outside chips
   const rows=isRead
     ?[['watching',icon('book')+' Reading'],['plan',icon('clipboard')+' Plan to Read'],['finished',icon('check')+' Finished'],['dropped',icon('x')+' Dropped']]
     :[['watching',icon('play')+' Watching'],['plan',icon('clipboard')+' Plan to Watch'],['finished',icon('check')+' Finished'],['dropped',icon('x')+' Dropped']];
   for(const[st,label]of rows){
+    const rc=(STATUS_META[st]||{}).color||'var(--t2)';
     let items=sorted(pool.filter(a=>a.status===st));
     if(st==='watching')items=items.filter(a=>!spotSet.has(a.id));
     if(!items.length)continue;
-    html+=`<div class="row-sec" data-amb="${items[0]?titleAccent(items[0]):''}"><div class="row-head"><div class="row-title">${label}</div><div class="row-count">${items.length}</div></div>
+    html+=`<div class="row-sec" data-amb="${items[0]?titleAccent(items[0]):''}"><div class="row-head"><div class="row-title" style="--rc:${rc}">${label}</div><div class="row-count">${items.length}</div></div>
       <div class="row-scroll">${items.map(posterCard).join('')}</div></div>`;
   }
   const favs=sorted(pool.filter(a=>a.fav));
-  if(favs.length)html+=`<div class="row-sec" data-amb="${favs[0]?titleAccent(favs[0]):''}"><div class="row-head"><div class="row-title">${icon('heart','fill')} Favorites</div><div class="row-count">${favs.length}</div></div>
+  if(favs.length)html+=`<div class="row-sec" data-amb="${favs[0]?titleAccent(favs[0]):''}"><div class="row-head"><div class="row-title" style="--rc:var(--a2)">${icon('heart','fill')} Favorites</div><div class="row-count">${favs.length}</div></div>
     <div class="row-scroll">${favs.map(posterCard).join('')}</div></div>`;
   // genre collections — browse your list by its most-common genres (Netflix-style lens)
   const gmap={};pool.forEach(a=>(a.genre||'').split(',').map(g=>g.trim()).filter(Boolean).forEach(g=>{(gmap[g]=gmap[g]||[]).push(a);}));
@@ -2335,17 +2339,17 @@ function renderSettings(){
   const el=document.getElementById('settingsBody');if(!el)return;
   const backedUp=!!syncCode();
   const rows=[
-    {ic:'bulb',   h:'How WatchList works', p:'A quick tour — and how not to lose your list', go:'openTutorial()'},
-    {ic:'cloud',  h:'Cloud backup',        p:backedUp?'On — restorable on any device':'Off — this list exists only on this device',
+    {ic:'bulb',   c:'var(--wat)', h:'How WatchList works', p:'A quick tour — and how not to lose your list', go:'openTutorial()'},
+    {ic:'cloud',  c:'var(--pln)', h:'Cloud backup',        p:backedUp?'On — restorable on any device':'Off — this list exists only on this device',
      go:"openSheet('backupSheet')", warn:!backedUp},
-    {ic:'lock',   h:'Password',            p:encEnabled()?'On — your list is encrypted':'Off', go:"openSheet('securitySheet')"},
-    {ic:'bell',   h:'Notifications',       p:notifyOn()?'On — you\'ll be told when an episode airs':'Off', go:'openNotifySheet()'},
-    {ic:'clipboard',h:'Import / Export',   p:'Paste a list in, or copy yours out', go:"openSheet('importSheet')"},
-    {ic:'palette',h:'Theme',               p:'Colours, or build your own', go:"openSheet('themeSheet')"},
+    {ic:'lock',   c:'var(--fin)', h:'Password',            p:encEnabled()?'On — your list is encrypted':'Off', go:"openSheet('securitySheet')"},
+    {ic:'bell',   c:'var(--a2)',  h:'Notifications',       p:notifyOn()?'On — you\'ll be told when an episode airs':'Off', go:'openNotifySheet()'},
+    {ic:'clipboard',c:'var(--drp)',h:'Import / Export',    p:'Paste a list in, or copy yours out', go:"openSheet('importSheet')"},
+    {ic:'palette',c:'var(--a2)',  h:'Theme',               p:'Colours, or build your own', go:"openSheet('themeSheet')"},
   ];
   el.innerHTML=rows.map(r=>
     `<button class="set-row${r.warn?' warn':''}" onclick="${r.go}">
-      <div class="set-ico">${icon(r.ic)}</div>
+      <div class="set-ico" style="--rc:${r.c}">${icon(r.ic)}</div>
       <div class="set-txt"><div class="set-h">${r.h}</div><div class="set-p${r.warn?' warn':''}">${r.p}</div></div>
       <span class="set-chev">${icon('chevron-right')}</span>
     </button>`).join('');

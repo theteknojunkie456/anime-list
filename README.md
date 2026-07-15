@@ -34,7 +34,7 @@ Every list is saved in **your own browser** (localStorage) and, optionally, in a
 - **Themes** — character-inspired color themes plus a custom theme builder (pick accent + background, name it, get the full palette).
 - **Responsive** — auto-adapts between portrait and landscape (and tablets/wide screens): a widescreen hero, fluid poster grids, and modal sheets in landscape.
 - **Import** — paste a plain-text list (one title per line, optional `- watching` / `- finished` tags) and bulk-import with a preview.
-- **AI panel (optional)** — Suggest / Ask / Rank helpers. Paste a **free** key from [Groq](https://console.groq.com), [Google AI Studio](https://aistudio.google.com), or [OpenRouter](https://openrouter.ai) (or paid Claude). Auto-detects the provider; key stored only on your device. Everything else works without one.
+- **AI chat (optional)** — a real conversational AI companion that knows your list (plus one-shot Suggest & Rank helpers). Paste a **free** key from [Groq](https://console.groq.com), [Google AI Studio](https://aistudio.google.com), or [OpenRouter](https://openrouter.ai) (or paid Claude). Auto-detects the provider; key stored only on your device. Everything else works without one.
 - **Cloud sync + Friends** — sync your list across devices with a secret code, and share it read-only with friends. See [FRIENDS.md](FRIENDS.md).
 - **Works offline** — service worker caches the app.
 

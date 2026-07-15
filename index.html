@@ -340,6 +340,26 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 .ai-run-btn.loading{opacity:0.5;pointer-events:none;}
 .ai-resp{display:none;font-size:13px;line-height:1.6;background:var(--bg3);border:1px solid var(--b1);border-radius:14px;padding:13px 15px;margin-top:4px;}
 .ai-resp.on{display:block;}
+.chat-thread{display:flex;flex-direction:column;gap:10px;min-height:240px;max-height:min(48vh,440px);overflow-y:auto;padding:6px 2px 10px;-webkit-overflow-scrolling:touch;}
+.chat-msg{max-width:86%;padding:10px 13px;border-radius:16px;font-size:13.5px;line-height:1.55;overflow-wrap:anywhere;animation:fadeUp .24s ease both;}
+.chat-msg.me{align-self:flex-end;background:var(--a);color:#fff;border-bottom-right-radius:5px;}
+.chat-msg.ai{align-self:flex-start;background:var(--bg3);border:1px solid var(--b1);color:var(--t1);border-bottom-left-radius:5px;}
+.chat-typing{display:flex;gap:4px;align-items:center;padding:14px 15px;}
+.chat-typing span{width:7px;height:7px;border-radius:50%;background:var(--t3);animation:blink 1.2s infinite;}
+.chat-typing span:nth-child(2){animation-delay:.18s;}
+.chat-typing span:nth-child(3){animation-delay:.36s;}
+@keyframes blink{0%,60%,100%{opacity:.25;transform:translateY(0);}30%{opacity:1;transform:translateY(-3px);}}
+.chat-empty{text-align:center;color:var(--t2);padding:22px 12px;}
+.chat-empty .ico{width:34px;height:34px;color:var(--a);margin-bottom:10px;}
+.chat-empty p{font-size:13px;line-height:1.55;margin-bottom:14px;}
+.chat-chips{display:flex;flex-wrap:wrap;gap:7px;justify-content:center;}
+.chat-chip{padding:8px 13px;border-radius:99px;font-size:11.5px;font-weight:700;background:var(--bg3);border:1px solid var(--b2);color:var(--t2);min-height:36px;}
+.chat-input-row{display:flex;gap:8px;margin-top:12px;align-items:center;}
+.chat-send{width:44px;height:44px;flex-shrink:0;border-radius:12px;background:var(--a);color:#fff;display:inline-flex;align-items:center;justify-content:center;transition:transform .12s,filter .16s;}
+.chat-send .ico{width:19px;height:19px;}
+.chat-send:active{transform:scale(.94);}
+.chat-clear{background:none;border:none;color:var(--t3);font-size:11px;font-weight:700;margin-top:9px;display:inline-flex;align-items:center;gap:5px;cursor:pointer;}
+.chat-clear .ico{width:12px;height:12px;}
 .dots span{animation:blink 1.2s infinite;}
 .dots span:nth-child(2){animation-delay:.2s;}
 .dots span:nth-child(3){animation-delay:.4s;}
@@ -739,7 +759,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
   </div>
   <div class="ai-tabs">
     <button class="aitab on" id="at-rec" onclick="setAITab('rec')"><i data-ic="bulb"></i> Suggest</button>
-    <button class="aitab" id="at-chat" onclick="setAITab('chat')"><i data-ic="message"></i> Ask</button>
+    <button class="aitab" id="at-chat" onclick="setAITab('chat')"><i data-ic="message"></i> Chat</button>
     <button class="aitab" id="at-rank" onclick="setAITab('rank')"><i data-ic="trophy"></i> Rank</button>
   </div>
   <div class="aipanel on" id="ap-rec">
@@ -751,12 +771,12 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
     <div class="ai-resp" id="recResp"></div>
   </div>
   <div class="aipanel" id="ap-chat">
-    <p class="ai-desc">Ask anything about your list — pacing, what to watch when sad, hidden gems.</p>
-    <div class="ai-prompt-row">
-      <input class="ai-prompt-in" id="chatPrompt" placeholder="e.g. What's shortest on my list?">
-      <button class="ai-run-btn" id="chatBtn" onclick="runChat()">Ask</button>
+    <div class="chat-thread" id="chatThread"></div>
+    <div class="chat-input-row">
+      <input class="ai-prompt-in" id="chatPrompt" placeholder="Message your anime companion…" autocomplete="off" onkeydown="if(event.key==='Enter'){event.preventDefault();sendChat();}">
+      <button class="chat-send" onclick="sendChat()" aria-label="Send"><i data-ic="send"></i></button>
     </div>
-    <div class="ai-resp" id="chatResp"></div>
+    <button class="chat-clear" onclick="clearChat()"><i data-ic="plus"></i> New chat</button>
   </div>
   <div class="aipanel" id="ap-rank">
     <p class="ai-desc">AI sorts your Plan to Watch list into the best viewing order.</p>
@@ -907,7 +927,8 @@ clock:'<circle cx="12" cy="12" r="9.5"/><path d="M12 7v5l3.5 2"/>',
 loader:'<path d="M12 3a9 9 0 1 0 9 9"/>',
 inbox:'<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5.1 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.9A2 2 0 0 0 16.8 4H7.2a2 2 0 0 0-1.7 1.1z"/>',
 plus:'<path d="M12 5v14M5 12h14"/>',
-compass:'<circle cx="12" cy="12" r="9.5"/><path d="m16 8-2 6-6 2 2-6z"/>'
+compass:'<circle cx="12" cy="12" r="9.5"/><path d="m16 8-2 6-6 2 2-6z"/>',
+  send:'<path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4z"/>'
 };
 function icon(name,cls){const p=ICONS[name];if(!p)return'';return `<svg class="ico${cls?' '+cls:''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`;}
 function hydrateIcons(root){(root||document).querySelectorAll('[data-ic]').forEach(el=>{const s=icon(el.getAttribute('data-ic'));if(s)el.outerHTML=s;});}
@@ -1765,6 +1786,7 @@ function setAITab(t){
     document.getElementById(`at-${x}`).classList.toggle('on',x===t);
     document.getElementById(`ap-${x}`).classList.toggle('on',x===t);
   });
+  if(t==='chat')renderChatThread(false);
 }
 function listSummary(){
   const g=st=>anime.filter(a=>a.status===st).map(a=>a.title+(a.rating?` (my rating ${a.rating}/5)`:'')).join(', ')||'none';
@@ -1821,16 +1843,56 @@ async function runRecommend(){
   }catch(e){const r=document.getElementById('recResp');r.className='ai-resp on';r.innerHTML=aiErrorHTML(e);}
   document.getElementById('recBtn').classList.remove('loading');
 }
-async function runChat(){
-  const q=document.getElementById('chatPrompt').value.trim();
-  if(!q){toast('Type a question first');return;}
-  setLoading('chatBtn','chatResp',true);
-  try{
-    const text=await callAI(`${listSummary()}\n\nQuestion: ${q}\n\nAnswer helpfully and concisely, referencing my list when relevant.`);
-    const r=document.getElementById('chatResp');r.className='ai-resp on';
-    r.innerHTML=`<div class="ai-badge">${icon('sparkles')} Answer</div>${text.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>')}`;
-  }catch(e){const r=document.getElementById('chatResp');r.className='ai-resp on';r.innerHTML=aiErrorHTML(e);}
-  document.getElementById('chatBtn').classList.remove('loading');
+let chatHistory=[];
+function fmtMsg(t){return schEsc(t).replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\*(.+?)\*/g,'<em>$1</em>').replace(/\n/g,'<br>');}
+function renderChatThread(typing){
+  const th=document.getElementById('chatThread');if(!th)return;
+  if(!chatHistory.length&&!typing){
+    th.innerHTML='<div class="chat-empty">'+icon('sparkles')+'<p>Hey — I know your list. Ask me what to watch next, hidden gems, what fits your mood, or the best viewing order.</p><div class="chat-chips">'+
+      ['What should I watch next?','Shortest thing on my list?','Something cozy for tonight','Rank my Plan list'].map(c=>'<button class="chat-chip" onclick="chatChip(this)">'+c+'</button>').join('')+'</div></div>';
+    return;
+  }
+  let html=chatHistory.map(m=>'<div class="chat-msg '+(m.role==='user'?'me':'ai')+'">'+fmtMsg(m.content)+'</div>').join('');
+  if(typing)html+='<div class="chat-msg ai chat-typing"><span></span><span></span><span></span></div>';
+  th.innerHTML=html;
+  th.scrollTop=th.scrollHeight;
+}
+function chatChip(btn){document.getElementById('chatPrompt').value=btn.textContent;sendChat();}
+function clearChat(){chatHistory=[];renderChatThread(false);document.getElementById('chatPrompt').value='';}
+function sendChat(){
+  const inp=document.getElementById('chatPrompt');const q=(inp.value||'').trim();
+  if(!q)return;
+  if(!getKey()){toast('Add an AI key below to chat');return;}
+  inp.value='';
+  chatHistory.push({role:'user',content:q});
+  renderChatThread(true);
+  callAIChat(chatHistory).then(text=>{
+    chatHistory.push({role:'assistant',content:text});renderChatThread(false);
+  }).catch(e=>{
+    chatHistory.push({role:'assistant',content:e===NO_KEY?'Add an AI key below and I\'m all yours.':'Hmm, that didn\'t go through — check your key or connection and try again.'});
+    renderChatThread(false);
+  });
+}
+function callChatOpenAI(url,key,model,system,history){
+  return fetch(url,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify({model,messages:[{role:'system',content:system}].concat(history),max_tokens:1000})}).then(async res=>{
+    if(!res.ok)throw new Error('API '+res.status);
+    const data=await res.json();return data.choices?.[0]?.message?.content||'No response.';
+  });
+}
+async function callAIChat(history){
+  const key=getKey();if(!key)throw NO_KEY;
+  const system='You are a warm, knowledgeable anime & manga companion living inside the user\'s personal watchlist app. Chat naturally and concisely, and reference their actual list when relevant. Here is their list:\n'+listSummary();
+  if(key.startsWith('gsk_'))return callChatOpenAI('https://api.groq.com/openai/v1/chat/completions',key,'llama-3.3-70b-versatile',system,history);
+  if(key.startsWith('sk-or-'))return callChatOpenAI('https://openrouter.ai/api/v1/chat/completions',key,'meta-llama/llama-3.3-70b-instruct:free',system,history);
+  if(key.startsWith('AIza')){
+    const contents=history.map(m=>({role:m.role==='assistant'?'model':'user',parts:[{text:m.content}]}));
+    const res=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},body:JSON.stringify({systemInstruction:{parts:[{text:system}]},contents,generationConfig:{maxOutputTokens:1000}})});
+    if(!res.ok)throw new Error('API '+res.status);
+    const data=await res.json();return data.candidates?.[0]?.content?.parts?.[0]?.text||'No response.';
+  }
+  const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-5',max_tokens:1000,system,messages:history})});
+  if(!res.ok)throw new Error('API '+res.status);
+  const data=await res.json();return data.content?.[0]?.text||'No response.';
 }
 async function runRank(){
   const pref=document.getElementById('rankPrompt').value.trim();

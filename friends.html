@@ -1667,6 +1667,24 @@ async function disableNotify(){
   setNotifyOn(false);toast('Notifications off');renderNotifyUI();
 }
 let notifyUpdT;
+// Proves the whole chain — VAPID signing → Apple's push service → service worker
+// → your lock screen — without waiting on an episode to air.
+async function sendTestNotify(){
+  try{
+    const reg=await navigator.serviceWorker.ready;
+    const sub=await reg.pushManager.getSubscription();
+    if(!sub){toast('Turn notifications off and on again');return;}
+    toast('Sending…');
+    const r=await fetch(NOTIFY_URL+'/test',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({endpoint:sub.endpoint})});
+    const d=await r.json().catch(()=>({}));
+    if(r.ok&&d.ok){toast('Sent — it should arrive in a second');return;}
+    if(r.status===410||r.status===404){ // endpoint died (usually a reinstall) — re-subscribe
+      toast('Subscription expired — turning it back on');
+      setNotifyOn(false);await enableNotify();return;
+    }
+    toast('Test failed'+(d.status?' ('+d.status+')':''));
+  }catch(e){toast('Test failed — check your connection');}
+}
 function scheduleNotifyUpdate(){if(!notifyOn())return;clearTimeout(notifyUpdT);notifyUpdT=setTimeout(notifyUpdate,2500);}
 // Keep the worker's tracked list current (fire-and-forget).
 async function notifyUpdate(){
@@ -1676,6 +1694,20 @@ async function notifyUpdate(){
     await fetch(NOTIFY_URL+'/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({endpoint:sub.endpoint,animeIds:notifyAnimeIds()})});
   }catch{}
 }
+// "I haven't seen anything" is almost always "nothing aired", not "it's broken" —
+// a list of mostly finished shows can go weeks without an episode. Say what's
+// tracked and what's next, so silence is explained rather than suspicious.
+function nextAiring(){
+  const now=Date.now();
+  const up=anime.filter(a=>kindOf(a)==='watch'&&(a.status==='watching'||a.status==='plan')&&a.airAt&&a.airAt*1000>now)
+                .sort((x,y)=>x.airAt-y.airAt)[0];
+  if(!up)return null;
+  const d=new Date(up.airAt*1000);
+  const days=Math.round((up.airAt*1000-now)/86400000);
+  return{title:up.title,ep:up.airEp||0,
+    when:d.toLocaleDateString([],{weekday:'long'})+' '+d.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}),
+    rel:days<=0?'today':days===1?'tomorrow':'in '+days+' days'};
+}
 function notifyUIHTML(){
   if(!pushSupported()){
     return`<div class="dt-label">${icon('bell')} Episode notifications</div>
@@ -1684,9 +1716,14 @@ function notifyUIHTML(){
   const granted=('Notification'in window)&&Notification.permission==='granted';
   const on=notifyOn()&&granted;
   if(on){
+    const n=notifyAnimeIds().length, nx=nextAiring();
+    const status=nx
+      ? `Tracking <b>${n}</b> show${n!==1?'s':''}. Next up: <b>${schEsc(nx.title)}</b>${nx.ep?' Ep '+nx.ep:''} — ${nx.when} (${nx.rel}).`
+      : `Tracking <b>${n}</b> show${n!==1?'s':''}. <b>Nothing's airing soon</b> — most of your list has finished, so it'll stay quiet until something new drops. That's expected, not a fault.`;
     return`<div class="dt-label">${icon('bell')} Episode notifications · ON</div>
-      <p class="ai-desc">You'll get a push when a new episode of your Watching/Plan shows airs.</p>
-      <button class="imp-all" style="width:100%" onclick="disableNotify()">Turn off notifications</button>`;
+      <p class="ai-desc">${status}</p>
+      <button class="parse-btn" style="margin-top:0" onclick="sendTestNotify()">Send a test notification</button>
+      <button class="imp-all" style="width:100%;margin-top:8px" onclick="disableNotify()">Turn off notifications</button>`;
   }
   return`<div class="dt-label">${icon('bell')} Episode notifications · OFF</div>
     <p class="ai-desc">Get notified when a new episode of your Watching/Plan shows airs.</p>

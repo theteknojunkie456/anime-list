@@ -404,9 +404,59 @@ async function handleFetch(request, env) {
       return handleUnsubscribe(body, env);
     case "/update":
       return handleUpdate(body, env);
+    case "/test":
+      return handleTest(body, env);
     default:
       return json({ ok: false, error: "not found" }, 404);
   }
+}
+
+/**
+ * Send a push to one subscription on demand.
+ *
+ * Without this, the only proof notifications work is waiting for an episode to
+ * air — which, for a list of mostly finished shows, can be weeks. Silence then
+ * reads as "broken" when it usually means "nothing aired". This makes the whole
+ * chain (VAPID signing → Apple/Google push service → service worker) verifiable
+ * in two seconds.
+ */
+async function handleTest(body, env) {
+  if (typeof body.endpoint !== "string" || !body.endpoint) {
+    return json({ ok: false, error: "endpoint required" }, 400);
+  }
+  const key = await subKey(body.endpoint);
+  const raw = await env.SUBS.get(key);
+  if (!raw) {
+    return json({ ok: false, error: "subscription not found" }, 404);
+  }
+  const record = JSON.parse(raw);
+
+  let status;
+  try {
+    status = await sendPush(
+      record.subscription,
+      {
+        title: "WatchList",
+        body: "Notifications are working — you'll hear from us when an episode drops.",
+        url: "/",
+        tag: "watchlist-test",
+      },
+      env,
+    );
+  } catch (e) {
+    return json({ ok: false, error: "push failed: " + (e && e.message) }, 502);
+  }
+
+  // The push service is the authority on whether an endpoint is still alive;
+  // a dead one should clean itself up here rather than linger in KV forever.
+  if (status === 404 || status === 410) {
+    await env.SUBS.delete(key);
+    return json({ ok: false, error: "subscription expired", status }, 410);
+  }
+  if (status < 200 || status >= 300) {
+    return json({ ok: false, error: "push rejected", status }, 502);
+  }
+  return json({ ok: true, tracking: (record.animeIds || []).length });
 }
 
 // ---------------------------------------------------------------------------

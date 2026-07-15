@@ -176,6 +176,19 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 .nudge-go:active{transform:scale(.94);}
 .nudge-x{flex-shrink:0;width:26px;height:26px;border-radius:8px;color:var(--t3);display:flex;align-items:center;justify-content:center;}
 .nudge-x .ico{width:13px;height:13px;}
+/* ── SETTINGS HUB ── */
+.set-row{display:flex;align-items:center;gap:13px;width:100%;padding:13px 0;border-top:1px solid var(--bn2);text-align:left;}
+.set-row:first-child{border-top:none;padding-top:2px;}
+.set-row:active{transform:scale(.985);}
+.set-ico{width:36px;height:36px;flex-shrink:0;border-radius:11px;background:var(--bg3);border:1px solid var(--b2);display:flex;align-items:center;justify-content:center;color:var(--a2);}
+.set-ico .ico{width:16px;height:16px;}
+.set-txt{flex:1;min-width:0;}
+.set-h{font-size:14px;font-weight:700;color:var(--t1);letter-spacing:-.2px;}
+.set-p{font-size:11.5px;color:var(--t3);margin-top:2px;line-height:1.4;}
+.set-p.warn{color:var(--a2);font-weight:700;}
+.set-row.warn .set-ico{background:color-mix(in srgb,var(--a) 20%,var(--bg3));border-color:transparent;}
+.set-chev{flex-shrink:0;color:var(--t3);display:flex;}
+.set-chev .ico{width:16px;height:16px;}
 .sv-hero{display:flex;gap:10px;padding:8px 18px 0;}
 .sv-heronum{flex:1;background:linear-gradient(160deg,var(--bg3),var(--bg2));border:1px solid var(--bn2);border-radius:18px;padding:15px 10px;text-align:center;box-shadow:var(--elev1);}
 .sv-heronum .v{font-size:27px;font-weight:900;letter-spacing:-1px;color:var(--a2);line-height:1;display:inline-flex;align-items:center;gap:3px;justify-content:center;}
@@ -804,7 +817,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
   <button class="nbtn on" id="nav-home" onclick="goHome()"><span><i data-ic="home"></i></span><small>Home</small></button>
   <button class="nbtn" onclick="openStats()"><span><i data-ic="chart"></i></span><small>Stats</small></button>
   <button class="nbtn add" onclick="openSheet_add()">＋</button>
-  <button class="nbtn" onclick="openSheet('importSheet')"><span><i data-ic="clipboard"></i></span><small>Import</small></button>
+  <button class="nbtn" onclick="openSheet('settingsSheet')"><span><i data-ic="settings"></i></span><small>Settings</small></button>
   <button class="nbtn" onclick="openSheet('aiSheet')"><span><i data-ic="sparkles"></i></span><small>AI</small></button>
 </div>
 
@@ -959,14 +972,43 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
   <p class="ai-desc" style="margin-top:12px">Your key stays on this device only. <strong style="color:var(--t1)">Free</strong> keys: console.groq.com (gsk_…), aistudio.google.com (AIza…), or openrouter.ai (sk-or-…). Claude keys (sk-ant-…) also work.</p>
 </div>
 
+<!-- SETTINGS HUB -->
+<div class="sheet" id="settingsSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <div class="sheet-title"><i data-ic="settings"></i> Settings</div>
+    <button class="sheet-cancel" onclick="closeAll()">Done</button>
+  </div>
+  <div id="settingsBody"></div>
+</div>
+
+<!-- CLOUD BACKUP -->
+<div class="sheet" id="backupSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <div class="sheet-title"><i data-ic="cloud"></i> Cloud backup</div>
+    <button class="sheet-cancel" onclick="openSheet('settingsSheet')">Back</button>
+  </div>
+  <div id="syncBox"></div>
+</div>
+
+<!-- PASSWORD -->
+<div class="sheet" id="securitySheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <div class="sheet-title"><i data-ic="lock"></i> Password</div>
+    <button class="sheet-cancel" onclick="openSheet('settingsSheet')">Back</button>
+  </div>
+  <div id="lockBox"></div>
+</div>
+
 <!-- IMPORT SHEET -->
 <div class="sheet" id="importSheet">
   <div class="sheet-handle"></div>
   <div class="sheet-header">
     <div class="sheet-title"><i data-ic="clipboard"></i> Import / Export</div>
-    <button class="sheet-cancel" onclick="closeAll()">Done</button>
+    <button class="sheet-cancel" onclick="openSheet('settingsSheet')">Back</button>
   </div>
-  <button class="tut-link" style="margin:0 0 18px" onclick="openTutorial()"><i data-ic="bulb"></i> How WatchList works</button>
   <p class="ai-desc">Paste your list from Notes, messages, or anywhere — one title per line, as messy as you like. After previewing, tap a status on each title (or use Set&nbsp;all). "Title | status | ep 5 | ★4" style lines are understood too.</p>
   <textarea class="import-paste" id="importPaste" placeholder="Attack on Titan&#10;Demon Slayer - watching&#10;One Piece | watching | ep 120&#10;..."></textarea>
   <button class="parse-btn" onclick="parseImport()">Preview Import</button>
@@ -978,9 +1020,6 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
   <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--b1);">
     <button class="parse-btn" style="margin-top:0" onclick="exportList()"><i data-ic="upload"></i> Copy my list to clipboard</button>
   </div>
-  <div id="syncBox" style="margin-top:16px;padding-top:14px;border-top:1px solid var(--b1);"></div>
-  <div id="lockBox" style="margin-top:16px;padding-top:14px;border-top:1px solid var(--b1);"></div>
-  <div id="notifyBox" style="margin-top:16px;padding-top:14px;border-top:1px solid var(--b1);"></div>
 </div>
 
 <!-- STATS SHEET -->
@@ -1014,7 +1053,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
     <div>
       <div class="tut-h">Back up your list — do this first</div>
       <div class="tut-p">Your list lives on <b>this device only</b>. Clearing your browser data, or deleting the app from your Home Screen, <b>erases it</b>. Turning on cloud backup gives you a <b>sync code</b>: save that code and your list can always be restored, and it follows you to any device.</div>
-      <button class="tut-do" onclick="tutGo('importSheet')">Set up backup</button>
+      <button class="tut-do" onclick="tutGo('backupSheet')">Set up backup</button>
     </div>
   </div>
   <div class="tut-step">
@@ -1148,7 +1187,8 @@ plus:'<path d="M12 5v14M5 12h14"/>',
 compass:'<circle cx="12" cy="12" r="9.5"/><path d="m16 8-2 6-6 2 2-6z"/>',
   send:'<path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4z"/>',
   lock:'<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
-  key:'<path d="M12.6 11.4a5.5 5.5 0 1 0-7.8 7.8 5.5 5.5 0 0 0 7.8-7.8zM12.6 11.4 22 2"/><path d="m17 7 3 3"/>'
+  key:'<path d="M12.6 11.4a5.5 5.5 0 1 0-7.8 7.8 5.5 5.5 0 0 0 7.8-7.8zM12.6 11.4 22 2"/><path d="m17 7 3 3"/>',
+  settings:'<line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>'
 };
 function icon(name,cls){const p=ICONS[name];if(!p)return'';return `<svg class="ico${cls?' '+cls:''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`;}
 function hydrateIcons(root){(root||document).querySelectorAll('[data-ic]').forEach(el=>{const s=icon(el.getAttribute('data-ic'));if(s)el.outerHTML=s;});}
@@ -1343,7 +1383,7 @@ async function tryUnlockRecovery(){                    // unlock with the recove
     anime=migrate(JSON.parse(await decList(env,cryptoKey)));
     finishUnlock();
     toast('Unlocked with recovery key — set a new password below');
-    setTimeout(()=>{try{openSheet('importSheet');}catch{}},600);
+    setTimeout(()=>{try{openSheet('securitySheet');}catch{}},600);
   }catch(e){_unlockErr(i,err,'That recovery key didn’t work');}
 }
 function showRecovery(code,title){
@@ -2009,7 +2049,9 @@ function openSheet(id){
   document.getElementById(id).classList.add('on');
   if(id==='themeSheet')renderThemeGrid();
   if(id==='statsSheet')renderStatsSheet();
-  if(id==='importSheet'){renderSyncUI();renderLockUI();renderNotifyUI();}
+  if(id==='settingsSheet')renderSettings();
+  if(id==='backupSheet')renderSyncUI();
+  if(id==='securitySheet')renderLockUI();
   if(id==='forYouSheet')renderForYou();
   if(id==='aiSheet'){renderModelPicker();updateKeyBtn();}
 }
@@ -2286,6 +2328,29 @@ function maybeShowTutorial(){
   if(fresh)setTimeout(openTutorial,650);else markTutSeen();
 }
 
+// ─── SETTINGS HUB ───────────────────────────────────────────────────────────
+// Each row states its own status, so "backup is off" is visible at a glance
+// instead of buried inside a panel nobody opens.
+function renderSettings(){
+  const el=document.getElementById('settingsBody');if(!el)return;
+  const backedUp=!!syncCode();
+  const rows=[
+    {ic:'bulb',   h:'How WatchList works', p:'A quick tour — and how not to lose your list', go:'openTutorial()'},
+    {ic:'cloud',  h:'Cloud backup',        p:backedUp?'On — restorable on any device':'Off — this list exists only on this device',
+     go:"openSheet('backupSheet')", warn:!backedUp},
+    {ic:'lock',   h:'Password',            p:encEnabled()?'On — your list is encrypted':'Off', go:"openSheet('securitySheet')"},
+    {ic:'bell',   h:'Notifications',       p:notifyOn()?'On — you\'ll be told when an episode airs':'Off', go:'openNotifySheet()'},
+    {ic:'clipboard',h:'Import / Export',   p:'Paste a list in, or copy yours out', go:"openSheet('importSheet')"},
+    {ic:'palette',h:'Theme',               p:'Colours, or build your own', go:"openSheet('themeSheet')"},
+  ];
+  el.innerHTML=rows.map(r=>
+    `<button class="set-row${r.warn?' warn':''}" onclick="${r.go}">
+      <div class="set-ico">${icon(r.ic)}</div>
+      <div class="set-txt"><div class="set-h">${r.h}</div><div class="set-p${r.warn?' warn':''}">${r.p}</div></div>
+      <span class="set-chev">${icon('chevron-right')}</span>
+    </button>`).join('');
+}
+
 // ─── BACKUP NUDGE ───────────────────────────────────────────────────────────
 // A list with no sync code dies with the device — clearing site data or deleting
 // the Home Screen app wipes it, with nothing to restore from. Once someone has
@@ -2297,7 +2362,7 @@ function nudgeHTML(){
   if(!shouldNudge())return'';
   return`<div class="nudge">${icon('cloud')}
     <div class="nudge-t">This list only exists on this device — back it up so you can't lose it.</div>
-    <button class="nudge-go" onclick="openSheet('importSheet')">Back up</button>
+    <button class="nudge-go" onclick="openSheet('backupSheet')">Back up</button>
     <button class="nudge-x" onclick="dismissNudge()" aria-label="Dismiss">${icon('x')}</button>
   </div>`;
 }

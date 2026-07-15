@@ -72,7 +72,7 @@ viewing a friend's list never touches or overwrites your personal Watchlist.
 - **Read-only for friends.** Viewing a friend's list can never edit it — imports
   copy into *your* list only.
 - **Revocable.** Rotate your sync code to stop sharing the live version.
-- **Password-protected lists.** If you set a password on your list (main app → backup panel), the cloud copy is **encrypted**. A friend then needs *both* your sync code **and** the password to view it — `friends.html` will prompt for the password on load. Without it, the list can't be read.
+- **Password-protected lists.** If you set a password on your list (main app → Settings → Password), the cloud copy is **encrypted**. A friend then needs *both* your sync code **and** the password to view it — `friends.html` will prompt for the password on load. Without it, the list can't be read.
 
 ---
 

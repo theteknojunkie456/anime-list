@@ -1342,6 +1342,8 @@ function showLock(){
   el.classList.add('on');
   const i=document.getElementById('lockPw');if(i)i.value='';
   setLockMode(false);   // sets Face ID vs password emphasis, and focuses only when it should
+  // prompt straight away — no reason to make you tap a button to ask for Face ID
+  if(faceIDOn())setTimeout(()=>{try{tryUnlockFaceID(true);}catch{}},300);
 }
 function hideLock(){appLocked=false;const el=document.getElementById('lockScreen');if(el)el.classList.remove('on');}
 function setLockMode(rec){
@@ -1452,13 +1454,17 @@ async function passkeyCreate(){
   if(!c)throw new Error('cancelled');
   return c;
 }
-// discoverable credential → no stored credential id, and it rides iCloud Keychain to your other devices
-async function passkeySecret(){
-  const a=await navigator.credentials.get({publicKey:{
+// Naming the credential (allowCredentials + transports:internal) lets iOS skip
+// the "which passkey?" sheet and go straight to the Face ID scan. The id isn't
+// secret; it rides inside the pfk wrap, so it syncs with the rest.
+async function passkeySecret(credId){
+  const pk={
     challenge:crypto.getRandomValues(new Uint8Array(32)),
     rpId:location.hostname,userVerification:'required',
     extensions:{prf:{eval:{first:PRF_SALT}}},timeout:60000,
-  }});
+  };
+  if(credId)pk.allowCredentials=[{type:'public-key',id:_unb64(credId),transports:['internal']}];
+  const a=await navigator.credentials.get({publicKey:pk});
   if(!a)throw new Error('cancelled');
   const r=a.getClientExtensionResults&&a.getClientExtensionResults();
   const first=r&&r.prf&&r.prf.results&&r.prf.results.first;
@@ -1468,9 +1474,12 @@ async function passkeySecret(){
 async function enableFaceID(){
   if(!cryptoKey||!envWraps){toast('Set a password first');return;}
   try{
-    await passkeyCreate();
-    const secret=await passkeySecret();          // PRF results aren't guaranteed at create time — read them here
-    envWraps={pw:envWraps.pw,rec:envWraps.rec,pfk:await wrapMaster(cryptoKey,secret)};
+    const cred=await passkeyCreate();
+    const id=cred.rawId?_b64(cred.rawId):'';
+    const secret=await passkeySecret(id);        // PRF results aren't guaranteed at create time — read them here
+    // stash the credential id inside the wrap: unwrapMaster only reads salt/iv/ct,
+    // so it rides along for free and lets unlock skip the passkey picker
+    envWraps={pw:envWraps.pw,rec:envWraps.rec,pfk:{...await wrapMaster(cryptoKey,secret),id}};
     await writeLocal();schedulePush();
     toast('Face ID unlock is on');renderLockUI();
   }catch(e){
@@ -1484,17 +1493,19 @@ async function disableFaceID(){
   await writeLocal();schedulePush();
   toast('Face ID unlock removed');renderLockUI();
 }
-async function tryUnlockFaceID(){
-  const err=document.getElementById('lockErr');if(err)err.textContent='';
+// auto=true → fired automatically on open: fail silently, the buttons are right there
+async function tryUnlockFaceID(auto){
+  const err=document.getElementById('lockErr');if(err&&!auto)err.textContent='';
   try{
     const env=JSON.parse(store().getItem(LSKEY));
     if(!(env&&env.v===2&&env.pfk))throw new Error('none');
-    const secret=await passkeySecret();
+    const secret=await passkeySecret(env.pfk.id);
     cryptoKey=await unwrapMaster(env.pfk,secret);   // throws unless Face ID produced the right secret
     envWraps={pw:env.pw,rec:env.rec,pfk:env.pfk};
     anime=migrate(JSON.parse(await decList(env,cryptoKey)));
     finishUnlock();
   }catch(e){
+    if(auto)return;   // Safari may refuse an un-prompted get(), or you dismissed it — say nothing
     if(err)err.textContent=(e&&e.message==='cancelled')?'':'Face ID didn’t work — use your password';
   }
 }

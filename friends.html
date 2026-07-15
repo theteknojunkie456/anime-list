@@ -998,8 +998,15 @@ async function decryptShared(env){ // friend viewing a password-protected list
   if(!pw)return null;
   try{
     const _unb64=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
-    const base=await crypto.subtle.importKey('raw',new TextEncoder().encode(pw),'PBKDF2',false,['deriveKey']);
-    const key=await crypto.subtle.deriveKey({name:'PBKDF2',salt:_unb64(env.salt),iterations:150000,hash:'SHA-256'},base,{name:'AES-GCM',length:256},false,['decrypt']);
+    const derive=async(secret,salt)=>{const base=await crypto.subtle.importKey('raw',new TextEncoder().encode(secret),'PBKDF2',false,['deriveKey']);return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:150000,hash:'SHA-256'},base,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);};
+    if(env.v===2&&env.pw){                       // master-key envelope: unwrap master with the password, then decrypt the list
+      const wk=await derive(pw,_unb64(env.pw.salt));
+      const raw=await crypto.subtle.decrypt({name:'AES-GCM',iv:_unb64(env.pw.iv)},wk,_unb64(env.pw.ct));
+      const master=await crypto.subtle.importKey('raw',raw,{name:'AES-GCM'},false,['decrypt']);
+      const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:_unb64(env.iv)},master,_unb64(env.ct));
+      return JSON.parse(new TextDecoder().decode(pt));
+    }
+    const key=await derive(pw,_unb64(env.salt));  // v1 legacy: list encrypted directly with the password key
     const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:_unb64(env.iv)},key,_unb64(env.ct));
     return JSON.parse(new TextDecoder().decode(pt));
   }catch{return null;}

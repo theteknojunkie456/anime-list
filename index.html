@@ -305,6 +305,10 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 .lock-err{color:#ff6b6b;font-size:13px;font-weight:600;min-height:18px;margin-top:14px;}
 .lock-card.shake{animation:lshake .4s;}
 @keyframes lshake{10%,90%{transform:translateX(-2px);}20%,80%{transform:translateX(4px);}30%,50%,70%{transform:translateX(-8px);}40%,60%{transform:translateX(8px);}}
+.lock-alt{display:inline-block;margin-top:18px;color:var(--t2);font-size:13px;font-weight:600;text-decoration:underline;cursor:pointer;}
+.lock-alt:active{opacity:.6;}
+.lock-btn2{width:100%;margin-top:10px;padding:13px;border-radius:14px;border:1px solid var(--b2);background:transparent;color:var(--t2);font-weight:700;font-size:14px;cursor:pointer;}
+.rec-code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:19px;font-weight:800;letter-spacing:1px;color:var(--t1);background:var(--bg3);border:1px solid var(--b2);border-radius:14px;padding:16px 12px;margin-bottom:16px;word-break:break-all;line-height:1.5;}
 .dt-top.has-banner .dt-cover,.dt-top.has-banner .dt-cover-ph,.dt-top.has-banner .dt-info{position:relative;z-index:1;}
 .dt-top.has-banner .dt-title{text-shadow:0 2px 12px rgba(0,0,0,0.55);}
 .dt-cover{width:110px;height:156px;border-radius:16px;object-fit:cover;background:var(--bg4);border:1px solid var(--b2);flex-shrink:0;box-shadow:0 8px 24px rgba(0,0,0,0.4);}
@@ -711,11 +715,22 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 <div class="lockscreen" id="lockScreen">
   <div class="lock-card">
     <div class="lock-emoji">🔒</div>
-    <div class="lock-title">WatchList is locked</div>
-    <div class="lock-sub">Enter your password to open your list.</div>
+    <div class="lock-title" id="lockTitle">WatchList is locked</div>
+    <div class="lock-sub" id="lockSub">Enter your password to open your list.</div>
     <input id="lockPw" class="lock-in" type="password" placeholder="Password" autocomplete="current-password" onkeydown="if(event.key==='Enter')tryUnlock()">
-    <button class="lock-btn" onclick="tryUnlock()">Unlock</button>
+    <button class="lock-btn" id="lockBtn" onclick="tryUnlock()">Unlock</button>
     <div class="lock-err" id="lockErr"></div>
+    <a class="lock-alt" id="lockAlt" onclick="toggleLockMode()">Forgot password? Use recovery key</a>
+  </div>
+</div>
+<div class="lockscreen" id="recoveryScreen">
+  <div class="lock-card">
+    <div class="lock-emoji">🔑</div>
+    <div class="lock-title" id="recTitle">Save your recovery key</div>
+    <div class="lock-sub">This is the <b>only</b> way back into your list if you forget your password. Store it somewhere safe — a password manager, or email it to yourself. It won't be shown again.</div>
+    <div class="rec-code" id="recCode"></div>
+    <button class="lock-btn" onclick="copyRecovery()">Copy recovery key</button>
+    <button class="lock-btn2" onclick="closeRecovery()">I've saved it</button>
   </div>
 </div>
 <div id="app">
@@ -1095,10 +1110,10 @@ function load(){try{const s=store(),d=s&&s.getItem(LSKEY);if(d){const p=JSON.par
 let saveWarned=false;let _writeChain=Promise.resolve();
 function writeLocal(){
   const s=store();if(!s)return;
-  if(cryptoKey&&encSalt){                       // password set → persist ciphertext only
+  if(cryptoKey&&envWraps){                       // password set → persist ciphertext only
     const snap=JSON.stringify(anime);
     _writeChain=_writeChain.then(async()=>{
-      try{const env=await encryptData(snap,cryptoKey,encSalt);s.setItem(LSKEY,JSON.stringify(env));saveWarned=false;}
+      try{const {iv,ct}=await encList(snap,cryptoKey);s.setItem(LSKEY,JSON.stringify({v:2,enc:1,iv,ct,pw:envWraps.pw,rec:envWraps.rec}));saveWarned=false;}
       catch{if(!saveWarned){saveWarned=true;toast('⚠️ Storage full — remove some uploaded covers');}}
     });
     return _writeChain;
@@ -1109,80 +1124,171 @@ function save(){writeLocal();schedulePush();scheduleNotifyUpdate();}
 
 // ─── PASSWORD LOCK — AES-GCM encryption of the whole list (local + cloud) ────
 const ENCFLAG='enc_'+LSKEY;
-let cryptoKey=null, encSalt=null, appLocked=false;
+let cryptoKey=null, envWraps=null, appLocked=false;  // cryptoKey = the master key (unwrapped); envWraps = {pw,rec} wrapped copies
 function encEnabled(){try{return localStorage.getItem(ENCFLAG)==='1';}catch{return false;}}
 const _b64=b=>btoa(String.fromCharCode(...new Uint8Array(b)));
 const _unb64=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
-function isEnvelope(x){return !!(x&&typeof x==='object'&&x.enc===1&&x.ct&&x.iv&&x.salt);}
-async function deriveKey(pw,salt){
-  const base=await crypto.subtle.importKey('raw',new TextEncoder().encode(pw),'PBKDF2',false,['deriveKey']);
+function isEnvelope(x){return !!(x&&typeof x==='object'&&x.enc===1&&x.ct&&x.iv);}
+async function deriveKey(secret,salt){               // PBKDF2 → a wrapping key (from a password OR a recovery key)
+  const base=await crypto.subtle.importKey('raw',new TextEncoder().encode(secret),'PBKDF2',false,['deriveKey']);
   return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:150000,hash:'SHA-256'},base,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);
 }
-async function encryptData(jsonStr,key,salt){
-  const iv=crypto.getRandomValues(new Uint8Array(12));
-  const ct=await crypto.subtle.encrypt({name:'AES-GCM',iv},key,new TextEncoder().encode(jsonStr));
-  return {v:1,enc:1,salt:_b64(salt),iv:_b64(iv),ct:_b64(ct)};
+// ── master-key model: the list is encrypted with a random master key; that master key
+//    is wrapped separately by the password AND by the recovery key. Either one unwraps it. ──
+async function wrapMaster(master,secret){
+  const salt=crypto.getRandomValues(new Uint8Array(16)),iv=crypto.getRandomValues(new Uint8Array(12));
+  const wk=await deriveKey(secret,salt);
+  const raw=await crypto.subtle.exportKey('raw',master);
+  const ct=await crypto.subtle.encrypt({name:'AES-GCM',iv},wk,raw);
+  return {salt:_b64(salt),iv:_b64(iv),ct:_b64(ct)};
 }
-async function decryptData(env,key){                 // throws on wrong key
+async function unwrapMaster(wrap,secret){            // throws if the secret is wrong
+  const wk=await deriveKey(secret,_unb64(wrap.salt));
+  const raw=await crypto.subtle.decrypt({name:'AES-GCM',iv:_unb64(wrap.iv)},wk,_unb64(wrap.ct));
+  return crypto.subtle.importKey('raw',raw,{name:'AES-GCM'},true,['encrypt','decrypt']);
+}
+async function encList(jsonStr,master){
+  const iv=crypto.getRandomValues(new Uint8Array(12));
+  const ct=await crypto.subtle.encrypt({name:'AES-GCM',iv},master,new TextEncoder().encode(jsonStr));
+  return {iv:_b64(iv),ct:_b64(ct)};
+}
+async function decList(env,master){                  // throws if master is wrong
+  const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:_unb64(env.iv)},master,_unb64(env.ct));
+  return new TextDecoder().decode(pt);
+}
+async function decryptData(env,key){                 // v1 legacy: list was encrypted directly with a password-derived key
   const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:_unb64(env.iv)},key,_unb64(env.ct));
   return new TextDecoder().decode(pt);
 }
-async function setAppPassword(){
+async function buildEnvelope(){
+  const {iv,ct}=await encList(JSON.stringify(anime),cryptoKey);
+  return {v:2,enc:1,iv,ct,pw:envWraps.pw,rec:envWraps.rec};
+}
+function genRecoveryKey(){const c='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';let s='';for(let i=0;i<24;i++)s+=c[Math.floor(Math.random()*c.length)];return s.replace(/(.{4})(?=.)/g,'$1-');}
+function normRecovery(x){return (x||'').toUpperCase().replace(/[^A-Z0-9]/g,'');}
+async function setAppPassword(){                      // first-time setup → new master key + recovery key
   const el=document.getElementById('newPwIn');const pw=el?el.value:'';
   if(!pw||pw.length<4){toast('Use at least 4 characters');return;}
-  const salt=crypto.getRandomValues(new Uint8Array(16));
-  cryptoKey=await deriveKey(pw,salt);encSalt=salt;
+  cryptoKey=await crypto.subtle.generateKey({name:'AES-GCM',length:256},true,['encrypt','decrypt']);
+  const rec=genRecoveryKey();
+  envWraps={pw:await wrapMaster(cryptoKey,pw),rec:await wrapMaster(cryptoKey,normRecovery(rec))};
   try{localStorage.setItem(ENCFLAG,'1');}catch{}
-  await writeLocal();                 // re-store encrypted (awaited so it lands)
-  schedulePush();                     // push ciphertext to the cloud too
+  await writeLocal();schedulePush();
   if(el)el.value='';
-  toast('🔒 Password set — your list is encrypted');
   renderLockUI();
+  showRecovery(rec,'Save your recovery key');
 }
-function changeAppPassword(){ return setAppPassword(); }   // same flow, fresh salt+key
+async function changeAppPassword(){                   // re-wrap the same master with a new password (keeps recovery key)
+  const el=document.getElementById('newPwIn');const pw=el?el.value:'';
+  if(!pw||pw.length<4){toast('Use at least 4 characters');return;}
+  if(!cryptoKey||!envWraps){toast('Unlock first');return;}
+  envWraps={pw:await wrapMaster(cryptoKey,pw),rec:envWraps.rec};
+  await writeLocal();schedulePush();
+  if(el)el.value='';
+  toast('🔒 Password changed');renderLockUI();
+}
+async function regenRecovery(){                       // issue a fresh recovery key (old one stops working)
+  if(!cryptoKey||!envWraps){toast('Unlock first');return;}
+  const rec=genRecoveryKey();
+  envWraps={pw:envWraps.pw,rec:await wrapMaster(cryptoKey,normRecovery(rec))};
+  await writeLocal();schedulePush();
+  showRecovery(rec,'Your new recovery key');
+}
 function removeAppPassword(){
   if(!confirm('Remove the password? Your list will be stored unencrypted again — on this device and in the cloud.'))return;
-  cryptoKey=null;encSalt=null;
+  cryptoKey=null;envWraps=null;
   try{localStorage.removeItem(ENCFLAG);}catch{}
   writeLocal();schedulePush();
-  toast('Password removed');
-  renderLockUI();
+  toast('Password removed');renderLockUI();
 }
-function showLock(){appLocked=true;const el=document.getElementById('lockScreen');if(el){el.classList.add('on');const i=document.getElementById('lockPw');if(i){i.value='';setTimeout(()=>i.focus(),60);}}}
+async function upgradeToV2(pw){                        // migrate an older (v1) password-only list to master+recovery
+  cryptoKey=await crypto.subtle.generateKey({name:'AES-GCM',length:256},true,['encrypt','decrypt']);
+  const rec=genRecoveryKey();
+  envWraps={pw:await wrapMaster(cryptoKey,pw),rec:await wrapMaster(cryptoKey,normRecovery(rec))};
+  await writeLocal();schedulePush();
+  showRecovery(rec,'Security upgraded — save your recovery key');
+}
+let lockRecMode=false;
+function showLock(){appLocked=true;lockRecMode=false;const el=document.getElementById('lockScreen');if(el){el.classList.add('on');setLockMode(false);const i=document.getElementById('lockPw');if(i){i.value='';setTimeout(()=>i.focus(),60);}}}
 function hideLock(){appLocked=false;const el=document.getElementById('lockScreen');if(el)el.classList.remove('on');}
-async function tryUnlock(){
+function setLockMode(rec){
+  lockRecMode=rec;
+  const t=document.getElementById('lockTitle'),s=document.getElementById('lockSub'),i=document.getElementById('lockPw'),b=document.getElementById('lockBtn'),l=document.getElementById('lockAlt'),e=document.getElementById('lockErr');
+  if(e)e.textContent='';if(!i)return;i.value='';
+  if(rec){
+    t.textContent='Enter recovery key';s.textContent='Use the recovery key you saved when you set your password.';
+    i.type='text';i.placeholder='XXXX-XXXX-XXXX-…';i.setAttribute('onkeydown',"if(event.key==='Enter')tryUnlockRecovery()");
+    b.textContent='Recover';b.setAttribute('onclick','tryUnlockRecovery()');l.textContent='← Back to password';
+  }else{
+    t.textContent='WatchList is locked';s.textContent='Enter your password to open your list.';
+    i.type='password';i.placeholder='Password';i.setAttribute('onkeydown',"if(event.key==='Enter')tryUnlock()");
+    b.textContent='Unlock';b.setAttribute('onclick','tryUnlock()');l.textContent='Forgot password? Use recovery key';
+  }
+  i.focus();
+}
+function toggleLockMode(){setLockMode(!lockRecMode);}
+function _unlockErr(i,err,msg){if(err)err.textContent=msg;const card=document.querySelector('.lock-card');if(card){card.classList.remove('shake');void card.offsetWidth;card.classList.add('shake');}if(i){i.value='';i.focus();}}
+function finishUnlock(){hideLock();render();renderLockUI();setTimeout(syncOnOpen,200);try{setTimeout(fetchCovers,600);}catch{}}
+async function tryUnlock(){                            // unlock with the password
   const i=document.getElementById('lockPw'),err=document.getElementById('lockErr');
-  const pw=i?i.value:'';if(!pw)return;
-  if(err)err.textContent='';
+  const pw=i?i.value:'';if(!pw)return;if(err)err.textContent='';
+  try{
+    const env=JSON.parse(store().getItem(LSKEY));if(!isEnvelope(env))throw 0;
+    if(env.v===2&&env.pw){                            // master-key envelope
+      cryptoKey=await unwrapMaster(env.pw,pw);        // throws if wrong password
+      envWraps={pw:env.pw,rec:env.rec};
+      anime=migrate(JSON.parse(await decList(env,cryptoKey)));
+      finishUnlock();
+    }else{                                            // v1 legacy → decrypt, then upgrade to master+recovery
+      const key=await deriveKey(pw,_unb64(env.salt));
+      anime=migrate(JSON.parse(await decryptData(env,key)));  // throws if wrong
+      await upgradeToV2(pw);
+      finishUnlock();
+    }
+  }catch(e){_unlockErr(i,err,'Wrong password — try again');}
+}
+async function tryUnlockRecovery(){                    // unlock with the recovery key
+  const i=document.getElementById('lockPw'),err=document.getElementById('lockErr');
+  const code=normRecovery(i?i.value:'');if(!code)return;if(err)err.textContent='';
   try{
     const env=JSON.parse(store().getItem(LSKEY));
-    if(!isEnvelope(env))throw 0;
-    const salt=_unb64(env.salt);
-    const key=await deriveKey(pw,salt);
-    const json=await decryptData(env,key);        // throws if password wrong
-    cryptoKey=key;encSalt=salt;
-    anime=migrate(JSON.parse(json));
-    hideLock();render();renderLockUI();
-    setTimeout(syncOnOpen,200);try{setTimeout(fetchCovers,600);}catch{}
-  }catch(e){
-    if(err)err.textContent='Wrong password — try again';
-    const card=document.querySelector('.lock-card');if(card){card.classList.remove('shake');void card.offsetWidth;card.classList.add('shake');}
-    if(i){i.value='';i.focus();}
-  }
+    if(!(env&&env.v===2&&env.rec))throw 0;
+    cryptoKey=await unwrapMaster(env.rec,code);       // throws if wrong recovery key
+    envWraps={pw:env.pw,rec:env.rec};
+    anime=migrate(JSON.parse(await decList(env,cryptoKey)));
+    finishUnlock();
+    toast('Unlocked with recovery key — set a new password below');
+    setTimeout(()=>{try{openSheet('importSheet');}catch{}},600);
+  }catch(e){_unlockErr(i,err,'That recovery key didn’t work');}
 }
+function showRecovery(code,title){
+  const sc=document.getElementById('recoveryScreen');if(!sc)return;
+  document.getElementById('recCode').textContent=code;
+  document.getElementById('recTitle').textContent=title||'Your recovery key';
+  sc.classList.add('on');
+}
+function copyRecovery(){
+  const c=document.getElementById('recCode').textContent,done=()=>toast('📋 Recovery key copied');
+  if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(c).then(done).catch(()=>{});
+  else{try{const t=document.createElement('textarea');t.value=c;document.body.appendChild(t);t.select();document.execCommand('copy');t.remove();done();}catch{}}
+}
+function closeRecovery(){const sc=document.getElementById('recoveryScreen');if(sc)sc.classList.remove('on');}
 function renderLockUI(){
   const box=document.getElementById('lockBox');if(!box)return;
   if(encEnabled()){
     box.innerHTML=`<div class="dt-label">${icon('lock')} Password · ON</div>
-      <p class="ai-desc">Your list is encrypted with your password — genuinely unreadable without it, on this device <b>and</b> in the cloud. If you forget it, the data can't be recovered.</p>
+      <p class="ai-desc">Your list is encrypted — genuinely unreadable without your password, on this device <b>and</b> in the cloud. If you ever forget the password, your <b>recovery key</b> is the only way back in.</p>
       <div style="display:flex;gap:8px;margin-top:8px;">
         <input class="ai-prompt-in" id="newPwIn" type="password" placeholder="New password (to change)" autocomplete="new-password">
         <button class="ai-run-btn" onclick="changeAppPassword()">Change</button>
       </div>
-      <button class="imp-all" style="margin-top:8px" onclick="removeAppPassword()">Remove password</button>`;
+      <div style="display:flex;gap:8px;margin-top:8px;">
+        <button class="parse-btn" style="margin:0;flex:1" onclick="regenRecovery()">New recovery key</button>
+        <button class="imp-all" onclick="removeAppPassword()">Remove</button>
+      </div>`;
   }else{
     box.innerHTML=`<div class="dt-label">${icon('lock')} Password · OFF</div>
-      <p class="ai-desc">Set a password to encrypt your whole list. It's scrambled on this device and in the cloud — unreadable without the password. <b>If you forget it, the list can't be recovered.</b></p>
+      <p class="ai-desc">Set a password to encrypt your whole list — scrambled on this device and in the cloud, unreadable without the password. You'll get a one-time <b>recovery key</b> to save; it's the only way in if you forget the password. <b>Lose both and the list can't be recovered.</b></p>
       <div style="display:flex;gap:8px;margin-top:8px;">
         <input class="ai-prompt-in" id="newPwIn" type="password" placeholder="Choose a password" autocomplete="new-password">
         <button class="ai-run-btn" onclick="setAppPassword()">Set password</button>
@@ -1204,7 +1310,7 @@ async function syncPush(){
   const code=syncCode();if(!code||!SYNC_URL)return;
   try{
     let payload=anime;
-    if(cryptoKey&&encSalt){payload=await encryptData(JSON.stringify(anime),cryptoKey,encSalt);} // ciphertext to cloud
+    if(cryptoKey&&envWraps){payload=await buildEnvelope();} // ciphertext (master-key envelope) to cloud
     const r=await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({op:'push',code,data:payload})});
     const d=await r.json();if(d&&d.ok)setSyncAt(d.updatedAt);
   }catch{}
@@ -1220,9 +1326,10 @@ async function syncOnOpen(){
     const res=await syncPull();
     if(res&&res.data&&res.updatedAt>syncAt()){ // another device wrote a newer copy
       let arr=null;
-      if(isEnvelope(res.data)){
-        if(!cryptoKey)return;                  // encrypted remote — can't read without the password
-        try{arr=JSON.parse(await decryptData(res.data,cryptoKey));}catch{return;} // wrong password / corrupt → leave local intact
+      if(res.data&&res.data.v===2){
+        if(!cryptoKey)return;                  // encrypted remote — can't read until unlocked
+        try{arr=JSON.parse(await decList(res.data,cryptoKey));}catch{return;} // wrong master / corrupt → leave local intact
+        envWraps={pw:res.data.pw||(envWraps&&envWraps.pw),rec:res.data.rec||(envWraps&&envWraps.rec)};
       }else if(Array.isArray(res.data)){arr=res.data;}
       if(arr){anime=migrate(arr);writeLocal();setSyncAt(res.updatedAt);render();renderSyncUI();toast('☁️ Synced from cloud');return;}
     }
@@ -1244,7 +1351,7 @@ async function syncRestore(){
     if(res&&isEnvelope(res.data)){ // encrypted backup — store it and ask for the password to unlock
       try{store().setItem(LSKEY,JSON.stringify(res.data));localStorage.setItem(ENCFLAG,'1');}catch{}
       setSyncAt(res.updatedAt||Date.now());
-      cryptoKey=null;encSalt=null;
+      cryptoKey=null;envWraps=null;
       renderSyncUI();renderLockUI();showLock();
       toast('🔒 Enter this list’s password to unlock');
     }else if(res&&Array.isArray(res.data)&&res.data.length){

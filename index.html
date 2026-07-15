@@ -136,6 +136,34 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards;}
 .hero{transition:transform .16s ease;}
 .hero:active{transform:scale(.99);}
+/* Full-screen Stats experience */
+.statsview{position:fixed;inset:0;z-index:90;background:var(--bg);overflow-y:auto;transform:translateY(100%);transition:transform .42s cubic-bezier(.2,1,.28,1);padding-bottom:calc(var(--safe-b) + 40px);}
+.statsview.on{transform:translateY(0);}
+.sv-top{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:12px;padding:calc(var(--safe-t) + 14px) 18px 12px;background:linear-gradient(var(--bg),color-mix(in srgb,var(--bg) 55%,transparent));backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);}
+.sv-back{width:40px;height:40px;flex-shrink:0;border-radius:12px;background:var(--bg3);border:1px solid var(--b2);display:flex;align-items:center;justify-content:center;color:var(--t1);}
+.sv-back:active{transform:scale(.92);}
+.sv-title{font-size:23px;font-weight:900;letter-spacing:-.5px;}
+.sv-hero{display:flex;gap:10px;padding:8px 18px 0;}
+.sv-heronum{flex:1;background:linear-gradient(160deg,var(--bg3),var(--bg2));border:1px solid var(--bn2);border-radius:18px;padding:15px 10px;text-align:center;box-shadow:var(--elev1);}
+.sv-heronum .v{font-size:27px;font-weight:900;letter-spacing:-1px;color:var(--a2);line-height:1;display:inline-flex;align-items:center;gap:3px;justify-content:center;}
+.sv-heronum .v .ico{width:19px;height:19px;fill:currentColor;}
+.sv-heronum .l{font-size:10.5px;font-weight:700;color:var(--t2);margin-top:5px;}
+.sv-sec{margin:20px 18px 0;}
+.sv-h{font-size:12px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--t3);margin-bottom:8px;}
+.sv-bar{display:flex;align-items:center;gap:10px;padding:11px 0;cursor:pointer;border-top:1px solid var(--bn2);min-height:44px;}
+.sv-bar:first-child{border-top:none;}
+.sv-bar .lbl{font-size:13px;font-weight:700;color:var(--t1);width:96px;flex-shrink:0;display:flex;align-items:center;gap:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.sv-bar .lbl .ico{width:13px;height:13px;fill:currentColor;flex-shrink:0;}
+.sv-bar .track{flex:1;height:9px;border-radius:99px;background:var(--bg4);overflow:hidden;}
+.sv-bar .fill{height:100%;border-radius:99px;transition:width .7s cubic-bezier(.2,1,.3,1);}
+.sv-bar .n{font-size:13px;font-weight:800;color:var(--t2);width:32px;text-align:right;flex-shrink:0;}
+.sv-bar .chev{color:var(--t3);display:inline-flex;transition:transform .22s;}
+.sv-bar .chev .ico{width:16px;height:16px;}
+.sv-bar.open .chev{transform:rotate(90deg);}
+.sv-drill{display:none;flex-wrap:wrap;gap:6px;padding:2px 0 12px;}
+.sv-drill.on{display:flex;animation:fadeUp .3s ease both;}
+.sv-chip{font-size:11.5px;font-weight:600;padding:6px 11px;border-radius:99px;background:var(--bg4);border:1px solid var(--b2);color:var(--t2);display:inline-flex;align-items:center;gap:4px;}
+.sv-chip .ico{width:11px;height:11px;fill:currentColor;color:var(--a2);}
 .hero-shade{position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,0.05) 0%,rgba(8,8,10,0.6) 55%,rgba(8,8,10,0.93) 100%);}
 .hero-body{position:relative;padding:16px 18px;width:100%;}
 .hero-kicker{font-size:10px;font-weight:800;letter-spacing:0.14em;text-transform:uppercase;color:var(--a2);margin-bottom:6px;}
@@ -680,7 +708,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 <!-- BOTTOM NAV -->
 <div class="nav">
   <button class="nbtn on" id="nav-home" onclick="goHome()"><span><i data-ic="home"></i></span><small>Home</small></button>
-  <button class="nbtn" onclick="openSheet('statsSheet')"><span><i data-ic="chart"></i></span><small>Stats</small></button>
+  <button class="nbtn" onclick="openStats()"><span><i data-ic="chart"></i></span><small>Stats</small></button>
   <button class="nbtn add" onclick="openSheet_add()">＋</button>
   <button class="nbtn" onclick="openSheet('importSheet')"><span><i data-ic="clipboard"></i></span><small>Import</small></button>
   <button class="nbtn" onclick="openSheet('aiSheet')"><span><i data-ic="sparkles"></i></span><small>AI</small></button>
@@ -860,6 +888,15 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 </div>
 
 <!-- STATS SHEET -->
+<!-- FULL-SCREEN STATS -->
+<div class="statsview" id="statsView">
+  <div class="sv-top">
+    <button class="sv-back" onclick="closeStats()" aria-label="Back"><i data-ic="chevron-left"></i></button>
+    <div class="sv-title">Your Stats</div>
+  </div>
+  <div id="statsViewBody"></div>
+</div>
+
 <div class="sheet" id="statsSheet">
   <div class="sheet-handle"></div>
   <div class="sheet-header">
@@ -1809,6 +1846,41 @@ function fallbackCopy(text,done){
 
 // ─── STATS ──────────────────────────────────────────────────────────────────
 function parseHrs(s){const m=/([\d.]+)/.exec(s||'');return m?+m[1]:0;}
+function openStats(){renderStats();const v=document.getElementById('statsView');if(v)v.classList.add('on');}
+function closeStats(){const v=document.getElementById('statsView');if(v)v.classList.remove('on');}
+function svCountUp(el,to){if(!el)return;const dur=850,t0=performance.now();const step=now=>{const p=Math.min(1,(now-t0)/dur),e=1-Math.pow(1-p,3);el.textContent=Math.round(to*e).toLocaleString();if(p<1)requestAnimationFrame(step);};requestAnimationFrame(step);}
+function svChips(list){return list.length?list.map(a=>'<span class="sv-chip">'+schEsc(a.title)+(a.rating?' '+icon('star','fill')+a.rating:'')+'</span>').join(''):'<span class="sv-chip">None yet</span>';}
+function svBar(id,label,color,val,max,drill){return '<div class="sv-bar" onclick="svDrill(\''+id+'\',this)"><div class="lbl">'+label+'</div><div class="track"><div class="fill" style="width:'+Math.round(val/Math.max(1,max)*100)+'%;background:'+color+'"></div></div><div class="n">'+val+'</div><span class="chev">'+icon('chevron-right')+'</span></div><div class="sv-drill" id="drill-'+id+'">'+drill+'</div>';}
+function svDrill(id,el){const d=document.getElementById('drill-'+id);if(!d)return;el.classList.toggle('open',d.classList.toggle('on'));}
+function renderStats(){
+  const body=document.getElementById('statsViewBody');if(!body)return;
+  const counts={watching:0,plan:0,finished:0,dropped:0};
+  anime.forEach(a=>{if(counts[a.status]!==undefined)counts[a.status]++;});
+  const rated=anime.filter(a=>a.rating>0);
+  const avg=rated.length?(rated.reduce((s,a)=>s+a.rating,0)/rated.length).toFixed(1):'—';
+  const eps=anime.reduce((s,a)=>s+(a.status==='finished'?(a.epTotal||a.ep||0):(a.ep||0)),0);
+  const hrs=Math.round(anime.reduce((s,a)=>{const h=parseHrs(a.time);if(a.status==='finished')return s+h;if(a.epTotal&&a.ep)return s+h*(a.ep/a.epTotal);return s;},0));
+  const maxStatus=Math.max(1,...Object.values(counts));
+  const statusBars=['watching','plan','finished','dropped'].map(st=>svBar('st-'+st,(STATUS_META[st]?STATUS_META[st].label:st),(STATUS_META[st]?STATUS_META[st].color:'var(--a)'),counts[st],maxStatus,svChips(anime.filter(a=>a.status===st)))).join('');
+  const gc={};anime.forEach(a=>(a.genre||'').split(',').map(g=>g.trim()).filter(Boolean).forEach(g=>gc[g]=(gc[g]||0)+1));
+  const topG=Object.entries(gc).sort((a,b)=>b[1]-a[1]).slice(0,8);const maxG=topG.length?topG[0][1]:1;
+  const genreBars=topG.length?topG.map(([g,n],i)=>svBar('g-'+i,schEsc(g),'var(--a)',n,maxG,svChips(anime.filter(a=>(a.genre||'').split(',').map(x=>x.trim()).includes(g))))).join(''):'<p class="ai-desc">Add genres (via Autofill) to see this.</p>';
+  const rd=[5,4,3,2,1].map(r=>({r,items:anime.filter(a=>Math.round(a.rating)===r)}));const maxR=Math.max(1,...rd.map(x=>x.items.length));
+  const ratingBars=rated.length?rd.map(x=>svBar('r-'+x.r,x.r+' '+icon('star','fill'),'var(--a)',x.items.length,maxR,svChips(x.items))).join(''):'<p class="ai-desc">Rate some titles to see this.</p>';
+  const topRated=[...rated].sort((a,b)=>b.rating-a.rating).slice(0,8);
+  body.innerHTML=
+    '<div class="sv-hero"><div class="sv-heronum"><div class="v" data-to="'+hrs+'">0</div><div class="l">Hours watched</div></div>'+
+      '<div class="sv-heronum"><div class="v" data-to="'+anime.length+'">0</div><div class="l">Titles</div></div>'+
+      '<div class="sv-heronum"><div class="v" data-to="'+eps+'">0</div><div class="l">Episodes</div></div></div>'+
+    '<div class="sv-hero"><div class="sv-heronum"><div class="v">'+icon('star','fill')+' '+avg+'</div><div class="l">Avg rating ('+rated.length+')</div></div>'+
+      '<div class="sv-heronum"><div class="v" data-to="'+counts.finished+'">0</div><div class="l">Finished</div></div>'+
+      '<div class="sv-heronum"><div class="v" data-to="'+anime.filter(a=>a.fav).length+'">0</div><div class="l">Favorites</div></div></div>'+
+    '<div class="sv-sec"><div class="sv-h">Status — tap to reveal</div>'+statusBars+'</div>'+
+    '<div class="sv-sec"><div class="sv-h">Top genres — tap to reveal</div>'+genreBars+'</div>'+
+    '<div class="sv-sec"><div class="sv-h">Ratings — tap to reveal</div>'+ratingBars+'</div>'+
+    (topRated.length?'<div class="sv-sec"><div class="sv-h">Your top rated</div><div class="sv-drill on">'+topRated.map(a=>'<span class="sv-chip">'+schEsc(a.title)+' '+icon('star','fill')+a.rating+'</span>').join('')+'</div></div>':'');
+  body.querySelectorAll('.sv-heronum .v[data-to]').forEach(el=>svCountUp(el,+el.getAttribute('data-to')));
+}
 function renderStatsSheet(){
   const counts={watching:0,plan:0,finished:0,dropped:0};
   anime.forEach(a=>counts[a.status]!==undefined&&counts[a.status]++);

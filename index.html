@@ -60,7 +60,9 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 @media(prefers-reduced-motion:reduce){*{animation-duration:.001ms!important;transition-duration:.001ms!important;}}
 
 /* ── SHELL ── */
-#app{height:100vh;height:100dvh;display:flex;flex-direction:column;background:var(--topgrad);}
+@property --amb{syntax:'<color>';inherits:true;initial-value:transparent;}
+.ambient{position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(80% 55% at 50% -12%,color-mix(in srgb,var(--amb) 44%,transparent) 0%,transparent 60%),radial-gradient(55% 40% at 84% 8%,color-mix(in srgb,var(--amb) 18%,transparent) 0%,transparent 55%),var(--topgrad);transition:--amb 1.1s ease;}
+#app{height:100vh;height:100dvh;display:flex;flex-direction:column;background:transparent;}
 .page{flex:1;overflow-y:auto;padding-bottom:calc(var(--safe-b) + 86px);}
 
 /* ── HEADER ── */
@@ -119,7 +121,8 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 .hero-cta{transition:transform .16s,box-shadow .16s;}
 .hero-bg{position:absolute;inset:0;background-size:cover;background-position:center 22%;filter:saturate(1.05);}
 /* per-title banner art rendered as an <img> so it lazy-loads + can gracefully drop on error (falls back to the gradient .hero-bg beneath it) */
-.hero-bg-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 30%;filter:saturate(1.05);}
+.hero-bg-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 30%;filter:saturate(1.08);animation:kenburns 28s ease-in-out infinite alternate;will-change:transform;}
+@keyframes kenburns{from{transform:scale(1.06) translate(0,0);}to{transform:scale(1.18) translate(-2.5%,-3%);}}
 .hero-shade{position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,0.05) 0%,rgba(8,8,10,0.6) 55%,rgba(8,8,10,0.93) 100%);}
 .hero-body{position:relative;padding:16px 18px;width:100%;}
 .hero-kicker{font-size:10px;font-weight:800;letter-spacing:0.14em;text-transform:uppercase;color:var(--a2);margin-bottom:6px;}
@@ -215,7 +218,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
   background:var(--bg2);border-radius:26px 26px 0 0;border-top:1px solid var(--b3);
   padding:10px 22px calc(var(--safe-b) + 24px);
   box-shadow:0 -20px 60px rgba(0,0,0,0.5);
-  transform:translateY(102%);transition:transform .34s cubic-bezier(.32,.72,.28,1);
+  transform:translateY(102%);transition:transform .44s cubic-bezier(.2,1,.28,1);
 }
 @supports ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
   .sheet{background:color-mix(in srgb,var(--bg2) 82%,transparent);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);}
@@ -635,6 +638,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 </head>
 <body>
 
+<div class="ambient" aria-hidden="true"></div>
 <div id="app">
   <div class="hdr">
     <div>
@@ -1267,6 +1271,7 @@ function prog(a){return a.status==='finished'?1:(a.epTotal?Math.min(1,(a.ep||0)/
 // per-title theming: user's own bg wins over AniList banner; accent follows the same source.
 function titleBg(a){return (a&&(a.bgImage||a.banner))||'';}
 function titleAccent(a){if(!a)return'';return (a.bgImage?(a.bgAccent||a.aniColor):a.aniColor)||'';}
+function setAmbient(c){try{document.documentElement.style.setProperty('--amb',(c&&/^#[0-9a-fA-F]{3,6}$/.test(c))?c:'transparent');}catch{}}
 // scoped CSS-var override string that tints a title's own detail/hero accents without touching global chrome
 function accentVars(a){const ac=titleAccent(a);if(!ac||!/^#[0-9a-fA-F]{3,6}$/.test(ac))return'';try{return`--a:${ac};--a2:${mix(ac,'#ffffff',0.28)};--ag:${rgba(ac,0.15)};--glow:${rgba(ac,0.26)};`;}catch{return'';}}
 function query(){return document.getElementById('searchIn').value.toLowerCase().trim();}
@@ -1386,6 +1391,7 @@ function renderHome(){
   }
   const watching=sorted(pool.filter(a=>a.status==='watching'));
   const hero=watching.find(a=>a.img)||watching[0];
+  setAmbient(hero?titleAccent(hero):'');
   let html=hero?heroHTML(hero):'';
   const rows=isRead
     ?[['watching',icon('book')+' Reading'],['plan',icon('clipboard')+' Plan to Read'],['finished',icon('check')+' Finished'],['dropped',icon('x')+' Dropped']]
@@ -1406,6 +1412,7 @@ function renderHome(){
 // ─── DETAIL ─────────────────────────────────────────────────────────────────
 function openDetail(id){
   detailId=id;
+  const it=anime.find(a=>a.id===id);setAmbient(it?titleAccent(it):'');
   renderDetail();
   openSheet('detailSheet');
 }

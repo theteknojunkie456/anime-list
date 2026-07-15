@@ -291,6 +291,20 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 #detailSheet.on .dt-back{display:flex;}
 .dt-back:active{transform:scale(.92);}
 .dt-back .ico{width:20px;height:20px;}
+/* Password lock screen */
+.lockscreen{position:fixed;inset:0;z-index:200;background:var(--bg);display:none;align-items:center;justify-content:center;padding:24px;}
+.lockscreen.on{display:flex;}
+.lock-card{width:100%;max-width:340px;text-align:center;}
+.lock-emoji{font-size:46px;margin-bottom:14px;}
+.lock-title{font-size:21px;font-weight:900;letter-spacing:-.3px;margin-bottom:6px;color:var(--t1);}
+.lock-sub{font-size:13px;color:var(--t2);margin-bottom:22px;}
+.lock-in{width:100%;padding:14px 16px;border-radius:14px;border:1px solid var(--b2);background:var(--bg2);color:var(--t1);font-size:16px;text-align:center;outline:none;box-sizing:border-box;}
+.lock-in:focus{border-color:var(--a);}
+.lock-btn{width:100%;margin-top:12px;padding:14px;border-radius:14px;border:none;background:var(--a);color:#fff;font-weight:800;font-size:15px;cursor:pointer;}
+.lock-btn:active{transform:scale(.97);}
+.lock-err{color:#ff6b6b;font-size:13px;font-weight:600;min-height:18px;margin-top:14px;}
+.lock-card.shake{animation:lshake .4s;}
+@keyframes lshake{10%,90%{transform:translateX(-2px);}20%,80%{transform:translateX(4px);}30%,50%,70%{transform:translateX(-8px);}40%,60%{transform:translateX(8px);}}
 .dt-top.has-banner .dt-cover,.dt-top.has-banner .dt-cover-ph,.dt-top.has-banner .dt-info{position:relative;z-index:1;}
 .dt-top.has-banner .dt-title{text-shadow:0 2px 12px rgba(0,0,0,0.55);}
 .dt-cover{width:110px;height:156px;border-radius:16px;object-fit:cover;background:var(--bg4);border:1px solid var(--b2);flex-shrink:0;box-shadow:0 8px 24px rgba(0,0,0,0.4);}
@@ -694,6 +708,16 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 <body>
 
 <div class="ambient" aria-hidden="true"></div>
+<div class="lockscreen" id="lockScreen">
+  <div class="lock-card">
+    <div class="lock-emoji">🔒</div>
+    <div class="lock-title">WatchList is locked</div>
+    <div class="lock-sub">Enter your password to open your list.</div>
+    <input id="lockPw" class="lock-in" type="password" placeholder="Password" autocomplete="current-password" onkeydown="if(event.key==='Enter')tryUnlock()">
+    <button class="lock-btn" onclick="tryUnlock()">Unlock</button>
+    <div class="lock-err" id="lockErr"></div>
+  </div>
+</div>
 <div id="app">
   <div class="hdr">
     <div>
@@ -898,6 +922,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
     <button class="parse-btn" style="margin-top:0" onclick="exportList()"><i data-ic="upload"></i> Copy my list to clipboard</button>
   </div>
   <div id="syncBox" style="margin-top:16px;padding-top:14px;border-top:1px solid var(--b1);"></div>
+  <div id="lockBox" style="margin-top:16px;padding-top:14px;border-top:1px solid var(--b1);"></div>
   <div id="notifyBox" style="margin-top:16px;padding-top:14px;border-top:1px solid var(--b1);"></div>
 </div>
 
@@ -1066,10 +1091,104 @@ function migrate(list){
   // banner/aniColor = AniList per-title art + dominant color; bgImage/bgAccent = user's own background + its extracted color
   return (Array.isArray(list)?list:[]).map(a=>({ep:0,rating:0,fav:false,upd:0,epTotal:parseEpTotal(a.eps),img:'',order:[],notes:'',genre:'',eps:'',time:'',kind:'watch',banner:'',aniColor:'',bgImage:'',bgAccent:'',bannerTried:false,...a}));
 }
-function load(){try{const s=store(),d=s&&s.getItem(LSKEY);anime=migrate(d?JSON.parse(d):JSON.parse(JSON.stringify(DEFAULT_DATA)));}catch{anime=migrate(JSON.parse(JSON.stringify(DEFAULT_DATA)));}}
-let saveWarned=false;
-function writeLocal(){try{const s=store();if(s)s.setItem(LSKEY,JSON.stringify(anime));saveWarned=false;}catch{if(!saveWarned){saveWarned=true;toast('⚠️ Storage full — remove some uploaded covers');}}}
+function load(){try{const s=store(),d=s&&s.getItem(LSKEY);if(d){const p=JSON.parse(d);if(isEnvelope(p)){appLocked=true;anime=[];return;}anime=migrate(p);}else{anime=migrate(JSON.parse(JSON.stringify(DEFAULT_DATA)));}}catch{anime=migrate(JSON.parse(JSON.stringify(DEFAULT_DATA)));}}
+let saveWarned=false;let _writeChain=Promise.resolve();
+function writeLocal(){
+  const s=store();if(!s)return;
+  if(cryptoKey&&encSalt){                       // password set → persist ciphertext only
+    const snap=JSON.stringify(anime);
+    _writeChain=_writeChain.then(async()=>{
+      try{const env=await encryptData(snap,cryptoKey,encSalt);s.setItem(LSKEY,JSON.stringify(env));saveWarned=false;}
+      catch{if(!saveWarned){saveWarned=true;toast('⚠️ Storage full — remove some uploaded covers');}}
+    });
+    return _writeChain;
+  }
+  try{s.setItem(LSKEY,JSON.stringify(anime));saveWarned=false;}catch{if(!saveWarned){saveWarned=true;toast('⚠️ Storage full — remove some uploaded covers');}}
+}
 function save(){writeLocal();schedulePush();scheduleNotifyUpdate();}
+
+// ─── PASSWORD LOCK — AES-GCM encryption of the whole list (local + cloud) ────
+const ENCFLAG='enc_'+LSKEY;
+let cryptoKey=null, encSalt=null, appLocked=false;
+function encEnabled(){try{return localStorage.getItem(ENCFLAG)==='1';}catch{return false;}}
+const _b64=b=>btoa(String.fromCharCode(...new Uint8Array(b)));
+const _unb64=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
+function isEnvelope(x){return !!(x&&typeof x==='object'&&x.enc===1&&x.ct&&x.iv&&x.salt);}
+async function deriveKey(pw,salt){
+  const base=await crypto.subtle.importKey('raw',new TextEncoder().encode(pw),'PBKDF2',false,['deriveKey']);
+  return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:150000,hash:'SHA-256'},base,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);
+}
+async function encryptData(jsonStr,key,salt){
+  const iv=crypto.getRandomValues(new Uint8Array(12));
+  const ct=await crypto.subtle.encrypt({name:'AES-GCM',iv},key,new TextEncoder().encode(jsonStr));
+  return {v:1,enc:1,salt:_b64(salt),iv:_b64(iv),ct:_b64(ct)};
+}
+async function decryptData(env,key){                 // throws on wrong key
+  const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:_unb64(env.iv)},key,_unb64(env.ct));
+  return new TextDecoder().decode(pt);
+}
+async function setAppPassword(){
+  const el=document.getElementById('newPwIn');const pw=el?el.value:'';
+  if(!pw||pw.length<4){toast('Use at least 4 characters');return;}
+  const salt=crypto.getRandomValues(new Uint8Array(16));
+  cryptoKey=await deriveKey(pw,salt);encSalt=salt;
+  try{localStorage.setItem(ENCFLAG,'1');}catch{}
+  await writeLocal();                 // re-store encrypted (awaited so it lands)
+  schedulePush();                     // push ciphertext to the cloud too
+  if(el)el.value='';
+  toast('🔒 Password set — your list is encrypted');
+  renderLockUI();
+}
+function changeAppPassword(){ return setAppPassword(); }   // same flow, fresh salt+key
+function removeAppPassword(){
+  if(!confirm('Remove the password? Your list will be stored unencrypted again — on this device and in the cloud.'))return;
+  cryptoKey=null;encSalt=null;
+  try{localStorage.removeItem(ENCFLAG);}catch{}
+  writeLocal();schedulePush();
+  toast('Password removed');
+  renderLockUI();
+}
+function showLock(){appLocked=true;const el=document.getElementById('lockScreen');if(el){el.classList.add('on');const i=document.getElementById('lockPw');if(i){i.value='';setTimeout(()=>i.focus(),60);}}}
+function hideLock(){appLocked=false;const el=document.getElementById('lockScreen');if(el)el.classList.remove('on');}
+async function tryUnlock(){
+  const i=document.getElementById('lockPw'),err=document.getElementById('lockErr');
+  const pw=i?i.value:'';if(!pw)return;
+  if(err)err.textContent='';
+  try{
+    const env=JSON.parse(store().getItem(LSKEY));
+    if(!isEnvelope(env))throw 0;
+    const salt=_unb64(env.salt);
+    const key=await deriveKey(pw,salt);
+    const json=await decryptData(env,key);        // throws if password wrong
+    cryptoKey=key;encSalt=salt;
+    anime=migrate(JSON.parse(json));
+    hideLock();render();renderLockUI();
+    setTimeout(syncOnOpen,200);try{setTimeout(fetchCovers,600);}catch{}
+  }catch(e){
+    if(err)err.textContent='Wrong password — try again';
+    const card=document.querySelector('.lock-card');if(card){card.classList.remove('shake');void card.offsetWidth;card.classList.add('shake');}
+    if(i){i.value='';i.focus();}
+  }
+}
+function renderLockUI(){
+  const box=document.getElementById('lockBox');if(!box)return;
+  if(encEnabled()){
+    box.innerHTML=`<div class="dt-label">${icon('lock')} Password · ON</div>
+      <p class="ai-desc">Your list is encrypted with your password — genuinely unreadable without it, on this device <b>and</b> in the cloud. If you forget it, the data can't be recovered.</p>
+      <div style="display:flex;gap:8px;margin-top:8px;">
+        <input class="ai-prompt-in" id="newPwIn" type="password" placeholder="New password (to change)" autocomplete="new-password">
+        <button class="ai-run-btn" onclick="changeAppPassword()">Change</button>
+      </div>
+      <button class="imp-all" style="margin-top:8px" onclick="removeAppPassword()">Remove password</button>`;
+  }else{
+    box.innerHTML=`<div class="dt-label">${icon('lock')} Password · OFF</div>
+      <p class="ai-desc">Set a password to encrypt your whole list. It's scrambled on this device and in the cloud — unreadable without the password. <b>If you forget it, the list can't be recovered.</b></p>
+      <div style="display:flex;gap:8px;margin-top:8px;">
+        <input class="ai-prompt-in" id="newPwIn" type="password" placeholder="Choose a password" autocomplete="new-password">
+        <button class="ai-run-btn" onclick="setAppPassword()">Set password</button>
+      </div>`;
+  }
+}
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2);}
 function touch(a){a.upd=Date.now();}
 
@@ -1084,7 +1203,9 @@ function schedulePush(){if(!syncCode()||!SYNC_URL)return;clearTimeout(pushT);pus
 async function syncPush(){
   const code=syncCode();if(!code||!SYNC_URL)return;
   try{
-    const r=await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({op:'push',code,data:anime})});
+    let payload=anime;
+    if(cryptoKey&&encSalt){payload=await encryptData(JSON.stringify(anime),cryptoKey,encSalt);} // ciphertext to cloud
+    const r=await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({op:'push',code,data:payload})});
     const d=await r.json();if(d&&d.ok)setSyncAt(d.updatedAt);
   }catch{}
 }
@@ -1094,14 +1215,18 @@ async function syncPull(){
   return await r.json();
 }
 async function syncOnOpen(){
-  if(!syncCode())return;
+  if(!syncCode()||appLocked)return;
   try{
     const res=await syncPull();
-    if(res&&Array.isArray(res.data)&&res.updatedAt>syncAt()){ // another device wrote a newer copy — adopt it
-      anime=migrate(res.data);writeLocal();setSyncAt(res.updatedAt);render();renderSyncUI();toast('☁️ Synced from cloud');
-    }else{ // local is current or newer — make sure the cloud has it
-      syncPush();
+    if(res&&res.data&&res.updatedAt>syncAt()){ // another device wrote a newer copy
+      let arr=null;
+      if(isEnvelope(res.data)){
+        if(!cryptoKey)return;                  // encrypted remote — can't read without the password
+        try{arr=JSON.parse(await decryptData(res.data,cryptoKey));}catch{return;} // wrong password / corrupt → leave local intact
+      }else if(Array.isArray(res.data)){arr=res.data;}
+      if(arr){anime=migrate(arr);writeLocal();setSyncAt(res.updatedAt);render();renderSyncUI();toast('☁️ Synced from cloud');return;}
     }
+    syncPush(); // local is current or newer — make sure the cloud has it
   }catch{}
 }
 function syncEnableNew(){
@@ -1116,7 +1241,13 @@ async function syncRestore(){
   try{
     setSyncCode(raw);
     const res=await syncPull();
-    if(res&&Array.isArray(res.data)&&res.data.length){
+    if(res&&isEnvelope(res.data)){ // encrypted backup — store it and ask for the password to unlock
+      try{store().setItem(LSKEY,JSON.stringify(res.data));localStorage.setItem(ENCFLAG,'1');}catch{}
+      setSyncAt(res.updatedAt||Date.now());
+      cryptoKey=null;encSalt=null;
+      renderSyncUI();renderLockUI();showLock();
+      toast('🔒 Enter this list’s password to unlock');
+    }else if(res&&Array.isArray(res.data)&&res.data.length){
       anime=migrate(res.data);writeLocal();setSyncAt(res.updatedAt||Date.now());render();renderSyncUI();toast('☁️ Restored from cloud');
     }else{ // nothing stored under that code yet — link this device and seed it
       setSyncAt(0);syncPush();renderSyncUI();toast('Code linked — this device now backs up here');
@@ -1608,7 +1739,7 @@ function openSheet(id){
   document.getElementById(id).classList.add('on');
   if(id==='themeSheet')renderThemeGrid();
   if(id==='statsSheet')renderStatsSheet();
-  if(id==='importSheet'){renderSyncUI();renderNotifyUI();}
+  if(id==='importSheet'){renderSyncUI();renderLockUI();renderNotifyUI();}
   if(id==='forYouSheet')renderForYou();
   if(id==='aiSheet'){renderModelPicker();updateKeyBtn();}
 }
@@ -2527,6 +2658,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeAll();closeCon
 // ─── INIT ───────────────────────────────────────────────────────────────────
 try{hydrateIcons();}catch{}
 load();loadTheme();render();
+if(appLocked)showLock();   // stored list is ciphertext → gate the app until unlocked
 try{document.getElementById('pageEl').addEventListener('scroll',onPageScroll,{passive:true});}catch{}
 try{document.getElementById('detailSheet').addEventListener('scroll',onDetailScroll,{passive:true});}catch{}
 try{renderNotifyBell();}catch{}

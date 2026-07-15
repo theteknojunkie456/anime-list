@@ -2314,7 +2314,7 @@ function fallbackCopy(text,done){
 }
 
 // ─── TUTORIAL ───────────────────────────────────────────────────────────────
-const TUT_FLAG='tut_seen_v1';
+const TUT_FLAG='tut_seen_'+LSKEY;   // namespaced like sync_/enc_: index + friends share an origin
 function tutSeen(){try{return localStorage.getItem(TUT_FLAG)==='1';}catch{return true;}}
 function markTutSeen(){try{localStorage.setItem(TUT_FLAG,'1');}catch{}}
 function openTutorial(){closeAll();const v=document.getElementById('tutView');if(v){v.scrollTop=0;v.classList.add('on');}markTutSeen();}
@@ -2355,8 +2355,9 @@ function renderSettings(){
 // A list with no sync code dies with the device — clearing site data or deleting
 // the Home Screen app wipes it, with nothing to restore from. Once someone has
 // enough titles to care about, say so once; then never nag again.
-function nudgeOff(){try{return localStorage.getItem('backup_nudge_off')==='1';}catch{return true;}}
-function dismissNudge(){try{localStorage.setItem('backup_nudge_off','1');}catch{}renderHome();}
+const NUDGE_FLAG='backup_nudge_'+LSKEY;
+function nudgeOff(){try{return localStorage.getItem(NUDGE_FLAG)==='1';}catch{return true;}}
+function dismissNudge(){try{localStorage.setItem(NUDGE_FLAG,'1');}catch{}renderHome();}
 function shouldNudge(){return anime.length>=5&&!syncCode()&&!nudgeOff();}
 function nudgeHTML(){
   if(!shouldNudge())return'';

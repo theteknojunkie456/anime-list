@@ -5,7 +5,9 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<!-- NOT black-translucent: it shifts the standalone viewport up by the status-bar
+     height on iOS, stranding a dead band at the bottom below the fixed nav. -->
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="theme-color" content="#0a0a0c">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
@@ -60,39 +62,48 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 @media(prefers-reduced-motion:reduce){*{animation-duration:.001ms!important;transition-duration:.001ms!important;}}
 
 /* ── SHELL ── */
-#app{height:100vh;height:100dvh;display:flex;flex-direction:column;background:var(--topgrad);}
+@property --amb{syntax:'<color>';inherits:true;initial-value:transparent;}
+/* iOS paints a solid #000 status bar above us (status-bar-style:black), so the
+   first ~200px ramp from black — a long, smooth falloff, not a hard edge — and
+   the glow blooms lower, behind the artwork rather than behind the chrome.
+   A short ramp here reads as a bright stripe; keep it generous. */
+.ambient{position:fixed;inset:0;z-index:-1;pointer-events:none;background:linear-gradient(to bottom,#000 0,rgba(0,0,0,0.86) 46px,rgba(0,0,0,0.5) 120px,rgba(0,0,0,0.18) 176px,rgba(0,0,0,0) 232px),radial-gradient(92% 52% at 50% 20%,color-mix(in srgb,var(--amb) 48%,transparent) 0%,transparent 68%),radial-gradient(55% 40% at 84% 34%,color-mix(in srgb,var(--amb) 18%,transparent) 0%,transparent 58%),var(--topgrad);transition:--amb 1.1s ease;}
+#app{height:100vh;height:100dvh;display:flex;flex-direction:column;background:transparent;}
 .page{flex:1;overflow-y:auto;padding-bottom:calc(var(--safe-b) + 86px);}
 
 /* ── HEADER ── */
-.hdr{padding:calc(var(--safe-t) + 16px) 18px 4px;display:flex;align-items:center;justify-content:space-between;}
-.hdr-title{font-size:26px;font-weight:900;letter-spacing:-0.6px;display:flex;align-items:center;gap:8px;}
-.hdr-title::before{content:'';width:6px;height:22px;border-radius:99px;background:linear-gradient(180deg,var(--a2),var(--a));box-shadow:0 0 12px var(--glow);}
-.hdr-sub{font-size:11.5px;color:var(--t2);font-weight:600;margin-top:4px;padding-left:14px;}
+.hdr{padding:calc(var(--safe-t) + 12px) 18px 0;display:flex;align-items:center;justify-content:space-between;}
+.hdr-title{font-size:21px;font-weight:900;letter-spacing:-0.5px;display:flex;align-items:center;gap:8px;}
+.hdr-title::before{content:'';width:5px;height:18px;border-radius:99px;background:linear-gradient(180deg,var(--a2),var(--a));box-shadow:0 0 12px var(--glow);}
 .hbtn{
-  width:40px;height:40px;border-radius:13px;font-size:17px;
+  width:36px;height:36px;border-radius:12px;font-size:16px;
   background:var(--bg3);border:1px solid var(--b2);
   display:flex;align-items:center;justify-content:center;transition:transform .12s,background .16s,border-color .16s;
 }
 .hbtn:active{transform:scale(0.9);}
 .hbtn.bell-on{background:color-mix(in srgb,var(--a) 22%,var(--bg3));border-color:transparent;color:var(--a2);box-shadow:0 4px 14px -6px var(--glow);}
-.hdr-actions{display:flex;align-items:center;gap:8px;}
-.search-row{padding:12px 18px 2px;}
-.search-wrap{position:relative;}
+.hdr-actions{display:flex;align-items:center;gap:6px;}
+.search-row{padding:10px 18px 0;display:flex;align-items:center;gap:8px;}
+.search-wrap{position:relative;flex:1;min-width:0;}
 .search-ico{position:absolute;left:13px;top:50%;transform:translateY(-50%);font-size:13px;opacity:0.5;}
 .search-in{
-  width:100%;padding:12px 14px 12px 38px;border-radius:14px;font-size:14px;
+  width:100%;padding:11px 14px 11px 38px;border-radius:14px;font-size:14px;
   background:var(--bg3);border:1px solid var(--bn);color:var(--t1);outline:none;font-family:inherit;
   transition:border-color .16s,box-shadow .16s,background .16s;box-shadow:var(--elev1);
 }
 .search-in:focus{border-color:var(--a);box-shadow:0 0 0 3px var(--ag);background:var(--bg2);}
 .search-in::placeholder{color:var(--t3);}
-.sort-row{display:flex;gap:7px;padding:11px 18px 4px;overflow-x:auto;}
+/* filters + sort share one scrolling strip, split by a hairline */
+.ctrl-row{display:flex;align-items:center;gap:9px;padding:10px 18px 0;overflow-x:auto;scrollbar-width:none;}
+.ctrl-row::-webkit-scrollbar{display:none;}
+.sort-row{display:flex;gap:6px;padding:0 0 0 10px;flex-shrink:0;position:relative;}
+.sort-row::before{content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);width:1px;height:16px;background:var(--b2);}
 .schip{
   flex-shrink:0;padding:7px 14px;border-radius:99px;font-size:11.5px;font-weight:700;
   background:var(--bg3);border:1px solid transparent;color:var(--t2);transition:all .15s;
 }
 .schip.on{background:color-mix(in srgb,var(--a) 20%,var(--bg3));border-color:transparent;color:var(--a2);box-shadow:0 3px 12px -5px var(--glow);}
-.filt-row{display:flex;gap:7px;padding:9px 18px 0;overflow-x:auto;}
+.filt-row{display:flex;gap:6px;flex-shrink:0;}
 .fchip{
   flex-shrink:0;padding:7px 13px;border-radius:99px;font-size:11.5px;font-weight:700;
   background:var(--bg3);border:1px solid transparent;color:var(--t2);
@@ -119,7 +130,86 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 .hero-cta{transition:transform .16s,box-shadow .16s;}
 .hero-bg{position:absolute;inset:0;background-size:cover;background-position:center 22%;filter:saturate(1.05);}
 /* per-title banner art rendered as an <img> so it lazy-loads + can gracefully drop on error (falls back to the gradient .hero-bg beneath it) */
-.hero-bg-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 30%;filter:saturate(1.05);}
+.hero-bg-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 30%;filter:saturate(1.08);animation:kenburns 28s ease-in-out infinite alternate;will-change:transform;}
+@keyframes kenburns{from{transform:scale(1.06) translate(0,0);}to{transform:scale(1.18) translate(-2.5%,-3%);}}
+/* Phase-2 motion: staggered reveals + tactile press */
+.pcard{animation:cardIn .42s cubic-bezier(.2,1,.3,1) backwards;}
+@keyframes cardIn{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:none;}}
+.pcard:active{transform:scale(.955);}
+.row-scroll .pcard:nth-child(2),.grid .pcard:nth-child(2){animation-delay:.03s}
+.row-scroll .pcard:nth-child(3),.grid .pcard:nth-child(3){animation-delay:.06s}
+.row-scroll .pcard:nth-child(4),.grid .pcard:nth-child(4){animation-delay:.09s}
+.row-scroll .pcard:nth-child(5),.grid .pcard:nth-child(5){animation-delay:.12s}
+.row-scroll .pcard:nth-child(6),.grid .pcard:nth-child(6){animation-delay:.15s}
+.row-scroll .pcard:nth-child(n+7),.grid .pcard:nth-child(n+7){animation-delay:.17s}
+.row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards;}
+.hero{transition:transform .16s ease;}
+.hero:active{transform:scale(.99);}
+/* Full-screen Stats experience */
+.statsview{position:fixed;inset:0;z-index:90;background:var(--bg);overflow-y:auto;transform:translateY(100%);transition:transform .42s cubic-bezier(.2,1,.28,1);padding-bottom:calc(var(--safe-b) + 40px);}
+.statsview.on{transform:translateY(0);}
+.sv-top{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:12px;padding:calc(var(--safe-t) + 14px) 18px 12px;background:linear-gradient(var(--bg),color-mix(in srgb,var(--bg) 55%,transparent));backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);}
+.sv-back{width:40px;height:40px;flex-shrink:0;border-radius:12px;background:var(--bg3);border:1px solid var(--b2);display:flex;align-items:center;justify-content:center;color:var(--t1);}
+.sv-back:active{transform:scale(.92);}
+.sv-title{font-size:23px;font-weight:900;letter-spacing:-.5px;}
+/* ── TUTORIAL (reuses the .statsview full-screen shell) ── */
+.tut-intro{font-size:13.5px;line-height:1.6;color:var(--t2);padding:2px 18px 4px;}
+.tut-step{display:flex;gap:13px;align-items:flex-start;margin:0 18px;padding:15px 0;border-top:1px solid var(--bn2);}
+.tut-ico{width:36px;height:36px;flex-shrink:0;border-radius:11px;background:var(--bg3);border:1px solid var(--b2);display:flex;align-items:center;justify-content:center;color:var(--a2);}
+.tut-ico .ico{width:17px;height:17px;}
+.tut-h{font-size:14px;font-weight:800;color:var(--t1);margin-bottom:3px;letter-spacing:-.2px;}
+.tut-p{font-size:12.5px;color:var(--t2);line-height:1.6;}
+.tut-p b{color:var(--t1);font-weight:700;}
+/* the backup step is the one that actually loses people their data — make it land */
+.tut-step.key-step{background:color-mix(in srgb,var(--a) 9%,transparent);border:1px solid color-mix(in srgb,var(--a) 26%,transparent);border-radius:18px;padding:15px 14px;margin-top:14px;}
+.tut-step.key-step .tut-ico{background:color-mix(in srgb,var(--a) 20%,var(--bg3));border-color:transparent;}
+.tut-do{margin-top:10px;padding:9px 14px;border-radius:11px;font-size:12px;font-weight:800;background:var(--a);color:#fff;}
+.tut-do:active{transform:scale(.96);}
+.tut-done{margin:20px 18px 0;width:calc(100% - 36px);padding:14px;border-radius:14px;font-size:14px;font-weight:800;background:var(--a);color:#fff;}
+.tut-link{width:100%;padding:12px 0;margin-top:12px;border-radius:12px;font-size:12.5px;font-weight:800;background:transparent;border:1px solid var(--b2);color:var(--t2);display:inline-flex;align-items:center;justify-content:center;gap:7px;}
+.tut-link .ico{width:14px;height:14px;}
+/* one-time backup nudge — a list with no sync code is one tap from gone */
+.nudge{display:flex;align-items:center;gap:10px;margin:12px 18px 0;padding:10px 11px;border-radius:14px;background:color-mix(in srgb,var(--a) 11%,var(--bg3));border:1px solid color-mix(in srgb,var(--a) 28%,transparent);animation:fadeUp .4s ease both;}
+.nudge>.ico{width:16px;height:16px;color:var(--a2);flex-shrink:0;}
+.nudge-t{flex:1;min-width:0;font-size:11.5px;font-weight:600;color:var(--t1);line-height:1.45;}
+.nudge-go{flex-shrink:0;padding:7px 12px;border-radius:9px;font-size:11px;font-weight:800;background:var(--a);color:#fff;}
+.nudge-go:active{transform:scale(.94);}
+.nudge-x{flex-shrink:0;width:26px;height:26px;border-radius:8px;color:var(--t3);display:flex;align-items:center;justify-content:center;}
+.nudge-x .ico{width:13px;height:13px;}
+/* ── SETTINGS HUB ── */
+.set-row{display:flex;align-items:center;gap:13px;width:100%;padding:13px 0;border-top:1px solid var(--bn2);text-align:left;}
+.set-row:first-child{border-top:none;padding-top:2px;}
+.set-row:active{transform:scale(.985);}
+.set-ico{width:36px;height:36px;flex-shrink:0;border-radius:11px;background:var(--bg3);border:1px solid var(--b2);display:flex;align-items:center;justify-content:center;color:var(--a2);}
+.set-ico .ico{width:16px;height:16px;}
+.set-txt{flex:1;min-width:0;}
+.set-h{font-size:14px;font-weight:700;color:var(--t1);letter-spacing:-.2px;}
+.set-p{font-size:11.5px;color:var(--t3);margin-top:2px;line-height:1.4;}
+.set-p.warn{color:var(--a2);font-weight:700;}
+.set-row.warn .set-ico{background:color-mix(in srgb,var(--a) 20%,var(--bg3));border-color:transparent;}
+.set-chev{flex-shrink:0;color:var(--t3);display:flex;}
+.set-chev .ico{width:16px;height:16px;}
+.sv-hero{display:flex;gap:10px;padding:8px 18px 0;}
+.sv-heronum{flex:1;background:linear-gradient(160deg,var(--bg3),var(--bg2));border:1px solid var(--bn2);border-radius:18px;padding:15px 10px;text-align:center;box-shadow:var(--elev1);}
+.sv-heronum .v{font-size:27px;font-weight:900;letter-spacing:-1px;color:var(--a2);line-height:1;display:inline-flex;align-items:center;gap:3px;justify-content:center;}
+.sv-heronum .v .ico{width:19px;height:19px;fill:currentColor;}
+.sv-heronum .l{font-size:10.5px;font-weight:700;color:var(--t2);margin-top:5px;}
+.sv-sec{margin:20px 18px 0;}
+.sv-h{font-size:12px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--t3);margin-bottom:8px;}
+.sv-bar{display:flex;align-items:center;gap:10px;padding:11px 0;cursor:pointer;border-top:1px solid var(--bn2);min-height:44px;}
+.sv-bar:first-child{border-top:none;}
+.sv-bar .lbl{font-size:13px;font-weight:700;color:var(--t1);width:96px;flex-shrink:0;display:flex;align-items:center;gap:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.sv-bar .lbl .ico{width:13px;height:13px;fill:currentColor;flex-shrink:0;}
+.sv-bar .track{flex:1;height:9px;border-radius:99px;background:var(--bg4);overflow:hidden;}
+.sv-bar .fill{height:100%;border-radius:99px;transition:width .7s cubic-bezier(.2,1,.3,1);}
+.sv-bar .n{font-size:13px;font-weight:800;color:var(--t2);width:32px;text-align:right;flex-shrink:0;}
+.sv-bar .chev{color:var(--t3);display:inline-flex;transition:transform .22s;}
+.sv-bar .chev .ico{width:16px;height:16px;}
+.sv-bar.open .chev{transform:rotate(90deg);}
+.sv-drill{display:none;flex-wrap:wrap;gap:6px;padding:2px 0 12px;}
+.sv-drill.on{display:flex;animation:fadeUp .3s ease both;}
+.sv-chip{font-size:11.5px;font-weight:600;padding:6px 11px;border-radius:99px;background:var(--bg4);border:1px solid var(--b2);color:var(--t2);display:inline-flex;align-items:center;gap:4px;}
+.sv-chip .ico{width:11px;height:11px;fill:currentColor;color:var(--a2);}
 .hero-shade{position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,0.05) 0%,rgba(8,8,10,0.6) 55%,rgba(8,8,10,0.93) 100%);}
 .hero-body{position:relative;padding:16px 18px;width:100%;}
 .hero-kicker{font-size:10px;font-weight:800;letter-spacing:0.14em;text-transform:uppercase;color:var(--a2);margin-bottom:6px;}
@@ -133,6 +223,16 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
   background:rgba(255,255,255,0.94);color:#0a0a0c;font-size:12.5px;font-weight:800;
   padding:9px 16px;border-radius:99px;
 }
+/* ── BILLBOARD (auto-rotating spotlight) ── */
+.billboard{position:relative;margin:14px 18px 6px;border-radius:24px;overflow:hidden;min-height:240px;border:1px solid var(--b2);box-shadow:0 14px 40px -12px rgba(0,0,0,0.6);animation:fadeUp .4s ease both;}
+.bb-track{display:flex;min-height:240px;will-change:transform;transition:transform .45s cubic-bezier(.22,1,.28,1);}
+.bb-track.dragging{transition:none;}
+.bb-slide{position:relative;flex:0 0 100%;min-height:240px;display:flex;align-items:flex-end;cursor:pointer;overflow:hidden;}
+.bb-slide .hero-bg-img{animation:kenburns 24s ease-in-out infinite alternate;}
+.bb-dots{position:absolute;bottom:15px;right:16px;z-index:4;display:flex;gap:6px;}
+.bb-dot{width:7px;height:7px;border-radius:99px;background:rgba(255,255,255,0.42);transition:all .35s cubic-bezier(.2,1,.3,1);cursor:pointer;}
+.bb-dot.on{background:#fff;width:20px;}
+.row-div{font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--t3);padding:22px 18px 2px;animation:fadeUp .4s ease both;}
 
 /* ── ROWS ── */
 .row-sec{margin-top:16px;animation:fadeUp .4s ease both;}
@@ -215,7 +315,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
   background:var(--bg2);border-radius:26px 26px 0 0;border-top:1px solid var(--b3);
   padding:10px 22px calc(var(--safe-b) + 24px);
   box-shadow:0 -20px 60px rgba(0,0,0,0.5);
-  transform:translateY(102%);transition:transform .34s cubic-bezier(.32,.72,.28,1);
+  transform:translateY(102%);transition:transform .44s cubic-bezier(.2,1,.28,1);
 }
 @supports ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
   .sheet{background:color-mix(in srgb,var(--bg2) 82%,transparent);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);}
@@ -233,6 +333,38 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 .dt-banner{position:absolute;top:-10px;left:-22px;right:-22px;height:150px;overflow:hidden;z-index:0;}
 .dt-banner-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 28%;}
 .dt-banner-scrim{position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,0.12) 0%,rgba(0,0,0,0.42) 46%,color-mix(in srgb,var(--bg2) 94%,transparent) 100%);}
+/* Cinematic full-screen title page (id-specific: overrides the bottom-sheet + landscape-modal .sheet styles in every orientation) */
+#detailSheet{position:fixed;inset:0;width:auto;height:100dvh;max-height:none;border:none;border-radius:0;opacity:1;box-shadow:none;padding:0;background:var(--bg2);transform:translateY(100%);transition:transform .46s cubic-bezier(.2,1,.28,1);}
+#detailSheet.on{transform:translateY(0);opacity:1;}
+#detailSheet .sheet-handle{display:none;}
+#detailBody{padding:0 22px calc(var(--safe-b) + 46px);}
+#detailSheet .dt-banner{top:0;left:-22px;right:-22px;height:min(48vh,360px);will-change:transform;}
+#detailSheet .dt-banner-scrim{background:linear-gradient(to bottom,rgba(0,0,0,.10) 0%,rgba(0,0,0,.32) 42%,color-mix(in srgb,var(--bg2) 97%,transparent) 100%);}
+#detailSheet .dt-top.has-banner{padding-top:calc(min(48vh,360px) - 92px);}
+#detailSheet .dt-top:not(.has-banner){padding-top:calc(var(--safe-t) + 62px);}
+#detailSheet .dt-title{font-size:24px;}
+.dt-back{position:fixed;top:calc(var(--safe-t) + 12px);left:14px;z-index:5;width:40px;height:40px;border-radius:12px;background:rgba(0,0,0,.42);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.14);color:#fff;display:none;align-items:center;justify-content:center;}
+#detailSheet.on .dt-back{display:flex;}
+.dt-back:active{transform:scale(.92);}
+.dt-back .ico{width:20px;height:20px;}
+/* Password lock screen */
+.lockscreen{position:fixed;inset:0;z-index:200;background:var(--bg);display:none;align-items:center;justify-content:center;padding:24px;}
+.lockscreen.on{display:flex;}
+.lock-card{width:100%;max-width:340px;text-align:center;}
+.lock-emoji{font-size:46px;margin-bottom:14px;}
+.lock-title{font-size:21px;font-weight:900;letter-spacing:-.3px;margin-bottom:6px;color:var(--t1);}
+.lock-sub{font-size:13px;color:var(--t2);margin-bottom:22px;}
+.lock-in{width:100%;padding:14px 16px;border-radius:14px;border:1px solid var(--b2);background:var(--bg2);color:var(--t1);font-size:16px;text-align:center;outline:none;box-sizing:border-box;}
+.lock-in:focus{border-color:var(--a);}
+.lock-btn{width:100%;margin-top:12px;padding:14px;border-radius:14px;border:none;background:var(--a);color:#fff;font-weight:800;font-size:15px;cursor:pointer;}
+.lock-btn:active{transform:scale(.97);}
+.lock-err{color:#ff6b6b;font-size:13px;font-weight:600;min-height:18px;margin-top:14px;}
+.lock-card.shake{animation:lshake .4s;}
+@keyframes lshake{10%,90%{transform:translateX(-2px);}20%,80%{transform:translateX(4px);}30%,50%,70%{transform:translateX(-8px);}40%,60%{transform:translateX(8px);}}
+.lock-alt{display:inline-block;margin-top:18px;color:var(--t2);font-size:13px;font-weight:600;text-decoration:underline;cursor:pointer;}
+.lock-alt:active{opacity:.6;}
+.lock-btn2{width:100%;margin-top:10px;padding:13px;border-radius:14px;border:1px solid var(--b2);background:transparent;color:var(--t2);font-weight:700;font-size:14px;cursor:pointer;}
+.rec-code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:19px;font-weight:800;letter-spacing:1px;color:var(--t1);background:var(--bg3);border:1px solid var(--b2);border-radius:14px;padding:16px 12px;margin-bottom:16px;word-break:break-all;line-height:1.5;}
 .dt-top.has-banner .dt-cover,.dt-top.has-banner .dt-cover-ph,.dt-top.has-banner .dt-info{position:relative;z-index:1;}
 .dt-top.has-banner .dt-title{text-shadow:0 2px 12px rgba(0,0,0,0.55);}
 .dt-cover{width:110px;height:156px;border-radius:16px;object-fit:cover;background:var(--bg4);border:1px solid var(--b2);flex-shrink:0;box-shadow:0 8px 24px rgba(0,0,0,0.4);}
@@ -340,6 +472,35 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 .ai-run-btn.loading{opacity:0.5;pointer-events:none;}
 .ai-resp{display:none;font-size:13px;line-height:1.6;background:var(--bg3);border:1px solid var(--b1);border-radius:14px;padding:13px 15px;margin-top:4px;}
 .ai-resp.on{display:block;}
+.chat-thread{display:flex;flex-direction:column;gap:10px;min-height:240px;max-height:min(48vh,440px);overflow-y:auto;padding:6px 2px 10px;-webkit-overflow-scrolling:touch;}
+.chat-msg{max-width:86%;padding:10px 13px;border-radius:16px;font-size:13.5px;line-height:1.55;overflow-wrap:anywhere;animation:fadeUp .24s ease both;}
+.chat-msg.me{align-self:flex-end;background:var(--a);color:#fff;border-bottom-right-radius:5px;}
+.chat-msg.ai{align-self:flex-start;background:var(--bg3);border:1px solid var(--b1);color:var(--t1);border-bottom-left-radius:5px;}
+.chat-typing{display:flex;gap:4px;align-items:center;padding:14px 15px;}
+.chat-typing span{width:7px;height:7px;border-radius:50%;background:var(--t3);animation:blink 1.2s infinite;}
+.chat-typing span:nth-child(2){animation-delay:.18s;}
+.chat-typing span:nth-child(3){animation-delay:.36s;}
+@keyframes blink{0%,60%,100%{opacity:.25;transform:translateY(0);}30%{opacity:1;transform:translateY(-3px);}}
+.chat-empty{text-align:center;color:var(--t2);padding:22px 12px;}
+.chat-empty .ico{width:34px;height:34px;color:var(--a);margin-bottom:10px;}
+.chat-empty p{font-size:13px;line-height:1.55;margin-bottom:14px;}
+.chat-chips{display:flex;flex-wrap:wrap;gap:7px;justify-content:center;}
+.chat-chip{padding:8px 13px;border-radius:99px;font-size:11.5px;font-weight:700;background:var(--bg3);border:1px solid var(--b2);color:var(--t2);min-height:36px;}
+.chat-input-row{display:flex;gap:8px;margin-top:12px;align-items:center;}
+.chat-send{width:44px;height:44px;flex-shrink:0;border-radius:12px;background:var(--a);color:#fff;display:inline-flex;align-items:center;justify-content:center;transition:transform .12s,filter .16s;}
+.chat-send .ico{width:19px;height:19px;}
+.chat-send:active{transform:scale(.94);}
+.chat-clear{background:none;border:none;color:var(--t3);font-size:11px;font-weight:700;margin-top:9px;display:inline-flex;align-items:center;gap:5px;cursor:pointer;}
+.chat-clear .ico{width:12px;height:12px;}
+.chat-msg.ai{position:relative;}
+.chat-copy{position:absolute;bottom:-9px;right:-2px;width:26px;height:26px;border-radius:8px;background:var(--bg4);border:1px solid var(--b2);color:var(--t3);display:inline-flex;align-items:center;justify-content:center;opacity:.5;transition:opacity .15s,color .15s;cursor:pointer;}
+.chat-copy:active{opacity:1;color:var(--a);}
+.chat-copy .ico{width:13px;height:13px;}
+.chat-msg code{background:var(--bg4);border:1px solid var(--b1);border-radius:5px;padding:1px 5px;font-size:12px;font-family:ui-monospace,Menlo,monospace;}
+.chat-pre{background:var(--bg4);border:1px solid var(--b1);border-radius:9px;padding:9px 11px;font-size:12px;font-family:ui-monospace,Menlo,monospace;overflow-x:auto;white-space:pre-wrap;margin:6px 0;}
+.chat-ul{margin:5px 0;padding-left:19px;}
+.chat-ul li{margin:3px 0;}
+.model-sel{padding:8px 10px;border-radius:11px;font-size:12px;font-weight:700;background:var(--bg3);border:1px solid var(--b2);color:var(--t1);max-width:170px;}
 .dots span{animation:blink 1.2s infinite;}
 .dots span:nth-child(2){animation-delay:.2s;}
 .dots span:nth-child(3){animation-delay:.4s;}
@@ -418,16 +579,18 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 }
 .toast.on{opacity:1;transform:translateX(-50%) translateY(0);}
 
-/* ── KIND VIEW SWITCH (Watch / Read) ── */
-.kind-seg{display:flex;gap:6px;padding:12px 18px 2px;}
+/* ── KIND VIEW SWITCH (Watch / Read) — docked beside the search field ── */
+.kind-seg{display:flex;gap:2px;flex-shrink:0;padding:3px;border-radius:14px;background:var(--bg3);border:1px solid var(--bn);}
 .kseg{
-  flex:1;padding:10px 0;border-radius:13px;font-size:12.5px;font-weight:800;letter-spacing:-0.1px;
-  background:var(--bg3);border:1px solid transparent;color:var(--t2);
-  transition:background .16s,border-color .16s,color .16s,transform .12s;
+  width:38px;height:36px;border-radius:11px;
+  display:flex;align-items:center;justify-content:center;
+  background:transparent;border:none;color:var(--t3);
+  transition:background .16s,color .16s,transform .12s;
 }
-.kseg:active{transform:scale(0.97);}
-.kseg.on{background:color-mix(in srgb,var(--a) 20%,var(--bg3));border-color:transparent;color:var(--a2);box-shadow:0 3px 12px -5px var(--glow);}
-.kseg .fn{font-size:9.5px;font-weight:800;opacity:0.6;font-variant-numeric:tabular-nums;margin-left:2px;}
+.kseg .ico{width:17px;height:17px;}
+.kseg:active{transform:scale(0.92);}
+.kseg.on{background:color-mix(in srgb,var(--a) 22%,var(--bg4));color:var(--a2);}
+.kseg .fn{display:none;}   /* counts live on the filter chips — keep the switch to a clean glyph */
 
 /* ── AIRING SCHEDULE ── */
 .pcard-air{font-size:9.5px;font-weight:700;color:var(--wat);margin-top:4px;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
@@ -542,12 +705,9 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 /* SHORT landscape (rotated phone): reclaim vertical space so the controls
    don't dominate the tiny viewport height. */
 @media (orientation:landscape) and (max-height:560px){
-  .hdr{padding-top:calc(var(--safe-t) + 8px);padding-bottom:2px;}
-  .hdr-title{font-size:22px;}
-  .search-row{padding-top:8px;padding-bottom:0;}
-  .kind-seg{padding-top:8px;padding-bottom:0;}
-  .filt-row{padding-top:6px;}
-  .sort-row{padding-top:7px;padding-bottom:2px;}
+  .hdr{padding-top:calc(var(--safe-t) + 8px);}
+  .search-row{padding-top:7px;}
+  .ctrl-row{padding-top:7px;}
   .hero{min-height:150px;margin-top:10px;}
   .hero-body{padding:12px 16px;}
   .hero-title{font-size:21px;}
@@ -556,7 +716,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 /* WIDE / tablet: center the content so lines & cards don't stretch absurdly,
    and let the hero + poster grid breathe with more columns. */
 @media (min-width:900px){
-  .hdr,.search-row,.kind-seg,.filt-row,.sort-row,.page{
+  .hdr,.search-row,.ctrl-row,.page{
     max-width:1180px;margin-left:auto;margin-right:auto;
   }
   .confirm-box{max-width:440px;margin-left:auto;margin-right:auto;}
@@ -606,12 +766,31 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 </head>
 <body>
 
+<div class="ambient" aria-hidden="true"></div>
+<div class="lockscreen" id="lockScreen">
+  <div class="lock-card">
+    <div class="lock-emoji">🔒</div>
+    <div class="lock-title" id="lockTitle">WatchList is locked</div>
+    <div class="lock-sub" id="lockSub">Enter your password to open your list.</div>
+    <input id="lockPw" class="lock-in" type="password" placeholder="Password" autocomplete="current-password" onkeydown="if(event.key==='Enter')tryUnlock()">
+    <button class="lock-btn" id="lockBtn" onclick="tryUnlock()">Unlock</button>
+    <div class="lock-err" id="lockErr"></div>
+    <a class="lock-alt" id="lockAlt" onclick="toggleLockMode()">Forgot password? Use recovery key</a>
+  </div>
+</div>
+<div class="lockscreen" id="recoveryScreen">
+  <div class="lock-card">
+    <div class="lock-emoji">🔑</div>
+    <div class="lock-title" id="recTitle">Save your recovery key</div>
+    <div class="lock-sub">This is the <b>only</b> way back into your list if you forget your password. Store it somewhere safe — a password manager, or email it to yourself. It won't be shown again.</div>
+    <div class="rec-code" id="recCode"></div>
+    <button class="lock-btn" onclick="copyRecovery()">Copy recovery key</button>
+    <button class="lock-btn2" onclick="closeRecovery()">I've saved it</button>
+  </div>
+</div>
 <div id="app">
   <div class="hdr">
-    <div>
-      <div class="hdr-title">Watchlist</div>
-      <div class="hdr-sub" id="headerSub"></div>
-    </div>
+    <div class="hdr-title">Watchlist</div>
     <div class="hdr-actions">
       <button class="hbtn" onclick="openForYou()" title="For You — tailored recommendations" aria-label="For You recommendations"><i data-ic="compass"></i></button>
       <button class="hbtn" onclick="openSchedule()" title="Weekly airing schedule" aria-label="Weekly airing schedule"><i data-ic="calendar"></i></button>
@@ -624,19 +803,21 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
       <span class="search-ico"><i data-ic="search"></i></span>
       <input class="search-in" type="search" id="searchIn" placeholder="Search titles, genres…" oninput="renderHome()">
     </div>
+    <div class="kind-seg" id="kindSeg"></div>
   </div>
-  <div class="kind-seg" id="kindSeg"></div>
-  <div class="filt-row" id="filtRow"></div>
-  <div class="sort-row" id="sortRow"></div>
+  <div class="ctrl-row">
+    <div class="filt-row" id="filtRow"></div>
+    <div class="sort-row" id="sortRow"></div>
+  </div>
   <div class="page" id="pageEl"></div>
 </div>
 
 <!-- BOTTOM NAV -->
 <div class="nav">
   <button class="nbtn on" id="nav-home" onclick="goHome()"><span><i data-ic="home"></i></span><small>Home</small></button>
-  <button class="nbtn" onclick="openSheet('statsSheet')"><span><i data-ic="chart"></i></span><small>Stats</small></button>
+  <button class="nbtn" onclick="openStats()"><span><i data-ic="chart"></i></span><small>Stats</small></button>
   <button class="nbtn add" onclick="openSheet_add()">＋</button>
-  <button class="nbtn" onclick="openSheet('importSheet')"><span><i data-ic="clipboard"></i></span><small>Import</small></button>
+  <button class="nbtn" onclick="openSheet('settingsSheet')"><span><i data-ic="settings"></i></span><small>Settings</small></button>
   <button class="nbtn" onclick="openSheet('aiSheet')"><span><i data-ic="sparkles"></i></span><small>AI</small></button>
 </div>
 
@@ -645,7 +826,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 
 <!-- DETAIL SHEET -->
 <div class="sheet" id="detailSheet">
-  <div class="sheet-handle"></div>
+  <button class="dt-back" onclick="closeAll()" aria-label="Back"><i data-ic="chevron-left"></i></button>
   <div id="detailBody"></div>
 </div>
 
@@ -739,7 +920,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
   </div>
   <div class="ai-tabs">
     <button class="aitab on" id="at-rec" onclick="setAITab('rec')"><i data-ic="bulb"></i> Suggest</button>
-    <button class="aitab" id="at-chat" onclick="setAITab('chat')"><i data-ic="message"></i> Ask</button>
+    <button class="aitab" id="at-chat" onclick="setAITab('chat')"><i data-ic="message"></i> Chat</button>
     <button class="aitab" id="at-rank" onclick="setAITab('rank')"><i data-ic="trophy"></i> Rank</button>
   </div>
   <div class="aipanel on" id="ap-rec">
@@ -751,12 +932,12 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
     <div class="ai-resp" id="recResp"></div>
   </div>
   <div class="aipanel" id="ap-chat">
-    <p class="ai-desc">Ask anything about your list — pacing, what to watch when sad, hidden gems.</p>
-    <div class="ai-prompt-row">
-      <input class="ai-prompt-in" id="chatPrompt" placeholder="e.g. What's shortest on my list?">
-      <button class="ai-run-btn" id="chatBtn" onclick="runChat()">Ask</button>
+    <div class="chat-thread" id="chatThread"></div>
+    <div class="chat-input-row">
+      <input class="ai-prompt-in" id="chatPrompt" placeholder="Message your anime companion…" autocomplete="off" onkeydown="if(event.key==='Enter'){event.preventDefault();sendChat();}">
+      <button class="chat-send" onclick="sendChat()" aria-label="Send"><i data-ic="send"></i></button>
     </div>
-    <div class="ai-resp" id="chatResp"></div>
+    <button class="chat-clear" onclick="clearChat()"><i data-ic="plus"></i> New chat</button>
   </div>
   <div class="aipanel" id="ap-rank">
     <p class="ai-desc">AI sorts your Plan to Watch list into the best viewing order.</p>
@@ -766,11 +947,59 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
     </div>
     <div class="ai-resp" id="rankResp"></div>
   </div>
-  <div style="display:flex;gap:8px;margin-top:20px;padding-top:16px;border-top:1px solid var(--b1);">
-    <input class="ai-prompt-in" id="apiKeyIn" type="password" placeholder="AI key — Groq, Gemini, OpenRouter, or Claude" autocomplete="off">
-    <button class="ai-run-btn" onclick="saveKey()">Save</button>
+  <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--b1);">
+    <button class="ai-run-btn" id="keyBtn" style="width:100%" onclick="openKeySheet()"><i data-ic="key"></i> Add AI Key</button>
   </div>
-  <p class="ai-desc" style="margin-top:8px">Suggest, Ask &amp; Rank need an AI key — it stays on this device only. <strong style="color:var(--t1)">Free</strong> keys: console.groq.com (gsk_…), aistudio.google.com (AIza…), or openrouter.ai (sk-or-…). Claude keys (sk-ant-…) also work. Autofill needs no key at all.</p>
+  <div style="display:flex;gap:8px;margin-top:10px;align-items:center;">
+    <span class="ai-desc" style="margin:0;flex-shrink:0;">Model</span>
+    <select class="model-sel" id="modelSel" onchange="setModelSel(this.value)" style="display:none;"></select>
+  </div>
+  <p class="ai-desc" style="margin-top:8px">Suggest, Chat &amp; Rank need an AI key; Autofill works without one.</p>
+</div>
+
+<!-- AI KEY SHEET -->
+<div class="sheet" id="keySheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <div class="sheet-title"><i data-ic="key"></i> AI Key</div>
+    <button class="sheet-cancel" onclick="closeKeySheet()">Done</button>
+  </div>
+  <div style="display:flex;gap:8px;">
+    <input class="ai-prompt-in" id="apiKeyIn" type="password" placeholder="Paste your AI key…" autocomplete="off">
+    <button class="ai-run-btn" onclick="saveKeyAndClose()">Save</button>
+  </div>
+  <button class="chat-clear" onclick="removeKey()" style="margin-top:10px"><i data-ic="trash"></i> Remove key</button>
+  <p class="ai-desc" style="margin-top:12px">Your key stays on this device only. <strong style="color:var(--t1)">Free</strong> keys: console.groq.com (gsk_…), aistudio.google.com (AIza…), or openrouter.ai (sk-or-…). Claude keys (sk-ant-…) also work.</p>
+</div>
+
+<!-- SETTINGS HUB -->
+<div class="sheet" id="settingsSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <div class="sheet-title"><i data-ic="settings"></i> Settings</div>
+    <button class="sheet-cancel" onclick="closeAll()">Done</button>
+  </div>
+  <div id="settingsBody"></div>
+</div>
+
+<!-- CLOUD BACKUP -->
+<div class="sheet" id="backupSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <div class="sheet-title"><i data-ic="cloud"></i> Cloud backup</div>
+    <button class="sheet-cancel" onclick="openSheet('settingsSheet')">Back</button>
+  </div>
+  <div id="syncBox"></div>
+</div>
+
+<!-- PASSWORD -->
+<div class="sheet" id="securitySheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <div class="sheet-title"><i data-ic="lock"></i> Password</div>
+    <button class="sheet-cancel" onclick="openSheet('settingsSheet')">Back</button>
+  </div>
+  <div id="lockBox"></div>
 </div>
 
 <!-- IMPORT SHEET -->
@@ -778,7 +1007,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
   <div class="sheet-handle"></div>
   <div class="sheet-header">
     <div class="sheet-title"><i data-ic="clipboard"></i> Import / Export</div>
-    <button class="sheet-cancel" onclick="closeAll()">Done</button>
+    <button class="sheet-cancel" onclick="openSheet('settingsSheet')">Back</button>
   </div>
   <p class="ai-desc">Paste your list from Notes, messages, or anywhere — one title per line, as messy as you like. After previewing, tap a status on each title (or use Set&nbsp;all). "Title | status | ep 5 | ★4" style lines are understood too.</p>
   <textarea class="import-paste" id="importPaste" placeholder="Attack on Titan&#10;Demon Slayer - watching&#10;One Piece | watching | ep 120&#10;..."></textarea>
@@ -791,11 +1020,59 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
   <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--b1);">
     <button class="parse-btn" style="margin-top:0" onclick="exportList()"><i data-ic="upload"></i> Copy my list to clipboard</button>
   </div>
-  <div id="syncBox" style="margin-top:16px;padding-top:14px;border-top:1px solid var(--b1);"></div>
-  <div id="notifyBox" style="margin-top:16px;padding-top:14px;border-top:1px solid var(--b1);"></div>
 </div>
 
 <!-- STATS SHEET -->
+<!-- TUTORIAL (auto-shown once to new users; always reachable from Import) -->
+<div class="statsview" id="tutView">
+  <div class="sv-top">
+    <button class="sv-back" onclick="closeTutorial()" aria-label="Close"><i data-ic="chevron-left"></i></button>
+    <div class="sv-title">How it works</div>
+  </div>
+  <p class="tut-intro">Everything you watch and read, in one place — with covers, air times and progress filled in for you.</p>
+
+  <div class="tut-step">
+    <div class="tut-ico"><i data-ic="plus"></i></div>
+    <div><div class="tut-h">Add anything</div><div class="tut-p">Tap <b>+</b> and type a title. <b>Autofill</b> pulls the real cover, episode count, genres and watch order — anime, TV, movies, manga, manhwa and webtoons. No setup, no API key.</div></div>
+  </div>
+  <div class="tut-step">
+    <div class="tut-ico"><i data-ic="book"></i></div>
+    <div><div class="tut-h">Watch or Read</div><div class="tut-p">The switch beside the search box flips between your <b>watch</b> list and your <b>reading</b> list. They're kept completely separate.</div></div>
+  </div>
+  <div class="tut-step">
+    <div class="tut-ico"><i data-ic="calendar"></i></div>
+    <div><div class="tut-h">Never miss an episode</div><div class="tut-p">The <b>calendar</b> shows what airs this week for the shows you follow, in your own time zone — and it tracks delays. Turn on the <b>bell</b> to get a notification the moment one drops.</div></div>
+  </div>
+  <div class="tut-step">
+    <div class="tut-ico"><i data-ic="compass"></i></div>
+    <div><div class="tut-h">Find your next one</div><div class="tut-p">The <b>compass</b> suggests titles you don't have yet, picked from what you already watch — real community recommendations, not guesses.</div></div>
+  </div>
+
+  <div class="tut-step key-step">
+    <div class="tut-ico"><i data-ic="cloud"></i></div>
+    <div>
+      <div class="tut-h">Back up your list — do this first</div>
+      <div class="tut-p">Your list lives on <b>this device only</b>. Clearing your browser data, or deleting the app from your Home Screen, <b>erases it</b>. Turning on cloud backup gives you a <b>sync code</b>: save that code and your list can always be restored, and it follows you to any device.</div>
+      <button class="tut-do" onclick="tutGo('backupSheet')">Set up backup</button>
+    </div>
+  </div>
+  <div class="tut-step">
+    <div class="tut-ico"><i data-ic="lock"></i></div>
+    <div><div class="tut-h">Lock it (optional)</div><div class="tut-p">A password encrypts your whole list — unreadable without it, here and in the cloud. You'll get a one-time <b>recovery key</b>; it's the only way back in if you forget the password. Save both. Lose both and the list is gone for good — there's no backdoor.</div></div>
+  </div>
+
+  <button class="tut-done" onclick="closeTutorial()">Got it</button>
+</div>
+
+<!-- FULL-SCREEN STATS -->
+<div class="statsview" id="statsView">
+  <div class="sv-top">
+    <button class="sv-back" onclick="closeStats()" aria-label="Back"><i data-ic="chevron-left"></i></button>
+    <div class="sv-title">Your Stats</div>
+  </div>
+  <div id="statsViewBody"></div>
+</div>
+
 <div class="sheet" id="statsSheet">
   <div class="sheet-handle"></div>
   <div class="sheet-header">
@@ -907,7 +1184,11 @@ clock:'<circle cx="12" cy="12" r="9.5"/><path d="M12 7v5l3.5 2"/>',
 loader:'<path d="M12 3a9 9 0 1 0 9 9"/>',
 inbox:'<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5.1 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.9A2 2 0 0 0 16.8 4H7.2a2 2 0 0 0-1.7 1.1z"/>',
 plus:'<path d="M12 5v14M5 12h14"/>',
-compass:'<circle cx="12" cy="12" r="9.5"/><path d="m16 8-2 6-6 2 2-6z"/>'
+compass:'<circle cx="12" cy="12" r="9.5"/><path d="m16 8-2 6-6 2 2-6z"/>',
+  send:'<path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4z"/>',
+  lock:'<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+  key:'<path d="M12.6 11.4a5.5 5.5 0 1 0-7.8 7.8 5.5 5.5 0 0 0 7.8-7.8zM12.6 11.4 22 2"/><path d="m17 7 3 3"/>',
+  settings:'<line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>'
 };
 function icon(name,cls){const p=ICONS[name];if(!p)return'';return `<svg class="ico${cls?' '+cls:''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`;}
 function hydrateIcons(root){(root||document).querySelectorAll('[data-ic]').forEach(el=>{const s=icon(el.getAttribute('data-ic'));if(s)el.outerHTML=s;});}
@@ -950,10 +1231,195 @@ function migrate(list){
   // banner/aniColor = AniList per-title art + dominant color; bgImage/bgAccent = user's own background + its extracted color
   return (Array.isArray(list)?list:[]).map(a=>({ep:0,rating:0,fav:false,upd:0,epTotal:parseEpTotal(a.eps),img:'',order:[],notes:'',genre:'',eps:'',time:'',kind:'watch',banner:'',aniColor:'',bgImage:'',bgAccent:'',bannerTried:false,...a}));
 }
-function load(){try{const s=store(),d=s&&s.getItem(LSKEY);anime=migrate(d?JSON.parse(d):JSON.parse(JSON.stringify(DEFAULT_DATA)));}catch{anime=migrate(JSON.parse(JSON.stringify(DEFAULT_DATA)));}}
-let saveWarned=false;
-function writeLocal(){try{const s=store();if(s)s.setItem(LSKEY,JSON.stringify(anime));saveWarned=false;}catch{if(!saveWarned){saveWarned=true;toast('⚠️ Storage full — remove some uploaded covers');}}}
+function load(){try{const s=store(),d=s&&s.getItem(LSKEY);if(d){const p=JSON.parse(d);if(isEnvelope(p)){appLocked=true;anime=[];return;}anime=migrate(p);}else{anime=migrate(JSON.parse(JSON.stringify(DEFAULT_DATA)));}}catch{anime=migrate(JSON.parse(JSON.stringify(DEFAULT_DATA)));}}
+let saveWarned=false;let _writeChain=Promise.resolve();
+function writeLocal(){
+  const s=store();if(!s)return;
+  if(cryptoKey&&envWraps){                       // password set → persist ciphertext only
+    const snap=JSON.stringify(anime);
+    _writeChain=_writeChain.then(async()=>{
+      try{const {iv,ct}=await encList(snap,cryptoKey);s.setItem(LSKEY,JSON.stringify({v:2,enc:1,iv,ct,pw:envWraps.pw,rec:envWraps.rec}));saveWarned=false;}
+      catch{if(!saveWarned){saveWarned=true;toast('⚠️ Storage full — remove some uploaded covers');}}
+    });
+    return _writeChain;
+  }
+  try{s.setItem(LSKEY,JSON.stringify(anime));saveWarned=false;}catch{if(!saveWarned){saveWarned=true;toast('⚠️ Storage full — remove some uploaded covers');}}
+}
 function save(){writeLocal();schedulePush();scheduleNotifyUpdate();}
+
+// ─── PASSWORD LOCK — AES-GCM encryption of the whole list (local + cloud) ────
+const ENCFLAG='enc_'+LSKEY;
+let cryptoKey=null, envWraps=null, appLocked=false;  // cryptoKey = the master key (unwrapped); envWraps = {pw,rec} wrapped copies
+function encEnabled(){try{return localStorage.getItem(ENCFLAG)==='1';}catch{return false;}}
+const _b64=b=>btoa(String.fromCharCode(...new Uint8Array(b)));
+const _unb64=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
+function isEnvelope(x){return !!(x&&typeof x==='object'&&x.enc===1&&x.ct&&x.iv);}
+async function deriveKey(secret,salt){               // PBKDF2 → a wrapping key (from a password OR a recovery key)
+  const base=await crypto.subtle.importKey('raw',new TextEncoder().encode(secret),'PBKDF2',false,['deriveKey']);
+  return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:150000,hash:'SHA-256'},base,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);
+}
+// ── master-key model: the list is encrypted with a random master key; that master key
+//    is wrapped separately by the password AND by the recovery key. Either one unwraps it. ──
+async function wrapMaster(master,secret){
+  const salt=crypto.getRandomValues(new Uint8Array(16)),iv=crypto.getRandomValues(new Uint8Array(12));
+  const wk=await deriveKey(secret,salt);
+  const raw=await crypto.subtle.exportKey('raw',master);
+  const ct=await crypto.subtle.encrypt({name:'AES-GCM',iv},wk,raw);
+  return {salt:_b64(salt),iv:_b64(iv),ct:_b64(ct)};
+}
+async function unwrapMaster(wrap,secret){            // throws if the secret is wrong
+  const wk=await deriveKey(secret,_unb64(wrap.salt));
+  const raw=await crypto.subtle.decrypt({name:'AES-GCM',iv:_unb64(wrap.iv)},wk,_unb64(wrap.ct));
+  return crypto.subtle.importKey('raw',raw,{name:'AES-GCM'},true,['encrypt','decrypt']);
+}
+async function encList(jsonStr,master){
+  const iv=crypto.getRandomValues(new Uint8Array(12));
+  const ct=await crypto.subtle.encrypt({name:'AES-GCM',iv},master,new TextEncoder().encode(jsonStr));
+  return {iv:_b64(iv),ct:_b64(ct)};
+}
+async function decList(env,master){                  // throws if master is wrong
+  const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:_unb64(env.iv)},master,_unb64(env.ct));
+  return new TextDecoder().decode(pt);
+}
+async function decryptData(env,key){                 // v1 legacy: list was encrypted directly with a password-derived key
+  const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:_unb64(env.iv)},key,_unb64(env.ct));
+  return new TextDecoder().decode(pt);
+}
+async function buildEnvelope(){
+  const {iv,ct}=await encList(JSON.stringify(anime),cryptoKey);
+  return {v:2,enc:1,iv,ct,pw:envWraps.pw,rec:envWraps.rec};
+}
+function genRecoveryKey(){const c='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';let s='';for(let i=0;i<24;i++)s+=c[Math.floor(Math.random()*c.length)];return s.replace(/(.{4})(?=.)/g,'$1-');}
+function normRecovery(x){return (x||'').toUpperCase().replace(/[^A-Z0-9]/g,'');}
+async function setAppPassword(){                      // first-time setup → new master key + recovery key
+  const el=document.getElementById('newPwIn');const pw=el?el.value:'';
+  if(!pw||pw.length<4){toast('Use at least 4 characters');return;}
+  cryptoKey=await crypto.subtle.generateKey({name:'AES-GCM',length:256},true,['encrypt','decrypt']);
+  const rec=genRecoveryKey();
+  envWraps={pw:await wrapMaster(cryptoKey,pw),rec:await wrapMaster(cryptoKey,normRecovery(rec))};
+  try{localStorage.setItem(ENCFLAG,'1');}catch{}
+  await writeLocal();schedulePush();
+  if(el)el.value='';
+  renderLockUI();
+  showRecovery(rec,'Save your recovery key');
+}
+async function changeAppPassword(){                   // re-wrap the same master with a new password (keeps recovery key)
+  const el=document.getElementById('newPwIn');const pw=el?el.value:'';
+  if(!pw||pw.length<4){toast('Use at least 4 characters');return;}
+  if(!cryptoKey||!envWraps){toast('Unlock first');return;}
+  envWraps={pw:await wrapMaster(cryptoKey,pw),rec:envWraps.rec};
+  await writeLocal();schedulePush();
+  if(el)el.value='';
+  toast('🔒 Password changed');renderLockUI();
+}
+async function regenRecovery(){                       // issue a fresh recovery key (old one stops working)
+  if(!cryptoKey||!envWraps){toast('Unlock first');return;}
+  const rec=genRecoveryKey();
+  envWraps={pw:envWraps.pw,rec:await wrapMaster(cryptoKey,normRecovery(rec))};
+  await writeLocal();schedulePush();
+  showRecovery(rec,'Your new recovery key');
+}
+function removeAppPassword(){
+  if(!confirm('Remove the password? Your list will be stored unencrypted again — on this device and in the cloud.'))return;
+  cryptoKey=null;envWraps=null;
+  try{localStorage.removeItem(ENCFLAG);}catch{}
+  writeLocal();schedulePush();
+  toast('Password removed');renderLockUI();
+}
+async function upgradeToV2(pw){                        // migrate an older (v1) password-only list to master+recovery
+  cryptoKey=await crypto.subtle.generateKey({name:'AES-GCM',length:256},true,['encrypt','decrypt']);
+  const rec=genRecoveryKey();
+  envWraps={pw:await wrapMaster(cryptoKey,pw),rec:await wrapMaster(cryptoKey,normRecovery(rec))};
+  await writeLocal();schedulePush();
+  showRecovery(rec,'Security upgraded — save your recovery key');
+}
+let lockRecMode=false;
+function showLock(){appLocked=true;lockRecMode=false;const el=document.getElementById('lockScreen');if(el){el.classList.add('on');setLockMode(false);const i=document.getElementById('lockPw');if(i){i.value='';setTimeout(()=>i.focus(),60);}}}
+function hideLock(){appLocked=false;const el=document.getElementById('lockScreen');if(el)el.classList.remove('on');}
+function setLockMode(rec){
+  lockRecMode=rec;
+  const t=document.getElementById('lockTitle'),s=document.getElementById('lockSub'),i=document.getElementById('lockPw'),b=document.getElementById('lockBtn'),l=document.getElementById('lockAlt'),e=document.getElementById('lockErr');
+  if(e)e.textContent='';if(!i)return;i.value='';
+  if(rec){
+    t.textContent='Enter recovery key';s.textContent='Use the recovery key you saved when you set your password.';
+    i.type='text';i.placeholder='XXXX-XXXX-XXXX-…';i.setAttribute('onkeydown',"if(event.key==='Enter')tryUnlockRecovery()");
+    b.textContent='Recover';b.setAttribute('onclick','tryUnlockRecovery()');l.textContent='← Back to password';
+  }else{
+    t.textContent='WatchList is locked';s.textContent='Enter your password to open your list.';
+    i.type='password';i.placeholder='Password';i.setAttribute('onkeydown',"if(event.key==='Enter')tryUnlock()");
+    b.textContent='Unlock';b.setAttribute('onclick','tryUnlock()');l.textContent='Forgot password? Use recovery key';
+  }
+  i.focus();
+}
+function toggleLockMode(){setLockMode(!lockRecMode);}
+function _unlockErr(i,err,msg){if(err)err.textContent=msg;const card=document.querySelector('.lock-card');if(card){card.classList.remove('shake');void card.offsetWidth;card.classList.add('shake');}if(i){i.value='';i.focus();}}
+function finishUnlock(){hideLock();render();renderLockUI();setTimeout(syncOnOpen,200);try{setTimeout(fetchCovers,600);}catch{}}
+async function tryUnlock(){                            // unlock with the password
+  const i=document.getElementById('lockPw'),err=document.getElementById('lockErr');
+  const pw=i?i.value:'';if(!pw)return;if(err)err.textContent='';
+  try{
+    const env=JSON.parse(store().getItem(LSKEY));if(!isEnvelope(env))throw 0;
+    if(env.v===2&&env.pw){                            // master-key envelope
+      cryptoKey=await unwrapMaster(env.pw,pw);        // throws if wrong password
+      envWraps={pw:env.pw,rec:env.rec};
+      anime=migrate(JSON.parse(await decList(env,cryptoKey)));
+      finishUnlock();
+    }else{                                            // v1 legacy → decrypt, then upgrade to master+recovery
+      const key=await deriveKey(pw,_unb64(env.salt));
+      anime=migrate(JSON.parse(await decryptData(env,key)));  // throws if wrong
+      await upgradeToV2(pw);
+      finishUnlock();
+    }
+  }catch(e){_unlockErr(i,err,'Wrong password — try again');}
+}
+async function tryUnlockRecovery(){                    // unlock with the recovery key
+  const i=document.getElementById('lockPw'),err=document.getElementById('lockErr');
+  const code=normRecovery(i?i.value:'');if(!code)return;if(err)err.textContent='';
+  try{
+    const env=JSON.parse(store().getItem(LSKEY));
+    if(!(env&&env.v===2&&env.rec))throw 0;
+    cryptoKey=await unwrapMaster(env.rec,code);       // throws if wrong recovery key
+    envWraps={pw:env.pw,rec:env.rec};
+    anime=migrate(JSON.parse(await decList(env,cryptoKey)));
+    finishUnlock();
+    toast('Unlocked with recovery key — set a new password below');
+    setTimeout(()=>{try{openSheet('securitySheet');}catch{}},600);
+  }catch(e){_unlockErr(i,err,'That recovery key didn’t work');}
+}
+function showRecovery(code,title){
+  const sc=document.getElementById('recoveryScreen');if(!sc)return;
+  document.getElementById('recCode').textContent=code;
+  document.getElementById('recTitle').textContent=title||'Your recovery key';
+  sc.classList.add('on');
+}
+function copyRecovery(){
+  const c=document.getElementById('recCode').textContent,done=()=>toast('📋 Recovery key copied');
+  if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(c).then(done).catch(()=>{});
+  else{try{const t=document.createElement('textarea');t.value=c;document.body.appendChild(t);t.select();document.execCommand('copy');t.remove();done();}catch{}}
+}
+function closeRecovery(){const sc=document.getElementById('recoveryScreen');if(sc)sc.classList.remove('on');}
+function renderLockUI(){
+  const box=document.getElementById('lockBox');if(!box)return;
+  if(encEnabled()){
+    box.innerHTML=`<div class="dt-label">${icon('lock')} Password · ON</div>
+      <p class="ai-desc">Your list is encrypted — genuinely unreadable without your password, on this device <b>and</b> in the cloud. If you ever forget the password, your <b>recovery key</b> is the only way back in.</p>
+      <div style="display:flex;gap:8px;margin-top:8px;">
+        <input class="ai-prompt-in" id="newPwIn" type="password" placeholder="New password (to change)" autocomplete="new-password">
+        <button class="ai-run-btn" onclick="changeAppPassword()">Change</button>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:8px;">
+        <button class="parse-btn" style="margin:0;flex:1" onclick="regenRecovery()">New recovery key</button>
+        <button class="imp-all" onclick="removeAppPassword()">Remove</button>
+      </div>`;
+  }else{
+    box.innerHTML=`<div class="dt-label">${icon('lock')} Password · OFF</div>
+      <p class="ai-desc">Set a password to encrypt your whole list — scrambled on this device and in the cloud, unreadable without the password. You'll get a one-time <b>recovery key</b> to save; it's the only way in if you forget the password. <b>Lose both and the list can't be recovered.</b></p>
+      <div style="display:flex;gap:8px;margin-top:8px;">
+        <input class="ai-prompt-in" id="newPwIn" type="password" placeholder="Choose a password" autocomplete="new-password">
+        <button class="ai-run-btn" onclick="setAppPassword()">Set password</button>
+      </div>`;
+  }
+}
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2);}
 function touch(a){a.upd=Date.now();}
 
@@ -968,7 +1434,9 @@ function schedulePush(){if(!syncCode()||!SYNC_URL)return;clearTimeout(pushT);pus
 async function syncPush(){
   const code=syncCode();if(!code||!SYNC_URL)return;
   try{
-    const r=await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({op:'push',code,data:anime})});
+    let payload=anime;
+    if(cryptoKey&&envWraps){payload=await buildEnvelope();} // ciphertext (master-key envelope) to cloud
+    const r=await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({op:'push',code,data:payload})});
     const d=await r.json();if(d&&d.ok)setSyncAt(d.updatedAt);
   }catch{}
 }
@@ -978,38 +1446,25 @@ async function syncPull(){
   return await r.json();
 }
 async function syncOnOpen(){
-  if(!syncCode())return;
+  if(!syncCode()||appLocked)return;
   try{
     const res=await syncPull();
-    if(res&&Array.isArray(res.data)&&res.updatedAt>syncAt()){ // another device wrote a newer copy — adopt it
-      anime=migrate(res.data);writeLocal();setSyncAt(res.updatedAt);render();renderSyncUI();toast('☁️ Synced from cloud');
-    }else{ // local is current or newer — make sure the cloud has it
-      syncPush();
+    if(res&&res.data&&res.updatedAt>syncAt()){ // another device wrote a newer copy
+      let arr=null;
+      if(res.data&&res.data.v===2){
+        if(!cryptoKey)return;                  // encrypted remote — can't read until unlocked
+        try{arr=JSON.parse(await decList(res.data,cryptoKey));}catch{return;} // wrong master / corrupt → leave local intact
+        envWraps={pw:res.data.pw||(envWraps&&envWraps.pw),rec:res.data.rec||(envWraps&&envWraps.rec)};
+      }else if(Array.isArray(res.data)){arr=res.data;}
+      if(arr){anime=migrate(arr);writeLocal();setSyncAt(res.updatedAt);render();renderSyncUI();toast('☁️ Synced from cloud');return;}
     }
+    syncPush(); // local is current or newer — make sure the cloud has it
   }catch{}
 }
 function syncEnableNew(){
   setSyncCode(genCode());setSyncAt(0);
   syncPush().then(()=>{renderSyncUI();toast('☁️ Cloud backup is on');});
   renderSyncUI();
-}
-async function decryptShared(env){ // friend viewing a password-protected list
-  const pw=prompt('This list is password-protected. Enter its password:');
-  if(!pw)return null;
-  try{
-    const _unb64=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
-    const derive=async(secret,salt)=>{const base=await crypto.subtle.importKey('raw',new TextEncoder().encode(secret),'PBKDF2',false,['deriveKey']);return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:150000,hash:'SHA-256'},base,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);};
-    if(env.v===2&&env.pw){                       // master-key envelope: unwrap master with the password, then decrypt the list
-      const wk=await derive(pw,_unb64(env.pw.salt));
-      const raw=await crypto.subtle.decrypt({name:'AES-GCM',iv:_unb64(env.pw.iv)},wk,_unb64(env.pw.ct));
-      const master=await crypto.subtle.importKey('raw',raw,{name:'AES-GCM'},false,['decrypt']);
-      const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:_unb64(env.iv)},master,_unb64(env.ct));
-      return JSON.parse(new TextDecoder().decode(pt));
-    }
-    const key=await derive(pw,_unb64(env.salt));  // v1 legacy: list encrypted directly with the password key
-    const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:_unb64(env.iv)},key,_unb64(env.ct));
-    return JSON.parse(new TextDecoder().decode(pt));
-  }catch{return null;}
 }
 async function syncRestore(){
   const raw=(document.getElementById('syncCodeIn').value||'').replace(/\s+/g,'');
@@ -1018,10 +1473,12 @@ async function syncRestore(){
   try{
     setSyncCode(raw);
     const res=await syncPull();
-    if(res&&res.data&&res.data.enc===1){ // encrypted list — needs the password
-      const dec=await decryptShared(res.data);
-      if(dec&&Array.isArray(dec)){anime=migrate(dec);writeLocal();setSyncAt(res.updatedAt||Date.now());render();renderSyncUI();toast('☁️ Restored from cloud');}
-      else{setSyncCode('');toast('Wrong or missing password');}
+    if(res&&isEnvelope(res.data)){ // encrypted backup — store it and ask for the password to unlock
+      try{store().setItem(LSKEY,JSON.stringify(res.data));localStorage.setItem(ENCFLAG,'1');}catch{}
+      setSyncAt(res.updatedAt||Date.now());
+      cryptoKey=null;envWraps=null;
+      renderSyncUI();renderLockUI();showLock();
+      toast('🔒 Enter this list’s password to unlock');
     }else if(res&&Array.isArray(res.data)&&res.data.length){
       anime=migrate(res.data);writeLocal();setSyncAt(res.updatedAt||Date.now());render();renderSyncUI();toast('☁️ Restored from cloud');
     }else{ // nothing stored under that code yet — link this device and seed it
@@ -1241,20 +1698,30 @@ function prog(a){return a.status==='finished'?1:(a.epTotal?Math.min(1,(a.ep||0)/
 // per-title theming: user's own bg wins over AniList banner; accent follows the same source.
 function titleBg(a){return (a&&(a.bgImage||a.banner))||'';}
 function titleAccent(a){if(!a)return'';return (a.bgImage?(a.bgAccent||a.aniColor):a.aniColor)||'';}
+function setAmbient(c){try{document.documentElement.style.setProperty('--amb',(c&&/^#[0-9a-fA-F]{3,6}$/.test(c))?c:'transparent');}catch{}}
+let heroAmb='',_ambRAF=0;
+function onPageScroll(){
+  if(_ambRAF)return;
+  _ambRAF=requestAnimationFrame(()=>{
+    _ambRAF=0;const pg=document.getElementById('pageEl');if(!pg)return;
+    if(pg.scrollTop<50){if(heroAmb)setAmbient(heroAmb);return;}
+    const ptop=pg.getBoundingClientRect().top;let col='',best=-1e9;
+    pg.querySelectorAll('.row-sec[data-amb]').forEach(s=>{const amb=s.getAttribute('data-amb');if(!amb)return;const t=s.getBoundingClientRect().top-ptop;if(t<=130&&t>best){best=t;col=amb;}});
+    if(col)setAmbient(col);
+  });
+}
 // scoped CSS-var override string that tints a title's own detail/hero accents without touching global chrome
 function accentVars(a){const ac=titleAccent(a);if(!ac||!/^#[0-9a-fA-F]{3,6}$/.test(ac))return'';try{return`--a:${ac};--a2:${mix(ac,'#ffffff',0.28)};--ag:${rgba(ac,0.15)};--glow:${rgba(ac,0.26)};`;}catch{return'';}}
 function query(){return document.getElementById('searchIn').value.toLowerCase().trim();}
 
 function render(){
   renderKindSeg();renderFiltRow();renderSortRow();renderHome();
-  const fin=anime.filter(a=>a.status==='finished').length;
-  document.getElementById('headerSub').textContent=`${anime.length} titles · ${fin} finished`;
 }
 function renderKindSeg(){
   const el=document.getElementById('kindSeg');if(!el)return;
-  const cW=anime.filter(a=>kindOf(a)==='watch').length,cR=anime.filter(a=>kindOf(a)==='read').length;
-  const opts=[['watch',icon('play')+' Watching',cW],['read',icon('book')+' Reading',cR]];
-  el.innerHTML=opts.map(([k,l,n])=>`<button class="kseg${viewKind===k?' on':''}" onclick="setViewKind('${k}')">${l} <span class="fn">${n}</span></button>`).join('');
+  const opts=[['watch','play','Watch list'],['read','book','Reading list']];
+  el.innerHTML=opts.map(([k,ic,lbl])=>
+    `<button class="kseg${viewKind===k?' on':''}" onclick="setViewKind('${k}')" title="${lbl}" aria-label="${lbl}" aria-pressed="${viewKind===k}">${icon(ic)}</button>`).join('');
 }
 function setViewKind(k){
   if(viewKind===k)return;
@@ -1334,8 +1801,71 @@ function heroHTML(a){
     </div>
   </div>`;
 }
+let bbItems=[],bbIdx=0,bbTimer=0;
+function bbSlideHTML(a){
+  const art=titleBg(a);
+  let bg=`<div class="hero-bg" style="background:linear-gradient(135deg,var(--bg4),var(--bg2))"></div>`;
+  if(art)bg+=`<img class="hero-bg-img" src="${art}" loading="lazy" alt="" onerror="this.remove()">`;
+  else if(a.img)bg=`<div class="hero-bg" style="background-image:url('${a.img}')"></div>`;
+  const av=accentVars(a),p=prog(a),air=airingInfo(a);
+  const airHTML=air?`<div class="hero-air">${icon('calendar')} Ep ${air.ep} · airs ${air.day} ${air.time}</div>`:'';
+  const kicker=a.status==='watching'?(kindOf(a)==='read'?'Continue reading':'Continue watching'):(a.fav?'One of your favorites':'In your spotlight');
+  return`<div class="bb-slide"${av?` style="${av}"`:''} onclick="openDetail('${a.id}')">
+    ${bg}<div class="hero-shade"></div>
+    <div class="hero-body">
+      <div class="hero-kicker">${kicker}</div>
+      <div class="hero-title">${a.title}</div>
+      <div class="hero-meta">${[a.eps,a.time,(a.genre||'').split(',')[0]].filter(Boolean).join(' · ')}</div>
+      ${a.epTotal?`<div class="hero-prog"><div class="pbar"><div class="pfill" style="width:${Math.round(p*100)}%"></div></div><span>${a.ep||0} / ${a.epTotal}</span></div>`:''}
+      ${airHTML}
+      <div class="hero-cta">${icon('play')} &nbsp;Open</div>
+    </div>
+  </div>`;
+}
+function billboardHTML(items){
+  const slides=items.map(a=>bbSlideHTML(a)).join('');
+  const dots=items.length>1?`<div class="bb-dots">${items.map((a,i)=>`<div class="bb-dot${i===0?' on':''}" onclick="event.stopPropagation();bbGo(${i})"></div>`).join('')}</div>`:'';
+  return`<div class="billboard" id="billboard"><div class="bb-track">${slides}</div>${dots}</div>`;
+}
+function bbSetup(items){
+  clearInterval(bbTimer);bbTimer=0;bbIdx=0;
+  bbItems=(items||[]).map(a=>({id:a.id,amb:titleAccent(a)}));
+  const bb=document.getElementById('billboard');
+  if(bb&&bbItems.length>1){
+    const track=bb.querySelector('.bb-track');
+    let sx=0,sy=0,w=1,dragging=false,swiped=false;
+    bb.addEventListener('touchstart',e=>{sx=e.touches[0].clientX;sy=e.touches[0].clientY;w=bb.offsetWidth||1;dragging=false;swiped=false;},{passive:true});
+    bb.addEventListener('touchmove',e=>{
+      const dx=e.touches[0].clientX-sx,dy=e.touches[0].clientY-sy;
+      if(!dragging){if(Math.abs(dx)>8&&Math.abs(dx)>Math.abs(dy)){dragging=true;track.classList.add('dragging');}else return;}
+      let d=dx;
+      if((bbIdx===0&&dx>0)||(bbIdx===bbItems.length-1&&dx<0))d=dx*0.35; // rubber-band at the ends
+      track.style.transform='translateX('+(-bbIdx*w+d)+'px)';
+    },{passive:true});
+    bb.addEventListener('touchend',e=>{
+      if(!dragging)return;
+      const dx=e.changedTouches[0].clientX-sx;
+      if(Math.abs(dx)>w*0.18){swiped=true;bbGo(bbIdx+(dx<0?1:-1));}else bbGo(bbIdx); // commit or snap back
+      dragging=false;
+    },{passive:true});
+    bb.addEventListener('click',e=>{if(swiped){e.stopPropagation();e.preventDefault();swiped=false;}},true); // a swipe shouldn't open the title
+    bbGo(0);
+    bbTimer=setInterval(()=>bbGo(bbIdx+1),6000);
+  }
+}
+function bbGo(i){
+  const bb=document.getElementById('billboard');if(!bb||bbItems.length<2)return;
+  bbIdx=((i%bbItems.length)+bbItems.length)%bbItems.length;
+  const track=bb.querySelector('.bb-track');
+  if(track){track.classList.remove('dragging');track.style.transform='translateX('+(-bbIdx*(bb.offsetWidth||0))+'px)';}
+  bb.querySelectorAll('.bb-dot').forEach((d,j)=>d.classList.toggle('on',j===bbIdx));
+  const pg=document.getElementById('pageEl');
+  if(pg&&pg.scrollTop<60){heroAmb=bbItems[bbIdx].amb;setAmbient(heroAmb);}
+  if(bbTimer){clearInterval(bbTimer);bbTimer=setInterval(()=>bbGo(bbIdx+1),6000);} // full dwell after a manual jump
+}
 function renderHome(){
   const el=document.getElementById('pageEl');
+  clearInterval(bbTimer);bbTimer=0;   // stop any rotation; the main path re-arms it
   const q=query();
   const isRead=viewKind==='read';
   const pool=anime.filter(a=>kindOf(a)===viewKind);
@@ -1359,29 +1889,60 @@ function renderHome(){
     return;
   }
   const watching=sorted(pool.filter(a=>a.status==='watching'));
-  const hero=watching.find(a=>a.img)||watching[0];
-  let html=hero?heroHTML(hero):'';
+  // spotlight billboard: watching-with-art, then favorites-with-art, then any watching, then any-with-art (max 5)
+  const seen=new Set(),spot=[];const addSpot=a=>{if(a&&!seen.has(a.id)){seen.add(a.id);spot.push(a);}};
+  sorted(pool.filter(a=>a.status==='watching'&&titleBg(a))).forEach(addSpot);
+  sorted(pool.filter(a=>a.fav&&titleBg(a))).forEach(addSpot);
+  watching.forEach(addSpot);
+  sorted(pool.filter(a=>titleBg(a))).forEach(addSpot);
+  const spotlight=spot.slice(0,5),spotSet=new Set(spotlight.map(a=>a.id));
+  heroAmb=spotlight[0]?titleAccent(spotlight[0]):'';setAmbient(heroAmb);
+  let html=nudgeHTML()+(spotlight.length?billboardHTML(spotlight):'');
   const rows=isRead
     ?[['watching',icon('book')+' Reading'],['plan',icon('clipboard')+' Plan to Read'],['finished',icon('check')+' Finished'],['dropped',icon('x')+' Dropped']]
     :[['watching',icon('play')+' Watching'],['plan',icon('clipboard')+' Plan to Watch'],['finished',icon('check')+' Finished'],['dropped',icon('x')+' Dropped']];
   for(const[st,label]of rows){
     let items=sorted(pool.filter(a=>a.status===st));
-    if(st==='watching'&&hero)items=items.filter(a=>a.id!==hero.id);
+    if(st==='watching')items=items.filter(a=>!spotSet.has(a.id));
     if(!items.length)continue;
-    html+=`<div class="row-sec"><div class="row-head"><div class="row-title">${label}</div><div class="row-count">${items.length}</div></div>
+    html+=`<div class="row-sec" data-amb="${items[0]?titleAccent(items[0]):''}"><div class="row-head"><div class="row-title">${label}</div><div class="row-count">${items.length}</div></div>
       <div class="row-scroll">${items.map(posterCard).join('')}</div></div>`;
   }
   const favs=sorted(pool.filter(a=>a.fav));
-  if(favs.length)html+=`<div class="row-sec"><div class="row-head"><div class="row-title">${icon('heart','fill')} Favorites</div><div class="row-count">${favs.length}</div></div>
+  if(favs.length)html+=`<div class="row-sec" data-amb="${favs[0]?titleAccent(favs[0]):''}"><div class="row-head"><div class="row-title">${icon('heart','fill')} Favorites</div><div class="row-count">${favs.length}</div></div>
     <div class="row-scroll">${favs.map(posterCard).join('')}</div></div>`;
-  el.innerHTML=html;
+  // genre collections — browse your list by its most-common genres (Netflix-style lens)
+  const gmap={};pool.forEach(a=>(a.genre||'').split(',').map(g=>g.trim()).filter(Boolean).forEach(g=>{(gmap[g]=gmap[g]||[]).push(a);}));
+  const topGenres=Object.keys(gmap).filter(g=>gmap[g].length>=2).sort((x,y)=>gmap[y].length-gmap[x].length).slice(0,4);
+  if(topGenres.length){
+    html+=`<div class="row-div">Browse by genre</div>`;
+    for(const g of topGenres){
+      const items=sorted(gmap[g]);
+      html+=`<div class="row-sec" data-amb="${items[0]?titleAccent(items[0]):''}"><div class="row-head"><div class="row-title">${g}</div><div class="row-count">${items.length}</div></div>
+        <div class="row-scroll">${items.map(posterCard).join('')}</div></div>`;
+    }
+  }
+  el.innerHTML=html;bbSetup(spotlight);
 }
 
 // ─── DETAIL ─────────────────────────────────────────────────────────────────
 function openDetail(id){
   detailId=id;
+  const it=anime.find(a=>a.id===id);setAmbient(it?titleAccent(it):'');
   renderDetail();
+  const sh=document.getElementById('detailSheet');if(sh)sh.scrollTop=0;
   openSheet('detailSheet');
+}
+let _dtRAF=0;
+function onDetailScroll(){
+  if(_dtRAF)return;
+  _dtRAF=requestAnimationFrame(()=>{
+    _dtRAF=0;
+    const sh=document.getElementById('detailSheet');if(!sh)return;
+    const img=sh.querySelector('.dt-banner-img'),bn=sh.querySelector('.dt-banner');
+    if(img)img.style.transform='translateY('+(sh.scrollTop*0.4).toFixed(1)+'px) scale(1.05)';
+    if(bn)bn.style.opacity=Math.max(0,1-sh.scrollTop/320).toFixed(2);
+  });
 }
 function renderDetail(){
   const a=anime.find(x=>x.id===detailId);if(!a)return;
@@ -1488,8 +2049,11 @@ function openSheet(id){
   document.getElementById(id).classList.add('on');
   if(id==='themeSheet')renderThemeGrid();
   if(id==='statsSheet')renderStatsSheet();
-  if(id==='importSheet'){renderSyncUI();renderNotifyUI();}
+  if(id==='settingsSheet')renderSettings();
+  if(id==='backupSheet')renderSyncUI();
+  if(id==='securitySheet')renderLockUI();
   if(id==='forYouSheet')renderForYou();
+  if(id==='aiSheet'){renderModelPicker();updateKeyBtn();}
 }
 function closeAll(){
   document.querySelectorAll('.sheet').forEach(s=>s.classList.remove('on'));
@@ -1749,8 +2313,98 @@ function fallbackCopy(text,done){
   ta.remove();
 }
 
+// ─── TUTORIAL ───────────────────────────────────────────────────────────────
+const TUT_FLAG='tut_seen_'+LSKEY;   // namespaced like sync_/enc_: index + friends share an origin
+function tutSeen(){try{return localStorage.getItem(TUT_FLAG)==='1';}catch{return true;}}
+function markTutSeen(){try{localStorage.setItem(TUT_FLAG,'1');}catch{}}
+function openTutorial(){closeAll();const v=document.getElementById('tutView');if(v){v.scrollTop=0;v.classList.add('on');}markTutSeen();}
+function closeTutorial(){const v=document.getElementById('tutView');if(v)v.classList.remove('on');markTutSeen();}
+function tutGo(id){closeTutorial();setTimeout(()=>openSheet(id),280);}
+// Only greet a genuinely new install — someone with a stored list has been here
+// before and shouldn't get an onboarding screen thrown at them.
+function maybeShowTutorial(){
+  if(tutSeen()||appLocked)return;
+  let fresh=false;try{fresh=!store()||!store().getItem(LSKEY);}catch{}
+  if(fresh)setTimeout(openTutorial,650);else markTutSeen();
+}
+
+// ─── SETTINGS HUB ───────────────────────────────────────────────────────────
+// Each row states its own status, so "backup is off" is visible at a glance
+// instead of buried inside a panel nobody opens.
+function renderSettings(){
+  const el=document.getElementById('settingsBody');if(!el)return;
+  const backedUp=!!syncCode();
+  const rows=[
+    {ic:'bulb',   h:'How WatchList works', p:'A quick tour — and how not to lose your list', go:'openTutorial()'},
+    {ic:'cloud',  h:'Cloud backup',        p:backedUp?'On — restorable on any device':'Off — this list exists only on this device',
+     go:"openSheet('backupSheet')", warn:!backedUp},
+    {ic:'lock',   h:'Password',            p:encEnabled()?'On — your list is encrypted':'Off', go:"openSheet('securitySheet')"},
+    {ic:'bell',   h:'Notifications',       p:notifyOn()?'On — you\'ll be told when an episode airs':'Off', go:'openNotifySheet()'},
+    {ic:'clipboard',h:'Import / Export',   p:'Paste a list in, or copy yours out', go:"openSheet('importSheet')"},
+    {ic:'palette',h:'Theme',               p:'Colours, or build your own', go:"openSheet('themeSheet')"},
+  ];
+  el.innerHTML=rows.map(r=>
+    `<button class="set-row${r.warn?' warn':''}" onclick="${r.go}">
+      <div class="set-ico">${icon(r.ic)}</div>
+      <div class="set-txt"><div class="set-h">${r.h}</div><div class="set-p${r.warn?' warn':''}">${r.p}</div></div>
+      <span class="set-chev">${icon('chevron-right')}</span>
+    </button>`).join('');
+}
+
+// ─── BACKUP NUDGE ───────────────────────────────────────────────────────────
+// A list with no sync code dies with the device — clearing site data or deleting
+// the Home Screen app wipes it, with nothing to restore from. Once someone has
+// enough titles to care about, say so once; then never nag again.
+const NUDGE_FLAG='backup_nudge_'+LSKEY;
+function nudgeOff(){try{return localStorage.getItem(NUDGE_FLAG)==='1';}catch{return true;}}
+function dismissNudge(){try{localStorage.setItem(NUDGE_FLAG,'1');}catch{}renderHome();}
+function shouldNudge(){return anime.length>=5&&!syncCode()&&!nudgeOff();}
+function nudgeHTML(){
+  if(!shouldNudge())return'';
+  return`<div class="nudge">${icon('cloud')}
+    <div class="nudge-t">This list only exists on this device — back it up so you can't lose it.</div>
+    <button class="nudge-go" onclick="openSheet('backupSheet')">Back up</button>
+    <button class="nudge-x" onclick="dismissNudge()" aria-label="Dismiss">${icon('x')}</button>
+  </div>`;
+}
+
 // ─── STATS ──────────────────────────────────────────────────────────────────
 function parseHrs(s){const m=/([\d.]+)/.exec(s||'');return m?+m[1]:0;}
+function openStats(){renderStats();const v=document.getElementById('statsView');if(v)v.classList.add('on');}
+function closeStats(){const v=document.getElementById('statsView');if(v)v.classList.remove('on');}
+function svCountUp(el,to){if(!el)return;const dur=850,t0=performance.now();const step=now=>{const p=Math.min(1,(now-t0)/dur),e=1-Math.pow(1-p,3);el.textContent=Math.round(to*e).toLocaleString();if(p<1)requestAnimationFrame(step);};requestAnimationFrame(step);}
+function svChips(list){return list.length?list.map(a=>'<span class="sv-chip">'+schEsc(a.title)+(a.rating?' '+icon('star','fill')+a.rating:'')+'</span>').join(''):'<span class="sv-chip">None yet</span>';}
+function svBar(id,label,color,val,max,drill){return '<div class="sv-bar" onclick="svDrill(\''+id+'\',this)"><div class="lbl">'+label+'</div><div class="track"><div class="fill" style="width:'+Math.round(val/Math.max(1,max)*100)+'%;background:'+color+'"></div></div><div class="n">'+val+'</div><span class="chev">'+icon('chevron-right')+'</span></div><div class="sv-drill" id="drill-'+id+'">'+drill+'</div>';}
+function svDrill(id,el){const d=document.getElementById('drill-'+id);if(!d)return;el.classList.toggle('open',d.classList.toggle('on'));}
+function renderStats(){
+  const body=document.getElementById('statsViewBody');if(!body)return;
+  const counts={watching:0,plan:0,finished:0,dropped:0};
+  anime.forEach(a=>{if(counts[a.status]!==undefined)counts[a.status]++;});
+  const rated=anime.filter(a=>a.rating>0);
+  const avg=rated.length?(rated.reduce((s,a)=>s+a.rating,0)/rated.length).toFixed(1):'—';
+  const eps=anime.reduce((s,a)=>s+(a.status==='finished'?(a.epTotal||a.ep||0):(a.ep||0)),0);
+  const hrs=Math.round(anime.reduce((s,a)=>{const h=parseHrs(a.time);if(a.status==='finished')return s+h;if(a.epTotal&&a.ep)return s+h*(a.ep/a.epTotal);return s;},0));
+  const maxStatus=Math.max(1,...Object.values(counts));
+  const statusBars=['watching','plan','finished','dropped'].map(st=>svBar('st-'+st,(STATUS_META[st]?STATUS_META[st].label:st),(STATUS_META[st]?STATUS_META[st].color:'var(--a)'),counts[st],maxStatus,svChips(anime.filter(a=>a.status===st)))).join('');
+  const gc={};anime.forEach(a=>(a.genre||'').split(',').map(g=>g.trim()).filter(Boolean).forEach(g=>gc[g]=(gc[g]||0)+1));
+  const topG=Object.entries(gc).sort((a,b)=>b[1]-a[1]).slice(0,8);const maxG=topG.length?topG[0][1]:1;
+  const genreBars=topG.length?topG.map(([g,n],i)=>svBar('g-'+i,schEsc(g),'var(--a)',n,maxG,svChips(anime.filter(a=>(a.genre||'').split(',').map(x=>x.trim()).includes(g))))).join(''):'<p class="ai-desc">Add genres (via Autofill) to see this.</p>';
+  const rd=[5,4,3,2,1].map(r=>({r,items:anime.filter(a=>Math.round(a.rating)===r)}));const maxR=Math.max(1,...rd.map(x=>x.items.length));
+  const ratingBars=rated.length?rd.map(x=>svBar('r-'+x.r,x.r+' '+icon('star','fill'),'var(--a)',x.items.length,maxR,svChips(x.items))).join(''):'<p class="ai-desc">Rate some titles to see this.</p>';
+  const topRated=[...rated].sort((a,b)=>b.rating-a.rating).slice(0,8);
+  body.innerHTML=
+    '<div class="sv-hero"><div class="sv-heronum"><div class="v" data-to="'+hrs+'">0</div><div class="l">Hours watched</div></div>'+
+      '<div class="sv-heronum"><div class="v" data-to="'+anime.length+'">0</div><div class="l">Titles</div></div>'+
+      '<div class="sv-heronum"><div class="v" data-to="'+eps+'">0</div><div class="l">Episodes</div></div></div>'+
+    '<div class="sv-hero"><div class="sv-heronum"><div class="v">'+icon('star','fill')+' '+avg+'</div><div class="l">Avg rating ('+rated.length+')</div></div>'+
+      '<div class="sv-heronum"><div class="v" data-to="'+counts.finished+'">0</div><div class="l">Finished</div></div>'+
+      '<div class="sv-heronum"><div class="v" data-to="'+anime.filter(a=>a.fav).length+'">0</div><div class="l">Favorites</div></div></div>'+
+    '<div class="sv-sec"><div class="sv-h">Status — tap to reveal</div>'+statusBars+'</div>'+
+    '<div class="sv-sec"><div class="sv-h">Top genres — tap to reveal</div>'+genreBars+'</div>'+
+    '<div class="sv-sec"><div class="sv-h">Ratings — tap to reveal</div>'+ratingBars+'</div>'+
+    (topRated.length?'<div class="sv-sec"><div class="sv-h">Your top rated</div><div class="sv-drill on">'+topRated.map(a=>'<span class="sv-chip">'+schEsc(a.title)+' '+icon('star','fill')+a.rating+'</span>').join('')+'</div></div>':'');
+  body.querySelectorAll('.sv-heronum .v[data-to]').forEach(el=>svCountUp(el,+el.getAttribute('data-to')));
+}
 function renderStatsSheet(){
   const counts={watching:0,plan:0,finished:0,dropped:0};
   anime.forEach(a=>counts[a.status]!==undefined&&counts[a.status]++);
@@ -1787,6 +2441,7 @@ function setAITab(t){
     document.getElementById(`at-${x}`).classList.toggle('on',x===t);
     document.getElementById(`ap-${x}`).classList.toggle('on',x===t);
   });
+  if(t==='chat')renderChatThread(false);
 }
 function listSummary(){
   const g=st=>anime.filter(a=>a.status===st).map(a=>a.title+(a.rating?` (my rating ${a.rating}/5)`:'')).join(', ')||'none';
@@ -1797,7 +2452,8 @@ function getKey(){try{return localStorage.getItem('anthropic_key')||'';}catch{re
 function saveKey(){
   const v=document.getElementById('apiKeyIn').value.trim();
   try{if(v)localStorage.setItem('anthropic_key',v);else localStorage.removeItem('anthropic_key');}catch{}
-  toast(v?'🔑 Key saved on this device':'Key removed');
+  toast(v?'Key saved on this device':'Key removed');
+  renderModelPicker();
 }
 function aiErrorHTML(e){
   return e===NO_KEY
@@ -1843,16 +2499,107 @@ async function runRecommend(){
   }catch(e){const r=document.getElementById('recResp');r.className='ai-resp on';r.innerHTML=aiErrorHTML(e);}
   document.getElementById('recBtn').classList.remove('loading');
 }
-async function runChat(){
-  const q=document.getElementById('chatPrompt').value.trim();
-  if(!q){toast('Type a question first');return;}
-  setLoading('chatBtn','chatResp',true);
-  try{
-    const text=await callAI(`${listSummary()}\n\nQuestion: ${q}\n\nAnswer helpfully and concisely, referencing my list when relevant.`);
-    const r=document.getElementById('chatResp');r.className='ai-resp on';
-    r.innerHTML=`<div class="ai-badge">${icon('sparkles')} Answer</div>${text.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>')}`;
-  }catch(e){const r=document.getElementById('chatResp');r.className='ai-resp on';r.innerHTML=aiErrorHTML(e);}
-  document.getElementById('chatBtn').classList.remove('loading');
+let chatHistory=[];
+try{chatHistory=JSON.parse(localStorage.getItem('chat_hist')||'[]');if(!Array.isArray(chatHistory))chatHistory=[];}catch{chatHistory=[];}
+function saveChat(){try{localStorage.setItem('chat_hist',JSON.stringify(chatHistory.slice(-40)));}catch{}}
+function chatContext(){
+  const line=a=>a.title+(a.genre?' ['+a.genre+']':'')+(a.rating?' ('+a.rating+'/5)':'');
+  const g=(kind,st)=>anime.filter(a=>kindOf(a)===kind&&a.status===st).map(line).join('; ')||'none';
+  return "You are a warm, sharp anime & manga companion inside the user's personal watchlist app. Chat naturally and fairly concisely (a few sentences unless they ask for more). Reference their ACTUAL list, read their ratings to gauge taste, keep spoilers out unless asked, and use light markdown (bold, bullet lists) when it helps. When recommending NEW titles, prefer things not already on their list, lean toward what matches their high-rated + genre patterns, and steer clear of what they dropped.\n\n"+
+    "WATCHING: "+g('watch','watching')+"\nPLAN TO WATCH: "+g('watch','plan')+"\nFINISHED (ratings shown): "+g('watch','finished')+"\nDROPPED (disliked): "+g('watch','dropped')+"\n"+
+    "READING: "+g('read','watching')+"\nPLAN TO READ: "+g('read','plan')+"\nFINISHED READING: "+g('read','finished');
+}
+function mdToHtml(t){
+  let s=schEsc(t);
+  s=s.replace(/```([\s\S]*?)```/g,(m,c)=>'<pre class="chat-pre">'+c.trim()+'</pre>');
+  s=s.replace(/`([^`]+)`/g,'<code>$1</code>');
+  s=s.replace(/^#{1,4}\s+(.+)$/gm,'<strong>$1</strong>');
+  s=s.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
+  s=s.replace(/(^|[^*])\*(?!\*)([^*\n]+?)\*/g,'$1<em>$2</em>');
+  s=s.replace(/(?:^|\n)((?:\s*[-*]\s.+(?:\n|$))+)/g,(m,blk)=>'\n<ul class="chat-ul">'+blk.trim().split(/\n/).map(l=>'<li>'+l.replace(/^\s*[-*]\s/,'').trim()+'</li>').join('')+'</ul>');
+  s=s.replace(/(?:^|\n)((?:\s*\d+\.\s.+(?:\n|$))+)/g,(m,blk)=>'\n<ol class="chat-ul">'+blk.trim().split(/\n/).map(l=>'<li>'+l.replace(/^\s*\d+\.\s/,'').trim()+'</li>').join('')+'</ol>');
+  return s.replace(/\n{2,}/g,'<br><br>').replace(/\n/g,'<br>');
+}
+function chatChips(){
+  const chips=['What should I watch next?','What should I marathon this weekend?','Something short for tonight','Recommend by mood: cozy'];
+  if(anime.filter(a=>kindOf(a)==='watch'&&a.status==='plan').length>1)chips.push('Best order for my Plan list');
+  return chips;
+}
+function renderChatThread(typing){
+  const th=document.getElementById('chatThread');if(!th)return;
+  if(!chatHistory.length&&!typing){
+    th.innerHTML='<div class="chat-empty">'+icon('sparkles')+'<p>Hey — I know your whole list. Ask me what to watch next, hidden gems, what fits your mood, or the best viewing order.</p><div class="chat-chips">'+
+      chatChips().map(c=>'<button class="chat-chip" onclick="chatChip(this)">'+schEsc(c)+'</button>').join('')+'</div></div>';
+    return;
+  }
+  let html=chatHistory.map((m,i)=>{
+    if(m.role==='user')return '<div class="chat-msg me">'+schEsc(m.content).replace(/\n/g,'<br>')+'</div>';
+    const copy=m.content?'<button class="chat-copy" onclick="copyMsg('+i+')" aria-label="Copy">'+icon('clipboard')+'</button>':'';
+    return '<div class="chat-msg ai">'+mdToHtml(m.content)+copy+'</div>';
+  }).join('');
+  if(typing)html+='<div class="chat-msg ai chat-typing"><span></span><span></span><span></span></div>';
+  th.innerHTML=html;
+  th.scrollTop=th.scrollHeight;
+}
+function chatChip(btn){document.getElementById('chatPrompt').value=btn.textContent;sendChat();}
+function clearChat(){chatHistory=[];saveChat();renderChatThread(false);const inp=document.getElementById('chatPrompt');if(inp)inp.value='';}
+function copyMsg(i){const m=chatHistory[i];if(!m)return;try{navigator.clipboard.writeText(m.content);toast('Copied');}catch{toast('Copy failed');}}
+function sendChat(){
+  const inp=document.getElementById('chatPrompt');const q=(inp.value||'').trim();
+  if(!q)return;
+  if(!getKey()){toast('Add an AI key below to chat');return;}
+  inp.value='';
+  chatHistory.push({role:'user',content:q});
+  renderChatThread(true);
+  const snapshot=chatHistory.slice();
+  let added=false,idx=-1;
+  const onTok=t=>{if(!added){chatHistory.push({role:'assistant',content:''});idx=chatHistory.length-1;added=true;}chatHistory[idx].content+=t;renderChatThread(false);};
+  callAIChatStream(snapshot,onTok).then(full=>{
+    if(!added)chatHistory.push({role:'assistant',content:full||'…'});else if(full)chatHistory[idx].content=full;
+    renderChatThread(false);saveChat();
+  }).catch(e=>{
+    const msg=e===NO_KEY?'Add an AI key below and I\'m all yours.':'Hmm, that didn\'t go through — check your key or connection and try again.';
+    if(!added)chatHistory.push({role:'assistant',content:msg});else chatHistory[idx].content=msg;
+    renderChatThread(false);saveChat();
+  });
+}
+const AI_MODELS={groq:['llama-3.3-70b-versatile','llama-3.1-8b-instant'],openrouter:['meta-llama/llama-3.3-70b-instruct:free','google/gemini-2.0-flash-exp:free'],gemini:['gemini-2.5-flash','gemini-2.5-pro'],claude:['claude-sonnet-5','claude-haiku-4-5-20251001']};
+function aiProvider(){const k=getKey();if(k.startsWith('gsk_'))return'groq';if(k.startsWith('sk-or-'))return'openrouter';if(k.startsWith('AIza'))return'gemini';if(k)return'claude';return'';}
+function getModel(){const p=aiProvider();if(!p)return'';try{return localStorage.getItem('ai_model_'+p)||AI_MODELS[p][0];}catch{return AI_MODELS[p][0];}}
+function setModelSel(v){const p=aiProvider();if(p){try{localStorage.setItem('ai_model_'+p,v);}catch{}}}
+function updateKeyBtn(){const b=document.getElementById('keyBtn');if(b)b.innerHTML=icon('key')+' '+(getKey()?'Change AI Key':'Add AI Key');}
+function openKeySheet(){const inp=document.getElementById('apiKeyIn');if(inp)inp.value=getKey();openSheet('keySheet');}
+function closeKeySheet(){openSheet('aiSheet');setAITab('chat');}
+function saveKeyAndClose(){saveKey();closeKeySheet();}
+function removeKey(){try{localStorage.removeItem('anthropic_key');}catch{}const inp=document.getElementById('apiKeyIn');if(inp)inp.value='';renderModelPicker();updateKeyBtn();toast('Key removed');}
+function renderModelPicker(){
+  const sel=document.getElementById('modelSel');if(!sel)return;
+  const p=aiProvider();
+  if(!p){sel.style.display='none';return;}
+  sel.style.display='';const cur=getModel();
+  sel.innerHTML=AI_MODELS[p].map(m=>'<option value="'+m+'"'+(m===cur?' selected':'')+'>'+m.split('/').pop()+'</option>').join('');
+}
+async function readSSE(resp,onData){
+  const reader=resp.body.getReader(),dec=new TextDecoder();let buf='';
+  while(true){const {done,value}=await reader.read();if(done)break;buf+=dec.decode(value,{stream:true});const parts=buf.split('\n');buf=parts.pop();for(let p of parts){p=p.replace(/\r$/,'');if(p.startsWith('data:'))onData(p.slice(p[5]===' '?6:5));}}
+}
+async function callAIChatStream(history,onToken){
+  const key=getKey();if(!key)throw NO_KEY;
+  const system=chatContext(),model=getModel();
+  if(key.startsWith('gsk_')||key.startsWith('sk-or-')){
+    const url=key.startsWith('gsk_')?'https://api.groq.com/openai/v1/chat/completions':'https://openrouter.ai/api/v1/chat/completions';
+    const resp=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify({model,messages:[{role:'system',content:system}].concat(history),stream:true,max_tokens:1200})});
+    if(!resp.ok)throw new Error('API '+resp.status);
+    let full='';await readSSE(resp,d=>{d=d.trim();if(d==='[DONE]'||!d)return;try{const j=JSON.parse(d);const t=j.choices?.[0]?.delta?.content;if(t){full+=t;onToken(t);}}catch(e){}});return full;
+  }
+  if(key.startsWith('AIza')){
+    const resp=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+model+':streamGenerateContent?alt=sse',{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},body:JSON.stringify({systemInstruction:{parts:[{text:system}]},contents:history.map(m=>({role:m.role==='assistant'?'model':'user',parts:[{text:m.content}]})),generationConfig:{maxOutputTokens:1200}})});
+    if(!resp.ok)throw new Error('API '+resp.status);
+    let full='';await readSSE(resp,d=>{d=d.trim();if(!d)return;try{const j=JSON.parse(d);const t=j.candidates?.[0]?.content?.parts?.[0]?.text;if(t){full+=t;onToken(t);}}catch(e){}});return full;
+  }
+  const resp=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model,max_tokens:1200,system,messages:history,stream:true})});
+  if(!resp.ok)throw new Error('API '+resp.status);
+  let full='';await readSSE(resp,d=>{d=d.trim();if(!d)return;try{const j=JSON.parse(d);if(j.type==='content_block_delta'&&j.delta&&j.delta.text){full+=j.delta.text;onToken(j.delta.text);}}catch(e){}});return full;
 }
 async function runRank(){
   const pref=document.getElementById('rankPrompt').value.trim();
@@ -2278,6 +3025,10 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeAll();closeCon
 // ─── INIT ───────────────────────────────────────────────────────────────────
 try{hydrateIcons();}catch{}
 load();loadTheme();render();
+if(appLocked)showLock();   // stored list is ciphertext → gate the app until unlocked
+try{maybeShowTutorial();}catch{}
+try{document.getElementById('pageEl').addEventListener('scroll',onPageScroll,{passive:true});}catch{}
+try{document.getElementById('detailSheet').addEventListener('scroll',onDetailScroll,{passive:true});}catch{}
 try{renderNotifyBell();}catch{}
 try{document.getElementById('apiKeyIn').value=getKey();}catch{}
 try{if(sessionStorage.getItem('justUpdated')){sessionStorage.removeItem('justUpdated');setTimeout(()=>toast('✨ Updated to the latest version'),700);}}catch{}

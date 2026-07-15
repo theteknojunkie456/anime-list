@@ -1442,11 +1442,15 @@ async function faceIDPossible(){
   try{return await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();}catch{return false;}
 }
 function faceIDOn(){try{const e=JSON.parse(store().getItem(LSKEY));return !!(e&&e.pfk);}catch{return false;}}
+// STABLE user id. With a random one, every re-enable filed a separate "account"
+// and iOS stacked up duplicate passkeys, forcing a picker before it would scan.
+// Same rp + same user.id + resident key ⇒ re-registering REPLACES the old one.
+const PK_USER=new TextEncoder().encode('watchlist-owner');
 async function passkeyCreate(){
   const c=await navigator.credentials.create({publicKey:{
     challenge:crypto.getRandomValues(new Uint8Array(32)),
     rp:{name:'WatchList',id:location.hostname},
-    user:{id:crypto.getRandomValues(new Uint8Array(16)),name:'watchlist',displayName:'WatchList'},
+    user:{id:PK_USER,name:'WatchList',displayName:'WatchList'},
     pubKeyCredParams:[{type:'public-key',alg:-7},{type:'public-key',alg:-257}],
     authenticatorSelection:{authenticatorAttachment:'platform',residentKey:'required',userVerification:'required'},
     extensions:{prf:{}},timeout:60000,

@@ -123,6 +123,19 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 /* per-title banner art rendered as an <img> so it lazy-loads + can gracefully drop on error (falls back to the gradient .hero-bg beneath it) */
 .hero-bg-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 30%;filter:saturate(1.08);animation:kenburns 28s ease-in-out infinite alternate;will-change:transform;}
 @keyframes kenburns{from{transform:scale(1.06) translate(0,0);}to{transform:scale(1.18) translate(-2.5%,-3%);}}
+/* Phase-2 motion: staggered reveals + tactile press */
+.pcard{animation:cardIn .42s cubic-bezier(.2,1,.3,1) backwards;}
+@keyframes cardIn{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:none;}}
+.pcard:active{transform:scale(.955);}
+.row-scroll .pcard:nth-child(2),.grid .pcard:nth-child(2){animation-delay:.03s}
+.row-scroll .pcard:nth-child(3),.grid .pcard:nth-child(3){animation-delay:.06s}
+.row-scroll .pcard:nth-child(4),.grid .pcard:nth-child(4){animation-delay:.09s}
+.row-scroll .pcard:nth-child(5),.grid .pcard:nth-child(5){animation-delay:.12s}
+.row-scroll .pcard:nth-child(6),.grid .pcard:nth-child(6){animation-delay:.15s}
+.row-scroll .pcard:nth-child(n+7),.grid .pcard:nth-child(n+7){animation-delay:.17s}
+.row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards;}
+.hero{transition:transform .16s ease;}
+.hero:active{transform:scale(.99);}
 .hero-shade{position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,0.05) 0%,rgba(8,8,10,0.6) 55%,rgba(8,8,10,0.93) 100%);}
 .hero-body{position:relative;padding:16px 18px;width:100%;}
 .hero-kicker{font-size:10px;font-weight:800;letter-spacing:0.14em;text-transform:uppercase;color:var(--a2);margin-bottom:6px;}
@@ -1272,6 +1285,17 @@ function prog(a){return a.status==='finished'?1:(a.epTotal?Math.min(1,(a.ep||0)/
 function titleBg(a){return (a&&(a.bgImage||a.banner))||'';}
 function titleAccent(a){if(!a)return'';return (a.bgImage?(a.bgAccent||a.aniColor):a.aniColor)||'';}
 function setAmbient(c){try{document.documentElement.style.setProperty('--amb',(c&&/^#[0-9a-fA-F]{3,6}$/.test(c))?c:'transparent');}catch{}}
+let heroAmb='',_ambRAF=0;
+function onPageScroll(){
+  if(_ambRAF)return;
+  _ambRAF=requestAnimationFrame(()=>{
+    _ambRAF=0;const pg=document.getElementById('pageEl');if(!pg)return;
+    if(pg.scrollTop<50){if(heroAmb)setAmbient(heroAmb);return;}
+    const ptop=pg.getBoundingClientRect().top;let col='',best=-1e9;
+    pg.querySelectorAll('.row-sec[data-amb]').forEach(s=>{const amb=s.getAttribute('data-amb');if(!amb)return;const t=s.getBoundingClientRect().top-ptop;if(t<=130&&t>best){best=t;col=amb;}});
+    if(col)setAmbient(col);
+  });
+}
 // scoped CSS-var override string that tints a title's own detail/hero accents without touching global chrome
 function accentVars(a){const ac=titleAccent(a);if(!ac||!/^#[0-9a-fA-F]{3,6}$/.test(ac))return'';try{return`--a:${ac};--a2:${mix(ac,'#ffffff',0.28)};--ag:${rgba(ac,0.15)};--glow:${rgba(ac,0.26)};`;}catch{return'';}}
 function query(){return document.getElementById('searchIn').value.toLowerCase().trim();}
@@ -1391,7 +1415,7 @@ function renderHome(){
   }
   const watching=sorted(pool.filter(a=>a.status==='watching'));
   const hero=watching.find(a=>a.img)||watching[0];
-  setAmbient(hero?titleAccent(hero):'');
+  heroAmb=hero?titleAccent(hero):'';setAmbient(heroAmb);
   let html=hero?heroHTML(hero):'';
   const rows=isRead
     ?[['watching',icon('book')+' Reading'],['plan',icon('clipboard')+' Plan to Read'],['finished',icon('check')+' Finished'],['dropped',icon('x')+' Dropped']]
@@ -1400,11 +1424,11 @@ function renderHome(){
     let items=sorted(pool.filter(a=>a.status===st));
     if(st==='watching'&&hero)items=items.filter(a=>a.id!==hero.id);
     if(!items.length)continue;
-    html+=`<div class="row-sec"><div class="row-head"><div class="row-title">${label}</div><div class="row-count">${items.length}</div></div>
+    html+=`<div class="row-sec" data-amb="${items[0]?titleAccent(items[0]):''}"><div class="row-head"><div class="row-title">${label}</div><div class="row-count">${items.length}</div></div>
       <div class="row-scroll">${items.map(posterCard).join('')}</div></div>`;
   }
   const favs=sorted(pool.filter(a=>a.fav));
-  if(favs.length)html+=`<div class="row-sec"><div class="row-head"><div class="row-title">${icon('heart','fill')} Favorites</div><div class="row-count">${favs.length}</div></div>
+  if(favs.length)html+=`<div class="row-sec" data-amb="${favs[0]?titleAccent(favs[0]):''}"><div class="row-head"><div class="row-title">${icon('heart','fill')} Favorites</div><div class="row-count">${favs.length}</div></div>
     <div class="row-scroll">${favs.map(posterCard).join('')}</div></div>`;
   el.innerHTML=html;
 }
@@ -2405,6 +2429,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeAll();closeCon
 // ─── INIT ───────────────────────────────────────────────────────────────────
 try{hydrateIcons();}catch{}
 load();loadTheme();render();
+try{document.getElementById('pageEl').addEventListener('scroll',onPageScroll,{passive:true});}catch{}
 try{renderNotifyBell();}catch{}
 try{document.getElementById('apiKeyIn').value=getKey();}catch{}
 try{if(sessionStorage.getItem('justUpdated')){sessionStorage.removeItem('justUpdated');setTimeout(()=>toast('✨ Updated to the latest version'),700);}}catch{}

@@ -177,6 +177,16 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
   background:rgba(255,255,255,0.94);color:#0a0a0c;font-size:12.5px;font-weight:800;
   padding:9px 16px;border-radius:99px;
 }
+/* ── BILLBOARD (auto-rotating spotlight) ── */
+.billboard{position:relative;margin:14px 18px 6px;border-radius:24px;overflow:hidden;min-height:240px;border:1px solid var(--b2);box-shadow:0 14px 40px -12px rgba(0,0,0,0.6);animation:fadeUp .4s ease both;}
+.bb-slide{position:absolute;inset:0;display:flex;align-items:flex-end;cursor:pointer;opacity:0;pointer-events:none;transition:opacity .85s ease;}
+.bb-slide.on{opacity:1;pointer-events:auto;}
+.bb-slide.on .hero-bg-img{animation:kenburns 22s ease-in-out infinite alternate;}
+.bb-slide:active{transform:none;}
+.bb-dots{position:absolute;bottom:15px;right:16px;z-index:4;display:flex;gap:6px;}
+.bb-dot{width:7px;height:7px;border-radius:99px;background:rgba(255,255,255,0.42);transition:all .35s cubic-bezier(.2,1,.3,1);cursor:pointer;}
+.bb-dot.on{background:#fff;width:20px;}
+.row-div{font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--t3);padding:22px 18px 2px;animation:fadeUp .4s ease both;}
 
 /* ── ROWS ── */
 .row-sec{margin-top:16px;animation:fadeUp .4s ease both;}
@@ -1678,8 +1688,49 @@ function heroHTML(a){
     </div>
   </div>`;
 }
+let bbItems=[],bbIdx=0,bbTimer=0;
+function bbSlideHTML(a,on){
+  const art=titleBg(a);
+  let bg=`<div class="hero-bg" style="background:linear-gradient(135deg,var(--bg4),var(--bg2))"></div>`;
+  if(art)bg+=`<img class="hero-bg-img" src="${art}" loading="lazy" alt="" onerror="this.remove()">`;
+  else if(a.img)bg=`<div class="hero-bg" style="background-image:url('${a.img}')"></div>`;
+  const av=accentVars(a),p=prog(a),air=airingInfo(a);
+  const airHTML=air?`<div class="hero-air">${icon('calendar')} Ep ${air.ep} · airs ${air.day} ${air.time}</div>`:'';
+  const kicker=a.status==='watching'?(kindOf(a)==='read'?'Continue reading':'Continue watching'):(a.fav?'One of your favorites':'In your spotlight');
+  return`<div class="bb-slide${on?' on':''}"${av?` style="${av}"`:''} onclick="openDetail('${a.id}')">
+    ${bg}<div class="hero-shade"></div>
+    <div class="hero-body">
+      <div class="hero-kicker">${kicker}</div>
+      <div class="hero-title">${a.title}</div>
+      <div class="hero-meta">${[a.eps,a.time,(a.genre||'').split(',')[0]].filter(Boolean).join(' · ')}</div>
+      ${a.epTotal?`<div class="hero-prog"><div class="pbar"><div class="pfill" style="width:${Math.round(p*100)}%"></div></div><span>${a.ep||0} / ${a.epTotal}</span></div>`:''}
+      ${airHTML}
+      <div class="hero-cta">${icon('play')} &nbsp;Open</div>
+    </div>
+  </div>`;
+}
+function billboardHTML(items){
+  const slides=items.map((a,i)=>bbSlideHTML(a,i===0)).join('');
+  const dots=items.length>1?`<div class="bb-dots">${items.map((a,i)=>`<div class="bb-dot${i===0?' on':''}" onclick="event.stopPropagation();bbGo(${i})"></div>`).join('')}</div>`:'';
+  return`<div class="billboard" id="billboard">${slides}${dots}</div>`;
+}
+function bbSetup(items){
+  clearInterval(bbTimer);bbTimer=0;bbIdx=0;
+  bbItems=(items||[]).map(a=>({id:a.id,amb:titleAccent(a)}));
+  if(bbItems.length>1)bbTimer=setInterval(()=>bbGo(bbIdx+1),6000);
+}
+function bbGo(i){
+  const bb=document.getElementById('billboard');if(!bb||bbItems.length<2)return;
+  bbIdx=((i%bbItems.length)+bbItems.length)%bbItems.length;
+  bb.querySelectorAll('.bb-slide').forEach((s,j)=>s.classList.toggle('on',j===bbIdx));
+  bb.querySelectorAll('.bb-dot').forEach((d,j)=>d.classList.toggle('on',j===bbIdx));
+  const pg=document.getElementById('pageEl');
+  if(pg&&pg.scrollTop<60){heroAmb=bbItems[bbIdx].amb;setAmbient(heroAmb);}
+  if(bbTimer){clearInterval(bbTimer);bbTimer=setInterval(()=>bbGo(bbIdx+1),6000);} // full dwell after a manual jump
+}
 function renderHome(){
   const el=document.getElementById('pageEl');
+  clearInterval(bbTimer);bbTimer=0;   // stop any rotation; the main path re-arms it
   const q=query();
   const isRead=viewKind==='read';
   const pool=anime.filter(a=>kindOf(a)===viewKind);
@@ -1703,15 +1754,21 @@ function renderHome(){
     return;
   }
   const watching=sorted(pool.filter(a=>a.status==='watching'));
-  const hero=watching.find(a=>a.img)||watching[0];
-  heroAmb=hero?titleAccent(hero):'';setAmbient(heroAmb);
-  let html=hero?heroHTML(hero):'';
+  // spotlight billboard: watching-with-art, then favorites-with-art, then any watching, then any-with-art (max 5)
+  const seen=new Set(),spot=[];const addSpot=a=>{if(a&&!seen.has(a.id)){seen.add(a.id);spot.push(a);}};
+  sorted(pool.filter(a=>a.status==='watching'&&titleBg(a))).forEach(addSpot);
+  sorted(pool.filter(a=>a.fav&&titleBg(a))).forEach(addSpot);
+  watching.forEach(addSpot);
+  sorted(pool.filter(a=>titleBg(a))).forEach(addSpot);
+  const spotlight=spot.slice(0,5),spotSet=new Set(spotlight.map(a=>a.id));
+  heroAmb=spotlight[0]?titleAccent(spotlight[0]):'';setAmbient(heroAmb);
+  let html=spotlight.length?billboardHTML(spotlight):'';
   const rows=isRead
     ?[['watching',icon('book')+' Reading'],['plan',icon('clipboard')+' Plan to Read'],['finished',icon('check')+' Finished'],['dropped',icon('x')+' Dropped']]
     :[['watching',icon('play')+' Watching'],['plan',icon('clipboard')+' Plan to Watch'],['finished',icon('check')+' Finished'],['dropped',icon('x')+' Dropped']];
   for(const[st,label]of rows){
     let items=sorted(pool.filter(a=>a.status===st));
-    if(st==='watching'&&hero)items=items.filter(a=>a.id!==hero.id);
+    if(st==='watching')items=items.filter(a=>!spotSet.has(a.id));
     if(!items.length)continue;
     html+=`<div class="row-sec" data-amb="${items[0]?titleAccent(items[0]):''}"><div class="row-head"><div class="row-title">${label}</div><div class="row-count">${items.length}</div></div>
       <div class="row-scroll">${items.map(posterCard).join('')}</div></div>`;
@@ -1719,7 +1776,18 @@ function renderHome(){
   const favs=sorted(pool.filter(a=>a.fav));
   if(favs.length)html+=`<div class="row-sec" data-amb="${favs[0]?titleAccent(favs[0]):''}"><div class="row-head"><div class="row-title">${icon('heart','fill')} Favorites</div><div class="row-count">${favs.length}</div></div>
     <div class="row-scroll">${favs.map(posterCard).join('')}</div></div>`;
-  el.innerHTML=html;
+  // genre collections — browse your list by its most-common genres (Netflix-style lens)
+  const gmap={};pool.forEach(a=>(a.genre||'').split(',').map(g=>g.trim()).filter(Boolean).forEach(g=>{(gmap[g]=gmap[g]||[]).push(a);}));
+  const topGenres=Object.keys(gmap).filter(g=>gmap[g].length>=2).sort((x,y)=>gmap[y].length-gmap[x].length).slice(0,4);
+  if(topGenres.length){
+    html+=`<div class="row-div">Browse by genre</div>`;
+    for(const g of topGenres){
+      const items=sorted(gmap[g]);
+      html+=`<div class="row-sec" data-amb="${items[0]?titleAccent(items[0]):''}"><div class="row-head"><div class="row-title">${g}</div><div class="row-count">${items.length}</div></div>
+        <div class="row-scroll">${items.map(posterCard).join('')}</div></div>`;
+    }
+  }
+  el.innerHTML=html;bbSetup(spotlight);
 }
 
 // ─── DETAIL ─────────────────────────────────────────────────────────────────

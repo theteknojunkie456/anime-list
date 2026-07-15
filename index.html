@@ -66,35 +66,38 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 .page{flex:1;overflow-y:auto;padding-bottom:calc(var(--safe-b) + 86px);}
 
 /* ── HEADER ── */
-.hdr{padding:calc(var(--safe-t) + 16px) 18px 4px;display:flex;align-items:center;justify-content:space-between;}
-.hdr-title{font-size:26px;font-weight:900;letter-spacing:-0.6px;display:flex;align-items:center;gap:8px;}
-.hdr-title::before{content:'';width:6px;height:22px;border-radius:99px;background:linear-gradient(180deg,var(--a2),var(--a));box-shadow:0 0 12px var(--glow);}
-.hdr-sub{font-size:11.5px;color:var(--t2);font-weight:600;margin-top:4px;padding-left:14px;}
+.hdr{padding:calc(var(--safe-t) + 12px) 18px 0;display:flex;align-items:center;justify-content:space-between;}
+.hdr-title{font-size:21px;font-weight:900;letter-spacing:-0.5px;display:flex;align-items:center;gap:8px;}
+.hdr-title::before{content:'';width:5px;height:18px;border-radius:99px;background:linear-gradient(180deg,var(--a2),var(--a));box-shadow:0 0 12px var(--glow);}
 .hbtn{
-  width:40px;height:40px;border-radius:13px;font-size:17px;
+  width:36px;height:36px;border-radius:12px;font-size:16px;
   background:var(--bg3);border:1px solid var(--b2);
   display:flex;align-items:center;justify-content:center;transition:transform .12s,background .16s,border-color .16s;
 }
 .hbtn:active{transform:scale(0.9);}
 .hbtn.bell-on{background:color-mix(in srgb,var(--a) 22%,var(--bg3));border-color:transparent;color:var(--a2);box-shadow:0 4px 14px -6px var(--glow);}
-.hdr-actions{display:flex;align-items:center;gap:8px;}
-.search-row{padding:12px 18px 2px;}
-.search-wrap{position:relative;}
+.hdr-actions{display:flex;align-items:center;gap:6px;}
+.search-row{padding:10px 18px 0;display:flex;align-items:center;gap:8px;}
+.search-wrap{position:relative;flex:1;min-width:0;}
 .search-ico{position:absolute;left:13px;top:50%;transform:translateY(-50%);font-size:13px;opacity:0.5;}
 .search-in{
-  width:100%;padding:12px 14px 12px 38px;border-radius:14px;font-size:14px;
+  width:100%;padding:11px 14px 11px 38px;border-radius:14px;font-size:14px;
   background:var(--bg3);border:1px solid var(--bn);color:var(--t1);outline:none;font-family:inherit;
   transition:border-color .16s,box-shadow .16s,background .16s;box-shadow:var(--elev1);
 }
 .search-in:focus{border-color:var(--a);box-shadow:0 0 0 3px var(--ag);background:var(--bg2);}
 .search-in::placeholder{color:var(--t3);}
-.sort-row{display:flex;gap:7px;padding:11px 18px 4px;overflow-x:auto;}
+/* filters + sort share one scrolling strip, split by a hairline */
+.ctrl-row{display:flex;align-items:center;gap:9px;padding:10px 18px 0;overflow-x:auto;scrollbar-width:none;}
+.ctrl-row::-webkit-scrollbar{display:none;}
+.sort-row{display:flex;gap:6px;padding:0 0 0 10px;flex-shrink:0;position:relative;}
+.sort-row::before{content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);width:1px;height:16px;background:var(--b2);}
 .schip{
   flex-shrink:0;padding:7px 14px;border-radius:99px;font-size:11.5px;font-weight:700;
   background:var(--bg3);border:1px solid transparent;color:var(--t2);transition:all .15s;
 }
 .schip.on{background:color-mix(in srgb,var(--a) 20%,var(--bg3));border-color:transparent;color:var(--a2);box-shadow:0 3px 12px -5px var(--glow);}
-.filt-row{display:flex;gap:7px;padding:9px 18px 0;overflow-x:auto;}
+.filt-row{display:flex;gap:6px;flex-shrink:0;}
 .fchip{
   flex-shrink:0;padding:7px 13px;border-radius:99px;font-size:11.5px;font-weight:700;
   background:var(--bg3);border:1px solid transparent;color:var(--t2);
@@ -533,16 +536,18 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 }
 .toast.on{opacity:1;transform:translateX(-50%) translateY(0);}
 
-/* ── KIND VIEW SWITCH (Watch / Read) ── */
-.kind-seg{display:flex;gap:6px;padding:12px 18px 2px;}
+/* ── KIND VIEW SWITCH (Watch / Read) — docked beside the search field ── */
+.kind-seg{display:flex;gap:2px;flex-shrink:0;padding:3px;border-radius:14px;background:var(--bg3);border:1px solid var(--bn);}
 .kseg{
-  flex:1;padding:10px 0;border-radius:13px;font-size:12.5px;font-weight:800;letter-spacing:-0.1px;
-  background:var(--bg3);border:1px solid transparent;color:var(--t2);
-  transition:background .16s,border-color .16s,color .16s,transform .12s;
+  width:38px;height:36px;border-radius:11px;
+  display:flex;align-items:center;justify-content:center;
+  background:transparent;border:none;color:var(--t3);
+  transition:background .16s,color .16s,transform .12s;
 }
-.kseg:active{transform:scale(0.97);}
-.kseg.on{background:color-mix(in srgb,var(--a) 20%,var(--bg3));border-color:transparent;color:var(--a2);box-shadow:0 3px 12px -5px var(--glow);}
-.kseg .fn{font-size:9.5px;font-weight:800;opacity:0.6;font-variant-numeric:tabular-nums;margin-left:2px;}
+.kseg .ico{width:17px;height:17px;}
+.kseg:active{transform:scale(0.92);}
+.kseg.on{background:color-mix(in srgb,var(--a) 22%,var(--bg4));color:var(--a2);}
+.kseg .fn{display:none;}   /* counts live on the filter chips — keep the switch to a clean glyph */
 
 /* ── AIRING SCHEDULE ── */
 .pcard-air{font-size:9.5px;font-weight:700;color:var(--wat);margin-top:4px;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
@@ -657,12 +662,9 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 /* SHORT landscape (rotated phone): reclaim vertical space so the controls
    don't dominate the tiny viewport height. */
 @media (orientation:landscape) and (max-height:560px){
-  .hdr{padding-top:calc(var(--safe-t) + 8px);padding-bottom:2px;}
-  .hdr-title{font-size:22px;}
-  .search-row{padding-top:8px;padding-bottom:0;}
-  .kind-seg{padding-top:8px;padding-bottom:0;}
-  .filt-row{padding-top:6px;}
-  .sort-row{padding-top:7px;padding-bottom:2px;}
+  .hdr{padding-top:calc(var(--safe-t) + 8px);}
+  .search-row{padding-top:7px;}
+  .ctrl-row{padding-top:7px;}
   .hero{min-height:150px;margin-top:10px;}
   .hero-body{padding:12px 16px;}
   .hero-title{font-size:21px;}
@@ -671,7 +673,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 /* WIDE / tablet: center the content so lines & cards don't stretch absurdly,
    and let the hero + poster grid breathe with more columns. */
 @media (min-width:900px){
-  .hdr,.search-row,.kind-seg,.filt-row,.sort-row,.page{
+  .hdr,.search-row,.ctrl-row,.page{
     max-width:1180px;margin-left:auto;margin-right:auto;
   }
   .confirm-box{max-width:440px;margin-left:auto;margin-right:auto;}
@@ -745,10 +747,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 </div>
 <div id="app">
   <div class="hdr">
-    <div>
-      <div class="hdr-title">Watchlist</div>
-      <div class="hdr-sub" id="headerSub"></div>
-    </div>
+    <div class="hdr-title">Watchlist</div>
     <div class="hdr-actions">
       <button class="hbtn" onclick="openForYou()" title="For You — tailored recommendations" aria-label="For You recommendations"><i data-ic="compass"></i></button>
       <button class="hbtn" onclick="openSchedule()" title="Weekly airing schedule" aria-label="Weekly airing schedule"><i data-ic="calendar"></i></button>
@@ -761,10 +760,12 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
       <span class="search-ico"><i data-ic="search"></i></span>
       <input class="search-in" type="search" id="searchIn" placeholder="Search titles, genres…" oninput="renderHome()">
     </div>
+    <div class="kind-seg" id="kindSeg"></div>
   </div>
-  <div class="kind-seg" id="kindSeg"></div>
-  <div class="filt-row" id="filtRow"></div>
-  <div class="sort-row" id="sortRow"></div>
+  <div class="ctrl-row">
+    <div class="filt-row" id="filtRow"></div>
+    <div class="sort-row" id="sortRow"></div>
+  </div>
   <div class="page" id="pageEl"></div>
 </div>
 
@@ -1601,14 +1602,12 @@ function query(){return document.getElementById('searchIn').value.toLowerCase().
 
 function render(){
   renderKindSeg();renderFiltRow();renderSortRow();renderHome();
-  const fin=anime.filter(a=>a.status==='finished').length;
-  document.getElementById('headerSub').textContent=`${anime.length} titles · ${fin} finished`;
 }
 function renderKindSeg(){
   const el=document.getElementById('kindSeg');if(!el)return;
-  const cW=anime.filter(a=>kindOf(a)==='watch').length,cR=anime.filter(a=>kindOf(a)==='read').length;
-  const opts=[['watch',icon('play')+' Watching',cW],['read',icon('book')+' Reading',cR]];
-  el.innerHTML=opts.map(([k,l,n])=>`<button class="kseg${viewKind===k?' on':''}" onclick="setViewKind('${k}')">${l} <span class="fn">${n}</span></button>`).join('');
+  const opts=[['watch','play','Watch list'],['read','book','Reading list']];
+  el.innerHTML=opts.map(([k,ic,lbl])=>
+    `<button class="kseg${viewKind===k?' on':''}" onclick="setViewKind('${k}')" title="${lbl}" aria-label="${lbl}" aria-pressed="${viewKind===k}">${icon(ic)}</button>`).join('');
 }
 function setViewKind(k){
   if(viewKind===k)return;

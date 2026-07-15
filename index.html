@@ -148,6 +148,22 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 .sv-back{width:40px;height:40px;flex-shrink:0;border-radius:12px;background:var(--bg3);border:1px solid var(--b2);display:flex;align-items:center;justify-content:center;color:var(--t1);}
 .sv-back:active{transform:scale(.92);}
 .sv-title{font-size:23px;font-weight:900;letter-spacing:-.5px;}
+/* ── TUTORIAL (reuses the .statsview full-screen shell) ── */
+.tut-intro{font-size:13.5px;line-height:1.6;color:var(--t2);padding:2px 18px 4px;}
+.tut-step{display:flex;gap:13px;align-items:flex-start;margin:0 18px;padding:15px 0;border-top:1px solid var(--bn2);}
+.tut-ico{width:36px;height:36px;flex-shrink:0;border-radius:11px;background:var(--bg3);border:1px solid var(--b2);display:flex;align-items:center;justify-content:center;color:var(--a2);}
+.tut-ico .ico{width:17px;height:17px;}
+.tut-h{font-size:14px;font-weight:800;color:var(--t1);margin-bottom:3px;letter-spacing:-.2px;}
+.tut-p{font-size:12.5px;color:var(--t2);line-height:1.6;}
+.tut-p b{color:var(--t1);font-weight:700;}
+/* the backup step is the one that actually loses people their data — make it land */
+.tut-step.key-step{background:color-mix(in srgb,var(--a) 9%,transparent);border:1px solid color-mix(in srgb,var(--a) 26%,transparent);border-radius:18px;padding:15px 14px;margin-top:14px;}
+.tut-step.key-step .tut-ico{background:color-mix(in srgb,var(--a) 20%,var(--bg3));border-color:transparent;}
+.tut-do{margin-top:10px;padding:9px 14px;border-radius:11px;font-size:12px;font-weight:800;background:var(--a);color:#fff;}
+.tut-do:active{transform:scale(.96);}
+.tut-done{margin:20px 18px 0;width:calc(100% - 36px);padding:14px;border-radius:14px;font-size:14px;font-weight:800;background:var(--a);color:#fff;}
+.tut-link{width:100%;padding:12px 0;margin-top:12px;border-radius:12px;font-size:12.5px;font-weight:800;background:transparent;border:1px solid var(--b2);color:var(--t2);display:inline-flex;align-items:center;justify-content:center;gap:7px;}
+.tut-link .ico{width:14px;height:14px;}
 .sv-hero{display:flex;gap:10px;padding:8px 18px 0;}
 .sv-heronum{flex:1;background:linear-gradient(160deg,var(--bg3),var(--bg2));border:1px solid var(--bn2);border-radius:18px;padding:15px 10px;text-align:center;box-shadow:var(--elev1);}
 .sv-heronum .v{font-size:27px;font-weight:900;letter-spacing:-1px;color:var(--a2);line-height:1;display:inline-flex;align-items:center;gap:3px;justify-content:center;}
@@ -952,9 +968,51 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
   <div id="syncBox" style="margin-top:16px;padding-top:14px;border-top:1px solid var(--b1);"></div>
   <div id="lockBox" style="margin-top:16px;padding-top:14px;border-top:1px solid var(--b1);"></div>
   <div id="notifyBox" style="margin-top:16px;padding-top:14px;border-top:1px solid var(--b1);"></div>
+  <button class="tut-link" onclick="openTutorial()"><i data-ic="bulb"></i> How WatchList works</button>
 </div>
 
 <!-- STATS SHEET -->
+<!-- TUTORIAL (auto-shown once to new users; always reachable from Import) -->
+<div class="statsview" id="tutView">
+  <div class="sv-top">
+    <button class="sv-back" onclick="closeTutorial()" aria-label="Close"><i data-ic="chevron-left"></i></button>
+    <div class="sv-title">How it works</div>
+  </div>
+  <p class="tut-intro">Everything you watch and read, in one place — with covers, air times and progress filled in for you.</p>
+
+  <div class="tut-step">
+    <div class="tut-ico"><i data-ic="plus"></i></div>
+    <div><div class="tut-h">Add anything</div><div class="tut-p">Tap <b>+</b> and type a title. <b>Autofill</b> pulls the real cover, episode count, genres and watch order — anime, TV, movies, manga, manhwa and webtoons. No setup, no API key.</div></div>
+  </div>
+  <div class="tut-step">
+    <div class="tut-ico"><i data-ic="book"></i></div>
+    <div><div class="tut-h">Watch or Read</div><div class="tut-p">The switch beside the search box flips between your <b>watch</b> list and your <b>reading</b> list. They're kept completely separate.</div></div>
+  </div>
+  <div class="tut-step">
+    <div class="tut-ico"><i data-ic="calendar"></i></div>
+    <div><div class="tut-h">Never miss an episode</div><div class="tut-p">The <b>calendar</b> shows what airs this week for the shows you follow, in your own time zone — and it tracks delays. Turn on the <b>bell</b> to get a notification the moment one drops.</div></div>
+  </div>
+  <div class="tut-step">
+    <div class="tut-ico"><i data-ic="compass"></i></div>
+    <div><div class="tut-h">Find your next one</div><div class="tut-p">The <b>compass</b> suggests titles you don't have yet, picked from what you already watch — real community recommendations, not guesses.</div></div>
+  </div>
+
+  <div class="tut-step key-step">
+    <div class="tut-ico"><i data-ic="cloud"></i></div>
+    <div>
+      <div class="tut-h">Back up your list — do this first</div>
+      <div class="tut-p">Your list lives on <b>this device only</b>. Clearing your browser data, or deleting the app from your Home Screen, <b>erases it</b>. Turning on cloud backup gives you a <b>sync code</b>: save that code and your list can always be restored, and it follows you to any device.</div>
+      <button class="tut-do" onclick="tutGo('importSheet')">Set up backup</button>
+    </div>
+  </div>
+  <div class="tut-step">
+    <div class="tut-ico"><i data-ic="lock"></i></div>
+    <div><div class="tut-h">Lock it (optional)</div><div class="tut-p">A password encrypts your whole list — unreadable without it, here and in the cloud. You'll get a one-time <b>recovery key</b>; it's the only way back in if you forget the password. Save both. Lose both and the list is gone for good — there's no backdoor.</div></div>
+  </div>
+
+  <button class="tut-done" onclick="closeTutorial()">Got it</button>
+</div>
+
 <!-- FULL-SCREEN STATS -->
 <div class="statsview" id="statsView">
   <div class="sv-top">
@@ -1076,7 +1134,9 @@ loader:'<path d="M12 3a9 9 0 1 0 9 9"/>',
 inbox:'<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5.1 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.9A2 2 0 0 0 16.8 4H7.2a2 2 0 0 0-1.7 1.1z"/>',
 plus:'<path d="M12 5v14M5 12h14"/>',
 compass:'<circle cx="12" cy="12" r="9.5"/><path d="m16 8-2 6-6 2 2-6z"/>',
-  send:'<path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4z"/>'
+  send:'<path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4z"/>',
+  lock:'<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+  key:'<path d="M12.6 11.4a5.5 5.5 0 1 0-7.8 7.8 5.5 5.5 0 0 0 7.8-7.8zM12.6 11.4 22 2"/><path d="m17 7 3 3"/>'
 };
 function icon(name,cls){const p=ICONS[name];if(!p)return'';return `<svg class="ico${cls?' '+cls:''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`;}
 function hydrateIcons(root){(root||document).querySelectorAll('[data-ic]').forEach(el=>{const s=icon(el.getAttribute('data-ic'));if(s)el.outerHTML=s;});}
@@ -2199,6 +2259,21 @@ function fallbackCopy(text,done){
   ta.remove();
 }
 
+// ─── TUTORIAL ───────────────────────────────────────────────────────────────
+const TUT_FLAG='tut_seen_v1';
+function tutSeen(){try{return localStorage.getItem(TUT_FLAG)==='1';}catch{return true;}}
+function markTutSeen(){try{localStorage.setItem(TUT_FLAG,'1');}catch{}}
+function openTutorial(){closeAll();const v=document.getElementById('tutView');if(v){v.scrollTop=0;v.classList.add('on');}markTutSeen();}
+function closeTutorial(){const v=document.getElementById('tutView');if(v)v.classList.remove('on');markTutSeen();}
+function tutGo(id){closeTutorial();setTimeout(()=>openSheet(id),280);}
+// Only greet a genuinely new install — someone with a stored list has been here
+// before and shouldn't get an onboarding screen thrown at them.
+function maybeShowTutorial(){
+  if(tutSeen()||appLocked)return;
+  let fresh=false;try{fresh=!store()||!store().getItem(LSKEY);}catch{}
+  if(fresh)setTimeout(openTutorial,650);else markTutSeen();
+}
+
 // ─── STATS ──────────────────────────────────────────────────────────────────
 function parseHrs(s){const m=/([\d.]+)/.exec(s||'');return m?+m[1]:0;}
 function openStats(){renderStats();const v=document.getElementById('statsView');if(v)v.classList.add('on');}
@@ -2857,6 +2932,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeAll();closeCon
 try{hydrateIcons();}catch{}
 load();loadTheme();render();
 if(appLocked)showLock();   // stored list is ciphertext → gate the app until unlocked
+try{maybeShowTutorial();}catch{}
 try{document.getElementById('pageEl').addEventListener('scroll',onPageScroll,{passive:true});}catch{}
 try{document.getElementById('detailSheet').addEventListener('scroll',onDetailScroll,{passive:true});}catch{}
 try{renderNotifyBell();}catch{}

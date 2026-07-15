@@ -63,7 +63,11 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 
 /* ── SHELL ── */
 @property --amb{syntax:'<color>';inherits:true;initial-value:transparent;}
-.ambient{position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(80% 55% at 50% -12%,color-mix(in srgb,var(--amb) 44%,transparent) 0%,transparent 60%),radial-gradient(55% 40% at 84% 8%,color-mix(in srgb,var(--amb) 18%,transparent) 0%,transparent 55%),var(--topgrad);transition:--amb 1.1s ease;}
+/* iOS paints a solid #000 status bar above us (status-bar-style:black), so the
+   first ~200px ramp from black — a long, smooth falloff, not a hard edge — and
+   the glow blooms lower, behind the artwork rather than behind the chrome.
+   A short ramp here reads as a bright stripe; keep it generous. */
+.ambient{position:fixed;inset:0;z-index:-1;pointer-events:none;background:linear-gradient(to bottom,#000 0,rgba(0,0,0,0.86) 46px,rgba(0,0,0,0.5) 120px,rgba(0,0,0,0.18) 176px,rgba(0,0,0,0) 232px),radial-gradient(92% 52% at 50% 20%,color-mix(in srgb,var(--amb) 48%,transparent) 0%,transparent 68%),radial-gradient(55% 40% at 84% 34%,color-mix(in srgb,var(--amb) 18%,transparent) 0%,transparent 58%),var(--topgrad);transition:--amb 1.1s ease;}
 #app{height:100vh;height:100dvh;display:flex;flex-direction:column;background:transparent;}
 .page{flex:1;overflow-y:auto;padding-bottom:calc(var(--safe-b) + 86px);}
 
@@ -164,6 +168,14 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 .tut-done{margin:20px 18px 0;width:calc(100% - 36px);padding:14px;border-radius:14px;font-size:14px;font-weight:800;background:var(--a);color:#fff;}
 .tut-link{width:100%;padding:12px 0;margin-top:12px;border-radius:12px;font-size:12.5px;font-weight:800;background:transparent;border:1px solid var(--b2);color:var(--t2);display:inline-flex;align-items:center;justify-content:center;gap:7px;}
 .tut-link .ico{width:14px;height:14px;}
+/* one-time backup nudge — a list with no sync code is one tap from gone */
+.nudge{display:flex;align-items:center;gap:10px;margin:12px 18px 0;padding:10px 11px;border-radius:14px;background:color-mix(in srgb,var(--a) 11%,var(--bg3));border:1px solid color-mix(in srgb,var(--a) 28%,transparent);animation:fadeUp .4s ease both;}
+.nudge>.ico{width:16px;height:16px;color:var(--a2);flex-shrink:0;}
+.nudge-t{flex:1;min-width:0;font-size:11.5px;font-weight:600;color:var(--t1);line-height:1.45;}
+.nudge-go{flex-shrink:0;padding:7px 12px;border-radius:9px;font-size:11px;font-weight:800;background:var(--a);color:#fff;}
+.nudge-go:active{transform:scale(.94);}
+.nudge-x{flex-shrink:0;width:26px;height:26px;border-radius:8px;color:var(--t3);display:flex;align-items:center;justify-content:center;}
+.nudge-x .ico{width:13px;height:13px;}
 .sv-hero{display:flex;gap:10px;padding:8px 18px 0;}
 .sv-heronum{flex:1;background:linear-gradient(160deg,var(--bg3),var(--bg2));border:1px solid var(--bn2);border-radius:18px;padding:15px 10px;text-align:center;box-shadow:var(--elev1);}
 .sv-heronum .v{font-size:27px;font-weight:900;letter-spacing:-1px;color:var(--a2);line-height:1;display:inline-flex;align-items:center;gap:3px;justify-content:center;}
@@ -1845,7 +1857,7 @@ function renderHome(){
   sorted(pool.filter(a=>titleBg(a))).forEach(addSpot);
   const spotlight=spot.slice(0,5),spotSet=new Set(spotlight.map(a=>a.id));
   heroAmb=spotlight[0]?titleAccent(spotlight[0]):'';setAmbient(heroAmb);
-  let html=spotlight.length?billboardHTML(spotlight):'';
+  let html=nudgeHTML()+(spotlight.length?billboardHTML(spotlight):'');
   const rows=isRead
     ?[['watching',icon('book')+' Reading'],['plan',icon('clipboard')+' Plan to Read'],['finished',icon('check')+' Finished'],['dropped',icon('x')+' Dropped']]
     :[['watching',icon('play')+' Watching'],['plan',icon('clipboard')+' Plan to Watch'],['finished',icon('check')+' Finished'],['dropped',icon('x')+' Dropped']];
@@ -2272,6 +2284,22 @@ function maybeShowTutorial(){
   if(tutSeen()||appLocked)return;
   let fresh=false;try{fresh=!store()||!store().getItem(LSKEY);}catch{}
   if(fresh)setTimeout(openTutorial,650);else markTutSeen();
+}
+
+// ─── BACKUP NUDGE ───────────────────────────────────────────────────────────
+// A list with no sync code dies with the device — clearing site data or deleting
+// the Home Screen app wipes it, with nothing to restore from. Once someone has
+// enough titles to care about, say so once; then never nag again.
+function nudgeOff(){try{return localStorage.getItem('backup_nudge_off')==='1';}catch{return true;}}
+function dismissNudge(){try{localStorage.setItem('backup_nudge_off','1');}catch{}renderHome();}
+function shouldNudge(){return anime.length>=5&&!syncCode()&&!nudgeOff();}
+function nudgeHTML(){
+  if(!shouldNudge())return'';
+  return`<div class="nudge">${icon('cloud')}
+    <div class="nudge-t">This list only exists on this device — back it up so you can't lose it.</div>
+    <button class="nudge-go" onclick="openSheet('importSheet')">Back up</button>
+    <button class="nudge-x" onclick="dismissNudge()" aria-label="Dismiss">${icon('x')}</button>
+  </div>`;
 }
 
 // ─── STATS ──────────────────────────────────────────────────────────────────

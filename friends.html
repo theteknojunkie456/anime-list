@@ -773,9 +773,9 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
     <div class="lock-emoji">🔒</div>
     <div class="lock-title" id="lockTitle">WatchList is locked</div>
     <div class="lock-sub" id="lockSub">Enter your password to open your list.</div>
+    <button class="lock-btn" id="lockFace" style="display:none" onclick="tryUnlockFaceID()">Unlock with Face ID</button>
     <input id="lockPw" class="lock-in" type="password" placeholder="Password" autocomplete="current-password" onkeydown="if(event.key==='Enter')tryUnlock()">
     <button class="lock-btn" id="lockBtn" onclick="tryUnlock()">Unlock</button>
-    <button class="lock-btn2" id="lockFace" style="display:none" onclick="tryUnlockFaceID()">Unlock with Face ID</button>
     <div class="lock-err" id="lockErr"></div>
     <a class="lock-alt" id="lockAlt" onclick="toggleLockMode()">Forgot password? Use recovery key</a>
   </div>
@@ -1339,9 +1339,9 @@ let lockRecMode=false;
 function showLock(){
   appLocked=true;lockRecMode=false;
   const el=document.getElementById('lockScreen');if(!el)return;
-  el.classList.add('on');setLockMode(false);
-  const f=document.getElementById('lockFace');if(f)f.style.display=faceIDOn()?'block':'none';
-  const i=document.getElementById('lockPw');if(i){i.value='';setTimeout(()=>i.focus(),60);}
+  el.classList.add('on');
+  const i=document.getElementById('lockPw');if(i)i.value='';
+  setLockMode(false);   // sets Face ID vs password emphasis, and focuses only when it should
 }
 function hideLock(){appLocked=false;const el=document.getElementById('lockScreen');if(el)el.classList.remove('on');}
 function setLockMode(rec){
@@ -1355,11 +1355,17 @@ function setLockMode(rec){
     i.type='text';i.placeholder='XXXX-XXXX-XXXX-…';i.setAttribute('onkeydown',"if(event.key==='Enter')tryUnlockRecovery()");
     b.textContent='Recover';b.setAttribute('onclick','tryUnlockRecovery()');l.textContent='← Back to password';
   }else{
-    t.textContent='WatchList is locked';s.textContent='Enter your password to open your list.';
+    t.textContent='WatchList is locked';
     i.type='password';i.placeholder='Password';i.setAttribute('onkeydown',"if(event.key==='Enter')tryUnlock()");
     b.textContent='Unlock';b.setAttribute('onclick','tryUnlock()');l.textContent='Forgot password? Use recovery key';
+    // when Face ID is on it's the way in — give it the primary button and demote
+    // the password, rather than leading with a field you won't type in
+    const face=faceIDOn();
+    s.textContent=face?'Unlock with Face ID — or use your password below.':'Enter your password to open your list.';
+    if(f)f.className=face?'lock-btn':'lock-btn2';
+    b.className=face?'lock-btn2':'lock-btn';
   }
-  i.focus();
+  if(!faceIDOn()||rec)i.focus();   // don't throw up the keyboard over a Face ID screen
 }
 function toggleLockMode(){setLockMode(!lockRecMode);}
 function _unlockErr(i,err,msg){if(err)err.textContent=msg;const card=document.querySelector('.lock-card');if(card){card.classList.remove('shake');void card.offsetWidth;card.classList.add('shake');}if(i){i.value='';i.focus();}}

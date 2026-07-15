@@ -360,6 +360,15 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 .chat-send:active{transform:scale(.94);}
 .chat-clear{background:none;border:none;color:var(--t3);font-size:11px;font-weight:700;margin-top:9px;display:inline-flex;align-items:center;gap:5px;cursor:pointer;}
 .chat-clear .ico{width:12px;height:12px;}
+.chat-msg.ai{position:relative;}
+.chat-copy{position:absolute;bottom:-9px;right:-2px;width:26px;height:26px;border-radius:8px;background:var(--bg4);border:1px solid var(--b2);color:var(--t3);display:inline-flex;align-items:center;justify-content:center;opacity:.5;transition:opacity .15s,color .15s;cursor:pointer;}
+.chat-copy:active{opacity:1;color:var(--a);}
+.chat-copy .ico{width:13px;height:13px;}
+.chat-msg code{background:var(--bg4);border:1px solid var(--b1);border-radius:5px;padding:1px 5px;font-size:12px;font-family:ui-monospace,Menlo,monospace;}
+.chat-pre{background:var(--bg4);border:1px solid var(--b1);border-radius:9px;padding:9px 11px;font-size:12px;font-family:ui-monospace,Menlo,monospace;overflow-x:auto;white-space:pre-wrap;margin:6px 0;}
+.chat-ul{margin:5px 0;padding-left:19px;}
+.chat-ul li{margin:3px 0;}
+.model-sel{padding:8px 10px;border-radius:11px;font-size:12px;font-weight:700;background:var(--bg3);border:1px solid var(--b2);color:var(--t1);max-width:170px;}
 .dots span{animation:blink 1.2s infinite;}
 .dots span:nth-child(2){animation-delay:.2s;}
 .dots span:nth-child(3){animation-delay:.4s;}
@@ -789,6 +798,10 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
   <div style="display:flex;gap:8px;margin-top:20px;padding-top:16px;border-top:1px solid var(--b1);">
     <input class="ai-prompt-in" id="apiKeyIn" type="password" placeholder="AI key — Groq, Gemini, OpenRouter, or Claude" autocomplete="off">
     <button class="ai-run-btn" onclick="saveKey()">Save</button>
+  </div>
+  <div style="display:flex;gap:8px;margin-top:9px;align-items:center;">
+    <span class="ai-desc" style="margin:0;flex-shrink:0;">Model</span>
+    <select class="model-sel" id="modelSel" onchange="setModelSel(this.value)" style="display:none;"></select>
   </div>
   <p class="ai-desc" style="margin-top:8px">Suggest, Chat &amp; Rank need an AI key — it stays on this device only. <strong style="color:var(--t1)">Free</strong> keys: console.groq.com (gsk_…), aistudio.google.com (AIza…), or openrouter.ai (sk-or-…). Claude keys (sk-ant-…) also work. Autofill needs no key at all.</p>
 </div>
@@ -1489,6 +1502,7 @@ function openSheet(id){
   if(id==='statsSheet')renderStatsSheet();
   if(id==='importSheet'){renderSyncUI();renderNotifyUI();}
   if(id==='forYouSheet')renderForYou();
+  if(id==='aiSheet')renderModelPicker();
 }
 function closeAll(){
   document.querySelectorAll('.sheet').forEach(s=>s.classList.remove('on'));
@@ -1797,7 +1811,8 @@ function getKey(){try{return localStorage.getItem('anthropic_key')||'';}catch{re
 function saveKey(){
   const v=document.getElementById('apiKeyIn').value.trim();
   try{if(v)localStorage.setItem('anthropic_key',v);else localStorage.removeItem('anthropic_key');}catch{}
-  toast(v?'🔑 Key saved on this device':'Key removed');
+  toast(v?'Key saved on this device':'Key removed');
+  renderModelPicker();
 }
 function aiErrorHTML(e){
   return e===NO_KEY
@@ -1844,21 +1859,50 @@ async function runRecommend(){
   document.getElementById('recBtn').classList.remove('loading');
 }
 let chatHistory=[];
-function fmtMsg(t){return schEsc(t).replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\*(.+?)\*/g,'<em>$1</em>').replace(/\n/g,'<br>');}
+try{chatHistory=JSON.parse(localStorage.getItem('chat_hist')||'[]');if(!Array.isArray(chatHistory))chatHistory=[];}catch{chatHistory=[];}
+function saveChat(){try{localStorage.setItem('chat_hist',JSON.stringify(chatHistory.slice(-40)));}catch{}}
+function chatContext(){
+  const line=a=>a.title+(a.genre?' ['+a.genre+']':'')+(a.rating?' ('+a.rating+'/5)':'');
+  const g=(kind,st)=>anime.filter(a=>kindOf(a)===kind&&a.status===st).map(line).join('; ')||'none';
+  return "You are a warm, sharp anime & manga companion inside the user's personal watchlist app. Chat naturally and fairly concisely (a few sentences unless they ask for more). Reference their ACTUAL list, read their ratings to gauge taste, keep spoilers out unless asked, and use light markdown (bold, bullet lists) when it helps. When recommending NEW titles, prefer things not already on their list, lean toward what matches their high-rated + genre patterns, and steer clear of what they dropped.\n\n"+
+    "WATCHING: "+g('watch','watching')+"\nPLAN TO WATCH: "+g('watch','plan')+"\nFINISHED (ratings shown): "+g('watch','finished')+"\nDROPPED (disliked): "+g('watch','dropped')+"\n"+
+    "READING: "+g('read','watching')+"\nPLAN TO READ: "+g('read','plan')+"\nFINISHED READING: "+g('read','finished');
+}
+function mdToHtml(t){
+  let s=schEsc(t);
+  s=s.replace(/```([\s\S]*?)```/g,(m,c)=>'<pre class="chat-pre">'+c.trim()+'</pre>');
+  s=s.replace(/`([^`]+)`/g,'<code>$1</code>');
+  s=s.replace(/^#{1,4}\s+(.+)$/gm,'<strong>$1</strong>');
+  s=s.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
+  s=s.replace(/(^|[^*])\*(?!\*)([^*\n]+?)\*/g,'$1<em>$2</em>');
+  s=s.replace(/(?:^|\n)((?:\s*[-*]\s.+(?:\n|$))+)/g,(m,blk)=>'\n<ul class="chat-ul">'+blk.trim().split(/\n/).map(l=>'<li>'+l.replace(/^\s*[-*]\s/,'').trim()+'</li>').join('')+'</ul>');
+  s=s.replace(/(?:^|\n)((?:\s*\d+\.\s.+(?:\n|$))+)/g,(m,blk)=>'\n<ol class="chat-ul">'+blk.trim().split(/\n/).map(l=>'<li>'+l.replace(/^\s*\d+\.\s/,'').trim()+'</li>').join('')+'</ol>');
+  return s.replace(/\n{2,}/g,'<br><br>').replace(/\n/g,'<br>');
+}
+function chatChips(){
+  const chips=['What should I watch next?','What should I marathon this weekend?','Something short for tonight','Recommend by mood: cozy'];
+  if(anime.filter(a=>kindOf(a)==='watch'&&a.status==='plan').length>1)chips.push('Best order for my Plan list');
+  return chips;
+}
 function renderChatThread(typing){
   const th=document.getElementById('chatThread');if(!th)return;
   if(!chatHistory.length&&!typing){
-    th.innerHTML='<div class="chat-empty">'+icon('sparkles')+'<p>Hey — I know your list. Ask me what to watch next, hidden gems, what fits your mood, or the best viewing order.</p><div class="chat-chips">'+
-      ['What should I watch next?','Shortest thing on my list?','Something cozy for tonight','Rank my Plan list'].map(c=>'<button class="chat-chip" onclick="chatChip(this)">'+c+'</button>').join('')+'</div></div>';
+    th.innerHTML='<div class="chat-empty">'+icon('sparkles')+'<p>Hey — I know your whole list. Ask me what to watch next, hidden gems, what fits your mood, or the best viewing order.</p><div class="chat-chips">'+
+      chatChips().map(c=>'<button class="chat-chip" onclick="chatChip(this)">'+schEsc(c)+'</button>').join('')+'</div></div>';
     return;
   }
-  let html=chatHistory.map(m=>'<div class="chat-msg '+(m.role==='user'?'me':'ai')+'">'+fmtMsg(m.content)+'</div>').join('');
+  let html=chatHistory.map((m,i)=>{
+    if(m.role==='user')return '<div class="chat-msg me">'+schEsc(m.content).replace(/\n/g,'<br>')+'</div>';
+    const copy=m.content?'<button class="chat-copy" onclick="copyMsg('+i+')" aria-label="Copy">'+icon('clipboard')+'</button>':'';
+    return '<div class="chat-msg ai">'+mdToHtml(m.content)+copy+'</div>';
+  }).join('');
   if(typing)html+='<div class="chat-msg ai chat-typing"><span></span><span></span><span></span></div>';
   th.innerHTML=html;
   th.scrollTop=th.scrollHeight;
 }
 function chatChip(btn){document.getElementById('chatPrompt').value=btn.textContent;sendChat();}
-function clearChat(){chatHistory=[];renderChatThread(false);document.getElementById('chatPrompt').value='';}
+function clearChat(){chatHistory=[];saveChat();renderChatThread(false);const inp=document.getElementById('chatPrompt');if(inp)inp.value='';}
+function copyMsg(i){const m=chatHistory[i];if(!m)return;try{navigator.clipboard.writeText(m.content);toast('Copied');}catch{toast('Copy failed');}}
 function sendChat(){
   const inp=document.getElementById('chatPrompt');const q=(inp.value||'').trim();
   if(!q)return;
@@ -1866,33 +1910,50 @@ function sendChat(){
   inp.value='';
   chatHistory.push({role:'user',content:q});
   renderChatThread(true);
-  callAIChat(chatHistory).then(text=>{
-    chatHistory.push({role:'assistant',content:text});renderChatThread(false);
+  const snapshot=chatHistory.slice();
+  let added=false,idx=-1;
+  const onTok=t=>{if(!added){chatHistory.push({role:'assistant',content:''});idx=chatHistory.length-1;added=true;}chatHistory[idx].content+=t;renderChatThread(false);};
+  callAIChatStream(snapshot,onTok).then(full=>{
+    if(!added)chatHistory.push({role:'assistant',content:full||'…'});else if(full)chatHistory[idx].content=full;
+    renderChatThread(false);saveChat();
   }).catch(e=>{
-    chatHistory.push({role:'assistant',content:e===NO_KEY?'Add an AI key below and I\'m all yours.':'Hmm, that didn\'t go through — check your key or connection and try again.'});
-    renderChatThread(false);
+    const msg=e===NO_KEY?'Add an AI key below and I\'m all yours.':'Hmm, that didn\'t go through — check your key or connection and try again.';
+    if(!added)chatHistory.push({role:'assistant',content:msg});else chatHistory[idx].content=msg;
+    renderChatThread(false);saveChat();
   });
 }
-function callChatOpenAI(url,key,model,system,history){
-  return fetch(url,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify({model,messages:[{role:'system',content:system}].concat(history),max_tokens:1000})}).then(async res=>{
-    if(!res.ok)throw new Error('API '+res.status);
-    const data=await res.json();return data.choices?.[0]?.message?.content||'No response.';
-  });
+const AI_MODELS={groq:['llama-3.3-70b-versatile','llama-3.1-8b-instant'],openrouter:['meta-llama/llama-3.3-70b-instruct:free','google/gemini-2.0-flash-exp:free'],gemini:['gemini-2.5-flash','gemini-2.5-pro'],claude:['claude-sonnet-5','claude-haiku-4-5-20251001']};
+function aiProvider(){const k=getKey();if(k.startsWith('gsk_'))return'groq';if(k.startsWith('sk-or-'))return'openrouter';if(k.startsWith('AIza'))return'gemini';if(k)return'claude';return'';}
+function getModel(){const p=aiProvider();if(!p)return'';try{return localStorage.getItem('ai_model_'+p)||AI_MODELS[p][0];}catch{return AI_MODELS[p][0];}}
+function setModelSel(v){const p=aiProvider();if(p){try{localStorage.setItem('ai_model_'+p,v);}catch{}}}
+function renderModelPicker(){
+  const sel=document.getElementById('modelSel');if(!sel)return;
+  const p=aiProvider();
+  if(!p){sel.style.display='none';return;}
+  sel.style.display='';const cur=getModel();
+  sel.innerHTML=AI_MODELS[p].map(m=>'<option value="'+m+'"'+(m===cur?' selected':'')+'>'+m.split('/').pop()+'</option>').join('');
 }
-async function callAIChat(history){
+async function readSSE(resp,onData){
+  const reader=resp.body.getReader(),dec=new TextDecoder();let buf='';
+  while(true){const {done,value}=await reader.read();if(done)break;buf+=dec.decode(value,{stream:true});const parts=buf.split('\n');buf=parts.pop();for(let p of parts){p=p.replace(/\r$/,'');if(p.startsWith('data:'))onData(p.slice(p[5]===' '?6:5));}}
+}
+async function callAIChatStream(history,onToken){
   const key=getKey();if(!key)throw NO_KEY;
-  const system='You are a warm, knowledgeable anime & manga companion living inside the user\'s personal watchlist app. Chat naturally and concisely, and reference their actual list when relevant. Here is their list:\n'+listSummary();
-  if(key.startsWith('gsk_'))return callChatOpenAI('https://api.groq.com/openai/v1/chat/completions',key,'llama-3.3-70b-versatile',system,history);
-  if(key.startsWith('sk-or-'))return callChatOpenAI('https://openrouter.ai/api/v1/chat/completions',key,'meta-llama/llama-3.3-70b-instruct:free',system,history);
-  if(key.startsWith('AIza')){
-    const contents=history.map(m=>({role:m.role==='assistant'?'model':'user',parts:[{text:m.content}]}));
-    const res=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},body:JSON.stringify({systemInstruction:{parts:[{text:system}]},contents,generationConfig:{maxOutputTokens:1000}})});
-    if(!res.ok)throw new Error('API '+res.status);
-    const data=await res.json();return data.candidates?.[0]?.content?.parts?.[0]?.text||'No response.';
+  const system=chatContext(),model=getModel();
+  if(key.startsWith('gsk_')||key.startsWith('sk-or-')){
+    const url=key.startsWith('gsk_')?'https://api.groq.com/openai/v1/chat/completions':'https://openrouter.ai/api/v1/chat/completions';
+    const resp=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify({model,messages:[{role:'system',content:system}].concat(history),stream:true,max_tokens:1200})});
+    if(!resp.ok)throw new Error('API '+resp.status);
+    let full='';await readSSE(resp,d=>{d=d.trim();if(d==='[DONE]'||!d)return;try{const j=JSON.parse(d);const t=j.choices?.[0]?.delta?.content;if(t){full+=t;onToken(t);}}catch(e){}});return full;
   }
-  const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-5',max_tokens:1000,system,messages:history})});
-  if(!res.ok)throw new Error('API '+res.status);
-  const data=await res.json();return data.content?.[0]?.text||'No response.';
+  if(key.startsWith('AIza')){
+    const resp=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+model+':streamGenerateContent?alt=sse',{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},body:JSON.stringify({systemInstruction:{parts:[{text:system}]},contents:history.map(m=>({role:m.role==='assistant'?'model':'user',parts:[{text:m.content}]})),generationConfig:{maxOutputTokens:1200}})});
+    if(!resp.ok)throw new Error('API '+resp.status);
+    let full='';await readSSE(resp,d=>{d=d.trim();if(!d)return;try{const j=JSON.parse(d);const t=j.candidates?.[0]?.content?.parts?.[0]?.text;if(t){full+=t;onToken(t);}}catch(e){}});return full;
+  }
+  const resp=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model,max_tokens:1200,system,messages:history,stream:true})});
+  if(!resp.ok)throw new Error('API '+resp.status);
+  let full='';await readSSE(resp,d=>{d=d.trim();if(!d)return;try{const j=JSON.parse(d);if(j.type==='content_block_delta'&&j.delta&&j.delta.text){full+=j.delta.text;onToken(j.delta.text);}}catch(e){}});return full;
 }
 async function runRank(){
   const pref=document.getElementById('rankPrompt').value.trim();

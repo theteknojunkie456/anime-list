@@ -39,7 +39,8 @@ Every list is saved in **your own browser** (localStorage) and, optionally, in a
 - **Import** — paste a plain-text list (one title per line, optional `- watching` / `- finished` tags) and bulk-import with a preview.
 - **AI chat (optional)** — a real conversational AI companion that knows your list: streaming replies, markdown, chat history that persists, a model picker, and quick prompts tuned to your list (plus one-shot Suggest & Rank helpers). Paste a **free** key from [Groq](https://console.groq.com), [Google AI Studio](https://aistudio.google.com), or [OpenRouter](https://openrouter.ai) (or paid Claude). Auto-detects the provider; key stored only on your device. Everything else works without one.
 - **Password lock (end-to-end encryption + recovery key)** — optionally set a password that encrypts your **entire list** with AES-GCM. Under the hood the list is sealed with a random **master key**, which is then wrapped twice — once by your password, once by a one-time **recovery key** — so *either* can unlock it (both via PBKDF2, 150k iterations). The list is stored as ciphertext on your device **and** in the cloud sync copy — genuinely unreadable without a secret, even in browser devtools. On launch the app shows a lock screen. **Forgot your password?** Tap "Use recovery key" and paste the code you saved at setup (accepts any spacing/case) to get back in and set a new one. Set / change / remove the password and re-issue a recovery key in Settings → Password. **Face ID / Touch ID unlock** (iOS 18.4+): a passkey's WebAuthn **PRF** extension derives a stable secret, and the master key is wrapped a third time with it — so biometric unlock is real cryptography, not a key left in localStorage behind a check. Password and recovery key keep working; the option is hidden where the platform can't do it. It stays **zero-knowledge** — no server, no account, no backdoor — so if you lose *both* the password and the recovery key, the data cannot be recovered. (A friend viewing an encrypted list via `friends.html` must be given the password.)
-- **Tutorial** — a short "How it works" guide that greets genuinely new installs once (never existing users), and stays reachable any time from Settings. It walks through adding titles, the Watch/Read switch, the schedule and notifications, and recommendations — and deliberately front-loads the thing that actually loses people their data: **turn on cloud backup and save your sync code**, plus how the password and recovery key relate.
+- **Typography & colour** — titles are set in **Bricolage Grotesque**, body in **Manrope** (deliberately not Inter, which every AI-generated UI converges on). Text runs on a three-tier ramp that is WCAG AA on every surface *and* keeps ~1.75× lightness between tiers, so "muted" still reads as muted instead of collapsing into the tier above. The accent marks primary actions and warnings only; section headers and settings rows wear the status palette (amber/blue/green/grey) so a theme tints the app without flattening it to one hue.
+- **Tutorial** — a short "How it works" guide that **opens on the first frame** for a genuinely new install — before any content, no delay, no slide-in — and is never shown to anyone with an existing list. Reachable any time from Settings → *How WatchList works* (the first row). Eight steps, with **"Back up your list — do this first"** deliberately second, on the opening screen: it's the only step whose absence costs someone their entire list. It walks through adding titles, the Watch/Read switch, the schedule and notifications, and recommendations — and deliberately front-loads the thing that actually loses people their data: **turn on cloud backup and save your sync code**, plus how the password and recovery key relate.
 - **Cloud sync + Friends** — sync your list across devices with a secret code, and share it read-only with friends. See [FRIENDS.md](FRIENDS.md).
 - **Works offline** — service worker caches the app.
 
@@ -62,6 +63,19 @@ anime-list/
 ```
 
 Each HTML file is fully self-contained — there is no build step. **Never edit `friends.html` directly**: edit `index.html`, then regenerate it (blank the `DEFAULT_DATA` array and swap the storage key `animelist_v4` → `animelist_friends_v4`).
+
+## Development
+
+Two agent skills are installed **project-locally** (`.claude/skills/`, gitignored — see the deploy note below):
+
+| Skill | What it does |
+|-------|--------------|
+| [impeccable](https://github.com/pbakaus/impeccable) | Design guidance + a deterministic detector. A `PostToolUse` hook scans UI edits and flags AI-generated-design tells, contrast failures, and readability problems. `npx impeccable detect index.html` for a full pass. |
+| [find-skills](https://github.com/vercel-labs/skills) | Discovers and installs other agent skills from the open ecosystem. |
+
+> **Why gitignored:** the Pages workflow uploads `path: .` — the *entire repo* — so anything tracked is published to the live site. Local tooling (and `skills-lock.json`, and `.look-backup/`) stays out of git so it never ships.
+
+Design tags mark restore points before visual overhauls: `look-v1` (pre-typography), `look-v2` (pre-prose-pass). Restore with `git checkout <tag> -- index.html friends.html`.
 
 ## Deploying changes
 

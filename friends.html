@@ -2938,7 +2938,7 @@ function usingDefaultSource(){return !streamSource();}
 function streamSlug(title){
   return (title||'').toLowerCase().replace(/["'’]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
 }
-let pvReturnId=null, pvWatchEp=null;
+let pvReturnId=null, pvWatchEp=null, pvOpenTime=0;
 // Which episode to open: the next one they haven't finished (ep watched + 1),
 // clamped to what exists. /ep-N streams straight into the player; an N beyond the
 // season 404s, so never exceed epTotal, and fall back to the info page when the
@@ -2968,7 +2968,8 @@ function watchAnime(id){
   if(kindOf(a)!=='watch'||!a.aniId){toast('Watch is for anime only');return;}
   pvReturnId=id;
   const {url,ep}=streamURL(a);
-  pvWatchEp=ep;   // the episode we opened, so we can offer to save progress on the way out
+  pvWatchEp=ep;   // the episode we opened, so we can save progress on the way out
+  pvOpenTime=Date.now();   // how long they stay is our only signal that they watched
   document.getElementById('pvTitle').textContent=a.title+(ep?` · Ep ${ep}`:'');
   const ext=document.getElementById('pvExt');
   const searchUrl=usingDefaultSource()?`${STREAM_DEFAULT}/browser?keyword=${encodeURIComponent(a.title)}`:url;
@@ -3057,39 +3058,59 @@ function saveSource(){
   if(v && !/^https?:\/\//i.test(v)){toast('That needs to start with http:// or https://');return;}
   setSource(v);
 }
+// Time in the player is the one signal we have (we can't read the cross-origin
+// frame). Long enough to have watched a ~24-min episode → assume watched and mark
+// it automatically, with an Undo. Barely opened → they just peeked, leave it be.
+// In between → the gentle "Mark watched?" prompt, since a short/skipped episode is
+// plausible but not certain.
+const AUTO_MARK_MS=15*60*1000;   // ~15 min → auto-mark (covers a full ep minus recap/outro)
+const PEEK_MS=2*60*1000;         // under 2 min → don't bother them
 function closePlayer(){
   const v=document.getElementById('playerView'); if(v)v.classList.remove('on');
-  // stop playback + free the frame
   const f=document.getElementById('pvFrame'); if(f)f.src='about:blank';
-  // We can't see inside the cross-origin player, so we can't KNOW they watched the
-  // episode — but we opened a specific one, so offer to save that progress. Only
-  // when it would actually advance them (opened ep > current), and only for anime.
-  const id=pvReturnId; const ep=pvWatchEp;
-  pvReturnId=null; pvWatchEp=null;
-  if(id&&ep){
-    const a=anime.find(x=>x.id===id);
-    if(a&&kindOf(a)==='watch'&&ep>(a.ep||0)) markWatchedPrompt(id,ep,a.title);
-  }
+  const id=pvReturnId, ep=pvWatchEp, elapsed=pvOpenTime?Date.now()-pvOpenTime:0;
+  pvReturnId=null; pvWatchEp=null; pvOpenTime=0;
+  if(!id||!ep) return;
+  const a=anime.find(x=>x.id===id);
+  if(!a||kindOf(a)!=='watch'||ep<=(a.ep||0)) return;   // only anime, only if it advances
+  if(elapsed>=AUTO_MARK_MS) autoMarkWatched(id,ep);
+  else if(elapsed>=PEEK_MS) markWatchedPrompt(id,ep,a.title);
+  // < PEEK_MS: they barely opened it — say nothing
 }
-// A quiet snackbar on the way out: "Watched Ep 12? — Mark watched". One tap saves
-// progress (localStorage + cloud sync); ignore it and nothing changes.
-let mwT;
-function markWatchedPrompt(id,ep,title){
-  const bar=document.getElementById('markWatched');if(!bar)return;
-  bar.querySelector('.mw-txt').innerHTML=`Watched <b>Ep ${ep}</b> of ${schEsc(title)}?`;
-  bar.querySelector('.mw-go').onclick=()=>{markWatched(id,ep);hideMarkWatched();};
-  bar.classList.add('on');
-  clearTimeout(mwT); mwT=setTimeout(hideMarkWatched,7000);   // auto-dismiss if ignored
-}
-function hideMarkWatched(){const bar=document.getElementById('markWatched');if(bar)bar.classList.remove('on');clearTimeout(mwT);}
-function markWatched(id,ep){
-  const a=anime.find(x=>x.id===id);if(!a)return;
+// Core: advance progress + save. Returns the previous state so it can be undone.
+function applyWatched(id,ep){
+  const a=anime.find(x=>x.id===id);if(!a)return null;
+  const prev={ep:a.ep||0,status:a.status};
   a.ep=a.epTotal?Math.min(ep,a.epTotal):ep;
-  if(a.epTotal&&a.ep===a.epTotal&&a.status!=='finished'){a.status='finished';toast('🎉 Marked as finished!');}
-  else if(a.status==='plan'){a.status='watching';toast(`Saved — up to Ep ${a.ep}`);}
-  else toast(`Saved — up to Ep ${a.ep}`);
+  if(a.epTotal&&a.ep===a.epTotal&&a.status!=='finished')a.status='finished';
+  else if(a.status==='plan')a.status='watching';
   touch(a);save();render();
   if(detailId===id)renderDetail();
+  return prev;
+}
+// The snackbar, one element, two modes: a "Mark watched?" prompt, or an
+// "auto-marked · Undo" confirmation.
+let mwT;
+function showMWBar(html,btnLabel,onGo){
+  const bar=document.getElementById('markWatched');if(!bar)return;
+  bar.querySelector('.mw-txt').innerHTML=html;
+  const go=bar.querySelector('.mw-go');go.textContent=btnLabel;go.onclick=()=>{onGo();hideMarkWatched();};
+  bar.classList.add('on');
+  clearTimeout(mwT);mwT=setTimeout(hideMarkWatched,7000);
+}
+function hideMarkWatched(){const bar=document.getElementById('markWatched');if(bar)bar.classList.remove('on');clearTimeout(mwT);}
+function markWatchedPrompt(id,ep,title){
+  showMWBar(`Watched <b>Ep ${ep}</b> of ${schEsc(title)}?`,'Mark watched',()=>{
+    applyWatched(id,ep);toast(`Saved — up to Ep ${ep}`);
+  });
+}
+function autoMarkWatched(id,ep){
+  const prev=applyWatched(id,ep);if(!prev)return;
+  const a=anime.find(x=>x.id===id);const finished=a&&a.status==='finished'&&prev.status!=='finished';
+  showMWBar(finished?`🎉 Finished — marked <b>${a.epTotal} episodes</b> watched`:`Marked <b>Ep ${ep}</b> watched`,'Undo',()=>{
+    const x=anime.find(y=>y.id===id);if(x){x.ep=prev.ep;x.status=prev.status;touch(x);save();render();if(detailId===id)renderDetail();}
+    toast('Undone');
+  });
 }
 function svCountUp(el,to){if(!el)return;const dur=850,t0=performance.now();const step=now=>{const p=Math.min(1,(now-t0)/dur),e=1-Math.pow(1-p,3);el.textContent=Math.round(to*e).toLocaleString();if(p<1)requestAnimationFrame(step);};requestAnimationFrame(step);}
 function svChips(list){return list.length?list.map(a=>'<span class="sv-chip">'+schEsc(a.title)+(a.rating?' '+icon('star','fill')+a.rating:'')+'</span>').join(''):'<span class="sv-chip">None yet</span>';}

@@ -1461,21 +1461,42 @@ function parseEpTotal(s){const m=/(\d+)\s*(?:eps?|chapters?|ch\b)/i.exec(s||'');
 function migrate(list){
   // add `kind` to every item (existing items default to "watch"); airing cache fields start empty
   // banner/aniColor = AniList per-title art + dominant color; bgImage/bgAccent = user's own background + its extracted color
-  return (Array.isArray(list)?list:[]).map(a=>({ep:0,rating:0,fav:false,upd:0,epTotal:parseEpTotal(a.eps),img:'',order:[],notes:'',genre:'',eps:'',time:'',kind:'watch',banner:'',aniColor:'',bgImage:'',bgAccent:'',bannerTried:false,...a}));
+  // Defensive: drop non-object entries and guarantee id/title/status so one malformed
+  // item (from a bad import, a truncated paste, a future format change) can't crash render.
+  return (Array.isArray(list)?list:[]).filter(a=>a&&typeof a==='object').map(a=>({id:uid(),title:'',status:'plan',ep:0,rating:0,fav:false,upd:0,epTotal:parseEpTotal(a.eps),img:'',order:[],notes:'',genre:'',eps:'',time:'',kind:'watch',banner:'',aniColor:'',bgImage:'',bgAccent:'',bannerTried:false,...a}));
 }
-function load(){try{const s=store(),d=s&&s.getItem(LSKEY);if(d){const p=JSON.parse(d);if(isEnvelope(p)){appLocked=true;anime=[];return;}anime=migrate(p);}else{anime=migrate(JSON.parse(JSON.stringify(DEFAULT_DATA)));}}catch{anime=migrate(JSON.parse(JSON.stringify(DEFAULT_DATA)));}}
+function load(){
+  const s=store();
+  const parseInto=raw=>{const p=JSON.parse(raw);if(isEnvelope(p)){appLocked=true;anime=[];return true;}anime=migrate(p);return true;};
+  try{
+    const d=s&&s.getItem(LSKEY);
+    if(d){parseInto(d);return;}
+    const bak=s&&s.getItem(LSKEY+'_bak');           // no primary → recover from last-known-good
+    if(bak){parseInto(bak);return;}
+    anime=migrate(JSON.parse(JSON.stringify(DEFAULT_DATA)));
+  }catch(e){
+    // primary is corrupt: preserve the raw bytes, then try the backup before giving up —
+    // and if nothing parses, don't let an auto-save wipe whatever's still there.
+    try{const d=s&&s.getItem(LSKEY);if(d&&!s.getItem(LSKEY+'_corrupt'))s.setItem(LSKEY+'_corrupt',d);}catch{}
+    try{const bak=s&&s.getItem(LSKEY+'_bak');if(bak){parseInto(bak);return;}}catch{}
+    anime=migrate(JSON.parse(JSON.stringify(DEFAULT_DATA)));
+    try{setTimeout(()=>toast('⚠️ Couldn’t read your saved list — a copy was kept. Restore from backup if it looks empty.'),800);}catch{}
+  }
+}
 let saveWarned=false;let _writeChain=Promise.resolve();
+function backupLocal(s,val){try{s.setItem(LSKEY+'_bak',val);}catch{}}   // best-effort last-known-good mirror
 function writeLocal(){
   const s=store();if(!s)return;
+  if(appLocked)return;      // locked: `anime` is an empty placeholder — never persist it over the ciphertext
   if(cryptoKey&&envWraps){                       // password set → persist ciphertext only
     const snap=JSON.stringify(anime);
     _writeChain=_writeChain.then(async()=>{
-      try{const {iv,ct}=await encList(snap,cryptoKey);s.setItem(LSKEY,JSON.stringify({v:2,enc:1,iv,ct,pw:envWraps.pw,rec:envWraps.rec,pfk:envWraps.pfk}));saveWarned=false;}
+      try{const {iv,ct}=await encList(snap,cryptoKey);const env=JSON.stringify({v:2,enc:1,iv,ct,pw:envWraps.pw,rec:envWraps.rec,pfk:envWraps.pfk});s.setItem(LSKEY,env);backupLocal(s,env);saveWarned=false;}
       catch{if(!saveWarned){saveWarned=true;toast('⚠️ Storage full — remove some uploaded covers');}}
     });
     return _writeChain;
   }
-  try{s.setItem(LSKEY,JSON.stringify(anime));saveWarned=false;}catch{if(!saveWarned){saveWarned=true;toast('⚠️ Storage full — remove some uploaded covers');}}
+  try{const raw=JSON.stringify(anime);s.setItem(LSKEY,raw);backupLocal(s,raw);saveWarned=false;}catch{if(!saveWarned){saveWarned=true;toast('⚠️ Storage full — remove some uploaded covers');}}
 }
 function save(){writeLocal();schedulePush();scheduleNotifyUpdate();}
 
@@ -2175,7 +2196,9 @@ function accentVars(a){const ac=titleAccent(a);if(!ac||!/^#[0-9a-fA-F]{3,6}$/.te
 function query(){return document.getElementById('searchIn').value.toLowerCase().trim();}
 
 function render(){
-  renderKindSeg();renderFiltRow();renderSortRow();renderHome();
+  // Each section renders independently so one thrower can't blank the whole app.
+  const step=fn=>{try{fn();}catch(e){try{console.error('render',e);}catch{}}};
+  step(renderKindSeg);step(renderFiltRow);step(renderSortRow);step(renderHome);
 }
 function renderKindSeg(){
   const el=document.getElementById('kindSeg');if(!el)return;

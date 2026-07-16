@@ -226,6 +226,9 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 .keyhow code{background:var(--bg4);border:1px solid var(--b1);border-radius:5px;padding:1px 5px;font-size:11.5px;font-family:ui-monospace,Menlo,monospace;color:var(--t1);}
 
 /* ── AUTOFILL PICKER ── */
+.pick-group{font-size:11px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--t3);margin:16px 0 2px;}
+.pick-group:first-child{margin-top:4px;}
+.pick-group + .pick-row{border-top:none;}
 .pick-row{display:flex;align-items:center;gap:12px;width:100%;padding:9px 0;border-top:1px solid var(--bn2);text-align:left;}
 .pick-row:first-child{border-top:none;}
 .pick-row:active{transform:scale(.985);}
@@ -3643,20 +3646,22 @@ async function aiAutofill(){
   btn.classList.add('loading');btn.innerHTML='<span>'+icon('sparkles')+'</span> Searching databases…';
   const cands=[];
   try{
+    // Keep the list short and grouped: a few best anime, then a couple of live-action.
+    // AniList/TVMaze already return best-match-first, so the top few are the ones that matter.
     if(curKind==='read'){
-      (await aniSearch(title,'MANGA')).forEach(m=>cands.push({
+      (await aniSearch(title,'MANGA')).slice(0,4).forEach(m=>cands.push({group:'Manga',
         title:m.title.english||m.title.romaji,
         sub:[aniLabel(m),m.startDate&&m.startDate.year,m.chapters?m.chapters+' ch':''].filter(Boolean).join(' · '),
         img:(m.coverImage&&m.coverImage.large)||'',data:aniToData(m,'read')}));
     }else{
-      (await aniSearch(title,'ANIME')).forEach(m=>cands.push({
+      (await aniSearch(title,'ANIME')).slice(0,3).forEach(m=>cands.push({group:'Anime',
         title:m.title.english||m.title.romaji,
         sub:[aniLabel(m),m.startDate&&m.startDate.year,m.episodes?m.episodes+' eps':''].filter(Boolean).join(' · '),
         img:(m.coverImage&&m.coverImage.large)||'',data:aniToData(m,'watch')}));
       try{ // live-action is a *choice*, never a silent substitute for the anime
-        (await tvSearch(title)).forEach(s=>cands.push({
+        (await tvSearch(title)).slice(0,2).forEach(s=>cands.push({group:'Live action',
           title:s.name,
-          sub:['Live action',(s.premiered||'').slice(0,4),((s.network||s.webChannel||{}).name)||''].filter(Boolean).join(' · '),
+          sub:[(s.premiered||'').slice(0,4),((s.network||s.webChannel||{}).name)||''].filter(Boolean).join(' · '),
           img:s.image?(s.image.medium||s.image.original||''):'',tvId:s.id}));
       }catch{}
     }
@@ -3669,12 +3674,22 @@ async function aiAutofill(){
 }
 function renderPicker(){
   const el=document.getElementById('pickBody');if(!el)return;
-  el.innerHTML=pickCands.map((c,i)=>{
+  const rowHTML=(c,i)=>{
     const ch=((c.title||'?').charAt(0)||'?').replace(/[^A-Za-z0-9]/g,'')||'?';
     const cover=c.img?`<img class="pick-img" src="${c.img}" alt="" loading="lazy" onerror="this.outerHTML='<div class=\\'pick-ph\\'>${ch}</div>'">`:`<div class="pick-ph">${ch}</div>`;
     return`<button class="pick-row" onclick="applyCandidate(${i})">${cover}
       <div class="pick-txt"><div class="pick-t">${schEsc(c.title)}</div><div class="pick-s">${schEsc(c.sub||'')}</div></div>
       <span class="set-chev">${icon('chevron-right')}</span></button>`;
+  };
+  // group into sections in a stable order, but keep each row's ORIGINAL index so
+  // applyCandidate(i) still points at the right candidate.
+  const order=['Anime','Manga','Live action'];
+  const groups=[...new Set(pickCands.map(c=>c.group||'Result'))].sort((a,b)=>order.indexOf(a)-order.indexOf(b));
+  el.innerHTML=groups.map(g=>{
+    const rows=pickCands.map((c,i)=>({c,i})).filter(x=>(x.c.group||'Result')===g);
+    if(!rows.length)return'';
+    const header=(groups.length>1)?`<div class="pick-group">${g}</div>`:'';
+    return header+rows.map(x=>rowHTML(x.c,x.i)).join('');
   }).join('');
 }
 async function applyCandidate(i){

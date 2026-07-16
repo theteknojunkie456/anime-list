@@ -621,6 +621,14 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 .src-chip{font-family:var(--fd);font-size:12.5px;font-weight:700;color:var(--t2);background:var(--bg3);border:1px solid var(--b1);border-radius:999px;padding:7px 13px;transition:border-color .15s,background .15s,color .15s;}
 .src-chip.on{border-color:var(--a);background:var(--ag);color:var(--a2);}
 .src-chip:active{transform:scale(.96);}
+.al-acct{display:flex;align-items:center;gap:12px;padding:14px 15px;border-radius:14px;background:var(--ag);border:1px solid var(--b2);margin-bottom:6px;}
+.al-acct .ico{width:22px;height:22px;color:var(--a2);flex-shrink:0;}
+.al-name{font-family:var(--fd);font-size:15px;font-weight:800;color:var(--t1);}
+.al-sub{font-size:12px;color:var(--t3);margin-top:2px;}
+.al-steps{margin-top:12px;display:flex;flex-direction:column;gap:9px;}
+.al-step{display:flex;align-items:flex-start;gap:10px;font-size:13px;color:var(--t2);line-height:1.45;}
+.al-step code{font-size:11.5px;word-break:break-all;}
+.al-num{flex-shrink:0;width:20px;height:20px;border-radius:50%;background:var(--ag);border:1px solid var(--b2);color:var(--a2);font-family:var(--fd);font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;margin-top:1px;}
 #sourceBody code{background:var(--bg4);border:1px solid var(--b1);border-radius:5px;padding:1px 5px;font-size:11px;font-family:ui-monospace,Menlo,monospace;color:var(--t2);}
 .dots span{animation:blink 1.2s infinite;}
 .dots span:nth-child(2){animation-delay:.2s;}
@@ -1150,6 +1158,16 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
   <div id="lockBox"></div>
 </div>
 
+<!-- ANILIST SYNC SHEET -->
+<div class="sheet" id="anilistSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <div class="sheet-title"><i data-ic="refresh"></i> AniList sync</div>
+    <button class="sheet-cancel" onclick="openSheet('settingsSheet')">Back</button>
+  </div>
+  <div id="anilistBody"></div>
+</div>
+
 <!-- IMPORT SHEET -->
 <div class="sheet" id="importSheet">
   <div class="sheet-handle"></div>
@@ -1395,6 +1413,7 @@ clock:'<circle cx="12" cy="12" r="9.5"/><path d="M12 7v5l3.5 2"/>',
 'chevron-left':'<path d="m15 18-6-6 6-6"/>',
 'chevron-right':'<path d="m9 18 6-6-6-6"/>',
 loader:'<path d="M12 3a9 9 0 1 0 9 9"/>',
+refresh:'<path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.5 9a9 9 0 0 1 14.8-3.4L23 10M1 14l4.7 4.4A9 9 0 0 0 20.5 15"/>',
 inbox:'<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5.1 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.9A2 2 0 0 0 16.8 4H7.2a2 2 0 0 0-1.7 1.1z"/>',
 plus:'<path d="M12 5v14M5 12h14"/>',
 compass:'<circle cx="12" cy="12" r="9.5"/><path d="m16 8-2 6-6 2 2-6z"/>',
@@ -1582,7 +1601,7 @@ function setLockMode(rec){
 }
 function toggleLockMode(){setLockMode(!lockRecMode);}
 function _unlockErr(i,err,msg){if(err)err.textContent=msg;const card=document.querySelector('.lock-card');if(card){card.classList.remove('shake');void card.offsetWidth;card.classList.add('shake');}if(i){i.value='';i.focus();}}
-function finishUnlock(){hideLock();render();renderLockUI();setTimeout(syncOnOpen,200);try{setTimeout(fetchCovers,600);}catch{}try{restorePlayer();}catch{}}
+function finishUnlock(){hideLock();render();renderLockUI();setTimeout(syncOnOpen,200);try{setTimeout(fetchCovers,600);}catch{}try{restorePlayer();}catch{}try{alBootSync();}catch{}}
 async function tryUnlock(){                            // unlock with the password
   const i=document.getElementById('lockPw'),err=document.getElementById('lockErr');
   const pw=i?i.value:'';if(!pw)return;if(err)err.textContent='';
@@ -2470,7 +2489,7 @@ function setDetailStatus(s){
   const a=anime.find(x=>x.id===detailId);if(!a)return;
   a.status=s;
   if(s==='finished'&&a.epTotal)a.ep=a.epTotal;
-  touch(a);save();renderDetail();render();
+  touch(a);save();renderDetail();render();alPushItem(a);
 }
 function bumpEp(d){
   const a=anime.find(x=>x.id===detailId);if(!a)return;
@@ -2478,12 +2497,12 @@ function bumpEp(d){
   if(a.epTotal)a.ep=Math.min(a.ep,a.epTotal);
   if(a.epTotal&&a.ep===a.epTotal&&a.status!=='finished'){a.status='finished';toast('🎉 Marked as finished!');}
   else if(a.ep>0&&a.status==='plan'){a.status='watching';}
-  touch(a);save();renderDetail();render();
+  touch(a);save();renderDetail();render();alPushItem(a);
 }
 function setRating(n){
   const a=anime.find(x=>x.id===detailId);if(!a)return;
   a.rating=a.rating===n?0:n;
-  touch(a);save();renderDetail();render();
+  touch(a);save();renderDetail();render();alPushItem(a);
 }
 function toggleFav(){
   const a=anime.find(x=>x.id===detailId);if(!a)return;
@@ -2503,6 +2522,7 @@ function openSheet(id){
   if(id==='forYouSheet')renderForYou();
   if(id==='aiSheet'){renderModelPicker();updateKeyBtn();}
   if(id==='sourceSheet')renderSource();
+  if(id==='anilistSheet')renderAniList();
 }
 function closeAll(){
   document.querySelectorAll('.sheet').forEach(s=>s.classList.remove('on'));
@@ -2829,6 +2849,184 @@ function doAccountImport(){
   toast(`Imported ${fresh.length} title${fresh.length!==1?'s':''}${dupes?` (${dupes} already had)`:''}`);
   setTimeout(fetchCovers,600);
 }
+// ─── ANILIST TWO-WAY SYNC ────────────────────────────────────────────────────
+// The app becomes the hub: connect an AniList account and progress flows both
+// ways — mark an episode here and it lands on AniList; anything a site (or you)
+// pushed to AniList flows back in. AniList's GraphQL allows browser calls and its
+// OAuth implicit grant needs no server or secret, so this stays a pure static
+// app. Matching is by media id (a.aniId); manual/live-action items (no aniId)
+// simply don't sync.
+const ANILIST_CLIENT_ID='';   // optional built-in default; a user can paste their own instead
+const AL_SYNC_THROTTLE=30*60*1000;   // background re-sync at most every 30 min
+function alClientId(){try{return(localStorage.getItem('al_client')||ANILIST_CLIENT_ID||'').trim();}catch{return ANILIST_CLIENT_ID;}}
+function alToken(){try{return localStorage.getItem('al_token')||'';}catch{return'';}}
+function alUser(){try{return localStorage.getItem('al_user')||'';}catch{return'';}}
+function alConnected(){return !!alToken();}
+function alLastSync(){try{return +localStorage.getItem('al_last')||0;}catch{return 0;}}
+function toAniStatus(s){return {watching:'CURRENT',plan:'PLANNING',finished:'COMPLETED',dropped:'DROPPED'}[s]||'CURRENT';}
+function alConfigured(){return !!alClientId();}
+
+function alConnect(){
+  if(!alConfigured()){toast('Add your AniList Client ID first');return;}
+  location.href=`https://anilist.co/api/v2/oauth/authorize?client_id=${alClientId()}&response_type=token`;
+}
+function alSaveClient(){
+  const v=(document.getElementById('alClientIn').value||'').trim();
+  if(!/^\d+$/.test(v)){toast('The Client ID is just a number');return;}
+  try{localStorage.setItem('al_client',v);}catch{}
+  toast('Client ID saved — now connect');renderAniList();
+}
+function alDisconnect(){
+  try{['al_token','al_user','al_uid','al_exp','al_last'].forEach(k=>localStorage.removeItem(k));}catch{}
+  toast('AniList disconnected');renderAniList();
+}
+// AniList redirects back with the token in the URL fragment — grab it, store it,
+// scrub it from the address bar, and flag a first full sync. The sync itself waits
+// for alBootSync so it never runs against a still-locked (ciphertext) list.
+async function alCatchRedirect(){
+  if(!location.hash||location.hash.indexOf('access_token=')<0)return false;
+  const p=new URLSearchParams(location.hash.slice(1));
+  const tok=p.get('access_token'); if(!tok)return false;
+  try{
+    localStorage.setItem('al_token',tok);
+    if(p.get('expires_in'))localStorage.setItem('al_exp',String(Date.now()+(+p.get('expires_in'))*1000));
+    localStorage.setItem('al_fresh','1');   // do a full first sync once the list is available
+  }catch{}
+  history.replaceState(null,'',location.pathname+location.search);
+  try{await alFetchViewer();}catch{}
+  return true;
+}
+// Sync once the real list is loaded (called at boot when unlocked, and after unlock).
+async function alBootSync(){
+  if(!alConnected())return;
+  let fresh=false; try{fresh=localStorage.getItem('al_fresh')==='1';}catch{}
+  try{
+    if(fresh){
+      const r=await alSync({importNew:true});
+      if(r.failed){toast('Couldn’t reach AniList — will retry');}
+      else{try{localStorage.removeItem('al_fresh');}catch{}
+        toast(`AniList synced · ${r.pulled} in, ${r.pushed} out${r.added?`, ${r.added} added`:''}`);}
+    }else await alAutoSync();
+  }catch{}
+  renderAniList();
+}
+async function alGQL(query,variables){
+  const r=await fetch('https://graphql.anilist.co',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json','Authorization':'Bearer '+alToken()},body:JSON.stringify({query,variables:variables||{}})});
+  if(r.status===401){alDisconnect();throw new Error('AniList session expired — reconnect');}
+  const j=await r.json();
+  if(j.errors&&j.errors.length)throw new Error(j.errors[0].message||'AniList error');
+  return j.data;
+}
+async function alFetchViewer(){
+  const d=await alGQL('query{Viewer{id name}}');
+  try{localStorage.setItem('al_user',d.Viewer.name);localStorage.setItem('al_uid',String(d.Viewer.id));}catch{}
+  return d.Viewer;
+}
+// The viewer's own list (authenticated, so private lists work too). Shaped like
+// aniListEntries so accItem/reconcile can consume it.
+async function alFetchList(type){
+  const uid=+(localStorage.getItem('al_uid')||0); if(!uid)return[];
+  const q=`query($u:Int,$t:MediaType){MediaListCollection(userId:$u,type:$t){lists{entries{status progress score media{id idMal title{romaji english} episodes chapters genres coverImage{large color} bannerImage}}}}}`;
+  const d=await alGQL(q,{u:uid,t:type}); const out=[],seen=new Set();
+  const lists=(d.MediaListCollection&&d.MediaListCollection.lists)||[];
+  for(const l of lists)for(const e of l.entries){
+    const m=e.media; if(!m||seen.has(m.id))continue; seen.add(m.id);
+    const total=type==='ANIME'?m.episodes:m.chapters;
+    out.push({title:m.title.english||m.title.romaji,status:mapAniStatus(e.status),kind:type==='ANIME'?'watch':'read',
+      progress:e.progress||0,rating:e.score?Math.round(e.score/2):0,epTotal:total||0,
+      eps:total?`${total} ${type==='ANIME'?'eps':'chapters'}`:'',genres:m.genres,
+      img:(m.coverImage&&m.coverImage.large)||'',color:(m.coverImage&&m.coverImage.color)||'',banner:m.bannerImage||'',aniId:m.id});
+  }
+  return out;
+}
+// Push one item up (fire-and-forget, serialized + spaced to respect the rate limit).
+let alQueue=Promise.resolve();
+function alPushItem(a){
+  if(!alConnected()||!a||!a.aniId)return;
+  if(kindOf(a)!=='watch'&&kindOf(a)!=='read')return;
+  const vars={mediaId:a.aniId,progress:a.ep||0,status:toAniStatus(a.status)};
+  if(a.rating)vars.score=a.rating*2;   // our 0–5 → AniList 0–10
+  alQueue=alQueue.then(async()=>{
+    await alGQL('mutation($mediaId:Int,$progress:Int,$status:MediaListStatus,$score:Float){SaveMediaListEntry(mediaId:$mediaId,progress:$progress,status:$status,score:$score){id}}',vars);
+    await pause(700);
+  }).catch(()=>{});   // one failed push shouldn't break the chain or nag
+}
+// Pull the AniList list and reconcile every matched item by highest progress
+// (never regress a count). Local-only items get created on AniList; remote-only
+// items are imported only when asked (first connect / full sync), so a title you
+// deleted here doesn't keep coming back on every background sync.
+async function alSync(opts){
+  if(!alConnected())return {pulled:0,pushed:0,added:0};
+  opts=opts||{};
+  let pulled=0,pushed=0,added=0,okTypes=0;
+  const remote=new Map();
+  for(const type of ['ANIME','MANGA']){
+    let list; try{list=await alFetchList(type);okTypes++;}catch(e){if(!alConnected())throw e;continue;}
+    for(const e of list)remote.set(e.aniId+'|'+e.kind,e);
+  }
+  // couldn't read the remote list at all → do nothing, rather than mistake an
+  // empty map for "AniList has nothing" and push/overwrite the whole list.
+  if(!okTypes)return {pulled:0,pushed:0,added:0,failed:true};
+  for(const a of anime){
+    if(!a.aniId||(kindOf(a)!=='watch'&&kindOf(a)!=='read'))continue;
+    const key=a.aniId+'|'+kindOf(a), r=remote.get(key);
+    if(!r){alPushItem(a);pushed++;continue;}   // local-only → create it on AniList
+    remote.delete(key);
+    const le=a.ep||0, re=r.progress||0;
+    if(re>le){a.ep=r.epTotal?Math.min(re,r.epTotal):re;a.status=r.status;touch(a);pulled++;}
+    else if(le>re){alPushItem(a);pushed++;}
+    // equal → assume already in sync (avoids status ping-pong)
+  }
+  if(opts.importNew){for(const r of remote.values()){anime.unshift(accItem(r));added++;}}
+  if(pulled||added){save();render();}
+  try{localStorage.setItem('al_last',String(Date.now()));}catch{}
+  return {pulled,pushed,added};
+}
+// Background sync on app open, throttled — keeps things fresh without hammering.
+async function alAutoSync(){
+  if(!alConnected())return;
+  if(Date.now()-alLastSync()<AL_SYNC_THROTTLE)return;
+  try{await alSync();}catch{}
+}
+async function alSyncNow(){
+  const btn=document.getElementById('alSyncBtn'); if(btn){btn.classList.add('loading');btn.textContent='Syncing…';}
+  try{const r=await alSync({importNew:true});
+    toast(r.failed?'Couldn’t reach AniList — try again':`Synced · ${r.pulled} in, ${r.pushed} out${r.added?`, ${r.added} added`:''}`);}
+  catch(e){toast(e.message||'Sync failed');}
+  renderAniList();
+}
+function relTime(t){if(!t)return'never';const s=Math.floor((Date.now()-t)/1000);if(s<60)return'just now';const m=Math.floor(s/60);if(m<60)return m+'m ago';const h=Math.floor(m/60);if(h<24)return h+'h ago';return Math.floor(h/24)+'d ago';}
+function renderAniList(){
+  const box=document.getElementById('anilistBody'); if(!box)return;
+  if(!alConfigured()){
+    box.innerHTML=`
+      <p class="ai-desc">Sync your progress with <b>AniList</b> so it's the same everywhere — mark an episode here and it lands on AniList; anything a site linked to AniList updates flows back in.</p>
+      <div class="al-steps">
+        <div class="al-step"><span class="al-num">1</span> Open <b>anilist.co → Settings → Developer → Create New Client</b></div>
+        <div class="al-step"><span class="al-num">2</span> Set <b>Redirect URL</b> to <code>${location.origin+location.pathname}</code></div>
+        <div class="al-step"><span class="al-num">3</span> Paste the <b>Client ID</b> it gives you below</div>
+      </div>
+      <input class="ai-prompt-in" id="alClientIn" placeholder="Client ID (a number)" inputmode="numeric" autocomplete="off" style="margin-top:10px">
+      <button class="parse-btn" onclick="alSaveClient()">Save Client ID</button>
+      <p class="ai-desc" style="margin-top:12px;font-size:11.5px">One-time setup. The Client ID isn't a secret — it just tells AniList which app is asking.</p>`;
+    return;
+  }
+  const syncable=anime.filter(a=>a.aniId&&(kindOf(a)==='watch'||kindOf(a)==='read')).length;
+  if(!alConnected()){
+    box.innerHTML=`
+      <p class="ai-desc">Connect your AniList account and your progress stays in sync <b>everywhere</b>: mark an episode here and it lands on AniList; anything you (or a site linked to AniList) update flows back in. Your list becomes one shared number per show.</p>
+      <button class="parse-btn" onclick="alConnect()">${icon('refresh')} Connect AniList</button>
+      <p class="ai-desc" style="margin-top:12px;font-size:11.5px">${syncable} of your titles have an AniList match and will sync. Manual or live-action entries won’t.</p>`;
+    return;
+  }
+  box.innerHTML=`
+    <div class="al-acct">${icon('check')}<div><div class="al-name">${schEsc(alUser())}</div><div class="al-sub">Connected · last synced ${relTime(alLastSync())}</div></div></div>
+    <p class="ai-desc">Marking episodes, changing status or rating here pushes to AniList automatically. Pull the latest anytime:</p>
+    <button class="parse-btn" id="alSyncBtn" onclick="alSyncNow()">${icon('refresh')} Sync now</button>
+    <button class="src-opt" style="margin-top:10px" onclick="alDisconnect()"><div class="src-name" style="color:var(--t2)">Disconnect AniList</div><div class="src-sub">Stops syncing. Your list stays here untouched.</div></button>
+    <p class="ai-desc" style="margin-top:12px;font-size:11.5px">${syncable} titles sync (matched by AniList id). Progress reconciles to the higher count, so nothing goes backwards.</p>`;
+}
+
 function doImport(){
   const existing=new Set(anime.map(a=>a.title.toLowerCase().trim()));
   const toAdd=importItems.filter(x=>x.selected&&!existing.has(x.title.toLowerCase().trim()));
@@ -2896,6 +3094,7 @@ function renderSettings(){
     {ic:'bell',    h:'Notifications',       p:notifyOn()?'On — you\'ll be told when an episode airs':'Off', go:'openNotifySheet()'},
     {ic:'sparkles',h:'AI & chat key',       p:getKey()?'On — '+(keyProvider(getKey())||'key')+' connected':'Off — add a free key to unlock chat', go:"openSheet('aiSheet')"},
     {ic:'play',    h:'Watch & read sources', p:'Where Watch now / Read now open', go:"openSheet('sourceSheet')"},
+    {ic:'refresh', h:'AniList sync',         p:alConnected()?'On — '+alUser()+' · progress syncs both ways':'Off — connect to sync progress everywhere', go:"openSheet('anilistSheet')"},
     {ic:'clipboard',h:'Import / Export',    p:'Paste a list in, or copy yours out', go:"openSheet('importSheet')"},
     {ic:'palette', h:'Theme',               p:'Colours, or build your own', go:"openSheet('themeSheet')"},
   ];
@@ -3202,7 +3401,7 @@ function applyWatched(id,ep){
   a.ep=a.epTotal?Math.min(ep,a.epTotal):ep;
   if(a.epTotal&&a.ep===a.epTotal&&a.status!=='finished')a.status='finished';
   else if(a.status==='plan')a.status='watching';
-  touch(a);save();render();
+  touch(a);save();render();alPushItem(a);
   if(detailId===id)renderDetail();
   return prev;
 }
@@ -4047,6 +4246,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeAll();closeCon
 // ─── INIT ───────────────────────────────────────────────────────────────────
 try{hydrateIcons();}catch{}
 load();loadTheme();render();
+try{alCatchRedirect().then(()=>{if(!appLocked)alBootSync();}).catch(()=>{});}catch{}   // returning from AniList OAuth
 if(appLocked)showLock();   // stored list is ciphertext → gate the app until unlocked
 else try{restorePlayer();}catch{}   // came back mid-stream after an iOS reload → reopen it
 try{maybeShowTutorial();}catch{}

@@ -584,6 +584,12 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 .model-sel{padding:8px 10px;border-radius:11px;font-size:12px;font-weight:700;background:var(--bg3);border:1px solid var(--b2);color:var(--t1);max-width:170px;}
 /* when no key is set, the "add a key" button is the accent CTA, not a grey line to scroll past */
 #keyBtn.key-cta{background:var(--a);color:var(--aFg);box-shadow:0 6px 18px -6px var(--glow);}
+/* account import — segment toggle + "or paste" divider */
+.acc-seg{display:flex;gap:6px;margin-top:4px;padding:3px;border-radius:12px;background:var(--bg3);border:1px solid var(--bn);}
+.acc-opt{flex:1;padding:9px 0;border-radius:9px;font-size:12.5px;font-weight:700;color:var(--t2);transition:background .15s,color .15s;}
+.acc-opt.on{background:color-mix(in srgb,var(--a) 20%,var(--bg4));color:var(--a2);}
+.imp-divider{display:flex;align-items:center;gap:12px;margin:20px 0 4px;color:var(--t3);font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;}
+.imp-divider::before,.imp-divider::after{content:'';flex:1;height:1px;background:var(--b1);}
 /* streaming source — quiet cards, the active one lit with the accent */
 .src-opt{display:block;width:100%;text-align:left;padding:13px 15px;margin-top:9px;border-radius:14px;background:var(--bg3);border:1px solid var(--b1);transition:border-color .15s,background .15s;}
 .src-opt.on{border-color:var(--a);background:var(--ag);}
@@ -1127,6 +1133,21 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
     <div class="sheet-title"><i data-ic="clipboard"></i> Import / Export</div>
     <button class="sheet-cancel" onclick="openSheet('settingsSheet')">Back</button>
   </div>
+
+  <!-- Bring an existing list over in one shot — the biggest onboarding unlock -->
+  <div class="dt-label">Import from AniList / MyAnimeList</div>
+  <p class="ai-desc">Already have a list elsewhere? Pull it in — covers, status and progress and all.</p>
+  <div class="acc-seg" id="accSeg">
+    <button class="acc-opt on" data-acc="anilist" onclick="setAccSrc('anilist')">AniList</button>
+    <button class="acc-opt" data-acc="mal" onclick="setAccSrc('mal')">MyAnimeList</button>
+  </div>
+  <div style="display:flex;gap:8px;margin-top:9px;">
+    <input class="ai-prompt-in" id="accUser" placeholder="your username" autocomplete="off" onkeydown="if(event.key==='Enter')fetchAccountList()">
+    <button class="ai-run-btn" id="accBtn" onclick="fetchAccountList()">Fetch</button>
+  </div>
+  <p class="ai-desc" id="accHint" style="font-size:11.5px;margin-top:7px">Your list must be <b>public</b>. Both your watch and reading lists come over.</p>
+
+  <div class="imp-divider"><span>or paste it</span></div>
   <p class="ai-desc">Paste your list from Notes, messages, or anywhere — one title per line, as messy as you like. After previewing, tap a status on each title (or use Set&nbsp;all). "Title | status | ep 5 | ★4" style lines are understood too.</p>
   <textarea class="import-paste" id="importPaste" placeholder="Attack on Titan&#10;Demon Slayer - watching&#10;One Piece | watching | ep 120&#10;..."></textarea>
   <button class="parse-btn" onclick="parseImport()">Preview Import</button>
@@ -2278,7 +2299,9 @@ function renderHome(){
   sorted(pool.filter(a=>titleBg(a))).forEach(addSpot);
   const spotlight=spot.slice(0,5),spotSet=new Set(spotlight.map(a=>a.id));
   heroAmb=spotlight[0]?titleAccent(spotlight[0]):'';setAmbient(heroAmb);
-  let html=nudgeHTML()+(spotlight.length?billboardHTML(spotlight):'')+resumeRailHTML(pool,isRead);
+  // one banner at most: backup warning (critical) wins; otherwise the behind nudge
+  const topBanner=shouldNudge()?nudgeHTML():(isRead?'':behindHTML());
+  let html=topBanner+(spotlight.length?billboardHTML(spotlight):'')+resumeRailHTML(pool,isRead);
   // each section wears its own status colour (STATUS_META) rather than the one
   // theme accent — the palette already exists, it was just unused outside chips
   const rows=isRead
@@ -2688,6 +2711,85 @@ function setImportStatus(id,s){const it=importItems.find(x=>x.id===id);if(it){it
 function setAllImportStatus(s){importItems.forEach(x=>x.status=s);renderPreview();toast(`All set to ${STATUS_META[s].label}`);}
 function toggleImport(id){const item=importItems.find(x=>x.id===id);if(item)item.selected=!item.selected;renderPreview();}
 function toggleAllImport(){const allOn=importItems.every(x=>x.selected);importItems.forEach(x=>x.selected=!allOn);renderPreview();}
+// ─── IMPORT FROM AN ACCOUNT (AniList / MyAnimeList) ─────────────────────────
+let accSrc='anilist';
+function setAccSrc(s){accSrc=s;document.querySelectorAll('.acc-opt').forEach(b=>b.classList.toggle('on',b.dataset.acc===s));
+  document.getElementById('accHint').innerHTML=s==='mal'
+    ? 'Your MAL list must be <b>public</b> (Settings → list visibility). Both anime and manga come over.'
+    : 'Your AniList list must be <b>public</b>. Both your watch and reading lists come over.';}
+// AniList/MAL statuses → ours
+function mapAniStatus(s){return {CURRENT:'watching',REPEATING:'watching',PLANNING:'plan',COMPLETED:'finished',DROPPED:'dropped',PAUSED:'plan'}[s]||'plan';}
+function mapMalStatus(s){return {watching:'watching',reading:'watching',plan_to_watch:'plan',plan_to_read:'plan',completed:'finished',dropped:'dropped',on_hold:'plan'}[s]||'plan';}
+// A fully-formed item from a list entry (richer than paste — carries aniId/cover/progress)
+function accItem(o){
+  return {id:uid(),title:o.title,status:o.status,kind:o.kind,ep:o.progress||0,rating:o.rating||0,fav:false,
+    eps:o.eps||'',epTotal:o.epTotal||0,time:'',genre:(o.genres||[]).slice(0,3).join(', '),order:[],notes:'',
+    img:o.img||'',aniId:o.aniId||0,aniColor:o.color||'',banner:o.banner||'',bannerTried:!!o.banner,upd:Date.now()};
+}
+async function aniListEntries(user,type){
+  const q=`query($n:String,$t:MediaType){MediaListCollection(userName:$n,type:$t){lists{entries{status progress score media{id idMal title{romaji english} episodes chapters genres coverImage{large color} bannerImage}}}}}`;
+  const r=await fetch('https://graphql.anilist.co',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({query:q,variables:{n:user,t:type}})});
+  if(!r.ok)throw new Error('AniList '+r.status);
+  const j=await r.json();
+  if(j.errors)throw new Error(j.errors[0].message||'not found');
+  const lists=(j.data&&j.data.MediaListCollection&&j.data.MediaListCollection.lists)||[];
+  const out=[],seen=new Set();
+  for(const l of lists)for(const e of l.entries){
+    const m=e.media; if(!m||seen.has(m.id))continue; seen.add(m.id);
+    const total=type==='ANIME'?m.episodes:m.chapters;
+    out.push({title:m.title.english||m.title.romaji,status:mapAniStatus(e.status),kind:type==='ANIME'?'watch':'read',
+      progress:e.progress||0,rating:e.score?Math.round(e.score/2):0,epTotal:total||0,
+      eps:total?`${total} ${type==='ANIME'?'eps':'chapters'}`:'',genres:m.genres,
+      img:(m.coverImage&&m.coverImage.large)||'',color:(m.coverImage&&m.coverImage.color)||'',banner:m.bannerImage||'',aniId:m.id});
+  }
+  return out;
+}
+async function malEntries(user,type){ // via Jikan (flaky but keyless)
+  const out=[];
+  for(let page=1;page<=8;page++){
+    const url=`https://api.jikan.moe/v4/users/${encodeURIComponent(user)}/${type}list?page=${page}`;
+    let j; try{const r=await fetch(url);if(r.status===429){await pause(1200);page--;continue;}if(!r.ok)break;j=await r.json();}catch{break;}
+    const data=j.data||[]; if(!data.length)break;
+    for(const e of data){
+      const m=type==='anime'?e.anime:e.manga; if(!m)continue;
+      const total=type==='anime'?m.episodes:m.chapters;
+      out.push({title:m.title,status:mapMalStatus(e.status),kind:type==='anime'?'watch':'read',
+        progress:(type==='anime'?e.watching_episodes:e.reading_chapters)||e.episodes_watched||e.chapters_read||0,
+        rating:e.score?Math.round(e.score/2):0,epTotal:total||0,eps:total?`${total} ${type==='anime'?'eps':'chapters'}`:'',
+        genres:(m.genres||[]).map(g=>g.name),img:m.images?.jpg?.large_image_url||m.images?.jpg?.image_url||'',aniId:0});
+      if(out.length>=1000)return out;
+    }
+    if(data.length<300)break;
+    await pause(500);
+  }
+  return out;
+}
+async function fetchAccountList(){
+  const user=(document.getElementById('accUser').value||'').trim();
+  if(!user){toast('Enter your username');return;}
+  const btn=document.getElementById('accBtn');btn.classList.add('loading');btn.textContent='Fetching…';
+  try{
+    let watch,read;
+    if(accSrc==='anilist'){ [watch,read]=await Promise.all([aniListEntries(user,'ANIME'),aniListEntries(user,'MANGA')]); }
+    else { watch=await malEntries(user,'anime'); read=await malEntries(user,'manga'); }
+    const all=[...watch,...read];
+    if(!all.length){toast('No public list found for that username');btn.classList.remove('loading');btn.textContent='Fetch';return;}
+    accImportItems=all;   // fully-formed, straight to confirm (no paste-style preview needed)
+    doAccountImport();
+  }catch(e){toast('Couldn\'t fetch — check the username, and that the list is public');}
+  btn.classList.remove('loading');btn.textContent='Fetch';
+}
+let accImportItems=[];
+function doAccountImport(){
+  const key=a=>normTitle(a.title)+'|'+kindOf(a);
+  const have=new Set(anime.map(key));
+  const fresh=accImportItems.filter(o=>!have.has(normTitle(o.title)+'|'+o.kind));
+  fresh.forEach(o=>anime.unshift(accItem(o)));
+  save();closeAll();render();
+  const dupes=accImportItems.length-fresh.length;
+  toast(`Imported ${fresh.length} title${fresh.length!==1?'s':''}${dupes?` (${dupes} already had)`:''}`);
+  setTimeout(fetchCovers,600);
+}
 function doImport(){
   const existing=new Set(anime.map(a=>a.title.toLowerCase().trim()));
   const toAdd=importItems.filter(x=>x.selected&&!existing.has(x.title.toLowerCase().trim()));
@@ -2780,6 +2882,25 @@ function nudgeHTML(){
     <div class="nudge-t">This list only exists on this device — back it up so you can't lose it.</div>
     <button class="nudge-go" onclick="openSheet('backupSheet')">Back up</button>
     <button class="nudge-x" onclick="dismissNudge()" aria-label="Dismiss">${icon('x')}</button>
+  </div>`;
+}
+// "You're N episodes behind" — for a show you're watching, how many aired episodes
+// you haven't seen. airEp is the NEXT episode to air, so episodes 1..airEp-1 exist.
+// Only currently-airing anime carry airEp, which is exactly where "behind" matters.
+function behindItems(){
+  const now=Date.now();
+  return anime.filter(a=>kindOf(a)==='watch'&&a.status==='watching'&&a.aniId&&a.airEp)
+    .map(a=>({a, behind:(a.airEp-1)-(a.ep||0)}))
+    .filter(x=>x.behind>=1)
+    .sort((x,y)=>y.behind-x.behind);
+}
+function behindHTML(){
+  const items=behindItems(); if(!items.length) return '';
+  const {a,behind}=items[0];
+  const more=items.length>1?` · +${items.length-1} more show${items.length>2?'s':''}`:'';
+  return`<div class="nudge behind" style="${accentVars(a)}">${icon('play')}
+    <div class="nudge-t"><b>${a.title}</b> — ${behind} new episode${behind!==1?'s':''} since you last watched${more}</div>
+    <button class="nudge-go" onclick="resumeWatch('${a.id}')">Resume</button>
   </div>`;
 }
 

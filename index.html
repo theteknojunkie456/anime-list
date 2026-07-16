@@ -496,6 +496,14 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 .pv-ext:active{transform:scale(.92);}
 .pv-frame-wrap{flex:1;min-height:0;position:relative;background:#000;}
 .pv-frame{position:absolute;inset:0;width:100%;height:100%;border:0;}
+.pv-nav{flex-shrink:0;display:flex;align-items:center;gap:10px;padding:10px 12px calc(var(--safe-b) + 10px);background:#000;border-top:1px solid rgba(255,255,255,.08);}
+.pv-nav-arrow{width:48px;height:46px;flex-shrink:0;border-radius:13px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);color:#fff;display:flex;align-items:center;justify-content:center;transition:opacity .15s;}
+.pv-nav-arrow .ico{width:22px;height:22px;}
+.pv-nav-arrow:active{transform:scale(.94);}
+.pv-nav-arrow:disabled{opacity:.3;pointer-events:none;}
+.pv-nav-mark{flex:1;height:46px;border-radius:13px;background:var(--a);border:0;color:var(--aFg,#fff);font-family:var(--fd);font-size:14.5px;font-weight:800;display:flex;align-items:center;justify-content:center;gap:7px;}
+.pv-nav-mark:active{transform:scale(.98);}
+.pv-nav-mark:disabled{opacity:.5;pointer-events:none;}
 .dt-actions{display:flex;gap:8px;margin-top:10px;}
 .dact{
   flex:1;padding:12px 0;border-radius:13px;font-size:12px;font-weight:800;
@@ -1261,6 +1269,14 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
        (verified HLS plays), but the frame can't spawn pop-up tabs or redirect the
        whole app away — the two things streaming-ad networks do. -->
   <div class="pv-frame-wrap"><iframe id="pvFrame" class="pv-frame" sandbox="allow-scripts allow-same-origin allow-forms allow-presentation allow-orientation-lock" allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowfullscreen referrerpolicy="no-referrer"></iframe></div>
+  <!-- binge controls: only shown when the source can target a specific episode
+       (AniNeko, or a custom source with an {ep} token) — hidden for search/plain
+       sources and for reading, where there's no episode to step through. -->
+  <div class="pv-nav" id="pvNav" style="display:none">
+    <button class="pv-nav-arrow" id="pvPrev" onclick="pvStep(-1)" aria-label="Previous episode"><i data-ic="chevron-left"></i></button>
+    <button class="pv-nav-mark" id="pvMark" onclick="pvMarkNext()">Mark watched &amp; next</button>
+    <button class="pv-nav-arrow" id="pvNext" onclick="pvStep(1)" aria-label="Next episode"><i data-ic="chevron-right"></i></button>
+  </div>
 </div>
 
 <!-- "Mark watched" snackbar — appears after leaving the player, since we can't detect playback across origins -->
@@ -2945,7 +2961,7 @@ function usingDefaultSource(){return !streamSource();}
 function streamSlug(title){
   return (title||'').toLowerCase().replace(/["'’]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
 }
-let pvReturnId=null, pvWatchEp=null, pvOpenTime=0;
+let pvReturnId=null, pvWatchEp=null, pvOpenTime=0, pvCanNav=false;
 // Which episode to open: the next one they haven't finished (ep watched + 1),
 // clamped to what exists. /ep-N streams straight into the player; an N beyond the
 // season 404s, so never exceed epTotal, and fall back to the info page when the
@@ -2985,6 +3001,9 @@ function watchAnime(id){
   f.src=url;
   document.getElementById('playerView').classList.add('on');
   savePvSession(id,ep,'watch');   // survive an iOS background/reload mid-stream
+  // binge controls light up only when we can address a specific episode
+  pvCanNav=!!ep&&(usingDefaultSource()||/\{ep\}/.test(streamSource()||''));
+  renderPvNav(a);
 }
 // Reading source (AsuraScans by default). AsuraScans series live at
 // /comics/<slug>-<suffix>, where the suffix is a CONSTANT site-wide token (not a
@@ -3014,6 +3033,51 @@ function readManga(id){
   document.getElementById('pvFrame').src=url;
   document.getElementById('playerView').classList.add('on');
   savePvSession(id,0,'read');   // survive an iOS background/reload mid-read
+  pvCanNav=false; renderPvNav(null);   // no episode stepping while reading
+}
+// ─── IN-PLAYER BINGE CONTROLS ────────────────────────────────────────────────
+// Step episodes or bank-and-advance without leaving the player. Only wired up
+// when the source can address a specific episode (AniNeko, or a custom source
+// with an {ep} token) — otherwise the nav bar stays hidden.
+function episodeURL(a,ep){
+  const slug=streamSlug(a.title), src=streamSource();
+  if(!src) return `${STREAM_DEFAULT}/watch/${slug}/ep-${ep}`;
+  if(/\{ep\}/.test(src)) return src.replace(/\{title\}/g,encodeURIComponent(a.title)).replace(/\{slug\}/g,slug).replace(/\{ep\}/g,ep);
+  return null;   // search / plain source — no way to target an episode
+}
+function renderPvNav(a){
+  const nav=document.getElementById('pvNav'); if(!nav) return;
+  const total=(a&&a.epTotal)||0;
+  const show=pvCanNav&&total>0&&pvWatchEp>0;
+  nav.style.display=show?'':'none';
+  if(!show) return;
+  document.getElementById('pvPrev').disabled=pvWatchEp<=1;
+  document.getElementById('pvNext').disabled=pvWatchEp>=total;
+  document.getElementById('pvMark').textContent=pvWatchEp>=total?'Mark finished':'Mark watched & next';
+}
+function pvGoTo(a,ep){
+  const url=episodeURL(a,ep); if(!url) return;
+  pvWatchEp=ep;
+  document.getElementById('pvFrame').src=url;
+  document.getElementById('pvTitle').textContent=a.title+' · Ep '+ep;
+  pvOpenTime=Date.now();                 // fresh clock — each episode earns its own auto-mark
+  savePvSession(pvReturnId,ep,'watch');
+  renderPvNav(a);
+}
+function pvStep(d){
+  const a=anime.find(x=>x.id===pvReturnId); if(!a) return;
+  const total=a.epTotal||0; if(!total) return;
+  const ep=Math.min(Math.max((pvWatchEp||1)+d,1),total);
+  if(ep!==pvWatchEp) pvGoTo(a,ep);
+}
+function pvMarkNext(){
+  const a=anime.find(x=>x.id===pvReturnId); if(!a) return;
+  const ep=pvWatchEp; if(!ep) return;
+  applyWatched(pvReturnId,ep);            // bank this episode as watched
+  const total=a.epTotal||0;
+  if(total&&ep>=total){ toast('🎉 Finished '+a.title); closePlayer(); return; }
+  pvGoTo(a,ep+1);
+  toast('Ep '+ep+' watched · now on Ep '+(ep+1));
 }
 // ─── LIVE PLAYER RESUME — survive an iOS PWA reload/kill mid-stream ───────────
 // An installed PWA is purged from memory when you background it (go Home, or exit

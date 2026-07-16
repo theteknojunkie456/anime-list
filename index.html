@@ -283,23 +283,26 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 .row-div{font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--t3);padding:22px 18px 2px;animation:fadeUp .4s ease both;}
 
 /* ── CONTINUE WATCHING RAIL ── */
-.rz-sec{margin-top:18px;animation:fadeUp .4s ease both;}
-.rz-head{display:flex;align-items:center;gap:7px;padding:0 18px 11px;font-family:var(--fd);font-size:15px;font-weight:800;letter-spacing:-.2px;color:var(--t1);}
+/* Continue-watching: framed as its own band (hairline top + bottom), a row of
+   uniform cinematic cards with one consistent glassy play button. */
+.rz-sec{margin-top:18px;padding:16px 0 15px;border-top:1px solid var(--b1);border-bottom:1px solid var(--b1);animation:fadeUp .4s ease both;}
+.rz-head{display:flex;align-items:center;gap:7px;padding:0 18px 12px;font-family:var(--fd);font-size:15px;font-weight:800;letter-spacing:-.2px;color:var(--t1);}
 .rz-head .ico{width:16px;height:16px;fill:var(--a2);color:var(--a2);}
-.rz-scroll{display:flex;gap:12px;overflow-x:auto;padding:0 18px 4px;scrollbar-width:none;scroll-snap-type:x mandatory;}
+.rz-scroll{display:flex;gap:13px;overflow-x:auto;padding:0 18px 2px;scrollbar-width:none;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;}
 .rz-scroll::-webkit-scrollbar{display:none;}
-.rz-card{flex:0 0 clamp(150px,42vw,190px);scroll-snap-align:start;text-align:left;}
-.rz-card:active{transform:scale(.97);}
-.rz-art{position:relative;width:100%;aspect-ratio:16/10;border-radius:14px;overflow:hidden;background:var(--bg4);border:1px solid var(--b1);box-shadow:var(--elev1);}
-.rz-img{width:100%;height:100%;object-fit:cover;}
-.rz-ph{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-family:var(--fd);font-size:34px;font-weight:900;color:var(--t3);background:linear-gradient(135deg,var(--bg4),var(--bg2));}
-.rz-play{position:absolute;inset:0;margin:auto;width:42px;height:42px;border-radius:50%;background:color-mix(in srgb,var(--a) 92%,transparent);color:var(--aFg);display:flex;align-items:center;justify-content:center;box-shadow:0 4px 16px -4px var(--glow);transition:transform .15s;}
-.rz-play .ico{width:18px;height:18px;fill:currentColor;margin-left:2px;}
-.rz-card:active .rz-play{transform:scale(1.12);}
-.rz-bar{position:absolute;left:0;right:0;bottom:0;height:4px;background:rgba(0,0,0,.45);}
+.rz-card{flex:0 0 clamp(212px,60vw,264px);scroll-snap-align:center;position:relative;aspect-ratio:16/9;border-radius:16px;overflow:hidden;background:var(--bg4);border:1px solid var(--b1);box-shadow:var(--elev1);text-align:left;}
+.rz-card:active{transform:scale(.98);}
+.rz-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
+.rz-ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--fd);font-size:40px;font-weight:900;color:var(--t3);background:linear-gradient(135deg,var(--bg4),var(--bg2));}
+.rz-scrim{position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.82) 0%,rgba(0,0,0,.34) 40%,rgba(0,0,0,0) 66%);}
+.rz-play{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:46px;height:46px;border-radius:50%;background:rgba(255,255,255,.15);-webkit-backdrop-filter:blur(7px);backdrop-filter:blur(7px);border:1.5px solid rgba(255,255,255,.62);color:#fff;display:flex;align-items:center;justify-content:center;transition:transform .15s,background .15s;}
+.rz-play .ico{width:20px;height:20px;fill:currentColor;margin-left:2px;}
+.rz-card:active .rz-play{transform:translate(-50%,-50%) scale(1.1);background:rgba(255,255,255,.28);}
+.rz-meta{position:absolute;left:13px;right:13px;bottom:12px;}
+.rz-title{font-family:var(--fd);font-size:14px;font-weight:800;color:#fff;line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-shadow:0 1px 6px rgba(0,0,0,.65);}
+.rz-sub{font-size:11.5px;font-weight:600;color:rgba(255,255,255,.82);margin-top:2px;text-shadow:0 1px 4px rgba(0,0,0,.6);}
+.rz-bar{position:absolute;left:0;right:0;bottom:0;height:4px;background:rgba(0,0,0,.4);}
 .rz-fill{height:100%;background:var(--a2);}
-.rz-title{font-size:12.5px;font-weight:700;color:var(--t1);margin-top:8px;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.rz-sub{font-size:11.5px;color:var(--t3);margin-top:2px;}
 /* ── ROWS ── */
 .row-sec{margin-top:16px;animation:fadeUp .4s ease both;}
 .row-head{display:flex;align-items:baseline;gap:8px;padding:0 18px 10px;}
@@ -2048,6 +2051,24 @@ function darkenBg(h){
   return '#'+[R,G,B].map(x=>Math.round(x*255).toString(16).padStart(2,'0')).join('');
 }
 function rgba(h,al){const[r,g,b]=hex2rgb(h);return`rgba(${r},${g},${b},${al})`;}
+// Cover-art colours arrive all over the map — washed-out pastels, near-greys,
+// muddy darks — and many look awful as a UI accent (e.g. The Angel Next Door's
+// pale pink). Keep the hue the art suggests, but pin saturation and lightness
+// into a vivid, dark-theme-friendly band so EVERY derived accent reads as a
+// deliberate colour, never muddy and never washed out.
+function conditionAccent(h){
+  if(!h||!/^#[0-9a-fA-F]{3,6}$/.test(h))return'';
+  const [r,g,b]=hex2rgb(h),R=r/255,G=g/255,B=b/255;
+  const mx=Math.max(R,G,B),mn=Math.min(R,G,B),d=mx-mn;
+  let H=0,S=0,L=(mx+mn)/2;
+  if(d){S=L>0.5?d/(2-mx-mn):d/(mx+mn);
+    H=mx===R?((G-B)/d+(G<B?6:0)):mx===G?((B-R)/d+2):((R-G)/d+4);H/=6;}
+  S=Math.min(Math.max(S,0.58),0.9);        // never muddy, never neon
+  L=Math.min(Math.max(L,0.5),0.62);        // never washed-out, never too dark
+  const f=(p,q,t)=>{if(t<0)t+=1;if(t>1)t-=1;if(t<1/6)return p+(q-p)*6*t;if(t<1/2)return q;if(t<2/3)return p+(q-p)*(2/3-t)*6;return p;};
+  const q=L<0.5?L*(1+S):L+S-L*S,p=2*L-q;
+  return '#'+[f(p,q,H+1/3),f(p,q,H),f(p,q,H-1/3)].map(x=>Math.round(x*255).toString(16).padStart(2,'0')).join('');
+}
 // Lightweight canvas dominant-color extractor for USER-uploaded backgrounds (local data URLs → no CORS taint).
 // Downscales to 32×32, averages the vivid mid-tone pixels (skips near-black/white/gray) → a representative hex.
 function dominantColor(src,cb){
@@ -2152,14 +2173,33 @@ function resumeRailHTML(pool,isRead){
     const art=titleBg(a)||a.img;
     const ch=((a.title||'?').trim()[0]||'?').toUpperCase().replace(/['"<&]/g,'?');
     const bg=art?`<img class="rz-img" src="${art}" loading="lazy" alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'rz-ph',textContent:'${ch}'}))">`:`<div class="rz-ph">${ch}</div>`;
-    return `<button class="rz-card" onclick="resumeWatch('${a.id}')" style="${accentVars(a)}">
-      <div class="rz-art">${bg}<div class="rz-play">${icon('play')}</div><div class="rz-bar"><div class="rz-fill" style="width:${p}%"></div></div></div>
-      <div class="rz-title">${a.title}</div>
-      <div class="rz-sub">Episode ${next}</div>
+    return `<button class="rz-card" onclick="resumeWatch('${a.id}')">
+      ${bg}<div class="rz-scrim"></div>
+      <div class="rz-play">${icon('play')}</div>
+      <div class="rz-meta"><div class="rz-title">${schEsc(a.title)}</div><div class="rz-sub">Episode ${next}</div></div>
+      <div class="rz-bar"><div class="rz-fill" style="width:${p}%"></div></div>
     </button>`;
   };
+  // Loop the row when there's enough to overflow: render the set twice so it can
+  // scroll forever, wrapping seamlessly at the seam (see rzLoop).
+  const loop=items.length>=3;
+  const cards=(loop?items.concat(items):items).map(card).join('');
   return `<div class="rz-sec"><div class="rz-head">${icon('play')} Continue watching</div>
-    <div class="rz-scroll">${items.map(card).join('')}</div></div>`;
+    <div class="rz-scroll" id="rzScroll"${loop?' data-loop="1"':''}>${cards}</div></div>`;
+}
+// Seamless infinite horizontal loop: the items are rendered twice, so we keep the
+// scroll position inside the first copy — when it crosses into the second, jump
+// back by one copy-width (invisible, same pixels). Scrolling never dead-ends.
+function rzLoop(){
+  const sc=document.getElementById('rzScroll');
+  if(!sc||sc.dataset.loop!=='1'||sc._looped)return;
+  sc._looped=true;
+  const half=()=>sc.scrollWidth/2;
+  sc.addEventListener('scroll',()=>{
+    const h=half();
+    if(sc.scrollLeft>=h)sc.scrollLeft-=h;        // wrapped forward → rewind one copy
+    else if(sc.scrollLeft<=0)sc.scrollLeft+=h;   // wrapped back → advance one copy
+  },{passive:true});
 }
 function resumeWatch(id){
   // exactly what Watch now does, but invoked from the rail — straight to the episode
@@ -2179,7 +2219,7 @@ function prog(a){return a.status==='finished'?1:(a.epTotal?Math.min(1,(a.ep||0)/
 // per-title theming: user's own bg wins over AniList banner; accent follows the same source.
 function titleBg(a){return (a&&(a.bgImage||a.banner))||'';}
 function titleAccent(a){if(!a)return'';return (a.bgImage?(a.bgAccent||a.aniColor):a.aniColor)||'';}
-function setAmbient(c){try{document.documentElement.style.setProperty('--amb',(c&&/^#[0-9a-fA-F]{3,6}$/.test(c))?c:'transparent');}catch{}}
+function setAmbient(c){const cc=conditionAccent(c);try{document.documentElement.style.setProperty('--amb',cc||'transparent');}catch{}}
 let heroAmb='',_ambRAF=0;
 function onPageScroll(){
   if(_ambRAF)return;
@@ -2192,7 +2232,7 @@ function onPageScroll(){
   });
 }
 // scoped CSS-var override string that tints a title's own detail/hero accents without touching global chrome
-function accentVars(a){const ac=titleAccent(a);if(!ac||!/^#[0-9a-fA-F]{3,6}$/.test(ac))return'';try{return`--a:${ac};--a2:${mix(ac,'#ffffff',0.28)};--ag:${rgba(ac,0.15)};--glow:${rgba(ac,0.26)};`;}catch{return'';}}
+function accentVars(a){const ac=conditionAccent(titleAccent(a));if(!ac)return'';try{return`--a:${ac};--a2:${mix(ac,'#ffffff',0.28)};--ag:${rgba(ac,0.15)};--glow:${rgba(ac,0.26)};`;}catch{return'';}}
 function query(){return document.getElementById('searchIn').value.toLowerCase().trim();}
 
 function render(){
@@ -2284,7 +2324,7 @@ function heroHTML(a){
     </div>
   </div>`;
 }
-let bbItems=[],bbIdx=0,bbTimer=0;
+let bbItems=[],bbIdx=0,bbTimer=0,bbP=1;   // bbP = physical slide index (clones at 0 and N+1)
 function bbSlideHTML(a){
   const art=titleBg(a);
   let bg=`<div class="hero-bg" style="background:linear-gradient(135deg,var(--bg4),var(--bg2))"></div>`;
@@ -2305,46 +2345,65 @@ function bbSlideHTML(a){
     </div>
   </div>`;
 }
+// Infinite carousel: clone the last slide before the first and the first after
+// the last, so advancing off either end lands on a clone, then snaps invisibly
+// to the real twin — swiping forward past the end never sweeps back to slide 1.
 function billboardHTML(items){
-  const slides=items.map(a=>bbSlideHTML(a)).join('');
-  const dots=items.length>1?`<div class="bb-dots">${items.map((a,i)=>`<div class="bb-dot${i===0?' on':''}" onclick="event.stopPropagation();bbGo(${i})"></div>`).join('')}</div>`:'';
-  return`<div class="billboard" id="billboard"><div class="bb-track">${slides}</div>${dots}</div>`;
+  const loop=items.length>1;
+  const real=items.map(a=>bbSlideHTML(a)).join('');
+  const head=loop?bbSlideHTML(items[items.length-1]):'';   // clone of last, at the front
+  const tail=loop?bbSlideHTML(items[0]):'';                // clone of first, at the back
+  const dots=loop?`<div class="bb-dots">${items.map((a,i)=>`<div class="bb-dot${i===0?' on':''}" onclick="event.stopPropagation();bbGo(${i+1})"></div>`).join('')}</div>`:'';
+  return`<div class="billboard" id="billboard"><div class="bb-track">${head}${real}${tail}</div>${dots}</div>`;
 }
+function bbReal(){const N=bbItems.length;return N?((bbP-1)%N+N)%N:0;}   // physical → logical index
 function bbSetup(items){
-  clearInterval(bbTimer);bbTimer=0;bbIdx=0;
+  clearInterval(bbTimer);bbTimer=0;
   bbItems=(items||[]).map(a=>({id:a.id,amb:titleAccent(a)}));
+  bbP=1;bbIdx=0;
   const bb=document.getElementById('billboard');
   if(bb&&bbItems.length>1){
     const track=bb.querySelector('.bb-track');
+    const jump=()=>{const w=bb.offsetWidth||0;track.style.transition='none';track.style.transform='translateX('+(-bbP*w)+'px)';void track.offsetWidth;track.style.transition='';};
+    jump();                                   // start on the first real slide, no animation
+    track.addEventListener('transitionend',bbSnap);
     let sx=0,sy=0,w=1,dragging=false,swiped=false;
     bb.addEventListener('touchstart',e=>{sx=e.touches[0].clientX;sy=e.touches[0].clientY;w=bb.offsetWidth||1;dragging=false;swiped=false;},{passive:true});
     bb.addEventListener('touchmove',e=>{
       const dx=e.touches[0].clientX-sx,dy=e.touches[0].clientY-sy;
       if(!dragging){if(Math.abs(dx)>8&&Math.abs(dx)>Math.abs(dy)){dragging=true;track.classList.add('dragging');}else return;}
-      let d=dx;
-      if((bbIdx===0&&dx>0)||(bbIdx===bbItems.length-1&&dx<0))d=dx*0.35; // rubber-band at the ends
-      track.style.transform='translateX('+(-bbIdx*w+d)+'px)';
+      track.style.transform='translateX('+(-bbP*w+dx)+'px)';   // no rubber-band — the track loops
     },{passive:true});
     bb.addEventListener('touchend',e=>{
       if(!dragging)return;
       const dx=e.changedTouches[0].clientX-sx;
-      if(Math.abs(dx)>w*0.18){swiped=true;bbGo(bbIdx+(dx<0?1:-1));}else bbGo(bbIdx); // commit or snap back
+      if(Math.abs(dx)>w*0.18){swiped=true;bbGo(bbP+(dx<0?1:-1));}else bbGo(bbP); // commit or spring back
       dragging=false;
     },{passive:true});
     bb.addEventListener('click',e=>{if(swiped){e.stopPropagation();e.preventDefault();swiped=false;}},true); // a swipe shouldn't open the title
-    bbGo(0);
-    bbTimer=setInterval(()=>bbGo(bbIdx+1),6000);
+    bbGo(bbP);
+    bbTimer=setInterval(()=>bbGo(bbP+1),6000);
   }
 }
-function bbGo(i){
+function bbGo(p){
   const bb=document.getElementById('billboard');if(!bb||bbItems.length<2)return;
-  bbIdx=((i%bbItems.length)+bbItems.length)%bbItems.length;
-  const track=bb.querySelector('.bb-track');
-  if(track){track.classList.remove('dragging');track.style.transform='translateX('+(-bbIdx*(bb.offsetWidth||0))+'px)';}
+  const track=bb.querySelector('.bb-track'),w=bb.offsetWidth||0;
+  bbP=p;
+  if(track){track.classList.remove('dragging');track.style.transform='translateX('+(-bbP*w)+'px)';}
+  bbIdx=bbReal();
   bb.querySelectorAll('.bb-dot').forEach((d,j)=>d.classList.toggle('on',j===bbIdx));
   const pg=document.getElementById('pageEl');
   if(pg&&pg.scrollTop<60){heroAmb=bbItems[bbIdx].amb;setAmbient(heroAmb);}
-  if(bbTimer){clearInterval(bbTimer);bbTimer=setInterval(()=>bbGo(bbIdx+1),6000);} // full dwell after a manual jump
+  if(bbTimer){clearInterval(bbTimer);bbTimer=setInterval(()=>bbGo(bbP+1),6000);} // full dwell after a manual jump
+}
+// After a move settles on a clone (physical 0 or N+1), snap to its real twin with
+// no animation — the pixels are identical, so the loop is invisible.
+function bbSnap(){
+  const bb=document.getElementById('billboard');if(!bb||bbItems.length<2)return;
+  const N=bbItems.length,track=bb.querySelector('.bb-track'),w=bb.offsetWidth||0;
+  let np=bbP; if(bbP>=N+1)np=1; else if(bbP<=0)np=N; else return;
+  bbP=np;
+  track.style.transition='none';track.style.transform='translateX('+(-bbP*w)+'px)';void track.offsetWidth;track.style.transition='';
 }
 function renderHome(){
   const el=document.getElementById('pageEl');
@@ -2410,7 +2469,7 @@ function renderHome(){
         <div class="row-scroll">${items.map(posterCard).join('')}</div></div>`;
     }
   }
-  el.innerHTML=html;bbSetup(spotlight);
+  el.innerHTML=html;bbSetup(spotlight);try{rzLoop();}catch{}
 }
 
 // ─── DETAIL ─────────────────────────────────────────────────────────────────

@@ -1387,7 +1387,7 @@ function icon(name,cls){const p=ICONS[name];if(!p)return'';return `<svg class="i
 function hydrateIcons(root){(root||document).querySelectorAll('[data-ic]').forEach(el=>{const s=icon(el.getAttribute('data-ic'));if(s)el.outerHTML=s;});}
 
 // ─── DATA ──────────────────────────────────────────────────────────────────
-const DEFAULT_DATA=[];
+const DEFAULT_DATA=[];   // new users start with their own empty list, not a demo
 
 // ─── STATE ─────────────────────────────────────────────────────────────────
 let anime=[],sortMode='recent',filterStatus='all',detailId=null,editingId=null,curStatus='plan',deleteId=null,importItems=[],curAITab='rec',curTheme='default',viewKind='watch',curKind='watch';
@@ -3639,6 +3639,37 @@ async function tvSearch(title){
   return (j||[]).slice(0,3).map(x=>x.show).filter(Boolean);
 }
 let pickCands=[];
+// One base name per show: CUT the title at the first season/part marker (subtitle
+// and all), so "Vinland Saga Season 2: Drowning…" and "Jujutsu Kaisen Season 3: The
+// Culling Game" both fold into the base. Subtitles WITHOUT a season marker (": The
+// Movie", ": No Regrets") are kept — they're genuinely different works.
+function seasonBase(title){
+  let t=(title||'').toLowerCase();
+  t=t.replace(/[:\-–—]?\s*\b((the\s+)?final\s+season|season\s*\d+|\d+(st|nd|rd|th)\s+season|(part|cour)\s*\d+)\b.*$/,'');
+  t=t.replace(/\s+(ii|iii|iv|v|vi|vii|viii|ix|x)\b.*$/,'');   // trailing roman numerals
+  return t.replace(/[^a-z0-9]+/g,' ').trim();
+}
+// Collapse seasons and keep the shortlist to the works people actually search for:
+// for anime, only TV / TV short / movie / ONA (drop OVAs, specials, recaps, music).
+// Ties keep AniList's best-match order.
+function dedupSeasons(media,n,animeOnly){
+  // Collapse seasons: dedup by BOTH title forms (a franchise can carry an English
+  // title on S1 but only romaji on a later season, so one form isn't enough).
+  const pick=formats=>{
+    const seen=new Set(),out=[];
+    for(const m of media){
+      if(formats&&!formats.has(m.format))continue;
+      const bases=[seasonBase(m.title.english),seasonBase(m.title.romaji)].filter(Boolean);
+      if(!bases.length||bases.some(x=>seen.has(x)))continue;
+      bases.forEach(x=>seen.add(x));out.push(m);
+      if(out.length>=n)break;
+    }
+    return out;
+  };
+  if(!animeOnly) return pick(null);                               // reading list: keep all formats
+  const main=pick(new Set(['TV','TV_SHORT','MOVIE']));            // real series/films
+  return main.length?main:pick(new Set(['ONA']));                // ONA only when the show IS ONA-original
+}
 async function aiAutofill(){
   const title=document.getElementById('fTitle').value.trim();
   if(!title){toast('Enter a title first');return;}
@@ -3649,12 +3680,14 @@ async function aiAutofill(){
     // Keep the list short and grouped: a few best anime, then a couple of live-action.
     // AniList/TVMaze already return best-match-first, so the top few are the ones that matter.
     if(curKind==='read'){
-      (await aniSearch(title,'MANGA')).slice(0,4).forEach(m=>cands.push({group:'Manga',
+      dedupSeasons(await aniSearch(title,'MANGA'),4).forEach(m=>cands.push({group:'Manga',
         title:m.title.english||m.title.romaji,
         sub:[aniLabel(m),m.startDate&&m.startDate.year,m.chapters?m.chapters+' ch':''].filter(Boolean).join(' · '),
         img:(m.coverImage&&m.coverImage.large)||'',data:aniToData(m,'read')}));
     }else{
-      (await aniSearch(title,'ANIME')).slice(0,3).forEach(m=>cands.push({group:'Anime',
+      // collapse seasons into one entry — the app shows the full season chain in
+      // watch order once you pick the base series, so listing every season is noise.
+      dedupSeasons(await aniSearch(title,'ANIME'),2,true).forEach(m=>cands.push({group:'Anime',
         title:m.title.english||m.title.romaji,
         sub:[aniLabel(m),m.startDate&&m.startDate.year,m.episodes?m.episodes+' eps':''].filter(Boolean).join(' · '),
         img:(m.coverImage&&m.coverImage.large)||'',data:aniToData(m,'watch')}));

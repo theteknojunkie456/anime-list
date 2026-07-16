@@ -12,13 +12,25 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <title>Watchlist</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Manrope:wght@400..800&display=swap" rel="stylesheet">
 <style>
 :root{
   --bg:#0a0a0c;--bg2:#111114;--bg3:#18181c;--bg4:#202025;--bg5:#28282e;
   --b1:rgba(255,255,255,0.05);--b2:rgba(255,255,255,0.09);--b3:rgba(255,255,255,0.16);
-  --t1:#f0ecea;--t2:#7e7b86;--t3:#44424a;
-  --a:#e03d55;--a2:#ff6070;--ag:rgba(224,61,85,0.14);--glow:rgba(224,61,85,0.18);
+  /* Text ramp: three tiers that are all WCAG AA (≥4.5:1) on every surface they
+     land on, and still visibly distinct from each other (t1→t2→t3 step ~1.8×).
+     The old ramp failed both: t2 hit 3.9:1 on bg5 and t3 was 2.0:1 on bg —
+     effectively invisible. Nudging t3 alone to 4.5 collapsed it into t2, so the
+     whole ramp is rebuilt rather than patched. */
+  --t1:#f0ecea;--t2:#b3aebb;--t3:#8a8792;
+  /* Accent darkened just enough (4.2:1 → 4.5:1) that white button text passes AA.
+     ~3% darker: the coral reads the same, the labels are legible. */
+  --a:#da374f;--a2:#ff6070;--ag:rgba(218,55,79,0.14);--glow:rgba(218,55,79,0.18);
+  /* Display face carries titles; body face carries everything else. Splitting the
+     two is what gives type a voice — one family at one weight range is what makes
+     a UI read as generic. */
+  --fd:'Bricolage Grotesque','Manrope',-apple-system,sans-serif;
+  --fb:'Manrope',-apple-system,sans-serif;
   --fin:#34c472;--finbg:rgba(52,196,114,0.12);
   --wat:#f5a623;--watbg:rgba(245,166,35,0.12);
   --pln:#5b9cf6;--plnbg:rgba(91,156,246,0.12);
@@ -39,9 +51,14 @@
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
 html,body{height:100%;overscroll-behavior-y:none;}
 body{
-  font-family:'Inter',-apple-system,sans-serif;background:var(--bg);color:var(--t1);
+  font-family:var(--fb);background:var(--bg);color:var(--t1);
   -webkit-font-smoothing:antialiased;user-select:none;-webkit-user-select:none;
 }
+/* Titles speak in the display face. Everything used to be one family between 600
+   and 900 — when every element shouts, none of them is emphasised, which is a
+   large part of why the UI read as flat. */
+.hdr-title,.hero-title,.sv-title,.lock-title,.sheet-title,.dt-title,.row-title,
+.pick-t,.tut-h,.set-h,.bb-slide .hero-title,.rec-title{font-family:var(--fd);letter-spacing:-0.02em;}
 input,textarea{user-select:text;-webkit-user-select:text;}
 button{font-family:inherit;border:none;background:none;color:inherit;cursor:pointer;}
 img{-webkit-user-drag:none;}
@@ -306,7 +323,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 }
 .nbtn:active{transform:scale(0.88);}
 .nbtn small{font-size:9px;font-weight:800;letter-spacing:0.04em;}
-.nbtn.on{color:var(--a);}
+.nbtn.on{color:var(--a2);}
 .nbtn.add{
   width:54px;height:54px;border-radius:50%;background:linear-gradient(180deg,var(--a2),var(--a));color:#fff;font-size:25px;
   justify-content:center;margin-top:-24px;box-shadow:0 10px 26px -4px var(--glow),0 3px 10px rgba(0,0,0,0.4);
@@ -383,7 +400,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 .dt-title{font-size:18px;font-weight:900;letter-spacing:-0.3px;line-height:1.2;}
 .dt-meta{font-size:11.5px;color:var(--t2);font-weight:600;margin-top:6px;line-height:1.5;}
 .dt-fav{align-self:flex-start;margin-top:auto;font-size:13px;font-weight:800;padding:8px 14px;border-radius:99px;background:var(--bg4);border:1px solid var(--b2);color:var(--t2);}
-.dt-fav.on{background:var(--ag);border-color:var(--a);color:var(--a);}
+.dt-fav.on{background:var(--ag);border-color:var(--a);color:var(--a2);}
 .dt-label{font-size:10px;font-weight:800;color:var(--t3);text-transform:uppercase;letter-spacing:0.1em;margin:16px 0 8px;}
 .dt-status{display:flex;gap:6px;}
 .dpick{flex:1;padding:9px 0;border-radius:11px;font-size:11px;font-weight:800;background:var(--bg4);border:1px solid var(--b2);color:var(--t3);transition:all .13s;}
@@ -414,9 +431,12 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 .ob-skip{background:var(--drpbg);color:var(--drp);text-decoration:line-through;}
 .films-acc{margin-top:10px;}
 .films-acc summary{font-size:12px;font-weight:700;color:var(--t2);padding:7px 0;cursor:pointer;list-style-position:inside;}
-.films-acc[open] summary{color:var(--a);}
+.films-acc[open] summary{color:var(--a2);}
 .films-acc .order-list{margin-top:6px;}
-.dt-note{font-size:13px;line-height:1.55;color:var(--t1);background:var(--bg3);border-left:3px solid var(--a);border-radius:0 12px 12px 0;padding:11px 13px;}
+/* Was a thick accent bar down the left with a flat-left/rounded-right shape — the
+   textbook AI callout. A plain panel with a hairline says the same thing without
+   the tell. */
+.dt-note{font-size:13px;line-height:1.55;color:var(--t1);background:var(--bg3);border:1px solid var(--b1);border-radius:12px;padding:12px 14px;}
 .ai-insight-box{
   font-size:12.5px;line-height:1.55;border-radius:14px;padding:12px 14px;
   background:linear-gradient(135deg,var(--ag),transparent 70%);border:1px solid var(--b2);
@@ -427,7 +447,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
   flex:1;padding:12px 0;border-radius:13px;font-size:12px;font-weight:800;
   background:var(--bg4);border:1px solid var(--b2);color:var(--t1);
 }
-.dact.ai-act{color:var(--a);border-color:var(--ag);background:var(--ag);}
+.dact.ai-act{color:var(--a2);border-color:var(--ag);background:var(--ag);}
 .dact.danger{color:#ff6b6b;flex:0 0 52px;}
 
 /* ── FORMS ── */
@@ -467,7 +487,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 /* ── AI SHEET ── */
 .ai-tabs{display:flex;gap:6px;margin-bottom:16px;}
 .aitab{flex:1;padding:9px 0;border-radius:11px;font-size:11.5px;font-weight:800;background:var(--bg3);border:1px solid var(--b2);color:var(--t2);}
-.aitab.on{background:var(--ag);border-color:var(--a);color:var(--a);}
+.aitab.on{background:var(--ag);border-color:var(--a);color:var(--a2);}
 .aipanel{display:none;}
 .aipanel.on{display:block;}
 .ai-desc{font-size:12px;color:var(--t2);line-height:1.55;margin-bottom:12px;}
@@ -492,7 +512,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 .chat-typing span:nth-child(3){animation-delay:.36s;}
 @keyframes blink{0%,60%,100%{opacity:.25;transform:translateY(0);}30%{opacity:1;transform:translateY(-3px);}}
 .chat-empty{text-align:center;color:var(--t2);padding:22px 12px;}
-.chat-empty .ico{width:34px;height:34px;color:var(--a);margin-bottom:10px;}
+.chat-empty .ico{width:34px;height:34px;color:var(--a2);margin-bottom:10px;}
 .chat-empty p{font-size:13px;line-height:1.55;margin-bottom:14px;}
 .chat-chips{display:flex;flex-wrap:wrap;gap:7px;justify-content:center;}
 .chat-chip{padding:8px 13px;border-radius:99px;font-size:11.5px;font-weight:700;background:var(--bg3);border:1px solid var(--b2);color:var(--t2);min-height:36px;}
@@ -504,7 +524,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 .chat-clear .ico{width:12px;height:12px;}
 .chat-msg.ai{position:relative;}
 .chat-copy{position:absolute;bottom:-9px;right:-2px;width:26px;height:26px;border-radius:8px;background:var(--bg4);border:1px solid var(--b2);color:var(--t3);display:inline-flex;align-items:center;justify-content:center;opacity:.5;transition:opacity .15s,color .15s;cursor:pointer;}
-.chat-copy:active{opacity:1;color:var(--a);}
+.chat-copy:active{opacity:1;color:var(--a2);}
 .chat-copy .ico{width:13px;height:13px;}
 .chat-msg code{background:var(--bg4);border:1px solid var(--b1);border-radius:5px;padding:1px 5px;font-size:12px;font-family:ui-monospace,Menlo,monospace;}
 .chat-pre{background:var(--bg4);border:1px solid var(--b1);border-radius:9px;padding:9px 11px;font-size:12px;font-family:ui-monospace,Menlo,monospace;overflow-x:auto;white-space:pre-wrap;margin:6px 0;}
@@ -536,7 +556,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 .pseg.on-watching{background:var(--watbg);border-color:var(--wat);color:var(--wat);}
 .pseg.on-finished{background:var(--finbg);border-color:var(--fin);color:var(--fin);}
 .pseg.on-dropped{background:var(--drpbg);border-color:var(--drp);color:var(--drp);}
-.bulk-row{display:flex;gap:5px;align-items:center;margin:10px 0 2px;font-size:11px;color:var(--t3);font-weight:800;}
+.bulk-row{display:flex;gap:5px;align-items:center;margin:10px 0 2px;font-size:12.5px;color:var(--t3);font-weight:800;}
 .bulk-row span{flex-shrink:0;}
 .bulk-row .pseg{padding:8px 0;font-size:10.5px;}
 .import-actions{display:flex;gap:8px;margin-top:6px;}
@@ -563,7 +583,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 .taccent-bar{width:20px;height:2.5px;border-radius:2px;position:relative;z-index:1;}
 .tdel{position:absolute;top:2px;right:2px;width:22px;height:22px;border-radius:50%;background:rgba(0,0,0,0.6);color:#fff;font-size:11px;display:flex;align-items:center;justify-content:center;z-index:2;}
 .tname{font-size:9.5px;font-weight:800;text-align:center;padding:6px 2px;color:var(--t2);text-transform:uppercase;letter-spacing:0.04em;background:var(--bg3);}
-.topt.on .tname{color:var(--a);}
+.topt.on .tname{color:var(--a2);}
 .cpick{width:46px;height:36px;border:1px solid var(--b2);border-radius:9px;background:var(--bg3);padding:2px;-webkit-appearance:none;appearance:none;}
 .cpick-lbl{display:flex;flex-direction:column;gap:5px;font-size:9.5px;font-weight:800;color:var(--t3);text-transform:uppercase;letter-spacing:0.08em;align-items:center;}
 
@@ -579,7 +599,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 .confirm-btns{display:flex;gap:8px;margin-top:14px;}
 .cbtn{flex:1;padding:12px 0;border-radius:12px;font-size:13px;font-weight:800;}
 .cbtn.cancel{background:var(--bg4);border:1px solid var(--b2);color:var(--t1);}
-.cbtn.del{background:#e5484d;color:#fff;}
+.cbtn.del{background:#d73a3f;color:#fff;}  /* darkened: white label was 3.9:1 */
 .toast{
   position:fixed;left:50%;bottom:calc(var(--safe-b) + 96px);transform:translateX(-50%) translateY(20px);
   background:var(--bg5);border:1px solid var(--b3);color:var(--t1);
@@ -655,7 +675,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 }
 .kbtn:active{transform:scale(0.97);}
 .kbtn.on{background:color-mix(in srgb,var(--a) 20%,var(--bg3));border-color:transparent;color:var(--a2);box-shadow:0 3px 14px -5px var(--glow);}
-.field-hint{font-size:11px;font-weight:600;color:var(--t3);margin-top:7px;line-height:1.45;}
+.field-hint{font-size:12.5px;font-weight:500;color:var(--t3);margin-top:7px;line-height:1.45;}
 #addSheet .sheet-header{margin-bottom:14px;}
 #addSheet .sheet-title{font-size:21px;letter-spacing:-0.4px;}
 #addSheet .flabel{margin-bottom:8px;}

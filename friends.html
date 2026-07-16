@@ -563,6 +563,14 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 .model-sel{padding:8px 10px;border-radius:11px;font-size:12px;font-weight:700;background:var(--bg3);border:1px solid var(--b2);color:var(--t1);max-width:170px;}
 /* when no key is set, the "add a key" button is the accent CTA, not a grey line to scroll past */
 #keyBtn.key-cta{background:var(--a);color:var(--aFg);box-shadow:0 6px 18px -6px var(--glow);}
+/* streaming source — quiet cards, the active one lit with the accent */
+.src-opt{display:block;width:100%;text-align:left;padding:13px 15px;margin-top:9px;border-radius:14px;background:var(--bg3);border:1px solid var(--b1);transition:border-color .15s,background .15s;}
+.src-opt.on{border-color:var(--a);background:var(--ag);}
+.src-opt:active{transform:scale(.99);}
+.src-name{font-family:var(--fd);font-size:14px;font-weight:800;color:var(--t1);display:flex;align-items:center;gap:8px;}
+.src-tag{font-size:9.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--a2);background:var(--ag);border:1px solid var(--b2);border-radius:6px;padding:2px 6px;}
+.src-sub{font-size:12px;color:var(--t3);margin-top:3px;}
+#sourceBody code{background:var(--bg4);border:1px solid var(--b1);border-radius:5px;padding:1px 5px;font-size:11px;font-family:ui-monospace,Menlo,monospace;color:var(--t2);}
 .dots span{animation:blink 1.2s infinite;}
 .dots span:nth-child(2){animation-delay:.2s;}
 .dots span:nth-child(3){animation-delay:.4s;}
@@ -1170,6 +1178,16 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
   <div id="statsViewBody"></div>
 </div>
 
+<!-- STREAMING SOURCE — config lives here, so the player itself stays bare -->
+<div class="sheet" id="sourceSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <div class="sheet-title"><i data-ic="play"></i> Streaming source</div>
+    <button class="sheet-cancel" onclick="openSheet('settingsSheet')">Back</button>
+  </div>
+  <div id="sourceBody"></div>
+</div>
+
 <!-- IN-APP PLAYER — embeds the streaming site's watch page for a logged anime -->
 <div class="playerview" id="playerView">
   <div class="pv-top">
@@ -1177,7 +1195,10 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
     <div class="pv-title" id="pvTitle"></div>
     <button class="pv-ext" id="pvExt" aria-label="Open in browser" title="Open in browser"><i data-ic="upload"></i></button>
   </div>
-  <div class="pv-frame-wrap"><iframe id="pvFrame" class="pv-frame" allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowfullscreen referrerpolicy="no-referrer"></iframe></div>
+  <!-- sandbox WITHOUT allow-popups / allow-top-navigation: the player still runs
+       (verified HLS plays), but the frame can't spawn pop-up tabs or redirect the
+       whole app away — the two things streaming-ad networks do. -->
+  <div class="pv-frame-wrap"><iframe id="pvFrame" class="pv-frame" sandbox="allow-scripts allow-same-origin allow-forms allow-presentation allow-orientation-lock" allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowfullscreen referrerpolicy="no-referrer"></iframe></div>
 </div>
 
 <div class="sheet" id="statsSheet">
@@ -2358,6 +2379,7 @@ function openSheet(id){
   if(id==='securitySheet')renderLockUI();
   if(id==='forYouSheet')renderForYou();
   if(id==='aiSheet'){renderModelPicker();updateKeyBtn();}
+  if(id==='sourceSheet')renderSource();
 }
 function closeAll(){
   document.querySelectorAll('.sheet').forEach(s=>s.classList.remove('on'));
@@ -2671,6 +2693,7 @@ function renderSettings(){
     {ic:'lock',   c:'var(--fin)', h:'Password',            p:encEnabled()?'On — your list is encrypted':'Off', go:"openSheet('securitySheet')"},
     {ic:'bell',   c:'var(--a2)',  h:'Notifications',       p:notifyOn()?'On — you\'ll be told when an episode airs':'Off', go:'openNotifySheet()'},
     {ic:'sparkles',c:'var(--fin)',h:'AI & chat key',       p:getKey()?'On — '+(keyProvider(getKey())||'key')+' connected':'Off — add a free key to unlock chat', go:"openSheet('aiSheet')"},
+    {ic:'play',   c:'var(--wat)', h:'Streaming source',    p:usingDefaultSource()?'AniNeko (built-in)':'Custom site', go:"openSheet('sourceSheet')"},
     {ic:'clipboard',c:'var(--drp)',h:'Import / Export',    p:'Paste a list in, or copy yours out', go:"openSheet('importSheet')"},
     {ic:'palette',c:'var(--a2)',  h:'Theme',               p:'Colours, or build your own', go:"openSheet('themeSheet')"},
   ];
@@ -2705,29 +2728,83 @@ function openStats(){renderStats();const v=document.getElementById('statsView');
 function closeStats(){const v=document.getElementById('statsView');if(v)v.classList.remove('on');}
 
 // ─── IN-APP PLAYER (streaming site embed) ───────────────────────────────────
-// The site rotates domains often (aniwatch → hianime → anineko …). Keep the base
-// in one place so a dead domain is a one-line fix, not a hunt through the code.
-const STREAM_BASE='https://anineko.to';
+// AniNeko is the built-in default. These sites rotate domains often, and some
+// people prefer their own source — so the base is overridable in Settings, and
+// falls back here when nothing custom is set.
+const STREAM_DEFAULT='https://anineko.to';
+function streamSource(){try{return localStorage.getItem('stream_src')||'';}catch{return'';}}
+function streamBase(){return streamSource()||STREAM_DEFAULT;}
+function usingDefaultSource(){return !streamSource();}
 // AniNeko slugs: lowercase, apostrophes dropped, every other run of non-alphanumerics
 // becomes a single hyphen. Verified against real /watch/ URLs.
 function streamSlug(title){
   return (title||'').toLowerCase().replace(/["'’]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
 }
 let pvReturnId=null;
+// Which episode to open: the next one they haven't finished (ep watched + 1),
+// clamped to what exists. /ep-N streams straight into the player; an N beyond the
+// season 404s, so never exceed epTotal, and fall back to the info page when the
+// count is unknown.
+function watchEpisode(a){
+  const total=a.epTotal||0;
+  if(!total) return null;                 // unknown length → info page, let them pick
+  const next=Math.min(Math.max((a.ep||0)+1,1), total);
+  return next;
+}
+// Build the URL to open. For the default (AniNeko) we know the exact scheme and
+// deep-link to the episode. A custom source can use {title}/{slug}/{ep} tokens;
+// with no token we just open it and let them navigate/search.
+function streamURL(a){
+  const slug=streamSlug(a.title), ep=watchEpisode(a);
+  const src=streamSource();
+  if(!src){ // built-in AniNeko
+    return {url:ep?`${STREAM_DEFAULT}/watch/${slug}/ep-${ep}`:`${STREAM_DEFAULT}/watch/${slug}`, ep};
+  }
+  if(/\{title\}|\{slug\}|\{ep\}/.test(src)){
+    return {url:src.replace(/\{title\}/g,encodeURIComponent(a.title)).replace(/\{slug\}/g,slug).replace(/\{ep\}/g,ep||1), ep};
+  }
+  return {url:src, ep:null}; // plain custom URL — open it as-is
+}
 function watchAnime(id){
   const a=anime.find(x=>x.id===id); if(!a) return;
   if(kindOf(a)!=='watch'||!a.aniId){toast('Watch is for anime only');return;}
   pvReturnId=id;
-  const slug=streamSlug(a.title);
-  // Deep-link straight to the show. If the guessed slug is wrong, the site lands on
-  // its own 404/search rather than breaking us — and the ⤴ button opens full search.
-  const url=`${STREAM_BASE}/watch/${slug}`;
-  document.getElementById('pvTitle').textContent=a.title;
+  const {url,ep}=streamURL(a);
+  document.getElementById('pvTitle').textContent=a.title+(ep?` · Ep ${ep}`:'');
   const ext=document.getElementById('pvExt');
-  ext.onclick=()=>{try{window.open(`${STREAM_BASE}/browser?keyword=${encodeURIComponent(a.title)}`,'_blank','noopener');}catch{}};
+  const searchUrl=usingDefaultSource()?`${STREAM_DEFAULT}/browser?keyword=${encodeURIComponent(a.title)}`:url;
+  ext.onclick=()=>{try{window.open(searchUrl,'_blank','noopener');}catch{}};
   const f=document.getElementById('pvFrame');
   f.src=url;
   document.getElementById('playerView').classList.add('on');
+}
+function renderSource(){
+  const box=document.getElementById('sourceBody'); if(!box) return;
+  const custom=streamSource();
+  const host=u=>{try{return new URL(u.replace(/\{[^}]+\}/g,'x')).hostname;}catch{return u.slice(0,32);}};
+  box.innerHTML=`
+    <p class="ai-desc">Where <b>Watch now</b> opens an anime. The built-in source deep-links straight to the episode you're on.</p>
+    <button class="src-opt${!custom?' on':''}" onclick="setSource('')">
+      <div class="src-name">AniNeko <span class="src-tag">Built-in</span></div>
+      <div class="src-sub">Jumps to your next episode automatically</div>
+    </button>
+    <button class="src-opt${custom?' on':''}" onclick="document.getElementById('srcCustom').focus()">
+      <div class="src-name">Your own site</div>
+      <div class="src-sub">${custom?'Using '+host(custom):'Paste any streaming site below'}</div>
+    </button>
+    <input class="ai-prompt-in" id="srcCustom" placeholder="https://example.com" value="${custom?custom.replace(/"/g,'&quot;'):''}" autocomplete="off" style="margin-top:10px">
+    <button class="parse-btn" onclick="saveSource()">Use this site</button>
+    <p class="ai-desc" style="margin-top:12px;font-size:11.5px">Optional tokens the app fills in: <code>{title}</code>, <code>{slug}</code>, <code>{ep}</code>. e.g. <code>https://site.com/watch/{slug}/ep-{ep}</code>. With no token, it just opens the site.</p>`;
+}
+function setSource(v){
+  try{if(v)localStorage.setItem('stream_src',v);else localStorage.removeItem('stream_src');}catch{}
+  renderSource();
+  toast(v?'Source set':'Back to AniNeko');
+}
+function saveSource(){
+  const v=(document.getElementById('srcCustom').value||'').trim();
+  if(v && !/^https?:\/\//i.test(v)){toast('That needs to start with http:// or https://');return;}
+  setSource(v);
 }
 function closePlayer(){
   const v=document.getElementById('playerView'); if(v)v.classList.remove('on');

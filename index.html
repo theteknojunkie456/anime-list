@@ -1562,7 +1562,7 @@ function setLockMode(rec){
 }
 function toggleLockMode(){setLockMode(!lockRecMode);}
 function _unlockErr(i,err,msg){if(err)err.textContent=msg;const card=document.querySelector('.lock-card');if(card){card.classList.remove('shake');void card.offsetWidth;card.classList.add('shake');}if(i){i.value='';i.focus();}}
-function finishUnlock(){hideLock();render();renderLockUI();setTimeout(syncOnOpen,200);try{setTimeout(fetchCovers,600);}catch{}}
+function finishUnlock(){hideLock();render();renderLockUI();setTimeout(syncOnOpen,200);try{setTimeout(fetchCovers,600);}catch{}try{restorePlayer();}catch{}}
 async function tryUnlock(){                            // unlock with the password
   const i=document.getElementById('lockPw'),err=document.getElementById('lockErr');
   const pw=i?i.value:'';if(!pw)return;if(err)err.textContent='';
@@ -2980,6 +2980,7 @@ function watchAnime(id){
   const f=document.getElementById('pvFrame');
   f.src=url;
   document.getElementById('playerView').classList.add('on');
+  savePvSession(id,ep,'watch');   // survive an iOS background/reload mid-stream
 }
 // Reading source (AsuraScans by default). AsuraScans series live at
 // /comics/<slug>-<suffix>, where the suffix is a CONSTANT site-wide token (not a
@@ -3008,6 +3009,31 @@ function readManga(id){
   ext.onclick=()=>{try{window.open(fallback,'_blank','noopener');}catch{}};
   document.getElementById('pvFrame').src=url;
   document.getElementById('playerView').classList.add('on');
+  savePvSession(id,0,'read');   // survive an iOS background/reload mid-read
+}
+// ─── LIVE PLAYER RESUME — survive an iOS PWA reload/kill mid-stream ───────────
+// An installed PWA is purged from memory when you background it (go Home, or exit
+// fullscreen). Returning reloads the app from scratch, so the open player — pure
+// in-memory state — would vanish and you'd have to re-find the episode. We stash
+// the active session and re-open it on the next load, back on the same episode.
+// The exact second is the streaming site's own resume (cross-origin, unreadable),
+// but landing back on the same episode is what lets that resume kick in.
+const PV_ACTIVE='pv_active';
+const PV_FRESH_MS=6*60*60*1000;   // only spring it back within ~6h; older = stale
+function savePvSession(id,ep,kind){
+  try{localStorage.setItem(PV_ACTIVE,JSON.stringify({id,ep:ep||0,kind,t:pvOpenTime||Date.now()}));}catch{}
+}
+function clearPvSession(){try{localStorage.removeItem(PV_ACTIVE);}catch{}}
+function restorePlayer(){
+  let s;try{s=JSON.parse(localStorage.getItem(PV_ACTIVE)||'null');}catch{}
+  if(!s||!s.id||document.getElementById('playerView').classList.contains('on'))return;
+  if(!s.t||Date.now()-s.t>PV_FRESH_MS){clearPvSession();return;}   // too old to spring on them
+  const a=anime.find(x=>x.id===s.id);
+  if(!a){clearPvSession();return;}
+  if(s.kind==='read'){ if(kindOf(a)==='read')readManga(s.id); else clearPvSession(); return; }
+  if(kindOf(a)!=='watch'||!a.aniId){clearPvSession();return;}
+  watchAnime(s.id);
+  if(pvReturnId===s.id){pvOpenTime=s.t;savePvSession(s.id,pvWatchEp,'watch');}   // keep the original clock so a long watch still auto-marks
 }
 function renderSource(){
   const box=document.getElementById('sourceBody'); if(!box) return;
@@ -3069,6 +3095,7 @@ function saveSource(){
 const AUTO_MARK_MS=15*60*1000;   // ~15 min → auto-mark (covers a full ep minus recap/outro)
 const PEEK_MS=2*60*1000;         // under 2 min → don't bother them
 function closePlayer(){
+  clearPvSession();   // an intentional close — don't spring it back on next load
   const v=document.getElementById('playerView'); if(v)v.classList.remove('on');
   const f=document.getElementById('pvFrame'); if(f)f.src='about:blank';
   const id=pvReturnId, ep=pvWatchEp, elapsed=pvOpenTime?Date.now()-pvOpenTime:0;
@@ -3933,6 +3960,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeAll();closeCon
 try{hydrateIcons();}catch{}
 load();loadTheme();render();
 if(appLocked)showLock();   // stored list is ciphertext → gate the app until unlocked
+else try{restorePlayer();}catch{}   // came back mid-stream after an iOS reload → reopen it
 try{maybeShowTutorial();}catch{}
 try{document.getElementById('pageEl').addEventListener('scroll',onPageScroll,{passive:true});}catch{}
 try{document.getElementById('detailSheet').addEventListener('scroll',onDetailScroll,{passive:true});}catch{}

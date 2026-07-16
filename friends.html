@@ -584,6 +584,15 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 .model-sel{padding:8px 10px;border-radius:11px;font-size:12px;font-weight:700;background:var(--bg3);border:1px solid var(--b2);color:var(--t1);max-width:170px;}
 /* when no key is set, the "add a key" button is the accent CTA, not a grey line to scroll past */
 #keyBtn.key-cta{background:var(--a);color:var(--aFg);box-shadow:0 6px 18px -6px var(--glow);}
+/* "Mark watched" snackbar — sits above the bottom nav, slides up when the player closes */
+.mw-bar{position:fixed;left:12px;right:12px;bottom:calc(var(--safe-b) + 78px);z-index:130;display:flex;align-items:center;gap:10px;padding:11px 12px 11px 15px;border-radius:15px;background:color-mix(in srgb,var(--a) 16%,var(--bg2));border:1px solid color-mix(in srgb,var(--a) 32%,transparent);box-shadow:0 12px 34px -10px rgba(0,0,0,.6);transform:translateY(calc(100% + 90px));opacity:0;transition:transform .34s cubic-bezier(.2,1,.28,1),opacity .34s;pointer-events:none;}
+.mw-bar.on{transform:translateY(0);opacity:1;pointer-events:auto;}
+.mw-txt{flex:1;min-width:0;font-size:13px;font-weight:600;color:var(--t1);line-height:1.35;}
+.mw-txt b{font-weight:800;}
+.mw-go{flex-shrink:0;padding:9px 14px;border-radius:10px;font-size:12.5px;font-weight:800;background:var(--a);color:var(--aFg);}
+.mw-go:active{transform:scale(.95);}
+.mw-x{flex-shrink:0;width:30px;height:30px;border-radius:9px;color:var(--t3);display:flex;align-items:center;justify-content:center;}
+.mw-x .ico{width:14px;height:14px;}
 /* account import — segment toggle + "or paste" divider */
 .acc-seg{display:flex;gap:6px;margin-top:4px;padding:3px;border-radius:12px;background:var(--bg3);border:1px solid var(--bn);}
 .acc-opt{flex:1;padding:9px 0;border-radius:9px;font-size:12.5px;font-weight:700;color:var(--t2);transition:background .15s,color .15s;}
@@ -1245,6 +1254,13 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
        (verified HLS plays), but the frame can't spawn pop-up tabs or redirect the
        whole app away — the two things streaming-ad networks do. -->
   <div class="pv-frame-wrap"><iframe id="pvFrame" class="pv-frame" sandbox="allow-scripts allow-same-origin allow-forms allow-presentation allow-orientation-lock" allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowfullscreen referrerpolicy="no-referrer"></iframe></div>
+</div>
+
+<!-- "Mark watched" snackbar — appears after leaving the player, since we can't detect playback across origins -->
+<div class="mw-bar" id="markWatched">
+  <div class="mw-txt"></div>
+  <button class="mw-go">Mark watched</button>
+  <button class="mw-x" onclick="hideMarkWatched()" aria-label="Dismiss"><i data-ic="x"></i></button>
 </div>
 
 <div class="sheet" id="statsSheet">
@@ -2922,7 +2938,7 @@ function usingDefaultSource(){return !streamSource();}
 function streamSlug(title){
   return (title||'').toLowerCase().replace(/["'’]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
 }
-let pvReturnId=null;
+let pvReturnId=null, pvWatchEp=null;
 // Which episode to open: the next one they haven't finished (ep watched + 1),
 // clamped to what exists. /ep-N streams straight into the player; an N beyond the
 // season 404s, so never exceed epTotal, and fall back to the info page when the
@@ -2952,6 +2968,7 @@ function watchAnime(id){
   if(kindOf(a)!=='watch'||!a.aniId){toast('Watch is for anime only');return;}
   pvReturnId=id;
   const {url,ep}=streamURL(a);
+  pvWatchEp=ep;   // the episode we opened, so we can offer to save progress on the way out
   document.getElementById('pvTitle').textContent=a.title+(ep?` · Ep ${ep}`:'');
   const ext=document.getElementById('pvExt');
   const searchUrl=usingDefaultSource()?`${STREAM_DEFAULT}/browser?keyword=${encodeURIComponent(a.title)}`:url;
@@ -3042,9 +3059,37 @@ function saveSource(){
 }
 function closePlayer(){
   const v=document.getElementById('playerView'); if(v)v.classList.remove('on');
-  // stop playback + free the frame, and drop the app back on the show's detail
+  // stop playback + free the frame
   const f=document.getElementById('pvFrame'); if(f)f.src='about:blank';
-  if(pvReturnId){const id=pvReturnId;pvReturnId=null;}
+  // We can't see inside the cross-origin player, so we can't KNOW they watched the
+  // episode — but we opened a specific one, so offer to save that progress. Only
+  // when it would actually advance them (opened ep > current), and only for anime.
+  const id=pvReturnId; const ep=pvWatchEp;
+  pvReturnId=null; pvWatchEp=null;
+  if(id&&ep){
+    const a=anime.find(x=>x.id===id);
+    if(a&&kindOf(a)==='watch'&&ep>(a.ep||0)) markWatchedPrompt(id,ep,a.title);
+  }
+}
+// A quiet snackbar on the way out: "Watched Ep 12? — Mark watched". One tap saves
+// progress (localStorage + cloud sync); ignore it and nothing changes.
+let mwT;
+function markWatchedPrompt(id,ep,title){
+  const bar=document.getElementById('markWatched');if(!bar)return;
+  bar.querySelector('.mw-txt').innerHTML=`Watched <b>Ep ${ep}</b> of ${schEsc(title)}?`;
+  bar.querySelector('.mw-go').onclick=()=>{markWatched(id,ep);hideMarkWatched();};
+  bar.classList.add('on');
+  clearTimeout(mwT); mwT=setTimeout(hideMarkWatched,7000);   // auto-dismiss if ignored
+}
+function hideMarkWatched(){const bar=document.getElementById('markWatched');if(bar)bar.classList.remove('on');clearTimeout(mwT);}
+function markWatched(id,ep){
+  const a=anime.find(x=>x.id===id);if(!a)return;
+  a.ep=a.epTotal?Math.min(ep,a.epTotal):ep;
+  if(a.epTotal&&a.ep===a.epTotal&&a.status!=='finished'){a.status='finished';toast('🎉 Marked as finished!');}
+  else if(a.status==='plan'){a.status='watching';toast(`Saved — up to Ep ${a.ep}`);}
+  else toast(`Saved — up to Ep ${a.ep}`);
+  touch(a);save();render();
+  if(detailId===id)renderDetail();
 }
 function svCountUp(el,to){if(!el)return;const dur=850,t0=performance.now();const step=now=>{const p=Math.min(1,(now-t0)/dur),e=1-Math.pow(1-p,3);el.textContent=Math.round(to*e).toLocaleString();if(p<1)requestAnimationFrame(step);};requestAnimationFrame(step);}
 function svChips(list){return list.length?list.map(a=>'<span class="sv-chip">'+schEsc(a.title)+(a.rating?' '+icon('star','fill')+a.rating:'')+'</span>').join(''):'<span class="sv-chip">None yet</span>';}

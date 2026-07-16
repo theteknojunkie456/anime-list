@@ -632,6 +632,42 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 .al-step{display:flex;align-items:flex-start;gap:10px;font-size:13px;color:var(--t2);line-height:1.45;}
 .al-step code{font-size:11.5px;word-break:break-all;}
 .al-num{flex-shrink:0;width:20px;height:20px;border-radius:50%;background:var(--ag);border:1px solid var(--b2);color:var(--a2);font-family:var(--fd);font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;margin-top:1px;}
+/* ── watch party ── */
+.pt-code{display:flex;align-items:center;gap:10px;background:var(--ag);border:1px solid var(--b2);border-radius:14px;padding:13px 15px;margin-bottom:12px;}
+.pt-code-val{font-family:var(--fd);font-size:24px;font-weight:900;letter-spacing:.16em;color:var(--a2);flex:1;}
+.pt-code-cta{width:38px;height:38px;flex-shrink:0;border-radius:11px;background:var(--bg3);border:1px solid var(--b2);color:var(--t1);display:flex;align-items:center;justify-content:center;}
+.pt-code-cta:active{transform:scale(.92);}
+.pt-code-cta .ico{width:17px;height:17px;}
+.pt-members{display:flex;flex-wrap:wrap;gap:7px;margin:4px 0 14px;}
+.pt-chip{display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;color:var(--t1);background:var(--bg3);border:1px solid var(--b1);border-radius:999px;padding:6px 12px;}
+.pt-chip .dot{width:7px;height:7px;border-radius:50%;background:#3ecf7e;box-shadow:0 0 6px #3ecf7e;}
+.pt-chip.host .dot{background:var(--a2);box-shadow:0 0 6px var(--a2);}
+.pt-now{display:flex;align-items:center;gap:11px;background:var(--bg3);border:1px solid var(--b1);border-radius:14px;padding:11px 13px;margin-bottom:12px;}
+.pt-now img{width:44px;height:62px;border-radius:8px;object-fit:cover;flex-shrink:0;background:var(--bg4);}
+.pt-now-t{font-family:var(--fd);font-size:14px;font-weight:800;color:var(--t1);}
+.pt-now-s{font-size:12px;color:var(--t3);margin-top:2px;}
+.pt-play{width:100%;height:48px;border-radius:14px;background:var(--a);color:var(--aFg,#fff);border:0;font-family:var(--fd);font-size:15px;font-weight:800;display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:6px;}
+.pt-play:active{transform:scale(.98);}
+.pt-play:disabled{opacity:.5;}
+.pt-chat{display:flex;flex-direction:column;gap:8px;max-height:38vh;overflow-y:auto;padding:12px 2px 4px;margin-top:6px;border-top:1px solid var(--b1);}
+.pt-msg{font-size:13px;line-height:1.4;color:var(--t1);}
+.pt-msg .who{font-weight:800;color:var(--a2);margin-right:5px;}
+.pt-msg.me .who{color:var(--t2);}
+.pt-sys{font-size:11.5px;color:var(--t3);text-align:center;font-style:italic;}
+.pt-chatbar{display:flex;gap:8px;margin-top:10px;}
+.pt-chatbar input{flex:1;height:44px;border-radius:12px;background:var(--bg3);border:1px solid var(--b1);color:var(--t1);padding:0 14px;font-size:14px;}
+.pt-send{width:44px;height:44px;flex-shrink:0;border-radius:12px;background:var(--a);color:var(--aFg,#fff);border:0;display:flex;align-items:center;justify-content:center;}
+.pt-send .ico{width:18px;height:18px;fill:currentColor;}
+.party-count{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.86);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);display:none;flex-direction:column;align-items:center;justify-content:center;gap:8px;}
+.party-count.on{display:flex;}
+.pc-num{font-family:var(--fd);font-size:120px;font-weight:900;color:#fff;line-height:1;animation:pcPop .9s ease;}
+.pc-lbl{font-size:15px;font-weight:700;color:rgba(255,255,255,.7);letter-spacing:.04em;}
+@keyframes pcPop{0%{transform:scale(.4);opacity:0;}30%{transform:scale(1.1);opacity:1;}100%{transform:scale(1);opacity:1;}}
+.party-pill{position:fixed;right:16px;bottom:calc(var(--safe-b) + 96px);z-index:90;display:none;align-items:center;gap:8px;background:var(--a);color:var(--aFg,#fff);border:0;border-radius:999px;padding:11px 16px;font-family:var(--fd);font-size:13.5px;font-weight:800;box-shadow:0 8px 24px -6px var(--glow);}
+.party-pill.on{display:flex;}
+.party-pill:active{transform:scale(.95);}
+.pp-dot{width:8px;height:8px;border-radius:50%;background:#fff;animation:ppPulse 1.6s ease-in-out infinite;}
+@keyframes ppPulse{0%,100%{opacity:1;}50%{opacity:.35;}}
 #sourceBody code{background:var(--bg4);border:1px solid var(--b1);border-radius:5px;padding:1px 5px;font-size:11px;font-family:ui-monospace,Menlo,monospace;color:var(--t2);}
 .dots span{animation:blink 1.2s infinite;}
 .dots span:nth-child(2){animation-delay:.2s;}
@@ -1171,6 +1207,22 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
   <div id="anilistBody"></div>
 </div>
 
+<!-- WATCH PARTY SHEET -->
+<div class="sheet" id="partySheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <div class="sheet-title"><i data-ic="users"></i> Watch party</div>
+    <button class="sheet-cancel" onclick="closeAll()">Close</button>
+  </div>
+  <div id="partyBody"></div>
+</div>
+
+<!-- 3·2·1 START CUE (full-screen) -->
+<div class="party-count" id="partyCount"><div class="pc-num" id="pcNum">3</div><div class="pc-lbl" id="pcLbl">Get ready…</div></div>
+
+<!-- floating pill while a party is live -->
+<button class="party-pill" id="partyPill" onclick="openSheet('partySheet')"><span class="pp-dot"></span><span id="ppText">Party</span></button>
+
 <!-- IMPORT SHEET -->
 <div class="sheet" id="importSheet">
   <div class="sheet-handle"></div>
@@ -1417,6 +1469,8 @@ clock:'<circle cx="12" cy="12" r="9.5"/><path d="M12 7v5l3.5 2"/>',
 'chevron-right':'<path d="m9 18 6-6-6-6"/>',
 loader:'<path d="M12 3a9 9 0 1 0 9 9"/>',
 refresh:'<path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.5 9a9 9 0 0 1 14.8-3.4L23 10M1 14l4.7 4.4A9 9 0 0 0 20.5 15"/>',
+users:'<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>',
+copy:'<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
 inbox:'<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5.1 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.9A2 2 0 0 0 16.8 4H7.2a2 2 0 0 0-1.7 1.1z"/>',
 plus:'<path d="M12 5v14M5 12h14"/>',
 compass:'<circle cx="12" cy="12" r="9.5"/><path d="m16 8-2 6-6 2 2-6z"/>',
@@ -2605,6 +2659,7 @@ function openSheet(id){
   if(id==='aiSheet'){renderModelPicker();updateKeyBtn();}
   if(id==='sourceSheet')renderSource();
   if(id==='anilistSheet')renderAniList();
+  if(id==='partySheet')renderParty();
 }
 function closeAll(){
   document.querySelectorAll('.sheet').forEach(s=>s.classList.remove('on'));
@@ -3109,6 +3164,138 @@ function renderAniList(){
     <p class="ai-desc" style="margin-top:12px;font-size:11.5px">${syncable} titles sync (matched by AniList id). Progress reconciles to the higher count, so nothing goes backwards.</p>`;
 }
 
+// ─── WATCH PARTY ─────────────────────────────────────────────────────────────
+// A short room code lets friends watch together: shared presence, a live chat,
+// the host's current episode, and a synchronized "3·2·1 play" cue. Playback isn't
+// frame-synced (the video is a cross-origin frame we can't control) — everyone
+// just starts together on the count. Backed by the sync worker (party- ops).
+let partyCode='',partyIsHost=false,partyRoom=null,partyTimer=0,partySeenPlay=0,partyChatRev=-1;
+function partyUid(){try{let u=localStorage.getItem('party_uid');if(!u){u='u'+Math.random().toString(36).slice(2)+Date.now().toString(36);localStorage.setItem('party_uid',u);}return u;}catch{return'u'+Date.now();}}
+function partyName(){try{return localStorage.getItem('party_name')||'';}catch{return'';}}
+function setPartyName(n){try{localStorage.setItem('party_name',n);}catch{}}
+async function partyPost(op,extra){
+  const r=await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({op,uid:partyUid(),name:partyName()||'Guest',code:partyCode,...extra})});
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok)throw new Error(j.error||'party error');
+  return j;
+}
+function partyActive(){return !!partyCode;}
+function updatePartyPill(){const el=document.getElementById('partyPill');if(!el)return;el.classList.toggle('on',partyActive());const t=document.getElementById('ppText');if(t)t.textContent=partyRoom?`Party · ${partyRoom.members.length}`:'Party';}
+function partyStartPolling(){clearInterval(partyTimer);partyTimer=setInterval(()=>{partyPoll();},2500);}
+function partyStopPolling(){clearInterval(partyTimer);partyTimer=0;}
+async function partyPoll(){if(!partyActive())return;try{const j=await partyPost('party-poll');applyRoom(j);}catch(e){if(/no such party/.test(e.message)){partyEnd(true);}}}
+function applyRoom(j){
+  if(!j||!j.room)return;
+  partyRoom=j.room; partyIsHost=(j.host===true)||(j.room.host===partyUid());
+  updatePartyPill();
+  if(document.getElementById('partySheet').classList.contains('on'))renderParty();
+  // the 3·2·1 cue: a fresh future playAt → count everyone in, then open the player
+  if(j.room.playAt&&j.room.playAt>Date.now()&&j.room.playAt!==partySeenPlay){partySeenPlay=j.room.playAt;partyCue(j.room);}
+}
+function partyCue(room){
+  const ov=document.getElementById('partyCount'),num=document.getElementById('pcNum'),lbl=document.getElementById('pcLbl');
+  if(!ov)return;
+  lbl.textContent='Get ready…';ov.classList.add('on');
+  const tick=()=>{
+    const left=Math.ceil((room.playAt-Date.now())/1000);
+    if(left>0){num.textContent=left;num.style.animation='none';void num.offsetWidth;num.style.animation='';setTimeout(tick,Math.min(1000,room.playAt-Date.now()));}
+    else{num.textContent='▶';lbl.textContent='Playing!';setTimeout(()=>{ov.classList.remove('on');closeAll();if(room.title)watchParty(room.title,room.ep);},450);}
+  };
+  tick();
+}
+// Open the player straight from a title/episode — a party member may not even have
+// the show in their own list, so this doesn't go through watchAnime.
+function partyStreamURL(title,ep){
+  const slug=streamSlug(title),src=streamSource();
+  if(!src)return ep?`${STREAM_DEFAULT}/watch/${slug}/ep-${ep}`:`${STREAM_DEFAULT}/watch/${slug}`;
+  if(/\{ep\}/.test(src))return src.replace(/\{title\}/g,encodeURIComponent(title)).replace(/\{slug\}/g,slug).replace(/\{ep\}/g,ep||1);
+  if(/\{title\}|\{slug\}/.test(src))return src.replace(/\{title\}/g,encodeURIComponent(title)).replace(/\{slug\}/g,slug);
+  return src;
+}
+function watchParty(title,ep){
+  pvReturnId=null;pvWatchEp=null;pvOpenTime=0;pvCanNav=false;
+  document.getElementById('pvTitle').textContent=title+(ep?` · Ep ${ep}`:'')+' · Party';
+  const ext=document.getElementById('pvExt');ext.onclick=()=>{document.getElementById('pvFrame').src=findUrl({title});};
+  document.getElementById('pvFrame').src=partyStreamURL(title,ep);
+  document.getElementById('playerView').classList.add('on');
+  renderPvNav(null);
+}
+async function partyCreate(){
+  const n=(document.getElementById('ptName')?document.getElementById('ptName').value.trim():'')||partyName();
+  if(!n){toast('Enter a name first');return;}
+  setPartyName(n);
+  try{const j=await partyPost('party-create',{code:''});partyCode=j.room.code;partyChatRev=-1;partySeenPlay=0;applyRoom(j);partyStartPolling();try{localStorage.setItem('party_active',partyCode);}catch{}renderParty();toast('Party created — share the code');}
+  catch(e){toast(e.message||'Couldn’t start the party');}
+}
+async function partyJoin(codeArg){
+  const n=(document.getElementById('ptName')?document.getElementById('ptName').value.trim():'')||partyName();
+  const code=(codeArg||(document.getElementById('ptJoin')?document.getElementById('ptJoin').value:'')||'').trim().toUpperCase();
+  if(!n){toast('Enter a name first');return;}
+  if(!/^[A-Z0-9]{5,8}$/.test(code)){toast('That doesn’t look like a party code');return;}
+  setPartyName(n);partyCode=code;
+  try{const j=await partyPost('party-join');partyChatRev=-1;partySeenPlay=0;applyRoom(j);partyStartPolling();try{localStorage.setItem('party_active',code);}catch{}renderParty();toast('Joined the party');}
+  catch(e){partyCode='';toast(e.message==='no such party'?'No party with that code':'Couldn’t join');}
+}
+async function partyEnd(silent){
+  const code=partyCode;partyStopPolling();
+  try{localStorage.removeItem('party_active');}catch{}
+  if(code&&!silent){try{await partyPost('party-leave',{code});}catch{}}
+  partyCode='';partyIsHost=false;partyRoom=null;updatePartyPill();
+  if(document.getElementById('partySheet').classList.contains('on'))renderParty();
+  if(silent)toast('The party ended');
+}
+async function partySend(){
+  const inp=document.getElementById('ptMsg');if(!inp)return;const msg=inp.value.trim();if(!msg)return;
+  inp.value='';
+  try{const j=await partyPost('party-chat',{msg});applyRoom(j);}catch{}
+}
+async function partyPlay(){if(!partyIsHost)return;if(!partyRoom||!partyRoom.title){toast('Pick what to watch first');return;}try{const j=await partyPost('party-play');applyRoom(j);}catch(e){toast(e.message);}}
+async function partyPick(id){
+  const a=anime.find(x=>x.id===id);if(!a)return;
+  const ep=Math.min((a.ep||0)+1,a.epTotal||((a.ep||0)+1));
+  try{const j=await partyPost('party-set',{title:a.title,animeId:a.id,ep,img:titleBg(a)||a.img||''});applyRoom(j);toast(`Set to ${a.title} · Ep ${ep}`);}catch(e){toast(e.message);}
+}
+function partyCopyCode(){try{navigator.clipboard.writeText(partyCode);toast('Code copied');}catch{toast(partyCode);}}
+function renderParty(){
+  const box=document.getElementById('partyBody');if(!box)return;
+  if(!partyActive()){
+    const nm=partyName();
+    box.innerHTML=`
+      <p class="ai-desc">Watch together with friends: everyone hits play on a shared <b>3·2·1</b> count, with a live chat to talk through it. <span style="opacity:.75">Playback isn’t frame-synced — you all just start together.</span></p>
+      <div class="dt-label">${icon('users')} Your name</div>
+      <input class="ai-prompt-in" id="ptName" placeholder="e.g. ${nm||'Alex'}" value="${nm?nm.replace(/"/g,'&quot;'):''}" maxlength="24" autocomplete="off">
+      <button class="parse-btn" onclick="partyCreate()">${icon('users')} Start a party</button>
+      <div class="dt-label" style="margin-top:20px">Join a friend’s party</div>
+      <div style="display:flex;gap:8px">
+        <input class="ai-prompt-in" id="ptJoin" placeholder="Party code" maxlength="8" autocomplete="off" autocapitalize="characters" spellcheck="false" style="flex:1;margin:0;text-transform:uppercase">
+        <button class="pt-code-cta" style="width:auto;padding:0 16px" onclick="partyJoin()">Join</button>
+      </div>`;
+    return;
+  }
+  const r=partyRoom||{members:[],chat:[]};
+  const meUid=partyUid();
+  const members=r.members.map(m=>`<span class="pt-chip${m.uid===r.host?' host':''}"><span class="dot"></span>${schEsc(m.name)}${m.uid===r.host?' 👑':''}</span>`).join('');
+  const now=r.title?`<div class="pt-now">${r.img?`<img src="${r.img}" alt="">`:''}<div><div class="pt-now-t">${schEsc(r.title)}</div><div class="pt-now-s">${r.ep?`Episode ${r.ep}`:'Ready'} · ${r.members.length} watching</div></div></div>`:'';
+  let hostCtl='';
+  if(partyIsHost){
+    const watchable=anime.filter(a=>kindOf(a)==='watch'&&a.aniId).slice(0,30);
+    const picker=watchable.length?`<div class="dt-label" style="margin-top:14px">Pick what to watch</div>
+      <div class="rz-scroll" style="padding:0 0 4px;scroll-snap-type:none">${watchable.map(a=>`<button class="rz-card" style="flex:0 0 118px;aspect-ratio:2/3" onclick="partyPick('${a.id}')">${(titleBg(a)||a.img)?`<img class="rz-img" src="${titleBg(a)||a.img}" alt="">`:`<div class="rz-ph">${((a.title||'?')[0]||'?').toUpperCase()}</div>`}<div class="rz-scrim"></div><div class="rz-meta"><div class="rz-title" style="font-size:12px">${schEsc(a.title)}</div></div></button>`).join('')}</div>`:'';
+    hostCtl=`${picker}<button class="pt-play" onclick="partyPlay()"${r.title?'':' disabled'}>${icon('play')} Play together</button>`;
+  }else{
+    hostCtl=`<p class="ai-desc" style="text-align:center">${r.title?'Waiting for the host to start…':'Waiting for the host to pick something…'}</p>`;
+  }
+  const chat=r.chat.map(m=>m.sys?`<div class="pt-sys">${schEsc(m.msg)}</div>`:`<div class="pt-msg${m.uid===meUid?' me':''}"><span class="who">${schEsc(m.name)}</span>${schEsc(m.msg)}</div>`).join('');
+  box.innerHTML=`
+    <div class="pt-code"><div class="pt-code-val">${r.code}</div><button class="pt-code-cta" onclick="partyCopyCode()" aria-label="Copy code">${icon('copy')}</button></div>
+    <div class="pt-members">${members}</div>
+    ${now}${hostCtl}
+    <div class="pt-chat" id="ptChat">${chat||'<div class="pt-sys">Say hi 👋</div>'}</div>
+    <div class="pt-chatbar"><input id="ptMsg" placeholder="Message… (e.g. pause a sec, brb)" maxlength="300" onkeydown="if(event.key==='Enter')partySend()"><button class="pt-send" onclick="partySend()">${icon('send')}</button></div>
+    <button class="src-opt" style="margin-top:14px" onclick="partyEnd()"><div class="src-name" style="color:var(--t2)">${partyIsHost?'End the party':'Leave the party'}</div></button>`;
+  const cc=document.getElementById('ptChat');if(cc)cc.scrollTop=cc.scrollHeight;
+}
+
 function doImport(){
   const existing=new Set(anime.map(a=>a.title.toLowerCase().trim()));
   const toAdd=importItems.filter(x=>x.selected&&!existing.has(x.title.toLowerCase().trim()));
@@ -3177,6 +3364,7 @@ function renderSettings(){
     {ic:'sparkles',h:'AI & chat key',       p:getKey()?'On — '+(keyProvider(getKey())||'key')+' connected':'Off — add a free key to unlock chat', go:"openSheet('aiSheet')"},
     {ic:'play',    h:'Watch & read sources', p:'Where Watch now / Read now open', go:"openSheet('sourceSheet')"},
     {ic:'refresh', h:'AniList sync',         p:alConnected()?'On — '+alUser()+' · progress syncs both ways':'Off — connect to sync progress everywhere', go:"openSheet('anilistSheet')"},
+    {ic:'users',   h:'Watch party',           p:partyActive()?'In a party · code '+partyCode:'Watch together with friends, in sync', go:"openSheet('partySheet')"},
     {ic:'clipboard',h:'Import / Export',    p:'Paste a list in, or copy yours out', go:"openSheet('importSheet')"},
     {ic:'palette', h:'Theme',               p:'Colours, or build your own', go:"openSheet('themeSheet')"},
   ];
@@ -4346,6 +4534,7 @@ try{document.getElementById('pageEl').addEventListener('scroll',onPageScroll,{pa
 try{document.getElementById('detailSheet').addEventListener('scroll',onDetailScroll,{passive:true});}catch{}
 try{renderNotifyBell();}catch{}
 try{document.getElementById('apiKeyIn').value=getKey();}catch{}
+try{const pc=localStorage.getItem('party_active');if(pc&&partyName())setTimeout(()=>partyJoin(pc),400);}catch{}   // rejoin a live party after a reload
 try{if(sessionStorage.getItem('justUpdated')){sessionStorage.removeItem('justUpdated');setTimeout(()=>toast('✨ Updated to the latest version'),700);}}catch{}
 setTimeout(fetchCovers,1200);
 setTimeout(syncOnOpen,300);

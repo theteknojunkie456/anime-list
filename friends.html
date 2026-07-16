@@ -561,6 +561,8 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 .chat-ul{margin:5px 0;padding-left:19px;}
 .chat-ul li{margin:3px 0;}
 .model-sel{padding:8px 10px;border-radius:11px;font-size:12px;font-weight:700;background:var(--bg3);border:1px solid var(--b2);color:var(--t1);max-width:170px;}
+/* when no key is set, the "add a key" button is the accent CTA, not a grey line to scroll past */
+#keyBtn.key-cta{background:var(--a);color:var(--aFg);box-shadow:0 6px 18px -6px var(--glow);}
 .dots span{animation:blink 1.2s infinite;}
 .dots span:nth-child(2){animation-delay:.2s;}
 .dots span:nth-child(3){animation-delay:.4s;}
@@ -2668,6 +2670,7 @@ function renderSettings(){
      go:"openSheet('backupSheet')", warn:!backedUp},
     {ic:'lock',   c:'var(--fin)', h:'Password',            p:encEnabled()?'On — your list is encrypted':'Off', go:"openSheet('securitySheet')"},
     {ic:'bell',   c:'var(--a2)',  h:'Notifications',       p:notifyOn()?'On — you\'ll be told when an episode airs':'Off', go:'openNotifySheet()'},
+    {ic:'sparkles',c:'var(--fin)',h:'AI & chat key',       p:getKey()?'On — '+(keyProvider(getKey())||'key')+' connected':'Off — add a free key to unlock chat', go:"openSheet('aiSheet')"},
     {ic:'clipboard',c:'var(--drp)',h:'Import / Export',    p:'Paste a list in, or copy yours out', go:"openSheet('importSheet')"},
     {ic:'palette',c:'var(--a2)',  h:'Theme',               p:'Colours, or build your own', go:"openSheet('themeSheet')"},
   ];
@@ -2809,15 +2812,37 @@ function listSummary(){
 }
 const NO_KEY='NO_KEY';
 function getKey(){try{return localStorage.getItem('anthropic_key')||'';}catch{return'';}}
+// Recognised key shapes, so we can tell "you pasted something that isn't a key"
+// from a genuine save. gsk_ Groq · sk-or- OpenRouter · AIza Google · sk-ant- Claude.
+function keyProvider(k){
+  if(!k)return'';
+  if(k.startsWith('gsk_'))return'Groq';
+  if(k.startsWith('sk-or-'))return'OpenRouter';
+  if(k.startsWith('AIza'))return'Google';
+  if(k.startsWith('sk-ant-'))return'Claude';
+  return null;   // present but unrecognised
+}
 function saveKey(){
-  const v=document.getElementById('apiKeyIn').value.trim();
-  try{if(v)localStorage.setItem('anthropic_key',v);else localStorage.removeItem('anthropic_key');}catch{}
-  toast(v?'Key saved on this device':'Key removed');
-  renderModelPicker();
+  // strip spaces/newlines a copy-paste often drags in — the #1 silent failure
+  const v=document.getElementById('apiKeyIn').value.replace(/\s+/g,'');
+  if(!v){                                   // empty save = remove
+    try{localStorage.removeItem('anthropic_key');}catch{}
+    toast('Key removed');
+    renderModelPicker();updateKeyBtn();
+    return;
+  }
+  const prov=keyProvider(v);
+  if(prov===null){                          // looks nothing like a key — don't save junk
+    toast("That doesn't look like a key — it should start with gsk_, sk-or-, AIza or sk-ant-");
+    return;
+  }
+  try{localStorage.setItem('anthropic_key',v);}catch{}
+  toast('✓ '+prov+' key saved');            // name the provider so they know it registered
+  renderModelPicker();updateKeyBtn();       // <- updateKeyBtn was missing: button stayed "Add AI Key"
 }
 function aiErrorHTML(e){
   return e===NO_KEY
-    ?'This needs an AI key — open the AI tab, scroll down, and add one. Free keys at console.groq.com or aistudio.google.com (the key stays on this device only).'
+    ?'This needs a free AI key. Tap the <b>AI</b> tab (bottom bar) → <b>Add a free key</b> — it walks you through getting one from Groq in about two minutes. The key stays on this device only.'
     :'Connection error — check your key and try again.';
 }
 async function callOpenAICompat(url,key,model,prompt){
@@ -2924,10 +2949,17 @@ function sendChat(){
   });
 }
 const AI_MODELS={groq:['llama-3.3-70b-versatile','llama-3.1-8b-instant'],openrouter:['meta-llama/llama-3.3-70b-instruct:free','google/gemini-2.0-flash-exp:free'],gemini:['gemini-2.5-flash','gemini-2.5-pro'],claude:['claude-sonnet-5','claude-haiku-4-5-20251001']};
-function aiProvider(){const k=getKey();if(k.startsWith('gsk_'))return'groq';if(k.startsWith('sk-or-'))return'openrouter';if(k.startsWith('AIza'))return'gemini';if(k)return'claude';return'';}
+// Only sk-ant- keys are Claude — a random non-empty string is NOT a key. (The old
+// `if(k)return'claude'` sent junk to the Claude endpoint and failed cryptically.)
+function aiProvider(){const k=getKey();if(k.startsWith('gsk_'))return'groq';if(k.startsWith('sk-or-'))return'openrouter';if(k.startsWith('AIza'))return'gemini';if(k.startsWith('sk-ant-'))return'claude';return'';}
 function getModel(){const p=aiProvider();if(!p)return'';try{return localStorage.getItem('ai_model_'+p)||AI_MODELS[p][0];}catch{return AI_MODELS[p][0];}}
 function setModelSel(v){const p=aiProvider();if(p){try{localStorage.setItem('ai_model_'+p,v);}catch{}}}
-function updateKeyBtn(){const b=document.getElementById('keyBtn');if(b)b.innerHTML=icon('key')+' '+(getKey()?'Change AI Key':'Add AI Key');}
+function updateKeyBtn(){
+  const b=document.getElementById('keyBtn');if(!b)return;
+  const k=getKey();
+  if(k){b.innerHTML=icon('key')+' Change AI key ('+(keyProvider(k)||'custom')+')';b.classList.remove('key-cta');}
+  else {b.innerHTML=icon('key')+' Add a free key to enable AI';b.classList.add('key-cta');}   // highlight when missing so it's not scrolled past
+}
 function openKeySheet(){const inp=document.getElementById('apiKeyIn');if(inp)inp.value=getKey();openSheet('keySheet');}
 function closeKeySheet(){openSheet('aiSheet');setAITab('chat');}
 function saveKeyAndClose(){saveKey();closeKeySheet();}

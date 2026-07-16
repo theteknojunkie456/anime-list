@@ -11,6 +11,9 @@
 <meta name="theme-color" content="#0a0a0c">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
+<!-- Without this the browser hunts for /favicon.ico at the domain root and 404s
+     on every first load — and the tab shows a blank page icon. -->
+<link rel="icon" href="icons/icon-192.png" type="image/png">
 <title>Watchlist</title>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Manrope:wght@400..800&display=swap" rel="stylesheet">
 <style>
@@ -1105,6 +1108,14 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
     <div class="tut-ico" style="--rc:var(--a2)"><i data-ic="plus"></i></div>
     <div><div class="tut-h">Add anything</div><div class="tut-p">Tap <b>+</b> and type a title. <b>Autofill</b> pulls the real cover, episode count, genres and watch order — anime, TV, movies, manga, manhwa and webtoons. No setup, no API key.</div></div>
   </div>
+  <div class="tut-step key-step">
+    <div class="tut-ico"><i data-ic="cloud"></i></div>
+    <div>
+      <div class="tut-h">Back up your list — do this first</div>
+      <div class="tut-p">Your list lives on <b>this device only</b>. Clearing your browser data, or deleting the app from your Home Screen, <b>erases it</b>. Turning on cloud backup gives you a <b>sync code</b>: save that code and your list can always be restored, and it follows you to any device.</div>
+      <button class="tut-do" onclick="tutGo('backupSheet')">Set up backup</button>
+    </div>
+  </div>
   <div class="tut-step">
     <div class="tut-ico" style="--rc:var(--pln)"><i data-ic="book"></i></div>
     <div><div class="tut-h">Watch or Read</div><div class="tut-p">The switch beside the search box flips between your <b>watch</b> list and your <b>reading</b> list. They're kept completely separate.</div></div>
@@ -1126,14 +1137,6 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
     <div><div class="tut-h">Ask it things (optional)</div><div class="tut-p">There's a chat that knows your list — what to watch next, what's short tonight, what fits your mood. It needs a <b>free</b> key (about two minutes, no card); <b>Settings → AI</b> walks you through it step by step. Everything else works without one.</div></div>
   </div>
 
-  <div class="tut-step key-step">
-    <div class="tut-ico"><i data-ic="cloud"></i></div>
-    <div>
-      <div class="tut-h">Back up your list — do this first</div>
-      <div class="tut-p">Your list lives on <b>this device only</b>. Clearing your browser data, or deleting the app from your Home Screen, <b>erases it</b>. Turning on cloud backup gives you a <b>sync code</b>: save that code and your list can always be restored, and it follows you to any device.</div>
-      <button class="tut-do" onclick="tutGo('backupSheet')">Set up backup</button>
-    </div>
-  </div>
   <div class="tut-step">
     <div class="tut-ico" style="--rc:var(--drp)"><i data-ic="lock"></i></div>
     <div><div class="tut-h">Lock it (optional)</div><div class="tut-p">A password encrypts your whole list — unreadable without it, here and in the cloud. You'll get a one-time <b>recovery key</b>; it's the only way back in if you forget the password. Save both. Lose both and the list is gone for good — there's no backdoor.</div></div>

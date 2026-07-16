@@ -90,7 +90,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
    A short ramp here reads as a bright stripe; keep it generous. */
 .ambient{position:fixed;inset:0;z-index:-1;pointer-events:none;background:linear-gradient(to bottom,#000 0,rgba(0,0,0,0.86) 46px,rgba(0,0,0,0.5) 120px,rgba(0,0,0,0.18) 176px,rgba(0,0,0,0) 232px),radial-gradient(92% 52% at 50% 20%,color-mix(in srgb,var(--amb) 48%,transparent) 0%,transparent 68%),radial-gradient(55% 40% at 84% 34%,color-mix(in srgb,var(--amb) 18%,transparent) 0%,transparent 58%),var(--topgrad);transition:--amb 1.1s ease;}
 #app{height:100vh;height:100dvh;display:flex;flex-direction:column;background:transparent;}
-.page{flex:1;overflow-y:auto;padding-bottom:calc(var(--safe-b) + 86px);}
+.page{flex:1;overflow-y:auto;overscroll-behavior:none;padding-bottom:calc(var(--safe-b) + 86px);}
 
 /* ── HEADER ── */
 .hdr{padding:calc(var(--safe-t) + 12px) 18px 0;display:flex;align-items:center;justify-content:space-between;}
@@ -668,6 +668,18 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 .party-pill:active{transform:scale(.95);}
 .pp-dot{width:8px;height:8px;border-radius:50%;background:#fff;animation:ppPulse 1.6s ease-in-out infinite;}
 @keyframes ppPulse{0%,100%{opacity:1;}50%{opacity:.35;}}
+.pt-picklist{display:flex;flex-direction:column;gap:7px;max-height:250px;overflow-y:auto;margin:6px 0 12px;padding-right:2px;scrollbar-width:none;}
+.pt-picklist::-webkit-scrollbar{display:none;}
+.pt-pick{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:var(--bg3);border:1px solid var(--b1);border-radius:13px;padding:9px 11px;transition:border-color .15s,background .15s;}
+.pt-pick:active{transform:scale(.99);}
+.pt-pick.on{border-color:var(--a);background:var(--ag);}
+.pt-pick img,.pt-pick .ph{width:40px;height:56px;border-radius:8px;object-fit:cover;flex-shrink:0;background:var(--bg4);}
+.pt-pick .ph{display:flex;align-items:center;justify-content:center;font-family:var(--fd);font-size:19px;font-weight:900;color:var(--t3);background:linear-gradient(135deg,var(--bg4),var(--bg2));}
+.pt-pick-info{flex:1;min-width:0;}
+.pt-pick-t{font-family:var(--fd);font-size:14px;font-weight:700;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.pt-pick-s{font-size:11.5px;color:var(--t3);margin-top:2px;}
+.pt-pick-go{width:32px;height:32px;flex-shrink:0;border-radius:50%;background:var(--ag);color:var(--a2);display:flex;align-items:center;justify-content:center;}
+.pt-pick-go .ico{width:15px;height:15px;fill:currentColor;margin-left:1px;}
 #sourceBody code{background:var(--bg4);border:1px solid var(--b1);border-radius:5px;padding:1px 5px;font-size:11px;font-family:ui-monospace,Menlo,monospace;color:var(--t2);}
 .dots span{animation:blink 1.2s infinite;}
 .dots span:nth-child(2){animation-delay:.2s;}
@@ -961,6 +973,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
   <div class="hdr">
     <div class="hdr-title">WatchList</div>
     <div class="hdr-actions">
+      <button class="hbtn" onclick="openSheet('partySheet')" title="Watch party" aria-label="Watch party"><i data-ic="users"></i></button>
       <button class="hbtn" onclick="openForYou()" title="For You — tailored recommendations" aria-label="For You recommendations"><i data-ic="compass"></i></button>
       <button class="hbtn" onclick="openSchedule()" title="Weekly airing schedule" aria-label="Weekly airing schedule"><i data-ic="calendar"></i></button>
       <button class="hbtn" id="notifyBell" onclick="openNotifySheet()" title="Episode notifications" aria-label="Notifications"><i data-ic="bell-off"></i></button>
@@ -2241,19 +2254,22 @@ function resumeRailHTML(pool,isRead){
   return `<div class="rz-sec"><div class="rz-head">${icon('play')} Continue watching</div>
     <div class="rz-scroll" id="rzScroll"${loop?' data-loop="1"':''}>${cards}</div></div>`;
 }
-// Seamless infinite horizontal loop: the items are rendered twice, so we keep the
-// scroll position inside the first copy — when it crosses into the second, jump
-// back by one copy-width (invisible, same pixels). Scrolling never dead-ends.
+// Seamless infinite horizontal loop. The items are rendered twice; when the
+// scroll settles inside the second copy we jump back by one copy-width — same
+// pixels, so it's invisible. Critically this happens ONLY after scrolling STOPS,
+// never mid-gesture: adjusting scrollLeft while iOS momentum is running fights
+// the fling (that was the lag — a hard flick kept getting yanked back).
 function rzLoop(){
   const sc=document.getElementById('rzScroll');
   if(!sc||sc.dataset.loop!=='1'||sc._looped)return;
   sc._looped=true;
-  const half=()=>sc.scrollWidth/2;
-  sc.addEventListener('scroll',()=>{
-    const h=half();
-    if(sc.scrollLeft>=h)sc.scrollLeft-=h;        // wrapped forward → rewind one copy
-    else if(sc.scrollLeft<=0)sc.scrollLeft+=h;   // wrapped back → advance one copy
-  },{passive:true});
+  let t=0;
+  const settle=()=>{
+    const half=sc.scrollWidth/2; if(half<10)return;
+    if(sc.scrollLeft>=half) sc.scrollLeft-=half;        // deep in copy 2 → rewind one copy
+    else if(sc.scrollLeft<1) sc.scrollLeft+=half;       // rubber-banded to the start → advance one
+  };
+  sc.addEventListener('scroll',()=>{clearTimeout(t);t=setTimeout(settle,140);},{passive:true});
 }
 function resumeWatch(id){
   // exactly what Watch now does, but invoked from the rail — straight to the episode
@@ -2660,10 +2676,12 @@ function openSheet(id){
   if(id==='sourceSheet')renderSource();
   if(id==='anilistSheet')renderAniList();
   if(id==='partySheet')renderParty();
+  try{updatePartyPill();}catch{}
 }
 function closeAll(){
   document.querySelectorAll('.sheet').forEach(s=>s.classList.remove('on'));
   document.getElementById('overlay').classList.remove('on');
+  try{updatePartyPill();}catch{}
 }
 
 // ─── ADD / EDIT ─────────────────────────────────────────────────────────────
@@ -3180,7 +3198,7 @@ async function partyPost(op,extra){
   return j;
 }
 function partyActive(){return !!partyCode;}
-function updatePartyPill(){const el=document.getElementById('partyPill');if(!el)return;el.classList.toggle('on',partyActive());const t=document.getElementById('ppText');if(t)t.textContent=partyRoom?`Party · ${partyRoom.members.length}`:'Party';}
+function updatePartyPill(){const el=document.getElementById('partyPill');if(!el)return;const sheetOpen=document.getElementById('partySheet').classList.contains('on');el.classList.toggle('on',partyActive()&&!sheetOpen);const t=document.getElementById('ppText');if(t)t.textContent=partyRoom?`Party · ${partyRoom.members.length}`:'Party';}
 function partyStartPolling(){clearInterval(partyTimer);partyTimer=setInterval(()=>{partyPoll();},2500);}
 function partyStopPolling(){clearInterval(partyTimer);partyTimer=0;}
 async function partyPoll(){if(!partyActive())return;try{const j=await partyPost('party-poll');applyRoom(j);}catch(e){if(/no such party/.test(e.message)){partyEnd(true);}}}
@@ -3278,9 +3296,17 @@ function renderParty(){
   const now=r.title?`<div class="pt-now">${r.img?`<img src="${r.img}" alt="">`:''}<div><div class="pt-now-t">${schEsc(r.title)}</div><div class="pt-now-s">${r.ep?`Episode ${r.ep}`:'Ready'} · ${r.members.length} watching</div></div></div>`:'';
   let hostCtl='';
   if(partyIsHost){
-    const watchable=anime.filter(a=>kindOf(a)==='watch'&&a.aniId).slice(0,30);
-    const picker=watchable.length?`<div class="dt-label" style="margin-top:14px">Pick what to watch</div>
-      <div class="rz-scroll" style="padding:0 0 4px;scroll-snap-type:none">${watchable.map(a=>`<button class="rz-card" style="flex:0 0 118px;aspect-ratio:2/3" onclick="partyPick('${a.id}')">${(titleBg(a)||a.img)?`<img class="rz-img" src="${titleBg(a)||a.img}" alt="">`:`<div class="rz-ph">${((a.title||'?')[0]||'?').toUpperCase()}</div>`}<div class="rz-scrim"></div><div class="rz-meta"><div class="rz-title" style="font-size:12px">${schEsc(a.title)}</div></div></button>`).join('')}</div>`:'';
+    // Watching first (most likely pick), then the rest; a scannable vertical list.
+    const watchable=anime.filter(a=>kindOf(a)==='watch'&&a.aniId)
+      .sort((x,y)=>(y.status==='watching')-(x.status==='watching')||(y.upd||0)-(x.upd||0));
+    const row=a=>{const cov=titleBg(a)||a.img,ep=Math.min((a.ep||0)+1,a.epTotal||((a.ep||0)+1)),on=r.animeId===a.id;
+      return `<button class="pt-pick${on?' on':''}" onclick="partyPick('${a.id}')">
+        ${cov?`<img src="${cov}" alt="">`:`<div class="ph">${((a.title||'?')[0]||'?').toUpperCase()}</div>`}
+        <div class="pt-pick-info"><div class="pt-pick-t">${schEsc(a.title)}</div><div class="pt-pick-s">Episode ${ep}${a.epTotal?` · ${a.epTotal} eps`:''}</div></div>
+        <span class="pt-pick-go">${icon('play')}</span></button>`;};
+    const picker=watchable.length
+      ?`<div class="dt-label" style="margin-top:14px">Pick what to watch</div><div class="pt-picklist">${watchable.map(row).join('')}</div>`
+      :`<p class="ai-desc" style="margin-top:14px">Add some anime to your watch list to pick from here.</p>`;
     hostCtl=`${picker}<button class="pt-play" onclick="partyPlay()"${r.title?'':' disabled'}>${icon('play')} Play together</button>`;
   }else{
     hostCtl=`<p class="ai-desc" style="text-align:center">${r.title?'Waiting for the host to start…':'Waiting for the host to pick something…'}</p>`;
@@ -3364,7 +3390,6 @@ function renderSettings(){
     {ic:'sparkles',h:'AI & chat key',       p:getKey()?'On — '+(keyProvider(getKey())||'key')+' connected':'Off — add a free key to unlock chat', go:"openSheet('aiSheet')"},
     {ic:'play',    h:'Watch & read sources', p:'Where Watch now / Read now open', go:"openSheet('sourceSheet')"},
     {ic:'refresh', h:'AniList sync',         p:alConnected()?'On — '+alUser()+' · progress syncs both ways':'Off — connect to sync progress everywhere', go:"openSheet('anilistSheet')"},
-    {ic:'users',   h:'Watch party',           p:partyActive()?'In a party · code '+partyCode:'Watch together with friends, in sync', go:"openSheet('partySheet')"},
     {ic:'clipboard',h:'Import / Export',    p:'Paste a list in, or copy yours out', go:"openSheet('importSheet')"},
     {ic:'palette', h:'Theme',               p:'Colours, or build your own', go:"openSheet('themeSheet')"},
   ];

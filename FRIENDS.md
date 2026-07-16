@@ -1,6 +1,6 @@
-# Friends — sharing your Watchlist
+# Friends — sharing your WatchList
 
-`friends.html` is the **social companion** to the main Watchlist app. It lets you
+`friends.html` is the **social companion** to the main WatchList app. It lets you
 **view a friend's list** (read-only) and **import titles** from it into your own,
 using the same private cloud-sync system the main app already uses.
 
@@ -12,7 +12,7 @@ sharing is done entirely with **secret sync codes**.
 ## How sharing works (in one picture)
 
 ```
-Your Watchlist (index.html)                Friend's Watchlist
+Your WatchList (index.html)                Friend's WatchList
         │                                          │
         │  cloud sync (your secret code)           │
         ▼                                          ▼
@@ -53,10 +53,10 @@ code** — it never enumerates codes and never exposes anyone else's data.
 3. Their list appears **read-only** — browse what they're watching, planning,
    and have finished, sorted/filtered like the main app.
 4. **Import** any titles you like into your own list (they're copied into your
-   Watchlist; your friend's list is never modified).
+   WatchList; your friend's list is never modified).
 
 `friends.html` keeps its own separate local storage (`animelist_friends_v4`), so
-viewing a friend's list never touches or overwrites your personal Watchlist.
+viewing a friend's list never touches or overwrites your personal WatchList.
 
 ---
 

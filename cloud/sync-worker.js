@@ -1,4 +1,4 @@
-// ── Watchlist cloud sync + watch parties — Cloudflare Worker ────────────────
+// ── WatchList cloud sync + watch parties — Cloudflare Worker ────────────────
 // Free, private, and completely separate from any other app.
 //
 // TWO features, one KV namespace (bound as LISTS):

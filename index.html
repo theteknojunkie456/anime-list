@@ -1284,7 +1284,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
   <div class="pv-top">
     <button class="sv-back" onclick="closePlayer()" aria-label="Back"><i data-ic="chevron-left"></i></button>
     <div class="pv-title" id="pvTitle"></div>
-    <button class="pv-ext" id="pvExt" aria-label="Open in browser" title="Open in browser"><i data-ic="upload"></i></button>
+    <button class="pv-ext" id="pvExt" aria-label="Find this title on the site" title="Wrong page? Search this title"><i data-ic="search"></i></button>
   </div>
   <!-- sandbox WITHOUT allow-popups / allow-top-navigation: the player still runs
        (verified HLS plays), but the frame can't spawn pop-up tabs or redirect the
@@ -3267,6 +3267,13 @@ function streamURL(a){
   }
   return {url:src, ep:null}; // plain custom URL — open it as-is
 }
+// The site's search for this exact title — the recovery when a deep-link 404s.
+function findUrl(a){
+  if(usingDefaultSource()) return `${STREAM_DEFAULT}/browser?keyword=${encodeURIComponent(a.title)}`;
+  const src=streamSource();
+  if(/\{title\}|\{slug\}/.test(src)) return src.replace(/\{title\}/g,encodeURIComponent(a.title)).replace(/\{slug\}/g,streamSlug(a.title)).replace(/\{ep\}/g,'1');
+  return src;   // plain custom URL — just reload the site so its own search is at hand
+}
 function watchAnime(id){
   const a=anime.find(x=>x.id===id); if(!a) return;
   if(kindOf(a)!=='watch'||!a.aniId){toast('Watch is for anime only');return;}
@@ -3276,8 +3283,10 @@ function watchAnime(id){
   pvOpenTime=Date.now();   // how long they stay is our only signal that they watched
   document.getElementById('pvTitle').textContent=a.title+(ep?` · Ep ${ep}`:'');
   const ext=document.getElementById('pvExt');
-  const searchUrl=usingDefaultSource()?`${STREAM_DEFAULT}/browser?keyword=${encodeURIComponent(a.title)}`:url;
-  ext.onclick=()=>{try{window.open(searchUrl,'_blank','noopener');}catch{}};
+  // The deep-link 404s when our slug ≠ the site's (romaji, a variant, season markers)
+  // and we can't detect that across the frame — so this loads the site's SEARCH for
+  // the exact title IN-FRAME: one tap to the right result, no typing, no leaving.
+  ext.onclick=()=>{const f=document.getElementById('pvFrame');f.src=findUrl(a);pvCanNav=false;renderPvNav(null);};
   const f=document.getElementById('pvFrame');
   f.src=url;
   document.getElementById('playerView').classList.add('on');
@@ -3308,9 +3317,10 @@ function readManga(id){
   const url=readURL(a);
   document.getElementById('pvTitle').textContent=a.title;
   const ext=document.getElementById('pvExt');
-  // ⤴ opens the site homepage so they can search by hand if a deep-link ever misses
-  const fallback=usingDefaultReadSource()?READ_DEFAULT:url;
-  ext.onclick=()=>{try{window.open(fallback,'_blank','noopener');}catch{}};
+  // Same 404 recovery as watch: load the reading site IN-FRAME so its own search is
+  // one tap away, rather than kicking out to a new tab and typing the title again.
+  const findRead=(usingDefaultReadSource()||!/\{title\}|\{slug\}/.test(readSource()))?(readSource()||READ_DEFAULT):readSource().replace(/\{title\}/g,encodeURIComponent(a.title)).replace(/\{slug\}/g,streamSlug(a.title));
+  ext.onclick=()=>{document.getElementById('pvFrame').src=findRead;};
   document.getElementById('pvFrame').src=url;
   document.getElementById('playerView').classList.add('on');
   savePvSession(id,0,'read');   // survive an iOS background/reload mid-read

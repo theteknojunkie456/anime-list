@@ -609,6 +609,10 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 .src-name{font-family:var(--fd);font-size:14px;font-weight:800;color:var(--t1);display:flex;align-items:center;gap:8px;}
 .src-tag{font-size:9.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--a2);background:var(--ag);border:1px solid var(--b2);border-radius:6px;padding:2px 6px;}
 .src-sub{font-size:12px;color:var(--t3);margin-top:3px;}
+.src-picks{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px;}
+.src-chip{font-family:var(--fd);font-size:12.5px;font-weight:700;color:var(--t2);background:var(--bg3);border:1px solid var(--b1);border-radius:999px;padding:7px 13px;transition:border-color .15s,background .15s,color .15s;}
+.src-chip.on{border-color:var(--a);background:var(--ag);color:var(--a2);}
+.src-chip:active{transform:scale(.96);}
 #sourceBody code{background:var(--bg4);border:1px solid var(--b1);border-radius:5px;padding:1px 5px;font-size:11px;font-family:ui-monospace,Menlo,monospace;color:var(--t2);}
 .dots span{animation:blink 1.2s infinite;}
 .dots span:nth-child(2){animation-delay:.2s;}
@@ -3035,10 +3039,21 @@ function restorePlayer(){
   watchAnime(s.id);
   if(pvReturnId===s.id){pvOpenTime=s.t;savePvSession(s.id,pvWatchEp,'watch');}   // keep the original clock so a long watch still auto-marks
 }
+// One-tap alternatives to AniNeko. Each opens the site's search for the exact
+// title (via the {title} token), so it's one step from playing — these sites
+// use numeric episode ids we can't deep-link, so search is the honest best.
+// All confirmed embeddable (no X-Frame-Options); pirate domains rotate, so if a
+// chip ever loads nothing the domain moved — paste the new one in the field.
+const WATCH_PRESETS=[
+  {name:'HiAnime',  url:'https://hianime.to/search?keyword={title}'},
+  {name:'AniWatch', url:'https://aniwatchtv.to/search?keyword={title}'},
+  {name:'GogoAnime',url:'https://anitaku.bz/search.html?keyword={title}'},
+];
 function renderSource(){
   const box=document.getElementById('sourceBody'); if(!box) return;
   const custom=streamSource(), rcustom=readSource();
   const host=u=>{try{return new URL(u.replace(/\{[^}]+\}/g,'x')).hostname;}catch{return u.slice(0,32);}};
+  const chips=WATCH_PRESETS.map(p=>`<button class="src-chip${custom===p.url?' on':''}" onclick="setSource('${p.url}')">${p.name}</button>`).join('');
   box.innerHTML=`
     <div class="dt-label">${icon('play')} Watch source</div>
     <p class="ai-desc">Where <b>Watch now</b> opens an anime. The built-in source deep-links straight to the episode you're on.</p>
@@ -3046,11 +3061,12 @@ function renderSource(){
       <div class="src-name">AniNeko <span class="src-tag">Built-in</span></div>
       <div class="src-sub">Jumps to your next episode automatically</div>
     </button>
-    <button class="src-opt${custom?' on':''}" onclick="document.getElementById('srcCustom').focus()">
+    <div class="src-picks">${chips}</div>
+    <button class="src-opt${custom&&!WATCH_PRESETS.some(p=>p.url===custom)?' on':''}" onclick="document.getElementById('srcCustom').focus()" style="margin-top:10px">
       <div class="src-name">Your own site</div>
-      <div class="src-sub">${custom?'Using '+host(custom):'Paste any streaming site below'}</div>
+      <div class="src-sub">${custom&&!WATCH_PRESETS.some(p=>p.url===custom)?'Using '+host(custom):'Paste any streaming site below'}</div>
     </button>
-    <input class="ai-prompt-in" id="srcCustom" placeholder="hianime.to — or a full URL" value="${custom?custom.replace(/"/g,'&quot;'):''}" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url" style="margin-top:10px">
+    <input class="ai-prompt-in" id="srcCustom" placeholder="hianime.to — or a full URL" value="${custom&&!WATCH_PRESETS.some(p=>p.url===custom)?custom.replace(/"/g,'&quot;'):''}" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url" style="margin-top:10px">
     <button class="parse-btn" onclick="saveSource()">Use this site</button>
     <p class="ai-desc" style="margin-top:12px;font-size:11.5px">Optional tokens: <code>{title}</code>, <code>{slug}</code>, <code>{ep}</code> — e.g. <code>https://site.com/watch/{slug}/ep-{ep}</code>. With none, it just opens the site.</p>
 

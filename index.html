@@ -201,7 +201,10 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 .set-row{display:flex;align-items:center;gap:13px;width:100%;padding:13px 0;border-top:1px solid var(--bn2);text-align:left;}
 .set-row:first-child{border-top:none;padding-top:2px;}
 .set-row:active{transform:scale(.985);}
-.set-ico{width:36px;height:36px;flex-shrink:0;border-radius:11px;background:var(--bg3);border:1px solid var(--b2);display:flex;align-items:center;justify-content:center;color:var(--rc,var(--a2));}
+/* Calm, uniform icons — a settings list should read as one quiet surface, not six
+   competing colours. Colour is reserved for a row that actually needs attention
+   (see .set-row.warn below), so it stands out instead of getting lost in the noise. */
+.set-ico{width:36px;height:36px;flex-shrink:0;border-radius:11px;background:var(--bg3);border:1px solid var(--b1);display:flex;align-items:center;justify-content:center;color:var(--t2);}
 .set-ico .ico{width:16px;height:16px;}
 .set-txt{flex:1;min-width:0;}
 .set-h{font-size:14px;font-weight:700;color:var(--t1);letter-spacing:-.2px;}
@@ -1186,7 +1189,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 <div class="sheet" id="sourceSheet">
   <div class="sheet-handle"></div>
   <div class="sheet-header">
-    <div class="sheet-title"><i data-ic="play"></i> Streaming source</div>
+    <div class="sheet-title"><i data-ic="play"></i> Sources</div>
     <button class="sheet-cancel" onclick="openSheet('settingsSheet')">Back</button>
   </div>
   <div id="sourceBody"></div>
@@ -2341,6 +2344,7 @@ function renderDetail(){
     <div class="dt-label" style="margin-top:18px"></div>
     <div id="ai-box-detail"></div>
     ${(kindOf(a)==='watch'&&a.aniId)?`<button class="dt-watch" onclick="watchAnime('${a.id}')">${icon('play')} Watch now</button>`:''}
+    ${kindOf(a)==='read'?`<button class="dt-watch" onclick="readManga('${a.id}')">${icon('book')} Read now</button>`:''}
     <div class="dt-actions">
       <button class="dact ai-act" onclick="aiCardInsight('${a.id}')">${icon('sparkles')} AI Insight</button>
       <button class="dact" onclick="editItem('${a.id}')">${icon('edit')} Edit</button>
@@ -2691,19 +2695,19 @@ function renderSettings(){
   const el=document.getElementById('settingsBody');if(!el)return;
   const backedUp=!!syncCode();
   const rows=[
-    {ic:'bulb',   c:'var(--wat)', h:'How WatchList works', p:'A quick tour — and how not to lose your list', go:'openTutorial()'},
-    {ic:'cloud',  c:'var(--pln)', h:'Cloud backup',        p:backedUp?'On — restorable on any device':'Off — this list exists only on this device',
+    {ic:'bulb',    h:'How WatchList works', p:'A quick tour — and how not to lose your list', go:'openTutorial()'},
+    {ic:'cloud',   h:'Cloud backup',        p:backedUp?'On — restorable on any device':'Off — this list exists only on this device',
      go:"openSheet('backupSheet')", warn:!backedUp},
-    {ic:'lock',   c:'var(--fin)', h:'Password',            p:encEnabled()?'On — your list is encrypted':'Off', go:"openSheet('securitySheet')"},
-    {ic:'bell',   c:'var(--a2)',  h:'Notifications',       p:notifyOn()?'On — you\'ll be told when an episode airs':'Off', go:'openNotifySheet()'},
-    {ic:'sparkles',c:'var(--fin)',h:'AI & chat key',       p:getKey()?'On — '+(keyProvider(getKey())||'key')+' connected':'Off — add a free key to unlock chat', go:"openSheet('aiSheet')"},
-    {ic:'play',   c:'var(--wat)', h:'Streaming source',    p:usingDefaultSource()?'AniNeko (built-in)':'Custom site', go:"openSheet('sourceSheet')"},
-    {ic:'clipboard',c:'var(--drp)',h:'Import / Export',    p:'Paste a list in, or copy yours out', go:"openSheet('importSheet')"},
-    {ic:'palette',c:'var(--a2)',  h:'Theme',               p:'Colours, or build your own', go:"openSheet('themeSheet')"},
+    {ic:'lock',    h:'Password',            p:encEnabled()?'On — your list is encrypted':'Off', go:"openSheet('securitySheet')"},
+    {ic:'bell',    h:'Notifications',       p:notifyOn()?'On — you\'ll be told when an episode airs':'Off', go:'openNotifySheet()'},
+    {ic:'sparkles',h:'AI & chat key',       p:getKey()?'On — '+(keyProvider(getKey())||'key')+' connected':'Off — add a free key to unlock chat', go:"openSheet('aiSheet')"},
+    {ic:'play',    h:'Watch & read sources', p:'Where Watch now / Read now open', go:"openSheet('sourceSheet')"},
+    {ic:'clipboard',h:'Import / Export',    p:'Paste a list in, or copy yours out', go:"openSheet('importSheet')"},
+    {ic:'palette', h:'Theme',               p:'Colours, or build your own', go:"openSheet('themeSheet')"},
   ];
   el.innerHTML=rows.map(r=>
     `<button class="set-row${r.warn?' warn':''}" onclick="${r.go}">
-      <div class="set-ico" style="--rc:${r.c}">${icon(r.ic)}</div>
+      <div class="set-ico">${icon(r.ic)}</div>
       <div class="set-txt"><div class="set-h">${r.h}</div><div class="set-p${r.warn?' warn':''}">${r.p}</div></div>
       <span class="set-chev">${icon('chevron-right')}</span>
     </button>`).join('');
@@ -2782,11 +2786,37 @@ function watchAnime(id){
   f.src=url;
   document.getElementById('playerView').classList.add('on');
 }
+// Reading source (AsuraScans by default). Unlike anime, AsuraScans has no URL-based
+// search or predictable series link (the slug carries a random hash), so we open the
+// site's homepage where search is front-and-centre. A custom source can use {title}/
+// {slug} tokens if the site supports deep-linking.
+const READ_DEFAULT='https://asurascans.com';
+function readSource(){try{return localStorage.getItem('read_src')||'';}catch{return'';}}
+function usingDefaultReadSource(){return !readSource();}
+function readURL(a){
+  const slug=streamSlug(a.title), src=readSource();
+  if(!src) return READ_DEFAULT;
+  if(/\{title\}|\{slug\}/.test(src))
+    return src.replace(/\{title\}/g,encodeURIComponent(a.title)).replace(/\{slug\}/g,slug);
+  return src;
+}
+function readManga(id){
+  const a=anime.find(x=>x.id===id); if(!a) return;
+  if(kindOf(a)!=='read'){toast('Read is for your reading list');return;}
+  pvReturnId=id;
+  const url=readURL(a);
+  document.getElementById('pvTitle').textContent=a.title;
+  const ext=document.getElementById('pvExt');
+  ext.onclick=()=>{try{window.open(url,'_blank','noopener');}catch{}};
+  document.getElementById('pvFrame').src=url;
+  document.getElementById('playerView').classList.add('on');
+}
 function renderSource(){
   const box=document.getElementById('sourceBody'); if(!box) return;
-  const custom=streamSource();
+  const custom=streamSource(), rcustom=readSource();
   const host=u=>{try{return new URL(u.replace(/\{[^}]+\}/g,'x')).hostname;}catch{return u.slice(0,32);}};
   box.innerHTML=`
+    <div class="dt-label">${icon('play')} Watch source</div>
     <p class="ai-desc">Where <b>Watch now</b> opens an anime. The built-in source deep-links straight to the episode you're on.</p>
     <button class="src-opt${!custom?' on':''}" onclick="setSource('')">
       <div class="src-name">AniNeko <span class="src-tag">Built-in</span></div>
@@ -2798,7 +2828,30 @@ function renderSource(){
     </button>
     <input class="ai-prompt-in" id="srcCustom" placeholder="https://example.com" value="${custom?custom.replace(/"/g,'&quot;'):''}" autocomplete="off" style="margin-top:10px">
     <button class="parse-btn" onclick="saveSource()">Use this site</button>
-    <p class="ai-desc" style="margin-top:12px;font-size:11.5px">Optional tokens the app fills in: <code>{title}</code>, <code>{slug}</code>, <code>{ep}</code>. e.g. <code>https://site.com/watch/{slug}/ep-{ep}</code>. With no token, it just opens the site.</p>`;
+    <p class="ai-desc" style="margin-top:12px;font-size:11.5px">Optional tokens: <code>{title}</code>, <code>{slug}</code>, <code>{ep}</code> — e.g. <code>https://site.com/watch/{slug}/ep-{ep}</code>. With none, it just opens the site.</p>
+
+    <div class="dt-label" style="margin-top:22px">${icon('book')} Reading source</div>
+    <p class="ai-desc">Where <b>Read now</b> opens a manga / manhwa / webtoon.</p>
+    <button class="src-opt${!rcustom?' on':''}" onclick="setReadSource('')">
+      <div class="src-name">AsuraScans <span class="src-tag">Built-in</span></div>
+      <div class="src-sub">Opens the site — search the title there</div>
+    </button>
+    <button class="src-opt${rcustom?' on':''}" onclick="document.getElementById('rsrcCustom').focus()">
+      <div class="src-name">Your own site</div>
+      <div class="src-sub">${rcustom?'Using '+host(rcustom):'Paste any reading site below'}</div>
+    </button>
+    <input class="ai-prompt-in" id="rsrcCustom" placeholder="https://example.com" value="${rcustom?rcustom.replace(/"/g,'&quot;'):''}" autocomplete="off" style="margin-top:10px">
+    <button class="parse-btn" onclick="saveReadSource()">Use this site</button>`;
+}
+function setReadSource(v){
+  try{if(v)localStorage.setItem('read_src',v);else localStorage.removeItem('read_src');}catch{}
+  renderSource();
+  toast(v?'Reading source set':'Back to AsuraScans');
+}
+function saveReadSource(){
+  const v=(document.getElementById('rsrcCustom').value||'').trim();
+  if(v && !/^https?:\/\//i.test(v)){toast('That needs to start with http:// or https://');return;}
+  setReadSource(v);
 }
 function setSource(v){
   try{if(v)localStorage.setItem('stream_src',v);else localStorage.removeItem('stream_src');}catch{}

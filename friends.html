@@ -189,6 +189,15 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 .set-row.warn .set-ico{background:color-mix(in srgb,var(--a) 20%,var(--bg3));border-color:transparent;}
 .set-chev{flex-shrink:0;color:var(--t3);display:flex;}
 .set-chev .ico{width:16px;height:16px;}
+/* ── AUTOFILL PICKER ── */
+.pick-row{display:flex;align-items:center;gap:12px;width:100%;padding:9px 0;border-top:1px solid var(--bn2);text-align:left;}
+.pick-row:first-child{border-top:none;}
+.pick-row:active{transform:scale(.985);}
+.pick-img,.pick-ph{width:44px;height:62px;border-radius:8px;flex-shrink:0;object-fit:cover;background:var(--bg4);border:1px solid var(--b2);}
+.pick-ph{display:flex;align-items:center;justify-content:center;font-weight:800;color:var(--t3);font-size:16px;}
+.pick-txt{flex:1;min-width:0;}
+.pick-t{font-size:13.5px;font-weight:700;color:var(--t1);line-height:1.35;}
+.pick-s{font-size:11.5px;color:var(--t3);margin-top:3px;}
 .sv-hero{display:flex;gap:10px;padding:8px 18px 0;}
 .sv-heronum{flex:1;background:linear-gradient(160deg,var(--bg3),var(--bg2));border:1px solid var(--bn2);border-radius:18px;padding:15px 10px;text-align:center;box-shadow:var(--elev1);}
 .sv-heronum .v{font-size:27px;font-weight:900;letter-spacing:-1px;color:var(--a2);line-height:1;display:inline-flex;align-items:center;gap:3px;justify-content:center;}
@@ -972,6 +981,16 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
   </div>
   <button class="chat-clear" onclick="removeKey()" style="margin-top:10px"><i data-ic="trash"></i> Remove key</button>
   <p class="ai-desc" style="margin-top:12px">Your key stays on this device only. <strong style="color:var(--t1)">Free</strong> keys: console.groq.com (gsk_…), aistudio.google.com (AIza…), or openrouter.ai (sk-or-…). Claude keys (sk-ant-…) also work.</p>
+</div>
+
+<!-- AUTOFILL PICKER -->
+<div class="sheet" id="pickSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <div class="sheet-title"><i data-ic="search"></i> Which one?</div>
+    <button class="sheet-cancel" onclick="openSheet('addSheet')">Cancel</button>
+  </div>
+  <div id="pickBody"></div>
 </div>
 
 <!-- SETTINGS HUB -->
@@ -2218,7 +2237,7 @@ function closeAll(){
 }
 
 // ─── ADD / EDIT ─────────────────────────────────────────────────────────────
-let pendingImg='',pendingBg='',pendingBgAccent='';
+let pendingImg='',pendingBg='',pendingBgAccent='',pendingAni=null;
 function setCoverPreview(url){
   pendingImg=url||'';
   const img=document.getElementById('coverImg'),rm=document.getElementById('coverRemoveBtn');
@@ -2300,7 +2319,7 @@ function formKindLabels(){
   if(btn&&!btn.classList.contains('loading'))btn.innerHTML=read?'<span>'+icon('sparkles')+'</span> Autofill — cover, chapters, genre &amp; status':'<span>'+icon('sparkles')+'</span> Autofill — cover, episodes, genre &amp; watch order';
 }
 function openSheet_add(){
-  editingId=null;
+  editingId=null;pendingAni=null;
   document.getElementById('addSheetTitle').textContent='Add to List';
   document.getElementById('submitBtn').textContent='Add to List';
   ['fTitle','fEps','fEp','fTime','fGenre','fOrder','fNotes'].forEach(i=>document.getElementById(i).value='');
@@ -2330,9 +2349,23 @@ function editItem(id){
   setKind(kindOf(a));
   setTimeout(()=>openSheet('addSheet'),60);
 }
+// Loose match: "Attack on Titan" / "attack on titan" / "Attack on Titan!" are the
+// same show to a person, so they should be to us. Watch and Read lists are separate
+// namespaces — the manga and the anime of the same name are legitimately both yours.
+function normTitle(t){return (t||'').toLowerCase().replace(/[^a-z0-9]/g,'');}
+function findDuplicate(title,kind,exceptId){
+  const n=normTitle(title);if(!n)return null;
+  return anime.find(a=>a.id!==exceptId&&kindOf(a)===kind&&normTitle(a.title)===n)||null;
+}
 function submitForm(){
   const title=document.getElementById('fTitle').value.trim();
   if(!title){toast('Enter a title first');return;}
+  const dupe=findDuplicate(title,curKind,editingId);
+  if(dupe){
+    toast(`Already in your ${curKind==='read'?'reading':'watch'} list — opening it`);
+    closeAll();setTimeout(()=>openDetail(dupe.id),260);
+    return;
+  }
   const orderRaw=document.getElementById('fOrder').value.trim();
   const epsStr=document.getElementById('fEps').value.trim();
   const epTotal=parseEpTotal(epsStr);
@@ -2349,6 +2382,7 @@ function submitForm(){
     notes:document.getElementById('fNotes').value.trim(),
     img:pendingImg,
     imgTried:!pendingImg&&!!editingId,
+    ...(pendingAni?{aniId:pendingAni.aniId,aniColor:pendingAni.aniColor,banner:pendingAni.banner,bannerTried:!!pendingAni.banner,detTried:true}:{}),
     bgImage:pendingBg,
     bgAccent:pendingBg?(pendingBgAccent||(prev&&prev.bgAccent)||''):'',
     upd:Date.now()};
@@ -2786,13 +2820,15 @@ async function jikan(path){const r=await fetch('https://api.jikan.moe/v4'+path);
 function durMins(d){if(!d)return 0;const h=/(\d+)\s*hr/.exec(d),m=/(\d+)\s*min/.exec(d);return(h?+h[1]*60:0)+(m?+m[1]:0);}
 function typeTag(t){return{TV:'TV',Movie:'MOVIE',OVA:'OVA',ONA:'ONA',Special:'SPECIAL','TV Special':'SPECIAL'}[t]||'TV';}
 function relEntry(full,kind){const r=(full.relations||[]).find(x=>x.relation===kind);return r&&r.entry.find(e=>e.type==='anime')||null;}
-async function lookupAnime(title){
-  const results=await jikan(`/anime?q=${encodeURIComponent(title)}&limit=5&sfw`);
-  if(!results||!results.length)return null;
-  const low=title.toLowerCase();
-  const best=results.find(a=>(a.title_english||'').toLowerCase()===low||a.title.toLowerCase()===low)||results[0];
-  const seen=new Set([best.mal_id]);
-  let cur;try{cur=await jikan(`/anime/${best.mal_id}/full`);}catch{cur=best;}
+// Franchise watch order, from a MAL id the user already picked on AniList.
+// This used to also *choose* the show by searching Jikan by title — which is how a
+// Jikan outage turned "One Piece" into the Netflix live-action. Identification now
+// happens on AniList; Jikan is only asked for the one thing it uniquely has (the
+// relation graph), and is allowed to fail without consequence.
+async function malWatchOrder(malId){
+  const seen=new Set([malId]);
+  let cur;try{cur=await jikan(`/anime/${malId}/full`);}catch{return [];}
+  if(!cur)return [];
   const before=[];let node=cur;
   for(let i=0;i<3;i++){
     const p=relEntry(node,'Prequel');if(!p||seen.has(p.mal_id))break;
@@ -2823,24 +2859,24 @@ async function lookupAnime(title){
   if(films.length>15)order.push(`MOVIE: …plus ${films.length-15} more — side film`);
   ovas.slice(0,3).forEach(n=>order.push(`OVA: ${short(n)} — optional`));
   recaps.slice(0,2).forEach(n=>order.push(`SKIP: ${short(n)} — recap`));
-  const totMin=chain.reduce((s,n)=>{const per=durMins(n.duration);return s+(n.type==='Movie'?per:per*(n.episodes||0));},0);
-  const filmCount=chain.filter(n=>n.type==='Movie').length+films.length;
-  const tvEps=chain.reduce((s,n)=>s+(n.type==='Movie'?0:(n.episodes||0)),0);
-  let eps;
-  if(chain.length===1&&cur.type==='Movie')eps='1 movie';
-  else eps=`${tvEps||cur.episodes||'?'} eps${filmCount?` + ${filmCount} movie${filmCount>1?'s':''}`:''}`;
-  const bits=[];
-  if(cur.score)bits.push(`★ ${cur.score} on MAL`);
-  if(cur.status)bits.push(cur.status);
-  if(chain.length>1)bits.push(`${chain.length}-part series`);
-  if(films.length)bits.push(`${films.length} side films`);
+  return order;
+}
+// A live-action pick, resolved by id — no fuzzy re-search, so what you chose is
+// exactly what you get.
+async function lookupShowById(id){
+  const r=await fetch(`https://api.tvmaze.com/shows/${id}?embed=episodes`);
+  if(!r.ok)return null;
+  const d=await r.json();
+  const eps=(d._embedded&&d._embedded.episodes)||[];
+  const seasons={};eps.forEach(e=>{seasons[e.season]=(seasons[e.season]||0)+1;});
+  const sNums=Object.keys(seasons);
   return{
-    eps,
-    time:totMin?`~${Math.max(1,Math.round(totMin/60))} hrs`:'',
-    genre:[...(cur.genres||[]),...(cur.themes||[]),...(cur.demographics||[])].map(g=>g.name).slice(0,3).join(', '),
-    order,
-    notes:bits.join(' · '),
-    img:cur.images?.jpg?.large_image_url||cur.images?.jpg?.image_url||''
+    eps:eps.length?`${eps.length} eps`:'TBA',
+    time:d.averageRuntime&&eps.length?`~${Math.round(d.averageRuntime*eps.length/60)} hrs`:'',
+    genre:(d.genres||[]).slice(0,3).join(', '),
+    order:sNums.length>1?sNums.map(s=>`TV: Season ${s} — ${seasons[s]} eps`):[],
+    notes:['Live action',d.status,(d.premiered||'').slice(0,4)].filter(Boolean).join(' · '),
+    img:d.image?(d.image.original||d.image.medium||''):''
   };
 }
 async function lookupShow(title){
@@ -2976,31 +3012,119 @@ async function fetchCovers(){
     }
   }finally{coverRunning=false;}
 }
+// ─── AUTOFILL ───────────────────────────────────────────────────────────────
+// Searching used to take the first hit from the first API that answered. Jikan
+// (MyAnimeList) is frequently down — it 504s — so "One Piece" would fall through
+// to TVMaze and confidently fill in the 2023 Netflix live-action. AniList answers
+// reliably and knows both anime and manga, so it leads; TVMaze is only *added* as
+// a live-action option rather than used as a silent fallback. And since one title
+// can legitimately mean several things, the user picks instead of us guessing.
+const ANI_FMT={TV:'TV',TV_SHORT:'TV short',MOVIE:'Movie',SPECIAL:'Special',OVA:'OVA',ONA:'ONA',MUSIC:'Music video',
+  MANGA:'Manga',MANHWA:'Manhwa',MANHUA:'Manhua',NOVEL:'Light novel',ONE_SHOT:'One-shot'};
+function aniLabel(m){
+  return ANI_FMT[m.format]||(m.countryOfOrigin==='KR'?'Manhwa':m.countryOfOrigin==='CN'?'Manhua':'');
+}
+function aniToData(m,kind){
+  const bits=[];const lbl=aniLabel(m);
+  if(lbl)bits.push(lbl);
+  if(m.averageScore)bits.push(`★ ${(m.averageScore/10).toFixed(1)} on AniList`);
+  if(m.status)bits.push(String(m.status).replace(/_/g,' ').toLowerCase());
+  if(m.startDate&&m.startDate.year)bits.push(String(m.startDate.year));
+  let eps='',time='';
+  if(kind==='read'){
+    eps=m.chapters?`${m.chapters} chapters`:(m.volumes?`${m.volumes} volumes`:'ongoing');
+  }else{
+    eps=m.episodes?`${m.episodes} eps`:'TBA';
+    if(m.episodes&&m.duration)time=`~${Math.round(m.episodes*m.duration/60)} hrs`;
+  }
+  return{eps,time,genre:(m.genres||[]).slice(0,3).join(', '),order:[],notes:bits.join(' · '),
+    img:(m.coverImage&&m.coverImage.large)||'',aniId:m.id,malId:m.idMal||0,
+    aniColor:(m.coverImage&&m.coverImage.color)||'',banner:m.bannerImage||''};
+}
+async function aniSearch(title,type){
+  const q=`query($s:String,$t:MediaType){Page(perPage:6){media(search:$s,type:$t,sort:SEARCH_MATCH,isAdult:false){
+    id idMal title{romaji english} coverImage{large color} bannerImage format episodes chapters volumes duration
+    genres averageScore status countryOfOrigin startDate{year}}}}`;
+  const r=await fetch('https://graphql.anilist.co',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},
+    body:JSON.stringify({query:q,variables:{s:title,t:type}})});
+  if(!r.ok)return [];
+  const j=await r.json();
+  return ((j&&j.data&&j.data.Page&&j.data.Page.media)||[]).filter(m=>m&&m.id);
+}
+async function tvSearch(title){
+  const r=await fetch(`https://api.tvmaze.com/search/shows?q=${encodeURIComponent(title)}`);
+  if(!r.ok)return [];
+  const j=await r.json();
+  return (j||[]).slice(0,3).map(x=>x.show).filter(Boolean);
+}
+let pickCands=[];
 async function aiAutofill(){
   const title=document.getElementById('fTitle').value.trim();
   if(!title){toast('Enter a title first');return;}
   const btn=document.getElementById('autofillBtn');
   btn.classList.add('loading');btn.innerHTML='<span>'+icon('sparkles')+'</span> Searching databases…';
-  let data=null,src='';
-  if(curKind==='read'){
-    // reading: AniList MANGA first (manhwa/webtoon/manga), then Open Library for light novels
-    try{data=await lookupManga(title);src='AniList (Manga)';}catch{}
-    if(!data){try{data=await lookupBook(title);src='Open Library';}catch{}}
-  }else{
-    try{data=await lookupAnime(title);src='MyAnimeList';}catch{}
-    if(!data){try{data=await lookupShow(title);src='TVMaze';}catch{}}
-    if(!data){try{data=await lookupBook(title);src='Open Library';}catch{}}
-  }
-  if(data){
-    if(data.eps)document.getElementById('fEps').value=data.eps;
-    if(data.time)document.getElementById('fTime').value=data.time;
-    if(data.genre)document.getElementById('fGenre').value=data.genre;
-    if(data.order&&data.order.length)document.getElementById('fOrder').value=data.order.join('\n');
-    if(data.notes)document.getElementById('fNotes').value=data.notes;
-    if(data.img)setCoverPreview(data.img);
-    toast(`Found on ${src}`);
-  }else toast('No match found — fill in manually.');
+  const cands=[];
+  try{
+    if(curKind==='read'){
+      (await aniSearch(title,'MANGA')).forEach(m=>cands.push({
+        title:m.title.english||m.title.romaji,
+        sub:[aniLabel(m),m.startDate&&m.startDate.year,m.chapters?m.chapters+' ch':''].filter(Boolean).join(' · '),
+        img:(m.coverImage&&m.coverImage.large)||'',data:aniToData(m,'read')}));
+    }else{
+      (await aniSearch(title,'ANIME')).forEach(m=>cands.push({
+        title:m.title.english||m.title.romaji,
+        sub:[aniLabel(m),m.startDate&&m.startDate.year,m.episodes?m.episodes+' eps':''].filter(Boolean).join(' · '),
+        img:(m.coverImage&&m.coverImage.large)||'',data:aniToData(m,'watch')}));
+      try{ // live-action is a *choice*, never a silent substitute for the anime
+        (await tvSearch(title)).forEach(s=>cands.push({
+          title:s.name,
+          sub:['Live action',(s.premiered||'').slice(0,4),((s.network||s.webChannel||{}).name)||''].filter(Boolean).join(' · '),
+          img:s.image?(s.image.medium||s.image.original||''):'',tvId:s.id}));
+      }catch{}
+    }
+  }catch{}
   btn.classList.remove('loading');formKindLabels();
+  if(!cands.length){toast('No match found — fill in manually.');return;}
+  pickCands=cands;
+  if(cands.length===1){applyCandidate(0);return;}
+  renderPicker();openSheet('pickSheet');
+}
+function renderPicker(){
+  const el=document.getElementById('pickBody');if(!el)return;
+  el.innerHTML=pickCands.map((c,i)=>{
+    const ch=((c.title||'?').charAt(0)||'?').replace(/[^A-Za-z0-9]/g,'')||'?';
+    const cover=c.img?`<img class="pick-img" src="${c.img}" alt="" loading="lazy" onerror="this.outerHTML='<div class=\\'pick-ph\\'>${ch}</div>'">`:`<div class="pick-ph">${ch}</div>`;
+    return`<button class="pick-row" onclick="applyCandidate(${i})">${cover}
+      <div class="pick-txt"><div class="pick-t">${schEsc(c.title)}</div><div class="pick-s">${schEsc(c.sub||'')}</div></div>
+      <span class="set-chev">${icon('chevron-right')}</span></button>`;
+  }).join('');
+}
+async function applyCandidate(i){
+  const c=pickCands[i];if(!c)return;
+  closeAll();openSheet('addSheet');
+  let data=c.data;
+  if(!data&&c.tvId){ // live-action pick — pull its season/episode detail from TVMaze
+    try{data=await lookupShowById(c.tvId);}catch{}
+  }
+  if(!data){toast('Could not load that one');return;}
+  const t=document.getElementById('fTitle');if(t&&c.title)t.value=c.title;
+  if(data.eps)document.getElementById('fEps').value=data.eps;
+  if(data.time)document.getElementById('fTime').value=data.time;
+  if(data.genre)document.getElementById('fGenre').value=data.genre;
+  if(data.notes)document.getElementById('fNotes').value=data.notes;
+  if(data.img)setCoverPreview(data.img);
+  pendingAni=data.aniId?{aniId:data.aniId,aniColor:data.aniColor||'',banner:data.banner||''}:null;
+  formKindLabels();
+  toast('Filled in');
+  // Watch order is the one thing only MyAnimeList's relation graph knows. It's
+  // best-effort: Jikan is flaky, and a missing watch order is a far smaller loss
+  // than a wrong show.
+  if(data.malId&&curKind!=='read'){
+    try{
+      const order=await malWatchOrder(data.malId);
+      if(order&&order.length){document.getElementById('fOrder').value=order.join('\n');toast('Watch order added');}
+    }catch{}
+  }
 }
 
 // ─── TOAST ──────────────────────────────────────────────────────────────────

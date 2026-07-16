@@ -3317,7 +3317,7 @@ function renderParty(){
     <div class="pt-members">${members}</div>
     ${now}${hostCtl}
     <div class="pt-chat" id="ptChat">${chat||'<div class="pt-sys">Say hi 👋</div>'}</div>
-    <div class="pt-chatbar"><input id="ptMsg" placeholder="Message… (e.g. pause a sec, brb)" maxlength="300" onkeydown="if(event.key==='Enter')partySend()"><button class="pt-send" onclick="partySend()">${icon('send')}</button></div>
+    <div class="pt-chatbar"><input id="ptMsg" placeholder="Message…" maxlength="300" onkeydown="if(event.key==='Enter')partySend()"><button class="pt-send" onclick="partySend()">${icon('send')}</button></div>
     <button class="src-opt" style="margin-top:14px" onclick="partyEnd()"><div class="src-name" style="color:var(--t2)">${partyIsHost?'End the party':'Leave the party'}</div></button>`;
   const cc=document.getElementById('ptChat');if(cc)cc.scrollTop=cc.scrollHeight;
 }

@@ -14,7 +14,7 @@
 <!-- Without this the browser hunts for /favicon.ico at the domain root and 404s
      on every first load — and the tab shows a blank page icon. -->
 <link rel="icon" href="icons/icon-192.png" type="image/png">
-<title>Watchlist</title>
+<title>WatchList</title>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Manrope:wght@400..800&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -959,7 +959,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 </div>
 <div id="app">
   <div class="hdr">
-    <div class="hdr-title">Watchlist</div>
+    <div class="hdr-title">WatchList</div>
     <div class="hdr-actions">
       <button class="hbtn" onclick="openForYou()" title="For You — tailored recommendations" aria-label="For You recommendations"><i data-ic="compass"></i></button>
       <button class="hbtn" onclick="openSchedule()" title="Weekly airing schedule" aria-label="Weekly airing schedule"><i data-ic="calendar"></i></button>
@@ -3864,7 +3864,7 @@ function saveChat(){try{localStorage.setItem('chat_hist',JSON.stringify(chatHist
 function chatContext(){
   const line=a=>a.title+(a.genre?' ['+a.genre+']':'')+(a.rating?' ('+a.rating+'/5)':'');
   const g=(kind,st)=>anime.filter(a=>kindOf(a)===kind&&a.status===st).map(line).join('; ')||'none';
-  return "You are a warm, sharp anime & manga companion inside the user's personal watchlist app. Chat naturally and fairly concisely (a few sentences unless they ask for more). Reference their ACTUAL list, read their ratings to gauge taste, keep spoilers out unless asked, and use light markdown (bold, bullet lists) when it helps. When recommending NEW titles, prefer things not already on their list, lean toward what matches their high-rated + genre patterns, and steer clear of what they dropped.\n\n"+
+  return "You are a warm, sharp anime & manga companion inside the user's personal WatchList app. Chat naturally and fairly concisely (a few sentences unless they ask for more). Reference their ACTUAL list, read their ratings to gauge taste, keep spoilers out unless asked, and use light markdown (bold, bullet lists) when it helps. When recommending NEW titles, prefer things not already on their list, lean toward what matches their high-rated + genre patterns, and steer clear of what they dropped.\n\n"+
     "WATCHING: "+g('watch','watching')+"\nPLAN TO WATCH: "+g('watch','plan')+"\nFINISHED (ratings shown): "+g('watch','finished')+"\nDROPPED (disliked): "+g('watch','dropped')+"\n"+
     "READING: "+g('read','watching')+"\nPLAN TO READ: "+g('read','plan')+"\nFINISHED READING: "+g('read','finished');
 }

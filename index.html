@@ -279,6 +279,24 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 .bb-dot.on{background:#fff;width:20px;}
 .row-div{font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--t3);padding:22px 18px 2px;animation:fadeUp .4s ease both;}
 
+/* ── CONTINUE WATCHING RAIL ── */
+.rz-sec{margin-top:18px;animation:fadeUp .4s ease both;}
+.rz-head{display:flex;align-items:center;gap:7px;padding:0 18px 11px;font-family:var(--fd);font-size:15px;font-weight:800;letter-spacing:-.2px;color:var(--t1);}
+.rz-head .ico{width:16px;height:16px;fill:var(--a2);color:var(--a2);}
+.rz-scroll{display:flex;gap:12px;overflow-x:auto;padding:0 18px 4px;scrollbar-width:none;scroll-snap-type:x mandatory;}
+.rz-scroll::-webkit-scrollbar{display:none;}
+.rz-card{flex:0 0 clamp(150px,42vw,190px);scroll-snap-align:start;text-align:left;}
+.rz-card:active{transform:scale(.97);}
+.rz-art{position:relative;width:100%;aspect-ratio:16/10;border-radius:14px;overflow:hidden;background:var(--bg4);border:1px solid var(--b1);box-shadow:var(--elev1);}
+.rz-img{width:100%;height:100%;object-fit:cover;}
+.rz-ph{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-family:var(--fd);font-size:34px;font-weight:900;color:var(--t3);background:linear-gradient(135deg,var(--bg4),var(--bg2));}
+.rz-play{position:absolute;inset:0;margin:auto;width:42px;height:42px;border-radius:50%;background:color-mix(in srgb,var(--a) 92%,transparent);color:var(--aFg);display:flex;align-items:center;justify-content:center;box-shadow:0 4px 16px -4px var(--glow);transition:transform .15s;}
+.rz-play .ico{width:18px;height:18px;fill:currentColor;margin-left:2px;}
+.rz-card:active .rz-play{transform:scale(1.12);}
+.rz-bar{position:absolute;left:0;right:0;bottom:0;height:4px;background:rgba(0,0,0,.45);}
+.rz-fill{height:100%;background:var(--a2);}
+.rz-title{font-size:12.5px;font-weight:700;color:var(--t1);margin-top:8px;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.rz-sub{font-size:11.5px;color:var(--t3);margin-top:2px;}
 /* ── ROWS ── */
 .row-sec{margin-top:16px;animation:fadeUp .4s ease both;}
 .row-head{display:flex;align-items:baseline;gap:8px;padding:0 18px 10px;}
@@ -2013,6 +2031,41 @@ function renderThemeGrid(){
   }).join('');
 }
 
+// ─── CONTINUE WATCHING ──────────────────────────────────────────────────────
+// The single biggest "open app → back to watching" lever: in-progress titles that
+// jump STRAIGHT into the next episode's player, skipping the detail page. Only
+// anime (aniId + known episode count) can deep-link to an episode, so the rail is
+// watch-list only — a reading equivalent would land on a search, not a resume.
+function resumeItems(pool){
+  return sorted(pool.filter(a=>
+    a.status==='watching' && kindOf(a)==='watch' && a.aniId && a.epTotal &&
+    (a.ep||0) < a.epTotal))       // started-or-fresh, not finished
+    .sort((a,b)=>(b.upd||0)-(a.upd||0)).slice(0,12);
+}
+function resumeRailHTML(pool,isRead){
+  if(isRead) return '';                    // reading has no episode deep-link
+  const items=resumeItems(pool);
+  if(!items.length) return '';
+  const card=a=>{
+    const next=Math.min((a.ep||0)+1,a.epTotal);
+    const p=Math.round(prog(a)*100);
+    const art=titleBg(a)||a.img;
+    const ch=((a.title||'?').trim()[0]||'?').toUpperCase().replace(/['"<&]/g,'?');
+    const bg=art?`<img class="rz-img" src="${art}" loading="lazy" alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'rz-ph',textContent:'${ch}'}))">`:`<div class="rz-ph">${ch}</div>`;
+    return `<button class="rz-card" onclick="resumeWatch('${a.id}')" style="${accentVars(a)}">
+      <div class="rz-art">${bg}<div class="rz-play">${icon('play')}</div><div class="rz-bar"><div class="rz-fill" style="width:${p}%"></div></div></div>
+      <div class="rz-title">${a.title}</div>
+      <div class="rz-sub">Episode ${next}</div>
+    </button>`;
+  };
+  return `<div class="rz-sec"><div class="rz-head">${icon('play')} Continue watching</div>
+    <div class="rz-scroll">${items.map(card).join('')}</div></div>`;
+}
+function resumeWatch(id){
+  // exactly what Watch now does, but invoked from the rail — straight to the episode
+  watchAnime(id);
+}
+
 // ─── HOME RENDER ────────────────────────────────────────────────────────────
 function sorted(list){
   const l=[...list];
@@ -2225,7 +2278,7 @@ function renderHome(){
   sorted(pool.filter(a=>titleBg(a))).forEach(addSpot);
   const spotlight=spot.slice(0,5),spotSet=new Set(spotlight.map(a=>a.id));
   heroAmb=spotlight[0]?titleAccent(spotlight[0]):'';setAmbient(heroAmb);
-  let html=nudgeHTML()+(spotlight.length?billboardHTML(spotlight):'');
+  let html=nudgeHTML()+(spotlight.length?billboardHTML(spotlight):'')+resumeRailHTML(pool,isRead);
   // each section wears its own status colour (STATUS_META) rather than the one
   // theme accent — the palette already exists, it was just unused outside chips
   const rows=isRead
@@ -2786,16 +2839,17 @@ function watchAnime(id){
   f.src=url;
   document.getElementById('playerView').classList.add('on');
 }
-// Reading source (AsuraScans by default). Unlike anime, AsuraScans has no URL-based
-// search or predictable series link (the slug carries a random hash), so we open the
-// site's homepage where search is front-and-centre. A custom source can use {title}/
-// {slug} tokens if the site supports deep-linking.
+// Reading source (AsuraScans by default). AsuraScans series live at
+// /comics/<slug>-<suffix>, where the suffix is a CONSTANT site-wide token (not a
+// per-series hash), so we can deep-link straight to the title. If a slug ever
+// misses, the site shows its own 404-with-search — and the ⤴ button opens search.
 const READ_DEFAULT='https://asurascans.com';
+const ASURA_SUFFIX='1d35e5bd';   // constant across all series; update if the site changes it
 function readSource(){try{return localStorage.getItem('read_src')||'';}catch{return'';}}
 function usingDefaultReadSource(){return !readSource();}
 function readURL(a){
   const slug=streamSlug(a.title), src=readSource();
-  if(!src) return READ_DEFAULT;
+  if(!src) return `${READ_DEFAULT}/comics/${slug}-${ASURA_SUFFIX}`;   // deep-link to the series
   if(/\{title\}|\{slug\}/.test(src))
     return src.replace(/\{title\}/g,encodeURIComponent(a.title)).replace(/\{slug\}/g,slug);
   return src;
@@ -2807,7 +2861,9 @@ function readManga(id){
   const url=readURL(a);
   document.getElementById('pvTitle').textContent=a.title;
   const ext=document.getElementById('pvExt');
-  ext.onclick=()=>{try{window.open(url,'_blank','noopener');}catch{}};
+  // ⤴ opens the site homepage so they can search by hand if a deep-link ever misses
+  const fallback=usingDefaultReadSource()?READ_DEFAULT:url;
+  ext.onclick=()=>{try{window.open(fallback,'_blank','noopener');}catch{}};
   document.getElementById('pvFrame').src=url;
   document.getElementById('playerView').classList.add('on');
 }
@@ -2834,7 +2890,7 @@ function renderSource(){
     <p class="ai-desc">Where <b>Read now</b> opens a manga / manhwa / webtoon.</p>
     <button class="src-opt${!rcustom?' on':''}" onclick="setReadSource('')">
       <div class="src-name">AsuraScans <span class="src-tag">Built-in</span></div>
-      <div class="src-sub">Opens the site — search the title there</div>
+      <div class="src-sub">Jumps straight to the series</div>
     </button>
     <button class="src-opt${rcustom?' on':''}" onclick="document.getElementById('rsrcCustom').focus()">
       <div class="src-name">Your own site</div>

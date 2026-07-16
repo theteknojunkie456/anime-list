@@ -3050,7 +3050,7 @@ function renderSource(){
       <div class="src-name">Your own site</div>
       <div class="src-sub">${custom?'Using '+host(custom):'Paste any streaming site below'}</div>
     </button>
-    <input class="ai-prompt-in" id="srcCustom" placeholder="https://example.com" value="${custom?custom.replace(/"/g,'&quot;'):''}" autocomplete="off" style="margin-top:10px">
+    <input class="ai-prompt-in" id="srcCustom" placeholder="hianime.to — or a full URL" value="${custom?custom.replace(/"/g,'&quot;'):''}" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url" style="margin-top:10px">
     <button class="parse-btn" onclick="saveSource()">Use this site</button>
     <p class="ai-desc" style="margin-top:12px;font-size:11.5px">Optional tokens: <code>{title}</code>, <code>{slug}</code>, <code>{ep}</code> — e.g. <code>https://site.com/watch/{slug}/ep-{ep}</code>. With none, it just opens the site.</p>
 
@@ -3064,7 +3064,7 @@ function renderSource(){
       <div class="src-name">Your own site</div>
       <div class="src-sub">${rcustom?'Using '+host(rcustom):'Paste any reading site below'}</div>
     </button>
-    <input class="ai-prompt-in" id="rsrcCustom" placeholder="https://example.com" value="${rcustom?rcustom.replace(/"/g,'&quot;'):''}" autocomplete="off" style="margin-top:10px">
+    <input class="ai-prompt-in" id="rsrcCustom" placeholder="comick.io — or a full URL" value="${rcustom?rcustom.replace(/"/g,'&quot;'):''}" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url" style="margin-top:10px">
     <button class="parse-btn" onclick="saveReadSource()">Use this site</button>`;
 }
 function setReadSource(v){
@@ -3072,9 +3072,17 @@ function setReadSource(v){
   renderSource();
   toast(v?'Reading source set':'Back to AsuraScans');
 }
+// Accept what people actually type: bare domains ("hianime.to"), with or without
+// www, get an https:// prefix so the paste just works instead of being rejected.
+function normSrc(v){
+  v=(v||'').trim();
+  if(!v||/^https?:\/\//i.test(v))return v;
+  if(/^[\w-]+(\.[\w-]+)+(\/|\?|#|$)/.test(v))return 'https://'+v;   // looks like a domain/path
+  return v;   // clearly not a URL — let the caller reject it
+}
 function saveReadSource(){
-  const v=(document.getElementById('rsrcCustom').value||'').trim();
-  if(v && !/^https?:\/\//i.test(v)){toast('That needs to start with http:// or https://');return;}
+  const v=normSrc(document.getElementById('rsrcCustom').value);
+  if(v && !/^https?:\/\//i.test(v)){toast('That doesn’t look like a website address');return;}
   setReadSource(v);
 }
 function setSource(v){
@@ -3083,8 +3091,8 @@ function setSource(v){
   toast(v?'Source set':'Back to AniNeko');
 }
 function saveSource(){
-  const v=(document.getElementById('srcCustom').value||'').trim();
-  if(v && !/^https?:\/\//i.test(v)){toast('That needs to start with http:// or https://');return;}
+  const v=normSrc(document.getElementById('srcCustom').value);
+  if(v && !/^https?:\/\//i.test(v)){toast('That doesn’t look like a website address');return;}
   setSource(v);
 }
 // Time in the player is the one signal we have (we can't read the cross-origin

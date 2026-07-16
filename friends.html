@@ -663,6 +663,19 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 .pc-num{font-family:var(--fd);font-size:120px;font-weight:900;color:#fff;line-height:1;animation:pcPop .9s ease;}
 .pc-lbl{font-size:15px;font-weight:700;color:rgba(255,255,255,.7);letter-spacing:.04em;}
 @keyframes pcPop{0%{transform:scale(.4);opacity:0;}30%{transform:scale(1.1);opacity:1;}100%{transform:scale(1);opacity:1;}}
+.shareview{position:fixed;inset:0;z-index:130;background:#000;display:none;flex-direction:column;transform:translateY(100%);transition:transform .38s cubic-bezier(.2,1,.28,1);}
+.shareview.on{display:flex;transform:translateY(0);}
+.sh-stage{flex:1;min-height:0;position:relative;background:#000;display:flex;align-items:center;justify-content:center;}
+.sh-video{width:100%;height:100%;object-fit:contain;background:#000;}
+.sh-wait{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;color:rgba(255,255,255,.7);font-size:14px;font-weight:600;}
+.sh-wait.gone{display:none;}
+.sh-spin{width:34px;height:34px;border-radius:50%;border:3px solid rgba(255,255,255,.18);border-top-color:#fff;animation:shSpin .8s linear infinite;}
+@keyframes shSpin{to{transform:rotate(360deg);}}
+.pt-share{width:100%;height:48px;border-radius:14px;background:var(--bg3);border:1px solid var(--b2);color:var(--t1);font-family:var(--fd);font-size:14.5px;font-weight:800;display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:8px;}
+.pt-share.live{background:#c0392b;border-color:#c0392b;color:#fff;}
+.pt-share:active{transform:scale(.98);}
+.pt-share .ico{width:17px;height:17px;}
+.pt-hint{font-size:11.5px;color:var(--t3);text-align:center;margin:-2px 0 12px;}
 .party-pill{position:fixed;right:16px;bottom:calc(var(--safe-b) + 96px);z-index:90;display:none;align-items:center;gap:8px;background:var(--a);color:var(--aFg,#fff);border:0;border-radius:999px;padding:11px 16px;font-family:var(--fd);font-size:13.5px;font-weight:800;box-shadow:0 8px 24px -6px var(--glow);}
 .party-pill.on{display:flex;}
 .party-pill:active{transform:scale(.95);}
@@ -1232,6 +1245,18 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 
 <!-- 3·2·1 START CUE (full-screen) -->
 <div class="party-count" id="partyCount"><div class="pc-num" id="pcNum">3</div><div class="pc-lbl" id="pcLbl">Get ready…</div></div>
+
+<!-- SCREEN-SHARE VIEWER (full-screen) — shows the host's shared screen, in sync -->
+<div class="shareview" id="shareView">
+  <div class="pv-top">
+    <button class="sv-back" onclick="leaveShareView()" aria-label="Back"><i data-ic="chevron-left"></i></button>
+    <div class="pv-title" id="shareTitle">Watch party</div>
+    <button class="pv-ext" onclick="openSheet('partySheet')" aria-label="Party chat"><i data-ic="message"></i></button>
+  </div>
+  <div class="sh-stage"><video id="shareVideo" class="sh-video" autoplay playsinline></video>
+    <div class="sh-wait" id="shareWait"><div class="sh-spin"></div><div>Connecting to the host…</div></div>
+  </div>
+</div>
 
 <!-- floating pill while a party is live -->
 <button class="party-pill" id="partyPill" onclick="openSheet('partySheet')"><span class="pp-dot"></span><span id="ppText">Party</span></button>
@@ -3188,6 +3213,7 @@ function renderAniList(){
 // frame-synced (the video is a cross-origin frame we can't control) — everyone
 // just starts together on the count. Backed by the sync worker (party- ops).
 let partyCode='',partyIsHost=false,partyRoom=null,partyTimer=0,partySeenPlay=0,partyChatRev=-1;
+let pcs={},localStream=null,partySeenSig=new Set(),partyPrevSharing='';   // WebRTC screen-share state
 function partyUid(){try{let u=localStorage.getItem('party_uid');if(!u){u='u'+Math.random().toString(36).slice(2)+Date.now().toString(36);localStorage.setItem('party_uid',u);}return u;}catch{return'u'+Date.now();}}
 function partyName(){try{return localStorage.getItem('party_name')||'';}catch{return'';}}
 function setPartyName(n){try{localStorage.setItem('party_name',n);}catch{}}
@@ -3209,6 +3235,7 @@ function applyRoom(j){
   if(document.getElementById('partySheet').classList.contains('on'))renderParty();
   // the 3·2·1 cue: a fresh future playAt → count everyone in, then open the player
   if(j.room.playAt&&j.room.playAt>Date.now()&&j.room.playAt!==partySeenPlay){partySeenPlay=j.room.playAt;partyCue(j.room);}
+  try{rtcTick(j.room,j.signals);}catch(e){}   // drive the screen-share mesh
 }
 function partyCue(room){
   const ov=document.getElementById('partyCount'),num=document.getElementById('pcNum'),lbl=document.getElementById('pcLbl');
@@ -3256,6 +3283,8 @@ async function partyJoin(codeArg){
 }
 async function partyEnd(silent){
   const code=partyCode;partyStopPolling();
+  if(localStream){localStream.getTracks().forEach(t=>t.stop());localStream=null;}
+  Object.keys(pcs).forEach(pcClose);hideShareView();partySeenSig=new Set();partyPrevSharing='';
   try{localStorage.removeItem('party_active');}catch{}
   if(code&&!silent){try{await partyPost('party-leave',{code});}catch{}}
   partyCode='';partyIsHost=false;partyRoom=null;updatePartyPill();
@@ -3274,6 +3303,74 @@ async function partyPick(id){
   try{const j=await partyPost('party-set',{title:a.title,animeId:a.id,ep,img:titleBg(a)||a.img||''});applyRoom(j);toast(`Set to ${a.title} · Ep ${ep}`);}catch(e){toast(e.message);}
 }
 function partyCopyCode(){try{navigator.clipboard.writeText(partyCode);toast('Code copied');}catch{toast(partyCode);}}
+
+// ── screen share (WebRTC, peer-to-peer — no server carries the video) ──────────
+// The desktop host captures a tab/window and streams it straight to each viewer;
+// everyone sees the host's actual screen, so play/pause/seek are perfectly synced
+// with zero effort. Signaling (offer/answer) rides on the party worker. Non-trickle
+// ICE (wait for gathering, send once) keeps it robust over slow polling.
+const RTC_CFG={iceServers:[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'}]};
+function canScreenShare(){return !!(navigator.mediaDevices&&navigator.mediaDevices.getDisplayMedia);}
+function iceComplete(pc){return new Promise(res=>{if(pc.iceGatheringState==='complete')return res();const c=()=>{if(pc.iceGatheringState==='complete'){pc.removeEventListener('icegatheringstatechange',c);res();}};pc.addEventListener('icegatheringstatechange',c);setTimeout(res,2800);});}
+async function startShare(){
+  if(!canScreenShare()){toast('Screen sharing needs a computer — iPhones can’t share a screen');return;}
+  if(!partyIsHost){toast('Only the host can share');return;}
+  let s;try{s=await navigator.mediaDevices.getDisplayMedia({video:{frameRate:30},audio:true});}catch{toast('Screen share cancelled');return;}
+  localStream=s;
+  s.getVideoTracks()[0].onended=()=>stopShare();   // browser's own "Stop sharing" bar
+  try{await partyPost('party-share',{on:true});}catch{}
+  renderParty();toast('Sharing — friends will connect in a moment');
+}
+function stopShare(){
+  if(localStream){localStream.getTracks().forEach(t=>t.stop());localStream=null;}
+  Object.keys(pcs).forEach(pcClose);
+  if(partyActive())partyPost('party-share',{on:false}).catch(()=>{});
+  renderParty();
+}
+function pcClose(uid){const pc=pcs[uid];if(pc){try{pc.close();}catch{}delete pcs[uid];}}
+async function pcConnectToViewer(vid){                 // HOST → each viewer
+  if(pcs[vid]||!localStream)return;
+  const pc=new RTCPeerConnection(RTC_CFG);pcs[vid]=pc;
+  localStream.getTracks().forEach(tr=>pc.addTrack(tr,localStream));
+  pc.onconnectionstatechange=()=>{if(['failed','closed','disconnected'].includes(pc.connectionState))pcClose(vid);};
+  try{const offer=await pc.createOffer();await pc.setLocalDescription(offer);await iceComplete(pc);
+    await partyPost('party-signal',{to:vid,kind:'offer',data:pc.localDescription});}catch{pcClose(vid);}
+}
+async function pcHandleOffer(from,offer){              // VIEWER answers the host
+  pcClose(from);
+  const pc=new RTCPeerConnection(RTC_CFG);pcs[from]=pc;
+  pc.ontrack=e=>{showShareView(e.streams[0]);};
+  pc.onconnectionstatechange=()=>{if(['failed','closed','disconnected'].includes(pc.connectionState)){pcClose(from);if(!Object.keys(pcs).length)hideShareView();}};
+  try{await pc.setRemoteDescription(offer);const ans=await pc.createAnswer();await pc.setLocalDescription(ans);await iceComplete(pc);
+    await partyPost('party-signal',{to:from,kind:'answer',data:pc.localDescription});}catch{pcClose(from);}
+}
+async function pcHandleAnswer(from,answer){            // HOST receives the viewer's answer
+  const pc=pcs[from];if(pc&&!pc.currentRemoteDescription)try{await pc.setRemoteDescription(answer);}catch{}
+}
+function showShareView(stream){
+  const v=document.getElementById('shareVideo');if(v){v.srcObject=stream;v.play&&v.play().catch(()=>{});}
+  document.getElementById('shareWait').classList.add('gone');
+  document.getElementById('shareTitle').textContent=(partyRoom&&partyRoom.title)?partyRoom.title:'Watch party';
+  closeAll();document.getElementById('shareView').classList.add('on');
+}
+function hideShareView(){const v=document.getElementById('shareVideo');if(v)v.srcObject=null;const sw=document.getElementById('shareWait');if(sw)sw.classList.remove('gone');document.getElementById('shareView').classList.remove('on');}
+function leaveShareView(){document.getElementById('shareView').classList.remove('on');}   // hide but keep the stream
+function reopenShareView(){const v=document.getElementById('shareVideo');if(v&&v.srcObject){closeAll();document.getElementById('shareView').classList.add('on');}else toast('Connecting to the host…');}
+// Called every poll: keep the mesh in sync with who's present and what's shared.
+function rtcTick(room,signals){
+  if(signals)for(const s of signals){if(partySeenSig.has(s.id))continue;partySeenSig.add(s.id);
+    if(s.kind==='offer')pcHandleOffer(s.from,s.data);else if(s.kind==='answer')pcHandleAnswer(s.from,s.data);}
+  const sharing=room.sharing||'';
+  if(partyIsHost&&localStream&&sharing===partyUid()){    // host: connect any newly-present viewers
+    const present=new Set(room.members.map(m=>m.uid));
+    room.members.forEach(m=>{if(m.uid!==partyUid()&&!pcs[m.uid])pcConnectToViewer(m.uid);});
+    Object.keys(pcs).forEach(uid=>{if(!present.has(uid))pcClose(uid);});   // viewer left → drop it
+  }
+  if(!sharing&&partyPrevSharing){                        // sharing ended → tear down + close viewer
+    Object.keys(pcs).forEach(pcClose);hideShareView();partySeenSig.clear();
+  }
+  partyPrevSharing=sharing;
+}
 function renderParty(){
   const box=document.getElementById('partyBody');if(!box)return;
   if(!partyActive()){
@@ -3295,7 +3392,11 @@ function renderParty(){
   const members=r.members.map(m=>`<span class="pt-chip${m.uid===r.host?' host':''}"><span class="dot"></span>${schEsc(m.name)}${m.uid===r.host?' 👑':''}</span>`).join('');
   const now=r.title?`<div class="pt-now">${r.img?`<img src="${r.img}" alt="">`:''}<div><div class="pt-now-t">${schEsc(r.title)}</div><div class="pt-now-s">${r.ep?`Episode ${r.ep}`:'Ready'} · ${r.members.length} watching</div></div></div>`:'';
   let hostCtl='';
-  if(partyIsHost){
+  const sharing=!!r.sharing, iShare=r.sharing===meUid;
+  if(partyIsHost&&iShare){
+    hostCtl=`<button class="pt-share live" onclick="stopShare()">${icon('x')} Stop screen share</button>
+      <div class="pt-hint">Friends are watching your screen — perfectly in sync. ${Math.max(0,r.members.length-1)} connected.</div>`;
+  }else if(partyIsHost){
     // Watching first (most likely pick), then the rest; a scannable vertical list.
     const watchable=anime.filter(a=>kindOf(a)==='watch'&&a.aniId)
       .sort((x,y)=>(y.status==='watching')-(x.status==='watching')||(y.upd||0)-(x.upd||0));
@@ -3307,7 +3408,13 @@ function renderParty(){
     const picker=watchable.length
       ?`<div class="dt-label" style="margin-top:14px">Pick what to watch</div><div class="pt-picklist">${watchable.map(row).join('')}</div>`
       :`<p class="ai-desc" style="margin-top:14px">Add some anime to your watch list to pick from here.</p>`;
-    hostCtl=`${picker}<button class="pt-play" onclick="partyPlay()"${r.title?'':' disabled'}>${icon('play')} Play together</button>`;
+    const shareBlock=`<button class="pt-share" onclick="startShare()">${icon('users')} Share your screen — real sync</button>`
+      +(canScreenShare()?`<div class="pt-hint">Everyone watches your screen, perfectly synced. Open the anime in another tab, then share it.</div>`
+        :`<div class="pt-hint">Needs a computer to host. On a phone, use “Start together” below.</div>`);
+    hostCtl=`${shareBlock}${picker}<button class="pt-play" onclick="partyPlay()"${r.title?'':' disabled'}>${icon('play')} Start together · 3·2·1</button>`;
+  }else if(sharing){
+    hostCtl=`<button class="pt-play" onclick="reopenShareView()">${icon('play')} Watch the shared screen</button>
+      <p class="ai-desc" style="text-align:center">The host is sharing their screen — you're watching in sync.</p>`;
   }else{
     hostCtl=`<p class="ai-desc" style="text-align:center">${r.title?'Waiting for the host to start…':'Waiting for the host to pick something…'}</p>`;
   }

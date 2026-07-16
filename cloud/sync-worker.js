@@ -66,8 +66,8 @@ async function handleParty(op, body, env, cors) {
     do { code = mintCode(); existing = await env.LISTS.get('party:' + code); }
     while (existing && ++tries < 6);
     const room = {
-      code, host: uid, title: '', animeId: '', ep: 0, img: '', playAt: 0,
-      members: { [uid]: { name, seen: Date.now() } }, chat: [], rev: 1,
+      code, host: uid, title: '', animeId: '', ep: 0, img: '', playAt: 0, sharing: '',
+      members: { [uid]: { name, seen: Date.now() } }, chat: [], signals: [], rev: 1,
     };
     sysMsg(room, `${name} started the party`);
     await saveRoom(env, room);
@@ -96,7 +96,8 @@ async function handleParty(op, body, env, cors) {
       room.members[uid] = { name: (m && m.name) || name, seen: now };
       await saveRoom(env, room);
     }
-    return json({ ok: true, room: view(room), host: isHost }, 200, cors);
+    const signals = (room.signals || []).filter(s => s.to === uid);   // WebRTC messages for me
+    return json({ ok: true, room: view(room), host: isHost, signals }, 200, cors);
   }
 
   if (op === 'party-set') {           // host chooses the current title/episode
@@ -119,6 +120,28 @@ async function handleParty(op, body, env, cors) {
     room.rev++;
     await saveRoom(env, room);
     return json({ ok: true, room: view(room) }, 200, cors);
+  }
+
+  // screen-share broadcaster on/off (desktop host)
+  if (op === 'party-share') {
+    if (!isHost) return json({ error: 'host only' }, 403, cors);
+    room.sharing = body.on ? uid : '';
+    if (!body.on) room.signals = [];
+    sysMsg(room, body.on ? `${name} started screen sharing` : `${name} stopped sharing`);
+    room.rev++; await saveRoom(env, room);
+    return json({ ok: true, room: view(room) }, 200, cors);
+  }
+
+  // WebRTC signaling relay: one small mailbox of offer/answer messages, addressed
+  // peer-to-peer. Consumers dedupe by id; entries auto-expire so it can't grow.
+  if (op === 'party-signal') {
+    const to = String(body.to || ''), kind = String(body.kind || '');
+    if (to && kind) {
+      room.signals = (room.signals || []).filter(s => Date.now() - s.t < 90000);
+      room.signals.push({ id: uid + '-' + to + '-' + kind + '-' + Date.now(), from: uid, to, kind, data: body.data, t: Date.now() });
+      room.rev++; await saveRoom(env, room);
+    }
+    return json({ ok: true }, 200, cors);
   }
 
   if (op === 'party-chat') {
@@ -158,7 +181,7 @@ function view(room) {
     .filter(([, m]) => now - (m.seen || 0) < PRESENT_MS)
     .map(([uid, m]) => ({ uid, name: m.name }));
   return { code: room.code, host: room.host, title: room.title, animeId: room.animeId,
-    ep: room.ep, img: room.img, playAt: room.playAt, members, chat: room.chat, rev: room.rev };
+    ep: room.ep, img: room.img, playAt: room.playAt, sharing: room.sharing || '', members, chat: room.chat, rev: room.rev };
 }
 
 function json(obj, status, cors) {

@@ -7,14 +7,16 @@ A personal anime / manga / show / movie tracker that runs entirely in the browse
 
 ## Two versions, one app
 
-| File | Who it's for | Starting data |
-|------|-------------|---------------|
-| `index.html` | The main app | A small neutral demo list (your real list lives in your browser + private sync) |
-| `friends.html` | Anyone — a read-only viewer for a friend's shared list | Blank |
+| File | Who it's for | Storage key |
+|------|-------------|-------------|
+| `index.html` | The main app — everyone starts with their own **empty** list | `animelist_v4` |
+| `friends.html` | A viewer for a friend's shared list, so browsing theirs never touches yours | `animelist_friends_v4` |
+
+Both files are the same app; they differ only by that storage key. New users start **blank** — no demo seed to delete. The tutorial (which opens immediately on a fresh install) explains what the app does, and the empty state offers *Add a title* or *Import a list*.
 
 Every list is saved in **your own browser** (localStorage) and, optionally, in a private cloud store gated by a secret sync code — nobody can see anyone else's data, and the two versions use separate storage so they never mix. See **[FRIENDS.md](FRIENDS.md)** for how sharing works.
 
-> **Privacy:** the repo is public (that's just the app code), but no personal list is in it — `index.html` ships a neutral demo seed; your real titles stay in localStorage and, if you enable sync, in a private code-gated cloud copy.
+> **Privacy:** the repo is public (that's just the app code), but no personal list is in it — `index.html` ships an empty list; your real titles stay in localStorage and, if you enable sync, in a private code-gated cloud copy.
 
 ## Features
 

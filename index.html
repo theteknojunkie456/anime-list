@@ -1275,7 +1275,7 @@ function icon(name,cls){const p=ICONS[name];if(!p)return'';return `<svg class="i
 function hydrateIcons(root){(root||document).querySelectorAll('[data-ic]').forEach(el=>{const s=icon(el.getAttribute('data-ic'));if(s)el.outerHTML=s;});}
 
 // ─── DATA ──────────────────────────────────────────────────────────────────
-const DEFAULT_DATA=[{id:'d1',title:'Frieren: Beyond Journey\'s End',status:'watching',eps:'28 eps',time:'~12 hrs',genre:'Adventure, Fantasy',order:[],notes:'',kind:'watch'},{id:'d2',title:'Attack on Titan',status:'finished',eps:'87 eps',time:'~35 hrs',genre:'Action, Drama',order:[],notes:'',kind:'watch'},{id:'d3',title:'Spy x Family',status:'plan',eps:'37 eps',time:'~15 hrs',genre:'Comedy, Action',order:[],notes:'',kind:'watch'},{id:'d4',title:'Solo Leveling',status:'plan',eps:'—',time:'—',genre:'Action, Fantasy',order:[],notes:'',kind:'read'}];
+const DEFAULT_DATA=[];   // new users start with their own empty list, not a demo
 
 // ─── STATE ─────────────────────────────────────────────────────────────────
 let anime=[],sortMode='recent',filterStatus='all',detailId=null,editingId=null,curStatus='plan',deleteId=null,importItems=[],curAITab='rec',curTheme='default',viewKind='watch',curKind='watch';

@@ -458,7 +458,21 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
   background:linear-gradient(135deg,var(--ag),transparent 70%);border:1px solid var(--b2);
 }
 .ai-badge{font-size:9.5px;font-weight:800;letter-spacing:0.1em;text-transform:uppercase;color:var(--a2);margin-bottom:6px;}
-.dt-actions{display:flex;gap:8px;margin-top:18px;}
+/* Watch button — the primary action on an anime, so it gets the accent and full width */
+.dt-watch{width:100%;margin-top:18px;padding:15px;border-radius:15px;border:none;background:var(--a);color:var(--aFg);font-family:var(--fd);font-size:15px;font-weight:800;letter-spacing:-.2px;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 8px 22px -6px var(--glow);transition:transform .12s;}
+.dt-watch:active{transform:scale(.97);}
+.dt-watch .ico{width:19px;height:19px;fill:currentColor;}
+/* Full-screen in-app player */
+.playerview{position:fixed;inset:0;z-index:120;background:#000;display:flex;flex-direction:column;transform:translateY(100%);transition:transform .38s cubic-bezier(.2,1,.28,1);}
+.playerview.on{transform:translateY(0);}
+.pv-top{flex-shrink:0;display:flex;align-items:center;gap:10px;padding:calc(var(--safe-t) + 10px) 12px 10px;background:#000;}
+.pv-title{flex:1;min-width:0;font-family:var(--fd);font-size:15px;font-weight:800;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.pv-ext{width:40px;height:40px;flex-shrink:0;border-radius:12px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);color:#fff;display:flex;align-items:center;justify-content:center;}
+.pv-ext .ico{width:18px;height:18px;}
+.pv-ext:active{transform:scale(.92);}
+.pv-frame-wrap{flex:1;min-height:0;position:relative;background:#000;}
+.pv-frame{position:absolute;inset:0;width:100%;height:100%;border:0;}
+.dt-actions{display:flex;gap:8px;margin-top:10px;}
 .dact{
   flex:1;padding:12px 0;border-radius:13px;font-size:12px;font-weight:800;
   background:var(--bg4);border:1px solid var(--b2);color:var(--t1);
@@ -1152,6 +1166,16 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
     <div class="sv-title">Your Stats</div>
   </div>
   <div id="statsViewBody"></div>
+</div>
+
+<!-- IN-APP PLAYER — embeds the streaming site's watch page for a logged anime -->
+<div class="playerview" id="playerView">
+  <div class="pv-top">
+    <button class="sv-back" onclick="closePlayer()" aria-label="Back"><i data-ic="chevron-left"></i></button>
+    <div class="pv-title" id="pvTitle"></div>
+    <button class="pv-ext" id="pvExt" aria-label="Open in browser" title="Open in browser"><i data-ic="upload"></i></button>
+  </div>
+  <div class="pv-frame-wrap"><iframe id="pvFrame" class="pv-frame" allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowfullscreen referrerpolicy="no-referrer"></iframe></div>
 </div>
 
 <div class="sheet" id="statsSheet">
@@ -2289,6 +2313,7 @@ function renderDetail(){
     ${notesHTML}
     <div class="dt-label" style="margin-top:18px"></div>
     <div id="ai-box-detail"></div>
+    ${(kindOf(a)==='watch'&&a.aniId)?`<button class="dt-watch" onclick="watchAnime('${a.id}')">${icon('play')} Watch now</button>`:''}
     <div class="dt-actions">
       <button class="dact ai-act" onclick="aiCardInsight('${a.id}')">${icon('sparkles')} AI Insight</button>
       <button class="dact" onclick="editItem('${a.id}')">${icon('edit')} Edit</button>
@@ -2675,6 +2700,38 @@ function nudgeHTML(){
 function parseHrs(s){const m=/([\d.]+)/.exec(s||'');return m?+m[1]:0;}
 function openStats(){renderStats();const v=document.getElementById('statsView');if(v)v.classList.add('on');}
 function closeStats(){const v=document.getElementById('statsView');if(v)v.classList.remove('on');}
+
+// ─── IN-APP PLAYER (streaming site embed) ───────────────────────────────────
+// The site rotates domains often (aniwatch → hianime → anineko …). Keep the base
+// in one place so a dead domain is a one-line fix, not a hunt through the code.
+const STREAM_BASE='https://anineko.to';
+// AniNeko slugs: lowercase, apostrophes dropped, every other run of non-alphanumerics
+// becomes a single hyphen. Verified against real /watch/ URLs.
+function streamSlug(title){
+  return (title||'').toLowerCase().replace(/["'’]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
+}
+let pvReturnId=null;
+function watchAnime(id){
+  const a=anime.find(x=>x.id===id); if(!a) return;
+  if(kindOf(a)!=='watch'||!a.aniId){toast('Watch is for anime only');return;}
+  pvReturnId=id;
+  const slug=streamSlug(a.title);
+  // Deep-link straight to the show. If the guessed slug is wrong, the site lands on
+  // its own 404/search rather than breaking us — and the ⤴ button opens full search.
+  const url=`${STREAM_BASE}/watch/${slug}`;
+  document.getElementById('pvTitle').textContent=a.title;
+  const ext=document.getElementById('pvExt');
+  ext.onclick=()=>{try{window.open(`${STREAM_BASE}/browser?keyword=${encodeURIComponent(a.title)}`,'_blank','noopener');}catch{}};
+  const f=document.getElementById('pvFrame');
+  f.src=url;
+  document.getElementById('playerView').classList.add('on');
+}
+function closePlayer(){
+  const v=document.getElementById('playerView'); if(v)v.classList.remove('on');
+  // stop playback + free the frame, and drop the app back on the show's detail
+  const f=document.getElementById('pvFrame'); if(f)f.src='about:blank';
+  if(pvReturnId){const id=pvReturnId;pvReturnId=null;}
+}
 function svCountUp(el,to){if(!el)return;const dur=850,t0=performance.now();const step=now=>{const p=Math.min(1,(now-t0)/dur),e=1-Math.pow(1-p,3);el.textContent=Math.round(to*e).toLocaleString();if(p<1)requestAnimationFrame(step);};requestAnimationFrame(step);}
 function svChips(list){return list.length?list.map(a=>'<span class="sv-chip">'+schEsc(a.title)+(a.rating?' '+icon('star','fill')+a.rating:'')+'</span>').join(''):'<span class="sv-chip">None yet</span>';}
 function svBar(id,label,color,val,max,drill){return '<div class="sv-bar" onclick="svDrill(\''+id+'\',this)"><div class="lbl">'+label+'</div><div class="track"><div class="fill" style="width:'+Math.round(val/Math.max(1,max)*100)+'%;background:'+color+'"></div></div><div class="n">'+val+'</div><span class="chev">'+icon('chevron-right')+'</span></div><div class="sv-drill" id="drill-'+id+'">'+drill+'</div>';}

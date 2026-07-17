@@ -4134,6 +4134,14 @@ const PV_LOADING="data:text/html,<body style='margin:0;background:%230b0b0f;colo
 async function watchAnime(id){
   const a=anime.find(x=>x.id===id); if(!a) return;
   if(kindOf(a)!=='watch'||!a.aniId){toast('Watch is for anime only');return;}
+  // Legal sites can't be embedded (DRM / X-Frame-Options), so open the official site's
+  // search for this title in the browser. The in-app frame player is kept only for a
+  // custom source that carries an {ep} token (someone's own embeddable player).
+  if(!/\{ep\}/.test(streamSource())){
+    openExternal(launchURL(a));
+    toast(`Opening ${sourceName()} for “${a.title}”`);
+    return;
+  }
   pvReturnId=id;
   const ep=watchEpisode(a);
   pvWatchEp=ep;   // the episode we opened, so we can save progress on the way out
@@ -4268,11 +4276,33 @@ function restorePlayer(){
 // use numeric episode ids we can't deep-link, so search is the honest best.
 // All confirmed embeddable (no X-Frame-Options); pirate domains rotate, so if a
 // chip ever loads nothing the domain moved — paste the new one in the field.
+// Official, legal streaming — WatchList opens the site's search for your exact title.
+// (Legal services use DRM / block framing, so they open in the browser, not in-app.)
 const WATCH_PRESETS=[
-  {name:'HiAnime',  url:'https://hianime.to/search?keyword={title}'},
-  {name:'AniWatch', url:'https://aniwatchtv.to/search?keyword={title}'},
-  {name:'GogoAnime',url:'https://anitaku.bz/search.html?keyword={title}'},
+  {name:'Crunchyroll',  url:'https://www.crunchyroll.com/search?q={title}'},
+  {name:'HIDIVE',       url:'https://www.hidive.com/search?q={title}'},
+  {name:'Tubi',         url:'https://tubitv.com/search/{title}'},
+  {name:'RetroCrush',   url:'https://www.retrocrush.tv/search?q={title}'},
+  {name:'Ani-One Asia', url:'https://www.youtube.com/@AniOneAsia/search?query={title}'},
+  {name:'Muse Asia',    url:'https://www.youtube.com/@MuseAsia/search?query={title}'},
 ];
+const LEGAL_DEFAULT=WATCH_PRESETS[0].url;   // Crunchyroll
+// Open a URL outside the app — legal sites can't be framed. In the native shell we
+// hand it to iOS (opens Safari); on the web it opens a new tab.
+function openExternal(url){
+  if(!url)return;
+  if(typeof IS_NATIVE!=='undefined'&&IS_NATIVE){try{window.webkit.messageHandlers.wl.postMessage({type:'openurl',url});return;}catch(e){}}
+  try{window.open(url,'_blank','noopener');}catch(e){location.href=url;}
+}
+function launchURL(a){
+  const src=streamSource()||LEGAL_DEFAULT, slug=streamSlug(a.title);
+  return src.replace(/\{title\}/g,encodeURIComponent(a.title)).replace(/\{slug\}/g,slug).replace(/\{ep\}/g,String(watchEpisode(a)||1));
+}
+function sourceName(){
+  const s=streamSource(); if(!s)return 'Crunchyroll';
+  const p=WATCH_PRESETS.find(x=>x.url===s); if(p)return p.name;
+  try{return new URL(s.replace(/\{[^}]+\}/g,'x')).hostname.replace(/^www\./,'');}catch{return 'the site';}
+}
 function renderSource(){
   const box=document.getElementById('sourceBody'); if(!box) return;
   const custom=streamSource(), rcustom=readSource();
@@ -4280,17 +4310,17 @@ function renderSource(){
   const chips=WATCH_PRESETS.map(p=>`<button class="src-chip${custom===p.url?' on':''}" onclick="setSource('${p.url}')">${p.name}</button>`).join('');
   box.innerHTML=`
     <div class="dt-label">${icon('play')} Watch source</div>
-    <p class="ai-desc">Where <b>Watch now</b> opens an anime. The built-in source deep-links straight to the episode you're on.</p>
+    <p class="ai-desc">Where <b>Watch now</b> sends you. These are <b>official, legal</b> services — it opens the site's search for your exact title in your browser.</p>
     <button class="src-opt${!custom?' on':''}" onclick="setSource('')">
-      <div class="src-name">AniNeko <span class="src-tag">Built-in</span></div>
-      <div class="src-sub">Jumps to your next episode automatically</div>
+      <div class="src-name">Crunchyroll <span class="src-tag">Default</span></div>
+      <div class="src-sub">Opens Crunchyroll's search for the title</div>
     </button>
     <div class="src-picks">${chips}</div>
     <button class="src-opt${custom&&!WATCH_PRESETS.some(p=>p.url===custom)?' on':''}" onclick="document.getElementById('srcCustom').focus()" style="margin-top:10px">
       <div class="src-name">Your own site</div>
       <div class="src-sub">${custom&&!WATCH_PRESETS.some(p=>p.url===custom)?'Using '+host(custom):'Paste any streaming site below'}</div>
     </button>
-    <input class="ai-prompt-in" id="srcCustom" placeholder="hianime.to — or a full URL" value="${custom&&!WATCH_PRESETS.some(p=>p.url===custom)?custom.replace(/"/g,'&quot;'):''}" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url" style="margin-top:10px">
+    <input class="ai-prompt-in" id="srcCustom" placeholder="your own site — or a full URL" value="${custom&&!WATCH_PRESETS.some(p=>p.url===custom)?custom.replace(/"/g,'&quot;'):''}" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url" style="margin-top:10px">
     <button class="parse-btn" onclick="saveSource()">Use this site</button>
     <p class="ai-desc" style="margin-top:12px;font-size:11.5px">Optional tokens: <code>{title}</code>, <code>{slug}</code>, <code>{ep}</code> — e.g. <code>https://site.com/watch/{slug}/ep-{ep}</code>. With none, it just opens the site.</p>
 

@@ -87,6 +87,10 @@ struct WatchListShell: UIViewRepresentable {
                 if let items = body["items"] as? [[String: Any]] { Notifier.schedule(items) }
             case "savepw":
                 if let pw = body["pw"] as? String, !pw.isEmpty { PWStore.save(pw) }
+            case "openurl":   // legal streaming sites can't be framed — open in Safari
+                if let s = body["url"] as? String, let url = URL(string: s) {
+                    DispatchQueue.main.async { UIApplication.shared.open(url) }
+                }
             default: break
             }
         }

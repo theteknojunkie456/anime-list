@@ -504,6 +504,13 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 .pv-pause-ico{font-size:48px;}
 .pv-pause-t{font-family:var(--fd);font-size:20px;font-weight:900;}
 .pv-pause-s{font-size:13px;color:rgba(255,255,255,.7);max-width:260px;line-height:1.4;}
+.pv-host{flex-shrink:0;display:flex;align-items:center;gap:9px;padding:10px 12px calc(var(--safe-b) + 10px);background:#000;border-top:1px solid rgba(255,255,255,.08);}
+.pv-host-main{flex:1;height:46px;border-radius:13px;background:var(--a);color:var(--aFg,#fff);border:0;font-family:var(--fd);font-size:14.5px;font-weight:800;display:flex;align-items:center;justify-content:center;}
+.pv-host-main.paused{background:#2fbf6b;}
+.pv-host-next{height:46px;padding:0 16px;border-radius:13px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.16);color:#fff;font-family:var(--fd);font-size:14px;font-weight:800;}
+.pv-host-chat{width:48px;height:46px;flex-shrink:0;border-radius:13px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.16);color:#fff;display:flex;align-items:center;justify-content:center;}
+.pv-host-main:active,.pv-host-next:active,.pv-host-chat:active{transform:scale(.96);}
+.pv-host-chat .ico{width:19px;height:19px;}
 .pv-nav{flex-shrink:0;display:flex;align-items:center;gap:10px;padding:10px 12px calc(var(--safe-b) + 10px);background:#000;border-top:1px solid rgba(255,255,255,.08);}
 .pv-nav-arrow{width:48px;height:46px;flex-shrink:0;border-radius:13px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);color:#fff;display:flex;align-items:center;justify-content:center;transition:opacity .15s;}
 .pv-nav-arrow .ico{width:22px;height:22px;}
@@ -687,8 +694,8 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 .pp-dot{width:8px;height:8px;border-radius:50%;background:#fff;animation:ppPulse 1.6s ease-in-out infinite;}
 @keyframes ppPulse{0%,100%{opacity:1;}50%{opacity:.35;}}
 .react-layer{position:fixed;inset:0;z-index:210;pointer-events:none;overflow:hidden;}
-.react-fly{position:absolute;bottom:15%;font-size:34px;will-change:transform,opacity;animation:reactFly 2.6s cubic-bezier(.3,.7,.4,1) forwards;filter:drop-shadow(0 2px 6px rgba(0,0,0,.4));}
-@keyframes reactFly{0%{transform:translateY(0) scale(.5);opacity:0;}12%{opacity:1;transform:translateY(-10px) scale(1.15);}100%{transform:translateY(-58vh) scale(1);opacity:0;}}
+.react-fly{position:absolute;bottom:22%;font-size:34px;will-change:transform,opacity;animation:reactFly 2s ease-out forwards;filter:drop-shadow(0 2px 6px rgba(0,0,0,.4));}
+@keyframes reactFly{0%{transform:translateY(6px) scale(.6);opacity:0;}18%{opacity:1;transform:translateY(0) scale(1.08);}75%{opacity:1;}100%{transform:translateY(-26vh) scale(1);opacity:0;}}
 .pt-reactbar{display:flex;gap:6px;justify-content:space-between;margin:12px 0 2px;}
 .pt-react{flex:1;height:42px;border-radius:12px;background:var(--bg3);border:1px solid var(--b1);font-size:21px;display:flex;align-items:center;justify-content:center;transition:transform .1s,background .15s;}
 .pt-react:active{transform:scale(1.25);background:var(--ag);}
@@ -1403,6 +1410,12 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
     <button class="pv-nav-arrow" id="pvPrev" onclick="pvStep(-1)" aria-label="Previous episode"><i data-ic="chevron-left"></i></button>
     <button class="pv-nav-mark" id="pvMark" onclick="pvMarkNext()">Mark watched &amp; next</button>
     <button class="pv-nav-arrow" id="pvNext" onclick="pvStep(1)" aria-label="Next episode"><i data-ic="chevron-right"></i></button>
+  </div>
+  <!-- host's party remote, right in the player — pause/next everyone without leaving the video -->
+  <div class="pv-host" id="pvHostBar" style="display:none">
+    <button class="pv-host-main" id="pvHostPause">⏸ Pause everyone</button>
+    <button class="pv-host-next" onclick="partyNext()">⏭ Next</button>
+    <button class="pv-host-chat" onclick="openSheet('partySheet')" aria-label="Party chat"><i data-ic="message"></i></button>
   </div>
 </div>
 
@@ -3269,6 +3282,7 @@ function applyRoom(room){
   try{rtcTick(room);}catch(e){}          // drive the screen-share mesh
   try{processReacts(room.reacts);}catch(e){}   // float everyone's emoji
   try{followHost(room);}catch(e){}       // viewers follow the host's remote
+  try{renderPvHostBar();}catch(e){}      // keep the host's in-player remote current
 }
 function handleSignalMsg(m){try{if(m.kind==='offer')pcHandleOffer(m.from,m.data);else if(m.kind==='answer')pcHandleAnswer(m.from,m.data);}catch(e){}}
 function partyCue(room){
@@ -3298,7 +3312,7 @@ function watchParty(title,ep){
   document.getElementById('pvFrame').src=partyStreamURL(title,ep);
   document.getElementById('playerView').classList.add('on');
   renderPvNav(null);
-  partyInSession=true;partyCurEp=ep;hidePauseOverlay();
+  partyInSession=true;partyCurEp=ep;hidePauseOverlay();renderPvHostBar();
 }
 function partyCreate(){
   const n=(document.getElementById('ptName')?document.getElementById('ptName').value.trim():'')||partyName();
@@ -3349,6 +3363,17 @@ function followHost(room){
   if(partyIsHost||!room||!partyInSession)return;
   if(room.title&&room.ep&&room.ep!==partyCurEp){partyCurEp=room.ep;toast('Host switched to Ep '+room.ep);watchParty(room.title,room.ep);return;}
   if(room.paused)showPauseOverlay();else hidePauseOverlay();
+}
+// The host's remote, in the player itself — pause/next everyone without leaving the video.
+function renderPvHostBar(){
+  const bar=document.getElementById('pvHostBar');if(!bar)return;
+  const show=partyInSession&&partyIsHost&&document.getElementById('playerView').classList.contains('on');
+  bar.style.display=show?'':'none';
+  if(!show)return;
+  const paused=!!(partyRoom&&partyRoom.paused),pb=document.getElementById('pvHostPause');
+  pb.textContent=paused?'▶ Resume everyone':'⏸ Pause everyone';
+  pb.classList.toggle('paused',paused);
+  pb.onclick=paused?partyPlay:partyPause;
 }
 function partyPick(id){
   const a=anime.find(x=>x.id===id);if(!a)return;
@@ -3856,7 +3881,7 @@ const AUTO_MARK_MS=15*60*1000;   // ~15 min → auto-mark (covers a full ep minu
 const PEEK_MS=2*60*1000;         // under 2 min → don't bother them
 function closePlayer(){
   clearPvSession();   // an intentional close — don't spring it back on next load
-  partyInSession=false;hidePauseOverlay();
+  partyInSession=false;hidePauseOverlay();try{renderPvHostBar();}catch{}
   const v=document.getElementById('playerView'); if(v)v.classList.remove('on');
   const f=document.getElementById('pvFrame'); if(f)f.src='about:blank';
   const id=pvReturnId, ep=pvWatchEp, elapsed=pvOpenTime?Date.now()-pvOpenTime:0;

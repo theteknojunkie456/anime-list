@@ -480,6 +480,17 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
    textbook AI callout. A plain panel with a hairline says the same thing without
    the tell. */
 .dt-note{font-size:13.5px;line-height:1.55;color:var(--t1);background:var(--bg3);border:1px solid var(--b1);border-radius:12px;padding:12px 14px;}
+.dt-seasons{display:flex;flex-direction:column;gap:8px;}
+.dt-season{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:var(--bg3);border:1px solid var(--b1);border-radius:13px;padding:9px 12px;transition:border-color .15s,background .15s;}
+.dt-season.cur{border-color:var(--a);background:var(--ag);}
+.dt-season:active{transform:scale(.99);}
+.dt-season img,.dt-season .ph{width:40px;height:56px;border-radius:8px;object-fit:cover;flex-shrink:0;background:var(--bg4);}
+.dt-season .ph{display:flex;align-items:center;justify-content:center;font-family:var(--fd);font-size:18px;font-weight:900;color:var(--t3);}
+.dt-season-info{flex:1;min-width:0;}
+.dt-season-t{font-family:var(--fd);font-size:14px;font-weight:700;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.dt-season-s{font-size:11.5px;color:var(--t3);margin-top:2px;}
+.dt-season .ico{width:16px;height:16px;color:var(--t3);flex-shrink:0;}
+.dt-season-here{font-size:11px;font-weight:800;color:var(--a2);flex-shrink:0;}
 .ai-insight-box{
   font-size:12.5px;line-height:1.55;border-radius:14px;padding:12px 14px;
   background:linear-gradient(135deg,var(--ag),transparent 70%);border:1px solid var(--b2);
@@ -2690,6 +2701,15 @@ function renderDetail(){
     orderHTML=`<div class="dt-label">${read?'Read order':'Watch order'}</div><ol class="order-list">${main.map(s=>li(s,false)).join('')}</ol>${filmsHTML}`;
   }
   const notesHTML=(a.notes&&a.notes.trim())?`<div class="dt-label">Notes</div><div class="dt-note">${a.notes}</div>`:'';
+  // Seasons/parts: every title in your list that belongs to this series, under one roof.
+  const sibs=seriesOf(a);
+  const seasonsHTML=sibs.length>1?`<div class="dt-label">${read?'Parts':'Seasons'} · ${sibs.length}</div>
+    <div class="dt-seasons">${sibs.map(s=>{const cur=s.id===a.id,st=STATUS_META[s.status];
+      return `<button class="dt-season${cur?' cur':''}"${cur?'':` onclick="openDetail('${s.id}')"`}>
+        ${s.img?`<img src="${s.img}" alt="">`:`<div class="ph">${((s.title||'?').trim()[0]||'?').toUpperCase()}</div>`}
+        <div class="dt-season-info"><div class="dt-season-t">${schEsc(s.title)}</div><div class="dt-season-s">${st?st.label:s.status}${s.epTotal?` · ${s.ep||0}/${s.epTotal}`:''}</div></div>
+        ${cur?'<span class="dt-season-here">Viewing</span>':icon('chevron-right')}
+      </button>`;}).join('')}</div>`:'';
   const body=document.getElementById('detailBody');
   body.setAttribute('style',accentVars(a));
   body.innerHTML=`
@@ -2707,6 +2727,7 @@ function renderDetail(){
     <div class="dt-status">${statusBtns}</div>
     ${progHTML}
     ${stars}
+    ${seasonsHTML}
     ${chips?`<div class="dt-label">Genres</div><div class="chips">${chips}</div>`:''}
     ${orderHTML}
     ${notesHTML}
@@ -4563,6 +4584,9 @@ function seasonBase(title){
   t=t.replace(/\s+(ii|iii|iv|v|vi|vii|viii|ix|x)\b.*$/,'');   // trailing roman numerals
   return t.replace(/[^a-z0-9]+/g,' ').trim();
 }
+// The series a title belongs to — used to gather seasons/parts under one entry.
+function seriesKey(a){return a?seasonBase(a.title):'';}
+function seriesOf(a){const k=seriesKey(a);if(!k)return a?[a]:[];return anime.filter(x=>kindOf(x)===kindOf(a)&&seriesKey(x)===k).sort((x,y)=>(x.title||'').localeCompare(y.title||''));}
 // Collapse seasons and keep the shortlist to the works people actually search for:
 // for anime, only TV / TV short / movie / ONA (drop OVAs, specials, recaps, music).
 // Ties keep AniList's best-match order.

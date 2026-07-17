@@ -66,8 +66,8 @@ async function handleParty(op, body, env, cors) {
     do { code = mintCode(); existing = await env.LISTS.get('party:' + code); }
     while (existing && ++tries < 6);
     const room = {
-      code, host: uid, title: '', animeId: '', ep: 0, img: '', playAt: 0, sharing: '',
-      members: { [uid]: { name, seen: Date.now() } }, chat: [], signals: [], rev: 1,
+      code, host: uid, title: '', animeId: '', ep: 0, img: '', playAt: 0, paused: false, sharing: '',
+      members: { [uid]: { name, seen: Date.now() } }, chat: [], signals: [], reacts: [], rev: 1,
     };
     sysMsg(room, `${name} started the party`);
     await saveRoom(env, room);
@@ -106,17 +106,26 @@ async function handleParty(op, body, env, cors) {
     room.animeId = String(body.animeId || '').slice(0, 40);
     room.ep = Math.max(0, Math.min(9999, parseInt(body.ep, 10) || 0));
     room.img = String(body.img || '').slice(0, 400);
-    room.playAt = 0;
+    room.playAt = 0; room.paused = false;
     sysMsg(room, `Now watching ${room.title}${room.ep ? ' · Ep ' + room.ep : ''}`);
     room.rev++;
     await saveRoom(env, room);
     return json({ ok: true, room: view(room) }, 200, cors);
   }
 
-  if (op === 'party-play') {          // host fires the 3·2·1 start cue
+  if (op === 'party-play') {          // host fires the 3·2·1 start / resume cue
     if (!isHost) return json({ error: 'host only' }, 403, cors);
-    room.playAt = Date.now() + 3600;
-    sysMsg(room, `Starting in 3…`);
+    room.playAt = Date.now() + 3600; room.paused = false;
+    sysMsg(room, `▶ Starting in 3…`);
+    room.rev++;
+    await saveRoom(env, room);
+    return json({ ok: true, room: view(room) }, 200, cors);
+  }
+
+  if (op === 'party-pause') {         // host pauses everyone
+    if (!isHost) return json({ error: 'host only' }, 403, cors);
+    room.paused = true; room.playAt = 0;
+    sysMsg(room, `⏸ ${name} paused`);
     room.rev++;
     await saveRoom(env, room);
     return json({ ok: true, room: view(room) }, 200, cors);
@@ -194,7 +203,7 @@ function view(room) {
     .filter(([, m]) => now - (m.seen || 0) < PRESENT_MS)
     .map(([uid, m]) => ({ uid, name: m.name }));
   return { code: room.code, host: room.host, title: room.title, animeId: room.animeId,
-    ep: room.ep, img: room.img, playAt: room.playAt, sharing: room.sharing || '', members, chat: room.chat,
+    ep: room.ep, img: room.img, playAt: room.playAt, paused: !!room.paused, sharing: room.sharing || '', members, chat: room.chat,
     reacts: (room.reacts || []).filter(r => Date.now() - r.t < 8000), rev: room.rev };
 }
 

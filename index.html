@@ -499,6 +499,11 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 .pv-ext:active{transform:scale(.92);}
 .pv-frame-wrap{flex:1;min-height:0;position:relative;background:#000;}
 .pv-frame{position:absolute;inset:0;width:100%;height:100%;border:0;}
+.pv-pause{position:absolute;inset:0;z-index:5;display:none;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:rgba(0,0,0,.82);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);color:#fff;text-align:center;padding:24px;}
+.pv-pause.on{display:flex;}
+.pv-pause-ico{font-size:48px;}
+.pv-pause-t{font-family:var(--fd);font-size:20px;font-weight:900;}
+.pv-pause-s{font-size:13px;color:rgba(255,255,255,.7);max-width:260px;line-height:1.4;}
 .pv-nav{flex-shrink:0;display:flex;align-items:center;gap:10px;padding:10px 12px calc(var(--safe-b) + 10px);background:#000;border-top:1px solid rgba(255,255,255,.08);}
 .pv-nav-arrow{width:48px;height:46px;flex-shrink:0;border-radius:13px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);color:#fff;display:flex;align-items:center;justify-content:center;transition:opacity .15s;}
 .pv-nav-arrow .ico{width:22px;height:22px;}
@@ -1388,7 +1393,9 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
   <!-- sandbox WITHOUT allow-popups / allow-top-navigation: the player still runs
        (verified HLS plays), but the frame can't spawn pop-up tabs or redirect the
        whole app away — the two things streaming-ad networks do. -->
-  <div class="pv-frame-wrap"><iframe id="pvFrame" class="pv-frame" sandbox="allow-scripts allow-same-origin allow-forms allow-presentation allow-orientation-lock" allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowfullscreen referrerpolicy="no-referrer"></iframe></div>
+  <div class="pv-frame-wrap"><iframe id="pvFrame" class="pv-frame" sandbox="allow-scripts allow-same-origin allow-forms allow-presentation allow-orientation-lock" allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowfullscreen referrerpolicy="no-referrer"></iframe>
+    <div class="pv-pause" id="pvPause"><div class="pv-pause-ico">⏸</div><div class="pv-pause-t">Host paused</div><div class="pv-pause-s">Pause your video too — you'll all resume together</div></div>
+  </div>
   <!-- binge controls: only shown when the source can target a specific episode
        (AniNeko, or a custom source with an {ep} token) — hidden for search/plain
        sources and for reading, where there's no episode to step through. -->
@@ -3223,7 +3230,7 @@ function renderAniList(){
 // just starts together on the count. Backed by the sync worker (party- ops).
 let partyCode='',partyIsHost=false,partyRoom=null,partyTimer=0,partySeenPlay=0,partyChatRev=-1;
 let pcs={},localStream=null,partySeenSig=new Set(),partyPrevSharing='';   // WebRTC screen-share state
-let partySeenReact=new Set();
+let partySeenReact=new Set(),partyInSession=false,partyCurEp=0;
 const PARTY_EMOJI=['❤️','😂','🔥','😱','😭','👏','💀','🎉'];
 function spawnReact(emoji){const layer=document.getElementById('reactLayer');if(!layer)return;const el=document.createElement('div');el.className='react-fly';el.textContent=emoji;el.style.left=(8+Math.random()*82)+'%';el.style.fontSize=(28+Math.random()*16)+'px';layer.appendChild(el);setTimeout(()=>el.remove(),2700);}
 function partyReact(e){if(!partyActive())return;spawnReact(e);partyPost('party-react',{emoji:e}).catch(()=>{});}
@@ -3251,6 +3258,7 @@ function applyRoom(j){
   if(j.room.playAt&&j.room.playAt>Date.now()&&j.room.playAt!==partySeenPlay){partySeenPlay=j.room.playAt;partyCue(j.room);}
   try{rtcTick(j.room,j.signals);}catch(e){}   // drive the screen-share mesh
   try{processReacts(j.room.reacts);}catch(e){}   // float everyone's emoji
+  try{followHost(j.room);}catch(e){}   // viewers follow the host's remote
 }
 function partyCue(room){
   const ov=document.getElementById('partyCount'),num=document.getElementById('pcNum'),lbl=document.getElementById('pcLbl');
@@ -3279,6 +3287,7 @@ function watchParty(title,ep){
   document.getElementById('pvFrame').src=partyStreamURL(title,ep);
   document.getElementById('playerView').classList.add('on');
   renderPvNav(null);
+  partyInSession=true;partyCurEp=ep;hidePauseOverlay();
 }
 async function partyCreate(){
   const n=(document.getElementById('ptName')?document.getElementById('ptName').value.trim():'')||partyName();
@@ -3312,6 +3321,22 @@ async function partySend(){
   try{const j=await partyPost('party-chat',{msg});applyRoom(j);}catch{}
 }
 async function partyPlay(){if(!partyIsHost)return;if(!partyRoom||!partyRoom.title){toast('Pick what to watch first');return;}try{const j=await partyPost('party-play');applyRoom(j);}catch(e){toast(e.message);}}
+async function partyPause(){if(!partyIsHost)return;try{const j=await partyPost('party-pause');applyRoom(j);}catch(e){toast(e.message);}}
+async function partyNext(){
+  if(!partyIsHost||!partyRoom||!partyRoom.title)return;
+  const ep=(partyRoom.ep||0)+1;
+  try{await partyPost('party-set',{title:partyRoom.title,animeId:partyRoom.animeId,ep,img:partyRoom.img});const j=await partyPost('party-play');applyRoom(j);}catch(e){toast(e.message);}
+}
+function showPauseOverlay(){const el=document.getElementById('pvPause');if(el&&document.getElementById('playerView').classList.contains('on'))el.classList.add('on');}
+function hidePauseOverlay(){const el=document.getElementById('pvPause');if(el)el.classList.remove('on');}
+// A viewer follows the host's remote: auto-jump on episode change, show the pause
+// veil on pause. (The embed is cross-origin so we can't literally pause its video —
+// the veil covers it and the resume 3·2·1 re-aligns everyone.)
+function followHost(room){
+  if(partyIsHost||!room||!partyInSession)return;
+  if(room.title&&room.ep&&room.ep!==partyCurEp){partyCurEp=room.ep;toast('Host switched to Ep '+room.ep);watchParty(room.title,room.ep);return;}
+  if(room.paused)showPauseOverlay();else hidePauseOverlay();
+}
 async function partyPick(id){
   const a=anime.find(x=>x.id===id);if(!a)return;
   const ep=Math.min((a.ep||0)+1,a.epTotal||((a.ep||0)+1));
@@ -3423,10 +3448,19 @@ function renderParty(){
     const picker=watchable.length
       ?`<div class="dt-label" style="margin-top:14px">Pick what to watch</div><div class="pt-picklist">${watchable.map(row).join('')}</div>`
       :`<p class="ai-desc" style="margin-top:14px">Add some anime to your watch list to pick from here.</p>`;
-    const shareBlock=`<button class="pt-share" onclick="startShare()">${icon('users')} Share your screen — real sync</button>`
-      +(canScreenShare()?`<div class="pt-hint">Everyone watches your screen, perfectly synced. Open the anime in another tab, then share it.</div>`
-        :`<div class="pt-hint">Needs a computer to host. On a phone, use “Start together” below.</div>`);
-    hostCtl=`${shareBlock}${picker}<button class="pt-play" onclick="partyPlay()"${r.title?'':' disabled'}>${icon('play')} Start together · 3·2·1</button>`;
+    if(r.playAt||r.paused){   // a session is running → the host is the remote
+      const primary=r.paused
+        ?`<button class="pt-play" onclick="partyPlay()">${icon('play')} Resume together · 3·2·1</button>`
+        :`<button class="pt-play" onclick="partyPause()">⏸ Pause everyone</button>`;
+      hostCtl=`<p class="ai-desc" style="text-align:center">You're running the session — everyone follows you.</p>
+        ${primary}<button class="pt-share" onclick="partyNext()">⏭ Next episode</button>
+        <div class="dt-label" style="margin-top:14px">Switch to something else</div>${picker}`;
+    }else{
+      const shareBlock=`<button class="pt-share" onclick="startShare()">${icon('users')} Share your screen — real sync</button>`
+        +(canScreenShare()?`<div class="pt-hint">Everyone watches your screen, perfectly synced. Open the anime in another tab, then share it.</div>`
+          :`<div class="pt-hint">Needs a computer to host. On a phone, use “Start together” below.</div>`);
+      hostCtl=`${shareBlock}${picker}<button class="pt-play" onclick="partyPlay()"${r.title?'':' disabled'}>${icon('play')} Start together · 3·2·1</button>`;
+    }
   }else if(sharing){
     hostCtl=`<button class="pt-play" onclick="reopenShareView()">${icon('play')} Watch the shared screen</button>
       <p class="ai-desc" style="text-align:center">The host is sharing their screen — you're watching in sync.</p>`;
@@ -3811,6 +3845,7 @@ const AUTO_MARK_MS=15*60*1000;   // ~15 min → auto-mark (covers a full ep minu
 const PEEK_MS=2*60*1000;         // under 2 min → don't bother them
 function closePlayer(){
   clearPvSession();   // an intentional close — don't spring it back on next load
+  partyInSession=false;hidePauseOverlay();
   const v=document.getElementById('playerView'); if(v)v.classList.remove('on');
   const f=document.getElementById('pvFrame'); if(f)f.src='about:blank';
   const id=pvReturnId, ep=pvWatchEp, elapsed=pvOpenTime?Date.now()-pvOpenTime:0;

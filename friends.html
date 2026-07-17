@@ -1818,6 +1818,7 @@ async function tryUnlock(){                            // unlock with the passwo
       await upgradeToV2(pw);
       finishUnlock();
     }
+    nativeSavePw(pw);   // in the native app: remember it in the Keychain behind Face ID
   }catch(e){_unlockErr(i,err,'Wrong password — try again');}
 }
 async function tryUnlockRecovery(){                    // unlock with the recovery key
@@ -3552,6 +3553,10 @@ function nativeScheduleNotifs(){
     window.webkit.messageHandlers.wl.postMessage({type:'notify',items});
   }catch(e){}
 }
+// Native Face ID → password auto-unlock: the app saves the password in the iPhone
+// Keychain (behind Face ID) and calls wlNativeUnlock() to fill + submit it for you.
+function nativeSavePw(pw){if(!IS_NATIVE||!pw)return;try{window.webkit.messageHandlers.wl.postMessage({type:'savepw',pw});}catch(e){}}
+window.wlNativeUnlock=function(pw){try{if(typeof appLocked!=='undefined'&&!appLocked)return;const i=document.getElementById('lockPw');if(i&&pw){i.value=pw;tryUnlock();}}catch(e){}};
 let pcs={},localStream=null,partySeenSig=new Set(),partyPrevSharing='';   // WebRTC screen-share state
 let partySeenReact=new Set(),partyInSession=false,partyCurEp=0;
 const PARTY_EMOJI=['❤️','😂','🔥','😱','😭','👏','💀','🎉'];

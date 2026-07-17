@@ -1,56 +1,138 @@
 import SwiftUI
 import WebKit
 import ReplayKit
-import LocalAuthentication
 import UserNotifications
+import Security
 
-// The native app IS WatchList: it loads the full web app in a web view, adds a
-// native Face ID lock (embedded web views can't use the web Face ID), and adds the
-// one thing the web can't do on a phone — hosting a screen broadcast. The party
-// screen-share button posts the current code over the JS bridge; we stash it for
-// the extension and fire the ReplayKit picker. One app, one party, one code.
+// The native app IS WatchList: it loads the full web app in a web view and adds the
+// things a web view can't do itself —
+//  • Face ID unlock: your list is AES-encrypted behind a password, and web Face ID
+//    (WebAuthn) can't run in a web view. So we save the password in the iPhone
+//    Keychain behind Face ID and auto-fill it into the web lock after a glance.
+//  • Broadcast: the party's "Broadcast your screen" posts the code over the bridge;
+//    we stash it for the extension and fire the ReplayKit picker.
+//  • Notifications: no web push in a web view, so we schedule free on-device local
+//    notifications from the air times the web app hands us.
 struct ContentView: View {
     @StateObject private var broadcaster = BroadcastController()
-    @State private var unlocked = false
-    @State private var authing = false
-
     var body: some View {
-        ZStack {
-            Color(hex: 0x0a0a0c).ignoresSafeArea()
-            if unlocked {
-                WatchListShell(broadcaster: broadcaster).ignoresSafeArea()
-            } else {
-                LockView(authenticate: authenticate)
-            }
-        }
-        .preferredColorScheme(.dark)
-        .onAppear { authenticate() }
+        WatchListShell(broadcaster: broadcaster)
+            .ignoresSafeArea()
+            .preferredColorScheme(.dark)
+            .onAppear { Notifier.requestAuth() }
+    }
+}
+
+struct WatchListShell: UIViewRepresentable {
+    let broadcaster: BroadcastController
+    private let siteURL = URL(string: "https://theteknojunkie456.github.io/anime-list/")!
+
+    func makeCoordinator() -> Coordinator { Coordinator(broadcaster: broadcaster) }
+
+    func makeUIView(context: Context) -> WKWebView {
+        let cfg = WKWebViewConfiguration()
+        cfg.allowsInlineMediaPlayback = true
+        cfg.mediaTypesRequiringUserActionForPlayback = []
+        cfg.applicationNameForUserAgent = "WatchListNative"   // web app switches on native mode
+        cfg.websiteDataStore = .default()                      // persist login/list across launches
+        let ucc = WKUserContentController()
+        ucc.add(context.coordinator, name: "wl")
+        cfg.userContentController = ucc
+
+        let wv = WKWebView(frame: .zero, configuration: cfg)
+        wv.isOpaque = false
+        wv.backgroundColor = UIColor(red: 0x0a/255.0, green: 0x0a/255.0, blue: 0x0c/255.0, alpha: 1)
+        wv.scrollView.backgroundColor = wv.backgroundColor
+        wv.allowsBackForwardNavigationGestures = true
+        wv.navigationDelegate = context.coordinator
+        context.coordinator.web = wv
+
+        broadcaster.picker.frame = CGRect(x: -20, y: -20, width: 1, height: 1)
+        broadcaster.picker.alpha = 0.01
+        wv.addSubview(broadcaster.picker)   // must be in the hierarchy to fire
+
+        wv.load(URLRequest(url: siteURL))
+        return wv
     }
 
-    private func authenticate() {
-        if unlocked || authing { return }
-        let ctx = LAContext()
-        ctx.localizedFallbackTitle = "Use Passcode"
-        var err: NSError?
-        // no biometrics AND no passcode set → don't trap the user, just open
-        guard ctx.canEvaluatePolicy(.deviceOwnerAuthentication, error: &err) else { unlocked = true; return }
-        let policy: LAPolicy = ctx.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: nil)
-            ? .deviceOwnerAuthenticationWithBiometrics : .deviceOwnerAuthentication
-        authing = true
-        ctx.evaluatePolicy(policy, localizedReason: "Unlock WatchList") { ok, _ in
-            DispatchQueue.main.async {
-                authing = false
-                if ok { unlocked = true; Notifier.requestAuth() }
+    func updateUIView(_ uiView: WKWebView, context: Context) {}
+
+    final class Coordinator: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
+        let broadcaster: BroadcastController
+        weak var web: WKWebView?
+        init(broadcaster: BroadcastController) { self.broadcaster = broadcaster }
+
+        // page loaded → if we saved the password, Face ID → auto-unlock the web lock
+        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+            guard PWStore.hasSaved() else { return }
+            PWStore.load { pw in
+                guard let pw, let web = self.web,
+                      let d = try? JSONSerialization.data(withJSONObject: [pw]),
+                      let arr = String(data: d, encoding: .utf8) else { return }
+                let jsPw = String(arr.dropFirst().dropLast())   // ["pw"] → "pw" (escaped JS literal)
+                web.evaluateJavaScript("window.wlNativeUnlock && window.wlNativeUnlock(\(jsPw))", completionHandler: nil)
+            }
+        }
+
+        func userContentController(_ ucc: WKUserContentController, didReceive msg: WKScriptMessage) {
+            guard let body = msg.body as? [String: Any] else { return }
+            switch body["type"] as? String ?? "" {
+            case "code":
+                let c = (body["code"] as? String ?? "").uppercased(); if !c.isEmpty { AppGroup.partyCode = c }
+            case "broadcast":
+                let c = (body["code"] as? String ?? "").uppercased(); if !c.isEmpty { AppGroup.partyCode = c }
+                AppGroup.partyOn(true)
+                DispatchQueue.main.async { self.broadcaster.start() }
+            case "notify":
+                if let items = body["items"] as? [[String: Any]] { Notifier.schedule(items) }
+            case "savepw":
+                if let pw = body["pw"] as? String, !pw.isEmpty { PWStore.save(pw) }
+            default: break
             }
         }
     }
 }
 
-// Free, no-server episode alerts. The web app knows every upcoming episode's air
-// time (AniList); it hands us that list over the bridge and we schedule on-device
-// local notifications — which iOS fires on the lock screen even when we're closed.
-// No push server, no paid account. Rescheduled every time the web app sends a fresh
-// list (on launch / when airing data updates).
+// Stores the WatchList password in the Keychain, guarded by Face ID (biometryCurrentSet,
+// this-device-only). Saving is silent; reading prompts Face ID.
+enum PWStore {
+    private static let service = "com.watchlist.party.pw"
+    private static let account = "watchlist"
+    private static func base() -> [String: Any] {
+        [kSecClass as String: kSecClassGenericPassword,
+         kSecAttrService as String: service, kSecAttrAccount as String: account]
+    }
+    static func save(_ pw: String) {
+        guard let data = pw.data(using: .utf8) else { return }
+        SecItemDelete(base() as CFDictionary)
+        var q = base()
+        q[kSecValueData as String] = data
+        if let ac = SecAccessControlCreateWithFlags(nil, kSecAttrAccessibleWhenUnlockedThisDeviceOnly, .biometryCurrentSet, nil) {
+            q[kSecAttrAccessControl as String] = ac
+        }
+        SecItemAdd(q as CFDictionary, nil)
+    }
+    static func hasSaved() -> Bool {
+        var q = base()
+        q[kSecUseAuthenticationUI as String] = kSecUseAuthenticationUISkip   // don't prompt just to check existence
+        let s = SecItemCopyMatching(q as CFDictionary, nil)
+        return s == errSecSuccess || s == errSecInteractionNotAllowed
+    }
+    static func load(completion: @escaping (String?) -> Void) {
+        var q = base()
+        q[kSecReturnData as String] = true
+        q[kSecUseOperationPrompt as String] = "Unlock WatchList"
+        DispatchQueue.global(qos: .userInitiated).async {
+            var out: CFTypeRef?
+            let status = SecItemCopyMatching(q as CFDictionary, &out)
+            let pw = status == errSecSuccess ? (out as? Data).flatMap { String(data: $0, encoding: .utf8) } : nil
+            DispatchQueue.main.async { completion(pw) }
+        }
+    }
+}
+
+// Free, no-server episode alerts scheduled on-device from the air times the web app
+// sends over the bridge.
 enum Notifier {
     static func requestAuth() {
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { _, _ in }
@@ -72,89 +154,6 @@ enum Notifier {
             let trigger = UNTimeIntervalNotificationTrigger(timeInterval: at - now, repeats: false)
             c.add(UNNotificationRequest(identifier: "wl-\(title)-\(ep)", content: content, trigger: trigger))
             scheduled += 1
-        }
-    }
-}
-
-struct LockView: View {
-    let authenticate: () -> Void
-    var body: some View {
-        VStack(spacing: 18) {
-            Image(systemName: "faceid")
-                .font(.system(size: 54))
-                .foregroundStyle(Color(hex: 0xda374f))
-            Text("WatchList")
-                .font(.system(size: 30, weight: .heavy))
-                .foregroundStyle(Color(hex: 0xf0ecea))
-            Button(action: authenticate) {
-                Text("Unlock").font(.headline.weight(.bold)).foregroundStyle(.white)
-                    .padding(.horizontal, 30).padding(.vertical, 13)
-                    .background(Color(hex: 0xda374f)).clipShape(Capsule())
-            }
-            .padding(.top, 6)
-        }
-    }
-}
-
-extension Color {
-    init(hex: UInt) {
-        self.init(.sRGB,
-                  red: Double((hex >> 16) & 0xff) / 255,
-                  green: Double((hex >> 8) & 0xff) / 255,
-                  blue: Double(hex & 0xff) / 255, opacity: 1)
-    }
-}
-
-struct WatchListShell: UIViewRepresentable {
-    let broadcaster: BroadcastController
-    private let siteURL = URL(string: "https://theteknojunkie456.github.io/anime-list/")!
-
-    func makeCoordinator() -> Coordinator { Coordinator(broadcaster: broadcaster) }
-
-    func makeUIView(context: Context) -> WKWebView {
-        let cfg = WKWebViewConfiguration()
-        cfg.allowsInlineMediaPlayback = true
-        cfg.mediaTypesRequiringUserActionForPlayback = []
-        cfg.applicationNameForUserAgent = "WatchListNative"   // web app reads this to enable native broadcast
-        cfg.websiteDataStore = .default()                      // persist login/list across launches
-        let ucc = WKUserContentController()
-        ucc.add(context.coordinator, name: "wl")
-        cfg.userContentController = ucc
-
-        let wv = WKWebView(frame: .zero, configuration: cfg)
-        wv.isOpaque = false
-        wv.backgroundColor = UIColor(red: 0x0a/255.0, green: 0x0a/255.0, blue: 0x0c/255.0, alpha: 1)
-        wv.scrollView.backgroundColor = wv.backgroundColor
-        wv.allowsBackForwardNavigationGestures = true
-
-        broadcaster.picker.frame = CGRect(x: -20, y: -20, width: 1, height: 1)
-        broadcaster.picker.alpha = 0.01
-        wv.addSubview(broadcaster.picker)   // must be in the hierarchy to fire
-
-        wv.load(URLRequest(url: siteURL))
-        return wv
-    }
-
-    func updateUIView(_ uiView: WKWebView, context: Context) {}
-
-    final class Coordinator: NSObject, WKScriptMessageHandler {
-        let broadcaster: BroadcastController
-        init(broadcaster: BroadcastController) { self.broadcaster = broadcaster }
-        func userContentController(_ ucc: WKUserContentController, didReceive msg: WKScriptMessage) {
-            guard let body = msg.body as? [String: Any] else { return }
-            let type = body["type"] as? String ?? ""
-            let code = (body["code"] as? String ?? "").uppercased()
-            switch type {
-            case "code":
-                if !code.isEmpty { AppGroup.partyCode = code }
-            case "broadcast":
-                if !code.isEmpty { AppGroup.partyCode = code }
-                AppGroup.partyOn(true)
-                DispatchQueue.main.async { self.broadcaster.start() }
-            case "notify":
-                if let items = body["items"] as? [[String: Any]] { Notifier.schedule(items) }
-            default: break
-            }
         }
     }
 }

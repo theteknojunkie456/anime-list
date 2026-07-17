@@ -13,6 +13,7 @@
 //   (needs the [[durable_objects]] + [[migrations]] blocks in that config).
 
 const CHAT_CAP = 60;
+const QUEUE_CAP = 30;
 
 export default {
   async fetch(request, env) {
@@ -85,7 +86,7 @@ export class PartyRoom {
     let room = await this.getRoom();
     if (!room) {
       if (!create) { server.send(JSON.stringify({ t: 'error', msg: 'no such party' })); server.close(4404, 'no room'); return new Response(null, { status: 101, webSocket: client }); }
-      room = this.room = { code, host: uid, title: '', animeId: '', ep: 0, img: '', playAt: 0, paused: false, sharing: '', members: {}, chat: [], reacts: [], rev: 1 };
+      room = this.room = { code, host: uid, title: '', animeId: '', ep: 0, img: '', playAt: 0, paused: false, sharing: '', members: {}, chat: [], reacts: [], queue: [], rev: 1 };
       this.sys(room, `${name} started the party`);
     }
     const fresh = !room.members[uid];
@@ -124,6 +125,27 @@ export class PartyRoom {
       }
       case 'play': { if (!isHost) return; room.playAt = Date.now() + 3600; room.paused = false; this.sys(room, '▶ Starting in 3…'); room.rev++; await this.save(); this.broadcast(); return; }
       case 'pause': { if (!isHost) return; room.paused = true; room.playAt = 0; this.sys(room, `⏸ ${name} paused`); room.rev++; await this.save(); this.broadcast(); return; }
+      case 'queue-add': {   // anyone may queue a pick for later
+        const title = String(msg.title || '').slice(0, 160); if (!title) return;
+        room.queue = room.queue || []; if (room.queue.length >= QUEUE_CAP) return;
+        room.queue.push({ id: uid + '-' + Date.now(), title, animeId: String(msg.animeId || '').slice(0, 40), ep: Math.max(0, Math.min(9999, parseInt(msg.ep, 10) || 0)), img: String(msg.img || '').slice(0, 400), by: name });
+        this.sys(room, `${name} queued ${title}`); room.rev++; await this.save(); this.broadcast(); return;
+      }
+      case 'queue-remove': {
+        const qid = String(msg.qid || ''); const q = room.queue = room.queue || [];
+        const i = q.findIndex(x => x.id === qid); if (i < 0) return;
+        if (!isHost && !qid.startsWith(uid + '-')) return;   // host removes anything; others only their own
+        q.splice(i, 1); room.rev++; await this.save(); this.broadcast(); return;
+      }
+      case 'queue-next': {   // host advances the party to the first queued item + fires the 3·2·1
+        if (!isHost) return;
+        const next = (room.queue = room.queue || []).shift(); if (!next) return;
+        room.title = next.title; room.animeId = next.animeId; room.ep = next.ep; room.img = next.img;
+        room.playAt = 0; room.paused = false;
+        this.sys(room, `Now watching ${room.title}${room.ep ? ' · Ep ' + room.ep : ''}`);
+        room.playAt = Date.now() + 3600; this.sys(room, '▶ Starting in 3…');
+        room.rev++; await this.save(); this.broadcast(); return;
+      }
       case 'share': { if (!isHost) return; room.sharing = msg.on ? uid : ''; this.sys(room, msg.on ? `${name} started screen sharing` : `${name} stopped sharing`); room.rev++; await this.save(); this.broadcast(); return; }
       case 'signal': {
         const to = String(msg.to || ''); if (!to) return;
@@ -160,7 +182,7 @@ export class PartyRoom {
   sys(room, msg) { room.chat.push({ id: 's-' + Date.now() + '-' + ((Math.random() * 1e6) | 0), sys: true, msg, t: Date.now() }); this.cap(room); }
   view() {
     const r = this.room;
-    return { code: r.code, host: r.host, title: r.title, animeId: r.animeId, ep: r.ep, img: r.img, playAt: r.playAt, paused: !!r.paused, sharing: r.sharing || '',
+    return { code: r.code, host: r.host, title: r.title, animeId: r.animeId, ep: r.ep, img: r.img, playAt: r.playAt, paused: !!r.paused, sharing: r.sharing || '', queue: r.queue || [],
       members: Object.entries(r.members).map(([uid, m]) => ({ uid, name: m.name })), chat: r.chat, reacts: (r.reacts || []).filter(x => Date.now() - x.t < 8000), rev: r.rev };
   }
   broadcast() { const s = JSON.stringify({ t: 'state', room: this.view() }); for (const ws of this.state.getWebSockets()) { try { ws.send(s); } catch {} } }

@@ -3488,8 +3488,9 @@ function renderParty(){
       const primary=r.paused
         ?`<button class="pt-play" onclick="partyPlay()">${icon('play')} Resume together · 3·2·1</button>`
         :`<button class="pt-play" onclick="partyPause()">⏸ Pause everyone</button>`;
+      const shareBtn=canScreenShare()?`<button class="pt-share" onclick="startShare()">${icon('users')} Share your screen — real sync</button>`:'';
       hostCtl=`<p class="ai-desc" style="text-align:center">You're running the session — everyone follows you.</p>
-        ${primary}<button class="pt-share" onclick="partyNext()">⏭ Next episode</button>
+        ${primary}<button class="pt-share" onclick="partyNext()">⏭ Next episode</button>${shareBtn}
         <div class="dt-label" style="margin-top:14px">Switch to something else</div>${picker}`;
     }else{
       const shareBlock=`<button class="pt-share" onclick="startShare()">${icon('users')} Share your screen — real sync</button>`

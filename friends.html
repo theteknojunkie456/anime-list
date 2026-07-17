@@ -3043,10 +3043,20 @@ function mapMalStatus(s){return {watching:'watching',reading:'watching',plan_to_
 function accItem(o){
   return {id:uid(),title:o.title,status:o.status,kind:o.kind,ep:o.progress||0,rating:o.rating||0,fav:false,
     eps:o.eps||'',epTotal:o.epTotal||0,time:'',genre:(o.genres||[]).slice(0,3).join(', '),order:[],notes:'',
-    img:o.img||'',aniId:o.aniId||0,aniColor:o.color||'',banner:o.banner||'',bannerTried:!!o.banner,upd:Date.now()};
+    img:o.img||'',aniId:o.aniId||0,malId:o.malId||0,aniColor:o.color||'',banner:o.banner||'',bannerTried:!!o.banner,upd:Date.now()};
+}
+// Every id a title can be known by — dedup collapses on ANY match, so the same
+// show from AniList (english title + id) and MAL (romaji title + its own id) is
+// caught even though the title strings differ. Falls back to normalized title.
+function dupeKeys(a){
+  const k=[]; const kind=kindOf(a);
+  if(a.aniId)k.push('ani:'+a.aniId);
+  if(a.malId)k.push('mal:'+a.malId+'|'+kind);
+  const nt=normTitle(a.title); if(nt)k.push('t:'+nt+'|'+kind);
+  return k;
 }
 async function aniListEntries(user,type){
-  const q=`query($n:String,$t:MediaType){MediaListCollection(userName:$n,type:$t){lists{entries{status progress score media{id idMal title{romaji english} episodes chapters genres coverImage{large color} bannerImage}}}}}`;
+  const q=`query($n:String,$t:MediaType){MediaListCollection(userName:$n,type:$t){lists{entries{status progress score media{id idMal isAdult title{romaji english} episodes chapters genres coverImage{large color} bannerImage}}}}}`;
   const r=await fetch('https://graphql.anilist.co',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({query:q,variables:{n:user,t:type}})});
   if(!r.ok)throw new Error('AniList '+r.status);
   const j=await r.json();
@@ -3059,7 +3069,7 @@ async function aniListEntries(user,type){
     out.push({title:m.title.english||m.title.romaji,status:mapAniStatus(e.status),kind:type==='ANIME'?'watch':'read',
       progress:e.progress||0,rating:e.score?Math.round(e.score/2):0,epTotal:total||0,
       eps:total?`${total} ${type==='ANIME'?'eps':'chapters'}`:'',genres:m.genres,
-      img:(m.coverImage&&m.coverImage.large)||'',color:(m.coverImage&&m.coverImage.color)||'',banner:m.bannerImage||'',aniId:m.id});
+      img:(m.coverImage&&m.coverImage.large)||'',color:(m.coverImage&&m.coverImage.color)||'',banner:m.bannerImage||'',aniId:m.id,malId:m.idMal||0,adult:isAdultMedia(m)});
   }
   return out;
 }
@@ -3075,7 +3085,8 @@ async function malEntries(user,type){ // via Jikan (flaky but keyless)
       out.push({title:m.title,status:mapMalStatus(e.status),kind:type==='anime'?'watch':'read',
         progress:(type==='anime'?e.watching_episodes:e.reading_chapters)||e.episodes_watched||e.chapters_read||0,
         rating:e.score?Math.round(e.score/2):0,epTotal:total||0,eps:total?`${total} ${type==='anime'?'eps':'chapters'}`:'',
-        genres:(m.genres||[]).map(g=>g.name),img:m.images?.jpg?.large_image_url||m.images?.jpg?.image_url||'',aniId:0});
+        genres:(m.genres||[]).map(g=>g.name),img:m.images?.jpg?.large_image_url||m.images?.jpg?.image_url||'',aniId:0,
+        malId:m.mal_id||0,adult:isAdultMedia({rating:m.rating,genres:m.genres,explicit_genres:m.explicit_genres})});
       if(out.length>=1000)return out;
     }
     if(data.length<300)break;
@@ -3100,13 +3111,17 @@ async function fetchAccountList(){
 }
 let accImportItems=[];
 function doAccountImport(){
-  const key=a=>normTitle(a.title)+'|'+kindOf(a);
-  const have=new Set(anime.map(key));
-  const fresh=accImportItems.filter(o=>!have.has(normTitle(o.title)+'|'+o.kind));
+  const have=new Set();anime.forEach(a=>dupeKeys(a).forEach(k=>have.add(k)));
+  let adult=0,dupes=0;const fresh=[];
+  for(const o of accImportItems){
+    if(o.adult){adult++;continue;}                       // hentai / adult — never imported
+    const keys=dupeKeys(o);
+    if(keys.some(k=>have.has(k))){dupes++;continue;}      // already have it (matched by id OR title)
+    keys.forEach(k=>have.add(k));fresh.push(o);           // register keys so intra-import dupes are caught too
+  }
   fresh.forEach(o=>anime.unshift(accItem(o)));
   save();closeAll();render();
-  const dupes=accImportItems.length-fresh.length;
-  toast(`Imported ${fresh.length} title${fresh.length!==1?'s':''}${dupes?` (${dupes} already had)`:''}`);
+  toast(`Imported ${fresh.length}${dupes?` · ${dupes} already had`:''}${adult?` · ${adult} adult title${adult!==1?'s':''} blocked`:''}`);
   setTimeout(fetchCovers,600);
 }
 // ─── ANILIST TWO-WAY SYNC ────────────────────────────────────────────────────
@@ -3186,16 +3201,17 @@ async function alFetchViewer(){
 // aniListEntries so accItem/reconcile can consume it.
 async function alFetchList(type){
   const uid=+(localStorage.getItem('al_uid')||0); if(!uid)return[];
-  const q=`query($u:Int,$t:MediaType){MediaListCollection(userId:$u,type:$t){lists{entries{status progress score media{id idMal title{romaji english} episodes chapters genres coverImage{large color} bannerImage}}}}}`;
+  const q=`query($u:Int,$t:MediaType){MediaListCollection(userId:$u,type:$t){lists{entries{status progress score media{id idMal isAdult title{romaji english} episodes chapters genres coverImage{large color} bannerImage}}}}}`;
   const d=await alGQL(q,{u:uid,t:type}); const out=[],seen=new Set();
   const lists=(d.MediaListCollection&&d.MediaListCollection.lists)||[];
   for(const l of lists)for(const e of l.entries){
     const m=e.media; if(!m||seen.has(m.id))continue; seen.add(m.id);
+    if(isAdultMedia(m))continue;                            // never sync adult content in
     const total=type==='ANIME'?m.episodes:m.chapters;
     out.push({title:m.title.english||m.title.romaji,status:mapAniStatus(e.status),kind:type==='ANIME'?'watch':'read',
       progress:e.progress||0,rating:e.score?Math.round(e.score/2):0,epTotal:total||0,
       eps:total?`${total} ${type==='ANIME'?'eps':'chapters'}`:'',genres:m.genres,
-      img:(m.coverImage&&m.coverImage.large)||'',color:(m.coverImage&&m.coverImage.color)||'',banner:m.bannerImage||'',aniId:m.id});
+      img:(m.coverImage&&m.coverImage.large)||'',color:(m.coverImage&&m.coverImage.color)||'',banner:m.bannerImage||'',aniId:m.id,malId:m.idMal||0});
   }
   return out;
 }
@@ -3638,11 +3654,18 @@ function renderParty(){
 }
 
 function doImport(){
-  const existing=new Set(anime.map(a=>a.title.toLowerCase().trim()));
-  const toAdd=importItems.filter(x=>x.selected&&!existing.has(x.title.toLowerCase().trim()));
+  const have=new Set();anime.forEach(a=>dupeKeys(a).forEach(k=>have.add(k)));
+  const toAdd=[];
+  for(const x of importItems){
+    if(!x.selected)continue;
+    const keys=dupeKeys({title:x.title,kind:viewKind});   // paste has no ids → match on normalized title
+    if(keys.some(k=>have.has(k)))continue;
+    keys.forEach(k=>have.add(k));toAdd.push(x);
+  }
   toAdd.forEach(item=>anime.unshift({id:uid(),title:item.title,status:item.status,kind:viewKind,ep:item.ep||0,rating:item.rating||0,fav:false,eps:'',epTotal:0,time:'',genre:'',order:[],notes:'',img:'',upd:Date.now()}));
   save();closeAll();render();
-  toast(`Added ${toAdd.length} title${toAdd.length!==1?'s':''}!`);
+  const dupes=importItems.filter(x=>x.selected).length-toAdd.length;
+  toast(`Added ${toAdd.length}${dupes?` · ${dupes} already had`:''}`);
   setTimeout(fetchCovers,500);
 }
 function exportList(){
@@ -4565,7 +4588,27 @@ async function aniSearch(title,type){
     body:JSON.stringify({query:q,variables:{s:title,t:type}})});
   if(!r.ok)return [];
   const j=await r.json();
-  return ((j&&j.data&&j.data.Page&&j.data.Page.media)||[]).filter(m=>m&&m.id);
+  return ((j&&j.data&&j.data.Page&&j.data.Page.media)||[]).filter(m=>m&&m.id&&!isAdultMedia(m));
+}
+// Adult / hentai gate — WatchList doesn't allow it. AniList flags it with isAdult
+// and/or a "Hentai" genre; MAL (Jikan) uses an "Rx - Hentai" rating / explicit genres.
+function isAdultMedia(m){
+  if(!m)return false;
+  if(m.isAdult)return true;
+  const g=(m.genres||[]).map(x=>(x&&x.name)||x||'');
+  if(g.some(x=>/hentai/i.test(x)))return true;
+  if((m.explicit_genres||[]).length)return true;
+  if(/(^|[^a-z])rx\b|hentai/i.test(m.rating||''))return true;
+  return false;
+}
+// Sweep out any adult titles already in the list (e.g. imported before the filter
+// existed) — the stored genre string gives them away.
+function purgeAdult(){
+  const before=anime.length;
+  anime=anime.filter(a=>!/\bhentai\b/i.test(a.genre||''));
+  const gone=before-anime.length;
+  if(gone){save();setTimeout(()=>toast(`Removed ${gone} adult title${gone!==1?'s':''} — not allowed`),900);}
+  return gone;
 }
 async function tvSearch(title){
   const r=await fetch(`https://api.tvmaze.com/search/shows?q=${encodeURIComponent(title)}`);
@@ -4807,7 +4850,7 @@ async function computeForYou(){
   const agg={};
   for(let i=0;i<top.length;i+=8){
     const batch=top.slice(i,i+8);
-    const q='{'+batch.map((s,j)=>'m'+j+':Media(id:'+s.aniId+'){recommendations(sort:RATING_DESC,perPage:8){nodes{rating mediaRecommendation{id title{romaji english} coverImage{large} genres averageScore}}}}').join(' ')+'}';
+    const q='{'+batch.map((s,j)=>'m'+j+':Media(id:'+s.aniId+'){recommendations(sort:RATING_DESC,perPage:8){nodes{rating mediaRecommendation{id isAdult title{romaji english} coverImage{large} genres averageScore}}}}').join(' ')+'}';
     try{
       const r=await fetch('https://graphql.anilist.co',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({query:q})});
       if(r.status===429){await pause(1500);i-=8;continue;}
@@ -4816,6 +4859,7 @@ async function computeForYou(){
         const md=data['m'+idx];if(!md||!md.recommendations)return;
         (md.recommendations.nodes||[]).forEach(n=>{
           const rec=n.mediaRecommendation;if(!rec||!rec.id||onList.has(rec.id))return;
+          if(isAdultMedia(rec))return;                      // never recommend adult titles
           if(!rec.coverImage||!rec.coverImage.large)return;
           if(!agg[rec.id])agg[rec.id]={score:0,srcs:new Set(),rec};
           agg[rec.id].score+=s.w*(n.rating>0?n.rating:1);
@@ -4869,7 +4913,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeAll();closeCon
 
 // ─── INIT ───────────────────────────────────────────────────────────────────
 try{hydrateIcons();}catch{}
-load();loadTheme();render();
+load();try{purgeAdult();}catch{}loadTheme();render();
 try{alCatchRedirect().then(()=>{if(!appLocked)alBootSync();}).catch(()=>{});}catch{}   // returning from AniList OAuth
 if(appLocked)showLock();   // stored list is ciphertext → gate the app until unlocked
 else try{restorePlayer();}catch{}   // came back mid-stream after an iOS reload → reopen it

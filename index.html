@@ -3534,6 +3534,12 @@ function renderAniList(){
 // frame-synced (the video is a cross-origin frame we can't control) — everyone
 // just starts together on the count. Backed by the sync worker (party- ops).
 let partyCode='',partyIsHost=false,partyRoom=null,partyTimer=0,partySeenPlay=0,partyChatRev=-1;
+// Running inside the native WatchList app? (it appends this to the user-agent.)
+// When true, "Share your screen" fires the app's native iPhone broadcast instead
+// of the desktop-only getDisplayMedia, so a phone can host — using this party's code.
+const IS_NATIVE=/WatchListNative/i.test(navigator.userAgent||'');
+function nativeBroadcast(){try{window.webkit.messageHandlers.wl.postMessage({type:'broadcast',code:partyCode||''});}catch(e){toast('Broadcasting needs the WatchList app');}}
+function nativeNotifyCode(){if(!IS_NATIVE)return;try{window.webkit.messageHandlers.wl.postMessage({type:'code',code:partyCode||''});}catch(e){}}
 let pcs={},localStream=null,partySeenSig=new Set(),partyPrevSharing='';   // WebRTC screen-share state
 let partySeenReact=new Set(),partyInSession=false,partyCurEp=0;
 const PARTY_EMOJI=['❤️','😂','🔥','😱','😭','👏','💀','🎉'];
@@ -3548,7 +3554,7 @@ let partyWS=null,partyReconn=0;
 function wsUrl(code,create){const base=(window.SYNC_URL||SYNC_URL).replace(/^http/,'ws');return `${base}/party/${code}?uid=${encodeURIComponent(partyUid())}&name=${encodeURIComponent(partyName()||'Guest')}${create?'&create=1':''}`;}
 function wsSend(obj){if(partyWS&&partyWS.readyState===1){partyWS.send(JSON.stringify(obj));return true;}return false;}
 function partyConnect(code,create){
-  partyCode=code;partySeenPlay=0;partySeenReact=new Set();
+  partyCode=code;partySeenPlay=0;partySeenReact=new Set();nativeNotifyCode();
   let ws;try{ws=new WebSocket(wsUrl(code,create));}catch{toast('Couldn’t connect to the party');return;}
   partyWS=ws;
   ws.onopen=()=>{partyReconn=0;updatePartyPill();};
@@ -3631,7 +3637,7 @@ function partyEnd(silent){
   Object.keys(pcs).forEach(pcClose);hideShareView();partySeenSig=new Set();partyPrevSharing='';
   try{localStorage.removeItem('party_active');}catch{}
   if(ws){try{ws.close();}catch{}}   // DO removes us + tells the others
-  partyCode='';partyIsHost=false;partyRoom=null;partyInSession=false;updatePartyPill();
+  partyCode='';partyIsHost=false;partyRoom=null;partyInSession=false;updatePartyPill();nativeNotifyCode();
   if(document.getElementById('partySheet').classList.contains('on'))renderParty();
   if(silent)toast('The party ended');
 }
@@ -3838,14 +3844,16 @@ function renderParty(){
       const primary=r.paused
         ?`<button class="pt-play" onclick="partyPlay()">${icon('play')} Resume together · 3·2·1</button>`
         :`<button class="pt-play" onclick="partyPause()">⏸ Pause everyone</button>`;
-      const shareBtn=canScreenShare()?`<button class="pt-share" onclick="startShare()">${icon('users')} Share your screen — real sync</button>`:'';
+      const shareBtn=IS_NATIVE?`<button class="pt-share" onclick="nativeBroadcast()">${icon('users')} Broadcast your screen</button>`:(canScreenShare()?`<button class="pt-share" onclick="startShare()">${icon('users')} Share your screen — real sync</button>`:'');
       hostCtl=`<p class="ai-desc" style="text-align:center">You're running the session — everyone follows you.</p>
         ${primary}<button class="pt-share" onclick="partyNext()">⏭ Next episode</button>${shareBtn}
         <div class="dt-label" style="margin-top:14px">Switch to something else</div>${picker}`;
     }else{
-      const shareBlock=`<button class="pt-share" onclick="startShare()">${icon('users')} Share your screen — real sync</button>`
-        +(canScreenShare()?`<div class="pt-hint">Everyone watches your screen, perfectly synced. Open the anime in another tab, then share it.</div>`
-          :`<div class="pt-hint">Needs a computer to host. On a phone, use “Start together” below.</div>`);
+      const shareBlock=IS_NATIVE
+        ?`<button class="pt-share" onclick="nativeBroadcast()">${icon('users')} Broadcast your screen</button><div class="pt-hint">Streams your iPhone screen to everyone in this party — no computer needed.</div>`
+        :`<button class="pt-share" onclick="startShare()">${icon('users')} Share your screen — real sync</button>`
+          +(canScreenShare()?`<div class="pt-hint">Everyone watches your screen, perfectly synced. Open the anime in another tab, then share it.</div>`
+            :`<div class="pt-hint">Needs a computer to host. On a phone, use “Start together” below.</div>`);
       hostCtl=`${shareBlock}${picker}<button class="pt-play" onclick="partyPlay()"${r.title?'':' disabled'}>${icon('play')} Start together · 3·2·1</button>`;
     }
   }else if(sharing){

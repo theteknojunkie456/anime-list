@@ -493,6 +493,18 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 .dt-season-s{font-size:11.5px;color:var(--t3);margin-top:2px;}
 .dt-season .ico{width:16px;height:16px;color:var(--t3);flex-shrink:0;}
 .dt-season-here{font-size:11px;font-weight:800;color:var(--a2);flex-shrink:0;}
+.dt-seasons-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:16px 0 8px;}
+.dt-seasons-head .dt-label{margin:0;}
+.dt-seenall{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:800;color:var(--a2);background:var(--ag);border:1px solid var(--b2);border-radius:99px;padding:5px 11px;flex-shrink:0;}
+.dt-seenall .ico{width:13px;height:13px;}
+.dt-season.off{opacity:.66;}
+.dt-season.done{border-color:#34c472;background:rgba(52,196,114,0.09);opacity:1;}
+.dt-seen-btn{flex-shrink:0;width:30px;height:30px;border-radius:50%;border:2px solid var(--b3);display:flex;align-items:center;justify-content:center;background:transparent;color:var(--t3);transition:background .15s,border-color .15s,color .15s;}
+.dt-seen-btn.on{background:#34c472;border-color:#34c472;color:#fff;}
+.dt-seen-btn .ico{width:15px;height:15px;}
+.dt-season-load{font-size:12px;color:var(--t3);padding:8px 2px;display:flex;align-items:center;gap:8px;}
+.dt-season-load .ico{width:15px;height:15px;animation:spin .9s linear infinite;}
+.dt-season-up{font-size:11px;font-weight:800;color:var(--wat);flex-shrink:0;white-space:nowrap;}
 .ai-insight-box{
   font-size:12.5px;line-height:1.55;border-radius:14px;padding:12px 14px;
   background:linear-gradient(135deg,var(--ag),transparent 70%);border:1px solid var(--b2);
@@ -2425,7 +2437,12 @@ function airingInfo(a){
   const ms=a.airAt*1000;
   if(ms<Date.now())return null; // aired already — refreshed opportunistically by fetchCovers
   const d=new Date(ms);
-  return{ep:a.airEp||0,day:d.toLocaleDateString([],{weekday:'short'}),time:d.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})};
+  // Within a week → weekday + time ("Wed 4:00 PM"); further out → the actual date
+  // ("Aug 6"), so a premiere months away doesn't read as this coming Wednesday.
+  const soon=(ms-Date.now())<7*86400000;
+  const day=d.toLocaleDateString([],{weekday:'short'}),time=d.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
+  const date=d.toLocaleDateString([],{month:'short',day:'numeric'});
+  return{ep:a.airEp||0,soon,day,time,date,when:soon?`${day} ${time}`:date};
 }
 function renderFiltRow(){
   const items=anime.filter(a=>kindOf(a)===viewKind);
@@ -2460,7 +2477,7 @@ function posterCard(a,nSeas){
   const p=prog(a);
   const bar=(a.status==='watching'&&a.epTotal)?`<div class="pbar"><div class="pfill" style="width:${Math.round(p*100)}%"></div></div>`:'';
   const air=airingInfo(a);
-  const airHTML=air?`<div class="pcard-air">${icon('calendar')} ${air.day} ${air.time}</div>`:'';
+  const airHTML=air?`<div class="pcard-air">${icon('calendar')} ${air.when}</div>`:'';
   const seas=multi?`<span class="pcard-seas">${icon('layers')}${nSeas}</span>`:'';
   return`<div class="pcard" onclick="openDetail('${a.id}')">
     <div class="pcard-wrap">
@@ -2498,7 +2515,7 @@ function heroHTML(a){
   else if(a.img)bg=`<div class="hero-bg" style="background-image:url('${a.img}')"></div>`;
   const av=accentVars(a);
   const air=airingInfo(a);
-  const airHTML=air?`<div class="hero-air">${icon('calendar')} Ep ${air.ep} · airs ${air.day} ${air.time}</div>`:'';
+  const airHTML=air?`<div class="hero-air">${icon('calendar')} Ep ${air.ep} · airs ${air.when}</div>`:'';
   return`<div class="hero"${av?` style="${av}"`:''} onclick="openDetail('${a.id}')">
     ${bg}<div class="hero-shade"></div>
     <div class="hero-body">
@@ -2518,7 +2535,7 @@ function bbSlideHTML(a){
   if(art)bg+=`<img class="hero-bg-img" src="${art}" loading="lazy" alt="" onerror="this.remove()">`;
   else if(a.img)bg=`<div class="hero-bg" style="background-image:url('${a.img}')"></div>`;
   const av=accentVars(a),p=prog(a),air=airingInfo(a);
-  const airHTML=air?`<div class="hero-air">${icon('calendar')} Ep ${air.ep} · airs ${air.day} ${air.time}</div>`:'';
+  const airHTML=air?`<div class="hero-air">${icon('calendar')} Ep ${air.ep} · airs ${air.when}</div>`:'';
   const kicker=a.status==='watching'?(kindOf(a)==='read'?'Continue reading':'Continue watching'):(a.fav?'One of your favorites':'In your spotlight');
   return`<div class="bb-slide"${av?` style="${av}"`:''} onclick="openDetail('${a.id}')">
     ${bg}<div class="hero-shade"></div>
@@ -2725,15 +2742,22 @@ function renderDetail(){
     orderHTML=`<div class="dt-label">${read?'Read order':'Watch order'}</div><ol class="order-list">${main.map(s=>li(s,false)).join('')}</ol>${filmsHTML}`;
   }
   const notesHTML=(a.notes&&a.notes.trim())?`<div class="dt-label">Notes</div><div class="dt-note">${a.notes}</div>`:'';
-  // Seasons/parts: every title in your list that belongs to this series, under one roof.
+  // Seasons/parts. For watch items with an AniList id we show the WHOLE franchise
+  // (every season, even ones not on your list), filled async by loadFranchise().
+  // Everything else falls back to just the seasons already on your list.
   const sibs=seriesOf(a);
-  const seasonsHTML=sibs.length>1?`<div class="dt-label">${read?'Parts':'Seasons'} · ${sibs.length}</div>
+  let seasonsHTML='';
+  if(kindOf(a)==='watch'&&a.aniId){
+    seasonsHTML=`<div id="dt-franchise"><div class="dt-season-load">${icon('loader')} Loading seasons…</div></div>`;
+  }else if(sibs.length>1){
+    seasonsHTML=`<div class="dt-label">${read?'Parts':'Seasons'} · ${sibs.length}</div>
     <div class="dt-seasons">${sibs.map(s=>{const cur=s.id===a.id,st=STATUS_META[s.status];
       return `<button class="dt-season${cur?' cur':''}"${cur?'':` onclick="openDetail('${s.id}')"`}>
         ${s.img?`<img src="${s.img}" alt="">`:`<div class="ph">${((s.title||'?').trim()[0]||'?').toUpperCase()}</div>`}
         <div class="dt-season-info"><div class="dt-season-t">${schEsc(s.title)}</div><div class="dt-season-s">${st?st.label:s.status}${s.epTotal?` · ${s.ep||0}/${s.epTotal}`:''}</div></div>
         ${cur?'<span class="dt-season-here">Viewing</span>':icon('chevron-right')}
-      </button>`;}).join('')}</div>`:'';
+      </button>`;}).join('')}</div>`;
+  }
   const body=document.getElementById('detailBody');
   body.setAttribute('style',accentVars(a));
   body.innerHTML=`
@@ -2743,7 +2767,7 @@ function renderDetail(){
       <div class="dt-info">
         <div class="dt-title">${a.title}</div>
         <div class="dt-meta">${[a.eps,a.time].filter(Boolean).join(' · ')}</div>
-        ${(()=>{const air=airingInfo(a);return air?`<div class="dt-air">${icon('calendar')} Ep ${air.ep} · airs ${air.day} ${air.time}</div>`:'';})()}
+        ${(()=>{const air=airingInfo(a);return air?`<div class="dt-air">${icon('calendar')} Ep ${air.ep} · airs ${air.when}</div>`:'';})()}
         <button class="dt-fav${a.fav?' on':''}" onclick="toggleFav()">${a.fav?icon('heart','fill')+' Favorited':icon('heart')+' Favorite'}</button>
       </div>
     </div>
@@ -2764,6 +2788,104 @@ function renderDetail(){
       <button class="dact" onclick="editItem('${a.id}')">${icon('edit')} Edit</button>
       <button class="dact danger" onclick="confirmDelete('${a.id}')">${icon('trash')}</button>
     </div>`;
+  // fill the franchise season list — from cache instantly, else fetch
+  if(kindOf(a)==='watch'&&a.aniId){
+    if(curFranchiseFor===a.id&&curFranchise.length)paintFranchise();
+    else loadFranchise(a.id,a.aniId);
+  }
+}
+// ─── FRANCHISE (every season of a title from AniList, on-list or not) ────────
+let franchiseCache={},curFranchise=[],curFranchiseFor='';
+async function fetchFranchise(a){
+  const base=seasonBase(a.title)||normTitle(a.title);
+  const key=a.aniId?('id:'+a.aniId):('t:'+base);
+  if(franchiseCache[key])return franchiseCache[key];
+  const q=`query($s:String){Page(perPage:30){media(search:$s,type:ANIME,isAdult:false,sort:SEARCH_MATCH){id format status episodes seasonYear startDate{year month} title{romaji english} coverImage{large} nextAiringEpisode{airingAt episode}}}}`;
+  let media=[];
+  try{
+    const r=await fetch('https://graphql.anilist.co',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({query:q,variables:{s:base}})});
+    if(r.ok)media=(((await r.json()).data||{}).Page||{}).media||[];
+  }catch{}
+  const ok=new Set(['TV','TV_SHORT','ONA']);  // the "seasons"; movies/OVAs stay out
+  let seasons=media.filter(m=>m&&ok.has(m.format)&&
+    [seasonBase(m.title.english),seasonBase(m.title.romaji)].filter(Boolean).some(x=>x===base));
+  // always include the season you're viewing, even if the search or format filter missed it
+  if(a.aniId&&!seasons.some(m=>m.id===a.aniId))
+    seasons.unshift({id:a.aniId,title:{romaji:a.title,english:a.title},format:'TV',status:'',episodes:a.epTotal||0,coverImage:{large:a.img||''},startDate:{year:0,month:0}});
+  const yr=m=>((m.startDate&&m.startDate.year)||m.seasonYear||9999),mo=m=>((m.startDate&&m.startDate.month)||0);
+  seasons.sort((x,y)=>yr(x)-yr(y)||mo(x)-mo(y));
+  const seen=new Set();seasons=seasons.filter(m=>!seen.has(m.id)&&seen.add(m.id));
+  franchiseCache[key]=seasons;
+  return seasons;
+}
+async function loadFranchise(detId){
+  const a=anime.find(x=>x.id===detId);if(!a)return;
+  let seasons=[];try{seasons=await fetchFranchise(a);}catch{}
+  if(detailId!==detId)return;   // navigated away while the request was in flight
+  curFranchise=seasons;curFranchiseFor=detId;
+  paintFranchise();
+}
+function franchiseMine(m){return anime.find(x=>kindOf(x)==='watch'&&x.aniId===m.id)||null;}
+function paintFranchise(){
+  const box=document.getElementById('dt-franchise');if(!box)return;
+  const seasons=curFranchise||[];
+  if(seasons.length<2){box.innerHTML='';return;}   // one season → nothing to group
+  const a=anime.find(x=>x.id===detailId);
+  const rows=seasons.map(m=>{
+    const mine=franchiseMine(m),cur=mine&&a&&mine.id===a.id,done=mine&&mine.status==='finished';
+    const title=m.title.english||m.title.romaji||'?';
+    const yr=(m.startDate&&m.startDate.year)||m.seasonYear||'';
+    let sub;
+    if(!mine)sub=(m.status==='NOT_YET_RELEASED'?'Upcoming':'Not on your list')+(yr?` · ${yr}`:'');
+    else{const st=STATUS_META[mine.status];sub=(st?st.label:mine.status)+(mine.epTotal?` · ${mine.ep||0}/${mine.epTotal}`:'');}
+    let up='';const na=m.nextAiringEpisode;
+    if(na&&na.airingAt&&na.airingAt*1000>Date.now()){
+      const d=new Date(na.airingAt*1000),soon=(na.airingAt*1000-Date.now())<7*86400000;
+      up=`<span class="dt-season-up">${icon('calendar')} ${soon?d.toLocaleDateString([],{weekday:'short'}):d.toLocaleDateString([],{month:'short',day:'numeric'})}</span>`;
+    }
+    const check=`<button class="dt-seen-btn${done?' on':''}" onclick="event.stopPropagation();toggleSeasonSeen(${m.id})" title="${done?'Watched — tap to unmark':'Mark as watched'}" aria-label="Mark season watched" aria-pressed="${done}">${icon('check')}</button>`;
+    const img=(m.coverImage&&m.coverImage.large)||(mine&&mine.img)||'';
+    const open=mine?` onclick="openDetail('${mine.id}')"`:'';
+    return `<div class="dt-season${cur?' cur':''}${done?' done':''}${mine?'':' off'}"${open}>
+      ${img?`<img src="${img}" alt="">`:`<div class="ph">${(title.trim()[0]||'?').toUpperCase()}</div>`}
+      <div class="dt-season-info"><div class="dt-season-t">${schEsc(title)}</div><div class="dt-season-s">${sub}</div></div>
+      ${up}${cur?'<span class="dt-season-here">Viewing</span>':''}${check}
+    </div>`;
+  }).join('');
+  const allSeen=seasons.every(m=>{const mine=franchiseMine(m);return mine&&mine.status==='finished';});
+  box.innerHTML=`<div class="dt-seasons-head"><div class="dt-label">Seasons · ${seasons.length}</div>
+    <button class="dt-seenall" onclick="markFranchiseSeen()">${icon(allSeen?'check':'layers')} ${allSeen?'All seen':'Seen all'}</button></div>
+    <div class="dt-seasons">${rows}</div>`;
+}
+function seasonToItem(m,status){
+  const title=m.title.english||m.title.romaji||'Untitled';
+  return {id:uid(),kind:'watch',status,title,aniId:m.id,
+    img:(m.coverImage&&m.coverImage.large)||'',
+    eps:m.episodes?m.episodes+' eps':'',epTotal:m.episodes||0,
+    ep:status==='finished'?(m.episodes||0):0,
+    time:'',genre:'',order:[],notes:'',rating:0,fav:false,upd:Date.now()};
+}
+function toggleSeasonSeen(aniId){
+  const m=(curFranchise||[]).find(x=>x.id===aniId);if(!m)return;
+  const mine=franchiseMine(m);
+  if(mine){
+    if(mine.status==='finished'){mine.status='plan';mine.ep=0;}
+    else{mine.status='finished';if(mine.epTotal)mine.ep=mine.epTotal;}
+    touch(mine);alPushItem&&alPushItem(mine);
+  }else anime.unshift(seasonToItem(m,'finished'));
+  save();renderDetail();render();
+  setTimeout(fetchCovers,300);
+}
+function markFranchiseSeen(){
+  const seasons=curFranchise||[];if(!seasons.length)return;
+  seasons.forEach(m=>{
+    const mine=franchiseMine(m);
+    if(mine){if(mine.status!=='finished'){mine.status='finished';if(mine.epTotal)mine.ep=mine.epTotal;touch(mine);alPushItem&&alPushItem(mine);}}
+    else anime.unshift(seasonToItem(m,'finished'));
+  });
+  save();renderDetail();render();
+  toast(`Marked ${seasons.length} season${seasons.length!==1?'s':''} as watched`);
+  setTimeout(fetchCovers,300);
 }
 function setDetailStatus(s){
   const a=anime.find(x=>x.id===detailId);if(!a)return;
@@ -4542,6 +4664,10 @@ async function fetchCovers(){
         const fields=read
           ?'coverImage{large extraLarge color} bannerImage chapters volumes genres'
           :'id coverImage{large extraLarge color} bannerImage episodes duration genres nextAiringEpisode{airingAt episode}';
+        // Known season? Refresh that EXACT media by id — a title search would drift to
+        // whatever AniList ranks first (often a different, currently-airing season),
+        // pinning the wrong air date. Only unknown items fall back to a title search.
+        if(!read&&a.aniId)return `a${i}:Media(id:${a.aniId},type:ANIME){${fields}}`;
         return `a${i}:Page(perPage:1){media(search:${JSON.stringify(String(a.title))},type:${type}){${fields}}}`;
       }).join(' ')+'}';
       let data=null,failed=false;
@@ -4557,7 +4683,8 @@ async function fetchCovers(){
       netFails=0;
       batch.forEach((a,i)=>{
         const read=kindOf(a)==='read';
-        const node=data['a'+i],m=node&&node.media&&node.media[0];
+        // Media(id:) returns the object directly; Page(search:) wraps it in {media:[…]}
+        const node=data['a'+i],m=node?(node.media?node.media[0]:node):null;
         if(m){
           if(!a.img&&!a.imgTried)a.img=(m.coverImage&&m.coverImage.large)||'';
           // per-title theming: wide banner art + AniList's dominant color (kept independent of any user-set bgImage/bgAccent)

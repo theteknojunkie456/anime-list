@@ -3540,6 +3540,18 @@ let partyCode='',partyIsHost=false,partyRoom=null,partyTimer=0,partySeenPlay=0,p
 const IS_NATIVE=/WatchListNative/i.test(navigator.userAgent||'');
 function nativeBroadcast(){try{window.webkit.messageHandlers.wl.postMessage({type:'broadcast',code:partyCode||''});}catch(e){toast('Broadcasting needs the WatchList app');}}
 function nativeNotifyCode(){if(!IS_NATIVE)return;try{window.webkit.messageHandlers.wl.postMessage({type:'code',code:partyCode||''});}catch(e){}}
+// Inside the app there's no web push — so hand the native shell every upcoming
+// episode air time and let it schedule free on-device local notifications instead.
+function nativeScheduleNotifs(){
+  if(!IS_NATIVE)return;
+  try{
+    const now=Date.now()/1000;
+    const items=anime.filter(a=>kindOf(a)==='watch'&&(a.status==='watching'||a.status==='plan')&&a.airAt&&a.airAt>now)
+      .sort((x,y)=>x.airAt-y.airAt).slice(0,60)
+      .map(a=>({title:a.title,at:a.airAt,ep:a.airEp||0}));
+    window.webkit.messageHandlers.wl.postMessage({type:'notify',items});
+  }catch(e){}
+}
 let pcs={},localStream=null,partySeenSig=new Set(),partyPrevSharing='';   // WebRTC screen-share state
 let partySeenReact=new Set(),partyInSession=false,partyCurEp=0;
 const PARTY_EMOJI=['❤️','😂','🔥','😱','😭','👏','💀','🎉'];
@@ -4852,7 +4864,7 @@ async function fetchCovers(){
         a.bannerTried=true; // stamp even when bannerImage was null (some titles have none) so we don't refetch forever
         a.detTried=true;
       });
-      save();renderHome();
+      save();renderHome();try{nativeScheduleNotifs();}catch{}
       await pause(1000); // stay comfortably under AniList's per-minute limit
     }
   }finally{coverRunning=false;}
@@ -5219,7 +5231,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeAll();closeCon
 
 // ─── INIT ───────────────────────────────────────────────────────────────────
 try{hydrateIcons();}catch{}
-load();try{purgeAdult();}catch{}loadTheme();render();
+load();try{purgeAdult();}catch{}loadTheme();render();try{nativeScheduleNotifs();}catch{}
 try{alCatchRedirect().then(()=>{if(!appLocked)alBootSync();}).catch(()=>{});}catch{}   // returning from AniList OAuth
 if(appLocked)showLock();   // stored list is ciphertext → gate the app until unlocked
 else try{restorePlayer();}catch{}   // came back mid-stream after an iOS reload → reopen it

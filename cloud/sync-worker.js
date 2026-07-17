@@ -16,7 +16,7 @@ const CHAT_CAP = 60;
 const QUEUE_CAP = 30;
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
     // ── watch-party WebSocket → route to the room's Durable Object ──────────
@@ -25,6 +25,38 @@ export default {
       const code = m[1].toUpperCase();
       const id = env.PARTY.idFromName(code);
       return env.PARTY.get(id).fetch(request);
+    }
+
+    // ── stream-slug resolver ────────────────────────────────────────────────
+    // The app can't fetch the streaming site's search (no CORS header), so it
+    // guesses the slug from the title and 404s a lot (the site slugs by romaji /
+    // drops punctuation — "Re:Zero" → "rezero", not "re-zero"). We fetch the
+    // site's search HERE (server-side, no CORS), pull out the real /watch/<slug>
+    // candidates, and hand them back so the app can match the right season and
+    // deep-link accurately. Cached at the edge for a day.
+    if (url.pathname === '/resolve') {
+      const rc = { 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'public, max-age=86400' };
+      const q = (url.searchParams.get('q') || '').slice(0, 120).trim();
+      if (!q) return json({ slugs: [] }, 200, rc);
+      const cache = caches.default;
+      const cacheKey = new Request('https://resolve.cache/anineko/' + encodeURIComponent(q.toLowerCase()));
+      const hit = await cache.match(cacheKey);
+      if (hit) return hit;
+      let slugs = [];
+      try {
+        const r = await fetch('https://anineko.to/browser?keyword=' + encodeURIComponent(q), {
+          headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'text/html' },
+        });
+        if (r.ok) {
+          const html = await r.text();
+          const set = new Set(); const re = /\/watch\/([a-z0-9][a-z0-9-]{1,80})/g; let m2;
+          while ((m2 = re.exec(html)) && set.size < 40) set.add(m2[1]);
+          slugs = [...set];
+        }
+      } catch (e) {}
+      const resp = json({ slugs }, 200, rc);
+      ctx.waitUntil(cache.put(cacheKey, resp.clone()));
+      return resp;
     }
 
     // ── list sync (KV, unchanged) ──────────────────────────────────────────

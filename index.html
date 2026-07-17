@@ -4014,9 +4014,64 @@ function streamSource(){try{return localStorage.getItem('stream_src')||'';}catch
 function streamBase(){return streamSource()||STREAM_DEFAULT;}
 function usingDefaultSource(){return !streamSource();}
 // AniNeko slugs: lowercase, apostrophes dropped, every other run of non-alphanumerics
-// becomes a single hyphen. Verified against real /watch/ URLs.
+// becomes a single hyphen. A best-effort GUESS — the site actually slugs by romaji
+// and drops punctuation ("Re:Zero" → "rezero"), so the guess 404s a lot. The real
+// slug is resolved via the worker (resolveStreamSlug) whenever possible; this stays
+// as the offline fallback.
 function streamSlug(title){
   return (title||'').toLowerCase().replace(/["'’]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
+}
+// ─── REAL SLUG RESOLUTION (kills the AniNeko 404s) ───────────────────────────
+// The site slugs by romaji and drops punctuation, so a title-derived guess rarely
+// matches. The worker fetches the site's search server-side and returns the real
+// /watch/<slug> candidates; we pick the one whose canonical title (season markers
+// normalized) matches this exact item, and cache it on the item so it's instant
+// next time. Season markers must match exactly — we never auto-play the wrong season.
+function canonTitle(s){
+  let t=' '+(s||'').toLowerCase().replace(/[^a-z0-9]+/g,' ')+' ';
+  t=t.replace(/ (the )?final season /g,' sf ');
+  t=t.replace(/ (\d+)(st|nd|rd|th) season /g,' s$1 ');
+  t=t.replace(/ season (\d+) /g,' s$1 ');
+  t=t.replace(/ (\d+)(st|nd|rd|th) /g,' s$1 ');
+  t=t.replace(/ part (\d+) /g,' p$1 ');
+  t=t.replace(/ cour (\d+) /g,' c$1 ');
+  t=t.replace(/ (ii|iii|iv|v|vi|vii|viii|ix|x) /g,(m,g)=>' s'+({ii:2,iii:3,iv:4,v:5,vi:6,vii:7,viii:8,ix:9,x:10}[g])+' ');
+  t=t.replace(/ (tv|the|animation|anime|movie|specials?|ova|ona) /g,' ');
+  return t.trim().replace(/\s+/g,' ');
+}
+const _seasonTok=x=>/^(s\d+|p\d+|c\d+|sf)$/.test(x);
+function slugScore(title,slug){
+  const A=canonTitle(title).split(' ').filter(Boolean);
+  const B=canonTitle(slug.replace(/-/g,' ')).split(' ').filter(Boolean);
+  if(!A.length||!B.length)return 0;
+  const setA=new Set(A),setB=new Set(B);
+  let sc;
+  if(A.join('')===B.join(''))sc=1000;
+  else{let inter=0;setA.forEach(x=>{if(setB.has(x))inter++;});const uni=new Set([...A,...B]).size;
+    const sh=A.length<=B.length?setA:setB,lo=A.length<=B.length?setB:setA;let cov=0;sh.forEach(x=>{if(lo.has(x))cov++;});
+    sc=Math.round((inter/uni)*600+(cov/sh.size)*400);}
+  const aS=A.filter(_seasonTok).sort().join(','),bS=B.filter(_seasonTok).sort().join(',');
+  if(aS!==bS)sc=Math.min(sc,450);   // different season → don't auto-pick it
+  return sc;
+}
+function pickSlug(title,slugs){
+  let best=null,bs=0;
+  (slugs||[]).forEach(s=>{const sc=slugScore(title,s);if(sc>bs){bs=sc;best=s;}});
+  return bs>=700?best:null;
+}
+// Return the real AniNeko slug for this item — cached, else worker-resolved, else
+// the best-effort guess. Only meaningful for the default (AniNeko) source.
+async function resolveStreamSlug(a){
+  if(!usingDefaultSource())return streamSlug(a.title);
+  if(a.streamSlug)return a.streamSlug;
+  try{
+    const r=await fetch(`${SYNC_URL}/resolve?q=${encodeURIComponent(a.title)}`,{cache:'no-store'});
+    if(r.ok){
+      const best=pickSlug(a.title,(await r.json()).slugs);
+      if(best){a.streamSlug=best;save();return best;}
+    }
+  }catch{}
+  return streamSlug(a.title);   // offline / no match → guess (may 404; search button recovers)
 }
 let pvReturnId=null, pvWatchEp=null, pvOpenTime=0, pvCanNav=false;
 // Which episode to open: the next one they haven't finished (ep watched + 1),
@@ -4050,11 +4105,12 @@ function findUrl(a){
   if(/\{title\}|\{slug\}/.test(src)) return src.replace(/\{title\}/g,encodeURIComponent(a.title)).replace(/\{slug\}/g,streamSlug(a.title)).replace(/\{ep\}/g,'1');
   return src;   // plain custom URL — just reload the site so its own search is at hand
 }
-function watchAnime(id){
+const PV_LOADING="data:text/html,<body style='margin:0;background:%230b0b0f;color:%23888;font:14px -apple-system,system-ui;display:flex;align-items:center;justify-content:center;height:100vh'>Finding your episode…</body>";
+async function watchAnime(id){
   const a=anime.find(x=>x.id===id); if(!a) return;
   if(kindOf(a)!=='watch'||!a.aniId){toast('Watch is for anime only');return;}
   pvReturnId=id;
-  const {url,ep}=streamURL(a);
+  const ep=watchEpisode(a);
   pvWatchEp=ep;   // the episode we opened, so we can save progress on the way out
   pvOpenTime=Date.now();   // how long they stay is our only signal that they watched
   document.getElementById('pvTitle').textContent=a.title+(ep?` · Ep ${ep}`:'');
@@ -4064,12 +4120,24 @@ function watchAnime(id){
   // the exact title IN-FRAME: one tap to the right result, no typing, no leaving.
   ext.onclick=()=>{const f=document.getElementById('pvFrame');f.src=findUrl(a);pvCanNav=false;renderPvNav(null);};
   const f=document.getElementById('pvFrame');
-  f.src=url;
   document.getElementById('playerView').classList.add('on');
-  savePvSession(id,ep,'watch');   // survive an iOS background/reload mid-stream
   // binge controls light up only when we can address a specific episode
   pvCanNav=!!ep&&(usingDefaultSource()||/\{ep\}/.test(streamSource()||''));
   renderPvNav(a);
+  // Resolve the REAL slug before deep-linking (kills the 404s). Cached items are
+  // instant; the first watch of a title shows a brief "finding…" while the worker
+  // looks up the site's true slug for this exact season.
+  let url;
+  if(usingDefaultSource()){
+    if(!a.streamSlug)f.src=PV_LOADING;
+    const slug=await resolveStreamSlug(a);
+    if(pvReturnId!==id)return;   // user opened something else while we resolved
+    url=ep?`${STREAM_DEFAULT}/watch/${slug}/ep-${ep}`:`${STREAM_DEFAULT}/watch/${slug}`;
+  }else{
+    url=streamURL(a).url;
+  }
+  f.src=url;
+  savePvSession(id,ep,'watch');   // survive an iOS background/reload mid-stream
 }
 // Reading source (AsuraScans by default). AsuraScans series live at
 // /comics/<slug>-<suffix>, where the suffix is a CONSTANT site-wide token (not a
@@ -4107,8 +4175,8 @@ function readManga(id){
 // when the source can address a specific episode (AniNeko, or a custom source
 // with an {ep} token) — otherwise the nav bar stays hidden.
 function episodeURL(a,ep){
-  const slug=streamSlug(a.title), src=streamSource();
-  if(!src) return `${STREAM_DEFAULT}/watch/${slug}/ep-${ep}`;
+  const slug=(usingDefaultSource()&&a&&a.streamSlug)||streamSlug(a.title), src=streamSource();
+  if(!src) return `${STREAM_DEFAULT}/watch/${slug}/ep-${ep}`;   // uses the resolved slug when we have it
   if(/\{ep\}/.test(src)) return src.replace(/\{title\}/g,encodeURIComponent(a.title)).replace(/\{slug\}/g,slug).replace(/\{ep\}/g,ep);
   return null;   // search / plain source — no way to target an episode
 }

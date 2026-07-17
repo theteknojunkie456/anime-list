@@ -165,7 +165,7 @@ final class BroadcastController: ObservableObject {
     let picker: RPSystemBroadcastPickerView = {
         let v = RPSystemBroadcastPickerView(frame: CGRect(x: 0, y: 0, width: 44, height: 44))
         v.showsMicrophoneButton = false
-        v.preferredExtension = "com.watchlist.party.BroadcastExt"
+        v.preferredExtension = "com.humblezone.watchlist.BroadcastExt"
         return v
     }()
     func start() {

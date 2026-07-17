@@ -1,25 +1,32 @@
 // ── WatchList cloud sync + watch parties — Cloudflare Worker ────────────────
 // Free, private, and completely separate from any other app.
 //
-// TWO features, one KV namespace (bound as LISTS):
-//  • Sync — stores one list per long random "sync code". Read/write only if you
-//    know the code; the Worker never lists codes or exposes anyone else's data.
-//    Keys: list:<code>
-//  • Watch parties — a short shareable room code lets friends watch together:
-//    shared presence, a live chat, the host's current episode, and a synchronized
-//    "3·2·1 play" cue. Playback itself isn't frame-synced (the app plays inside a
-//    cross-origin frame it can't control) — this coordinates *around* it.
-//    Keys: party:<CODE>   (auto-expire after a few hours of inactivity)
+//  • Sync — one list per long random "sync code", stored in KV (bound as LISTS).
+//    POST {op:'pull'|'push', code, data}. Keys: list:<code>
+//  • Watch parties — REAL-TIME over WebSockets via a Durable Object (PARTY).
+//    Each room code is one Durable Object instance holding the live state in
+//    memory, pushing updates to every connected member instantly (no polling,
+//    no eventual-consistency staleness — that was the old KV design's lag).
+//    Connect: GET wss://…/party/<CODE>?uid=…&name=…&create=1
 //
-// Deploy: `wrangler deploy` (the same worker you already run for sync).
+// Deploy: `wrangler deploy -c sync-wrangler.toml`
+//   (needs the [[durable_objects]] + [[migrations]] blocks in that config).
 
-const PARTY_TTL = 6 * 60 * 60;          // room lives 6h past its last activity
-const PRESENT_MS = 15 * 1000;           // a member seen within 15s counts as "here"
-const CHAT_CAP = 60;                    // keep only the most recent messages
-const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';   // no ambiguous 0/O/1/I/L
+const CHAT_CAP = 60;
 
 export default {
   async fetch(request, env) {
+    const url = new URL(request.url);
+
+    // ── watch-party WebSocket → route to the room's Durable Object ──────────
+    const m = url.pathname.match(/^\/party\/([A-Za-z0-9]{4,8})$/);
+    if (m) {
+      const code = m[1].toUpperCase();
+      const id = env.PARTY.idFromName(code);
+      return env.PARTY.get(id).fetch(request);
+    }
+
+    // ── list sync (KV, unchanged) ──────────────────────────────────────────
     const cors = {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'POST, OPTIONS',
@@ -28,12 +35,9 @@ export default {
     };
     if (request.method === 'OPTIONS') return new Response(null, { headers: cors });
     if (request.method !== 'POST') return json({ error: 'POST only' }, 405, cors);
-
     let body;
     try { body = await request.json(); } catch { return json({ error: 'bad json' }, 400, cors); }
     const op = String(body.op || '');
-
-    // ── list sync (long secret code) ──────────────────────────────────────
     if (op === 'pull' || op === 'push') {
       const code = String(body.code || '');
       if (!/^[A-Za-z0-9]{10,64}$/.test(code)) return json({ error: 'bad code' }, 400, cors);
@@ -47,164 +51,114 @@ export default {
       await env.LISTS.put(key, payload);
       return json({ ok: true, updatedAt: Date.now() }, 200, cors);
     }
-
-    // ── watch parties (short room code) ───────────────────────────────────
-    if (op.startsWith('party-')) return handleParty(op, body, env, cors);
-
     return json({ error: 'bad op' }, 400, cors);
   },
 };
 
-async function handleParty(op, body, env, cors) {
-  const uid = String(body.uid || '').slice(0, 40);
-  const name = String(body.name || 'Guest').replace(/[<>]/g, '').slice(0, 24) || 'Guest';
-  if (!uid) return json({ error: 'no uid' }, 400, cors);
+// ── PARTY ROOM (Durable Object) ─────────────────────────────────────────────
+// One instance per code. Holds the room in memory + durable storage, and pushes
+// state to every socket the instant anything changes. Presence = who's connected
+// (a socket closing removes them immediately — no heartbeats, no stale lists).
+export class PartyRoom {
+  constructor(state, env) { this.state = state; this.env = env; this.room = null; }
 
-  // create: mint a fresh code and seat the creator as host
-  if (op === 'party-create') {
-    let code, existing, tries = 0;
-    do { code = mintCode(); existing = await env.LISTS.get('party:' + code); }
-    while (existing && ++tries < 6);
-    const room = {
-      code, host: uid, title: '', animeId: '', ep: 0, img: '', playAt: 0, paused: false, sharing: '',
-      members: { [uid]: { name, seen: Date.now() } }, chat: [], signals: [], reacts: [], rev: 1,
-    };
-    sysMsg(room, `${name} started the party`);
-    await saveRoom(env, room);
-    return json({ ok: true, room: view(room), host: true }, 200, cors);
+  async getRoom() {
+    if (!this.room) this.room = (await this.state.storage.get('room')) || null;
+    return this.room;
   }
+  async save() { await this.state.storage.put('room', this.room); }
 
-  const code = String(body.code || '').toUpperCase();
-  if (!/^[A-Z0-9]{5,8}$/.test(code)) return json({ error: 'bad code' }, 400, cors);
-  const room = await loadRoom(env, code);
-  if (!room) return json({ error: 'no such party' }, 404, cors);
-  const isHost = room.host === uid;
+  async fetch(request) {
+    const url = new URL(request.url);
+    const uid = (url.searchParams.get('uid') || '').slice(0, 40);
+    const name = (url.searchParams.get('name') || 'Guest').replace(/[<>]/g, '').slice(0, 24) || 'Guest';
+    const create = url.searchParams.get('create') === '1';
+    const code = (url.pathname.split('/').pop() || '').toUpperCase();
+    if (request.headers.get('Upgrade') !== 'websocket') return new Response('expected websocket', { status: 426 });
+    if (!uid) return new Response('no uid', { status: 400 });
 
-  if (op === 'party-join') {
+    const pair = new WebSocketPair();
+    const client = pair[0], server = pair[1];
+    this.state.acceptWebSocket(server, [uid]);            // hibernatable, tagged by uid
+    server.serializeAttachment({ uid, name });
+
+    let room = await this.getRoom();
+    if (!room) {
+      if (!create) { server.send(JSON.stringify({ t: 'error', msg: 'no such party' })); server.close(4404, 'no room'); return new Response(null, { status: 101, webSocket: client }); }
+      room = this.room = { code, host: uid, title: '', animeId: '', ep: 0, img: '', playAt: 0, paused: false, sharing: '', members: {}, chat: [], reacts: [], rev: 1 };
+      this.sys(room, `${name} started the party`);
+    }
     const fresh = !room.members[uid];
-    room.members[uid] = { name, seen: Date.now() };
-    if (fresh) sysMsg(room, `${name} joined`);
+    room.members[uid] = { name };
+    if (fresh && !create) this.sys(room, `${name} joined`);
     room.rev++;
-    await saveRoom(env, room);
-    return json({ ok: true, room: view(room), host: isHost }, 200, cors);
+    await this.save();
+    this.broadcast();
+    return new Response(null, { status: 101, webSocket: client });
   }
 
-  if (op === 'party-poll') {
-    // heartbeat — only write when the last-seen is stale, to spare KV writes
-    const m = room.members[uid], now = Date.now();
-    if (!m || now - (m.seen || 0) > 5000) {
-      room.members[uid] = { name: (m && m.name) || name, seen: now };
-      await saveRoom(env, room);
+  async webSocketMessage(ws, raw) {
+    let msg; try { msg = JSON.parse(raw); } catch { return; }
+    const att = ws.deserializeAttachment() || {};
+    const uid = att.uid, name = att.name || 'Guest';
+    const room = await this.getRoom(); if (!room) return;
+    const isHost = room.host === uid;
+
+    switch (msg.t) {
+      case 'chat': {
+        const text = String(msg.msg || '').slice(0, 300).trim();
+        if (text) { room.chat.push({ id: room.rev + '-' + Date.now(), uid, name, msg: text, t: Date.now() }); this.cap(room); room.rev++; await this.save(); this.broadcast(); }
+        return;
+      }
+      case 'react': {
+        const emoji = String(msg.emoji || '').slice(0, 8);
+        if (emoji) { room.reacts = (room.reacts || []).filter(r => Date.now() - r.t < 8000); room.reacts.push({ id: uid + '-' + Date.now() + '-' + ((Math.random() * 1e4) | 0), emoji, uid, t: Date.now() }); if (room.reacts.length > 24) room.reacts = room.reacts.slice(-24); room.rev++; await this.save(); this.broadcast(); }
+        return;
+      }
+      case 'set': {
+        if (!isHost) return;
+        room.title = String(msg.title || '').slice(0, 160); room.animeId = String(msg.animeId || '').slice(0, 40);
+        room.ep = Math.max(0, Math.min(9999, parseInt(msg.ep, 10) || 0)); room.img = String(msg.img || '').slice(0, 400);
+        room.playAt = 0; room.paused = false;
+        this.sys(room, `Now watching ${room.title}${room.ep ? ' · Ep ' + room.ep : ''}`); room.rev++; await this.save(); this.broadcast(); return;
+      }
+      case 'play': { if (!isHost) return; room.playAt = Date.now() + 3600; room.paused = false; this.sys(room, '▶ Starting in 3…'); room.rev++; await this.save(); this.broadcast(); return; }
+      case 'pause': { if (!isHost) return; room.paused = true; room.playAt = 0; this.sys(room, `⏸ ${name} paused`); room.rev++; await this.save(); this.broadcast(); return; }
+      case 'share': { if (!isHost) return; room.sharing = msg.on ? uid : ''; this.sys(room, msg.on ? `${name} started screen sharing` : `${name} stopped sharing`); room.rev++; await this.save(); this.broadcast(); return; }
+      case 'signal': {
+        const to = String(msg.to || ''); if (!to) return;
+        this.sendTo(to, { t: 'signal', from: uid, kind: msg.kind, data: msg.data });
+        return;
+      }
     }
-    const signals = (room.signals || []).filter(s => s.to === uid);   // WebRTC messages for me
-    return json({ ok: true, room: view(room), host: isHost, signals }, 200, cors);
   }
 
-  if (op === 'party-set') {           // host chooses the current title/episode
-    if (!isHost) return json({ error: 'host only' }, 403, cors);
-    room.title = String(body.title || '').slice(0, 160);
-    room.animeId = String(body.animeId || '').slice(0, 40);
-    room.ep = Math.max(0, Math.min(9999, parseInt(body.ep, 10) || 0));
-    room.img = String(body.img || '').slice(0, 400);
-    room.playAt = 0; room.paused = false;
-    sysMsg(room, `Now watching ${room.title}${room.ep ? ' · Ep ' + room.ep : ''}`);
+  async webSocketClose(ws) { await this.dropSocket(ws); }
+  async webSocketError(ws) { await this.dropSocket(ws); }
+
+  async dropSocket(ws) {
+    const att = ws.deserializeAttachment() || {};
+    const uid = att.uid; const room = await this.getRoom(); if (!room || !uid) return;
+    // only drop the member if they have no other live sockets
+    const stillOpen = this.state.getWebSockets(uid).filter(s => s !== ws && s.readyState === WebSocket.OPEN).length;
+    if (stillOpen) return;
+    if (room.members[uid]) { this.sys(room, `${room.members[uid].name} left`); delete room.members[uid]; }
+    if (room.sharing === uid) room.sharing = '';
+    if (room.host === uid) { const rest = Object.keys(room.members); if (rest.length) { room.host = rest[0]; this.sys(room, `${room.members[rest[0]].name} is now host`); } }
     room.rev++;
-    await saveRoom(env, room);
-    return json({ ok: true, room: view(room) }, 200, cors);
+    if (Object.keys(room.members).length) { await this.save(); this.broadcast(); }
+    else { await this.state.storage.deleteAll(); this.room = null; }   // empty → gone
   }
 
-  if (op === 'party-play') {          // host fires the 3·2·1 start / resume cue
-    if (!isHost) return json({ error: 'host only' }, 403, cors);
-    room.playAt = Date.now() + 3600; room.paused = false;
-    sysMsg(room, `▶ Starting in 3…`);
-    room.rev++;
-    await saveRoom(env, room);
-    return json({ ok: true, room: view(room) }, 200, cors);
+  cap(room) { if (room.chat.length > CHAT_CAP) room.chat = room.chat.slice(-CHAT_CAP); }
+  sys(room, msg) { room.chat.push({ id: 's-' + Date.now() + '-' + ((Math.random() * 1e6) | 0), sys: true, msg, t: Date.now() }); this.cap(room); }
+  view() {
+    const r = this.room;
+    return { code: r.code, host: r.host, title: r.title, animeId: r.animeId, ep: r.ep, img: r.img, playAt: r.playAt, paused: !!r.paused, sharing: r.sharing || '',
+      members: Object.entries(r.members).map(([uid, m]) => ({ uid, name: m.name })), chat: r.chat, reacts: (r.reacts || []).filter(x => Date.now() - x.t < 8000), rev: r.rev };
   }
-
-  if (op === 'party-pause') {         // host pauses everyone
-    if (!isHost) return json({ error: 'host only' }, 403, cors);
-    room.paused = true; room.playAt = 0;
-    sysMsg(room, `⏸ ${name} paused`);
-    room.rev++;
-    await saveRoom(env, room);
-    return json({ ok: true, room: view(room) }, 200, cors);
-  }
-
-  // screen-share broadcaster on/off (desktop host)
-  if (op === 'party-share') {
-    if (!isHost) return json({ error: 'host only' }, 403, cors);
-    room.sharing = body.on ? uid : '';
-    if (!body.on) room.signals = [];
-    sysMsg(room, body.on ? `${name} started screen sharing` : `${name} stopped sharing`);
-    room.rev++; await saveRoom(env, room);
-    return json({ ok: true, room: view(room) }, 200, cors);
-  }
-
-  // WebRTC signaling relay: one small mailbox of offer/answer messages, addressed
-  // peer-to-peer. Consumers dedupe by id; entries auto-expire so it can't grow.
-  if (op === 'party-signal') {
-    const to = String(body.to || ''), kind = String(body.kind || '');
-    if (to && kind) {
-      room.signals = (room.signals || []).filter(s => Date.now() - s.t < 90000);
-      room.signals.push({ id: uid + '-' + to + '-' + kind + '-' + Date.now(), from: uid, to, kind, data: body.data, t: Date.now() });
-      room.rev++; await saveRoom(env, room);
-    }
-    return json({ ok: true }, 200, cors);
-  }
-
-  // live emoji reactions — ephemeral, everyone sees them float up
-  if (op === 'party-react') {
-    const emoji = String(body.emoji || '').slice(0, 8);
-    if (emoji) {
-      room.members[uid] = { name, seen: Date.now() };
-      room.reacts = (room.reacts || []).filter(r => Date.now() - r.t < 8000);
-      room.reacts.push({ id: uid + '-' + Date.now() + '-' + ((Math.random() * 1e4) | 0), emoji, uid, t: Date.now() });
-      if (room.reacts.length > 24) room.reacts = room.reacts.slice(-24);
-      room.rev++; await saveRoom(env, room);
-    }
-    return json({ ok: true }, 200, cors);
-  }
-
-  if (op === 'party-chat') {
-    const msg = String(body.msg || '').slice(0, 300).trim();
-    if (msg) {
-      room.members[uid] = { name, seen: Date.now() };
-      room.chat.push({ id: room.rev + '-' + Date.now(), uid, name, msg, t: Date.now() });
-      if (room.chat.length > CHAT_CAP) room.chat = room.chat.slice(-CHAT_CAP);
-      room.rev++; await saveRoom(env, room);
-    }
-    return json({ ok: true, room: view(room) }, 200, cors);
-  }
-
-  if (op === 'party-leave') {
-    if (room.members[uid]) { sysMsg(room, `${room.members[uid].name} left`); delete room.members[uid]; }
-    if (isHost) {                     // host left → hand off to whoever's still here
-      const rest = Object.keys(room.members);
-      if (rest.length) { room.host = rest[0]; sysMsg(room, `${room.members[rest[0]].name} is now host`); }
-    }
-    room.rev++;
-    if (Object.keys(room.members).length) await saveRoom(env, room);
-    else await env.LISTS.delete('party:' + code);   // empty → drop it
-    return json({ ok: true }, 200, cors);
-  }
-
-  return json({ error: 'bad party op' }, 400, cors);
-}
-
-function mintCode() { let s = ''; for (let i = 0; i < 6; i++) s += CODE_CHARS[(Math.random() * CODE_CHARS.length) | 0]; return s; }
-function sysMsg(room, msg) { room.chat.push({ id: 's-' + Date.now() + '-' + ((Math.random() * 1e6) | 0), sys: true, msg, t: Date.now() }); if (room.chat.length > CHAT_CAP) room.chat = room.chat.slice(-CHAT_CAP); }
-async function loadRoom(env, code) { const s = await env.LISTS.get('party:' + code); return s ? JSON.parse(s) : null; }
-async function saveRoom(env, room) { await env.LISTS.put('party:' + room.code, JSON.stringify(room), { expirationTtl: PARTY_TTL }); }
-// what clients see: present-only member list, everything else as-is
-function view(room) {
-  const now = Date.now();
-  const members = Object.entries(room.members)
-    .filter(([, m]) => now - (m.seen || 0) < PRESENT_MS)
-    .map(([uid, m]) => ({ uid, name: m.name }));
-  return { code: room.code, host: room.host, title: room.title, animeId: room.animeId,
-    ep: room.ep, img: room.img, playAt: room.playAt, paused: !!room.paused, sharing: room.sharing || '', members, chat: room.chat,
-    reacts: (room.reacts || []).filter(r => Date.now() - r.t < 8000), rev: room.rev };
+  broadcast() { const s = JSON.stringify({ t: 'state', room: this.view() }); for (const ws of this.state.getWebSockets()) { try { ws.send(s); } catch {} } }
+  sendTo(uid, obj) { const s = JSON.stringify(obj); for (const ws of this.state.getWebSockets(uid)) { try { ws.send(s); } catch {} } }
 }
 
 function json(obj, status, cors) {

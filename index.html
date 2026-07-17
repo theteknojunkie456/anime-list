@@ -3233,33 +3233,44 @@ let pcs={},localStream=null,partySeenSig=new Set(),partyPrevSharing='';   // Web
 let partySeenReact=new Set(),partyInSession=false,partyCurEp=0;
 const PARTY_EMOJI=['❤️','😂','🔥','😱','😭','👏','💀','🎉'];
 function spawnReact(emoji){const layer=document.getElementById('reactLayer');if(!layer)return;const el=document.createElement('div');el.className='react-fly';el.textContent=emoji;el.style.left=(8+Math.random()*82)+'%';el.style.fontSize=(28+Math.random()*16)+'px';layer.appendChild(el);setTimeout(()=>el.remove(),2700);}
-function partyReact(e){if(!partyActive())return;spawnReact(e);partyPost('party-react',{emoji:e}).catch(()=>{});}
+function partyReact(e){if(!partyActive())return;spawnReact(e);wsSend({t:'react',emoji:e});}
 function processReacts(reacts){if(!reacts)return;const me=partyUid();for(const r of reacts){if(partySeenReact.has(r.id))continue;partySeenReact.add(r.id);if(r.uid!==me)spawnReact(r.emoji);}if(partySeenReact.size>240)partySeenReact=new Set([...partySeenReact].slice(-120));}
 function partyUid(){try{let u=localStorage.getItem('party_uid');if(!u){u='u'+Math.random().toString(36).slice(2)+Date.now().toString(36);localStorage.setItem('party_uid',u);}return u;}catch{return'u'+Date.now();}}
 function partyName(){try{return localStorage.getItem('party_name')||'';}catch{return'';}}
 function setPartyName(n){try{localStorage.setItem('party_name',n);}catch{}}
-async function partyPost(op,extra){
-  const r=await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({op,uid:partyUid(),name:partyName()||'Guest',code:partyCode,...extra})});
-  const j=await r.json().catch(()=>({}));
-  if(!r.ok)throw new Error(j.error||'party error');
-  return j;
+// ── real-time connection (WebSocket → the room's Durable Object) ─────────────
+let partyWS=null,partyReconn=0;
+function wsUrl(code,create){const base=(window.SYNC_URL||SYNC_URL).replace(/^http/,'ws');return `${base}/party/${code}?uid=${encodeURIComponent(partyUid())}&name=${encodeURIComponent(partyName()||'Guest')}${create?'&create=1':''}`;}
+function wsSend(obj){if(partyWS&&partyWS.readyState===1){partyWS.send(JSON.stringify(obj));return true;}return false;}
+function partyConnect(code,create){
+  partyCode=code;partySeenPlay=0;partySeenReact=new Set();
+  let ws;try{ws=new WebSocket(wsUrl(code,create));}catch{toast('Couldn’t connect to the party');return;}
+  partyWS=ws;
+  ws.onopen=()=>{partyReconn=0;updatePartyPill();};
+  ws.onmessage=e=>{let m;try{m=JSON.parse(e.data);}catch{return;}
+    if(m.t==='state')applyRoom(m.room);
+    else if(m.t==='signal')handleSignalMsg(m);
+    else if(m.t==='error'){toast(m.msg||'Party error');partyEnd(true);}
+  };
+  ws.onclose=()=>{ if(partyWS!==ws)return;   // a newer socket superseded this one
+    if(partyCode&&partyReconn<6){partyReconn++;setTimeout(()=>{if(partyCode)partyConnect(partyCode,false);},700*partyReconn);}   // resilient reconnect
+  };
+  ws.onerror=()=>{};
 }
 function partyActive(){return !!partyCode;}
 function updatePartyPill(){const el=document.getElementById('partyPill');if(!el)return;const sheetOpen=document.getElementById('partySheet').classList.contains('on');el.classList.toggle('on',partyActive()&&!sheetOpen);const t=document.getElementById('ppText');if(t)t.textContent=partyRoom?`Party · ${partyRoom.members.length}`:'Party';}
-function partyStartPolling(){clearInterval(partyTimer);partyTimer=setInterval(()=>{partyPoll();},2500);}
-function partyStopPolling(){clearInterval(partyTimer);partyTimer=0;}
-async function partyPoll(){if(!partyActive())return;try{const j=await partyPost('party-poll');applyRoom(j);}catch(e){if(/no such party/.test(e.message)){partyEnd(true);}}}
-function applyRoom(j){
-  if(!j||!j.room)return;
-  partyRoom=j.room; partyIsHost=(j.host===true)||(j.room.host===partyUid());
+function applyRoom(room){
+  if(!room)return;
+  partyRoom=room; partyIsHost=(room.host===partyUid());
   updatePartyPill();
   if(document.getElementById('partySheet').classList.contains('on'))renderParty();
   // the 3·2·1 cue: a fresh future playAt → count everyone in, then open the player
-  if(j.room.playAt&&j.room.playAt>Date.now()&&j.room.playAt!==partySeenPlay){partySeenPlay=j.room.playAt;partyCue(j.room);}
-  try{rtcTick(j.room,j.signals);}catch(e){}   // drive the screen-share mesh
-  try{processReacts(j.room.reacts);}catch(e){}   // float everyone's emoji
-  try{followHost(j.room);}catch(e){}   // viewers follow the host's remote
+  if(room.playAt&&room.playAt>Date.now()&&room.playAt!==partySeenPlay){partySeenPlay=room.playAt;partyCue(room);}
+  try{rtcTick(room);}catch(e){}          // drive the screen-share mesh
+  try{processReacts(room.reacts);}catch(e){}   // float everyone's emoji
+  try{followHost(room);}catch(e){}       // viewers follow the host's remote
 }
+function handleSignalMsg(m){try{if(m.kind==='offer')pcHandleOffer(m.from,m.data);else if(m.kind==='answer')pcHandleAnswer(m.from,m.data);}catch(e){}}
 function partyCue(room){
   const ov=document.getElementById('partyCount'),num=document.getElementById('pcNum'),lbl=document.getElementById('pcLbl');
   if(!ov)return;
@@ -3289,43 +3300,45 @@ function watchParty(title,ep){
   renderPvNav(null);
   partyInSession=true;partyCurEp=ep;hidePauseOverlay();
 }
-async function partyCreate(){
+function partyCreate(){
   const n=(document.getElementById('ptName')?document.getElementById('ptName').value.trim():'')||partyName();
   if(!n){toast('Enter a name first');return;}
   setPartyName(n);
-  try{const j=await partyPost('party-create',{code:''});partyCode=j.room.code;partyChatRev=-1;partySeenPlay=0;applyRoom(j);partyStartPolling();try{localStorage.setItem('party_active',partyCode);}catch{}renderParty();toast('Party created — share the code');}
-  catch(e){toast(e.message||'Couldn’t start the party');}
+  const CH='ABCDEFGHJKMNPQRSTUVWXYZ23456789';let code='';for(let i=0;i<6;i++)code+=CH[Math.floor(Math.random()*CH.length)];
+  partyConnect(code,true);
+  try{localStorage.setItem('party_active',code);}catch{}
+  renderParty();toast('Party created — share the code');
 }
-async function partyJoin(codeArg){
+function partyJoin(codeArg){
   const n=(document.getElementById('ptName')?document.getElementById('ptName').value.trim():'')||partyName();
   const code=(codeArg||(document.getElementById('ptJoin')?document.getElementById('ptJoin').value:'')||'').trim().toUpperCase();
   if(!n){toast('Enter a name first');return;}
   if(!/^[A-Z0-9]{5,8}$/.test(code)){toast('That doesn’t look like a party code');return;}
-  setPartyName(n);partyCode=code;
-  try{const j=await partyPost('party-join');partyChatRev=-1;partySeenPlay=0;applyRoom(j);partyStartPolling();try{localStorage.setItem('party_active',code);}catch{}renderParty();toast('Joined the party');}
-  catch(e){partyCode='';toast(e.message==='no such party'?'No party with that code':'Couldn’t join');}
+  setPartyName(n);
+  partyConnect(code,false);
+  try{localStorage.setItem('party_active',code);}catch{}
+  renderParty();
 }
-async function partyEnd(silent){
-  const code=partyCode;partyStopPolling();
+function partyEnd(silent){
+  const ws=partyWS;partyWS=null;   // null first so onclose won't reconnect
   if(localStream){localStream.getTracks().forEach(t=>t.stop());localStream=null;}
   Object.keys(pcs).forEach(pcClose);hideShareView();partySeenSig=new Set();partyPrevSharing='';
   try{localStorage.removeItem('party_active');}catch{}
-  if(code&&!silent){try{await partyPost('party-leave',{code});}catch{}}
-  partyCode='';partyIsHost=false;partyRoom=null;updatePartyPill();
+  if(ws){try{ws.close();}catch{}}   // DO removes us + tells the others
+  partyCode='';partyIsHost=false;partyRoom=null;partyInSession=false;updatePartyPill();
   if(document.getElementById('partySheet').classList.contains('on'))renderParty();
   if(silent)toast('The party ended');
 }
-async function partySend(){
+function partySend(){
   const inp=document.getElementById('ptMsg');if(!inp)return;const msg=inp.value.trim();if(!msg)return;
-  inp.value='';
-  try{const j=await partyPost('party-chat',{msg});applyRoom(j);}catch{}
+  inp.value='';wsSend({t:'chat',msg});
 }
-async function partyPlay(){if(!partyIsHost)return;if(!partyRoom||!partyRoom.title){toast('Pick what to watch first');return;}try{const j=await partyPost('party-play');applyRoom(j);}catch(e){toast(e.message);}}
-async function partyPause(){if(!partyIsHost)return;try{const j=await partyPost('party-pause');applyRoom(j);}catch(e){toast(e.message);}}
-async function partyNext(){
+function partyPlay(){if(!partyIsHost)return;if(!partyRoom||!partyRoom.title){toast('Pick what to watch first');return;}wsSend({t:'play'});}
+function partyPause(){if(!partyIsHost)return;wsSend({t:'pause'});}
+function partyNext(){
   if(!partyIsHost||!partyRoom||!partyRoom.title)return;
   const ep=(partyRoom.ep||0)+1;
-  try{await partyPost('party-set',{title:partyRoom.title,animeId:partyRoom.animeId,ep,img:partyRoom.img});const j=await partyPost('party-play');applyRoom(j);}catch(e){toast(e.message);}
+  wsSend({t:'set',title:partyRoom.title,animeId:partyRoom.animeId,ep,img:partyRoom.img});wsSend({t:'play'});
 }
 function showPauseOverlay(){const el=document.getElementById('pvPause');if(el&&document.getElementById('playerView').classList.contains('on'))el.classList.add('on');}
 function hidePauseOverlay(){const el=document.getElementById('pvPause');if(el)el.classList.remove('on');}
@@ -3337,10 +3350,10 @@ function followHost(room){
   if(room.title&&room.ep&&room.ep!==partyCurEp){partyCurEp=room.ep;toast('Host switched to Ep '+room.ep);watchParty(room.title,room.ep);return;}
   if(room.paused)showPauseOverlay();else hidePauseOverlay();
 }
-async function partyPick(id){
+function partyPick(id){
   const a=anime.find(x=>x.id===id);if(!a)return;
   const ep=Math.min((a.ep||0)+1,a.epTotal||((a.ep||0)+1));
-  try{const j=await partyPost('party-set',{title:a.title,animeId:a.id,ep,img:titleBg(a)||a.img||''});applyRoom(j);toast(`Set to ${a.title} · Ep ${ep}`);}catch(e){toast(e.message);}
+  wsSend({t:'set',title:a.title,animeId:a.id,ep,img:titleBg(a)||a.img||''});toast(`Set to ${a.title} · Ep ${ep}`);
 }
 function partyCopyCode(){try{navigator.clipboard.writeText(partyCode);toast('Code copied');}catch{toast(partyCode);}}
 
@@ -3358,13 +3371,13 @@ async function startShare(){
   let s;try{s=await navigator.mediaDevices.getDisplayMedia({video:{frameRate:30},audio:true});}catch{toast('Screen share cancelled');return;}
   localStream=s;
   s.getVideoTracks()[0].onended=()=>stopShare();   // browser's own "Stop sharing" bar
-  try{await partyPost('party-share',{on:true});}catch{}
+  wsSend({t:'share',on:true});
   renderParty();toast('Sharing — friends will connect in a moment');
 }
 function stopShare(){
   if(localStream){localStream.getTracks().forEach(t=>t.stop());localStream=null;}
   Object.keys(pcs).forEach(pcClose);
-  if(partyActive())partyPost('party-share',{on:false}).catch(()=>{});
+  if(partyActive())wsSend({t:'share',on:false});
   renderParty();
 }
 function pcClose(uid){const pc=pcs[uid];if(pc){try{pc.close();}catch{}delete pcs[uid];}}
@@ -3374,7 +3387,7 @@ async function pcConnectToViewer(vid){                 // HOST → each viewer
   localStream.getTracks().forEach(tr=>pc.addTrack(tr,localStream));
   pc.onconnectionstatechange=()=>{if(['failed','closed','disconnected'].includes(pc.connectionState))pcClose(vid);};
   try{const offer=await pc.createOffer();await pc.setLocalDescription(offer);await iceComplete(pc);
-    await partyPost('party-signal',{to:vid,kind:'offer',data:pc.localDescription});}catch{pcClose(vid);}
+    wsSend({t:'signal',to:vid,kind:'offer',data:pc.localDescription});}catch{pcClose(vid);}
 }
 async function pcHandleOffer(from,offer){              // VIEWER answers the host
   pcClose(from);
@@ -3382,7 +3395,7 @@ async function pcHandleOffer(from,offer){              // VIEWER answers the hos
   pc.ontrack=e=>{showShareView(e.streams[0]);};
   pc.onconnectionstatechange=()=>{if(['failed','closed','disconnected'].includes(pc.connectionState)){pcClose(from);if(!Object.keys(pcs).length)hideShareView();}};
   try{await pc.setRemoteDescription(offer);const ans=await pc.createAnswer();await pc.setLocalDescription(ans);await iceComplete(pc);
-    await partyPost('party-signal',{to:from,kind:'answer',data:pc.localDescription});}catch{pcClose(from);}
+    wsSend({t:'signal',to:from,kind:'answer',data:pc.localDescription});}catch{pcClose(from);}
 }
 async function pcHandleAnswer(from,answer){            // HOST receives the viewer's answer
   const pc=pcs[from];if(pc&&!pc.currentRemoteDescription)try{await pc.setRemoteDescription(answer);}catch{}
@@ -3396,10 +3409,8 @@ function showShareView(stream){
 function hideShareView(){const v=document.getElementById('shareVideo');if(v)v.srcObject=null;const sw=document.getElementById('shareWait');if(sw)sw.classList.remove('gone');document.getElementById('shareView').classList.remove('on');}
 function leaveShareView(){document.getElementById('shareView').classList.remove('on');}   // hide but keep the stream
 function reopenShareView(){const v=document.getElementById('shareVideo');if(v&&v.srcObject){closeAll();document.getElementById('shareView').classList.add('on');}else toast('Connecting to the host…');}
-// Called every poll: keep the mesh in sync with who's present and what's shared.
-function rtcTick(room,signals){
-  if(signals)for(const s of signals){if(partySeenSig.has(s.id))continue;partySeenSig.add(s.id);
-    if(s.kind==='offer')pcHandleOffer(s.from,s.data);else if(s.kind==='answer')pcHandleAnswer(s.from,s.data);}
+// On each state push: keep the mesh in sync with who's present and what's shared.
+function rtcTick(room){
   const sharing=room.sharing||'';
   if(partyIsHost&&localStream&&sharing===partyUid()){    // host: connect any newly-present viewers
     const present=new Set(room.members.map(m=>m.uid));

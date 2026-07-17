@@ -1,8 +1,9 @@
-# WatchList — cloud sync + watch-party worker
+# WatchList — cloud sync + real-time watch-party worker
 #
 # Deploy:  wrangler deploy -c sync-wrangler.toml
-# Binds the existing "watchlist-sync" KV namespace as LISTS (used for both the
-# per-code list sync and the party:<CODE> rooms). Same worker, same URL.
+#  • LISTS  = existing KV namespace (per-code list sync).
+#  • PARTY  = Durable Object (one instance per room code) for the live watch
+#    party over WebSockets. SQLite-backed DO → available on the free plan.
 
 name = "watchlist-sync"
 main = "sync-worker.js"
@@ -12,3 +13,11 @@ account_id = "dac431f2a81f703796b30b165e61b0f2"
 [[kv_namespaces]]
 binding = "LISTS"
 id = "2d33c48c2507420f895ce4a26904ce0b"
+
+[[durable_objects.bindings]]
+name = "PARTY"
+class_name = "PartyRoom"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["PartyRoom"]

@@ -329,6 +329,8 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
   text-transform:uppercase;box-shadow:0 2px 8px rgba(0,0,0,0.35);
 }
 .pcard-fav{position:absolute;top:5px;right:7px;font-size:13px;text-shadow:0 1px 6px rgba(0,0,0,0.6);}
+.pcard-seas{position:absolute;bottom:7px;right:7px;display:inline-flex;align-items:center;gap:3px;font-size:9px;font-weight:800;padding:3px 7px 3px 6px;border-radius:99px;background:rgba(12,12,16,0.62);color:#fff;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);box-shadow:0 2px 8px rgba(0,0,0,0.4);}
+.pcard-seas .ico{width:11px;height:11px;}
 .b-watching{background:rgba(245,166,35,0.28);color:#ffd48a;}
 .b-finished{background:rgba(52,196,114,0.28);color:#8ef0b6;}
 .b-plan{background:rgba(91,156,246,0.28);color:#a9ccff;}
@@ -1581,6 +1583,7 @@ copy:'<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 
 inbox:'<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5.1 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.9A2 2 0 0 0 16.8 4H7.2a2 2 0 0 0-1.7 1.1z"/>',
 plus:'<path d="M12 5v14M5 12h14"/>',
 compass:'<circle cx="12" cy="12" r="9.5"/><path d="m16 8-2 6-6 2 2-6z"/>',
+layers:'<path d="M12 2 2 7l10 5 10-5z"/><path d="m2 17 10 5 10-5"/><path d="m2 12 10 5 10-5"/>',
   send:'<path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4z"/>',
   lock:'<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
   key:'<path d="M12.6 11.4a5.5 5.5 0 1 0-7.8 7.8 5.5 5.5 0 0 0 7.8-7.8zM12.6 11.4 22 2"/><path d="m17 7 3 3"/>',
@@ -2446,24 +2449,44 @@ function setSort(m){sortMode=m;render();}
 function setFilter(f){filterStatus=f;renderFiltRow();renderHome();document.getElementById('pageEl').scrollTo({top:0,behavior:'smooth'});}
 function goHome(){document.getElementById('searchIn').value='';filterStatus='all';render();document.getElementById('pageEl').scrollTo({top:0,behavior:'smooth'});}
 
-function posterCard(a){
+// nSeas>1 → this card stands in for a whole series (multiple seasons collapsed
+// into one tile, Netflix-style); show a seasons pill and the series' base title.
+function posterCard(a,nSeas){
+  const multi=nSeas>1;
+  const title=multi?seasonBase(a.title):a.title;
   const img=a.img
     ?`<img class="pcard-img" src="${a.img}" loading="lazy" alt="" onerror="this.remove()">`
-    :`<div class="pcard-ph">${((a.title||'?').trim()[0]||'?').toUpperCase().replace(/['"<&]/g,'?')}</div>`;
+    :`<div class="pcard-ph">${((title||'?').trim()[0]||'?').toUpperCase().replace(/['"<&]/g,'?')}</div>`;
   const p=prog(a);
   const bar=(a.status==='watching'&&a.epTotal)?`<div class="pbar"><div class="pfill" style="width:${Math.round(p*100)}%"></div></div>`:'';
   const air=airingInfo(a);
   const airHTML=air?`<div class="pcard-air">${icon('calendar')} ${air.day} ${air.time}</div>`:'';
+  const seas=multi?`<span class="pcard-seas">${icon('layers')}${nSeas}</span>`:'';
   return`<div class="pcard" onclick="openDetail('${a.id}')">
     <div class="pcard-wrap">
       ${img}
       <span class="pcard-badge b-${a.status}">${STATUS_META[a.status].icon} ${a.status==='plan'?'PLAN':a.status.toUpperCase().slice(0,5)}</span>
       ${a.fav?'<span class="pcard-fav">'+icon('heart','fill')+'</span>':''}
+      ${seas}
     </div>
     ${bar}
-    <div class="pcard-title">${a.title}</div>
+    <div class="pcard-title">${title}</div>
     ${airHTML}
   </div>`;
+}
+// Collapse seasons of one series into a single representative card. Input is
+// already sorted; we keep the first season encountered and drop its siblings,
+// then render that one card standing in for the whole series (with a count).
+// Returns [{a, n}] — the representative item and how many seasons it covers.
+function collapseSeries(items){
+  const idx=new Map(),out=[];
+  for(const a of items){
+    const k=seriesKey(a);
+    if(!k){out.push({a,n:1});continue;}
+    if(idx.has(k)){out[idx.get(k)].n++;continue;}
+    idx.set(k,out.length);out.push({a,n:1});
+  }
+  return out;
 }
 function heroHTML(a){
   const p=prog(a);
@@ -2616,21 +2639,22 @@ function renderHome(){
     let items=sorted(pool.filter(a=>a.status===st));
     if(st==='watching')items=items.filter(a=>!spotSet.has(a.id));
     if(!items.length)continue;
-    html+=`<div class="row-sec" data-amb="${items[0]?titleAccent(items[0]):''}"><div class="row-head"><div class="row-title" style="--rc:${rc}">${label}</div><div class="row-count">${items.length}</div></div>
-      <div class="row-scroll">${items.map(posterCard).join('')}</div></div>`;
+    const cells=collapseSeries(items);
+    html+=`<div class="row-sec" data-amb="${items[0]?titleAccent(items[0]):''}"><div class="row-head"><div class="row-title" style="--rc:${rc}">${label}</div><div class="row-count">${cells.length}</div></div>
+      <div class="row-scroll">${cells.map(s=>posterCard(s.a,s.n)).join('')}</div></div>`;
   }
   const favs=sorted(pool.filter(a=>a.fav));
-  if(favs.length)html+=`<div class="row-sec" data-amb="${favs[0]?titleAccent(favs[0]):''}"><div class="row-head"><div class="row-title" style="--rc:var(--a2)">${icon('heart','fill')} Favorites</div><div class="row-count">${favs.length}</div></div>
-    <div class="row-scroll">${favs.map(posterCard).join('')}</div></div>`;
+  if(favs.length){const fc=collapseSeries(favs);html+=`<div class="row-sec" data-amb="${favs[0]?titleAccent(favs[0]):''}"><div class="row-head"><div class="row-title" style="--rc:var(--a2)">${icon('heart','fill')} Favorites</div><div class="row-count">${fc.length}</div></div>
+    <div class="row-scroll">${fc.map(s=>posterCard(s.a,s.n)).join('')}</div></div>`;}
   // genre collections — browse your list by its most-common genres (Netflix-style lens)
   const gmap={};pool.forEach(a=>(a.genre||'').split(',').map(g=>g.trim()).filter(Boolean).forEach(g=>{(gmap[g]=gmap[g]||[]).push(a);}));
   const topGenres=Object.keys(gmap).filter(g=>gmap[g].length>=2).sort((x,y)=>gmap[y].length-gmap[x].length).slice(0,4);
   if(topGenres.length){
     html+=`<div class="row-div">Browse by genre</div>`;
     for(const g of topGenres){
-      const items=sorted(gmap[g]);
-      html+=`<div class="row-sec" data-amb="${items[0]?titleAccent(items[0]):''}"><div class="row-head"><div class="row-title">${g}</div><div class="row-count">${items.length}</div></div>
-        <div class="row-scroll">${items.map(posterCard).join('')}</div></div>`;
+      const items=sorted(gmap[g]),gc=collapseSeries(items);
+      html+=`<div class="row-sec" data-amb="${items[0]?titleAccent(items[0]):''}"><div class="row-head"><div class="row-title">${g}</div><div class="row-count">${gc.length}</div></div>
+        <div class="row-scroll">${gc.map(s=>posterCard(s.a,s.n)).join('')}</div></div>`;
     }
   }
   el.innerHTML=html;bbSetup(spotlight);try{rzLoop();}catch{}
@@ -2910,7 +2934,18 @@ function findDuplicate(title,kind,exceptId){
   const n=normTitle(title);if(!n)return null;
   return anime.find(a=>a.id!==exceptId&&kindOf(a)===kind&&normTitle(a.title)===n)||null;
 }
-function submitForm(){
+// Does this typed title match a hentai/adult work on AniList? (searches ONLY adult
+// results, then confirms it's a close title match so we don't false-positive.)
+async function isAdultTitle(title,kind){
+  try{
+    const q=`query($s:String,$t:MediaType){Page(perPage:3){media(search:$s,type:$t,isAdult:true){genres title{romaji english}}}}`;
+    const r=await fetch('https://graphql.anilist.co',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({query:q,variables:{s:title,t:kind==='read'?'MANGA':'ANIME'}})});
+    if(!r.ok)return false;
+    const j=await r.json(),media=(j&&j.data&&j.data.Page&&j.data.Page.media)||[],nt=normTitle(title);
+    return media.some(m=>[m.title.romaji,m.title.english].filter(Boolean).map(normTitle).some(x=>x&&(x===nt||x.includes(nt)||nt.includes(x))));
+  }catch{return false;}
+}
+async function submitForm(){
   const title=document.getElementById('fTitle').value.trim();
   if(!title){toast('Enter a title first');return;}
   const dupe=findDuplicate(title,curKind,editingId);
@@ -2918,6 +2953,10 @@ function submitForm(){
     toast(`Already in your ${curKind==='read'?'reading':'watch'} list — opening it`);
     closeAll();setTimeout(()=>openDetail(dupe.id),260);
     return;
+  }
+  // adult/hentai gate — only for typed titles (autofill already excludes adult)
+  if(!editingId && !(pendingAni&&pendingAni.aniId) && await isAdultTitle(title,curKind)){
+    toast('That title can’t be added — WatchList doesn’t allow adult content');return;
   }
   const orderRaw=document.getElementById('fOrder').value.trim();
   const epsStr=document.getElementById('fEps').value.trim();

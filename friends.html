@@ -658,6 +658,9 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 .pt-now img{width:44px;height:62px;border-radius:8px;object-fit:cover;flex-shrink:0;background:var(--bg4);}
 .pt-now-t{font-family:var(--fd);font-size:14px;font-weight:800;color:var(--t1);}
 .pt-now-s{font-size:12px;color:var(--t3);margin-top:2px;}
+.pt-ext{width:100%;height:48px;border-radius:14px;background:var(--ag);border:1px solid var(--b2);color:var(--a2);font-family:var(--fd);font-size:14px;font-weight:800;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:2px;}
+.pt-ext:active{transform:scale(.98);}
+.pt-ext .ico{width:17px;height:17px;}
 .pt-play{width:100%;height:48px;border-radius:14px;background:var(--a);color:var(--aFg,#fff);border:0;font-family:var(--fd);font-size:15px;font-weight:800;display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:6px;}
 .pt-play:active{transform:scale(.98);}
 .pt-play:disabled{opacity:.5;}
@@ -3386,6 +3389,11 @@ function partyPick(id){
   wsSend({t:'set',title:a.title,animeId:a.id,ep,img:titleBg(a)||a.img||''});toast(`Set to ${a.title} · Ep ${ep}`);
 }
 function partyCopyCode(){try{navigator.clipboard.writeText(partyCode);toast('Code copied');}catch{toast(partyCode);}}
+function getPartyExtension(){
+  const base=location.href.replace(/[#?].*$/,'').replace(/[^/]*$/,'');
+  try{window.open(base+'watchlist-party.zip','_blank');}catch{}
+  toast('Downloading — unzip, then chrome://extensions → Load unpacked');
+}
 
 // ── screen share (WebRTC, peer-to-peer — no server carries the video) ──────────
 // The desktop host captures a tab/window and streams it straight to each viewer;
@@ -3511,10 +3519,13 @@ function renderParty(){
     hostCtl=`<p class="ai-desc" style="text-align:center">${r.title?'Waiting for the host to start…':'Waiting for the host to pick something…'}</p>`;
   }
   const chat=r.chat.map(m=>m.sys?`<div class="pt-sys">${schEsc(m.msg)}</div>`:`<div class="pt-msg${m.uid===meUid?' me':''}"><span class="who">${schEsc(m.name)}</span>${schEsc(m.msg)}</div>`).join('');
+  const extBlock=canScreenShare()?`
+    <button class="pt-ext" onclick="getPartyExtension()">${icon('users')} Perfect sync on desktop — get the extension</button>
+    <p class="pt-hint" style="margin:-2px 0 10px">Free browser add-on: play/pause/seek stay <b>exactly</b> in sync on AniNeko. One-time install.</p>`:'';
   box.innerHTML=`
     <div class="pt-code"><div class="pt-code-val">${r.code}</div><button class="pt-code-cta" onclick="partyCopyCode()" aria-label="Copy code">${icon('copy')}</button></div>
     <div class="pt-members">${members}</div>
-    ${now}${hostCtl}
+    ${extBlock}${now}${hostCtl}
     <div class="pt-reactbar">${PARTY_EMOJI.map(e=>`<button class="pt-react" onclick="partyReact('${e}')">${e}</button>`).join('')}</div>
     <div class="pt-chat" id="ptChat">${chat||'<div class="pt-sys">Say hi 👋</div>'}</div>
     <div class="pt-chatbar"><input id="ptMsg" placeholder="Message…" maxlength="300" onkeydown="if(event.key==='Enter')partySend()"><button class="pt-send" onclick="partySend()">${icon('send')}</button></div>

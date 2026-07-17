@@ -130,6 +130,12 @@ export class PartyRoom {
         this.sendTo(to, { t: 'signal', from: uid, kind: msg.kind, data: msg.data });
         return;
       }
+      case 'pb': {   // precise playback state from the host's browser extension → relay to the rest
+        if (!isHost) return;
+        const s = JSON.stringify({ t: 'pb', playing: !!msg.playing, time: +msg.time || 0, ts: Date.now() });
+        for (const w of this.state.getWebSockets()) { if (w !== ws) { try { w.send(s); } catch {} } }
+        return;
+      }
     }
   }
 

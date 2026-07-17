@@ -4276,17 +4276,19 @@ function restorePlayer(){
 // use numeric episode ids we can't deep-link, so search is the honest best.
 // All confirmed embeddable (no X-Frame-Options); pirate domains rotate, so if a
 // chip ever loads nothing the domain moved — paste the new one in the field.
-// Official, legal streaming — WatchList opens the site's search for your exact title.
-// (Legal services use DRM / block framing, so they open in the browser, not in-app.)
+// Official, legal, and FREE-FOREVER streaming — no paid tiers (Crunchyroll ended its
+// free tier in 2026; HIDIVE is paid — both excluded). WatchList opens the site's
+// search for your exact title in the browser (these services DRM / block framing).
 const WATCH_PRESETS=[
-  {name:'Crunchyroll',  url:'https://www.crunchyroll.com/search?q={title}'},
-  {name:'HIDIVE',       url:'https://www.hidive.com/search?q={title}'},
   {name:'Tubi',         url:'https://tubitv.com/search/{title}'},
+  {name:'Pluto TV',     url:'https://pluto.tv/en/search/details?query={title}'},
+  {name:'Peacock',      url:'https://www.peacocktv.com/watch/search?q={title}'},
   {name:'RetroCrush',   url:'https://www.retrocrush.tv/search?q={title}'},
+  {name:'Plex',         url:'https://watch.plex.tv/search?query={title}'},
   {name:'Ani-One Asia', url:'https://www.youtube.com/@AniOneAsia/search?query={title}'},
   {name:'Muse Asia',    url:'https://www.youtube.com/@MuseAsia/search?query={title}'},
 ];
-const LEGAL_DEFAULT=WATCH_PRESETS[0].url;   // Crunchyroll
+const LEGAL_DEFAULT=WATCH_PRESETS[0].url;   // Tubi — 100% free, no account, no paid tier
 // Open a URL outside the app — legal sites can't be framed. In the native shell we
 // hand it to iOS (opens Safari); on the web it opens a new tab.
 function openExternal(url){
@@ -4299,7 +4301,7 @@ function launchURL(a){
   return src.replace(/\{title\}/g,encodeURIComponent(a.title)).replace(/\{slug\}/g,slug).replace(/\{ep\}/g,String(watchEpisode(a)||1));
 }
 function sourceName(){
-  const s=streamSource(); if(!s)return 'Crunchyroll';
+  const s=streamSource(); if(!s)return 'Tubi';
   const p=WATCH_PRESETS.find(x=>x.url===s); if(p)return p.name;
   try{return new URL(s.replace(/\{[^}]+\}/g,'x')).hostname.replace(/^www\./,'');}catch{return 'the site';}
 }
@@ -4310,10 +4312,10 @@ function renderSource(){
   const chips=WATCH_PRESETS.map(p=>`<button class="src-chip${custom===p.url?' on':''}" onclick="setSource('${p.url}')">${p.name}</button>`).join('');
   box.innerHTML=`
     <div class="dt-label">${icon('play')} Watch source</div>
-    <p class="ai-desc">Where <b>Watch now</b> sends you. These are <b>official, legal</b> services — it opens the site's search for your exact title in your browser.</p>
+    <p class="ai-desc">Where <b>Watch now</b> sends you — all <b>official, legal, and free</b> services (no paid tiers). It opens the site's search for your exact title in your browser.</p>
     <button class="src-opt${!custom?' on':''}" onclick="setSource('')">
-      <div class="src-name">Crunchyroll <span class="src-tag">Default</span></div>
-      <div class="src-sub">Opens Crunchyroll's search for the title</div>
+      <div class="src-name">Tubi <span class="src-tag">Default · Free</span></div>
+      <div class="src-sub">100% free, no account — opens Tubi's search for the title</div>
     </button>
     <div class="src-picks">${chips}</div>
     <button class="src-opt${custom&&!WATCH_PRESETS.some(p=>p.url===custom)?' on':''}" onclick="document.getElementById('srcCustom').focus()" style="margin-top:10px">

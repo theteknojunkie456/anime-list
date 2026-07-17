@@ -3417,7 +3417,15 @@ function getPartyExtension(){
 // everyone sees the host's actual screen, so play/pause/seek are perfectly synced
 // with zero effort. Signaling (offer/answer) rides on the party worker. Non-trickle
 // ICE (wait for gathering, send once) keeps it robust over slow polling.
-const RTC_CFG={iceServers:[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'}]};
+// STUN finds a direct path; TURN relays when the network won't allow one (cellular,
+// strict/symmetric NAT — the usual reason a phone viewer sees nothing). openrelay is
+// a free public TURN. Without a relay, ~a third of phone connections silently fail.
+const RTC_CFG={iceServers:[
+  {urls:['stun:stun.l.google.com:19302','stun:stun1.l.google.com:19302']},
+  {urls:'turn:openrelay.metered.ca:80',username:'openrelayproject',credential:'openrelayproject'},
+  {urls:'turn:openrelay.metered.ca:443',username:'openrelayproject',credential:'openrelayproject'},
+  {urls:'turn:openrelay.metered.ca:443?transport=tcp',username:'openrelayproject',credential:'openrelayproject'}
+]};
 function canScreenShare(){return !!(navigator.mediaDevices&&navigator.mediaDevices.getDisplayMedia);}
 function iceComplete(pc){return new Promise(res=>{if(pc.iceGatheringState==='complete')return res();const c=()=>{if(pc.iceGatheringState==='complete'){pc.removeEventListener('icegatheringstatechange',c);res();}};pc.addEventListener('icegatheringstatechange',c);setTimeout(res,2800);});}
 async function startShare(){
@@ -3456,11 +3464,19 @@ async function pcHandleAnswer(from,answer){            // HOST receives the view
   const pc=pcs[from];if(pc&&!pc.currentRemoteDescription)try{await pc.setRemoteDescription(answer);}catch{}
 }
 function showShareView(stream){
-  const v=document.getElementById('shareVideo');if(v){v.srcObject=stream;v.play&&v.play().catch(()=>{});}
-  document.getElementById('shareWait').classList.add('gone');
+  const v=document.getElementById('shareVideo'),sv=document.getElementById('shareView');
   document.getElementById('shareTitle').textContent=(partyRoom&&partyRoom.title)?partyRoom.title:'Watch party';
-  const hint=document.getElementById('shFitHint');if(hint){hint.style.opacity='1';setTimeout(()=>{hint.style.opacity='0';},4000);}
-  closeAll();document.getElementById('shareView').classList.add('on');
+  closeAll();sv.classList.add('on');
+  if(v){
+    v.srcObject=stream;
+    const tryPlay=()=>{const p=v.play&&v.play();if(p&&p.catch)p.catch(()=>{});};
+    tryPlay();
+    // iOS blocks autoplay (esp. with audio) → the first tap anywhere starts it
+    sv.addEventListener('click',tryPlay);
+    v.addEventListener('loadedmetadata',()=>{document.getElementById('shareWait').classList.add('gone');tryPlay();},{once:true});
+    v.addEventListener('playing',()=>{document.getElementById('shareWait').classList.add('gone');},{once:true});
+  }
+  const hint=document.getElementById('shFitHint');if(hint){hint.textContent='Black screen? Tap once. Tap again to fill.';hint.style.opacity='1';setTimeout(()=>{hint.style.opacity='0';},6000);}
 }
 function hideShareView(){const v=document.getElementById('shareVideo');if(v)v.srcObject=null;const sw=document.getElementById('shareWait');if(sw)sw.classList.remove('gone');document.getElementById('shareView').classList.remove('on');}
 function leaveShareView(){document.getElementById('shareView').classList.remove('on');}   // hide but keep the stream

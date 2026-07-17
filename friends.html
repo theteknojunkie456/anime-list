@@ -2794,27 +2794,94 @@ function renderDetail(){
     else loadFranchise(a.id,a.aniId);
   }
 }
-// ─── FRANCHISE (every season of a title from AniList, on-list or not) ────────
+// ─── FRANCHISE (every season of a title, on-list or not) ────────────────────
+// Seasons come from TWO independent sources so a gap in one can't hide a season:
+//   1) AniList's sequel/prequel graph (walked hop-by-hop) — catches arc-named
+//      seasons (Demon Slayer) and seasons whose titles differ wildly.
+//   2) MyAnimeList via Jikan (same graph walk) — a second opinion; MAL and
+//      AniList each list entries the other misses.
+// Plus an AniList title search as a cheap third net. All merged by AniList id /
+// MAL id into one normalized list. Cached per franchise.
 let franchiseCache={},curFranchise=[],curFranchiseFor='';
+const SEASON_FMT=new Set(['TV','TV_SHORT','ONA']);   // the "seasons"; movies/OVAs/specials stay out
+function aniSeason(m){const na=m.nextAiringEpisode;return{aniId:m.id,malId:m.idMal||0,
+  title:(m.title&&(m.title.english||m.title.romaji))||'?',
+  year:(m.startDate&&m.startDate.year)||m.seasonYear||0,month:(m.startDate&&m.startDate.month)||0,
+  format:m.format||'',status:m.status||'',episodes:m.episodes||0,
+  img:(m.coverImage&&m.coverImage.large)||'',airingAt:(na&&na.airingAt)||0,airEp:(na&&na.episode)||0,src:'anilist'};}
+function malSeason(d){return{aniId:0,malId:d.mal_id,title:d.title_english||d.title||'?',
+  year:d.year||(d.aired&&d.aired.prop&&d.aired.prop.from&&d.aired.prop.from.year)||0,month:0,
+  format:(d.type||'').toUpperCase().replace(/\s+/g,'_'),status:'',episodes:d.episodes||0,
+  img:(d.images&&d.images.jpg&&(d.images.jpg.large_image_url||d.images.jpg.image_url))||'',airingAt:0,airEp:0,src:'mal'};}
+// Walk AniList sequel/prequel edges from a seed id, returning every reached node.
+async function aniGraph(seedId){
+  const nodes={},want=[seedId],seen=new Set([seedId]);let hops=0;
+  while(want.length&&hops<12){
+    hops++;const id=want.shift();
+    const q=`query($id:Int){Media(id:$id){id idMal format status episodes seasonYear startDate{year month} title{romaji english} coverImage{large} nextAiringEpisode{airingAt episode} relations{edges{relationType node{id type}}}}}`;
+    let m;try{const r=await fetch('https://graphql.anilist.co',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({query:q,variables:{id}})});if(r.status===429){await pause(1400);want.unshift(id);hops--;continue;}if(!r.ok)continue;m=((await r.json()).data||{}).Media;}catch{continue;}
+    if(!m)continue;nodes[m.id]=m;
+    ((m.relations&&m.relations.edges)||[]).forEach(e=>{if((e.relationType==='SEQUEL'||e.relationType==='PREQUEL')&&e.node&&e.node.type==='ANIME'&&!seen.has(e.node.id)){seen.add(e.node.id);want.push(e.node.id);}});
+    if(want.length)await pause(320);
+  }
+  return Object.values(nodes);
+}
+// Same walk on MyAnimeList (Jikan). Follows Sequel/Prequel relations.
+async function malGraph(seedMal){
+  const nodes={},want=[seedMal],seen=new Set([seedMal]);let hops=0;
+  while(want.length&&hops<12){
+    hops++;const id=want.shift();
+    let d;try{const r=await fetch(`https://api.jikan.moe/v4/anime/${id}/full`);if(r.status===429){await pause(1400);want.unshift(id);hops--;continue;}if(!r.ok)continue;d=(await r.json()).data;}catch{continue;}
+    if(!d)continue;nodes[d.mal_id]=d;
+    ((d.relations)||[]).forEach(rel=>{if(/Sequel|Prequel/i.test(rel.relation||'')){((rel.entry)||[]).forEach(e=>{if(e.type==='anime'&&!seen.has(e.mal_id)){seen.add(e.mal_id);want.push(e.mal_id);}});}});
+    if(want.length)await pause(400);
+  }
+  return Object.values(nodes);
+}
+async function aniSearchSeasons(base){
+  const q=`query($s:String){Page(perPage:30){media(search:$s,type:ANIME,isAdult:false,sort:SEARCH_MATCH){id idMal format status episodes seasonYear startDate{year month} title{romaji english} coverImage{large} nextAiringEpisode{airingAt episode}}}}`;
+  try{const r=await fetch('https://graphql.anilist.co',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({query:q,variables:{s:base}})});
+    if(!r.ok)return[];const media=(((await r.json()).data||{}).Page||{}).media||[];
+    return media.filter(m=>m&&[seasonBase(m.title.english),seasonBase(m.title.romaji)].filter(Boolean).some(x=>x===base));
+  }catch{return[];}
+}
 async function fetchFranchise(a){
   const base=seasonBase(a.title)||normTitle(a.title);
-  const key=a.aniId?('id:'+a.aniId):('t:'+base);
+  const key=a.aniId?('id:'+a.aniId):('mal:'+(a.malId||0)+'|t:'+base);
   if(franchiseCache[key])return franchiseCache[key];
-  const q=`query($s:String){Page(perPage:30){media(search:$s,type:ANIME,isAdult:false,sort:SEARCH_MATCH){id format status episodes seasonYear startDate{year month} title{romaji english} coverImage{large} nextAiringEpisode{airingAt episode}}}}`;
-  let media=[];
-  try{
-    const r=await fetch('https://graphql.anilist.co',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({query:q,variables:{s:base}})});
-    if(r.ok)media=(((await r.json()).data||{}).Page||{}).media||[];
-  }catch{}
-  const ok=new Set(['TV','TV_SHORT','ONA']);  // the "seasons"; movies/OVAs stay out
-  let seasons=media.filter(m=>m&&ok.has(m.format)&&
-    [seasonBase(m.title.english),seasonBase(m.title.romaji)].filter(Boolean).some(x=>x===base));
-  // always include the season you're viewing, even if the search or format filter missed it
-  if(a.aniId&&!seasons.some(m=>m.id===a.aniId))
-    seasons.unshift({id:a.aniId,title:{romaji:a.title,english:a.title},format:'TV',status:'',episodes:a.epTotal||0,coverImage:{large:a.img||''},startDate:{year:0,month:0}});
-  const yr=m=>((m.startDate&&m.startDate.year)||m.seasonYear||9999),mo=m=>((m.startDate&&m.startDate.month)||0);
-  seasons.sort((x,y)=>yr(x)-yr(y)||mo(x)-mo(y));
-  const seen=new Set();seasons=seasons.filter(m=>!seen.has(m.id)&&seen.add(m.id));
+  // merge everything into one list, deduped by AniList id and MAL id
+  const list=[],byAni=new Map(),byMal=new Map();
+  const merge=s=>{
+    if(!s||!s.title)return;
+    const ex=(s.aniId&&byAni.get(s.aniId))||(s.malId&&byMal.get(s.malId))||null;
+    if(ex){ // same season from another source — fill gaps, prefer AniList's richer fields
+      if(!ex.aniId&&s.aniId)ex.aniId=s.aniId;
+      if(!ex.malId&&s.malId)ex.malId=s.malId;
+      ['img','year','month','episodes','airingAt','airEp'].forEach(k=>{if(!ex[k]&&s[k])ex[k]=s[k];});
+      if(s.src==='anilist'&&s.status)ex.status=s.status;
+      if(ex.aniId)byAni.set(ex.aniId,ex);
+      if(ex.malId)byMal.set(ex.malId,ex);   // now findable by either id
+      return;
+    }
+    list.push(s);
+    if(s.aniId)byAni.set(s.aniId,s);
+    if(s.malId)byMal.set(s.malId,s);
+  };
+  // 1) AniList graph (+ discover the seed's MAL id for the MAL walk)
+  let seedMal=a.malId||0;
+  if(a.aniId){
+    const g=await aniGraph(a.aniId);
+    g.forEach(m=>{if(m.id===a.aniId&&m.idMal)seedMal=seedMal||m.idMal;merge(aniSeason(m));});
+  }
+  // 2) AniList title search (cheap third net; also seeds MAL id if graph gave none)
+  (await aniSearchSeasons(base)).forEach(m=>{if(!seedMal&&m.idMal)seedMal=m.idMal;merge(aniSeason(m));});
+  // 3) MyAnimeList graph — the independent second source
+  if(seedMal){(await malGraph(seedMal)).forEach(d=>merge(malSeason(d)));}
+  // keep only real seasons; always include the one you're viewing
+  let seasons=list.filter(s=>SEASON_FMT.has(s.format)||(a.aniId&&s.aniId===a.aniId));
+  if(a.aniId&&!seasons.some(s=>s.aniId===a.aniId))
+    seasons.unshift({aniId:a.aniId,malId:a.malId||0,title:a.title,year:0,month:0,format:'TV',status:'',episodes:a.epTotal||0,img:a.img||'',airingAt:a.airAt||0,airEp:a.airEp||0,src:'self'});
+  seasons.sort((x,y)=>(x.year||9999)-(y.year||9999)||(x.month||0)-(y.month||0));
   franchiseCache[key]=seasons;
   return seasons;
 }
@@ -2825,26 +2892,25 @@ async function loadFranchise(detId){
   curFranchise=seasons;curFranchiseFor=detId;
   paintFranchise();
 }
-function franchiseMine(m){return anime.find(x=>kindOf(x)==='watch'&&x.aniId===m.id)||null;}
+function franchiseMine(s){return anime.find(x=>kindOf(x)==='watch'&&((s.aniId&&x.aniId===s.aniId)||(s.malId&&x.malId&&x.malId===s.malId)))||null;}
 function paintFranchise(){
   const box=document.getElementById('dt-franchise');if(!box)return;
   const seasons=curFranchise||[];
   if(seasons.length<2){box.innerHTML='';return;}   // one season → nothing to group
   const a=anime.find(x=>x.id===detailId);
-  const rows=seasons.map(m=>{
-    const mine=franchiseMine(m),cur=mine&&a&&mine.id===a.id,done=mine&&mine.status==='finished';
-    const title=m.title.english||m.title.romaji||'?';
-    const yr=(m.startDate&&m.startDate.year)||m.seasonYear||'';
+  const rows=seasons.map((s,idx)=>{
+    const mine=franchiseMine(s),cur=mine&&a&&mine.id===a.id,done=mine&&mine.status==='finished';
+    const title=s.title||'?';
     let sub;
-    if(!mine)sub=(m.status==='NOT_YET_RELEASED'?'Upcoming':'Not on your list')+(yr?` · ${yr}`:'');
+    if(!mine)sub=(s.status==='NOT_YET_RELEASED'?'Upcoming':'Not on your list')+(s.year?` · ${s.year}`:'');
     else{const st=STATUS_META[mine.status];sub=(st?st.label:mine.status)+(mine.epTotal?` · ${mine.ep||0}/${mine.epTotal}`:'');}
-    let up='';const na=m.nextAiringEpisode;
-    if(na&&na.airingAt&&na.airingAt*1000>Date.now()){
-      const d=new Date(na.airingAt*1000),soon=(na.airingAt*1000-Date.now())<7*86400000;
+    let up='';
+    if(s.airingAt&&s.airingAt*1000>Date.now()){
+      const d=new Date(s.airingAt*1000),soon=(s.airingAt*1000-Date.now())<7*86400000;
       up=`<span class="dt-season-up">${icon('calendar')} ${soon?d.toLocaleDateString([],{weekday:'short'}):d.toLocaleDateString([],{month:'short',day:'numeric'})}</span>`;
     }
-    const check=`<button class="dt-seen-btn${done?' on':''}" onclick="event.stopPropagation();toggleSeasonSeen(${m.id})" title="${done?'Watched — tap to unmark':'Mark as watched'}" aria-label="Mark season watched" aria-pressed="${done}">${icon('check')}</button>`;
-    const img=(m.coverImage&&m.coverImage.large)||(mine&&mine.img)||'';
+    const check=`<button class="dt-seen-btn${done?' on':''}" onclick="event.stopPropagation();toggleSeasonSeen(${idx})" title="${done?'Watched — tap to unmark':'Mark as watched'}" aria-label="Mark season watched" aria-pressed="${done}">${icon('check')}</button>`;
+    const img=s.img||(mine&&mine.img)||'';
     const open=mine?` onclick="openDetail('${mine.id}')"`:'';
     return `<div class="dt-season${cur?' cur':''}${done?' done':''}${mine?'':' off'}"${open}>
       ${img?`<img src="${img}" alt="">`:`<div class="ph">${(title.trim()[0]||'?').toUpperCase()}</div>`}
@@ -2852,36 +2918,34 @@ function paintFranchise(){
       ${up}${cur?'<span class="dt-season-here">Viewing</span>':''}${check}
     </div>`;
   }).join('');
-  const allSeen=seasons.every(m=>{const mine=franchiseMine(m);return mine&&mine.status==='finished';});
+  const allSeen=seasons.every(s=>{const mine=franchiseMine(s);return mine&&mine.status==='finished';});
   box.innerHTML=`<div class="dt-seasons-head"><div class="dt-label">Seasons · ${seasons.length}</div>
     <button class="dt-seenall" onclick="markFranchiseSeen()">${icon(allSeen?'check':'layers')} ${allSeen?'All seen':'Seen all'}</button></div>
     <div class="dt-seasons">${rows}</div>`;
 }
-function seasonToItem(m,status){
-  const title=m.title.english||m.title.romaji||'Untitled';
-  return {id:uid(),kind:'watch',status,title,aniId:m.id,
-    img:(m.coverImage&&m.coverImage.large)||'',
-    eps:m.episodes?m.episodes+' eps':'',epTotal:m.episodes||0,
-    ep:status==='finished'?(m.episodes||0):0,
+function seasonToItem(s,status){
+  return {id:uid(),kind:'watch',status,title:s.title||'Untitled',aniId:s.aniId||0,malId:s.malId||0,
+    img:s.img||'',eps:s.episodes?s.episodes+' eps':'',epTotal:s.episodes||0,
+    ep:status==='finished'?(s.episodes||0):0,
     time:'',genre:'',order:[],notes:'',rating:0,fav:false,upd:Date.now()};
 }
-function toggleSeasonSeen(aniId){
-  const m=(curFranchise||[]).find(x=>x.id===aniId);if(!m)return;
-  const mine=franchiseMine(m);
+function toggleSeasonSeen(idx){
+  const s=(curFranchise||[])[idx];if(!s)return;
+  const mine=franchiseMine(s);
   if(mine){
     if(mine.status==='finished'){mine.status='plan';mine.ep=0;}
     else{mine.status='finished';if(mine.epTotal)mine.ep=mine.epTotal;}
     touch(mine);alPushItem&&alPushItem(mine);
-  }else anime.unshift(seasonToItem(m,'finished'));
+  }else anime.unshift(seasonToItem(s,'finished'));
   save();renderDetail();render();
   setTimeout(fetchCovers,300);
 }
 function markFranchiseSeen(){
   const seasons=curFranchise||[];if(!seasons.length)return;
-  seasons.forEach(m=>{
-    const mine=franchiseMine(m);
+  seasons.forEach(s=>{
+    const mine=franchiseMine(s);
     if(mine){if(mine.status!=='finished'){mine.status='finished';if(mine.epTotal)mine.ep=mine.epTotal;touch(mine);alPushItem&&alPushItem(mine);}}
-    else anime.unshift(seasonToItem(m,'finished'));
+    else anime.unshift(seasonToItem(s,'finished'));
   });
   save();renderDetail();render();
   toast(`Marked ${seasons.length} season${seasons.length!==1?'s':''} as watched`);

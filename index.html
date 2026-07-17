@@ -3426,8 +3426,8 @@ function renderPartyExt(){
   const dl=location.href.replace(/[#?].*$/,'').replace(/[^/]*$/,'')+'watchlist-party.zip';
   const steps=(a)=>`<div class="pe-steps">${a.map((s,i)=>`<div class="pe-step"><span>${i+1}</span><div>${s}</div></div>`).join('')}</div>`;
   box.innerHTML=`
-    <div class="pe-note">${icon('bulb')}<div>The extension lives on the <b>AniNeko website</b>, not in this app. Everyone installs it, opens the same episode on anineko.to, and runs the party from the <b>🎉 icon there</b>. This app doesn't need to be open.</div></div>
-    <p class="ai-desc">Why bother: it keeps <b>play / pause / seek exactly in sync</b> — everyone streams their own copy, only the controls travel. Free, no group limit.</p>
+    <div class="pe-note">${icon('bulb')}<div><b>This is a separate way to watch together — use it INSTEAD of the party in this app, not on top of it.</b> The extension runs on the <b>AniNeko website</b> (the 🎉 icon there). If your whole crew is on computers/Android, just use this and ignore the app's party screen.</div></div>
+    <p class="ai-desc">Why: it keeps <b>play / pause / seek exactly in sync</b> — everyone streams their own copy, only the controls travel. Free, no group limit.</p>
     <a class="parse-btn" href="${dl}" download style="display:flex;align-items:center;justify-content:center;text-decoration:none;gap:7px">${icon('cloud')} Download the extension (.zip)</a>
     <div class="dt-label" style="margin-top:20px">💻 Install — Chrome / Edge / Brave</div>
     ${steps(['Unzip the download','Open <code>chrome://extensions</code> (paste in the address bar)','Turn on <b>Developer mode</b> — top-right toggle','Click <b>Load unpacked</b> → pick the unzipped folder','Pin the 🎉 icon (puzzle-piece menu → pin)'])}
@@ -3506,7 +3506,13 @@ function showShareView(stream){
 }
 function hideShareView(){const v=document.getElementById('shareVideo');if(v)v.srcObject=null;const sw=document.getElementById('shareWait');if(sw)sw.classList.remove('gone');document.getElementById('shareView').classList.remove('on');}
 function leaveShareView(){document.getElementById('shareView').classList.remove('on');}   // hide but keep the stream
-function reopenShareView(){const v=document.getElementById('shareVideo');if(v&&v.srcObject){closeAll();document.getElementById('shareView').classList.add('on');}else toast('Connecting to the host…');}
+function reopenShareView(){
+  const v=document.getElementById('shareVideo');
+  closeAll();document.getElementById('shareView').classList.add('on');
+  if(v&&v.srcObject){const p=v.play&&v.play();if(p&&p.catch)p.catch(()=>{});document.getElementById('shareWait').classList.add('gone');
+    const hint=document.getElementById('shFitHint');if(hint){hint.textContent='Black screen? Tap once.';hint.style.opacity='1';setTimeout(()=>{hint.style.opacity='0';},5000);}}
+  else{document.getElementById('shareWait').classList.remove('gone');}   // no stream yet → show the spinner, not black
+}
 // On each state push: keep the mesh in sync with who's present and what's shared.
 function rtcTick(room){
   const sharing=room.sharing||'';

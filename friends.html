@@ -3389,10 +3389,14 @@ function partyPick(id){
   wsSend({t:'set',title:a.title,animeId:a.id,ep,img:titleBg(a)||a.img||''});toast(`Set to ${a.title} · Ep ${ep}`);
 }
 function partyCopyCode(){try{navigator.clipboard.writeText(partyCode);toast('Code copied');}catch{toast(partyCode);}}
+function isIOS(){return /iP(hone|od|ad)/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);}
+function isAndroid(){return /Android/.test(navigator.userAgent);}
 function getPartyExtension(){
   const base=location.href.replace(/[#?].*$/,'').replace(/[^/]*$/,'');
   try{window.open(base+'watchlist-party.zip','_blank');}catch{}
-  toast('Downloading — unzip, then chrome://extensions → Load unpacked');
+  toast(isAndroid()
+    ?'Downloaded — open Kiwi Browser → Extensions → Developer mode → load the zip'
+    :'Downloaded — unzip, then chrome://extensions → Load unpacked');
 }
 
 // ── screen share (WebRTC, peer-to-peer — no server carries the video) ──────────
@@ -3519,9 +3523,9 @@ function renderParty(){
     hostCtl=`<p class="ai-desc" style="text-align:center">${r.title?'Waiting for the host to start…':'Waiting for the host to pick something…'}</p>`;
   }
   const chat=r.chat.map(m=>m.sys?`<div class="pt-sys">${schEsc(m.msg)}</div>`:`<div class="pt-msg${m.uid===meUid?' me':''}"><span class="who">${schEsc(m.name)}</span>${schEsc(m.msg)}</div>`).join('');
-  const extBlock=canScreenShare()?`
-    <button class="pt-ext" onclick="getPartyExtension()">${icon('users')} Perfect sync on desktop — get the extension</button>
-    <p class="pt-hint" style="margin:-2px 0 10px">Free browser add-on: play/pause/seek stay <b>exactly</b> in sync on AniNeko. One-time install.</p>`:'';
+  const extBlock=!isIOS()?`
+    <button class="pt-ext" onclick="getPartyExtension()">${icon('users')} Perfect sync — get the extension</button>
+    <p class="pt-hint" style="margin:-2px 0 10px">Free add-on (desktop, or <b>Kiwi Browser</b> on Android): play/pause/seek stay <b>exactly</b> in sync on AniNeko.</p>`:'';
   box.innerHTML=`
     <div class="pt-code"><div class="pt-code-val">${r.code}</div><button class="pt-code-cta" onclick="partyCopyCode()" aria-label="Copy code">${icon('copy')}</button></div>
     <div class="pt-members">${members}</div>

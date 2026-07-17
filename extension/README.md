@@ -15,10 +15,18 @@ the controls sync), so there's no bandwidth cost and no group-size limit.
 4. Click **Load unpacked** and pick the unzipped `watchlist-party` folder.
 5. Pin the 🎉 icon so it's easy to find.
 
-## Install (Firefox — including **Firefox for Android**)
+## Install (Android — Kiwi Browser, easiest)
+Kiwi Browser is a Chromium browser for Android that runs Chrome extensions, so the
+same zip works with no signing.
+1. Install **Kiwi Browser** from the Play Store.
+2. Kiwi menu (⋮) → **Extensions** → turn on **Developer mode** (top-right).
+3. Tap **+ (from .zip/.crx)** → pick the downloaded `watchlist-party.zip`.
+4. Open `anineko.to` **in Kiwi** and tap the 🎉 icon.
+
+## Install (Firefox desktop)
 1. Download + unzip.
-2. Go to `about:debugging#/runtime/this-firefox` → **Load Temporary Add-on** → pick `manifest.json`.
-   (On Android, use Firefox Nightly's Custom Add-on collection, or Load Temporary.)
+2. `about:debugging#/runtime/this-firefox` → **Load Temporary Add-on** → pick `manifest.json`.
+   (Firefox for **stable Android** needs the add-on signed on addons.mozilla.org; Kiwi above is simpler.)
 
 ## Use
 1. Everyone opens the **same anime episode** on `anineko.to`.

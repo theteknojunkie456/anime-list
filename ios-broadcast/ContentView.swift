@@ -68,15 +68,9 @@ struct BroadcastButton: UIViewRepresentable {
     func makeUIView(context: Context) -> RPSystemBroadcastPickerView {
         let v = RPSystemBroadcastPickerView(frame: .zero)
         v.showsMicrophoneButton = false
-        // Set to your extension's bundle id so the picker preselects it:
-        // v.preferredExtension = "com.you.WatchListBroadcast.BroadcastExt"
+        // Preselect our extension so the picker opens straight to it.
+        v.preferredExtension = "com.watchlist.party.BroadcastExt"
         return v
     }
     func updateUIView(_ uiView: RPSystemBroadcastPickerView, context: Context) {}
-}
-
-extension AppGroup {
-    static func partyOn(_ on: Bool) {
-        (UserDefaults(suiteName: id) ?? .standard).set(on, forKey: "partyOn")
-    }
 }

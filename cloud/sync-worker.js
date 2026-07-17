@@ -144,6 +144,19 @@ async function handleParty(op, body, env, cors) {
     return json({ ok: true }, 200, cors);
   }
 
+  // live emoji reactions — ephemeral, everyone sees them float up
+  if (op === 'party-react') {
+    const emoji = String(body.emoji || '').slice(0, 8);
+    if (emoji) {
+      room.members[uid] = { name, seen: Date.now() };
+      room.reacts = (room.reacts || []).filter(r => Date.now() - r.t < 8000);
+      room.reacts.push({ id: uid + '-' + Date.now() + '-' + ((Math.random() * 1e4) | 0), emoji, uid, t: Date.now() });
+      if (room.reacts.length > 24) room.reacts = room.reacts.slice(-24);
+      room.rev++; await saveRoom(env, room);
+    }
+    return json({ ok: true }, 200, cors);
+  }
+
   if (op === 'party-chat') {
     const msg = String(body.msg || '').slice(0, 300).trim();
     if (msg) {
@@ -181,7 +194,8 @@ function view(room) {
     .filter(([, m]) => now - (m.seen || 0) < PRESENT_MS)
     .map(([uid, m]) => ({ uid, name: m.name }));
   return { code: room.code, host: room.host, title: room.title, animeId: room.animeId,
-    ep: room.ep, img: room.img, playAt: room.playAt, sharing: room.sharing || '', members, chat: room.chat, rev: room.rev };
+    ep: room.ep, img: room.img, playAt: room.playAt, sharing: room.sharing || '', members, chat: room.chat,
+    reacts: (room.reacts || []).filter(r => Date.now() - r.t < 8000), rev: room.rev };
 }
 
 function json(obj, status, cors) {

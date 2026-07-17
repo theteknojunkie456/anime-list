@@ -681,6 +681,12 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 .party-pill:active{transform:scale(.95);}
 .pp-dot{width:8px;height:8px;border-radius:50%;background:#fff;animation:ppPulse 1.6s ease-in-out infinite;}
 @keyframes ppPulse{0%,100%{opacity:1;}50%{opacity:.35;}}
+.react-layer{position:fixed;inset:0;z-index:210;pointer-events:none;overflow:hidden;}
+.react-fly{position:absolute;bottom:15%;font-size:34px;will-change:transform,opacity;animation:reactFly 2.6s cubic-bezier(.3,.7,.4,1) forwards;filter:drop-shadow(0 2px 6px rgba(0,0,0,.4));}
+@keyframes reactFly{0%{transform:translateY(0) scale(.5);opacity:0;}12%{opacity:1;transform:translateY(-10px) scale(1.15);}100%{transform:translateY(-58vh) scale(1);opacity:0;}}
+.pt-reactbar{display:flex;gap:6px;justify-content:space-between;margin:12px 0 2px;}
+.pt-react{flex:1;height:42px;border-radius:12px;background:var(--bg3);border:1px solid var(--b1);font-size:21px;display:flex;align-items:center;justify-content:center;transition:transform .1s,background .15s;}
+.pt-react:active{transform:scale(1.25);background:var(--ag);}
 .pt-picklist{display:flex;flex-direction:column;gap:7px;max-height:250px;overflow-y:auto;margin:6px 0 12px;padding-right:2px;scrollbar-width:none;}
 .pt-picklist::-webkit-scrollbar{display:none;}
 .pt-pick{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:var(--bg3);border:1px solid var(--b1);border-radius:13px;padding:9px 11px;transition:border-color .15s,background .15s;}
@@ -1260,6 +1266,9 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 
 <!-- floating pill while a party is live -->
 <button class="party-pill" id="partyPill" onclick="openSheet('partySheet')"><span class="pp-dot"></span><span id="ppText">Party</span></button>
+
+<!-- live reaction layer — emoji float up over whatever's on screen -->
+<div class="react-layer" id="reactLayer"></div>
 
 <!-- IMPORT SHEET -->
 <div class="sheet" id="importSheet">
@@ -3214,6 +3223,11 @@ function renderAniList(){
 // just starts together on the count. Backed by the sync worker (party- ops).
 let partyCode='',partyIsHost=false,partyRoom=null,partyTimer=0,partySeenPlay=0,partyChatRev=-1;
 let pcs={},localStream=null,partySeenSig=new Set(),partyPrevSharing='';   // WebRTC screen-share state
+let partySeenReact=new Set();
+const PARTY_EMOJI=['❤️','😂','🔥','😱','😭','👏','💀','🎉'];
+function spawnReact(emoji){const layer=document.getElementById('reactLayer');if(!layer)return;const el=document.createElement('div');el.className='react-fly';el.textContent=emoji;el.style.left=(8+Math.random()*82)+'%';el.style.fontSize=(28+Math.random()*16)+'px';layer.appendChild(el);setTimeout(()=>el.remove(),2700);}
+function partyReact(e){if(!partyActive())return;spawnReact(e);partyPost('party-react',{emoji:e}).catch(()=>{});}
+function processReacts(reacts){if(!reacts)return;const me=partyUid();for(const r of reacts){if(partySeenReact.has(r.id))continue;partySeenReact.add(r.id);if(r.uid!==me)spawnReact(r.emoji);}if(partySeenReact.size>240)partySeenReact=new Set([...partySeenReact].slice(-120));}
 function partyUid(){try{let u=localStorage.getItem('party_uid');if(!u){u='u'+Math.random().toString(36).slice(2)+Date.now().toString(36);localStorage.setItem('party_uid',u);}return u;}catch{return'u'+Date.now();}}
 function partyName(){try{return localStorage.getItem('party_name')||'';}catch{return'';}}
 function setPartyName(n){try{localStorage.setItem('party_name',n);}catch{}}
@@ -3236,6 +3250,7 @@ function applyRoom(j){
   // the 3·2·1 cue: a fresh future playAt → count everyone in, then open the player
   if(j.room.playAt&&j.room.playAt>Date.now()&&j.room.playAt!==partySeenPlay){partySeenPlay=j.room.playAt;partyCue(j.room);}
   try{rtcTick(j.room,j.signals);}catch(e){}   // drive the screen-share mesh
+  try{processReacts(j.room.reacts);}catch(e){}   // float everyone's emoji
 }
 function partyCue(room){
   const ov=document.getElementById('partyCount'),num=document.getElementById('pcNum'),lbl=document.getElementById('pcLbl');
@@ -3423,6 +3438,7 @@ function renderParty(){
     <div class="pt-code"><div class="pt-code-val">${r.code}</div><button class="pt-code-cta" onclick="partyCopyCode()" aria-label="Copy code">${icon('copy')}</button></div>
     <div class="pt-members">${members}</div>
     ${now}${hostCtl}
+    <div class="pt-reactbar">${PARTY_EMOJI.map(e=>`<button class="pt-react" onclick="partyReact('${e}')">${e}</button>`).join('')}</div>
     <div class="pt-chat" id="ptChat">${chat||'<div class="pt-sys">Say hi 👋</div>'}</div>
     <div class="pt-chatbar"><input id="ptMsg" placeholder="Message…" maxlength="300" onkeydown="if(event.key==='Enter')partySend()"><button class="pt-send" onclick="partySend()">${icon('send')}</button></div>
     <button class="src-opt" style="margin-top:14px" onclick="partyEnd()"><div class="src-name" style="color:var(--t2)">${partyIsHost?'End the party':'Leave the party'}</div></button>`;

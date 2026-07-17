@@ -27,6 +27,10 @@ settings:
     SWIFT_VERSION: "5.0"
     GENERATE_INFOPLIST_FILE: "NO"
     CODE_SIGN_STYLE: Automatic
+    # Put all app code in the main binary. Xcode's Debug "debug dylib" split
+    # (the default) does NOT load when the app is installed outside Xcode (e.g.
+    # via devicectl), so the app launches to a black screen. Keep this NO.
+    ENABLE_DEBUG_DYLIB: "NO"
     # DEVELOPMENT_TEAM is intentionally left blank — pick your Apple ID team in
     # Xcode → target → Signing & Capabilities (do it for BOTH targets).
 

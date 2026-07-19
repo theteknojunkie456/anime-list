@@ -4423,6 +4423,32 @@ async function acceptReq(id){
   toast("Friend added — you're connected");
 }
 function denyReq(id){addFrHandled(id);friendReqs=friendReqs.filter(r=>r.id!==id);renderFriends();}
+// Merge a pushed recommendation instantly (no KV wait), with a toast so they know.
+function mergeRec(env){
+  if(!env||!env.id||recsIn.some(e=>e.id===env.id))return;
+  recsIn.push(env);
+  try{localStorage.setItem('recs_in',JSON.stringify(recsIn));}catch{}
+  const ls=document.getElementById('lockScreen'), unlocked=!ls||getComputedStyle(ls).display==='none';
+  if(unlocked){try{render();}catch(e){}
+    const n=(env.items||[]).length,who=(env.from&&env.from.name)||'A friend';
+    try{toast(`${who} recommended you ${n} ${n===1?'show':'shows'}`);}catch(e){}}
+}
+// Merge a pushed friend request / accept instantly.
+function mergeFriendMsg(m){
+  if(!m||!m.from||!m.from.code||frHandled().includes(m.id))return;
+  let friends=friendsList();
+  if(m.type==='accept'){
+    if(!friends.some(f=>f.code===m.from.code)){friends.push({code:m.from.code,name:m.from.name||'Friend'});saveFriends(friends);}
+    saveFriendsOut(friendsOut().filter(f=>f.code!==m.from.code));
+    addFrHandled(m.id);
+    try{toast(`${m.from.name} accepted your friend request`);}catch(e){}
+  }else if(m.type==='request'){
+    if(friends.some(f=>f.code===m.from.code)){addFrHandled(m.id);return;}
+    if(!friendReqs.some(r=>r.id===m.id))friendReqs.push(m);
+    try{toast(`${m.from.name} sent you a friend request`);}catch(e){}
+  }
+  if(document.getElementById('friendsSheet').classList.contains('on'))renderFriends();
+}
 // Live channel: a WebSocket to our friend code so requests + recs arrive instantly.
 // On a ping we pull the fresh data; auto-reconnects; a keepalive stops idle drops.
 let friendWS=null, friendWSRetry=0;
@@ -4434,9 +4460,12 @@ function connectFriendWS(){
     const url=SYNC_URL.replace(/^http/,'ws')+'/friend?code='+encodeURIComponent(code);
     const ws=new WebSocket(url); friendWS=ws;
     ws.onopen=()=>{friendWSRetry=0;pullRecs();pullFriendReqs();};   // catch up on anything missed while offline
-    // KV can lag a beat behind the write, so pull a short burst to beat propagation.
-    const burst=(fn)=>{fn();setTimeout(fn,800);setTimeout(fn,2200);};
-    ws.onmessage=(e)=>{const t=String(e.data||'');if(t==='rec')burst(pullRecs);else if(t==='fr')burst(pullFriendReqs);else{burst(pullRecs);burst(pullFriendReqs);}};
+    ws.onmessage=(e)=>{
+      let d=null; try{d=JSON.parse(e.data);}catch(err){}
+      if(d&&d.kind==='rec'){ if(d.data)mergeRec(d.data); setTimeout(pullRecs,3000); }        // instant merge + reconcile once KV is consistent
+      else if(d&&d.kind==='fr'){ if(d.data)mergeFriendMsg(d.data); setTimeout(pullFriendReqs,3000); }
+      else { pullRecs(); pullFriendReqs(); }   // plain-ping fallback
+    };
     ws.onclose=()=>{if(friendWS===ws)friendWS=null;friendWSRetry=Math.min(friendWSRetry+1,6);setTimeout(connectFriendWS,700*friendWSRetry);};
     ws.onerror=()=>{try{ws.close();}catch(e){}};
   }catch(e){friendWSRetry=Math.min(friendWSRetry+1,6);setTimeout(connectFriendWS,700*friendWSRetry);}

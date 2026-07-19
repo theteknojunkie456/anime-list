@@ -89,11 +89,12 @@ export default {
       let list = [];
       try { const s = await env.LISTS.get(key); if (s) list = JSON.parse(s); } catch {}
       if (!Array.isArray(list)) list = [];
-      list.push({ id: fromCode.slice(0, 8) + Date.now().toString(36), from: { code: fromCode, name: fromName }, items, at: Date.now() });
+      const envelope = { id: fromCode.slice(0, 8) + Date.now().toString(36), from: { code: fromCode, name: fromName }, items, at: Date.now() };
+      list.push(envelope);
       if (list.length > 200) list = list.slice(list.length - 200);
       while (JSON.stringify(list).length > 2_000_000 && list.length > 1) list = list.slice(Math.ceil(list.length / 2));
       await env.LISTS.put(key, JSON.stringify(list));
-      ctx.waitUntil(notifyChan(env, to, 'rec'));
+      ctx.waitUntil(notifyChan(env, to, 'rec', envelope));
       return json({ ok: true }, 200, cors);
     }
     if (op === 'rec_pull') {
@@ -124,10 +125,11 @@ export default {
       const type = op === 'fr_accept' ? 'accept' : 'request';
       // de-dupe: one live message of each type per (from → to)
       list = list.filter(m => !(m && m.type === type && m.from && m.from.code === fromCode));
-      list.push({ id: type[0] + fromCode.slice(0, 8) + Date.now().toString(36), type, from: { code: fromCode, name: fromName }, at: Date.now() });
+      const message = { id: type[0] + fromCode.slice(0, 8) + Date.now().toString(36), type, from: { code: fromCode, name: fromName }, at: Date.now() };
+      list.push(message);
       if (list.length > 200) list = list.slice(list.length - 200);
       await env.LISTS.put(key, JSON.stringify(list));
-      ctx.waitUntil(notifyChan(env, to, 'fr'));
+      ctx.waitUntil(notifyChan(env, to, 'fr', message));
       return json({ ok: true }, 200, cors);
     }
     if (op === 'fr_pull') {
@@ -143,10 +145,12 @@ export default {
   },
 };
 
-// Ping a user's live channel (best-effort) so their app pulls the new data now.
-async function notifyChan(env, code, kind) {
+// Push to a user's live channel (best-effort): carries the actual new item so the
+// client shows it instantly without waiting on KV to become globally consistent.
+async function notifyChan(env, code, kind, data) {
   try {
-    await env.CHAN.get(env.CHAN.idFromName(code)).fetch(new Request('https://chan/notify', { method: 'POST', body: kind || 'ping' }));
+    const body = JSON.stringify({ kind: kind || 'ping', data: data || null });
+    await env.CHAN.get(env.CHAN.idFromName(code)).fetch(new Request('https://chan/notify', { method: 'POST', body }));
   } catch (e) {}
 }
 

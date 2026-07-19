@@ -139,7 +139,7 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 /* sort is a pinned button + dropdown — always visible, never scrolled past */
 .sort-wrap{position:relative;flex-shrink:0;}
 .sort-btn{display:inline-flex;align-items:center;gap:5px;padding:7px 11px;border-radius:99px;font-size:11.5px;font-weight:700;background:var(--bg3);border:1px solid transparent;color:var(--t2);white-space:nowrap;transition:color .15s;}
-.sort-btn.on{background:color-mix(in srgb,var(--a) 20%,var(--bg3));color:var(--a2);}
+.sort-btn.on,.sort-btn.filt-on{background:color-mix(in srgb,var(--a) 20%,var(--bg3));color:var(--a2);}
 .sort-btn .ico{width:13px;height:13px;}
 .sort-btn .ico:last-child{width:12px;height:12px;opacity:.7;}
 .sort-menu{position:absolute;right:0;top:calc(100% + 8px);z-index:60;min-width:172px;background:var(--bg2);border:1px solid var(--b2);border-radius:14px;padding:6px;box-shadow:0 18px 44px -12px rgba(0,0,0,.65);display:none;flex-direction:column;gap:2px;}
@@ -150,6 +150,10 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 .sort-opt .ico{width:15px;height:15px;flex-shrink:0;}
 .sort-opt .chk{margin-left:auto;display:flex;color:var(--a2);}
 .sort-opt .chk .ico{width:16px;height:16px;}
+.sort-div{height:1px;background:var(--b2);margin:5px 10px;}
+.sort-cnt{margin-left:auto;font-size:11px;font-weight:800;color:var(--t3);font-variant-numeric:tabular-nums;}
+.sort-opt.on .sort-cnt{color:var(--a2);}
+.sort-opt.on .sort-cnt+.chk{margin-left:8px;}
 .sort-row{display:flex;gap:6px;padding:0 0 0 10px;flex-shrink:0;position:relative;}
 .sort-row::before{content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);width:1px;height:16px;background:var(--b2);}
 .schip{
@@ -2642,7 +2646,8 @@ function renderFiltRow(){
   const counts={all:items.length,watching:0,plan:0,finished:0,dropped:0};
   items.forEach(a=>counts[a.status]!==undefined&&counts[a.status]++);
   const isRead=viewKind==='read';
-  const filts=[['all','All'],['watching',isRead?icon('book')+' Reading':icon('play')+' Watching'],['plan',isRead?icon('clipboard')+' To Read':icon('clipboard')+' Plan'],['finished',icon('check')+' Finished'],['dropped',icon('x')+' Dropped']];
+  // just the everyday three so the row never scrolls; Finished/Dropped live in the sort menu
+  const filts=[['all','All'],['watching',isRead?icon('book')+' Reading':icon('play')+' Watching'],['plan',isRead?icon('clipboard')+' To Read':icon('clipboard')+' Plan']];
   document.getElementById('filtRow').innerHTML=filts.map(([f,l])=>{
     const on=filterStatus===f;
     const cls=on?(f==='all'?'on':'on-'+f):'';
@@ -2651,13 +2656,27 @@ function renderFiltRow(){
   }).join('');
 }
 const SORT_MODES=[['recent','clock','Recent'],['az',null,'A–Z'],['rating','star','Rating'],['progress','play','Progress'],['duration','film','Shortest']];
+const MENU_FILTS=[['finished','check','Finished'],['dropped','x','Dropped']];   // extra filters tucked in the menu
 function renderSortRow(){
-  const cur=SORT_MODES.find(x=>x[0]===sortMode)||SORT_MODES[0];
+  const curSort=SORT_MODES.find(x=>x[0]===sortMode)||SORT_MODES[0];
+  const activeFilt=MENU_FILTS.find(x=>x[0]===filterStatus);   // Finished/Dropped active?
   const btn=document.getElementById('sortBtn');
-  if(btn)btn.innerHTML=`${cur[1]?icon(cur[1]):icon('sort')}<span>${cur[2]}</span>${icon('chevron-down')}`;
+  if(btn){
+    // when a menu-filter is active, the button shows THAT (so you can see it at a glance); else the sort
+    btn.innerHTML=activeFilt?`${icon(activeFilt[1])}<span>${activeFilt[2]}</span>${icon('chevron-down')}`
+      :`${curSort[1]?icon(curSort[1]):icon('sort')}<span>${curSort[2]}</span>${icon('chevron-down')}`;
+    btn.classList.toggle('filt-on',!!activeFilt);
+  }
   const menu=document.getElementById('sortMenu');
-  if(menu)menu.innerHTML=SORT_MODES.map(([m,ic,t])=>`<button class="sort-opt${sortMode===m?' on':''}" onclick="pickSort('${m}')">${ic?icon(ic):'<span class="ico"></span>'}<span>${t}</span>${sortMode===m?`<span class="chk">${icon('check')}</span>`:''}</button>`).join('');
+  if(menu){
+    const items=anime.filter(a=>kindOf(a)===viewKind); const cnt={finished:0,dropped:0};
+    items.forEach(a=>{if(cnt[a.status]!==undefined)cnt[a.status]++;});
+    const sortHTML=SORT_MODES.map(([m,ic,t])=>`<button class="sort-opt${sortMode===m?' on':''}" onclick="pickSort('${m}')">${ic?icon(ic):'<span class="ico"></span>'}<span>${t}</span>${sortMode===m?`<span class="chk">${icon('check')}</span>`:''}</button>`).join('');
+    const filtHTML=MENU_FILTS.map(([f,ic,t])=>`<button class="sort-opt${filterStatus===f?' on':''}" onclick="pickFilt('${f}')">${icon(ic)}<span>${t}</span><span class="sort-cnt">${cnt[f]||0}</span>${filterStatus===f?`<span class="chk">${icon('check')}</span>`:''}</button>`).join('');
+    menu.innerHTML=sortHTML+`<div class="sort-div"></div>`+filtHTML;
+  }
 }
+function pickFilt(f){const menu=document.getElementById('sortMenu'),btn=document.getElementById('sortBtn');if(menu)menu.classList.remove('on');if(btn)btn.classList.remove('on');setFilter(f);}
 function openSortMenu(e){
   if(e)e.stopPropagation();
   const menu=document.getElementById('sortMenu'),btn=document.getElementById('sortBtn');
@@ -2667,7 +2686,7 @@ function openSortMenu(e){
 }
 function pickSort(m){sortMode=m;const menu=document.getElementById('sortMenu'),btn=document.getElementById('sortBtn');if(menu)menu.classList.remove('on');if(btn)btn.classList.remove('on');render();}
 function setSort(m){pickSort(m);}   // back-compat
-function setFilter(f){filterStatus=f;renderFiltRow();renderHome();document.getElementById('pageEl').scrollTo({top:0,behavior:'smooth'});}
+function setFilter(f){filterStatus=f;renderFiltRow();renderSortRow();renderHome();document.getElementById('pageEl').scrollTo({top:0,behavior:'smooth'});}
 function goHome(){document.getElementById('searchIn').value='';filterStatus='all';render();document.getElementById('pageEl').scrollTo({top:0,behavior:'smooth'});}
 
 // nSeas>1 → this card stands in for a whole series (multiple seasons collapsed

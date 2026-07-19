@@ -2544,24 +2544,31 @@ function renderThemeGrid(){
 // anime (aniId + known episode count) can deep-link to an episode, so the rail is
 // watch-list only — a reading equivalent would land on a search, not a resume.
 function resumeItems(pool){
-  return sorted(pool.filter(a=>
-    a.status==='watching' && kindOf(a)==='watch' && a.aniId && a.epTotal &&
-    (a.ep||0) < a.epTotal))       // started-or-fresh, not finished
-    .sort((a,b)=>(b.upd||0)-(a.upd||0)).slice(0,12);
+  // The home screen's single watching surface: EVERY watching title, seasons of a
+  // series collapsed to one card, most-recently-touched first. (The old separate
+  // "Watching" row was merged in here — see renderHome. The "Watching" tab up top
+  // is unaffected and still lists every title.)
+  const list=pool.filter(a=>a.status==='watching' && kindOf(a)==='watch')
+    .sort((a,b)=>(b.upd||0)-(a.upd||0));
+  return collapseSeries(list).map(c=>c.a);
 }
 function resumeRailHTML(items,isRead){
   if(isRead||!items||!items.length) return '';   // reading has no episode deep-link; items pre-filtered by caller
   const card=a=>{
-    const next=Math.min((a.ep||0)+1,a.epTotal);
-    const p=Math.round(prog(a)*100);
+    // Titles with a known episode count show "Episode N" + a progress bar (resume);
+    // ones without (movies, or metadata not yet fetched) just show the title, so the
+    // merged-in Watching titles still render cleanly.
+    const known=!!a.epTotal;
+    const next=known?Math.min((a.ep||0)+1,a.epTotal):0;
+    const p=known?Math.round(prog(a)*100):0;
     const art=titleBg(a)||a.img;
     const ch=((a.title||'?').trim()[0]||'?').toUpperCase().replace(/['"<&]/g,'?');
     const bg=art?`<img class="rz-img" src="${art}" loading="lazy" alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'rz-ph',textContent:'${ch}'}))">`:`<div class="rz-ph">${ch}</div>`;
     return `<button class="rz-card" onclick="resumeWatch('${a.id}')">
       ${bg}<div class="rz-scrim"></div>
       <div class="rz-play">${icon('play')}</div>
-      <div class="rz-meta"><div class="rz-title">${schEsc(a.title)}</div><div class="rz-sub">Episode ${next}</div></div>
-      <div class="rz-bar"><div class="rz-fill" style="width:${p}%"></div></div>
+      <div class="rz-meta"><div class="rz-title">${schEsc(a.title)}</div>${known?`<div class="rz-sub">Episode ${next}</div>`:''}</div>
+      ${known?`<div class="rz-bar"><div class="rz-fill" style="width:${p}%"></div></div>`:''}
     </button>`;
   };
   // Loop the row when there's enough to overflow: render the set twice so it can
@@ -2900,25 +2907,24 @@ function renderHome(){
   sorted(pool.filter(a=>titleBg(a))).forEach(addSpot);
   const spotlight=spot.slice(0,5),spotSet=new Set(spotlight.map(a=>a.id));
   heroAmb=spotlight[0]?titleAccent(spotlight[0]):'';setAmbient(heroAmb);
-  // Continue-watching rail: resumable titles, minus anything already up in the
-  // billboard, so no show appears in both. This is the single source of truth for
-  // what's in the rail — the Watching row below subtracts it too (railSet).
+  // Continue-watching rail: the ONE watching surface on home — every watching
+  // title, minus anything already up in the billboard so nothing appears twice.
   const railItems=isRead?[]:resumeItems(pool).filter(a=>!spotSet.has(a.id));
-  const railSet=new Set(railItems.map(a=>a.id));
   // one banner at most: backup warning (critical) wins; otherwise the behind nudge
   const topBanner=shouldNudge()?nudgeHTML():(isRead?'':behindHTML());
   let html=topBanner+(spotlight.length?billboardHTML(spotlight):'')+resumeRailHTML(railItems,isRead)+friendRecRowHTML();
   // each section wears its own status colour (STATUS_META) rather than the one
   // theme accent — the palette already exists, it was just unused outside chips
+  // Watch list: no "Watching" row — it's merged into the Continue-watching rail
+  // above. Reading list keeps its "Reading" row (reading has no rail).
   const rows=isRead
     ?[['watching',icon('book')+' Reading'],['plan',icon('clipboard')+' Plan to Read'],['finished',icon('check')+' Finished'],['dropped',icon('x')+' Dropped']]
-    :[['watching',icon('play')+' Watching'],['plan',icon('clipboard')+' Plan to Watch'],['finished',icon('check')+' Finished'],['dropped',icon('x')+' Dropped']];
+    :[['plan',icon('clipboard')+' Plan to Watch'],['finished',icon('check')+' Finished'],['dropped',icon('x')+' Dropped']];
   for(const[st,label]of rows){
     const rc=(STATUS_META[st]||{}).color||'var(--t2)';
     let items=sorted(pool.filter(a=>a.status===st));
-    // Watching row shows only what ISN'T already in the billboard or the Continue-
-    // watching rail, so a show never appears twice on the home screen.
-    if(st==='watching')items=items.filter(a=>!spotSet.has(a.id)&&!railSet.has(a.id));
+    // Reading row (read kind only) drops anything already up in the billboard.
+    if(st==='watching')items=items.filter(a=>!spotSet.has(a.id));
     if(!items.length)continue;
     const cells=collapseSeries(items);
     html+=`<div class="row-sec" data-amb="${items[0]?titleAccent(items[0]):''}"><div class="row-head"><div class="row-title" style="--rc:${rc}">${label}</div><div class="row-count">${cells.length}</div></div>

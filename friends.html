@@ -4434,7 +4434,9 @@ function connectFriendWS(){
     const url=SYNC_URL.replace(/^http/,'ws')+'/friend?code='+encodeURIComponent(code);
     const ws=new WebSocket(url); friendWS=ws;
     ws.onopen=()=>{friendWSRetry=0;pullRecs();pullFriendReqs();};   // catch up on anything missed while offline
-    ws.onmessage=(e)=>{const t=String(e.data||'');if(t==='rec')pullRecs();else if(t==='fr')pullFriendReqs();else{pullRecs();pullFriendReqs();}};
+    // KV can lag a beat behind the write, so pull a short burst to beat propagation.
+    const burst=(fn)=>{fn();setTimeout(fn,800);setTimeout(fn,2200);};
+    ws.onmessage=(e)=>{const t=String(e.data||'');if(t==='rec')burst(pullRecs);else if(t==='fr')burst(pullFriendReqs);else{burst(pullRecs);burst(pullFriendReqs);}};
     ws.onclose=()=>{if(friendWS===ws)friendWS=null;friendWSRetry=Math.min(friendWSRetry+1,6);setTimeout(connectFriendWS,700*friendWSRetry);};
     ws.onerror=()=>{try{ws.close();}catch(e){}};
   }catch(e){friendWSRetry=Math.min(friendWSRetry+1,6);setTimeout(connectFriendWS,700*friendWSRetry);}

@@ -88,7 +88,24 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
    first ~200px ramp from black — a long, smooth falloff, not a hard edge — and
    the glow blooms lower, behind the artwork rather than behind the chrome.
    A short ramp here reads as a bright stripe; keep it generous. */
-.ambient{position:fixed;inset:0;z-index:-1;pointer-events:none;background:linear-gradient(to bottom,#000 0,rgba(0,0,0,0.86) 46px,rgba(0,0,0,0.5) 120px,rgba(0,0,0,0.18) 176px,rgba(0,0,0,0) 232px),radial-gradient(92% 52% at 50% 20%,color-mix(in srgb,var(--amb) 48%,transparent) 0%,transparent 68%),radial-gradient(55% 40% at 84% 34%,color-mix(in srgb,var(--amb) 18%,transparent) 0%,transparent 58%),var(--topgrad);transition:--amb 1.1s ease;}
+.ambient{position:fixed;inset:0;z-index:-2;pointer-events:none;background:linear-gradient(to bottom,#000 0,rgba(0,0,0,0.86) 46px,rgba(0,0,0,0.5) 120px,rgba(0,0,0,0.18) 176px,rgba(0,0,0,0) 232px),radial-gradient(92% 52% at 50% 20%,color-mix(in srgb,var(--amb) 48%,transparent) 0%,transparent 68%),radial-gradient(55% 40% at 84% 34%,color-mix(in srgb,var(--amb) 18%,transparent) 0%,transparent 58%),var(--topgrad);transition:--amb 1.1s ease;}
+/* Background brightness veil — lifts the dark backdrop toward light; the top is
+   tinted with the ambient accent so the "glow" brightens right along with it. The
+   amount (--bgb, 0–0.62) comes from the slider under the theme picker. */
+#brightVeil{position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:var(--bgb,0);transition:opacity .35s ease;
+  background:radial-gradient(95% 46% at 50% 6%,color-mix(in srgb,var(--amb) 60%,#f2f2f8) 0%,transparent 62%),linear-gradient(180deg,#dcdce6 0%,#cfcfd8 55%,#c6c6d0 100%);}
+/* keep background-level text legible as the backdrop brightens */
+.hdr-title,.row-title,.row-count,.row-div,.rz-head{text-shadow:0 1px 3px rgba(0,0,0,calc(var(--bgb,0)*0.85));}
+/* liquid-glass brightness slider */
+.bright-slider{-webkit-appearance:none;appearance:none;width:100%;height:36px;border-radius:18px;outline:none;cursor:pointer;
+  background:linear-gradient(90deg,var(--bg4) 0%,color-mix(in srgb,var(--a) 45%,#fff) 100%);
+  border:1px solid rgba(255,255,255,.16);box-shadow:inset 0 1px 3px rgba(0,0,0,.35),inset 0 0 0 1px rgba(255,255,255,.05);}
+.bright-slider::-webkit-slider-thumb{-webkit-appearance:none;width:30px;height:30px;border-radius:50%;border:none;cursor:pointer;
+  background:radial-gradient(circle at 34% 30%,#ffffff 0%,rgba(255,255,255,.82) 60%,rgba(230,230,240,.7) 100%);
+  box-shadow:0 3px 12px rgba(0,0,0,.45),inset 0 0 0 1px rgba(255,255,255,.7),inset 0 -3px 6px rgba(0,0,0,.12);}
+.bright-slider::-moz-range-thumb{width:30px;height:30px;border-radius:50%;border:none;background:rgba(255,255,255,.85);box-shadow:0 3px 12px rgba(0,0,0,.45);}
+.bright-row{display:flex;align-items:center;gap:12px;margin-top:16px;}
+.bright-ico{flex-shrink:0;color:var(--t2);display:flex;}.bright-ico .ico{width:18px;height:18px;}
 #app{height:100vh;height:100dvh;display:flex;flex-direction:column;background:transparent;}
 .page{flex:1;overflow-y:auto;overscroll-behavior:none;padding-bottom:calc(var(--safe-b) + 86px);}
 
@@ -1072,6 +1089,7 @@ body.recsel .pcard{position:relative;}
 <body>
 
 <div class="ambient" aria-hidden="true"></div>
+<div id="brightVeil" aria-hidden="true"></div>
 <div class="lockscreen" id="lockScreen">
   <div class="lock-card">
     <div class="lock-emoji">🔒</div>
@@ -1599,6 +1617,14 @@ body.recsel .pcard{position:relative;}
   </div>
   <div class="theme-grid" id="themeGrid"></div>
   <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--b1);">
+    <div class="flabel" style="margin-bottom:10px">Background brightness</div>
+    <div class="bright-row">
+      <span class="bright-ico" style="opacity:.5"><i data-ic="bulb"></i></span>
+      <input type="range" class="bright-slider" id="brightSlider" min="0" max="100" value="0" step="1" oninput="setBgBright(this.value)" aria-label="Background brightness">
+      <span class="bright-ico"><i data-ic="bulb"></i></span>
+    </div>
+  </div>
+  <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--b1);">
     <div class="flabel" style="margin-bottom:10px">Make your own</div>
     <div style="display:flex;gap:8px;margin-bottom:12px;">
       <input class="finput" id="ctName" placeholder="Theme name…" maxlength="14" style="flex:1" autocomplete="off">
@@ -1607,7 +1633,7 @@ body.recsel .pcard{position:relative;}
     <div style="display:flex;gap:16px;align-items:flex-end;">
       <label class="cpick-lbl">Accent<input type="color" class="cpick" id="ctAccent" value="#e03d55"></label>
       <label class="cpick-lbl">Background<input type="color" class="cpick" id="ctBg" value="#111114"></label>
-      <button class="ai-run-btn" style="flex:1" onclick="saveCustomTheme()">Save &amp; Apply</button>
+      <button class="ai-run-btn" style="flex:1" onclick="saveCustomTheme()">Save theme</button>
     </div>
   </div>
 </div>
@@ -2388,7 +2414,12 @@ function applyCustomVars(t){
   CUSTOM_VARS.forEach(k=>st.setProperty(k,v[k]));
 }
 function clearCustomVars(){const st=document.documentElement.style;CUSTOM_VARS.forEach(k=>st.removeProperty(k));}
-function loadTheme(){try{const s=store();curTheme=(s&&s.getItem('animetheme'))||'default';}catch{curTheme='default';}applyTheme(curTheme,false);}
+function loadTheme(){try{const s=store();curTheme=(s&&s.getItem('animetheme'))||'default';}catch{curTheme='default';}applyTheme(curTheme,false);applyBright();}
+// Background brightness (0–100). Lifts the dark backdrop toward light; the ambient
+// glow brightens with it (see #brightVeil). Persisted per-user.
+function bgBright(){try{const s=store();return parseInt((s&&s.getItem('bg_bright'))||'0',10)||0;}catch{return 0;}}
+function setBgBright(v){v=Math.max(0,Math.min(100,parseInt(v,10)||0));try{const s=store();if(s)s.setItem('bg_bright',String(v));}catch{}applyBright();}
+function applyBright(){try{document.documentElement.style.setProperty('--bgb',(bgBright()/100*0.62).toFixed(3));}catch{}}
 function applyTheme(id,persist=true){
   const t=allThemes().find(x=>x.id===id)||THEMES[0];
   curTheme=t.id;
@@ -2405,7 +2436,8 @@ function saveCustomTheme(){
   setCustomThemes([...customThemes(),t]);
   document.getElementById('ctName').value='';
   applyTheme(t.id);
-  toast(`${name} saved & applied`);
+  closeAll();   // one button: save + apply + close, so nobody re-taps into duplicate themes
+  toast(`${name} applied`);
 }
 function deleteCustomTheme(id){
   setCustomThemes(customThemes().filter(t=>t.id!==id));
@@ -2413,6 +2445,7 @@ function deleteCustomTheme(id){
   toast('Theme deleted');
 }
 function renderThemeGrid(){
+  const bs=document.getElementById('brightSlider');if(bs)bs.value=bgBright();
   const g=document.getElementById('themeGrid');if(!g)return;
   g.innerHTML=allThemes().map(t=>{
     // Show the swatch in the SAME dark background the theme actually applies —

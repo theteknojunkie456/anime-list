@@ -132,20 +132,21 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 .search-in:focus{border-color:var(--a);box-shadow:0 0 0 3px var(--ag);background:var(--bg2);}
 .search-in::placeholder{color:var(--t3);}
 /* filters + sort share one scrolling strip, split by a hairline */
-.ctrl-row{display:flex;align-items:center;gap:9px;padding:10px 18px 0;overflow-x:auto;scrollbar-width:none;}
+.ctrl-row{display:flex;align-items:center;gap:9px;padding:10px 18px 0;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;scroll-snap-type:x proximity;scroll-padding-left:18px;}
 .ctrl-row::-webkit-scrollbar{display:none;}
+.ctrl-row>.filt-row>.fchip:first-child,.ctrl-row>.sort-row{scroll-snap-align:start;}
 .sort-row{display:flex;gap:6px;padding:0 0 0 10px;flex-shrink:0;position:relative;}
 .sort-row::before{content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);width:1px;height:16px;background:var(--b2);}
 .schip{
   flex-shrink:0;padding:7px 14px;border-radius:99px;font-size:11.5px;font-weight:700;
-  background:var(--bg3);border:1px solid transparent;color:var(--t2);transition:all .15s;
+  background:var(--bg3);border:1px solid transparent;color:var(--t2);transition:background-color .15s,color .15s,box-shadow .15s;
 }
 .schip.on{background:color-mix(in srgb,var(--a) 20%,var(--bg3));border-color:transparent;color:var(--a2);box-shadow:0 3px 12px -5px var(--glow);}
 .filt-row{display:flex;gap:6px;flex-shrink:0;}
 .fchip{
   flex-shrink:0;padding:7px 13px;border-radius:99px;font-size:11.5px;font-weight:700;
   background:var(--bg3);border:1px solid transparent;color:var(--t2);
-  display:inline-flex;align-items:center;gap:6px;transition:all .15s;
+  display:inline-flex;align-items:center;gap:6px;transition:background-color .15s,color .15s,box-shadow .15s;
 }
 .fchip .fn{font-size:9.5px;font-weight:800;opacity:0.65;font-variant-numeric:tabular-nums;}
 .fchip.on{background:color-mix(in srgb,var(--a) 20%,var(--bg3));border-color:transparent;color:var(--a2);}
@@ -347,6 +348,8 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 }
 .pcard-fav{position:absolute;top:5px;right:7px;font-size:13px;text-shadow:0 1px 6px rgba(0,0,0,0.6);}
 .pcard-seas{position:absolute;bottom:7px;right:7px;display:inline-flex;align-items:center;gap:3px;font-size:9px;font-weight:800;padding:3px 7px 3px 6px;border-radius:99px;background:rgba(12,12,16,0.62);color:#fff;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);box-shadow:0 2px 8px rgba(0,0,0,0.4);}
+.pcard-dur{position:absolute;bottom:7px;left:7px;display:inline-flex;align-items:center;gap:3px;font-size:9px;font-weight:800;padding:3px 7px 3px 6px;border-radius:99px;background:rgba(12,12,16,0.62);color:#fff;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);box-shadow:0 2px 8px rgba(0,0,0,0.4);}
+.pcard-dur .ico{width:9px;height:9px;}
 .pcard-seas .ico{width:11px;height:11px;}
 .b-watching{background:rgba(245,166,35,0.28);color:#ffd48a;}
 .b-finished{background:rgba(52,196,114,0.28);color:#8ef0b6;}
@@ -918,6 +921,10 @@ body.recsel .pcard{position:relative;}
 .pcard-air{font-size:9.5px;font-weight:700;color:var(--wat);margin-top:4px;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .hero-air{display:inline-flex;align-items:center;gap:5px;margin-top:9px;font-size:11px;font-weight:700;color:#ffd9a0;background:rgba(245,166,35,0.18);border:1px solid rgba(245,166,35,0.34);padding:5px 11px;border-radius:99px;}
 .dt-air{display:inline-flex;align-items:center;gap:6px;margin-top:10px;font-size:11.5px;font-weight:700;color:var(--wat);background:var(--watbg);border:1px solid var(--wat);padding:7px 12px;border-radius:99px;align-self:flex-start;}
+.dt-runtime{display:inline-flex;align-items:center;gap:6px;margin-top:9px;font-size:12px;font-weight:700;color:var(--t1);background:color-mix(in srgb,var(--a) 12%,transparent);border:1px solid color-mix(in srgb,var(--a) 40%,transparent);padding:6px 11px;border-radius:99px;align-self:flex-start;flex-wrap:wrap;}
+.dt-runtime .ico{width:14px;height:14px;color:var(--a2);}
+.dt-runtime b{color:var(--a2);}
+.dt-runtime-films{color:var(--t2);font-weight:600;}
 
 /* ── WEEKLY SCHEDULE ── */
 .sched-nav{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
@@ -2533,10 +2540,30 @@ function sorted(list){
   if(sortMode==='az')l.sort((a,b)=>a.title.localeCompare(b.title));
   else if(sortMode==='rating')l.sort((a,b)=>(b.rating||0)-(a.rating||0));
   else if(sortMode==='progress')l.sort((a,b)=>prog(b)-prog(a));
+  else if(sortMode==='duration')l.sort((a,b)=>(totalWatchMins(a)||Infinity)-(totalWatchMins(b)||Infinity));   // shortest first
   else l.sort((a,b)=>(b.upd||0)-(a.upd||0));
   return l;
 }
 function prog(a){return a.status==='finished'?1:(a.epTotal?Math.min(1,(a.ep||0)/a.epTotal):0);}
+// Total minutes to watch every episode. Uses the real per-episode runtime (a.dur,
+// filled from AniList) × episode count; falls back to the stored "~N hrs" string,
+// then to a 24-min TV estimate — so every title has a sortable, showable duration.
+function totalWatchMins(a){
+  if(a.dur&&a.epTotal)return a.dur*a.epTotal;
+  if(a.dur&&!a.epTotal)return a.dur;              // a movie
+  const h=parseHrs(a.time); if(h)return Math.round(h*60);
+  if(a.epTotal)return 24*a.epTotal;
+  return 0;
+}
+// Estimated minutes for the side films in a title's watch order (~110 min each).
+function filmMins(a){const n=(a.order||[]).filter(s=>/^movie:/i.test(s)).length;return n*110;}
+function fmtWatch(mins){
+  if(!mins)return '';
+  if(mins<60)return `~${mins}m`;
+  const h=Math.round(mins/60);
+  if(h<48)return `~${h}h`;
+  return `~${h}h · ${Math.round(h/24)}d`;
+}
 // per-title theming: user's own bg wins over AniList banner; accent follows the same source.
 function titleBg(a){return (a&&(a.bgImage||a.banner))||'';}
 function titleAccent(a){if(!a)return'';return (a.bgImage?(a.bgAccent||a.aniColor):a.aniColor)||'';}
@@ -2600,7 +2627,7 @@ function renderFiltRow(){
   }).join('');
 }
 function renderSortRow(){
-  const modes=[['recent',icon('clock')+' Recent'],['az','A–Z'],['rating',icon('star','fill')+' Rating'],['progress',icon('play')+' Progress']];
+  const modes=[['recent',icon('clock')+' Recent'],['az','A–Z'],['rating',icon('star','fill')+' Rating'],['progress',icon('play')+' Progress'],['duration',icon('film')+' Shortest']];
   document.getElementById('sortRow').innerHTML=modes.map(([m,l])=>
     `<button class="schip${sortMode===m?' on':''}" onclick="setSort('${m}')">${l}</button>`).join('');
 }
@@ -2621,12 +2648,15 @@ function posterCard(a,nSeas){
   const air=airingInfo(a);
   const airHTML=air?`<div class="pcard-air">${icon('calendar')} ${air.when}</div>`:'';
   const seas=multi?`<span class="pcard-seas">${icon('layers')}${nSeas}</span>`:'';
+  const twMins=kindOf(a)==='watch'?totalWatchMins(a):0;
+  const durBadge=twMins?`<span class="pcard-dur">${icon('clock')}${fmtWatch(twMins)}</span>`:'';
   return`<div class="pcard${recSel&&recSel.has(a.id)?' sel':''}" onclick="pcTap('${a.id}',event)">
     <div class="pcard-wrap">
       ${img}
       <span class="pcard-badge b-${a.status}">${STATUS_META[a.status].icon} ${a.status==='plan'?'PLAN':a.status.toUpperCase().slice(0,5)}</span>
       ${a.fav?'<span class="pcard-fav">'+icon('heart','fill')+'</span>':''}
       ${seas}
+      ${durBadge}
     </div>
     ${bar}
     <div class="pcard-title">${title}</div>
@@ -2909,7 +2939,8 @@ function renderDetail(){
       ${cover}
       <div class="dt-info">
         <div class="dt-title">${a.title}</div>
-        <div class="dt-meta">${[a.eps,a.time].filter(Boolean).join(' · ')}</div>
+        <div class="dt-meta">${[a.eps, kindOf(a)==='read'?a.time:''].filter(Boolean).join(' · ')}</div>
+        ${(()=>{if(kindOf(a)!=='watch')return '';const tw=totalWatchMins(a),fm=filmMins(a);if(!tw)return '';return `<div class="dt-runtime">${icon('clock')} <b>${fmtWatch(tw)}</b> to watch${a.epTotal?` all ${a.epTotal} episodes`:''}${fm?`<span class="dt-runtime-films"> + ${fmtWatch(fm)} of films</span>`:''}</div>`;})()}
         ${(()=>{const air=airingInfo(a);return air?`<div class="dt-air">${icon('calendar')} Ep ${air.ep} · airs ${air.when}</div>`:'';})()}
         <button class="dt-fav${a.fav?' on':''}" onclick="toggleFav()">${a.fav?icon('heart','fill')+' Favorited':icon('heart')+' Favorite'}</button>
       </div>
@@ -5305,6 +5336,7 @@ async function fetchCovers(){
               else if(m.volumes){a.eps=`${m.volumes} volumes`;}
             }else{
               if(m.episodes){a.eps=`${m.episodes} eps`;a.epTotal=m.episodes;}
+              if(m.duration)a.dur=m.duration;   // per-episode minutes → exact total watch time + sorting
               if(!a.time&&m.duration&&m.episodes)a.time=`~${Math.max(1,Math.round(m.duration*m.episodes/60))} hrs`;
             }
             if(!a.genre&&m.genres&&m.genres.length)a.genre=m.genres.slice(0,3).join(', ');

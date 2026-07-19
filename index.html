@@ -812,6 +812,9 @@ body.recsel .pcard{position:relative;}
 .rc-note-main{flex:1;min-width:0;}
 .rc-note-t{font-weight:700;font-size:13.5px;margin-bottom:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .rc-note-in{margin:0;}
+.rc-note-x{flex-shrink:0;width:30px;height:30px;border-radius:50%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:var(--t2);display:flex;align-items:center;justify-content:center;cursor:pointer;}
+.rc-note-x .ico{width:15px;height:15px;}
+.rc-note-x:active{transform:scale(.92);}
 .party-pill.on{display:flex;}
 .party-pill:active{transform:scale(.95);}
 .pp-dot{width:8px;height:8px;border-radius:50%;background:#fff;animation:ppPulse 1.6s ease-in-out infinite;}
@@ -1798,7 +1801,8 @@ function migrate(list){
   // banner/aniColor = AniList per-title art + dominant color; bgImage/bgAccent = user's own background + its extracted color
   // Defensive: drop non-object entries and guarantee id/title/status so one malformed
   // item (from a bad import, a truncated paste, a future format change) can't crash render.
-  return (Array.isArray(list)?list:[]).filter(a=>a&&typeof a==='object').map(a=>({id:uid(),title:'',status:'plan',ep:0,rating:0,fav:false,upd:0,epTotal:parseEpTotal(a.eps),img:'',order:[],notes:'',genre:'',eps:'',time:'',kind:'watch',banner:'',aniColor:'',bgImage:'',bgAccent:'',bannerTried:false,...a}));
+  const mapped=(Array.isArray(list)?list:[]).filter(a=>a&&typeof a==='object').map(a=>({id:uid(),title:'',status:'plan',ep:0,rating:0,fav:false,upd:0,epTotal:parseEpTotal(a.eps),img:'',order:[],notes:'',genre:'',eps:'',time:'',kind:'watch',banner:'',aniColor:'',bgImage:'',bgAccent:'',bannerTried:false,...a}));
+  return dedupeList(mapped).kept;   // never load a list with duplicates
 }
 function load(){
   const s=store();
@@ -3387,7 +3391,7 @@ async function submitForm(){
     anime.unshift({id:uid(),rating:0,fav:false,...data});
     toast('Added!');
   }
-  save();closeAll();render();
+  dedupeAnime();save();closeAll();render();
   setTimeout(fetchCovers,500);
 }
 
@@ -3493,6 +3497,40 @@ function dupeKeys(a){
   const nt=normTitle(a.title); if(nt)k.push('t:'+nt+'|'+kind);
   return k;
 }
+// Hard guarantee: the list never holds the same title twice, no matter how it got
+// in (Notes paste, a friend's shared list, AniList sync, a recommendation, manual
+// add). Collapse any duplicates by dupeKeys into ONE, keeping the richer copy
+// (further-along status, higher ep/rating, any id/cover/notes). Returns # removed.
+const _statusRank={finished:3,watching:2,plan:1,dropped:0};
+function dedupeList(list){
+  const seen=new Map(); const kept=[]; let removed=0;
+  for(const a of (list||[])){
+    const keys=dupeKeys(a); let hit=-1;
+    for(const k of keys){ if(seen.has(k)){hit=seen.get(k);break;} }
+    if(hit<0){ const i=kept.length; kept.push(a); keys.forEach(k=>seen.set(k,i)); continue; }
+    const b=kept[hit];   // merge a into the kept copy b
+    if(!b.aniId&&a.aniId)b.aniId=a.aniId;
+    if(!b.malId&&a.malId)b.malId=a.malId;
+    if((a.ep||0)>(b.ep||0))b.ep=a.ep;
+    if(!b.epTotal&&a.epTotal)b.epTotal=a.epTotal;
+    if(!b.img&&a.img)b.img=a.img;
+    if(!b.genre&&a.genre)b.genre=a.genre;
+    if(!b.eps&&a.eps)b.eps=a.eps;
+    if(!b.time&&a.time)b.time=a.time;
+    if(!b.dur&&a.dur)b.dur=a.dur;
+    if(a.notes&&!String(b.notes||'').includes(a.notes))b.notes=[b.notes,a.notes].filter(Boolean).join('\n');
+    if((a.rating||0)>(b.rating||0))b.rating=a.rating;
+    if(a.fav)b.fav=true;
+    if((_statusRank[a.status]||0)>(_statusRank[b.status]||0))b.status=a.status;
+    b.upd=Math.max(b.upd||0,a.upd||0);
+    dupeKeys(b).forEach(k=>seen.set(k,hit));   // b may have just gained an id key
+    removed++;
+  }
+  return {kept,removed};
+}
+function dedupeAnime(){const r=dedupeList(anime);if(r.removed)anime=r.kept;return r.removed;}
+// Dedupe, and if anything collapsed, persist + repaint.
+function dedupeAndSave(){const n=dedupeAnime();if(n){save();try{render();}catch(e){}}return n;}
 async function aniListEntries(user,type){
   const q=`query($n:String,$t:MediaType){MediaListCollection(userName:$n,type:$t){lists{entries{status progress score media{id idMal isAdult title{romaji english} episodes chapters genres coverImage{large color} bannerImage}}}}}`;
   const r=await fetch('https://graphql.anilist.co',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({query:q,variables:{n:user,t:type}})});
@@ -3558,7 +3596,7 @@ function doAccountImport(){
     keys.forEach(k=>have.add(k));fresh.push(o);           // register keys so intra-import dupes are caught too
   }
   fresh.forEach(o=>anime.unshift(accItem(o)));
-  save();closeAll();render();
+  dedupeAnime();save();closeAll();render();
   toast(`Imported ${fresh.length}${dupes?` · ${dupes} already had`:''}${adult?` · ${adult} adult title${adult!==1?'s':''} blocked`:''}`);
   setTimeout(fetchCovers,600);
 }
@@ -3692,7 +3730,7 @@ async function alSync(opts){
     // equal → assume already in sync (avoids status ping-pong)
   }
   if(opts.importNew){for(const r of remote.values()){anime.unshift(accItem(r));added++;}}
-  if(pulled||added){save();render();}
+  if(pulled||added){dedupeAnime();save();render();}
   try{localStorage.setItem('al_last',String(Date.now()));}catch{}
   return {pulled,pushed,added};
 }
@@ -4109,7 +4147,7 @@ function doImport(){
     keys.forEach(k=>have.add(k));toAdd.push(x);
   }
   toAdd.forEach(item=>anime.unshift({id:uid(),title:item.title,status:item.status,kind:viewKind,ep:item.ep||0,rating:item.rating||0,fav:false,eps:'',epTotal:0,time:'',genre:'',order:[],notes:'',img:'',upd:Date.now()}));
-  save();closeAll();render();
+  dedupeAnime();save();closeAll();render();
   const dupes=importItems.filter(x=>x.selected).length-toAdd.length;
   toast(`Added ${toAdd.length}${dupes?` · ${dupes} already had`:''}`);
   setTimeout(fetchCovers,500);
@@ -4508,10 +4546,10 @@ async function pullFriendReqs(){
     const handled=frHandled(); let friends=friendsList(); let changed=false; const incoming=[];
     for(const m of msgs){
       if(!m||!m.from||!m.from.code)continue;
-      refreshFriendName(m.from.code,m.from.name);   // keep friend names current
+      refreshFriendName(m.from.code,m.from.name,m.at);   // keep friend names current (newest wins)
       if(handled.includes(m.id))continue;
       if(m.type==='accept'){
-        if(!friends.some(f=>f.code===m.from.code)){friends.push({code:m.from.code,name:m.from.name||'Friend'});changed=true;}
+        if(!friends.some(f=>f.code===m.from.code)){friends.push({code:m.from.code,name:m.from.name||'Friend',nameAt:m.at||0});changed=true;}
         saveFriendsOut(friendsOut().filter(f=>f.code!==m.from.code));
         addFrHandled(m.id);
       }else if(m.type==='request'){
@@ -4528,23 +4566,25 @@ async function acceptReq(id){
   const req=friendReqs.find(r=>r.id===id); if(!req)return;
   const c=req.from.code, n=req.from.name;
   let friends=friendsList();
-  if(!friends.some(f=>f.code===c)){friends.push({code:c,name:n||'Friend'});saveFriends(friends);}
+  if(!friends.some(f=>f.code===c)){friends.push({code:c,name:n||'Friend',nameAt:req.at||0});saveFriends(friends);}
   addFrHandled(id); friendReqs=friendReqs.filter(r=>r.id!==id); renderFriends();
   try{const from={code:myFriendCode(),name:myFriendName()||'A friend'};await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({op:'fr_accept',to:c,from})});}catch(e){}
   toast("Friend added — you're connected");
 }
 function denyReq(id){addFrHandled(id);friendReqs=friendReqs.filter(r=>r.id!==id);renderFriends();}
-// Keep a stored friend's name current: they carry their latest name on everything
-// they send, so if it changed, update our copy (fixes the send list showing an old name).
-function refreshFriendName(code,name){
+// Keep a stored friend's name current. Every message carries the sender's name AND
+// a timestamp; only a NEWER message may change the name — so old friend-requests/
+// recommendations (frozen at the old name) can't revert it. Fixes the stale a→b name.
+function refreshFriendName(code,name,at){
   if(!code||!name)return;
-  const fr=friendsList(),f=fr.find(x=>x.code===code);
-  if(f&&f.name!==name){f.name=name;saveFriends(fr);if(document.getElementById('friendsSheet').classList.contains('on'))renderFriends();}
+  at=at||0;
+  const fr=friendsList(),f=fr.find(x=>x.code===code); if(!f)return;
+  if(at>=(f.nameAt||0)&&f.name!==name){f.name=name;f.nameAt=at;saveFriends(fr);if(document.getElementById('friendsSheet').classList.contains('on'))renderFriends();}
 }
 // Merge a pushed recommendation instantly (no KV wait), with a toast so they know.
 function mergeRec(env){
   if(!env)return;
-  refreshFriendName(env.from&&env.from.code,env.from&&env.from.name);
+  refreshFriendName(env.from&&env.from.code,env.from&&env.from.name,env.at);
   if(!env.id||recsIn.some(e=>e.id===env.id))return;
   recsIn.push(env);
   try{localStorage.setItem('recs_in',JSON.stringify(recsIn));}catch{}
@@ -4556,11 +4596,11 @@ function mergeRec(env){
 // Merge a pushed friend request / accept instantly.
 function mergeFriendMsg(m){
   if(!m||!m.from||!m.from.code)return;
-  refreshFriendName(m.from.code,m.from.name);
+  refreshFriendName(m.from.code,m.from.name,m.at);
   if(frHandled().includes(m.id))return;
   let friends=friendsList();
   if(m.type==='accept'){
-    if(!friends.some(f=>f.code===m.from.code)){friends.push({code:m.from.code,name:m.from.name||'Friend'});saveFriends(friends);}
+    if(!friends.some(f=>f.code===m.from.code)){friends.push({code:m.from.code,name:m.from.name||'Friend',nameAt:m.at||0});saveFriends(friends);}
     saveFriendsOut(friendsOut().filter(f=>f.code!==m.from.code));
     addFrHandled(m.id);
     try{toast(`${m.from.name} accepted your friend request`);}catch(e){}
@@ -4603,7 +4643,7 @@ async function pullRecs(){
     if(!r.ok)return;
     const j=await r.json();
     recsIn=Array.isArray(j.recs)?j.recs:[];
-    recsIn.forEach(e=>refreshFriendName(e.from&&e.from.code,e.from&&e.from.name));   // keep friend names current
+    recsIn.forEach(e=>refreshFriendName(e.from&&e.from.code,e.from&&e.from.name,e.at));   // keep friend names current
     try{localStorage.setItem('recs_in',JSON.stringify(recsIn));}catch{}
     const ls=document.getElementById('lockScreen');
     if(!ls||getComputedStyle(ls).display==='none'){try{render();}catch(e){}}
@@ -4743,6 +4783,7 @@ function doneRecSel(){if(!recSel||!recSel.size){toast('Tap a few shows first');r
 function proceedRecommend(){if(!recPickShows.size){toast('Pick at least one show');return;}recToFriends=new Set();renderRecSend();openSheet('recSendSheet');}
 function toggleRecFriend(code){if(recToFriends.has(code))recToFriends.delete(code);else recToFriends.add(code);renderRecSend();}
 function setItemNote(id,v){recItemNotes[id]=v;}
+function removeRecShow(id){recPickShows.delete(id);delete recItemNotes[id];renderRecSend();}
 function renderRecSend(){
   const box=document.getElementById('recSendBody');if(!box)return;
   const shows=[...recPickShows].map(id=>anime.find(a=>a.id===id)).filter(Boolean);
@@ -4752,6 +4793,7 @@ function renderRecSend(){
     ${a.img?`<img class="rc-note-img" src="${escH(a.img)}" alt="" onerror="this.remove()">`:`<div class="rc-note-ph">${escH(((a.title||'?')[0]||'?').toUpperCase())}</div>`}
     <div class="rc-note-main"><div class="rc-note-t">${escH(a.title)}</div>
     <input class="ai-prompt-in rc-note-in" placeholder="Note for this one (optional)" maxlength="300" value="${escH(recItemNotes[a.id]||'')}" oninput="setItemNote('${a.id}',this.value)"></div>
+    <button class="rc-note-x" onclick="removeRecShow('${a.id}')" aria-label="Remove this show">${icon('x')}</button>
   </div>`).join('');
   const friendHTML=fr.length?fr.map(f=>{const on=recToFriends.has(f.code),col=friendColor(f.code);return `<button class="rs-pick${on?' on':''}" onclick="toggleRecFriend('${escH(f.code)}')"><span class="fr-dot" style="background:${col}"></span><span class="rs-name">${escH(f.name)}</span><span class="pt-pick-check">${on?icon('check'):''}</span></button>`;}).join(''):`<p class="ai-desc">No accepted friends yet — <b onclick="openSheet('friendsSheet')" style="color:var(--a);cursor:pointer">add a friend</b> first (they have to accept).</p>`;
   box.innerHTML=`<div class="dt-label">${icon('edit')} A note for each show</div>
@@ -5725,7 +5767,7 @@ function fyPlan(aniId,btn){
   const x=(fyCache||[]).find(o=>o.rec.id===aniId);if(!x)return;
   const r=x.rec;
   anime.push({id:uid(),title:r.title.english||r.title.romaji,status:'plan',kind:'watch',aniId:r.id,img:(r.coverImage&&r.coverImage.large)||'',eps:'',time:'',genre:(r.genres||[]).join(', '),order:[],notes:''});
-  save();render();
+  dedupeAnime();save();render();
   if(typeof toast==='function')toast('Added to Plan');
   fyCache=(fyCache||[]).filter(o=>o.rec.id!==aniId);
   const card=btn&&btn.closest?btn.closest('.fy-card'):null;
@@ -5760,7 +5802,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeAll();closeCon
 
 // ─── INIT ───────────────────────────────────────────────────────────────────
 try{hydrateIcons();}catch{}
-load();try{purgeAdult();}catch{}loadTheme();render();try{nativeScheduleNotifs();}catch{}
+load();try{purgeAdult();}catch{}try{if(!appLocked&&dedupeAnime())writeLocal();}catch{}loadTheme();render();try{nativeScheduleNotifs();}catch{}
 try{alCatchRedirect().then(()=>{if(!appLocked)alBootSync();}).catch(()=>{});}catch{}   // returning from AniList OAuth
 if(appLocked)showLock();   // stored list is ciphertext → gate the app until unlocked
 else try{restorePlayer();}catch{}   // came back mid-stream after an iOS reload → reopen it

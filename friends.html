@@ -2723,7 +2723,6 @@ function openSortMenu(e){
   if(open)setTimeout(()=>{const close=(ev)=>{if(!menu.contains(ev.target)&&!btn.contains(ev.target)){menu.classList.remove('on');btn.classList.remove('on');document.removeEventListener('click',close);}};document.addEventListener('click',close);},0);
 }
 function pickSort(m){sortMode=m;const menu=document.getElementById('sortMenu'),btn=document.getElementById('sortBtn');if(menu)menu.classList.remove('on');if(btn)btn.classList.remove('on');render();}
-function setSort(m){pickSort(m);}   // back-compat
 function setFilter(f){filterStatus=f;renderFiltRow();renderSortRow();renderHome();document.getElementById('pageEl').scrollTo({top:0,behavior:'smooth'});}
 function goHome(){document.getElementById('searchIn').value='';filterStatus='all';render();document.getElementById('pageEl').scrollTo({top:0,behavior:'smooth'});}
 
@@ -2768,29 +2767,6 @@ function collapseSeries(items){
     idx.set(k,out.length);out.push({a,n:1});
   }
   return out;
-}
-function heroHTML(a){
-  const p=prog(a);
-  // background priority: user's own photo → AniList wide banner art → cover → gradient. Banner/photo lazy-load as <img> and
-  // gracefully drop on error, revealing the gradient .hero-bg beneath. .hero-shade scrim keeps title/CTA legible over any art.
-  const art=titleBg(a);
-  let bg=`<div class="hero-bg" style="background:linear-gradient(135deg,var(--bg4),var(--bg2))"></div>`;
-  if(art)bg+=`<img class="hero-bg-img" src="${art}" loading="lazy" alt="" onerror="this.remove()">`;
-  else if(a.img)bg=`<div class="hero-bg" style="background-image:url('${a.img}')"></div>`;
-  const av=accentVars(a);
-  const air=airingInfo(a);
-  const airHTML=air?`<div class="hero-air">${icon('calendar')} Ep ${air.ep} · airs ${air.when}</div>`:'';
-  return`<div class="hero"${av?` style="${av}"`:''} onclick="openDetail('${a.id}')">
-    ${bg}<div class="hero-shade"></div>
-    <div class="hero-body">
-      <div class="hero-kicker">${kindOf(a)==='read'?'Continue reading':'Continue watching'}</div>
-      <div class="hero-title">${a.title}</div>
-      <div class="hero-meta">${[a.eps,a.time,(a.genre||'').split(',')[0]].filter(Boolean).join(' · ')}</div>
-      ${a.epTotal?`<div class="hero-prog"><div class="pbar"><div class="pfill" style="width:${Math.round(p*100)}%"></div></div><span>${a.ep||0} / ${a.epTotal}</span></div>`:''}
-      ${airHTML}
-      <div class="hero-cta">${icon('play')} &nbsp;Open</div>
-    </div>
-  </div>`;
 }
 let bbItems=[],bbIdx=0,bbTimer=0,bbP=1;   // bbP = physical slide index (clones at 0 and N+1)
 function bbSlideHTML(a){
@@ -3597,7 +3573,6 @@ function dedupeList(list){
 }
 function dedupeAnime(){const r=dedupeList(anime);if(r.removed)anime=r.kept;return r.removed;}
 // Dedupe, and if anything collapsed, persist + repaint.
-function dedupeAndSave(){const n=dedupeAnime();if(n){save();try{render();}catch(e){}}return n;}
 async function aniListEntries(user,type){
   const q=`query($n:String,$t:MediaType){MediaListCollection(userName:$n,type:$t){lists{entries{status progress score media{id idMal isAdult title{romaji english} episodes chapters genres coverImage{large color} bannerImage}}}}}`;
   const r=await fetch('https://graphql.anilist.co',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({query:q,variables:{n:user,t:type}})});
@@ -4024,8 +3999,6 @@ function partyQueueAdd(id){
 function partyQueueRemoveAt(i){const q=partyRoom&&partyRoom.queue&&partyRoom.queue[i];if(q)wsSend({t:'queue-remove',qid:q.id});}
 function partyQueueNext(){if(!partyIsHost||!partyRoom||!(partyRoom.queue||[]).length)return;wsSend({t:'queue-next'});}
 function partyCopyCode(){try{navigator.clipboard.writeText(partyCode);toast('Code copied');}catch{toast(partyCode);}}
-function isIOS(){return /iP(hone|od|ad)/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);}
-function isAndroid(){return /Android/.test(navigator.userAgent);}
 
 // ── screen share (WebRTC, peer-to-peer — no server carries the video) ──────────
 // The desktop host captures a tab/window and streams it straight to each viewer;
@@ -4374,7 +4347,6 @@ function closeStats(){const v=document.getElementById('statsView');if(v)v.classL
 // legal services externally (launchURL / Open-in-service). The in-frame player runs
 // ONLY for a user-provided custom embeddable source that carries {ep}/{slug}.
 function streamSource(){try{return localStorage.getItem('stream_src')||'';}catch{return'';}}
-function usingDefaultSource(){return !streamSource();}
 // Slugify a title for a custom source's {slug} token: lowercase, punctuation dropped,
 // runs of non-alphanumerics collapsed to a single hyphen.
 function streamSlug(title){
@@ -5426,7 +5398,6 @@ async function aiCardInsight(id){
 // ─── AUTOFILL — free public databases, works for everyone, no key ────────────
 const pause=ms=>new Promise(r=>setTimeout(r,ms));
 async function jikan(path){const r=await fetch('https://api.jikan.moe/v4'+path);if(!r.ok)throw new Error('jikan '+r.status);return(await r.json()).data;}
-function durMins(d){if(!d)return 0;const h=/(\d+)\s*hr/.exec(d),m=/(\d+)\s*min/.exec(d);return(h?+h[1]*60:0)+(m?+m[1]:0);}
 function typeTag(t){return{TV:'TV',Movie:'MOVIE',OVA:'OVA',ONA:'ONA',Special:'SPECIAL','TV Special':'SPECIAL'}[t]||'TV';}
 function relEntry(full,kind){const r=(full.relations||[]).find(x=>x.relation===kind);return r&&r.entry.find(e=>e.type==='anime')||null;}
 // Franchise watch order, from a MAL id the user already picked on AniList.
@@ -5486,60 +5457,6 @@ async function lookupShowById(id){
     order:sNums.length>1?sNums.map(s=>`TV: Season ${s} — ${seasons[s]} eps`):[],
     notes:['Live action',d.status,(d.premiered||'').slice(0,4)].filter(Boolean).join(' · '),
     img:d.image?(d.image.original||d.image.medium||''):''
-  };
-}
-async function lookupShow(title){
-  const r=await fetch(`https://api.tvmaze.com/singlesearch/shows?q=${encodeURIComponent(title)}&embed=episodes`);
-  if(!r.ok)return null;
-  const d=await r.json();
-  const eps=(d._embedded&&d._embedded.episodes)||[];
-  const seasons={};eps.forEach(e=>{seasons[e.season]=(seasons[e.season]||0)+1;});
-  const sNums=Object.keys(seasons);
-  return{
-    eps:eps.length?`${eps.length} eps`:'TBA',
-    time:d.averageRuntime&&eps.length?`~${Math.round(d.averageRuntime*eps.length/60)} hrs`:'',
-    genre:(d.genres||[]).slice(0,3).join(', '),
-    order:sNums.length>1?sNums.map(s=>`TV: Season ${s} — ${seasons[s]} eps`):[],
-    notes:[d.status,(d.premiered||'').slice(0,4)].filter(Boolean).join(' · '),
-    img:d.image?(d.image.original||d.image.medium||''):''
-  };
-}
-async function lookupBook(title){
-  const r=await fetch(`https://openlibrary.org/search.json?title=${encodeURIComponent(title)}&limit=1&fields=title,author_name,first_publish_year,subject,number_of_pages_median,cover_i`);
-  if(!r.ok)return null;
-  const doc=(await r.json()).docs[0];if(!doc)return null;
-  const pg=doc.number_of_pages_median;
-  return{
-    eps:pg?`${pg} pages`:'book',
-    time:pg?`~${Math.max(1,Math.round(pg/40))} hrs read`:'',
-    genre:(doc.subject||[]).slice(0,3).join(', '),
-    order:[],
-    notes:['by '+(doc.author_name?doc.author_name[0]:'unknown'),doc.first_publish_year].filter(Boolean).join(' · '),
-    img:doc.cover_i?`https://covers.openlibrary.org/b/id/${doc.cover_i}-L.jpg`:''
-  };
-}
-
-async function lookupManga(title){
-  // AniList MANGA covers manhwa / webtoon / manga / light novels — the side the ANIME query misses.
-  const q=`{Media(search:${JSON.stringify(String(title))},type:MANGA){coverImage{large} chapters volumes genres status format countryOfOrigin averageScore startDate{year}}}`;
-  const r=await fetch('https://graphql.anilist.co',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({query:q})});
-  if(!r.ok)return null;
-  const j=await r.json();const m=j&&j.data&&j.data.Media;
-  if(!m)return null;
-  const eps=m.chapters?`${m.chapters} chapters`:(m.volumes?`${m.volumes} volumes`:'ongoing');
-  const fmtLabel={MANGA:'Manga',MANHWA:'Manhwa',MANHUA:'Manhua',NOVEL:'Light novel',ONE_SHOT:'One-shot'}[m.format]
-    ||(m.countryOfOrigin==='KR'?'Manhwa':m.countryOfOrigin==='CN'?'Manhua':'');
-  const bits=[];
-  if(fmtLabel)bits.push(fmtLabel);
-  if(m.averageScore)bits.push(`★ ${(m.averageScore/10).toFixed(1)} on AniList`);
-  if(m.status)bits.push(m.status.replace(/_/g,' ').toLowerCase());
-  if(m.startDate&&m.startDate.year)bits.push(String(m.startDate.year));
-  return{
-    eps,time:'',
-    genre:(m.genres||[]).slice(0,3).join(', '),
-    order:[],
-    notes:bits.join(' · '),
-    img:(m.coverImage&&m.coverImage.large)||''
   };
 }
 // ── COVER + DETAILS FETCHER — batched via AniList (≈25 titles per request) ──
@@ -5967,8 +5884,8 @@ async function computeForYou(){
 function fyPlan(aniId,btn){
   const x=(fyCache||[]).find(o=>o.rec.id===aniId);if(!x)return;
   const r=x.rec;
-  anime.push({id:uid(),title:r.title.english||r.title.romaji,status:'plan',kind:'watch',aniId:r.id,img:(r.coverImage&&r.coverImage.large)||'',eps:'',time:'',genre:(r.genres||[]).join(', '),order:[],notes:''});
-  dedupeAnime();save();render();
+  anime.unshift({id:uid(),title:r.title.english||r.title.romaji,status:'plan',kind:'watch',aniId:r.id,img:(r.coverImage&&r.coverImage.large)||'',eps:'',epTotal:0,time:'',genre:(r.genres||[]).join(', '),order:[],notes:'',rating:0,fav:false,upd:Date.now()});
+  dedupeAnime();save();render();setTimeout(fetchCovers,300);
   if(typeof toast==='function')toast('Added to Plan');
   fyCache=(fyCache||[]).filter(o=>o.rec.id!==aniId);
   const card=btn&&btn.closest?btn.closest('.fy-card'):null;

@@ -1532,9 +1532,9 @@ body.no-party .friend-only{display:flex;}
   <div class="pv-frame-wrap"><iframe id="pvFrame" class="pv-frame" sandbox="allow-scripts allow-same-origin allow-forms allow-presentation allow-orientation-lock" allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowfullscreen referrerpolicy="no-referrer"></iframe>
     <div class="pv-pause" id="pvPause"><div class="pv-pause-ico">⏸</div><div class="pv-pause-t">Host paused</div><div class="pv-pause-s">Pause your video too — you'll all resume together</div></div>
   </div>
-  <!-- binge controls: only shown when the source can target a specific episode
-       (AniNeko, or a custom source with an {ep} token) — hidden for search/plain
-       sources and for reading, where there's no episode to step through. -->
+  <!-- binge controls: only shown when a custom source can target a specific episode
+       (an {ep} token) — hidden for search/plain sources and for reading, where
+       there's no episode to step through. -->
   <div class="pv-nav" id="pvNav" style="display:none">
     <button class="pv-nav-arrow" id="pvPrev" onclick="pvStep(-1)" aria-label="Previous episode"><i data-ic="chevron-left"></i></button>
     <button class="pv-nav-mark" id="pvMark" onclick="pvMarkNext()">Mark watched &amp; next</button>
@@ -3701,7 +3701,7 @@ function partyCue(room){
 // the show in their own list, so this doesn't go through watchAnime.
 function partyStreamURL(title,ep){
   const slug=streamSlug(title),src=streamSource();
-  if(!src)return ep?`${STREAM_DEFAULT}/watch/${slug}/ep-${ep}`:`${STREAM_DEFAULT}/watch/${slug}`;
+  if(!src)return '';   // no custom source → party uses screen-broadcast, not a built-in player
   if(/\{ep\}/.test(src))return src.replace(/\{title\}/g,encodeURIComponent(title)).replace(/\{slug\}/g,slug).replace(/\{ep\}/g,ep||1);
   if(/\{title\}|\{slug\}/.test(src))return src.replace(/\{title\}/g,encodeURIComponent(title)).replace(/\{slug\}/g,slug);
   return src;
@@ -3709,8 +3709,9 @@ function partyStreamURL(title,ep){
 function watchParty(title,ep){
   pvReturnId=null;pvWatchEp=null;pvOpenTime=0;pvCanNav=false;
   document.getElementById('pvTitle').textContent=title+(ep?` · Ep ${ep}`:'')+' · Party';
-  const ext=document.getElementById('pvExt');ext.onclick=()=>{document.getElementById('pvFrame').src=findUrl({title});};
-  document.getElementById('pvFrame').src=partyStreamURL(title,ep);
+  const ext=document.getElementById('pvExt');ext.onclick=()=>{const u=findUrl({title});if(u&&u!=='about:blank')document.getElementById('pvFrame').src=u;};
+  const purl=partyStreamURL(title,ep);
+  document.getElementById('pvFrame').src=purl||"data:text/html,<body style='margin:0;background:%230b0b0f;color:%23aaa;font:15px -apple-system,system-ui;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px;height:100vh'>Set your own streaming source in Settings, or use <b style='color:%23fff'>&nbsp;Broadcast your screen&nbsp;</b> to watch together.</body>";
   document.getElementById('playerView').classList.add('on');
   renderPvNav(null);
   partyInSession=true;partyCurEp=ep;hidePauseOverlay();renderPvHostBar();
@@ -4097,72 +4098,15 @@ function openStats(){renderStats();const v=document.getElementById('statsView');
 function closeStats(){const v=document.getElementById('statsView');if(v)v.classList.remove('on');}
 
 // ─── IN-APP PLAYER (streaming site embed) ───────────────────────────────────
-// AniNeko is the built-in default. These sites rotate domains often, and some
-// people prefer their own source — so the base is overridable in Settings, and
-// falls back here when nothing custom is set.
-const STREAM_DEFAULT='https://anineko.to';
+// No built-in streaming source. The app never ships a default player: Watch opens
+// legal services externally (launchURL / Open-in-service). The in-frame player runs
+// ONLY for a user-provided custom embeddable source that carries {ep}/{slug}.
 function streamSource(){try{return localStorage.getItem('stream_src')||'';}catch{return'';}}
-function streamBase(){return streamSource()||STREAM_DEFAULT;}
 function usingDefaultSource(){return !streamSource();}
-// AniNeko slugs: lowercase, apostrophes dropped, every other run of non-alphanumerics
-// becomes a single hyphen. A best-effort GUESS — the site actually slugs by romaji
-// and drops punctuation ("Re:Zero" → "rezero"), so the guess 404s a lot. The real
-// slug is resolved via the worker (resolveStreamSlug) whenever possible; this stays
-// as the offline fallback.
+// Slugify a title for a custom source's {slug} token: lowercase, punctuation dropped,
+// runs of non-alphanumerics collapsed to a single hyphen.
 function streamSlug(title){
   return (title||'').toLowerCase().replace(/["'’]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
-}
-// ─── REAL SLUG RESOLUTION (kills the AniNeko 404s) ───────────────────────────
-// The site slugs by romaji and drops punctuation, so a title-derived guess rarely
-// matches. The worker fetches the site's search server-side and returns the real
-// /watch/<slug> candidates; we pick the one whose canonical title (season markers
-// normalized) matches this exact item, and cache it on the item so it's instant
-// next time. Season markers must match exactly — we never auto-play the wrong season.
-function canonTitle(s){
-  let t=' '+(s||'').toLowerCase().replace(/[^a-z0-9]+/g,' ')+' ';
-  t=t.replace(/ (the )?final season /g,' sf ');
-  t=t.replace(/ (\d+)(st|nd|rd|th) season /g,' s$1 ');
-  t=t.replace(/ season (\d+) /g,' s$1 ');
-  t=t.replace(/ (\d+)(st|nd|rd|th) /g,' s$1 ');
-  t=t.replace(/ part (\d+) /g,' p$1 ');
-  t=t.replace(/ cour (\d+) /g,' c$1 ');
-  t=t.replace(/ (ii|iii|iv|v|vi|vii|viii|ix|x) /g,(m,g)=>' s'+({ii:2,iii:3,iv:4,v:5,vi:6,vii:7,viii:8,ix:9,x:10}[g])+' ');
-  t=t.replace(/ (tv|the|animation|anime|movie|specials?|ova|ona) /g,' ');
-  return t.trim().replace(/\s+/g,' ');
-}
-const _seasonTok=x=>/^(s\d+|p\d+|c\d+|sf)$/.test(x);
-function slugScore(title,slug){
-  const A=canonTitle(title).split(' ').filter(Boolean);
-  const B=canonTitle(slug.replace(/-/g,' ')).split(' ').filter(Boolean);
-  if(!A.length||!B.length)return 0;
-  const setA=new Set(A),setB=new Set(B);
-  let sc;
-  if(A.join('')===B.join(''))sc=1000;
-  else{let inter=0;setA.forEach(x=>{if(setB.has(x))inter++;});const uni=new Set([...A,...B]).size;
-    const sh=A.length<=B.length?setA:setB,lo=A.length<=B.length?setB:setA;let cov=0;sh.forEach(x=>{if(lo.has(x))cov++;});
-    sc=Math.round((inter/uni)*600+(cov/sh.size)*400);}
-  const aS=A.filter(_seasonTok).sort().join(','),bS=B.filter(_seasonTok).sort().join(',');
-  if(aS!==bS)sc=Math.min(sc,450);   // different season → don't auto-pick it
-  return sc;
-}
-function pickSlug(title,slugs){
-  let best=null,bs=0;
-  (slugs||[]).forEach(s=>{const sc=slugScore(title,s);if(sc>bs){bs=sc;best=s;}});
-  return bs>=700?best:null;
-}
-// Return the real AniNeko slug for this item — cached, else worker-resolved, else
-// the best-effort guess. Only meaningful for the default (AniNeko) source.
-async function resolveStreamSlug(a){
-  if(!usingDefaultSource())return streamSlug(a.title);
-  if(a.streamSlug)return a.streamSlug;
-  try{
-    const r=await fetch(`${SYNC_URL}/resolve?q=${encodeURIComponent(a.title)}`,{cache:'no-store'});
-    if(r.ok){
-      const best=pickSlug(a.title,(await r.json()).slugs);
-      if(best){a.streamSlug=best;save();return best;}
-    }
-  }catch{}
-  return streamSlug(a.title);   // offline / no match → guess (may 404; search button recovers)
 }
 let pvReturnId=null, pvWatchEp=null, pvOpenTime=0, pvCanNav=false;
 // Which episode to open: the next one they haven't finished (ep watched + 1),
@@ -4175,15 +4119,13 @@ function watchEpisode(a){
   const next=Math.min(Math.max((a.ep||0)+1,1), total);
   return next;
 }
-// Build the URL to open. For the default (AniNeko) we know the exact scheme and
-// deep-link to the episode. A custom source can use {title}/{slug}/{ep} tokens;
-// with no token we just open it and let them navigate/search.
+// Build the in-frame URL for a custom source. It can use {title}/{slug}/{ep} tokens;
+// with no token we just open it and let them navigate/search. No custom source →
+// empty (default Watch never frames anything — it opens legal sites externally).
 function streamURL(a){
   const slug=streamSlug(a.title), ep=watchEpisode(a);
   const src=streamSource();
-  if(!src){ // built-in AniNeko
-    return {url:ep?`${STREAM_DEFAULT}/watch/${slug}/ep-${ep}`:`${STREAM_DEFAULT}/watch/${slug}`, ep};
-  }
+  if(!src) return {url:'', ep};   // no custom source → nothing to frame (Watch opens legal sites externally)
   if(/\{title\}|\{slug\}|\{ep\}/.test(src)){
     return {url:src.replace(/\{title\}/g,encodeURIComponent(a.title)).replace(/\{slug\}/g,slug).replace(/\{ep\}/g,ep||1), ep};
   }
@@ -4191,12 +4133,11 @@ function streamURL(a){
 }
 // The site's search for this exact title — the recovery when a deep-link 404s.
 function findUrl(a){
-  if(usingDefaultSource()) return `${STREAM_DEFAULT}/browser?keyword=${encodeURIComponent(a.title)}`;
+  if(usingDefaultSource()) return 'about:blank';   // no built-in source to search
   const src=streamSource();
   if(/\{title\}|\{slug\}/.test(src)) return src.replace(/\{title\}/g,encodeURIComponent(a.title)).replace(/\{slug\}/g,streamSlug(a.title)).replace(/\{ep\}/g,'1');
   return src;   // plain custom URL — just reload the site so its own search is at hand
 }
-const PV_LOADING="data:text/html,<body style='margin:0;background:%230b0b0f;color:%23888;font:14px -apple-system,system-ui;display:flex;align-items:center;justify-content:center;height:100vh'>Finding your episode…</body>";
 async function watchAnime(id){
   const a=anime.find(x=>x.id===id); if(!a) return;
   if(kindOf(a)!=='watch'||!a.aniId){toast('Watch is for anime only');return;}
@@ -4226,19 +4167,9 @@ async function watchAnime(id){
   // binge controls light up only when we can address a specific episode
   pvCanNav=!!ep&&(usingDefaultSource()||/\{ep\}/.test(streamSource()||''));
   renderPvNav(a);
-  // Resolve the REAL slug before deep-linking (kills the 404s). Cached items are
-  // instant; the first watch of a title shows a brief "finding…" while the worker
-  // looks up the site's true slug for this exact season.
-  let url;
-  if(usingDefaultSource()){
-    if(!a.streamSlug)f.src=PV_LOADING;
-    const slug=await resolveStreamSlug(a);
-    if(pvReturnId!==id)return;   // user opened something else while we resolved
-    url=ep?`${STREAM_DEFAULT}/watch/${slug}/ep-${ep}`:`${STREAM_DEFAULT}/watch/${slug}`;
-  }else{
-    url=streamURL(a).url;
-  }
-  f.src=url;
+  // Only custom {ep} sources reach here (default Watch opened a legal site externally
+  // above), so this is always the user's own embeddable player URL.
+  f.src=streamURL(a).url;
   savePvSession(id,ep,'watch');   // survive an iOS background/reload mid-stream
 }
 // Reading source (AsuraScans by default). AsuraScans series live at
@@ -4274,11 +4205,11 @@ function readManga(id){
 }
 // ─── IN-PLAYER BINGE CONTROLS ────────────────────────────────────────────────
 // Step episodes or bank-and-advance without leaving the player. Only wired up
-// when the source can address a specific episode (AniNeko, or a custom source
-// with an {ep} token) — otherwise the nav bar stays hidden.
+// when a custom source can address a specific episode (an {ep} token) — otherwise
+// the nav bar stays hidden.
 function episodeURL(a,ep){
-  const slug=(usingDefaultSource()&&a&&a.streamSlug)||streamSlug(a.title), src=streamSource();
-  if(!src) return `${STREAM_DEFAULT}/watch/${slug}/ep-${ep}`;   // uses the resolved slug when we have it
+  const slug=streamSlug(a.title), src=streamSource();
+  if(!src) return null;   // no custom source → can't address an episode in-frame
   if(/\{ep\}/.test(src)) return src.replace(/\{title\}/g,encodeURIComponent(a.title)).replace(/\{slug\}/g,slug).replace(/\{ep\}/g,ep);
   return null;   // search / plain source — no way to target an episode
 }
@@ -4340,11 +4271,6 @@ function restorePlayer(){
   watchAnime(s.id);
   if(pvReturnId===s.id){pvOpenTime=s.t;savePvSession(s.id,pvWatchEp,'watch');}   // keep the original clock so a long watch still auto-marks
 }
-// One-tap alternatives to AniNeko. Each opens the site's search for the exact
-// title (via the {title} token), so it's one step from playing — these sites
-// use numeric episode ids we can't deep-link, so search is the honest best.
-// All confirmed embeddable (no X-Frame-Options); pirate domains rotate, so if a
-// chip ever loads nothing the domain moved — paste the new one in the field.
 // Official, legal, and FREE-FOREVER streaming — no paid tiers (Crunchyroll ended its
 // free tier in 2026; HIDIVE is paid — both excluded). WatchList opens the site's
 // search for your exact title in the browser (these services DRM / block framing).
@@ -4519,7 +4445,7 @@ function renderFriends(){
     <div class="fr-err" id="frErr"></div>
     <div class="dt-label" style="margin-top:20px">${icon('users')} Friends · ${fr.length}</div>
     <div class="fr-list">${flist}</div>
-    <button class="dt-watch" style="margin-top:16px" onclick="startRecommend()"${fr.length?'':' disabled'}>${icon('send')} Recommend shows to friends</button>`;
+    <button class="dt-watch" style="margin-top:16px" onclick="startRecommend()">${icon('send')} Recommend shows to friends</button>`;
 }
 function copyFriendCode(){const c=myFriendCode();try{navigator.clipboard.writeText(c);toast('Code copied');}catch{toast(c);}}
 function doAddFriend(){
@@ -4531,7 +4457,7 @@ function doAddFriend(){
   renderFriends();toast('Friend added');
 }
 let recPickShows=new Set(),recToFriends=new Set(),recNotes={};
-function startRecommend(){if(!friendsList().length){toast('Add a friend first');return;}recPickShows=new Set();renderRecPick();openSheet('recPickSheet');}
+function startRecommend(){recPickShows=new Set();renderRecPick();openSheet('recPickSheet');}
 function toggleRecPick(id){if(recPickShows.has(id))recPickShows.delete(id);else recPickShows.add(id);renderRecPick();}
 function renderRecPick(){
   const box=document.getElementById('recPickBody');if(!box)return;
@@ -4542,7 +4468,7 @@ function renderRecPick(){
     <span class="pt-pick-check">${on?icon('check'):''}</span></button>`;}).join('');
   box.innerHTML=`<p class="ai-desc">Pick the shows to recommend — as many as you like.</p>
     <div class="pt-picks">${rows||'<p class="ai-desc">Your list is empty.</p>'}</div>
-    <button class="dt-watch rec-next" onclick="proceedRecommend()"${recPickShows.size?'':' disabled'}>${icon('chevron-right')} Next — choose friends (${recPickShows.size})</button>`;
+    <button class="dt-watch rec-next" onclick="proceedRecommend()">${icon('chevron-right')} Next — choose friends (${recPickShows.size})</button>`;
 }
 function proceedRecommend(){if(!recPickShows.size){toast('Pick at least one show');return;}recToFriends=new Set();recNotes={};renderRecSend();openSheet('recSendSheet');}
 function toggleRecFriend(code){if(recToFriends.has(code))recToFriends.delete(code);else recToFriends.add(code);renderRecSend();}
@@ -4550,6 +4476,11 @@ function setRecNote(code,v){recNotes[code]=v;}
 function renderRecSend(){
   const box=document.getElementById('recSendBody');if(!box)return;
   const fr=friendsList();
+  if(!fr.length){
+    box.innerHTML=`<p class="ai-desc">You picked <b>${recPickShows.size}</b> show${recPickShows.size===1?'':'s'} — now add a friend to send to. Share your code or enter theirs.</p>
+      <button class="dt-watch" onclick="openSheet('friendsSheet')">${icon('plus')} Add a friend</button>`;
+    return;
+  }
   const rows=fr.map(f=>{const on=recToFriends.has(f.code),col=friendColor(f.code);return `<div class="rs-friend${on?' on':''}">
     <button class="rs-pick" onclick="toggleRecFriend('${escH(f.code)}')"><span class="fr-dot" style="background:${col}"></span><span class="rs-name">${escH(f.name)}</span><span class="pt-pick-check">${on?icon('check'):''}</span></button>
     ${on?`<input class="ai-prompt-in rs-note" placeholder="Optional note — e.g. 10/10 banger" maxlength="300" value="${escH(recNotes[f.code]||'')}" oninput="setRecNote('${escH(f.code)}',this.value)">`:''}
@@ -4651,7 +4582,7 @@ function saveReadSource(){
 function setSource(v){
   try{if(v)localStorage.setItem('stream_src',v);else localStorage.removeItem('stream_src');}catch{}
   renderSource();
-  toast(v?'Source set':'Back to AniNeko');
+  toast(v?'Source set':'Back to default (legal, free)');
 }
 function saveSource(){
   const v=normSrc(document.getElementById('srcCustom').value);

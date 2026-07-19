@@ -730,6 +730,34 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
    floating pill is force-hidden even when updatePartyPill() tries to show it. */
 body.no-party .party-only{display:none!important;}
 body.no-party #partyPill{display:none!important;}
+/* Friends button: shows only on the public web build (where parties are hidden). */
+.friend-only{display:none;}
+body.no-party .friend-only{display:flex;}
+/* Friends-recommend cards + notes, tinted in the sender's colour (--fc). */
+.rec-card .rec-wrap{outline:2px solid var(--fc);outline-offset:-2px;border-radius:12px;position:relative;}
+.rec-flag{position:absolute;top:6px;left:6px;width:22px;height:22px;border-radius:7px;display:flex;align-items:center;justify-content:center;color:#fff;box-shadow:0 2px 6px rgba(0,0,0,.35);}
+.rec-flag .ico{width:13px;height:13px;}
+.rec-by{font-size:11px;font-weight:800;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.rec-badges{margin:2px 0 6px;}
+.rec-badge{background:color-mix(in srgb,var(--fc) 15%,transparent);border:1px solid var(--fc);border-radius:12px;padding:10px 12px;margin-bottom:8px;}
+.rec-badge-who{font-weight:800;font-size:12.5px;color:var(--fc);display:flex;align-items:center;gap:6px;}
+.rec-badge-who .ico{width:14px;height:14px;}
+.rec-badge-note{margin-top:4px;font-size:13px;color:var(--t1);font-style:italic;}
+.fr-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.08);}
+.fr-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0;}
+.fr-info{flex:1;min-width:0;}
+.fr-name{font-weight:700;font-size:14px;}
+.fr-code{font-size:11px;color:var(--t2);font-family:ui-monospace,monospace;overflow:hidden;text-overflow:ellipsis;}
+.fr-x{background:none;border:0;color:var(--t2);padding:4px;cursor:pointer;}
+.fr-x .ico{width:16px;height:16px;}
+.fr-err{color:#ff6b6b;font-size:12px;margin-top:6px;min-height:14px;}
+.rs-friend{margin-bottom:10px;}
+.rs-pick{width:100%;display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:11px 12px;color:var(--t1);cursor:pointer;}
+.rs-friend.on .rs-pick{border-color:var(--a);}
+.rs-name{flex:1;text-align:left;font-weight:700;}
+.rs-note{margin-top:6px;}
+.pt-pick-check{margin-left:auto;color:var(--a);display:flex;}
+.pt-pick-check .ico{width:18px;height:18px;}
 .party-pill.on{display:flex;}
 .party-pill:active{transform:scale(.95);}
 .pp-dot{width:8px;height:8px;border-radius:50%;background:#fff;animation:ppPulse 1.6s ease-in-out infinite;}
@@ -1051,6 +1079,7 @@ body.no-party #partyPill{display:none!important;}
   <div class="hdr">
     <div class="hdr-title">WatchList</div>
     <div class="hdr-actions">
+      <button class="hbtn friend-only" onclick="openFriends()" title="Friends" aria-label="Friends"><i data-ic="users"></i></button>
       <button class="hbtn party-only" onclick="openSheet('partySheet')" title="Watch party" aria-label="Watch party"><i data-ic="users"></i></button>
       <button class="hbtn" onclick="openForYou()" title="For You — tailored recommendations" aria-label="For You recommendations"><i data-ic="compass"></i></button>
       <button class="hbtn" onclick="openSchedule()" title="Weekly airing schedule" aria-label="Weekly airing schedule"><i data-ic="calendar"></i></button>
@@ -1306,6 +1335,46 @@ body.no-party #partyPill{display:none!important;}
     <button class="sheet-cancel" onclick="closeAll()">Close</button>
   </div>
   <div id="partyBody"></div>
+</div>
+
+<!-- FRIENDS — recommend shows to friends (public web build) -->
+<div class="sheet" id="friendsSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <div class="sheet-title"><i data-ic="users"></i> Friends</div>
+    <button class="sheet-cancel" onclick="closeAll()">Close</button>
+  </div>
+  <div id="friendsBody"></div>
+</div>
+
+<!-- FRIENDS — pick shows to recommend -->
+<div class="sheet" id="recPickSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <div class="sheet-title"><i data-ic="send"></i> Recommend shows</div>
+    <button class="sheet-cancel" onclick="openSheet('friendsSheet')">Back</button>
+  </div>
+  <div id="recPickBody"></div>
+</div>
+
+<!-- FRIENDS — pick friends + note -->
+<div class="sheet" id="recSendSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <div class="sheet-title"><i data-ic="users"></i> Send to friends</div>
+    <button class="sheet-cancel" onclick="openSheet('recPickSheet')">Back</button>
+  </div>
+  <div id="recSendBody"></div>
+</div>
+
+<!-- FRIENDS — view a received recommendation -->
+<div class="sheet" id="recDetailSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <div class="sheet-title"><i data-ic="users"></i> Recommended for you</div>
+    <button class="sheet-cancel" onclick="closeAll()">Close</button>
+  </div>
+  <div id="recDetailBody"></div>
 </div>
 
 
@@ -2652,7 +2721,7 @@ function renderHome(){
   heroAmb=spotlight[0]?titleAccent(spotlight[0]):'';setAmbient(heroAmb);
   // one banner at most: backup warning (critical) wins; otherwise the behind nudge
   const topBanner=shouldNudge()?nudgeHTML():(isRead?'':behindHTML());
-  let html=topBanner+(spotlight.length?billboardHTML(spotlight):'')+resumeRailHTML(pool,isRead);
+  let html=topBanner+(spotlight.length?billboardHTML(spotlight):'')+resumeRailHTML(pool,isRead)+friendRecRowHTML();
   // each section wears its own status colour (STATUS_META) rather than the one
   // theme accent — the palette already exists, it was just unused outside chips
   const rows=isRead
@@ -2778,6 +2847,7 @@ function renderDetail(){
         <button class="dt-fav${a.fav?' on':''}" onclick="toggleFav()">${a.fav?icon('heart','fill')+' Favorited':icon('heart')+' Favorite'}</button>
       </div>
     </div>
+    ${friendRecBadge(a)}
     <div class="dt-label">Status</div>
     <div class="dt-status">${statusBtns}</div>
     ${progHTML}
@@ -3001,6 +3071,10 @@ function openSheet(id){
   if(id==='anilistSheet')renderAniList();
   if(id==='partySheet')renderParty();
   if(id==='watchSheet')renderWatch();
+  if(id==='friendsSheet')renderFriends();
+  if(id==='recPickSheet')renderRecPick();
+  if(id==='recSendSheet')renderRecSend();
+  if(id==='recDetailSheet')renderRecDetail();
   try{updatePartyPill();}catch{}
 }
 function closeAll(){
@@ -4322,6 +4396,184 @@ function renderWatch(){
     +sec('Free — no account',free,subs.length);
 }
 function watchOpen(i){const o=watchOpts[i],a=watchTarget;if(!o||!a)return;openExternal(fillURL(o.url,a));closeAll();toast(`Opening ${o.name}…`);}
+
+// ═══ FRIENDS — recommend shows to friends (public web build only) ════════════
+// No accounts: each person has a random "friend code" (a shareable bearer token).
+// You add friends by their code, then push show recommendations (+ an optional
+// note) to their code's mailbox on the worker. They pull it and the shows appear
+// in a "Your Friends Recommend" row, tinted in the sender's colour, note attached.
+// All localStorage + the KV mailbox. Gated to the web build (mirrors party=app).
+const FRIEND_COLORS=['#ff6b6b','#4dabf7','#51cf66','#ffd43b','#cc5de8','#20c997','#ff922b','#f783ac','#748ffc','#a9e34b'];
+function friendColor(code){let h=2166136261;const s=String(code||'');for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}return FRIEND_COLORS[(h>>>0)%FRIEND_COLORS.length];}
+function myFriendCode(){try{let c=localStorage.getItem('friend_code');if(!c||!/^[A-Za-z0-9]{10,64}$/.test(c)){c=(Math.random().toString(36).slice(2)+Math.random().toString(36).slice(2)+Date.now().toString(36)).replace(/[^A-Za-z0-9]/g,'').slice(0,16);while(c.length<12)c+='7';localStorage.setItem('friend_code',c);}return c;}catch{return '';}}
+function myFriendName(){try{return localStorage.getItem('friend_name')||localStorage.getItem('party_name')||'';}catch{return '';}}
+function setMyFriendName(n){try{localStorage.setItem('friend_name',String(n||'').slice(0,40));}catch{}}
+function friendsList(){try{const a=JSON.parse(localStorage.getItem('friends')||'[]');return Array.isArray(a)?a:[];}catch{return [];}}
+function saveFriends(a){try{localStorage.setItem('friends',JSON.stringify(a.slice(0,200)));}catch{}}
+function addFriendByCode(code,name){
+  code=String(code||'').trim();
+  if(!/^[A-Za-z0-9]{10,64}$/.test(code))return "That doesn't look like a friend code.";
+  if(code===myFriendCode())return "That's your own code.";
+  let a=friendsList();
+  if(a.some(f=>f.code===code)){a=a.map(f=>f.code===code?{code,name:(name||f.name)}:f);}
+  else a.push({code,name:String(name||'Friend').slice(0,40)});
+  saveFriends(a);return '';
+}
+function removeFriend(code){saveFriends(friendsList().filter(f=>f.code!==code));renderFriends();}
+
+let recsIn=[];
+function loadRecsCache(){try{const a=JSON.parse(localStorage.getItem('recs_in')||'[]');recsIn=Array.isArray(a)?a:[];}catch{recsIn=[];}}
+async function pullRecs(){
+  if(IS_NATIVE)return;
+  const code=myFriendCode(); if(!code) return;
+  try{
+    const r=await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({op:'rec_pull',code})});
+    if(!r.ok)return;
+    const j=await r.json();
+    recsIn=Array.isArray(j.recs)?j.recs:[];
+    try{localStorage.setItem('recs_in',JSON.stringify(recsIn));}catch{}
+    const ls=document.getElementById('lockScreen');
+    if(!ls||getComputedStyle(ls).display==='none'){try{render();}catch(e){}}
+  }catch(e){}
+}
+// aniId (or title) -> {item, senders:[{name,code,note,at}]}
+function recByAni(){
+  const m={};
+  recsIn.forEach(env=>{(env.items||[]).forEach(it=>{const k=it.aniId?('a'+it.aniId):('t'+String(it.title||'').toLowerCase());if(!m[k])m[k]={item:it,senders:[]};m[k].senders.push({name:(env.from&&env.from.name)||'A friend',code:(env.from&&env.from.code)||'',note:env.note||'',at:env.at||0});});});
+  return m;
+}
+function friendRecRowHTML(){
+  if(IS_NATIVE)return '';
+  const map=recByAni(), mine=new Set(anime.map(a=>a.aniId).filter(Boolean));
+  const keys=Object.keys(map).filter(k=>{const it=map[k].item;const kind=it.kind==='read'?'read':'watch';return kind===viewKind && !(it.aniId&&mine.has(it.aniId));});
+  if(!keys.length)return '';
+  keys.sort((x,y)=>Math.max(0,...map[y].senders.map(s=>s.at))-Math.max(0,...map[x].senders.map(s=>s.at)));
+  return `<div class="row-sec"><div class="row-head"><div class="row-title" style="--rc:var(--a2)">${icon('users')} Your Friends Recommend</div><div class="row-count">${keys.length}</div></div><div class="row-scroll">${keys.map(k=>recCard(k,map[k])).join('')}</div></div>`;
+}
+function recCard(k,rec){
+  const it=rec.item,s0=rec.senders[0],col=friendColor(s0.code);
+  const img=it.img?`<img class="pcard-img" src="${escH(it.img)}" loading="lazy" alt="" onerror="this.remove()">`:`<div class="pcard-ph">${escH(((it.title||'?').trim()[0]||'?').toUpperCase())}</div>`;
+  const more=rec.senders.length>1?` +${rec.senders.length-1}`:'';
+  return `<div class="pcard rec-card" style="--fc:${col}" onclick="openRecDetail('${encodeURIComponent(k)}')">
+    <div class="pcard-wrap rec-wrap">${img}<span class="rec-flag" style="background:${col}">${icon('users')}</span></div>
+    <div class="pcard-title">${escH(it.title)}</div>
+    <div class="rec-by" style="color:${col}">${escH(s0.name)}${more}</div>
+  </div>`;
+}
+function recNoteRows(rec){
+  return rec.senders.map(s=>{const col=friendColor(s.code);return `<div class="rec-badge" style="--fc:${col}"><div class="rec-badge-who">${icon('users')} ${escH(s.name)} recommends this</div>${s.note?`<div class="rec-badge-note">“${escH(s.note)}”</div>`:''}</div>`;}).join('');
+}
+function friendRecBadge(a){
+  if(IS_NATIVE||!a||!a.aniId)return '';
+  const rec=recByAni()['a'+a.aniId]; if(!rec)return '';
+  return `<div class="rec-badges">${recNoteRows(rec)}</div>`;
+}
+let recDetailKey='';
+function openRecDetail(k){recDetailKey=decodeURIComponent(k);renderRecDetail();openSheet('recDetailSheet');}
+function renderRecDetail(){
+  const box=document.getElementById('recDetailBody');if(!box)return;
+  const rec=recByAni()[recDetailKey];
+  if(!rec){box.innerHTML='<p class="ai-desc">This recommendation is no longer available.</p>';return;}
+  const it=rec.item;
+  const cover=it.img?`<img class="dt-cover" src="${escH(it.img)}" alt="" onerror="this.remove()">`:`<div class="dt-cover-ph">${escH(((it.title||'?').trim()[0]||'?').toUpperCase())}</div>`;
+  const chips=(it.genre||'').split(',').map(g=>g.trim()).filter(Boolean).map(g=>`<span class="chip">${escH(g)}</span>`).join('');
+  box.innerHTML=`
+    <div class="dt-top">${cover}<div class="dt-info"><div class="dt-title">${escH(it.title)}</div><div class="dt-meta">${it.kind==='read'?'Manga / manhwa':'Anime'}</div></div></div>
+    <div class="rec-badges">${recNoteRows(rec)}</div>
+    ${chips?`<div class="dt-label">Genres</div><div class="chips">${chips}</div>`:''}
+    <button class="dt-watch" onclick="addRecToList(false)">${icon('plus')} Add to My List</button>
+    ${it.kind!=='read'?`<button class="dt-watch" style="margin-top:8px" onclick="addRecToList(true)">${icon('play')} Add & Watch now</button>`:''}`;
+}
+function addRecToList(watchAfter){
+  const rec=recByAni()[recDetailKey];if(!rec)return;
+  const it=rec.item;
+  let existing=it.aniId?anime.find(a=>a.aniId===it.aniId):anime.find(a=>a.title===it.title);
+  let id;
+  if(existing){id=existing.id;}
+  else{
+    id=uid();
+    const noteLines=rec.senders.map(s=>`${s.name}: ${s.note||'recommended this'}`).join('\n');
+    anime.push({id,title:it.title,status:'plan',kind:it.kind==='read'?'read':'watch',aniId:it.aniId||0,img:it.img||'',eps:'',time:'',genre:it.genre||'',order:[],notes:noteLines});
+    save();
+  }
+  render();closeAll();
+  const item=anime.find(a=>a.id===id);
+  if(watchAfter&&item&&kindOf(item)==='watch'){watchAnime(id);}
+  else{toast(existing?'Already on your list':'Added to your list');openDetail(id);}
+}
+function openFriends(){renderFriends();openSheet('friendsSheet');pullRecs();}
+function renderFriends(){
+  const box=document.getElementById('friendsBody');if(!box)return;
+  const code=myFriendCode(),name=myFriendName(),fr=friendsList();
+  const flist=fr.length?fr.map(f=>`<div class="fr-row"><span class="fr-dot" style="background:${friendColor(f.code)}"></span><div class="fr-info"><div class="fr-name">${escH(f.name)}</div><div class="fr-code">${escH(f.code)}</div></div><button class="fr-x" onclick="removeFriend('${escH(f.code)}')" aria-label="Remove friend">${icon('x')}</button></div>`).join(''):'<p class="ai-desc">No friends yet — share your code, or add a friend code below.</p>';
+  box.innerHTML=`
+    <div class="dt-label">${icon('star')} Your name</div>
+    <input class="ai-prompt-in" id="frName" placeholder="What friends see" value="${escH(name)}" maxlength="40" oninput="setMyFriendName(this.value)">
+    <div class="dt-label" style="margin-top:16px">${icon('users')} Your friend code</div>
+    <p class="ai-desc">Share this so friends can add you and send you recommendations.</p>
+    <div class="pt-code"><div class="pt-code-val">${escH(code)}</div><button class="pt-code-cta" onclick="copyFriendCode()" aria-label="Copy code">${icon('copy')}</button></div>
+    <div class="dt-label" style="margin-top:18px">${icon('plus')} Add a friend</div>
+    <input class="ai-prompt-in" id="frAddCode" placeholder="Their friend code" autocapitalize="off" autocomplete="off" spellcheck="false">
+    <input class="ai-prompt-in" id="frAddName" placeholder="Name them (optional)" maxlength="40" style="margin-top:8px">
+    <button class="parse-btn" onclick="doAddFriend()">Add friend</button>
+    <div class="fr-err" id="frErr"></div>
+    <div class="dt-label" style="margin-top:20px">${icon('users')} Friends · ${fr.length}</div>
+    <div class="fr-list">${flist}</div>
+    <button class="dt-watch" style="margin-top:16px" onclick="startRecommend()"${fr.length?'':' disabled'}>${icon('send')} Recommend shows to friends</button>`;
+}
+function copyFriendCode(){const c=myFriendCode();try{navigator.clipboard.writeText(c);toast('Code copied');}catch{toast(c);}}
+function doAddFriend(){
+  const code=(document.getElementById('frAddCode')||{}).value||'';
+  const name=(document.getElementById('frAddName')||{}).value||'';
+  const err=addFriendByCode(code,name);
+  const e=document.getElementById('frErr');
+  if(err){if(e)e.textContent=err;return;}
+  renderFriends();toast('Friend added');
+}
+let recPickShows=new Set(),recToFriends=new Set(),recNotes={};
+function startRecommend(){if(!friendsList().length){toast('Add a friend first');return;}recPickShows=new Set();renderRecPick();openSheet('recPickSheet');}
+function toggleRecPick(id){if(recPickShows.has(id))recPickShows.delete(id);else recPickShows.add(id);renderRecPick();}
+function renderRecPick(){
+  const box=document.getElementById('recPickBody');if(!box)return;
+  const items=anime.filter(a=>a.title).slice().sort((a,b)=>(b.upd||0)-(a.upd||0));
+  const rows=items.map(a=>{const on=recPickShows.has(a.id);return `<button class="pt-pick${on?' on':''}" onclick="toggleRecPick('${a.id}')">
+    ${a.img?`<img src="${escH(a.img)}" alt="">`:`<div class="ph">${escH(((a.title||'?')[0]||'?').toUpperCase())}</div>`}
+    <div class="pt-pick-info"><div class="pt-pick-t">${escH(a.title)}</div><div class="pt-pick-s">${escH((a.genre||'').split(',')[0]||(kindOf(a)==='read'?'Manga':'Anime'))}</div></div>
+    <span class="pt-pick-check">${on?icon('check'):''}</span></button>`;}).join('');
+  box.innerHTML=`<p class="ai-desc">Pick the shows to recommend — as many as you like.</p>
+    <div class="pt-picks">${rows||'<p class="ai-desc">Your list is empty.</p>'}</div>
+    <button class="dt-watch rec-next" onclick="proceedRecommend()"${recPickShows.size?'':' disabled'}>${icon('chevron-right')} Next — choose friends (${recPickShows.size})</button>`;
+}
+function proceedRecommend(){if(!recPickShows.size){toast('Pick at least one show');return;}recToFriends=new Set();recNotes={};renderRecSend();openSheet('recSendSheet');}
+function toggleRecFriend(code){if(recToFriends.has(code))recToFriends.delete(code);else recToFriends.add(code);renderRecSend();}
+function setRecNote(code,v){recNotes[code]=v;}
+function renderRecSend(){
+  const box=document.getElementById('recSendBody');if(!box)return;
+  const fr=friendsList();
+  const rows=fr.map(f=>{const on=recToFriends.has(f.code),col=friendColor(f.code);return `<div class="rs-friend${on?' on':''}">
+    <button class="rs-pick" onclick="toggleRecFriend('${escH(f.code)}')"><span class="fr-dot" style="background:${col}"></span><span class="rs-name">${escH(f.name)}</span><span class="pt-pick-check">${on?icon('check'):''}</span></button>
+    ${on?`<input class="ai-prompt-in rs-note" placeholder="Optional note — e.g. 10/10 banger" maxlength="300" value="${escH(recNotes[f.code]||'')}" oninput="setRecNote('${escH(f.code)}',this.value)">`:''}
+  </div>`;}).join('');
+  box.innerHTML=`<p class="ai-desc">Send <b>${recPickShows.size}</b> show${recPickShows.size>1?'s':''} to which friends? Add a note for each if you like.</p>
+    <div class="rs-list">${rows}</div>
+    <button class="dt-watch" style="margin-top:14px" onclick="sendRecommend()"${recToFriends.size?'':' disabled'}>${icon('send')} Send recommendation${recToFriends.size>1?'s':''}</button>`;
+}
+async function sendRecommend(){
+  if(!recToFriends.size||!recPickShows.size)return;
+  const items=[...recPickShows].map(id=>anime.find(a=>a.id===id)).filter(Boolean).map(a=>({aniId:a.aniId||0,title:a.title,img:a.img||'',genre:a.genre||'',kind:kindOf(a)==='read'?'read':'watch'}));
+  if(!items.length){toast('Nothing to send');return;}
+  const from={code:myFriendCode(),name:myFriendName()||'A friend'};
+  let ok=0,fail=0;
+  for(const code of [...recToFriends]){
+    try{
+      const r=await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({op:'rec_send',to:code,from,items,note:String(recNotes[code]||'').trim()})});
+      const j=r.ok?await r.json():{};
+      if(j&&j.ok)ok++;else fail++;
+    }catch(e){fail++;}
+  }
+  closeAll();
+  toast(ok?`Sent to ${ok} friend${ok>1?'s':''}${fail?` (${fail} failed)`:''}`:'Send failed — try again');
+}
 // Open a URL outside the app — legal sites can't be framed. In the native shell we
 // hand it to iOS (opens Safari); on the web it opens a new tab.
 function openExternal(url){
@@ -5319,6 +5571,9 @@ try{document.getElementById('apiKeyIn').value=getKey();}catch{}
 // rejoin a live party after a reload — official app only; the public web build has no parties
 try{if(IS_NATIVE){const pc=localStorage.getItem('party_active');if(pc&&partyName())setTimeout(()=>partyJoin(pc),400);}}catch{}
 try{if(sessionStorage.getItem('justUpdated')){sessionStorage.removeItem('justUpdated');setTimeout(()=>toast('✨ Updated to the latest version'),700);}}catch{}
+// Friends recommendations (public web build): show cached instantly, then refresh.
+try{loadRecsCache();}catch(e){}
+if(!IS_NATIVE){setTimeout(pullRecs,1100);try{document.addEventListener('visibilitychange',()=>{if(!document.hidden)pullRecs();});}catch(e){}}
 setTimeout(fetchCovers,1200);
 setTimeout(syncOnOpen,300);
 // If notifications are on, re-sync the tracked show list with the worker on load (fire-and-forget).

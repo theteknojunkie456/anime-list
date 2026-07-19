@@ -84,6 +84,48 @@ export default {
       await env.LISTS.put(key, payload);
       return json({ ok: true, updatedAt: Date.now() }, 200, cors);
     }
+
+    // ── friend recommendations ──────────────────────────────────────────────
+    // A tiny per-user mailbox: friends send show recommendations to your friend
+    // code, you pull them and they surface as a "Your Friends Recommend" row.
+    // Keyed by the RECIPIENT's code (a long random bearer token shared with
+    // friends), stored in the same KV. Show metadata + a short note only — never
+    // the encrypted list. Cap so a mailbox can't grow without bound.
+    if (op === 'rec_send') {
+      const to = String(body.to || '');
+      if (!/^[A-Za-z0-9]{10,64}$/.test(to)) return json({ error: 'bad to' }, 400, cors);
+      const from = (body.from && typeof body.from === 'object') ? body.from : {};
+      const fromCode = String(from.code || '');
+      const fromName = String(from.name || 'A friend').slice(0, 40);
+      if (!/^[A-Za-z0-9]{10,64}$/.test(fromCode)) return json({ error: 'bad from' }, 400, cors);
+      const items = (Array.isArray(body.items) ? body.items : []).slice(0, 40).map(it => ({
+        aniId: Number(it && it.aniId) || 0,
+        title: String((it && it.title) || '').slice(0, 200),
+        img: String((it && it.img) || '').slice(0, 400),
+        genre: String((it && it.genre) || '').slice(0, 200),
+        kind: (it && it.kind) === 'read' ? 'read' : 'watch',
+      })).filter(it => it.aniId || it.title);
+      if (!items.length) return json({ error: 'no items' }, 400, cors);
+      const note = String(body.note || '').slice(0, 500);
+      const key = 'rec:' + to;
+      let list = [];
+      try { const s = await env.LISTS.get(key); if (s) list = JSON.parse(s); } catch {}
+      if (!Array.isArray(list)) list = [];
+      list.push({ id: fromCode.slice(0, 8) + Date.now().toString(36), from: { code: fromCode, name: fromName }, items, note, at: Date.now() });
+      if (list.length > 200) list = list.slice(list.length - 200);
+      while (JSON.stringify(list).length > 2_000_000 && list.length > 1) list = list.slice(Math.ceil(list.length / 2));
+      await env.LISTS.put(key, JSON.stringify(list));
+      return json({ ok: true }, 200, cors);
+    }
+    if (op === 'rec_pull') {
+      const code = String(body.code || '');
+      if (!/^[A-Za-z0-9]{10,64}$/.test(code)) return json({ error: 'bad code' }, 400, cors);
+      let list = [];
+      try { const s = await env.LISTS.get('rec:' + code); if (s) list = JSON.parse(s); } catch {}
+      if (!Array.isArray(list)) list = [];
+      return json({ recs: list }, 200, cors);
+    }
+
     return json({ error: 'bad op' }, 400, cors);
   },
 };

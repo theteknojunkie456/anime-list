@@ -1569,6 +1569,7 @@ body.recsel .pcard{position:relative;}
     <button class="sv-back" onclick="closePlayer()" aria-label="Back"><i data-ic="chevron-left"></i></button>
     <div class="pv-title" id="pvTitle"></div>
     <button class="pv-ext" id="pvExt" aria-label="Find this title on the site" title="Wrong page? Search this title"><i data-ic="search"></i></button>
+    <button class="pv-ext" id="pvOpen" onclick="pvOpenExternal()" aria-label="Open in your browser" title="Open in your browser"><i data-ic="external"></i></button>
   </div>
   <!-- sandbox WITHOUT allow-popups / allow-top-navigation: the player still runs
        (verified HLS plays), but the frame can't spawn pop-up tabs or redirect the
@@ -1726,7 +1727,8 @@ layers:'<path d="M12 2 2 7l10 5 10-5z"/><path d="m2 17 10 5 10-5"/><path d="m2 1
   send:'<path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4z"/>',
   lock:'<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
   key:'<path d="M12.6 11.4a5.5 5.5 0 1 0-7.8 7.8 5.5 5.5 0 0 0 7.8-7.8zM12.6 11.4 22 2"/><path d="m17 7 3 3"/>',
-  settings:'<line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>'
+  settings:'<line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>',
+  external:'<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/>'
 };
 function icon(name,cls){const p=ICONS[name];if(!p)return'';return `<svg class="ico${cls?' '+cls:''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`;}
 function hydrateIcons(root){(root||document).querySelectorAll('[data-ic]').forEach(el=>{const s=icon(el.getAttribute('data-ic'));if(s)el.outerHTML=s;});}
@@ -4198,25 +4200,32 @@ function streamURL(a){
 }
 // The site's search for this exact title — the recovery when a deep-link 404s.
 function findUrl(a){
-  if(usingDefaultSource()) return 'about:blank';   // no built-in source to search
   const src=streamSource();
+  if(!src) return 'about:blank';   // no source to search
   if(/\{title\}|\{slug\}/.test(src)) return src.replace(/\{title\}/g,encodeURIComponent(a.title)).replace(/\{slug\}/g,streamSlug(a.title)).replace(/\{ep\}/g,'1');
-  return src;   // plain custom URL — just reload the site so its own search is at hand
+  try{return new URL(src.replace(/\{[^}]+\}/g,'x')).origin;}catch{return src;}   // {ep}-only/plain → the site's homepage, so its own search is at hand
+}
+// Open whatever's playing in the browser — the escape hatch when a source won't frame.
+function pvOpenExternal(){
+  const a=anime.find(x=>x.id===pvReturnId); if(!a){toast('Nothing to open');return;}
+  const u=(streamURL(a).url)||findUrl(a);
+  if(u&&u!=='about:blank')openExternal(u);
 }
 async function watchAnime(id){
   const a=anime.find(x=>x.id===id); if(!a) return;
   if(kindOf(a)!=='watch'||!a.aniId){toast('Watch is for anime only');return;}
-  // Legal sites can't be embedded (DRM / X-Frame-Options), so open the official site's
-  // search for this title in the browser. The in-app frame player is kept only for a
-  // custom source that carries an {ep} token (someone's own embeddable player).
-  if(!/\{ep\}/.test(streamSource())){
-    // Official app with services set → "Open in [Service]" chooser (their own apps
-    // + free-legal fallback). Public web / app-without-services → free source direct.
-    if(IS_NATIVE && !streamSource() && myServices().length){ watchTarget=a; openSheet('watchSheet'); return; }
+  // The default + the built-in legal presets (Tubi, Netflix…) can't be framed
+  // (DRM / X-Frame-Options), so they open in the browser. But if you've set YOUR OWN
+  // source in Settings, we play it in the immersive in-app player.
+  const src=streamSource();
+  const presetOrDefault = !src || WATCH_PRESETS.some(p=>p.url===src);
+  if(presetOrDefault){
+    if(IS_NATIVE && !src && myServices().length){ watchTarget=a; openSheet('watchSheet'); return; }
     openExternal(launchURL(a));
     toast(`Opening ${sourceName()} for “${a.title}”`);
     return;
   }
+  // your own source → immersive in-app player
   pvReturnId=id;
   const ep=watchEpisode(a);
   pvWatchEp=ep;   // the episode we opened, so we can save progress on the way out
@@ -4229,8 +4238,8 @@ async function watchAnime(id){
   ext.onclick=()=>{const f=document.getElementById('pvFrame');f.src=findUrl(a);pvCanNav=false;renderPvNav(null);};
   const f=document.getElementById('pvFrame');
   document.getElementById('playerView').classList.add('on');
-  // binge controls light up only when we can address a specific episode
-  pvCanNav=!!ep&&(usingDefaultSource()||/\{ep\}/.test(streamSource()||''));
+  // binge controls light up only when the source can address a specific episode
+  pvCanNav=!!ep&&/\{ep\}/.test(src);
   renderPvNav(a);
   // Only custom {ep} sources reach here (default Watch opened a legal site externally
   // above), so this is always the user's own embeddable player URL.
@@ -4436,7 +4445,9 @@ async function pullFriendReqs(){
     const msgs=(await r.json()).reqs; if(!Array.isArray(msgs))return;
     const handled=frHandled(); let friends=friendsList(); let changed=false; const incoming=[];
     for(const m of msgs){
-      if(!m||!m.from||!m.from.code||handled.includes(m.id))continue;
+      if(!m||!m.from||!m.from.code)continue;
+      refreshFriendName(m.from.code,m.from.name);   // keep friend names current
+      if(handled.includes(m.id))continue;
       if(m.type==='accept'){
         if(!friends.some(f=>f.code===m.from.code)){friends.push({code:m.from.code,name:m.from.name||'Friend'});changed=true;}
         saveFriendsOut(friendsOut().filter(f=>f.code!==m.from.code));
@@ -4461,9 +4472,18 @@ async function acceptReq(id){
   toast("Friend added — you're connected");
 }
 function denyReq(id){addFrHandled(id);friendReqs=friendReqs.filter(r=>r.id!==id);renderFriends();}
+// Keep a stored friend's name current: they carry their latest name on everything
+// they send, so if it changed, update our copy (fixes the send list showing an old name).
+function refreshFriendName(code,name){
+  if(!code||!name)return;
+  const fr=friendsList(),f=fr.find(x=>x.code===code);
+  if(f&&f.name!==name){f.name=name;saveFriends(fr);if(document.getElementById('friendsSheet').classList.contains('on'))renderFriends();}
+}
 // Merge a pushed recommendation instantly (no KV wait), with a toast so they know.
 function mergeRec(env){
-  if(!env||!env.id||recsIn.some(e=>e.id===env.id))return;
+  if(!env)return;
+  refreshFriendName(env.from&&env.from.code,env.from&&env.from.name);
+  if(!env.id||recsIn.some(e=>e.id===env.id))return;
   recsIn.push(env);
   try{localStorage.setItem('recs_in',JSON.stringify(recsIn));}catch{}
   const ls=document.getElementById('lockScreen'), unlocked=!ls||getComputedStyle(ls).display==='none';
@@ -4473,7 +4493,9 @@ function mergeRec(env){
 }
 // Merge a pushed friend request / accept instantly.
 function mergeFriendMsg(m){
-  if(!m||!m.from||!m.from.code||frHandled().includes(m.id))return;
+  if(!m||!m.from||!m.from.code)return;
+  refreshFriendName(m.from.code,m.from.name);
+  if(frHandled().includes(m.id))return;
   let friends=friendsList();
   if(m.type==='accept'){
     if(!friends.some(f=>f.code===m.from.code)){friends.push({code:m.from.code,name:m.from.name||'Friend'});saveFriends(friends);}
@@ -4519,6 +4541,7 @@ async function pullRecs(){
     if(!r.ok)return;
     const j=await r.json();
     recsIn=Array.isArray(j.recs)?j.recs:[];
+    recsIn.forEach(e=>refreshFriendName(e.from&&e.from.code,e.from&&e.from.name));   // keep friend names current
     try{localStorage.setItem('recs_in',JSON.stringify(recsIn));}catch{}
     const ls=document.getElementById('lockScreen');
     if(!ls||getComputedStyle(ls).display==='none'){try{render();}catch(e){}}

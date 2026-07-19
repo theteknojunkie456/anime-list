@@ -5816,6 +5816,37 @@ try{
   }
 }catch(e){}
 
+// ─── AUTO-UPDATE ────────────────────────────────────────────────────────────
+// The service worker reloads only when IT changes, but most updates are HTML-only.
+// So we also watch the deployed file's version tag (ETag): when it changes a new
+// build is live → reload to pick it up. Never yanks you out of a video or mid-type;
+// it waits for a calm moment (next refocus / when you're idle).
+let _bootVer=null,_updateReady=false;
+async function _liveVer(){
+  try{const r=await fetch('./?_ck='+Date.now(),{method:'HEAD',cache:'no-store'});return r.headers.get('etag')||r.headers.get('last-modified')||'';}catch(e){return '';}
+}
+function _updBusy(){
+  const pv=document.getElementById('playerView'); if(pv&&pv.classList.contains('on'))return true;   // watching
+  const el=document.activeElement; if(el&&/^(INPUT|TEXTAREA)$/.test(el.tagName)&&(el.value||'').length)return true;   // mid-typing
+  return false;
+}
+function _applyUpdate(){
+  if(!_updateReady||_updBusy())return;
+  try{sessionStorage.setItem('justUpdated','1');}catch{}
+  location.reload();
+}
+async function checkUpdate(){
+  const v=await _liveVer(); if(!v)return;
+  if(!_bootVer){_bootVer=v;return;}                 // first run → remember the running version
+  if(v!==_bootVer){_updateReady=true;_applyUpdate();}
+}
+try{
+  setTimeout(checkUpdate,4000);                                                         // learn current version after boot
+  setInterval(checkUpdate,120000);                                                      // poll every 2 min
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkUpdate();});// and on refocus
+  window.addEventListener('focus',()=>{if(_updateReady)_applyUpdate();});
+}catch(e){}
+
 // ─── KEYBOARD ───────────────────────────────────────────────────────────────
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeAll();closeConfirm();}});
 

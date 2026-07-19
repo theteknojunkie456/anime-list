@@ -1,4 +1,4 @@
-const CACHE = 'animelist-v4';
+const CACHE = 'animelist-v5';
 const ASSETS = ['./index.html', './friends.html', './manifest.json'];
 
 self.addEventListener('install', e => {
@@ -48,8 +48,11 @@ self.addEventListener('fetch', e => {
   // Network-first so updates show up without clearing Safari data; cache is the offline fallback
   e.respondWith(
     fetch(e.request).then(res => {
-      const copy = res.clone();
-      caches.open(CACHE).then(c => c.put(e.request, copy));
+      // Only GET, OK responses are cacheable (HEAD version-checks would throw).
+      if (e.request.method === 'GET' && res && res.ok) {
+        const copy = res.clone();
+        caches.open(CACHE).then(c => c.put(e.request, copy)).catch(() => {});
+      }
       return res;
     }).catch(() =>
       caches.match(e.request).then(r => r || caches.match('./index.html'))

@@ -726,6 +726,10 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 .pt-share .ico{width:17px;height:17px;}
 .pt-hint{font-size:11.5px;color:var(--t3);text-align:center;margin:-2px 0 12px;}
 .party-pill{position:fixed;right:16px;bottom:calc(var(--safe-b) + 96px);z-index:90;display:none;align-items:center;gap:8px;background:var(--a);color:var(--aFg,#fff);border:0;border-radius:999px;padding:11px 16px;font-family:var(--fd);font-size:13.5px;font-weight:800;box-shadow:0 8px 24px -6px var(--glow);}
+/* Public web build (no native app) = no parties. Hide every entry point; the
+   floating pill is force-hidden even when updatePartyPill() tries to show it. */
+body.no-party .party-only{display:none!important;}
+body.no-party #partyPill{display:none!important;}
 .party-pill.on{display:flex;}
 .party-pill:active{transform:scale(.95);}
 .pp-dot{width:8px;height:8px;border-radius:50%;background:#fff;animation:ppPulse 1.6s ease-in-out infinite;}
@@ -1047,7 +1051,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
   <div class="hdr">
     <div class="hdr-title">WatchList</div>
     <div class="hdr-actions">
-      <button class="hbtn" onclick="openSheet('partySheet')" title="Watch party" aria-label="Watch party"><i data-ic="users"></i></button>
+      <button class="hbtn party-only" onclick="openSheet('partySheet')" title="Watch party" aria-label="Watch party"><i data-ic="users"></i></button>
       <button class="hbtn" onclick="openForYou()" title="For You — tailored recommendations" aria-label="For You recommendations"><i data-ic="compass"></i></button>
       <button class="hbtn" onclick="openSchedule()" title="Weekly airing schedule" aria-label="Weekly airing schedule"><i data-ic="calendar"></i></button>
       <button class="hbtn" id="notifyBell" onclick="openNotifySheet()" title="Episode notifications" aria-label="Notifications"><i data-ic="bell-off"></i></button>
@@ -1313,6 +1317,16 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
   <div id="partyExtBody"></div>
 </div>
 
+<!-- WATCH — "Open in [service]" chooser (official app only) -->
+<div class="sheet" id="watchSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <div class="sheet-title"><i data-ic="play"></i> Watch</div>
+    <button class="sheet-cancel" onclick="closeAll()">Close</button>
+  </div>
+  <div id="watchBody"></div>
+</div>
+
 <!-- 3·2·1 START CUE (full-screen) -->
 <div class="party-count" id="partyCount"><div class="pc-num" id="pcNum">3</div><div class="pc-lbl" id="pcLbl">Get ready…</div></div>
 
@@ -1321,7 +1335,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
   <div class="pv-top">
     <button class="sv-back" onclick="leaveShareView()" aria-label="Back"><i data-ic="chevron-left"></i></button>
     <div class="pv-title" id="shareTitle">Watch party</div>
-    <button class="pv-ext" onclick="openSheet('partySheet')" aria-label="Party chat"><i data-ic="message"></i></button>
+    <button class="pv-ext party-only" onclick="openSheet('partySheet')" aria-label="Party chat"><i data-ic="message"></i></button>
   </div>
   <div class="sh-stage">
     <video id="shareVideo" class="sh-video" autoplay playsinline onclick="this.classList.toggle('fill')"></video>
@@ -1469,7 +1483,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
   <div class="pv-host" id="pvHostBar" style="display:none">
     <button class="pv-host-main" id="pvHostPause">⏸ Pause everyone</button>
     <button class="pv-host-next" onclick="partyNext()">⏭ Next</button>
-    <button class="pv-host-chat" onclick="openSheet('partySheet')" aria-label="Party chat"><i data-ic="message"></i></button>
+    <button class="pv-host-chat party-only" onclick="openSheet('partySheet')" aria-label="Party chat"><i data-ic="message"></i></button>
   </div>
 </div>
 
@@ -2978,6 +2992,9 @@ function toggleFav(){
 
 // ─── SHEETS ────────────────────────────────────────────────────────────────
 function openSheet(id){
+  // Watch parties live only in the official app. On the public web build there's
+  // no way in — the entry buttons are hidden (body.no-party) and this is the backstop.
+  if((id==='partySheet'||id==='partyExtSheet')&&!IS_NATIVE)return;
   closeAll();
   document.getElementById('overlay').classList.add('on');
   document.getElementById(id).classList.add('on');
@@ -2992,6 +3009,7 @@ function openSheet(id){
   if(id==='anilistSheet')renderAniList();
   if(id==='partySheet')renderParty();
   if(id==='partyExtSheet')renderPartyExt();
+  if(id==='watchSheet')renderWatch();
   try{updatePartyPill();}catch{}
 }
 function closeAll(){
@@ -3539,6 +3557,9 @@ let partyCode='',partyIsHost=false,partyRoom=null,partyTimer=0,partySeenPlay=0,p
 // When true, "Share your screen" fires the app's native iPhone broadcast instead
 // of the desktop-only getDisplayMedia, so a phone can host — using this party's code.
 const IS_NATIVE=/WatchListNative/i.test(navigator.userAgent||'');
+// Public web build = pure tracker: hide every party entry point. Only the official
+// app (WatchListNative UA) shows parties. CSS keys off body.no-party.
+if(!IS_NATIVE){try{document.body.classList.add('no-party');}catch(e){}}
 function nativeBroadcast(){try{window.webkit.messageHandlers.wl.postMessage({type:'broadcast',code:partyCode||''});}catch(e){toast('Broadcasting needs the WatchList app');}}
 function nativeNotifyCode(){if(!IS_NATIVE)return;try{window.webkit.messageHandlers.wl.postMessage({type:'code',code:partyCode||''});}catch(e){}}
 // Inside the app there's no web push — so hand the native shell every upcoming
@@ -4138,6 +4159,9 @@ async function watchAnime(id){
   // search for this title in the browser. The in-app frame player is kept only for a
   // custom source that carries an {ep} token (someone's own embeddable player).
   if(!/\{ep\}/.test(streamSource())){
+    // Official app with services set → "Open in [Service]" chooser (their own apps
+    // + free-legal fallback). Public web / app-without-services → free source direct.
+    if(IS_NATIVE && !streamSource() && myServices().length){ watchTarget=a; openSheet('watchSheet'); return; }
     openExternal(launchURL(a));
     toast(`Opening ${sourceName()} for “${a.title}”`);
     return;
@@ -4291,6 +4315,42 @@ const WATCH_PRESETS=[
   {name:'Muse Asia',     url:'https://www.youtube.com/@MuseAsia/search?query={title}'},
 ];
 const LEGAL_DEFAULT=WATCH_PRESETS[0].url;   // Tubi — 100% free, no account, no paid tier
+// ── Official-app only: "Open in [Service]" ──────────────────────────────────
+// The public web build uses ONLY the free-legal sources above. The official app
+// adds this: the user ticks the paid services they personally subscribe to, and
+// Watch hands off — via the native openurl bridge — into that service's own iPhone
+// app (universal link), where they're already signed in. We never see a password
+// and never host video: no streaming service lets a third party play its content,
+// so the only legal move is to open THEIR app. No piracy, ever, on either build.
+const PAID_SERVICES=[
+  {id:'crunchyroll',name:'Crunchyroll', url:'https://www.crunchyroll.com/search?q={title}'},
+  {id:'netflix',    name:'Netflix',     url:'https://www.netflix.com/search?q={title}'},
+  {id:'hidive',     name:'HIDIVE',      url:'https://www.hidive.com/search?q={title}'},
+  {id:'hulu',       name:'Hulu',        url:'https://www.hulu.com/search?q={title}'},
+  {id:'disney',     name:'Disney+',     url:'https://www.disneyplus.com/search?q={title}'},
+  {id:'max',        name:'Max',         url:'https://play.max.com/search?q={title}'},
+  {id:'prime',      name:'Prime Video', url:'https://www.primevideo.com/search/ref=atv_nb_sr?phrase={title}'},
+  {id:'appletv',    name:'Apple TV',    url:'https://tv.apple.com/search?term={title}'},
+];
+function escH(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+function myServices(){try{return JSON.parse(localStorage.getItem('my_services')||'[]');}catch{return[];}}
+function toggleService(id){let s=myServices();s=s.includes(id)?s.filter(x=>x!==id):s.concat(id);try{localStorage.setItem('my_services',JSON.stringify(s));}catch{}renderSource();}
+function fillURL(url,a){return url.replace(/\{title\}/g,encodeURIComponent(a.title)).replace(/\{slug\}/g,streamSlug(a.title)).replace(/\{ep\}/g,String(watchEpisode(a)||1));}
+// The "Open in …" chooser: the user's subscribed services first, free-legal after
+// so a title is never a dead end. Only reachable in the app (see watchAnime).
+let watchTarget=null, watchOpts=[];
+function renderWatch(){
+  const a=watchTarget, box=document.getElementById('watchBody'); if(!a||!box)return;
+  const subs=myServices().map(id=>PAID_SERVICES.find(s=>s.id===id)).filter(Boolean).map(s=>({name:s.name,url:s.url,tag:'Your account'}));
+  const free=WATCH_PRESETS.map(p=>({name:p.name,url:p.url,tag:'Free'}));
+  watchOpts=subs.concat(free);
+  const row=(o,i)=>`<button class="src-opt" onclick="watchOpen(${i})"><div class="src-name">Open in ${escH(o.name)}</div><div class="src-sub">${o.tag}</div></button>`;
+  const sec=(label,items,off)=>items.length?`<div class="dt-label" style="margin-top:14px">${label}</div>`+items.map((o,i)=>row(o,off+i)).join(''):'';
+  box.innerHTML=`<p class="ai-desc">Where do you want to watch <b>${escH(a.title)}</b>? Opens the app on your phone — you're already signed in.</p>`
+    +sec('Your services',subs,0)
+    +sec('Free — no account',free,subs.length);
+}
+function watchOpen(i){const o=watchOpts[i],a=watchTarget;if(!o||!a)return;openExternal(fillURL(o.url,a));closeAll();toast(`Opening ${o.name}…`);}
 // Open a URL outside the app — legal sites can't be framed. In the native shell we
 // hand it to iOS (opens Safari); on the web it opens a new tab.
 function openExternal(url){
@@ -4327,6 +4387,12 @@ function renderSource(){
     <input class="ai-prompt-in" id="srcCustom" placeholder="your own site — or a full URL" value="${custom&&!WATCH_PRESETS.some(p=>p.url===custom)?custom.replace(/"/g,'&quot;'):''}" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url" style="margin-top:10px">
     <button class="parse-btn" onclick="saveSource()">Use this site</button>
     <p class="ai-desc" style="margin-top:12px;font-size:11.5px">Optional tokens: <code>{title}</code>, <code>{slug}</code>, <code>{ep}</code> — e.g. <code>https://site.com/watch/{slug}/ep-{ep}</code>. With none, it just opens the site.</p>
+    ${IS_NATIVE?`
+    <div class="dt-label" style="margin-top:22px">${icon('film')} Your streaming accounts</div>
+    <p class="ai-desc">Tick the services you subscribe to. On a show, <b>Watch</b> then offers <b>“Open in …”</b> for each — opening that app on your phone where you're already signed in. We never see your password, and nothing is ever pirated.</p>
+    <div class="src-picks">${PAID_SERVICES.map(s=>`<button class="src-chip${myServices().includes(s.id)?' on':''}" onclick="toggleService('${s.id}')">${s.name}</button>`).join('')}</div>
+    <p class="ai-desc" style="margin-top:10px;font-size:11.5px">Watch lists your services first, then the free options — so a title is never a dead end.</p>
+    `:''}
 
     <div class="dt-label" style="margin-top:22px">${icon('book')} Reading source</div>
     <p class="ai-desc">Where <b>Read now</b> opens a manga / manhwa / webtoon.</p>
@@ -5279,7 +5345,8 @@ try{document.getElementById('pageEl').addEventListener('scroll',onPageScroll,{pa
 try{document.getElementById('detailSheet').addEventListener('scroll',onDetailScroll,{passive:true});}catch{}
 try{renderNotifyBell();}catch{}
 try{document.getElementById('apiKeyIn').value=getKey();}catch{}
-try{const pc=localStorage.getItem('party_active');if(pc&&partyName())setTimeout(()=>partyJoin(pc),400);}catch{}   // rejoin a live party after a reload
+// rejoin a live party after a reload — official app only; the public web build has no parties
+try{if(IS_NATIVE){const pc=localStorage.getItem('party_active');if(pc&&partyName())setTimeout(()=>partyJoin(pc),400);}}catch{}
 try{if(sessionStorage.getItem('justUpdated')){sessionStorage.removeItem('justUpdated');setTimeout(()=>toast('✨ Updated to the latest version'),700);}}catch{}
 setTimeout(fetchCovers,1200);
 setTimeout(syncOnOpen,300);

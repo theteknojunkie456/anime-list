@@ -92,10 +92,10 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 /* Background brightness veil — lifts the dark backdrop toward light; the top is
    tinted with the ambient accent so the "glow" brightens right along with it. The
    amount (--bgb, 0–0.62) comes from the slider under the theme picker. */
-#brightVeil{position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:var(--bgb,0);transition:opacity .35s ease;
+#brightVeil{position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:0;transition:opacity .35s ease;
   background:radial-gradient(95% 46% at 50% 6%,color-mix(in srgb,var(--amb) 60%,#f2f2f8) 0%,transparent 62%),linear-gradient(180deg,#dcdce6 0%,#cfcfd8 55%,#c6c6d0 100%);}
-/* keep background-level text legible as the backdrop brightens */
-.hdr-title,.row-title,.row-count,.row-div,.rz-head{text-shadow:0 1px 3px rgba(0,0,0,calc(var(--bgb,0)*0.85));}
+/* keep background-level text legible once the backdrop is lifted */
+body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright .row-div,body.bright .rz-head{text-shadow:0 1px 4px rgba(0,0,0,0.6);}
 /* liquid-glass brightness slider */
 .bright-slider{-webkit-appearance:none;appearance:none;width:100%;height:36px;border-radius:18px;outline:none;cursor:pointer;
   background:linear-gradient(90deg,var(--bg4) 0%,color-mix(in srgb,var(--a) 45%,#fff) 100%);
@@ -2419,7 +2419,12 @@ function loadTheme(){try{const s=store();curTheme=(s&&s.getItem('animetheme'))||
 // glow brightens with it (see #brightVeil). Persisted per-user.
 function bgBright(){try{const s=store();return parseInt((s&&s.getItem('bg_bright'))||'0',10)||0;}catch{return 0;}}
 function setBgBright(v){v=Math.max(0,Math.min(100,parseInt(v,10)||0));try{const s=store();if(s)s.setItem('bg_bright',String(v));}catch{}applyBright();}
-function applyBright(){try{document.documentElement.style.setProperty('--bgb',(bgBright()/100*0.62).toFixed(3));}catch{}}
+function applyBright(){
+  const v=bgBright()/100*0.62;   // 0 → 0.62 max
+  // set opacity directly (var() inside opacity/calc-alpha doesn't resolve reliably)
+  try{const veil=document.getElementById('brightVeil');if(veil)veil.style.opacity=v.toFixed(3);}catch{}
+  try{document.body.classList.toggle('bright',bgBright()>=22);}catch{}   // deepen text shadows when lifted
+}
 function applyTheme(id,persist=true){
   const t=allThemes().find(x=>x.id===id)||THEMES[0];
   curTheme=t.id;

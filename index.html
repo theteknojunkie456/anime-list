@@ -421,6 +421,27 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
   opacity:0;pointer-events:none;transition:opacity .22s;
 }
 .overlay.on{opacity:1;pointer-events:auto;}
+/* new-user onboarding: full-screen swipeable cards (setup sheets open on top) */
+.onb{position:fixed;inset:0;z-index:75;background:var(--bg);display:none;flex-direction:column;}
+.onb.on{display:flex;}
+.onb-skip{position:absolute;top:calc(var(--safe-t,0px) + 14px);right:16px;z-index:2;background:none;border:0;color:var(--t2);font-size:14px;font-weight:600;padding:8px 10px;}
+.onb-track{flex:1;display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;}
+.onb-track::-webkit-scrollbar{display:none;}
+.onb-card{flex:0 0 100%;width:100%;scroll-snap-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:40px 32px;}
+.onb-ico{width:86px;height:86px;border-radius:26px;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--oc) 18%,var(--bg2));border:1px solid color-mix(in srgb,var(--oc) 34%,transparent);color:var(--oc);margin-bottom:24px;box-shadow:0 18px 44px -12px color-mix(in srgb,var(--oc) 60%,transparent);}
+.onb-ico .ico{width:38px;height:38px;}
+.onb-imp{display:inline-block;font-size:10.5px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--oc);background:color-mix(in srgb,var(--oc) 15%,transparent);border:1px solid color-mix(in srgb,var(--oc) 40%,transparent);padding:4px 11px;border-radius:99px;margin-bottom:12px;}
+.onb-title{font-family:var(--fd);font-size:26px;font-weight:800;letter-spacing:-.5px;color:var(--t1);margin-bottom:13px;line-height:1.15;}
+.onb-body{font-size:15px;line-height:1.62;color:var(--t2);max-width:340px;margin-bottom:24px;}
+.onb-body b{color:var(--t1);font-weight:700;}
+.onb-cta{background:var(--oc);color:#0c0c10;border:0;border-radius:15px;padding:15px 26px;font-family:var(--fd);font-size:15.5px;font-weight:800;box-shadow:0 12px 30px -8px color-mix(in srgb,var(--oc) 70%,transparent);}
+.onb-cta:active{transform:scale(.97);}
+.onb-note{margin-top:16px;font-size:12px;color:var(--t3);max-width:300px;line-height:1.5;}
+.onb-foot{display:flex;align-items:center;justify-content:space-between;padding:14px 24px calc(var(--safe-b,0px) + 20px);gap:16px;}
+.onb-dots{display:flex;gap:7px;align-items:center;}
+.onb-dot{width:7px;height:7px;border-radius:50%;background:var(--bg5);transition:all .22s;}
+.onb-dot.on{background:var(--a2);width:22px;border-radius:99px;}
+.onb-next{background:var(--a);color:var(--aFg,#fff);border:0;border-radius:99px;padding:12px 28px;font-family:var(--fd);font-size:14.5px;font-weight:800;box-shadow:0 8px 22px -6px var(--glow);white-space:nowrap;}
 .sheet{
   position:fixed;left:0;right:0;bottom:0;z-index:80;max-height:90dvh;overflow-y:auto;
   background:var(--bg2);border-radius:26px 26px 0 0;border-top:1px solid var(--b3);
@@ -1183,6 +1204,16 @@ body.recsel .pcard{position:relative;}
 
 <!-- OVERLAY -->
 <div class="overlay" id="overlay" onclick="closeAll()"></div>
+
+<!-- NEW-USER ONBOARDING — swipeable welcome + setup -->
+<div class="onb" id="onb" aria-hidden="true">
+  <button class="onb-skip" onclick="finishOnb()">Skip</button>
+  <div class="onb-track" id="onbTrack" onscroll="onbScroll()"></div>
+  <div class="onb-foot">
+    <div class="onb-dots" id="onbDots"></div>
+    <button class="onb-next" id="onbNextBtn" onclick="onbNext()">Next</button>
+  </div>
+</div>
 
 <!-- DETAIL SHEET -->
 <div class="sheet" id="detailSheet">
@@ -4209,14 +4240,52 @@ function maybeShowTutorial(){
   if(tutSeen()||appLocked)return;
   let fresh=false;try{fresh=!store()||!store().getItem(LSKEY);}catch{}
   if(!fresh){markTutSeen();return;}
-  const v=document.getElementById('tutView');
-  if(!v){setTimeout(openTutorial,300);return;}
-  v.scrollTop=0;
-  v.style.transition='none';        // already there on frame one, rather than arriving
-  v.classList.add('on');
-  requestAnimationFrame(()=>{v.style.transition='';});   // restore for the exit
-  markTutSeen();
+  showOnb();   // brand-new install → the swipeable welcome + setup flow
 }
+// ─── ONBOARDING (swipeable welcome + setup) ─────────────────────────────────
+const ONB=[
+  {ic:'sparkles',oc:'#c084fc',title:'Welcome to WatchList',body:'Track every anime & manga, see the total time to binge a whole series, watch on free legal sources, and swap recommendations with friends — all in one place.'},
+  {ic:'cloud',oc:'#4dabf7',imp:'Recommended',title:'Never lose your list',body:'Your list lives on this device. Turn on <b>Cloud backup</b> for a key that restores it anywhere. <b>Save that key somewhere safe</b> — your Notes app is perfect. It\'s the only way back.',cta:{label:'Set up backup',sheet:'backupSheet'}},
+  {ic:'lock',oc:'#51cf66',title:'Lock your list',body:'Add a <b>password</b> and everything gets encrypted. You\'ll get a one-time <b>recovery key</b> — the only way in if you forget the password. Save both.',cta:{label:'Set a password',sheet:'securitySheet'}},
+  {ic:'key',oc:'#ffd43b',title:'Unlock with a glance',body:'Once a password is set, open the app with <b>Face ID</b> instead of typing it every time.',cta:{label:'Set up Face ID',sheet:'securitySheet'}},
+  {ic:'bell',oc:'#ff6b6b',title:'Episode alerts',body:'Get a heads-up the moment a new episode of something you\'re watching airs. Only the shows you follow — no spam.',cta:{label:'Turn on alerts',sheet:'notifySheet'}},
+  {ic:'compass',oc:'#20c997',title:'You\'re all set',body:'Tap <b>+</b> to add anything, or <b>Import</b> your whole list from Notes in one paste. The icons up top are Friends, schedule, AI and themes. Anything you skipped is waiting in <b>Settings</b>.',primary:'Start watching'},
+];
+let onbIdx=0;
+function renderOnb(){
+  const track=document.getElementById('onbTrack'); if(!track)return;
+  track.innerHTML=ONB.map(c=>`<div class="onb-card" style="--oc:${c.oc}">
+    <div class="onb-ico">${icon(c.ic)}</div>
+    ${c.imp?`<span class="onb-imp">${c.imp}</span>`:''}
+    <div class="onb-title">${c.title}</div>
+    <div class="onb-body">${c.body}</div>
+    ${c.cta?`<button class="onb-cta" onclick="onbCTA('${c.cta.sheet}')">${c.cta.label}</button><div class="onb-note">You can change this anytime in Settings — nothing here is permanent.</div>`:''}
+  </div>`).join('');
+  onbIdx=0;updOnbDots();
+}
+function updOnbDots(){
+  const dots=document.getElementById('onbDots'); if(dots)dots.innerHTML=ONB.map((_,i)=>`<span class="onb-dot${i===onbIdx?' on':''}"></span>`).join('');
+  const nb=document.getElementById('onbNextBtn'); if(nb)nb.textContent=onbIdx>=ONB.length-1?(ONB[ONB.length-1].primary||'Done'):'Next';
+  const sk=document.querySelector('.onb-skip'); if(sk)sk.style.display=onbIdx>=ONB.length-1?'none':'';
+}
+function onbScroll(){
+  const track=document.getElementById('onbTrack'); if(!track||!track.clientWidth)return;
+  const i=Math.round(track.scrollLeft/track.clientWidth);
+  if(i!==onbIdx){onbIdx=i;updOnbDots();}
+}
+function onbNext(){
+  const track=document.getElementById('onbTrack'); if(!track)return;
+  if(onbIdx>=ONB.length-1){finishOnb();return;}
+  onbIdx++; track.scrollTo({left:onbIdx*track.clientWidth,behavior:'smooth'}); updOnbDots();
+}
+function onbCTA(sheet){ if(sheet==='notifySheet')openNotifySheet(); else openSheet(sheet); }   // opens on top of onboarding
+function showOnb(){
+  renderOnb();
+  const v=document.getElementById('onb'); if(v)v.classList.add('on');
+  markTutSeen();   // don't also pop the old text tutorial
+  try{localStorage.setItem('onboarded_'+LSKEY,'1');}catch{}
+}
+function finishOnb(){ const v=document.getElementById('onb'); if(v)v.classList.remove('on'); markTutSeen(); }
 
 // ─── SETTINGS HUB ───────────────────────────────────────────────────────────
 // Each row states its own status, so "backup is off" is visible at a glance

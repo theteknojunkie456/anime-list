@@ -1308,14 +1308,6 @@ body.no-party #partyPill{display:none!important;}
   <div id="partyBody"></div>
 </div>
 
-<div class="sheet" id="partyExtSheet">
-  <div class="sheet-handle"></div>
-  <div class="sheet-header">
-    <div class="sheet-title">🎉 Perfect-sync extension</div>
-    <button class="sheet-cancel" onclick="openSheet('partySheet')">Back</button>
-  </div>
-  <div id="partyExtBody"></div>
-</div>
 
 <!-- WATCH — "Open in [service]" chooser (official app only) -->
 <div class="sheet" id="watchSheet">
@@ -2994,7 +2986,7 @@ function toggleFav(){
 function openSheet(id){
   // Watch parties live only in the official app. On the public web build there's
   // no way in — the entry buttons are hidden (body.no-party) and this is the backstop.
-  if((id==='partySheet'||id==='partyExtSheet')&&!IS_NATIVE)return;
+  if(id==='partySheet'&&!IS_NATIVE)return;
   closeAll();
   document.getElementById('overlay').classList.add('on');
   document.getElementById(id).classList.add('on');
@@ -3008,7 +3000,6 @@ function openSheet(id){
   if(id==='sourceSheet')renderSource();
   if(id==='anilistSheet')renderAniList();
   if(id==='partySheet')renderParty();
-  if(id==='partyExtSheet')renderPartyExt();
   if(id==='watchSheet')renderWatch();
   try{updatePartyPill();}catch{}
 }
@@ -3726,23 +3717,6 @@ function partyQueueNext(){if(!partyIsHost||!partyRoom||!(partyRoom.queue||[]).le
 function partyCopyCode(){try{navigator.clipboard.writeText(partyCode);toast('Code copied');}catch{toast(partyCode);}}
 function isIOS(){return /iP(hone|od|ad)/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);}
 function isAndroid(){return /Android/.test(navigator.userAgent);}
-function getPartyExtension(){openSheet('partyExtSheet');}
-function renderPartyExt(){
-  const box=document.getElementById('partyExtBody');if(!box)return;
-  const dl=location.href.replace(/[#?].*$/,'').replace(/[^/]*$/,'')+'watchlist-party.zip';
-  const steps=(a)=>`<div class="pe-steps">${a.map((s,i)=>`<div class="pe-step"><span>${i+1}</span><div>${s}</div></div>`).join('')}</div>`;
-  box.innerHTML=`
-    <div class="pe-note">${icon('bulb')}<div><b>This is a separate way to watch together — use it INSTEAD of the party in this app, not on top of it.</b> The extension runs on the <b>AniNeko website</b> (the 🎉 icon there). If your whole crew is on computers/Android, just use this and ignore the app's party screen.</div></div>
-    <p class="ai-desc">Why: it keeps <b>play / pause / seek exactly in sync</b> — everyone streams their own copy, only the controls travel. Free, no group limit.</p>
-    <a class="parse-btn" href="${dl}" download style="display:flex;align-items:center;justify-content:center;text-decoration:none;gap:7px">${icon('cloud')} Download the extension (.zip)</a>
-    <div class="dt-label" style="margin-top:20px">💻 Install — Chrome / Edge / Brave</div>
-    ${steps(['Unzip the download','Open <code>chrome://extensions</code> (paste in the address bar)','Turn on <b>Developer mode</b> — top-right toggle','Click <b>Load unpacked</b> → pick the unzipped folder','Pin the 🎉 icon (puzzle-piece menu → pin)'])}
-    <div class="dt-label" style="margin-top:18px">🤖 Install — Android (Kiwi Browser)</div>
-    ${steps(['Install <b>Kiwi Browser</b> from the Play Store','Kiwi ⋮ → <b>Extensions</b> → turn on Developer mode → <b>+ (from .zip)</b> → pick the download','Open anineko.to <b>in Kiwi</b>'])}
-    <div class="dt-label" style="margin-top:18px">▶ Then, to watch together</div>
-    ${steps(['<b>Everyone</b> opens the <b>same episode</b> on anineko.to','One person clicks the <b>🎉 icon</b> → <b>Start a party</b> → shares the code','Everyone else clicks 🎉 → types the code → <b>Join</b>','The <b>host</b> drives — their play/pause/seek controls everyone. A pink pill shows your status.'])}
-    <p class="ai-desc" style="margin-top:14px;font-size:11.5px">iPhone can't run extensions — on iPhone use this app's <b>screen-share</b> or <b>3·2·1</b> modes instead.</p>`;
-}
 
 // ── screen share (WebRTC, peer-to-peer — no server carries the video) ──────────
 // The desktop host captures a tab/window and streams it straight to each viewer;
@@ -3910,13 +3884,10 @@ function renderParty(){
         <span class="pt-pick-q">+ Queue</span></button>`;}).join('')}</div>`;
   }
   const chat=r.chat.map(m=>m.sys?`<div class="pt-sys">${schEsc(m.msg)}</div>`:`<div class="pt-msg${m.uid===meUid?' me':''}"><span class="who">${schEsc(m.name)}</span>${schEsc(m.msg)}</div>`).join('');
-  const extBlock=!isIOS()?`
-    <button class="pt-ext" onclick="getPartyExtension()">${icon('users')} Perfect sync — get the extension</button>
-    <p class="pt-hint" style="margin:-2px 0 10px">Free add-on (desktop, or <b>Kiwi Browser</b> on Android): play/pause/seek stay <b>exactly</b> in sync on AniNeko.</p>`:'';
   box.innerHTML=`
     <div class="pt-code"><div class="pt-code-val">${r.code}</div><button class="pt-code-cta" onclick="partyCopyCode()" aria-label="Copy code">${icon('copy')}</button></div>
     <div class="pt-members">${members}</div>
-    ${extBlock}${now}${queueBlock}${hostCtl}
+    ${now}${queueBlock}${hostCtl}
     <div class="pt-reactbar">${PARTY_EMOJI.map(e=>`<button class="pt-react" onclick="partyReact('${e}')">${e}</button>`).join('')}</div>
     <div class="pt-chat" id="ptChat">${chat||'<div class="pt-sys">Say hi 👋</div>'}</div>
     <div class="pt-chatbar"><input id="ptMsg" placeholder="Message…" maxlength="300" onkeydown="if(event.key==='Enter')partySend()"><button class="pt-send" onclick="partySend()">${icon('send')}</button></div>

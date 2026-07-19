@@ -3084,13 +3084,24 @@ function renderDetail(){
       <input class="ai-prompt-in" id="dtPinIn" placeholder="https://site.com/watch/slug/ep-{ep}" value="${escH(a.srcUrl||'')}" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url">
       <div style="display:flex;gap:8px;margin-top:8px">
         <button class="parse-btn" style="flex:1" onclick="savePin('${a.id}')">Save</button>
-        <button class="parse-btn" style="flex:0 0 auto;padding-left:16px;padding-right:16px" onclick="testPin('${a.id}')">Test</button>
-        ${a.srcUrl?`<button class="parse-btn" style="flex:0 0 auto;padding-left:16px;padding-right:16px" onclick="clearPin('${a.id}')">Clear</button>`:''}
+        <button class="parse-btn" style="flex:0 0 auto;width:auto;padding-left:16px;padding-right:16px" onclick="testPin('${a.id}')">Test</button>
+        ${a.srcUrl?`<button class="parse-btn" style="flex:0 0 auto;width:auto;padding-left:16px;padding-right:16px" onclick="clearPin('${a.id}')">Clear</button>`:''}
       </div>
       <div id="dtPinOut" style="display:none;margin-top:8px;padding:9px 11px;border-radius:9px;background:var(--bg2);color:var(--t2);font:12px/1.45 ui-monospace,Menlo,monospace;word-break:break-all;white-space:pre-wrap"></div>
       <p class="ai-desc" style="margin-top:8px;font-size:11px">Set once for this show — Watch goes straight here. Put <code>{ep}</code> where the episode number goes; Next/Prev then auto-advance.</p>
     </div>`:''}
-    ${kindOf(a)==='read'?`<button class="dt-watch" onclick="readManga('${a.id}')">${icon('book')} Read now</button>`:''}
+    ${kindOf(a)==='read'?`<button class="dt-watch" onclick="readManga('${a.id}')">${icon('book')} Read now</button>
+    <button class="dt-pin-toggle" onclick="togglePin()">${icon('external')} ${a.srcUrl?'Direct link pinned — edit':'Pin a direct link for this title'}</button>
+    <div id="dtPin" style="display:none">
+      <input class="ai-prompt-in" id="dtPinIn" placeholder="https://reader.com/manga/{slug}" value="${escH(a.srcUrl||'')}" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url">
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="parse-btn" style="flex:1" onclick="savePin('${a.id}')">Save</button>
+        <button class="parse-btn" style="flex:0 0 auto;width:auto;padding-left:16px;padding-right:16px" onclick="testPin('${a.id}')">Test</button>
+        ${a.srcUrl?`<button class="parse-btn" style="flex:0 0 auto;width:auto;padding-left:16px;padding-right:16px" onclick="clearPin('${a.id}')">Clear</button>`:''}
+      </div>
+      <div id="dtPinOut" style="display:none;margin-top:8px;padding:9px 11px;border-radius:9px;background:var(--bg2);color:var(--t2);font:12px/1.45 ui-monospace,Menlo,monospace;word-break:break-all;white-space:pre-wrap"></div>
+      <p class="ai-desc" style="margin-top:8px;font-size:11px">Set once for this title — Read goes straight here. Use <code>{slug}</code> or <code>{query}</code>.</p>
+    </div>`:''}
     <div class="dt-actions">
       <button class="dact ai-act" onclick="aiCardInsight('${a.id}')">${icon('sparkles')} AI Insight</button>
       <button class="dact" onclick="editItem('${a.id}')">${icon('edit')} Edit</button>
@@ -4569,11 +4580,12 @@ const READ_DEFAULT='https://asurascans.com';
 const ASURA_SUFFIX='1d35e5bd';   // constant across all series; update if the site changes it
 function readSource(){try{return localStorage.getItem('read_src')||'';}catch{return'';}}
 function usingDefaultReadSource(){return !readSource();}
+// A per-title pin (a.srcUrl) overrides the global reading source for that title.
+function effectiveReadSource(a){return (a&&a.srcUrl&&String(a.srcUrl).trim())||readSource();}
 function readURL(a){
-  const slug=streamSlug(a.title), src=readSource();
-  if(!src) return `${READ_DEFAULT}/comics/${slug}-${ASURA_SUFFIX}`;   // deep-link to the series
-  if(/\{title\}|\{slug\}/.test(src))
-    return src.replace(/\{title\}/g,encodeURIComponent(a.title)).replace(/\{slug\}/g,slug);
+  const src=effectiveReadSource(a);
+  if(!src) return `${READ_DEFAULT}/comics/${streamSlug(slugTitle(a))}-${ASURA_SUFFIX}`;   // AsuraScans deep-link
+  if(SRC_TOKEN_RE.test(src)) return fillSourceTokens(src,a,(a.ep||0)+1);   // {slug}/{query}/{titleRomaji}…; {ep}=next chapter
   return src;
 }
 function readManga(id){
@@ -5116,7 +5128,7 @@ function renderSource(){
     <input class="ai-prompt-in" id="srcCustom" placeholder="your own site — or a full URL" value="${custom&&!WATCH_PRESETS.some(p=>p.url===custom)?custom.replace(/"/g,'&quot;'):''}" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url" style="margin-top:10px">
     <div style="display:flex;gap:8px">
       <button class="parse-btn" style="flex:1" onclick="saveSource()">Use this site</button>
-      <button class="parse-btn" style="flex:0 0 auto;padding-left:16px;padding-right:16px" onclick="testSource()">${icon('search')} Test</button>
+      <button class="parse-btn" style="flex:0 0 auto;width:auto;padding-left:16px;padding-right:16px" onclick="testSource()">${icon('search')} Test</button>
     </div>
     <div id="srcTest" style="display:none;margin-top:8px;padding:9px 11px;border-radius:9px;background:var(--bg2);color:var(--t2);font:12px/1.45 ui-monospace,Menlo,monospace;word-break:break-all;white-space:pre-wrap"></div>
     <p class="ai-desc" style="margin-top:12px;font-size:11.5px">Tokens: <code>{query}</code>/<code>{title}</code>, <code>{slug}</code>, <code>{ep}</code>, <code>{titleRomaji}</code>, <code>{titleEnglish}</code>, <code>{titleNative}</code>, <code>{anilistId}</code>, <code>{malId}</code>. A <b>search</b> template — <code>https://site.com/search?keyword={query}</code> — is sturdiest (slugs &amp; domains change). Tap <b>Test</b> to preview the exact URL before saving.</p>

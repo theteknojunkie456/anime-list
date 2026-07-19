@@ -3400,15 +3400,17 @@ function findDuplicate(title,kind,exceptId){
   const n=normTitle(title);if(!n)return null;
   return anime.find(a=>a.id!==exceptId&&kindOf(a)===kind&&normTitle(a.title)===n)||null;
 }
-// Does this typed title match a hentai/adult work on AniList? (searches ONLY adult
-// results, then confirms it's a close title match so we don't false-positive.)
+// Does this typed title match a hentai/adult work on AniList? Searches the real top
+// matches (NOT pre-filtered) and judges each with isAdultMedia — so it blocks on the
+// isAdult flag OR a Hentai genre — then confirms the name matches so we don't
+// false-positive a SFW namesake.
 async function isAdultTitle(title,kind){
   try{
-    const q=`query($s:String,$t:MediaType){Page(perPage:3){media(search:$s,type:$t,isAdult:true){genres title{romaji english}}}}`;
+    const q=`query($s:String,$t:MediaType){Page(perPage:6){media(search:$s,type:$t,sort:SEARCH_MATCH){isAdult genres title{romaji english}}}}`;
     const r=await fetch('https://graphql.anilist.co',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({query:q,variables:{s:title,t:kind==='read'?'MANGA':'ANIME'}})});
     if(!r.ok)return false;
     const j=await r.json(),media=(j&&j.data&&j.data.Page&&j.data.Page.media)||[],nt=normTitle(title);
-    return media.some(m=>[m.title.romaji,m.title.english].filter(Boolean).map(normTitle).some(x=>x&&(x===nt||x.includes(nt)||nt.includes(x))));
+    return media.some(m=>isAdultMedia(m)&&[m.title.romaji,m.title.english].filter(Boolean).map(normTitle).some(x=>x&&(x===nt||x.includes(nt)||nt.includes(x))));
   }catch{return false;}
 }
 async function submitForm(){
@@ -3420,8 +3422,12 @@ async function submitForm(){
     closeAll();setTimeout(()=>openDetail(dupe.id),260);
     return;
   }
-  // adult/hentai gate for free-typed titles runs in the BACKGROUND now (see below),
-  // so adding is instant instead of blocking on an AniList round-trip.
+  // Adult/hentai gate — hard block BEFORE the title is ever inserted, so it never
+  // appears in the list. Only free-typed titles need it (autofill already excludes
+  // adult). Worth the one AniList round-trip: correctness beats a few ms here.
+  if(!editingId && !(pendingAni&&pendingAni.aniId) && await isAdultTitle(title,curKind)){
+    toast('That title can’t be added — WatchList doesn’t allow adult content');return;
+  }
   const orderRaw=document.getElementById('fOrder').value.trim();
   const epsStr=document.getElementById('fEps').value.trim();
   const epTotal=parseEpTotal(epsStr);
@@ -3444,28 +3450,16 @@ async function submitForm(){
     upd:Date.now()};
   if(curKind==='read'){data.airAt=0;data.airEp=0;data.airChk=0;} // reading items never carry airing data
   if(kindChanged){data.imgTried=!!pendingImg;data.detTried=false;} // switched Watch⇄Read — re-fetch cover/details from the right AniList type
-  let newId=null;
   if(editingId){
     const i=anime.findIndex(a=>a.id===editingId);
     if(i!==-1)anime[i]={...anime[i],...data};
     toast('Saved!');
   }else{
-    newId=uid();
-    anime.unshift({id:newId,rating:0,fav:false,...data});
+    anime.unshift({id:uid(),rating:0,fav:false,...data});
     toast('Added!');
   }
   dedupeAnime();save();closeAll();render();
-  // Free-typed new titles (no autofill match) get the adult-content check in the
-  // background so the add feels instant. Hold the cover fetch until it clears, so we
-  // never pull adult artwork for something we're about to roll back.
-  if(newId && !(pendingAni&&pendingAni.aniId)){
-    isAdultTitle(title,data.kind).then(bad=>{
-      if(bad){
-        anime=anime.filter(a=>a.id!==newId);dedupeAnime();save();render();
-        toast('That title can’t be added — WatchList doesn’t allow adult content');
-      }else setTimeout(fetchCovers,200);
-    }).catch(()=>setTimeout(fetchCovers,200));   // network hiccup → don't strand the cover
-  }else setTimeout(fetchCovers,500);
+  setTimeout(fetchCovers,500);
 }
 
 // ─── DELETE ─────────────────────────────────────────────────────────────────

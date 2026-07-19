@@ -241,7 +241,7 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 /* Calm, uniform icons — a settings list should read as one quiet surface, not six
    competing colours. Colour is reserved for a row that actually needs attention
    (see .set-row.warn below), so it stands out instead of getting lost in the noise. */
-.set-ico{width:36px;height:36px;flex-shrink:0;border-radius:11px;background:var(--bg3);border:1px solid var(--b1);display:flex;align-items:center;justify-content:center;color:var(--t2);}
+.set-ico{width:36px;height:36px;flex-shrink:0;border-radius:11px;background:color-mix(in srgb,var(--sc,var(--t2)) 15%,var(--bg3));border:1px solid color-mix(in srgb,var(--sc,var(--t2)) 24%,transparent);display:flex;align-items:center;justify-content:center;color:var(--sc,var(--t2));}
 .set-ico .ico{width:16px;height:16px;}
 .set-txt{flex:1;min-width:0;}
 .set-h{font-size:14px;font-weight:700;color:var(--t1);letter-spacing:-.2px;}
@@ -819,6 +819,8 @@ body.recsel .pcard{position:relative;}
 .rc-note-x{flex-shrink:0;width:30px;height:30px;border-radius:50%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:var(--t2);display:flex;align-items:center;justify-content:center;cursor:pointer;}
 .rc-note-x .ico{width:15px;height:15px;}
 .rc-note-x:active{transform:scale(.92);}
+/* keep the primary Send/Next action pinned so a long friend list never buries it */
+.rec-cta{position:sticky;bottom:8px;z-index:5;margin-top:16px;box-shadow:0 7px 22px -5px var(--glow),0 -12px 20px -6px var(--bg2);}
 .party-pill.on{display:flex;}
 .party-pill:active{transform:scale(.95);}
 .pp-dot{width:8px;height:8px;border-radius:50%;background:#fff;animation:ppPulse 1.6s ease-in-out infinite;}
@@ -4223,19 +4225,19 @@ function renderSettings(){
   const el=document.getElementById('settingsBody');if(!el)return;
   const backedUp=!!syncCode();
   const rows=[
-    {ic:'bulb',    h:'How WatchList works', p:'A quick tour — and how not to lose your list', go:'openTutorial()'},
-    {ic:'cloud',   h:'Cloud backup',        p:backedUp?'On — restorable on any device':'Off — this list exists only on this device',
+    {ic:'bulb',    col:'#f5b642', h:'How WatchList works', p:'A quick tour — and how not to lose your list', go:'openTutorial()'},
+    {ic:'cloud',   col:'#4dabf7', h:'Cloud backup',        p:backedUp?'On — restorable on any device':'Off — this list exists only on this device',
      go:"openSheet('backupSheet')", warn:!backedUp},
-    {ic:'lock',    h:'Password',            p:encEnabled()?'On — your list is encrypted':'Off', go:"openSheet('securitySheet')"},
-    {ic:'bell',    h:'Notifications',       p:notifyOn()?'On — you\'ll be told when an episode airs':'Off', go:'openNotifySheet()'},
-    {ic:'sparkles',h:'AI & chat key',       p:getKey()?'On — '+(keyProvider(getKey())||'key')+' connected':'Off — add a free key to unlock chat', go:"openSheet('aiSheet')"},
-    {ic:'play',    h:'Watch & read sources', p:'Where Watch now / Read now open', go:"openSheet('sourceSheet')"},
-    {ic:'refresh', h:'AniList sync',         p:alConnected()?'On — '+alUser()+' · progress syncs both ways':'Off — connect to sync progress everywhere', go:"openSheet('anilistSheet')"},
-    {ic:'clipboard',h:'Import / Export',    p:'Paste a list in, or copy yours out', go:"openSheet('importSheet')"},
-    {ic:'palette', h:'Theme',               p:'Colours, or build your own', go:"openSheet('themeSheet')"},
+    {ic:'lock',    col:'#51cf66', h:'Password',            p:encEnabled()?'On — your list is encrypted':'Off', go:"openSheet('securitySheet')"},
+    {ic:'bell',    col:'#ff6b6b', h:'Notifications',       p:notifyOn()?'On — you\'ll be told when an episode airs':'Off', go:'openNotifySheet()'},
+    {ic:'sparkles',col:'#c084fc', h:'AI & chat key',       p:getKey()?'On — '+(keyProvider(getKey())||'key')+' connected':'Off — add a free key to unlock chat', go:"openSheet('aiSheet')"},
+    {ic:'play',    col:'#20c997', h:'Watch & read sources', p:'Where Watch now / Read now open', go:"openSheet('sourceSheet')"},
+    {ic:'refresh', col:'#748ffc', h:'AniList sync',         p:alConnected()?'On — '+alUser()+' · progress syncs both ways':'Off — connect to sync progress everywhere', go:"openSheet('anilistSheet')"},
+    {ic:'clipboard',col:'#ff922b',h:'Import / Export',    p:'Paste a list in, or copy yours out', go:"openSheet('importSheet')"},
+    {ic:'palette', col:'#f783ac', h:'Theme',               p:'Colours, or build your own', go:"openSheet('themeSheet')"},
   ];
   el.innerHTML=rows.map(r=>
-    `<button class="set-row${r.warn?' warn':''}" onclick="${r.go}">
+    `<button class="set-row${r.warn?' warn':''}" style="--sc:${r.col}" onclick="${r.go}">
       <div class="set-ico">${icon(r.ic)}</div>
       <div class="set-txt"><div class="set-h">${r.h}</div><div class="set-p${r.warn?' warn':''}">${r.p}</div></div>
       <span class="set-chev">${icon('chevron-right')}</span>
@@ -4788,7 +4790,7 @@ function renderRecPick(){
   box.innerHTML=`<button class="src-opt" onclick="pickFromList()"><div class="src-name">${icon('home')} Pick right on your list</div><div class="src-sub">Browse your rows and tap shows to pick — easiest way to find things</div></button>
     <div class="dt-label" style="margin-top:14px">Or quick-pick here</div>
     <div class="pt-picks">${rows||'<p class="ai-desc">Your list is empty.</p>'}</div>
-    <button class="dt-watch rec-next" onclick="proceedRecommend()">${icon('chevron-right')} Next — notes & friends (${recPickShows.size})</button>`;
+    <button class="dt-watch rec-next rec-cta" onclick="proceedRecommend()">${icon('chevron-right')} Next — notes & friends (${recPickShows.size})</button>`;
 }
 // "Pick right on your list" — leave the sheets, tap posters in the home rows.
 function pickFromList(){recSel=new Set(recPickShows);closeAll();render();document.body.classList.add('recsel');updateRecSelBar();toast('Tap shows to recommend, then Done');}
@@ -4820,7 +4822,7 @@ function renderRecSend(){
     <div class="rc-notes">${noteRows}</div>
     <div class="dt-label" style="margin-top:18px">${icon('users')} Send to</div>
     <div class="rs-list">${friendHTML}</div>
-    <button class="dt-watch" style="margin-top:14px" onclick="sendRecommend()"${(recToFriends.size&&fr.length)?'':' disabled'}>${icon('send')} Send${recToFriends.size?' to '+recToFriends.size:''}</button>`;
+    <button class="dt-watch rec-cta" onclick="sendRecommend()"${(recToFriends.size&&fr.length)?'':' disabled'}>${icon('send')} Send${recToFriends.size?' to '+recToFriends.size:''}</button>`;
 }
 async function sendRecommend(){
   const fr=friendsList();

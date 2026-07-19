@@ -5927,7 +5927,7 @@ try{
       // guard against the very first install (no prior controller) and reload loops.
       if(reloading||!hadController)return;
       reloading=true;
-      try{sessionStorage.setItem('justUpdated','1');}catch{}
+      _snapUpd();
       location.reload();
     });
     navigator.serviceWorker.register('./sw.js').then(reg=>{
@@ -5943,7 +5943,7 @@ try{
 // So we also watch the deployed file's version tag (ETag): when it changes a new
 // build is live → reload to pick it up. Never yanks you out of a video or mid-type;
 // it waits for a calm moment (next refocus / when you're idle).
-let _bootVer=null,_updateReady=false;
+let _bootVer=null,_updateReady=false,_updSnap=null;
 async function _liveVer(){
   try{const r=await fetch('./?_ck='+Date.now(),{method:'HEAD',cache:'no-store'});return r.headers.get('etag')||r.headers.get('last-modified')||'';}catch(e){return '';}
 }
@@ -5952,9 +5952,27 @@ function _updBusy(){
   const el=document.activeElement; if(el&&/^(INPUT|TEXTAREA)$/.test(el.tagName)&&(el.value||'').length)return true;   // mid-typing
   return false;
 }
+// Snapshot where you are (tab, filter, sort, scroll) so the post-reload app can put
+// you right back — the update should feel like nothing happened, not a jump to top.
+function _snapUpd(){
+  try{const pg=document.getElementById('pageEl');
+    sessionStorage.setItem('justUpdated',JSON.stringify({k:viewKind,f:filterStatus,s:sortMode,y:pg?Math.round(pg.scrollTop):0}));
+  }catch(e){}
+}
+// Read that snapshot on boot and restore tab/filter/sort BEFORE the first render
+// (scroll is restored after, once the list has height). Silent if there's none.
+function _restoreUpd(){
+  try{const j=sessionStorage.getItem('justUpdated'); if(!j)return;
+    sessionStorage.removeItem('justUpdated');
+    const s=(j==='1')?{}:(JSON.parse(j)||{}); _updSnap=s;   // '1' = legacy flag, no position
+    if(s.k==='watch'||s.k==='read')viewKind=s.k;
+    if(s.f)filterStatus=s.f;
+    if(s.s)sortMode=s.s;
+  }catch(e){_updSnap=null;}
+}
 function _applyUpdate(){
   if(!_updateReady||_updBusy())return;
-  try{sessionStorage.setItem('justUpdated','1');}catch{}
+  _snapUpd();
   location.reload();
 }
 async function checkUpdate(){
@@ -5964,9 +5982,10 @@ async function checkUpdate(){
 }
 try{
   setTimeout(checkUpdate,4000);                                                         // learn current version after boot
-  setInterval(checkUpdate,120000);                                                      // poll every 2 min
+  setInterval(checkUpdate,60000);                                                       // poll every minute
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkUpdate();});// and on refocus
   window.addEventListener('focus',()=>{if(_updateReady)_applyUpdate();});
+  window.addEventListener('online',()=>{checkUpdate();});                               // and the moment the network is back
 }catch(e){}
 
 // ─── KEYBOARD ───────────────────────────────────────────────────────────────
@@ -5974,7 +5993,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeAll();closeCon
 
 // ─── INIT ───────────────────────────────────────────────────────────────────
 try{hydrateIcons();}catch{}
-load();try{purgeAdult();}catch{}try{if(!appLocked&&dedupeAnime())writeLocal();}catch{}loadTheme();render();try{nativeScheduleNotifs();}catch{}
+load();try{purgeAdult();}catch{}try{if(!appLocked&&dedupeAnime())writeLocal();}catch{}loadTheme();try{_restoreUpd();}catch{}render();try{nativeScheduleNotifs();}catch{}
 try{alCatchRedirect().then(()=>{if(!appLocked)alBootSync();}).catch(()=>{});}catch{}   // returning from AniList OAuth
 if(appLocked)showLock();   // stored list is ciphertext → gate the app until unlocked
 else try{restorePlayer();}catch{}   // came back mid-stream after an iOS reload → reopen it
@@ -5985,7 +6004,7 @@ try{renderNotifyBell();}catch{}
 try{document.getElementById('apiKeyIn').value=getKey();}catch{}
 // rejoin a live party after a reload — official app only; the public web build has no parties
 try{if(IS_NATIVE){const pc=localStorage.getItem('party_active');if(pc&&partyName())setTimeout(()=>partyJoin(pc),400);}}catch{}
-try{if(sessionStorage.getItem('justUpdated')){sessionStorage.removeItem('justUpdated');setTimeout(()=>toast('✨ Updated to the latest version'),700);}}catch{}
+try{if(_updSnap){const pg=document.getElementById('pageEl'),y=_updSnap.y||0;if(y&&pg)requestAnimationFrame(()=>requestAnimationFrame(()=>{try{pg.scrollTop=y;}catch(e){}}));setTimeout(()=>toast('Updated to the latest version'),700);_updSnap=null;}}catch{}
 // Friends recommendations (public web build): show cached instantly, then refresh.
 try{loadRecsCache();}catch(e){}
 if(!IS_NATIVE){

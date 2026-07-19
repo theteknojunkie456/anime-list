@@ -4404,18 +4404,16 @@ function pvOpenExternal(){
 async function watchAnime(id){
   const a=anime.find(x=>x.id===id); if(!a) return;
   if(kindOf(a)!=='watch'||!a.aniId){toast('Watch is for anime only');return;}
-  // The default + the built-in legal presets (Tubi, Netflix…) can't be framed
-  // (DRM / X-Frame-Options), so they open in the browser. But if you've set YOUR OWN
-  // source in Settings, we play it in the immersive in-app player.
+  // Default (no source set) → the legal auto-routing switcher: it looks up which
+  // official services actually carry THIS title and opens the exact page. An
+  // explicit preset opens in the browser; your OWN {ep} source plays in-frame.
   const src=streamSource();
-  const presetOrDefault = !src || WATCH_PRESETS.some(p=>p.url===src);
-  if(presetOrDefault){
-    if(IS_NATIVE && !src && myServices().length){ watchTarget=a; openSheet('watchSheet'); return; }
-    openExternal(launchURL(a));
-    toast(`Opening ${sourceName()} for “${a.title}”`);
-    return;
+  if(!src){
+    if(IS_NATIVE){ await routeLegal(a); return; }   // official app → legal auto-routing (goes straight to the show)
+    openExternal(launchURL(a)); toast(`Opening ${sourceName()} for “${a.title}”`); return;   // web → free-legal default; set your own source in Settings
   }
-  // your own source → immersive in-app player
+  if(!/\{ep\}/.test(src)){ openExternal(launchURL(a)); toast(`Opening ${sourceName()} for “${a.title}”`); return; }
+  // your own {ep} source → immersive in-app player
   pvReturnId=id;
   const ep=watchEpisode(a);
   pvWatchEp=ep;   // the episode we opened, so we can save progress on the way out
@@ -4571,21 +4569,62 @@ function escH(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;',
 function myServices(){try{return JSON.parse(localStorage.getItem('my_services')||'[]');}catch{return[];}}
 function toggleService(id){let s=myServices();s=s.includes(id)?s.filter(x=>x!==id):s.concat(id);try{localStorage.setItem('my_services',JSON.stringify(s));}catch{}renderSource();}
 function fillURL(url,a){return url.replace(/\{title\}/g,encodeURIComponent(a.title)).replace(/\{slug\}/g,streamSlug(a.title)).replace(/\{ep\}/g,String(watchEpisode(a)||1));}
-// The "Open in …" chooser: the user's subscribed services first, free-legal after
-// so a title is never a dead end. Only reachable in the app (see watchAnime).
+// ── LEGAL AUTO-ROUTING ──────────────────────────────────────────────────────
+// AniList's externalLinks are the OFFICIAL streaming links per title — direct to
+// the exact show (no slug-guessing, no 404s), free + subscription. We fetch them,
+// rank (your subscriptions → free → subscription), open the exact page, and
+// remember your pick so it just opens there next time.
+const LEGAL_FREE_SITES=new Set(['youtube','bilibili tv','bilibili','hoopla','tubi','tubi tv','pluto tv','the roku channel','roku','roku channel','retrocrush','plex','ani-one','ani-one asia','muse asia','iq','wetv','amazon freevee','freevee','crunchyroll (free)','pokemon tv']);
+// map a My-Services id onto how the site appears in AniList (loose contains match)
+const SUB_MATCH={crunchyroll:'crunchyroll',netflix:'netflix',hidive:'hidive',hulu:'hulu',disney:'disney',max:'max',prime:'amazon',appletv:'apple'};
+async function whereLegal(a){
+  if(a.streams)return a.streams;
+  if(!a.aniId)return (a.streams=[]);
+  try{
+    const q='query($id:Int){Media(id:$id){externalLinks{site url type}}}';
+    const r=await fetch('https://graphql.anilist.co',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query:q,variables:{id:a.aniId}})});
+    if(!r.ok)return (a.streams=[]);
+    const links=(((await r.json()).data||{}).Media||{}).externalLinks||[];
+    const seen=new Set(),out=[];
+    for(const l of links){
+      if(l.type!=='STREAMING'||!l.url)continue;
+      const key=(l.site||'').toLowerCase(); if(!key||seen.has(key))continue; seen.add(key);
+      out.push({site:l.site,url:String(l.url).replace(/^http:/,'https:'),free:LEGAL_FREE_SITES.has(key)});
+    }
+    a.streams=out; try{save();}catch{}
+    return out;
+  }catch(e){return (a.streams=[]);}
+}
+function legalPref(){try{return localStorage.getItem('legal_pref')||'';}catch{return '';}}
+function setLegalPref(s){try{localStorage.setItem('legal_pref',s||'');}catch{}}
+function subHas(siteLower){return myServices().some(id=>SUB_MATCH[id]&&siteLower.includes(SUB_MATCH[id]));}
+// Entry point: look up where it's legal, auto-open your remembered pick if it's
+// available, otherwise show the chooser of what actually carries THIS title.
+async function routeLegal(a){
+  toast(`Finding where to watch “${a.title}”…`);
+  const streams=await whereLegal(a);
+  watchTarget=a;
+  const pref=legalPref();
+  const hit=pref&&streams.find(s=>s.site.toLowerCase()===pref);
+  if(hit){ openExternal(hit.url); toast(`Opening ${hit.site} for “${a.title}”`); return; }
+  renderWatch(); openSheet('watchSheet');
+}
 let watchTarget=null, watchOpts=[];
 function renderWatch(){
   const a=watchTarget, box=document.getElementById('watchBody'); if(!a||!box)return;
-  const subs=myServices().map(id=>PAID_SERVICES.find(s=>s.id===id)).filter(Boolean).map(s=>({name:s.name,url:s.url,tag:'Your account'}));
-  const free=WATCH_PRESETS.map(p=>({name:p.name,url:p.url,tag:'Free'}));
-  watchOpts=subs.concat(free);
-  const row=(o,i)=>`<button class="src-opt" onclick="watchOpen(${i})"><div class="src-name">Open in ${escH(o.name)}</div><div class="src-sub">${o.tag}</div></button>`;
+  const streams=a.streams||[];
+  const prio=s=>{const k=s.site.toLowerCase();return subHas(k)?0:(s.free?1:2);};
+  const avail=streams.slice().sort((x,y)=>prio(x)-prio(y)).map(s=>{const k=s.site.toLowerCase();return {label:s.site,url:s.url,site:k,tag:subHas(k)?'Your account':(s.free?'Free':'Subscription'),exact:true};});
+  const cat=WATCH_PRESETS.map(p=>({label:p.name,url:fillURL(p.url,a),site:p.name.toLowerCase(),tag:'Free · search',exact:false}));
+  watchOpts=avail.concat(cat);
+  const row=(o,i)=>`<button class="src-opt${legalPref()===o.site?' on':''}" onclick="watchOpen(${i})"><div class="src-name">${o.exact?icon('play')+' ':''}Watch on ${escH(o.label)}</div><div class="src-sub">${o.tag}${o.exact?' · straight to the show':''}</div></button>`;
   const sec=(label,items,off)=>items.length?`<div class="dt-label" style="margin-top:14px">${label}</div>`+items.map((o,i)=>row(o,off+i)).join(''):'';
-  box.innerHTML=`<p class="ai-desc">Where do you want to watch <b>${escH(a.title)}</b>? Opens the app on your phone — you're already signed in.</p>`
-    +sec('Your services',subs,0)
-    +sec('Free — no account',free,subs.length);
+  box.innerHTML=`<p class="ai-desc">Where do you want to watch <b>${escH(a.title)}</b>? Tap one and it remembers — next time it opens there automatically.</p>`
+    +sec(avail.length?'Available now — official':'',avail,0)
+    +sec('Free — search',cat,avail.length)
+    +(avail.length?'':'<p class="ai-desc" style="margin-top:10px">No official link listed for this one — the free searches above usually still have it.</p>');
 }
-function watchOpen(i){const o=watchOpts[i],a=watchTarget;if(!o||!a)return;openExternal(fillURL(o.url,a));closeAll();toast(`Opening ${o.name}…`);}
+function watchOpen(i){const o=watchOpts[i],a=watchTarget;if(!o||!a)return;setLegalPref(o.site);openExternal(o.url);closeAll();toast(`Opening ${o.label}…`);}
 
 // ═══ FRIENDS — recommend shows to friends (public web build only) ════════════
 // No accounts: each person has a random "friend code" (a shareable bearer token).

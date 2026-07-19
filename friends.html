@@ -4612,7 +4612,16 @@ async function pullRecs(){
 // aniId (or title) -> {item, senders:[{name,code,note,at}]}
 function recByAni(){
   const m={};
-  recsIn.forEach(env=>{(env.items||[]).forEach(it=>{const k=it.aniId?('a'+it.aniId):('t'+String(it.title||'').toLowerCase());if(!m[k])m[k]={item:it,senders:[]};m[k].senders.push({name:(env.from&&env.from.name)||'A friend',code:(env.from&&env.from.code)||'',note:it.note||'',at:env.at||0});});});
+  recsIn.forEach(env=>{(env.items||[]).forEach(it=>{
+    const k=it.aniId?('a'+it.aniId):('t'+String(it.title||'').toLowerCase());
+    if(!m[k])m[k]={item:it,senders:[]};
+    const code=(env.from&&env.from.code)||'', name=(env.from&&env.from.name)||'A friend', note=it.note||'', at=env.at||0;
+    // one entry per friend even if they recommended it more than once; keep their
+    // most recent name, and their most recent NON-empty note.
+    const ex=m[k].senders.find(s=>s.code===code);
+    if(ex){ if(at>=ex.at){ex.at=at;ex.name=name;} if(note&&at>=(ex.noteAt||0)){ex.note=note;ex.noteAt=at;} }
+    else m[k].senders.push({name,code,note,at,noteAt:note?at:0});
+  });});
   return m;
 }
 function friendRecRowHTML(){

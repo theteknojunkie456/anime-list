@@ -3420,10 +3420,8 @@ async function submitForm(){
     closeAll();setTimeout(()=>openDetail(dupe.id),260);
     return;
   }
-  // adult/hentai gate — only for typed titles (autofill already excludes adult)
-  if(!editingId && !(pendingAni&&pendingAni.aniId) && await isAdultTitle(title,curKind)){
-    toast('That title can’t be added — WatchList doesn’t allow adult content');return;
-  }
+  // adult/hentai gate for free-typed titles runs in the BACKGROUND now (see below),
+  // so adding is instant instead of blocking on an AniList round-trip.
   const orderRaw=document.getElementById('fOrder').value.trim();
   const epsStr=document.getElementById('fEps').value.trim();
   const epTotal=parseEpTotal(epsStr);
@@ -3446,16 +3444,28 @@ async function submitForm(){
     upd:Date.now()};
   if(curKind==='read'){data.airAt=0;data.airEp=0;data.airChk=0;} // reading items never carry airing data
   if(kindChanged){data.imgTried=!!pendingImg;data.detTried=false;} // switched Watch⇄Read — re-fetch cover/details from the right AniList type
+  let newId=null;
   if(editingId){
     const i=anime.findIndex(a=>a.id===editingId);
     if(i!==-1)anime[i]={...anime[i],...data};
     toast('Saved!');
   }else{
-    anime.unshift({id:uid(),rating:0,fav:false,...data});
+    newId=uid();
+    anime.unshift({id:newId,rating:0,fav:false,...data});
     toast('Added!');
   }
   dedupeAnime();save();closeAll();render();
-  setTimeout(fetchCovers,500);
+  // Free-typed new titles (no autofill match) get the adult-content check in the
+  // background so the add feels instant. Hold the cover fetch until it clears, so we
+  // never pull adult artwork for something we're about to roll back.
+  if(newId && !(pendingAni&&pendingAni.aniId)){
+    isAdultTitle(title,data.kind).then(bad=>{
+      if(bad){
+        anime=anime.filter(a=>a.id!==newId);dedupeAnime();save();render();
+        toast('That title can’t be added — WatchList doesn’t allow adult content');
+      }else setTimeout(fetchCovers,200);
+    }).catch(()=>setTimeout(fetchCovers,200));   // network hiccup → don't strand the cover
+  }else setTimeout(fetchCovers,500);
 }
 
 // ─── DELETE ─────────────────────────────────────────────────────────────────
@@ -5506,10 +5516,12 @@ function airingNeedy(a){
   if(a.airAt&&a.airAt*1000>now)return false; // still holding a valid upcoming-episode time
   return !a.airChk||(now-a.airChk>6*3600*1000);
 }
-function coverNeedy(){return anime.filter(a=>(!a.img&&!a.imgTried)||(!a.eps&&!a.detTried)||(!a.banner&&!a.bannerTried)||airingNeedy(a));}
+// !a.adultChk forces a one-time isAdult verification of EVERY title — even ones
+// already fully enriched — so adult content imported before this gate gets swept.
+function coverNeedy(){return anime.filter(a=>!a.adultChk||(!a.img&&!a.imgTried)||(!a.eps&&!a.detTried)||(!a.banner&&!a.bannerTried)||airingNeedy(a));}
 async function fetchCovers(){
   if(coverRunning)return;coverRunning=true;
-  let netFails=0;
+  let netFails=0,adultRemoved=0;
   try{
     while(true){
       const needy=coverNeedy();
@@ -5525,8 +5537,8 @@ async function fetchCovers(){
         const type=read?'MANGA':'ANIME';
         // bannerImage = wide per-title scene art (may be null); coverImage.color = AniList's precomputed dominant hex
         const fields=read
-          ?'coverImage{large extraLarge color} bannerImage chapters volumes genres'
-          :'id coverImage{large extraLarge color} bannerImage episodes duration genres nextAiringEpisode{airingAt episode}';
+          ?'coverImage{large extraLarge color} bannerImage chapters volumes genres isAdult'
+          :'id coverImage{large extraLarge color} bannerImage episodes duration genres isAdult nextAiringEpisode{airingAt episode}';
         // Known season? Refresh that EXACT media by id — a title search would drift to
         // whatever AniList ranks first (often a different, currently-airing season),
         // pinning the wrong air date. Only unknown items fall back to a title search.
@@ -5544,10 +5556,16 @@ async function fetchCovers(){
         await pause(3000);continue;
       }
       netFails=0;
+      const adultIds=[];
       batch.forEach((a,i)=>{
         const read=kindOf(a)==='read';
         // Media(id:) returns the object directly; Page(search:) wraps it in {media:[…]}
         const node=data['a'+i],m=node?(node.media?node.media[0]:node):null;
+        // Universal adult gate: AniList's own isAdult flag / Hentai genre is the
+        // authority. Any title that reached the list by ANY path (paste-import,
+        // hand-typed, sync) is pulled here the instant its data loads — no reliance
+        // on the truncated stored genre string.
+        if(m&&isAdultMedia(m)){adultIds.push(a.id);return;}
         if(m){
           if(!a.img&&!a.imgTried)a.img=(m.coverImage&&m.coverImage.large)||'';
           // per-title theming: wide banner art + AniList's dominant color (kept independent of any user-set bgImage/bgAccent)
@@ -5575,10 +5593,14 @@ async function fetchCovers(){
         if(!a.img)a.imgTried=true;
         a.bannerTried=true; // stamp even when bannerImage was null (some titles have none) so we don't refetch forever
         a.detTried=true;
+        a.adultChk=1;   // verified against AniList's isAdult flag (adult ones already removed above)
       });
+      if(adultIds.length){const gone=new Set(adultIds);anime=anime.filter(a=>!gone.has(a.id));adultRemoved+=adultIds.length;
+        if(detailId&&gone.has(detailId)){detailId=null;try{closeAll();}catch{}}}
       save();renderHome();try{nativeScheduleNotifs();}catch{}
       await pause(1000); // stay comfortably under AniList's per-minute limit
     }
+    if(adultRemoved)toast(`Blocked ${adultRemoved} adult title${adultRemoved!==1?'s':''} — not allowed`);
   }finally{coverRunning=false;}
 }
 // ─── AUTOFILL ───────────────────────────────────────────────────────────────
@@ -6012,13 +6034,14 @@ if(!IS_NATIVE){
   // keepalive so Cloudflare doesn't drop the idle socket
   setInterval(()=>{try{if(friendWS&&friendWS.readyState===1)friendWS.send('p');}catch(e){}},25000);
   try{document.addEventListener('visibilitychange',()=>{if(!document.hidden){connectFriendWS();pullRecs();pullFriendReqs();}});}catch(e){}
-  try{window.addEventListener('online',()=>{connectFriendWS();});}catch(e){}
+  try{window.addEventListener('online',()=>{connectFriendWS();pullRecs();pullFriendReqs();});}catch(e){}
 }
 setTimeout(fetchCovers,1200);
 setTimeout(syncOnOpen,300);
 // If notifications are on, re-sync the tracked show list with the worker on load (fire-and-forget).
 setTimeout(()=>{try{if(notifyOn())notifyUpdate();}catch{}},1600);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)syncOnOpen();});
+try{window.addEventListener('online',()=>syncOnOpen());}catch(e){}   // cloud sync recovers the moment the network is back
 </script>
 </body>
 </html>

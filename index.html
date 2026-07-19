@@ -582,6 +582,9 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 /* Watch button — the primary action on an anime, so it gets the accent and full width */
 .dt-watch{width:100%;margin-top:18px;padding:15px;border-radius:15px;border:none;background:var(--a);color:var(--aFg);font-family:var(--fd);font-size:15px;font-weight:800;letter-spacing:-.2px;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 8px 22px -6px var(--glow);transition:transform .12s;}
 .dt-watch:active{transform:scale(.97);}
+.dt-pin-toggle{width:100%;margin-top:9px;padding:8px;background:none;border:none;color:var(--t2);font-family:inherit;font-size:12.5px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;transition:color .15s;}
+.dt-pin-toggle:active{color:var(--t1);}
+.dt-pin-toggle svg{width:14px;height:14px;}
 .dt-watch .ico{width:19px;height:19px;fill:currentColor;}
 /* Full-screen in-app player */
 .playerview{position:fixed;inset:0;z-index:120;background:#000;display:flex;flex-direction:column;transform:translateY(100%);transition:transform .38s cubic-bezier(.2,1,.28,1);}
@@ -3075,7 +3078,18 @@ function renderDetail(){
     ${notesHTML}
     <div class="dt-label" style="margin-top:18px"></div>
     <div id="ai-box-detail"></div>
-    ${(kindOf(a)==='watch'&&a.aniId)?`<button class="dt-watch" onclick="watchAnime('${a.id}')">${icon('play')} Watch now</button>`:''}
+    ${(kindOf(a)==='watch'&&a.aniId)?`<button class="dt-watch" onclick="watchAnime('${a.id}')">${icon('play')} Watch now</button>
+    <button class="dt-pin-toggle" onclick="togglePin()">${icon('external')} ${a.srcUrl?'Direct link pinned — edit':'Pin a direct link for this show'}</button>
+    <div id="dtPin" style="display:none">
+      <input class="ai-prompt-in" id="dtPinIn" placeholder="https://site.com/watch/slug/ep-{ep}" value="${escH(a.srcUrl||'')}" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url">
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="parse-btn" style="flex:1" onclick="savePin('${a.id}')">Save</button>
+        <button class="parse-btn" style="flex:0 0 auto;padding-left:16px;padding-right:16px" onclick="testPin('${a.id}')">Test</button>
+        ${a.srcUrl?`<button class="parse-btn" style="flex:0 0 auto;padding-left:16px;padding-right:16px" onclick="clearPin('${a.id}')">Clear</button>`:''}
+      </div>
+      <div id="dtPinOut" style="display:none;margin-top:8px;padding:9px 11px;border-radius:9px;background:var(--bg2);color:var(--t2);font:12px/1.45 ui-monospace,Menlo,monospace;word-break:break-all;white-space:pre-wrap"></div>
+      <p class="ai-desc" style="margin-top:8px;font-size:11px">Set once for this show — Watch goes straight here. Put <code>{ep}</code> where the episode number goes; Next/Prev then auto-advance.</p>
+    </div>`:''}
     ${kindOf(a)==='read'?`<button class="dt-watch" onclick="readManga('${a.id}')">${icon('book')} Read now</button>`:''}
     <div class="dt-actions">
       <button class="dact ai-act" onclick="aiCardInsight('${a.id}')">${icon('sparkles')} AI Insight</button>
@@ -4419,6 +4433,34 @@ function streamSource(){try{return localStorage.getItem('stream_src')||'';}catch
 function streamSlug(title){
   return (title||'').toLowerCase().replace(/["'’]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
 }
+// A per-title pinned link (a.srcUrl) overrides the global source for THAT show — you
+// set the exact URL once and Watch goes straight there. Falls back to the global
+// custom source, then (empty) to the default free-legal route. No scraping: you
+// supply the mapping, the app just remembers it.
+function effectiveSource(a){return (a&&a.srcUrl&&String(a.srcUrl).trim())||streamSource();}
+// Which title spelling feeds {slug}: 'romaji' | 'english' | '' (the main title).
+// Some sites index by romaji, some by English — this lifts the direct-hit rate.
+function slugPref(){try{return localStorage.getItem('slug_src')||'';}catch{return'';}}
+function setSlugPref(v){try{v?localStorage.setItem('slug_src',v):localStorage.removeItem('slug_src');}catch{}try{renderSource();}catch(e){}}
+function slugTitle(a){const p=slugPref();if(p==='romaji'&&a&&a.titleRo)return a.titleRo;if(p==='english'&&a&&a.titleEn)return a.titleEn;return (a&&a.title)||'';}
+// ── Per-title pinned link (detail sheet) ──
+function togglePin(){const el=document.getElementById('dtPin');if(el)el.style.display=(el.style.display==='none'||!el.style.display)?'block':'none';}
+function savePin(id){
+  const a=anime.find(x=>x.id===id);if(!a)return;
+  const v=((document.getElementById('dtPinIn')||{}).value||'').trim();
+  if(v)a.srcUrl=v; else delete a.srcUrl;
+  touch(a);save();renderDetail();
+  toast(v?'Direct link pinned for this show':'Link cleared');
+}
+function clearPin(id){const a=anime.find(x=>x.id===id);if(!a)return;delete a.srcUrl;touch(a);save();renderDetail();toast('Link cleared');}
+function testPin(id){
+  const a=anime.find(x=>x.id===id);if(!a)return;
+  const v=((document.getElementById('dtPinIn')||{}).value||'').trim();
+  const out=document.getElementById('dtPinOut');if(!out)return;
+  if(!v){out.style.display='block';out.textContent='Enter a link first.';return;}
+  const ep=watchEpisode(a)||1;
+  out.style.display='block';out.textContent=SRC_TOKEN_RE.test(v)?fillSourceTokens(v,a,ep):v;
+}
 let pvReturnId=null, pvWatchEp=null, pvOpenTime=0, pvCanNav=false;
 // Which episode to open: the next one they haven't finished (ep watched + 1),
 // clamped to what exists. /ep-N streams straight into the player; an N beyond the
@@ -4442,7 +4484,7 @@ const SRC_SEARCH_RE=/\{(title|query|slug|titleenglish|titleromaji|titlenative|an
 function fillSourceTokens(template,a,ep){
   const t=a.title||'', enc=encodeURIComponent;
   const raw={ep:(ep||1),episode:(ep||1),anilistid:a.aniId||'',malid:a.malId||''};                    // inserted verbatim
-  const txt={title:t,query:t,slug:streamSlug(t),titleenglish:a.titleEn||t,titleromaji:a.titleRo||t,titlenative:a.titleNa||t}; // url-encoded
+  const txt={title:t,query:t,slug:streamSlug(slugTitle(a)),titleenglish:a.titleEn||t,titleromaji:a.titleRo||t,titlenative:a.titleNa||t}; // url-encoded
   return String(template||'').replace(/\{(\w+)\}/g,(m,k)=>{
     const key=k.toLowerCase();
     if(key in raw)return String(raw[key]);
@@ -4454,14 +4496,14 @@ function fillSourceTokens(template,a,ep){
 // them navigate/search. No custom source → empty (default Watch opens legal sites
 // externally, never frames).
 function streamURL(a){
-  const ep=watchEpisode(a), src=streamSource();
+  const ep=watchEpisode(a), src=effectiveSource(a);
   if(!src) return {url:'', ep};
   if(SRC_TOKEN_RE.test(src)) return {url:fillSourceTokens(src,a,ep), ep};
   return {url:src, ep:null}; // plain custom URL — open it as-is
 }
 // The site's search for this exact title — the recovery when a deep-link 404s.
 function findUrl(a){
-  const src=streamSource();
+  const src=effectiveSource(a);
   if(!src) return 'about:blank';   // no source to search
   if(SRC_SEARCH_RE.test(src)) return fillSourceTokens(src,a,1);
   try{return new URL(src.replace(/\{[^}]+\}/g,'x')).origin;}catch{return src;}   // {ep}-only/plain → the site's homepage, so its own search is at hand
@@ -4488,10 +4530,10 @@ function pvOpenExternal(){
 async function watchAnime(id){
   const a=anime.find(x=>x.id===id); if(!a) return;
   if(kindOf(a)!=='watch'||!a.aniId){toast('Watch is for anime only');return;}
-  // Default (no source set) → the legal auto-routing switcher: it looks up which
-  // official services actually carry THIS title and opens the exact page. An
-  // explicit preset opens in the browser; your OWN {ep} source plays in-frame.
-  const src=streamSource();
+  // Source resolution: a per-title pinned link (a.srcUrl) wins; else the global
+  // custom source; else the default legal route. A pin/custom source with {ep} plays
+  // in-frame; a bare preset opens in the browser.
+  const src=effectiveSource(a);
   if(!src){
     if(IS_NATIVE){ await routeLegal(a); return; }   // official app → legal auto-routing (goes straight to the show)
     openExternal(launchURL(a)); toast(`Opening ${sourceName()} for “${a.title}”`); return;   // web → free-legal default; set your own source in Settings
@@ -5078,6 +5120,13 @@ function renderSource(){
     </div>
     <div id="srcTest" style="display:none;margin-top:8px;padding:9px 11px;border-radius:9px;background:var(--bg2);color:var(--t2);font:12px/1.45 ui-monospace,Menlo,monospace;word-break:break-all;white-space:pre-wrap"></div>
     <p class="ai-desc" style="margin-top:12px;font-size:11.5px">Tokens: <code>{query}</code>/<code>{title}</code>, <code>{slug}</code>, <code>{ep}</code>, <code>{titleRomaji}</code>, <code>{titleEnglish}</code>, <code>{titleNative}</code>, <code>{anilistId}</code>, <code>{malId}</code>. A <b>search</b> template — <code>https://site.com/search?keyword={query}</code> — is sturdiest (slugs &amp; domains change). Tap <b>Test</b> to preview the exact URL before saving.</p>
+    <div class="dt-label" style="margin-top:16px">${icon('sort')} <code>{slug}</code> spelling</div>
+    <p class="ai-desc">Which title fills <code>{slug}</code> — some sites index by romaji, some by English. Raises the direct-hit rate.</p>
+    <div class="src-picks">
+      <button class="src-chip${!slugPref()?' on':''}" onclick="setSlugPref('')">Auto</button>
+      <button class="src-chip${slugPref()==='romaji'?' on':''}" onclick="setSlugPref('romaji')">Romaji</button>
+      <button class="src-chip${slugPref()==='english'?' on':''}" onclick="setSlugPref('english')">English</button>
+    </div>
     ${IS_NATIVE?`
     <div class="dt-label" style="margin-top:22px">${icon('film')} Your streaming accounts</div>
     <p class="ai-desc">Tick the services you subscribe to. On a show, <b>Watch</b> then offers <b>“Open in …”</b> for each — opening that app on your phone where you're already signed in. We never see your password, and nothing is ever pirated.</p>

@@ -4811,8 +4811,13 @@ function recByAni(){
 }
 function friendRecRowHTML(){
   if(IS_NATIVE)return '';
-  const map=recByAni(), mine=new Set(anime.map(a=>a.aniId).filter(Boolean));
-  const keys=Object.keys(map).filter(k=>{const it=map[k].item;const kind=it.kind==='read'?'read':'watch';return kind===viewKind && !(it.aniId&&mine.has(it.aniId));});
+  const map=recByAni();
+  const mineAni=new Set(anime.map(a=>a.aniId).filter(Boolean));
+  const mineTitle=new Set(anime.map(a=>normTitle(a.title)).filter(Boolean));
+  // once a rec is on your list it leaves this row — matched by AniList id OR title,
+  // so title-only recs (no id) also drop out after you add them.
+  const inList=it=>(it.aniId&&mineAni.has(it.aniId))||mineTitle.has(normTitle(it.title));
+  const keys=Object.keys(map).filter(k=>{const it=map[k].item;const kind=it.kind==='read'?'read':'watch';return kind===viewKind && !inList(it);});
   if(!keys.length)return '';
   keys.sort((x,y)=>Math.max(0,...map[y].senders.map(s=>s.at))-Math.max(0,...map[x].senders.map(s=>s.at)));
   return `<div class="row-sec"><div class="row-head"><div class="row-title" style="--rc:var(--a2)">${icon('users')} Your Friends Recommend</div><div class="row-count">${keys.length}</div></div><div class="row-scroll">${keys.map(k=>recCard(k,map[k])).join('')}</div></div>`;
@@ -4853,15 +4858,17 @@ function renderRecDetail(){
 }
 function addRecToList(watchAfter){
   const rec=recByAni()[recDetailKey];if(!rec)return;
-  const it=rec.item;
-  let existing=it.aniId?anime.find(a=>a.aniId===it.aniId):anime.find(a=>a.title===it.title);
+  const it=rec.item,nt=normTitle(it.title);
+  let existing=it.aniId?anime.find(a=>a.aniId===it.aniId):null;
+  if(!existing)existing=anime.find(a=>normTitle(a.title)===nt);   // also catch title-only recs
   let id;
   if(existing){id=existing.id;}
   else{
     id=uid();
     const noteLines=rec.senders.map(s=>`${s.name}: ${s.note||'recommended this'}`).join('\n');
-    anime.push({id,title:it.title,status:'plan',kind:it.kind==='read'?'read':'watch',aniId:it.aniId||0,img:it.img||'',eps:'',time:'',genre:it.genre||'',order:[],notes:noteLines});
-    save();
+    // add it like any freshly-added show: top of the list, marked recent, then enriched
+    anime.unshift({id,title:it.title,status:'plan',kind:it.kind==='read'?'read':'watch',aniId:it.aniId||0,img:it.img||'',eps:'',epTotal:0,time:'',genre:it.genre||'',order:[],notes:noteLines,rating:0,fav:false,upd:Date.now()});
+    dedupeAnime();save();setTimeout(fetchCovers,300);   // pull episode counts / banner / airing
   }
   render();closeAll();
   const item=anime.find(a=>a.id===id);
@@ -4954,10 +4961,11 @@ async function sendRecommend(){
   const items=[...recPickShows].map(id=>anime.find(a=>a.id===id)).filter(Boolean).map(a=>({aniId:a.aniId||0,title:a.title,img:a.img||'',genre:a.genre||'',kind:kindOf(a)==='read'?'read':'watch',note:String(recItemNotes[a.id]||'').trim()}));
   if(!items.length){toast('Nothing to send');return;}
   const from={code:myFriendCode(),name:myFriendName()||'A friend'};
-  let ok=0,fail=0;
-  for(const code of [...recToFriends]){
-    try{const r=await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({op:'rec_send',to:code,from,items})});const j=r.ok?await r.json():{};if(j&&j.ok)ok++;else fail++;}catch(e){fail++;}
-  }
+  // fire all sends at once — a 5-friend send is as fast as a 1-friend send
+  const results=await Promise.all([...recToFriends].map(async code=>{
+    try{const r=await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({op:'rec_send',to:code,from,items})});const j=r.ok?await r.json():{};return !!(j&&j.ok);}catch(e){return false;}
+  }));
+  const ok=results.filter(Boolean).length,fail=results.length-ok;
   closeAll();
   toast(ok?`Sent to ${ok} friend${ok>1?'s':''}${fail?` (${fail} failed)`:''}`:'Send failed — try again');
 }

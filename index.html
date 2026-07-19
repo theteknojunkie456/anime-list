@@ -1739,11 +1739,11 @@ body.recsel .pcard{position:relative;}
 
 <!-- CONFIRM DELETE -->
 <div class="confirm-box" id="confirmBox">
-  <div class="confirm-title">Remove from list?</div>
+  <div class="confirm-title" id="confirmTitle">Remove from list?</div>
   <div class="confirm-msg" id="confirmMsg"></div>
   <div class="confirm-btns">
     <button class="cbtn cancel" onclick="closeConfirm()">Cancel</button>
-    <button class="cbtn del" onclick="doDelete()">Remove</button>
+    <button class="cbtn del" id="confirmYesBtn" onclick="confirmYes()">Remove</button>
   </div>
 </div>
 
@@ -1949,11 +1949,12 @@ async function regenRecovery(){                       // issue a fresh recovery 
   showRecovery(rec,'Your new recovery key');
 }
 function removeAppPassword(){
-  if(!confirm('Remove the password? Your list will be stored unencrypted again — on this device and in the cloud.'))return;
-  cryptoKey=null;envWraps=null;
-  try{localStorage.removeItem(ENCFLAG);}catch{}
-  writeLocal();schedulePush();
-  toast('Password removed');renderLockUI();
+  askConfirm({title:'Remove password?',msg:'Your list will be stored unencrypted again — on this device and in the cloud.',yes:'Remove',onYes:()=>{
+    cryptoKey=null;envWraps=null;
+    try{localStorage.removeItem(ENCFLAG);}catch{}
+    writeLocal();schedulePush();
+    toast('Password removed');renderLockUI();
+  }});
 }
 async function upgradeToV2(pw){                        // migrate an older (v1) password-only list to master+recovery
   cryptoKey=await crypto.subtle.generateKey({name:'AES-GCM',length:256},true,['encrypt','decrypt']);
@@ -2214,22 +2215,25 @@ function syncEnableNew(){
 async function syncRestore(){
   const raw=(document.getElementById('syncCodeIn').value||'').replace(/\s+/g,'');
   if(!/^[A-Za-z0-9]{10,64}$/.test(raw)){toast('That code looks off — check it');return;}
-  if(anime.length&&!confirm("This replaces this device's list with the backup for that code. Continue?"))return;
-  try{
-    setSyncCode(raw);
-    const res=await syncPull();
-    if(res&&isEnvelope(res.data)){ // encrypted backup — store it and ask for the password to unlock
-      try{store().setItem(LSKEY,JSON.stringify(res.data));localStorage.setItem(ENCFLAG,'1');}catch{}
-      setSyncAt(res.updatedAt||Date.now());
-      cryptoKey=null;envWraps=null;
-      renderSyncUI();renderLockUI();showLock();
-      toast('Enter this list’s password to unlock');
-    }else if(res&&Array.isArray(res.data)&&res.data.length){
-      anime=migrate(res.data);writeLocal();setSyncAt(res.updatedAt||Date.now());render();renderSyncUI();toast('Restored from cloud');
-    }else{ // nothing stored under that code yet — link this device and seed it
-      setSyncAt(0);syncPush();renderSyncUI();toast('Code linked — this device now backs up here');
-    }
-  }catch{setSyncCode('');toast('Could not reach cloud — try again');}
+  const proceed=async()=>{
+    try{
+      setSyncCode(raw);
+      const res=await syncPull();
+      if(res&&isEnvelope(res.data)){ // encrypted backup — store it and ask for the password to unlock
+        try{store().setItem(LSKEY,JSON.stringify(res.data));localStorage.setItem(ENCFLAG,'1');}catch{}
+        setSyncAt(res.updatedAt||Date.now());
+        cryptoKey=null;envWraps=null;
+        renderSyncUI();renderLockUI();showLock();
+        toast('Enter this list’s password to unlock');
+      }else if(res&&Array.isArray(res.data)&&res.data.length){
+        anime=migrate(res.data);writeLocal();setSyncAt(res.updatedAt||Date.now());render();renderSyncUI();toast('Restored from cloud');
+      }else{ // nothing stored under that code yet — link this device and seed it
+        setSyncAt(0);syncPush();renderSyncUI();toast('Code linked — this device now backs up here');
+      }
+    }catch{setSyncCode('');toast('Could not reach cloud — try again');}
+  };
+  if(anime.length)askConfirm({title:'Restore from backup?',msg:"This replaces this device's list with the backup for that code.",yes:'Replace',onYes:proceed});
+  else proceed();
 }
 function syncOff(){setSyncCode('');renderSyncUI();toast('Backup off — data stays on this device');}
 function copySyncCode(){const c=syncCode();if(!c)return;const done=()=>toast('Code copied');if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(c).then(done).catch(()=>fallbackCopy(c,done));else fallbackCopy(c,done);}
@@ -3439,13 +3443,35 @@ async function submitForm(){
 }
 
 // ─── DELETE ─────────────────────────────────────────────────────────────────
+let _confirmCb=null;
+// The app's own styled confirm modal — a callback-based drop-in for native confirm(),
+// so dialogs match the app and don't misbehave inside the iOS WKWebView.
+function askConfirm(opts){
+  opts=opts||{};
+  const box=document.getElementById('confirmBox');if(!box)return;
+  const t=document.getElementById('confirmTitle');if(t)t.textContent=opts.title||'Are you sure?';
+  document.getElementById('confirmMsg').textContent=opts.msg||'';
+  const yb=document.getElementById('confirmYesBtn');
+  if(yb){yb.textContent=opts.yes||'Confirm';yb.className='cbtn del';}
+  deleteId=null;
+  _confirmCb=typeof opts.onYes==='function'?opts.onYes:null;
+  box.classList.add('on');
+}
+function confirmYes(){
+  const cb=_confirmCb;_confirmCb=null;
+  const box=document.getElementById('confirmBox');if(box)box.classList.remove('on');
+  if(deleteId){doDelete();return;}   // legacy delete path
+  if(cb)cb();
+}
 function confirmDelete(id){
   const a=anime.find(x=>x.id===id);if(!a)return;
-  deleteId=id;
+  deleteId=id;_confirmCb=null;
+  const t=document.getElementById('confirmTitle');if(t)t.textContent='Remove from list?';
+  const yb=document.getElementById('confirmYesBtn');if(yb){yb.textContent='Remove';yb.className='cbtn del';}
   document.getElementById('confirmMsg').textContent=`"${a.title}" will be removed from your list.`;
   document.getElementById('confirmBox').classList.add('on');
 }
-function closeConfirm(){deleteId=null;document.getElementById('confirmBox').classList.remove('on');}
+function closeConfirm(){deleteId=null;_confirmCb=null;document.getElementById('confirmBox').classList.remove('on');}
 function doDelete(){
   if(!deleteId)return;
   anime=anime.filter(a=>a.id!==deleteId);

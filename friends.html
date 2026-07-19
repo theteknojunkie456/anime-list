@@ -2549,10 +2549,8 @@ function resumeItems(pool){
     (a.ep||0) < a.epTotal))       // started-or-fresh, not finished
     .sort((a,b)=>(b.upd||0)-(a.upd||0)).slice(0,12);
 }
-function resumeRailHTML(pool,isRead){
-  if(isRead) return '';                    // reading has no episode deep-link
-  const items=resumeItems(pool);
-  if(!items.length) return '';
+function resumeRailHTML(items,isRead){
+  if(isRead||!items||!items.length) return '';   // reading has no episode deep-link; items pre-filtered by caller
   const card=a=>{
     const next=Math.min((a.ep||0)+1,a.epTotal);
     const p=Math.round(prog(a)*100);
@@ -2902,9 +2900,14 @@ function renderHome(){
   sorted(pool.filter(a=>titleBg(a))).forEach(addSpot);
   const spotlight=spot.slice(0,5),spotSet=new Set(spotlight.map(a=>a.id));
   heroAmb=spotlight[0]?titleAccent(spotlight[0]):'';setAmbient(heroAmb);
+  // Continue-watching rail: resumable titles, minus anything already up in the
+  // billboard, so no show appears in both. This is the single source of truth for
+  // what's in the rail — the Watching row below subtracts it too (railSet).
+  const railItems=isRead?[]:resumeItems(pool).filter(a=>!spotSet.has(a.id));
+  const railSet=new Set(railItems.map(a=>a.id));
   // one banner at most: backup warning (critical) wins; otherwise the behind nudge
   const topBanner=shouldNudge()?nudgeHTML():(isRead?'':behindHTML());
-  let html=topBanner+(spotlight.length?billboardHTML(spotlight):'')+resumeRailHTML(pool,isRead)+friendRecRowHTML();
+  let html=topBanner+(spotlight.length?billboardHTML(spotlight):'')+resumeRailHTML(railItems,isRead)+friendRecRowHTML();
   // each section wears its own status colour (STATUS_META) rather than the one
   // theme accent — the palette already exists, it was just unused outside chips
   const rows=isRead
@@ -2913,7 +2916,9 @@ function renderHome(){
   for(const[st,label]of rows){
     const rc=(STATUS_META[st]||{}).color||'var(--t2)';
     let items=sorted(pool.filter(a=>a.status===st));
-    if(st==='watching')items=items.filter(a=>!spotSet.has(a.id));
+    // Watching row shows only what ISN'T already in the billboard or the Continue-
+    // watching rail, so a show never appears twice on the home screen.
+    if(st==='watching')items=items.filter(a=>!spotSet.has(a.id)&&!railSet.has(a.id));
     if(!items.length)continue;
     const cells=collapseSeries(items);
     html+=`<div class="row-sec" data-amb="${items[0]?titleAccent(items[0]):''}"><div class="row-head"><div class="row-title" style="--rc:${rc}">${label}</div><div class="row-count">${cells.length}</div></div>

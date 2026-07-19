@@ -4412,8 +4412,9 @@ async function watchAnime(id){
     if(IS_NATIVE){ await routeLegal(a); return; }   // official app → legal auto-routing (goes straight to the show)
     openExternal(launchURL(a)); toast(`Opening ${sourceName()} for “${a.title}”`); return;   // web → free-legal default; set your own source in Settings
   }
-  if(!/\{ep\}/.test(src)){ openExternal(launchURL(a)); toast(`Opening ${sourceName()} for “${a.title}”`); return; }
-  // your own {ep} source → immersive in-app player
+  // built-in legal presets (Tubi, Netflix…) can't be framed (DRM / X-Frame-Options) → browser
+  if(WATCH_PRESETS.some(p=>p.url===src)){ openExternal(launchURL(a)); toast(`Opening ${sourceName()} for “${a.title}”`); return; }
+  // YOUR OWN source → immersive in-app player (WatchList top + bottom chrome, in-frame search)
   pvReturnId=id;
   const ep=watchEpisode(a);
   pvWatchEp=ep;   // the episode we opened, so we can save progress on the way out

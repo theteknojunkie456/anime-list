@@ -322,6 +322,15 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 /* ── CONTINUE WATCHING RAIL ── */
 /* Continue-watching: framed as its own band (hairline top + bottom), a row of
    uniform cinematic cards with one consistent glassy play button. */
+/* ── QUICK PICKS (help me decide) ── */
+.qp-sec{margin:16px 0 4px;animation:fadeUp .4s ease both;}
+.qp-head{font-size:13px;font-weight:600;color:var(--t2);margin:0 0 9px;display:flex;align-items:center;gap:7px;}
+.qp-head svg{width:15px;height:15px;stroke-width:2.2;}
+.qp-chips{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px;}
+.qp-chips::-webkit-scrollbar{display:none;}
+.qp-chip{flex:0 0 auto;display:flex;align-items:center;gap:6px;padding:9px 14px;border-radius:12px;border:1px solid var(--b1);background:var(--bg2);color:var(--t1);font-size:13px;font-weight:600;cursor:pointer;transition:transform .12s ease,border-color .15s ease;}
+.qp-chip:active{transform:scale(.95);}
+.qp-chip svg{width:15px;height:15px;color:var(--a);stroke-width:2.2;}
 .rz-sec{margin-top:18px;padding:16px 0 15px;border-top:1px solid var(--b1);border-bottom:1px solid var(--b1);animation:fadeUp .4s ease both;}
 .rz-head{display:flex;align-items:center;gap:7px;padding:0 18px 12px;font-family:var(--fd);font-size:15px;font-weight:800;letter-spacing:-.2px;color:var(--t1);}
 .rz-head .ico{width:16px;height:16px;fill:var(--a2);color:var(--a2);}
@@ -2603,6 +2612,38 @@ function resumeWatch(id){
   // exactly what Watch now does, but invoked from the rail — straight to the episode
   watchAnime(id);
 }
+// ─── QUICK PICKS — a "help me decide" strip (watch list only) ────────────────
+// Minutes left to finish a title — powers the "Short one" pick.
+function qpLeftMins(a){
+  const per=a.dur||24, total=a.epTotal||0;
+  if(!total) return 1e9;                          // unknown length → never "shortest"
+  const done=Math.min(a.ep||0,total);
+  return Math.max(per,(total-done)*per);
+}
+function quickPickStripHTML(pool,isRead){
+  if(isRead) return '';                            // watch list only for now
+  if(pool.filter(a=>a.status==='watching'||a.status==='plan').length<2) return '';
+  const picks=[['sparkles','Surprise me','surprise'],['clock','Short one','short'],['check','Almost done','almost'],['compass','Something new','new']];
+  const chips=picks.map(([ic,label,mood])=>`<button class="qp-chip" onclick="quickPick('${mood}')">${icon(ic)}<span>${label}</span></button>`).join('');
+  return `<div class="qp-sec"><div class="qp-head">${icon('bulb')} Not sure what to watch?</div><div class="qp-chips">${chips}</div></div>`;
+}
+// Pick one title by mood and open it — a decision-maker, not another list to scroll.
+function quickPick(mood){
+  const pool=anime.filter(a=>kindOf(a)==='watch');
+  const watching=pool.filter(a=>a.status==='watching'), plan=pool.filter(a=>a.status==='plan');
+  let cands=[], why='';
+  if(mood==='short'){ cands=[...watching,...plan].filter(a=>a.epTotal).sort((a,b)=>qpLeftMins(a)-qpLeftMins(b)); why='shortest left'; }
+  else if(mood==='almost'){ cands=watching.filter(a=>a.epTotal&&(a.ep||0)<a.epTotal).sort((a,b)=>prog(b)-prog(a)); why='closest to the finish'; }
+  else if(mood==='new'){ cands=plan.slice().sort((a,b)=>(b.rating||0)-(a.rating||0)||(b.upd||0)-(a.upd||0)); why='fresh from your Plan'; }
+  else{ // surprise — a genuinely random one from what you're watching or plan to
+    cands=[...watching,...plan];
+    if(cands.length){const p=cands[Math.floor(Math.random()*cands.length)]; toast('Surprise — '+p.title); openDetail(p.id); return;}
+  }
+  if(!cands.length){ toast('Nothing fits that yet'); return; }
+  const pick=cands[0];
+  toast(pick.title+' — '+why);
+  openDetail(pick.id);
+}
 
 // ─── HOME RENDER ────────────────────────────────────────────────────────────
 function sorted(list){
@@ -2892,7 +2933,7 @@ function renderHome(){
   const railItems=isRead?[]:resumeItems(pool).filter(a=>!spotSet.has(a.id));
   // one banner at most: backup warning (critical) wins; otherwise the behind nudge
   const topBanner=shouldNudge()?nudgeHTML():(isRead?'':behindHTML());
-  let html=topBanner+(spotlight.length?billboardHTML(spotlight):'')+resumeRailHTML(railItems,isRead)+friendRecRowHTML();
+  let html=topBanner+(spotlight.length?billboardHTML(spotlight):'')+resumeRailHTML(railItems,isRead)+quickPickStripHTML(pool,isRead)+friendRecRowHTML();
   // each section wears its own status colour (STATUS_META) rather than the one
   // theme accent — the palette already exists, it was just unused outside chips
   // Watch list: no "Watching" row — it's merged into the Continue-watching rail

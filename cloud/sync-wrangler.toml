@@ -18,6 +18,16 @@ id = "2d33c48c2507420f895ce4a26904ce0b"
 name = "PARTY"
 class_name = "PartyRoom"
 
+# CHAN = per-user live channel (WebSocket) so friend requests + recommendations
+# arrive instantly. No storage — just holds the user's open sockets.
+[[durable_objects.bindings]]
+name = "CHAN"
+class_name = "UserChannel"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["PartyRoom"]
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["UserChannel"]

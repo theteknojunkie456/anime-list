@@ -27,6 +27,16 @@ export default {
       return env.PARTY.get(id).fetch(request);
     }
 
+    // ── friend live channel: a per-user WebSocket so friend requests and
+    // recommendations arrive instantly (no polling / no re-open needed). The
+    // client keeps this open; rec_send/fr_send/fr_accept ping the recipient's
+    // channel, which pushes a tiny message so their app pulls the fresh data.
+    if (url.pathname === '/friend') {
+      const code = (url.searchParams.get('code') || '');
+      if (!/^[A-Za-z0-9]{10,64}$/.test(code)) return new Response('bad code', { status: 400 });
+      return env.CHAN.get(env.CHAN.idFromName(code)).fetch(request);
+    }
+
     // ── list sync (KV, unchanged) ──────────────────────────────────────────
     const cors = {
       'Access-Control-Allow-Origin': '*',
@@ -83,6 +93,7 @@ export default {
       if (list.length > 200) list = list.slice(list.length - 200);
       while (JSON.stringify(list).length > 2_000_000 && list.length > 1) list = list.slice(Math.ceil(list.length / 2));
       await env.LISTS.put(key, JSON.stringify(list));
+      ctx.waitUntil(notifyChan(env, to, 'rec'));
       return json({ ok: true }, 200, cors);
     }
     if (op === 'rec_pull') {
@@ -116,6 +127,7 @@ export default {
       list.push({ id: type[0] + fromCode.slice(0, 8) + Date.now().toString(36), type, from: { code: fromCode, name: fromName }, at: Date.now() });
       if (list.length > 200) list = list.slice(list.length - 200);
       await env.LISTS.put(key, JSON.stringify(list));
+      ctx.waitUntil(notifyChan(env, to, 'fr'));
       return json({ ok: true }, 200, cors);
     }
     if (op === 'fr_pull') {
@@ -130,6 +142,40 @@ export default {
     return json({ error: 'bad op' }, 400, cors);
   },
 };
+
+// Ping a user's live channel (best-effort) so their app pulls the new data now.
+async function notifyChan(env, code, kind) {
+  try {
+    await env.CHAN.get(env.CHAN.idFromName(code)).fetch(new Request('https://chan/notify', { method: 'POST', body: kind || 'ping' }));
+  } catch (e) {}
+}
+
+// ── USER CHANNEL (Durable Object) ───────────────────────────────────────────
+// One instance per friend code. Holds that user's open WebSocket(s). When a
+// friend request / recommendation lands for them, the worker POSTs /notify here
+// and we push a tiny message ("rec"/"fr") to every socket, so the app refreshes
+// instantly. No stored state — just the live connections.
+export class UserChannel {
+  constructor(state, env) { this.state = state; this.sockets = new Set(); }
+  async fetch(request) {
+    if (request.headers.get('Upgrade') === 'websocket') {
+      const pair = new WebSocketPair();
+      const client = pair[0], server = pair[1];
+      server.accept();
+      this.sockets.add(server);
+      const drop = () => this.sockets.delete(server);
+      server.addEventListener('close', drop);
+      server.addEventListener('error', drop);
+      // ignore anything the client sends (it only sends keepalive pings)
+      return new Response(null, { status: 101, webSocket: client });
+    }
+    const msg = (await request.text()) || 'ping';
+    for (const s of [...this.sockets]) {
+      try { s.send(msg); } catch (e) { this.sockets.delete(s); }
+    }
+    return new Response('ok');
+  }
+}
 
 // ── PARTY ROOM (Durable Object) ─────────────────────────────────────────────
 // One instance per code. Holds the room in memory + durable storage, and pushes

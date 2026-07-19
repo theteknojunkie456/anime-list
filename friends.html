@@ -4423,6 +4423,22 @@ async function acceptReq(id){
   toast("Friend added — you're connected");
 }
 function denyReq(id){addFrHandled(id);friendReqs=friendReqs.filter(r=>r.id!==id);renderFriends();}
+// Live channel: a WebSocket to our friend code so requests + recs arrive instantly.
+// On a ping we pull the fresh data; auto-reconnects; a keepalive stops idle drops.
+let friendWS=null, friendWSRetry=0;
+function connectFriendWS(){
+  if(IS_NATIVE)return;
+  const code=myFriendCode(); if(!code)return;
+  if(friendWS&&(friendWS.readyState===0||friendWS.readyState===1))return;   // connecting/open already
+  try{
+    const url=SYNC_URL.replace(/^http/,'ws')+'/friend?code='+encodeURIComponent(code);
+    const ws=new WebSocket(url); friendWS=ws;
+    ws.onopen=()=>{friendWSRetry=0;pullRecs();pullFriendReqs();};   // catch up on anything missed while offline
+    ws.onmessage=(e)=>{const t=String(e.data||'');if(t==='rec')pullRecs();else if(t==='fr')pullFriendReqs();else{pullRecs();pullFriendReqs();}};
+    ws.onclose=()=>{if(friendWS===ws)friendWS=null;friendWSRetry=Math.min(friendWSRetry+1,6);setTimeout(connectFriendWS,700*friendWSRetry);};
+    ws.onerror=()=>{try{ws.close();}catch(e){}};
+  }catch(e){friendWSRetry=Math.min(friendWSRetry+1,6);setTimeout(connectFriendWS,700*friendWSRetry);}
+}
 
 let recsIn=[];
 function loadRecsCache(){try{const a=JSON.parse(localStorage.getItem('recs_in')||'[]');recsIn=Array.isArray(a)?a:[];}catch{recsIn=[];}}
@@ -5594,7 +5610,13 @@ try{if(IS_NATIVE){const pc=localStorage.getItem('party_active');if(pc&&partyName
 try{if(sessionStorage.getItem('justUpdated')){sessionStorage.removeItem('justUpdated');setTimeout(()=>toast('✨ Updated to the latest version'),700);}}catch{}
 // Friends recommendations (public web build): show cached instantly, then refresh.
 try{loadRecsCache();}catch(e){}
-if(!IS_NATIVE){setTimeout(()=>{pullRecs();pullFriendReqs();},1100);try{document.addEventListener('visibilitychange',()=>{if(!document.hidden){pullRecs();pullFriendReqs();}});}catch(e){}}
+if(!IS_NATIVE){
+  setTimeout(()=>{pullRecs();pullFriendReqs();connectFriendWS();},1100);
+  // keepalive so Cloudflare doesn't drop the idle socket
+  setInterval(()=>{try{if(friendWS&&friendWS.readyState===1)friendWS.send('p');}catch(e){}},25000);
+  try{document.addEventListener('visibilitychange',()=>{if(!document.hidden){connectFriendWS();pullRecs();pullFriendReqs();}});}catch(e){}
+  try{window.addEventListener('online',()=>{connectFriendWS();});}catch(e){}
+}
 setTimeout(fetchCovers,1200);
 setTimeout(syncOnOpen,300);
 // If notifications are on, re-sync the tracked show list with the worker on load (fire-and-forget).

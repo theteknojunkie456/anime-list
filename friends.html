@@ -758,6 +758,25 @@ body.no-party .friend-only{display:flex;}
 .rs-note{margin-top:6px;}
 .pt-pick-check{margin-left:auto;color:var(--a);display:flex;}
 .pt-pick-check .ico{width:18px;height:18px;}
+/* friend request Accept button */
+.fr-accept{background:var(--a);color:var(--aFg,#fff);border:0;border-radius:999px;padding:8px 14px;font-family:var(--fd);font-size:12.5px;font-weight:800;display:flex;align-items:center;gap:5px;flex-shrink:0;}
+.fr-accept .ico{width:14px;height:14px;}
+/* pick-from-list selection mode */
+.recsel-bar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--safe-b) + 16px);z-index:120;display:none;align-items:center;gap:12px;background:var(--card,#17171d);border:1px solid rgba(255,255,255,.14);border-radius:999px;padding:8px 8px 8px 18px;box-shadow:0 12px 34px -8px rgba(0,0,0,.6);}
+body.recsel .recsel-bar{display:flex;}
+.recsel-count{font-family:var(--fd);font-weight:800;font-size:13.5px;color:var(--t1);white-space:nowrap;}
+.recsel-cancel{background:none;border:0;color:var(--t2);font-weight:700;font-size:13px;padding:6px 8px;}
+.recsel-done{background:var(--a);color:var(--aFg,#fff);border:0;border-radius:999px;padding:9px 18px;font-family:var(--fd);font-weight:800;font-size:13.5px;}
+.pcard.sel .pcard-wrap{outline:3px solid var(--a);outline-offset:-3px;border-radius:12px;}
+.pcard.sel::after{content:"";position:absolute;top:8px;right:8px;width:22px;height:22px;border-radius:50%;background:var(--a);box-shadow:0 0 0 2px var(--bg,#0b0b0f);z-index:2;}
+body.recsel .pcard{position:relative;}
+/* per-show note rows in the compose sheet */
+.rc-note{display:flex;gap:10px;align-items:center;margin-bottom:10px;}
+.rc-note-img,.rc-note-ph{width:44px;height:60px;border-radius:8px;object-fit:cover;flex-shrink:0;}
+.rc-note-ph{display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.08);font-weight:800;color:var(--t2);}
+.rc-note-main{flex:1;min-width:0;}
+.rc-note-t{font-weight:700;font-size:13.5px;margin-bottom:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.rc-note-in{margin:0;}
 .party-pill.on{display:flex;}
 .party-pill:active{transform:scale(.95);}
 .pp-dot{width:8px;height:8px;border-radius:50%;background:#fff;animation:ppPulse 1.6s ease-in-out infinite;}
@@ -1407,6 +1426,13 @@ body.no-party .friend-only{display:flex;}
 
 <!-- floating pill while a party is live -->
 <button class="party-pill" id="partyPill" onclick="openSheet('partySheet')"><span class="pp-dot"></span><span id="ppText">Party</span></button>
+
+<!-- selection bar while picking shows to recommend from the list -->
+<div class="recsel-bar" id="recSelBar">
+  <button class="recsel-cancel" onclick="cancelRecSel()">Cancel</button>
+  <span class="recsel-count" id="recSelCount">0 shows</span>
+  <button class="recsel-done" onclick="doneRecSel()">Done</button>
+</div>
 
 <!-- live reaction layer — emoji float up over whatever's on screen -->
 <div class="react-layer" id="reactLayer"></div>
@@ -2555,7 +2581,7 @@ function posterCard(a,nSeas){
   const air=airingInfo(a);
   const airHTML=air?`<div class="pcard-air">${icon('calendar')} ${air.when}</div>`:'';
   const seas=multi?`<span class="pcard-seas">${icon('layers')}${nSeas}</span>`:'';
-  return`<div class="pcard" onclick="openDetail('${a.id}')">
+  return`<div class="pcard${recSel&&recSel.has(a.id)?' sel':''}" onclick="pcTap('${a.id}',event)">
     <div class="pcard-wrap">
       ${img}
       <span class="pcard-badge b-${a.status}">${STATUS_META[a.status].icon} ${a.status==='plan'?'PLAN':a.status.toUpperCase().slice(0,5)}</span>
@@ -2755,6 +2781,7 @@ function renderHome(){
 
 // ─── DETAIL ─────────────────────────────────────────────────────────────────
 function openDetail(id){
+  if(recSel){if(recSel.has(id))recSel.delete(id);else recSel.add(id);updateRecSelBar();render();return;}   // selection mode: tap toggles
   detailId=id;
   const it=anime.find(a=>a.id===id);setAmbient(it?titleAccent(it):'');
   renderDetail();
@@ -4336,16 +4363,66 @@ function myFriendName(){try{return localStorage.getItem('friend_name')||localSto
 function setMyFriendName(n){try{localStorage.setItem('friend_name',String(n||'').slice(0,40));}catch{}}
 function friendsList(){try{const a=JSON.parse(localStorage.getItem('friends')||'[]');return Array.isArray(a)?a:[];}catch{return [];}}
 function saveFriends(a){try{localStorage.setItem('friends',JSON.stringify(a.slice(0,200)));}catch{}}
-function addFriendByCode(code,name){
+// Pending outgoing requests (I asked them) + handled message ids (so accepts/reqs
+// aren't processed twice). Incoming requests live in memory (friendReqs), pulled.
+function friendsOut(){try{const a=JSON.parse(localStorage.getItem('friend_out')||'[]');return Array.isArray(a)?a:[];}catch{return [];}}
+function saveFriendsOut(a){try{localStorage.setItem('friend_out',JSON.stringify(a.slice(0,200)));}catch{}}
+function frHandled(){try{const a=JSON.parse(localStorage.getItem('fr_handled')||'[]');return Array.isArray(a)?a:[];}catch{return [];}}
+function addFrHandled(id){try{const a=frHandled();if(!a.includes(id)){a.push(id);localStorage.setItem('fr_handled',JSON.stringify(a.slice(-500)));}}catch{}}
+let friendReqs=[];   // pending incoming requests [{id,from:{code,name},at}]
+// Friending is now a two-sided request: this posts a request to their mailbox and
+// marks it pending. They accept → an 'accept' comes back and both sides add each other.
+async function sendFriendRequest(code,name){
   code=String(code||'').trim();
   if(!/^[A-Za-z0-9]{10,64}$/.test(code))return "That doesn't look like a friend code.";
   if(code===myFriendCode())return "That's your own code.";
-  let a=friendsList();
-  if(a.some(f=>f.code===code)){a=a.map(f=>f.code===code?{code,name:(name||f.name)}:f);}
-  else a.push({code,name:String(name||'Friend').slice(0,40)});
-  saveFriends(a);return '';
+  if(friendsList().some(f=>f.code===code))return "You're already friends.";
+  let out=friendsOut().filter(f=>f.code!==code);out.push({code,name:String(name||'').slice(0,40)});saveFriendsOut(out);
+  try{
+    const from={code:myFriendCode(),name:myFriendName()||'A friend'};
+    const r=await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({op:'fr_send',to:code,from})});
+    const j=r.ok?await r.json():{};
+    if(!j.ok)return "Couldn't send — double-check the code.";
+  }catch(e){return "Network error — try again.";}
+  return '';
 }
 function removeFriend(code){saveFriends(friendsList().filter(f=>f.code!==code));renderFriends();}
+function cancelOutgoing(code){saveFriendsOut(friendsOut().filter(f=>f.code!==code));renderFriends();}
+// Pull my mailbox: auto-add anyone who ACCEPTED my request; surface incoming requests.
+async function pullFriendReqs(){
+  if(IS_NATIVE)return;
+  const code=myFriendCode(); if(!code) return;
+  try{
+    const r=await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({op:'fr_pull',code})});
+    if(!r.ok)return;
+    const msgs=(await r.json()).reqs; if(!Array.isArray(msgs))return;
+    const handled=frHandled(); let friends=friendsList(); let changed=false; const incoming=[];
+    for(const m of msgs){
+      if(!m||!m.from||!m.from.code||handled.includes(m.id))continue;
+      if(m.type==='accept'){
+        if(!friends.some(f=>f.code===m.from.code)){friends.push({code:m.from.code,name:m.from.name||'Friend'});changed=true;}
+        saveFriendsOut(friendsOut().filter(f=>f.code!==m.from.code));
+        addFrHandled(m.id);
+      }else if(m.type==='request'){
+        if(friends.some(f=>f.code===m.from.code)){addFrHandled(m.id);continue;}
+        incoming.push(m);
+      }
+    }
+    if(changed)saveFriends(friends);
+    friendReqs=incoming;
+    if(document.getElementById('friendsSheet').classList.contains('on'))renderFriends();
+  }catch(e){}
+}
+async function acceptReq(id){
+  const req=friendReqs.find(r=>r.id===id); if(!req)return;
+  const c=req.from.code, n=req.from.name;
+  let friends=friendsList();
+  if(!friends.some(f=>f.code===c)){friends.push({code:c,name:n||'Friend'});saveFriends(friends);}
+  addFrHandled(id); friendReqs=friendReqs.filter(r=>r.id!==id); renderFriends();
+  try{const from={code:myFriendCode(),name:myFriendName()||'A friend'};await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({op:'fr_accept',to:c,from})});}catch(e){}
+  toast("Friend added — you're connected");
+}
+function denyReq(id){addFrHandled(id);friendReqs=friendReqs.filter(r=>r.id!==id);renderFriends();}
 
 let recsIn=[];
 function loadRecsCache(){try{const a=JSON.parse(localStorage.getItem('recs_in')||'[]');recsIn=Array.isArray(a)?a:[];}catch{recsIn=[];}}
@@ -4365,7 +4442,7 @@ async function pullRecs(){
 // aniId (or title) -> {item, senders:[{name,code,note,at}]}
 function recByAni(){
   const m={};
-  recsIn.forEach(env=>{(env.items||[]).forEach(it=>{const k=it.aniId?('a'+it.aniId):('t'+String(it.title||'').toLowerCase());if(!m[k])m[k]={item:it,senders:[]};m[k].senders.push({name:(env.from&&env.from.name)||'A friend',code:(env.from&&env.from.code)||'',note:env.note||'',at:env.at||0});});});
+  recsIn.forEach(env=>{(env.items||[]).forEach(it=>{const k=it.aniId?('a'+it.aniId):('t'+String(it.title||'').toLowerCase());if(!m[k])m[k]={item:it,senders:[]};m[k].senders.push({name:(env.from&&env.from.name)||'A friend',code:(env.from&&env.from.code)||'',note:it.note||'',at:env.at||0});});});
   return m;
 }
 function friendRecRowHTML(){
@@ -4427,37 +4504,41 @@ function addRecToList(watchAfter){
   if(watchAfter&&item&&kindOf(item)==='watch'){watchAnime(id);}
   else{toast(existing?'Already on your list':'Added to your list');openDetail(id);}
 }
-function openFriends(){renderFriends();openSheet('friendsSheet');pullRecs();}
+function openFriends(){renderFriends();openSheet('friendsSheet');pullRecs();pullFriendReqs();}
 function renderFriends(){
   const box=document.getElementById('friendsBody');if(!box)return;
-  const code=myFriendCode(),name=myFriendName(),fr=friendsList();
-  const flist=fr.length?fr.map(f=>`<div class="fr-row"><span class="fr-dot" style="background:${friendColor(f.code)}"></span><div class="fr-info"><div class="fr-name">${escH(f.name)}</div><div class="fr-code">${escH(f.code)}</div></div><button class="fr-x" onclick="removeFriend('${escH(f.code)}')" aria-label="Remove friend">${icon('x')}</button></div>`).join(''):'<p class="ai-desc">No friends yet — share your code, or add a friend code below.</p>';
+  const code=myFriendCode(),name=myFriendName(),fr=friendsList(),out=friendsOut(),reqs=friendReqs;
+  const reqHTML=reqs.length?`<div class="dt-label" style="margin-top:18px">${icon('inbox')} Friend requests · ${reqs.length}</div>`+reqs.map(r=>`<div class="fr-row"><span class="fr-dot" style="background:${friendColor(r.from.code)}"></span><div class="fr-info"><div class="fr-name">${escH(r.from.name)}</div><div class="fr-code">wants to be friends</div></div><button class="fr-accept" onclick="acceptReq('${escH(r.id)}')">${icon('check')} Accept</button><button class="fr-x" onclick="denyReq('${escH(r.id)}')" aria-label="Deny">${icon('x')}</button></div>`).join(''):'';
+  const outHTML=out.length?`<div class="dt-label" style="margin-top:16px">Pending · ${out.length}</div>`+out.map(f=>`<div class="fr-row"><span class="fr-dot" style="background:${friendColor(f.code)};opacity:.4"></span><div class="fr-info"><div class="fr-name">${escH(f.name||f.code)}</div><div class="fr-code">request sent — waiting to accept</div></div><button class="fr-x" onclick="cancelOutgoing('${escH(f.code)}')" aria-label="Cancel">${icon('x')}</button></div>`).join(''):'';
+  const flist=fr.length?fr.map(f=>`<div class="fr-row"><span class="fr-dot" style="background:${friendColor(f.code)}"></span><div class="fr-info"><div class="fr-name">${escH(f.name)}</div><div class="fr-code">${escH(f.code)}</div></div><button class="fr-x" onclick="removeFriend('${escH(f.code)}')" aria-label="Remove friend">${icon('x')}</button></div>`).join(''):'<p class="ai-desc">No friends yet — share your code, or send a request below.</p>';
   box.innerHTML=`
     <div class="dt-label">${icon('star')} Your name</div>
     <input class="ai-prompt-in" id="frName" placeholder="What friends see" value="${escH(name)}" maxlength="40" oninput="setMyFriendName(this.value)">
     <div class="dt-label" style="margin-top:16px">${icon('users')} Your friend code</div>
-    <p class="ai-desc">Share this so friends can add you and send you recommendations.</p>
+    <p class="ai-desc">Share this so friends can send you a request.</p>
     <div class="pt-code"><div class="pt-code-val">${escH(code)}</div><button class="pt-code-cta" onclick="copyFriendCode()" aria-label="Copy code">${icon('copy')}</button></div>
+    ${reqHTML}
     <div class="dt-label" style="margin-top:18px">${icon('plus')} Add a friend</div>
     <input class="ai-prompt-in" id="frAddCode" placeholder="Their friend code" autocapitalize="off" autocomplete="off" spellcheck="false">
     <input class="ai-prompt-in" id="frAddName" placeholder="Name them (optional)" maxlength="40" style="margin-top:8px">
-    <button class="parse-btn" onclick="doAddFriend()">Add friend</button>
+    <button class="parse-btn" onclick="doAddFriend()">Send friend request</button>
     <div class="fr-err" id="frErr"></div>
+    ${outHTML}
     <div class="dt-label" style="margin-top:20px">${icon('users')} Friends · ${fr.length}</div>
     <div class="fr-list">${flist}</div>
     <button class="dt-watch" style="margin-top:16px" onclick="startRecommend()">${icon('send')} Recommend shows to friends</button>`;
 }
 function copyFriendCode(){const c=myFriendCode();try{navigator.clipboard.writeText(c);toast('Code copied');}catch{toast(c);}}
-function doAddFriend(){
+async function doAddFriend(){
   const code=(document.getElementById('frAddCode')||{}).value||'';
   const name=(document.getElementById('frAddName')||{}).value||'';
-  const err=addFriendByCode(code,name);
-  const e=document.getElementById('frErr');
+  const e=document.getElementById('frErr'); if(e)e.textContent='Sending…';
+  const err=await sendFriendRequest(code,name);
   if(err){if(e)e.textContent=err;return;}
-  renderFriends();toast('Friend added');
+  renderFriends();toast('Friend request sent');
 }
-let recPickShows=new Set(),recToFriends=new Set(),recNotes={};
-function startRecommend(){recPickShows=new Set();renderRecPick();openSheet('recPickSheet');}
+let recPickShows=new Set(),recToFriends=new Set(),recItemNotes={},recSel=null;
+function startRecommend(){recPickShows=new Set();recToFriends=new Set();recItemNotes={};renderRecPick();openSheet('recPickSheet');}
 function toggleRecPick(id){if(recPickShows.has(id))recPickShows.delete(id);else recPickShows.add(id);renderRecPick();}
 function renderRecPick(){
   const box=document.getElementById('recPickBody');if(!box)return;
@@ -4466,41 +4547,50 @@ function renderRecPick(){
     ${a.img?`<img src="${escH(a.img)}" alt="">`:`<div class="ph">${escH(((a.title||'?')[0]||'?').toUpperCase())}</div>`}
     <div class="pt-pick-info"><div class="pt-pick-t">${escH(a.title)}</div><div class="pt-pick-s">${escH((a.genre||'').split(',')[0]||(kindOf(a)==='read'?'Manga':'Anime'))}</div></div>
     <span class="pt-pick-check">${on?icon('check'):''}</span></button>`;}).join('');
-  box.innerHTML=`<p class="ai-desc">Pick the shows to recommend — as many as you like.</p>
+  box.innerHTML=`<button class="src-opt" onclick="pickFromList()"><div class="src-name">${icon('home')} Pick right on your list</div><div class="src-sub">Browse your rows and tap shows to pick — easiest way to find things</div></button>
+    <div class="dt-label" style="margin-top:14px">Or quick-pick here</div>
     <div class="pt-picks">${rows||'<p class="ai-desc">Your list is empty.</p>'}</div>
-    <button class="dt-watch rec-next" onclick="proceedRecommend()">${icon('chevron-right')} Next — choose friends (${recPickShows.size})</button>`;
+    <button class="dt-watch rec-next" onclick="proceedRecommend()">${icon('chevron-right')} Next — notes & friends (${recPickShows.size})</button>`;
 }
-function proceedRecommend(){if(!recPickShows.size){toast('Pick at least one show');return;}recToFriends=new Set();recNotes={};renderRecSend();openSheet('recSendSheet');}
+// "Pick right on your list" — leave the sheets, tap posters in the home rows.
+function pickFromList(){recSel=new Set(recPickShows);closeAll();render();document.body.classList.add('recsel');updateRecSelBar();toast('Tap shows to recommend, then Done');}
+function pcTap(id,ev){
+  if(recSel){if(recSel.has(id))recSel.delete(id);else recSel.add(id);const el=ev&&ev.currentTarget;if(el)el.classList.toggle('sel',recSel.has(id));updateRecSelBar();return;}
+  openDetail(id);
+}
+function updateRecSelBar(){const el=document.getElementById('recSelCount');if(el&&recSel)el.textContent=recSel.size+(recSel.size===1?' show':' shows');}
+function cancelRecSel(){recSel=null;document.body.classList.remove('recsel');render();}
+function doneRecSel(){if(!recSel||!recSel.size){toast('Tap a few shows first');return;}recPickShows=new Set(recSel);recSel=null;document.body.classList.remove('recsel');render();recToFriends=new Set();renderRecSend();openSheet('recSendSheet');}
+function proceedRecommend(){if(!recPickShows.size){toast('Pick at least one show');return;}recToFriends=new Set();renderRecSend();openSheet('recSendSheet');}
 function toggleRecFriend(code){if(recToFriends.has(code))recToFriends.delete(code);else recToFriends.add(code);renderRecSend();}
-function setRecNote(code,v){recNotes[code]=v;}
+function setItemNote(id,v){recItemNotes[id]=v;}
 function renderRecSend(){
   const box=document.getElementById('recSendBody');if(!box)return;
+  const shows=[...recPickShows].map(id=>anime.find(a=>a.id===id)).filter(Boolean);
+  if(!shows.length){box.innerHTML='<p class="ai-desc">No shows selected.</p>';return;}
   const fr=friendsList();
-  if(!fr.length){
-    box.innerHTML=`<p class="ai-desc">You picked <b>${recPickShows.size}</b> show${recPickShows.size===1?'':'s'} — now add a friend to send to. Share your code or enter theirs.</p>
-      <button class="dt-watch" onclick="openSheet('friendsSheet')">${icon('plus')} Add a friend</button>`;
-    return;
-  }
-  const rows=fr.map(f=>{const on=recToFriends.has(f.code),col=friendColor(f.code);return `<div class="rs-friend${on?' on':''}">
-    <button class="rs-pick" onclick="toggleRecFriend('${escH(f.code)}')"><span class="fr-dot" style="background:${col}"></span><span class="rs-name">${escH(f.name)}</span><span class="pt-pick-check">${on?icon('check'):''}</span></button>
-    ${on?`<input class="ai-prompt-in rs-note" placeholder="Optional note — e.g. 10/10 banger" maxlength="300" value="${escH(recNotes[f.code]||'')}" oninput="setRecNote('${escH(f.code)}',this.value)">`:''}
-  </div>`;}).join('');
-  box.innerHTML=`<p class="ai-desc">Send <b>${recPickShows.size}</b> show${recPickShows.size>1?'s':''} to which friends? Add a note for each if you like.</p>
-    <div class="rs-list">${rows}</div>
-    <button class="dt-watch" style="margin-top:14px" onclick="sendRecommend()"${recToFriends.size?'':' disabled'}>${icon('send')} Send recommendation${recToFriends.size>1?'s':''}</button>`;
+  const noteRows=shows.map(a=>`<div class="rc-note">
+    ${a.img?`<img class="rc-note-img" src="${escH(a.img)}" alt="" onerror="this.remove()">`:`<div class="rc-note-ph">${escH(((a.title||'?')[0]||'?').toUpperCase())}</div>`}
+    <div class="rc-note-main"><div class="rc-note-t">${escH(a.title)}</div>
+    <input class="ai-prompt-in rc-note-in" placeholder="Note for this one (optional)" maxlength="300" value="${escH(recItemNotes[a.id]||'')}" oninput="setItemNote('${a.id}',this.value)"></div>
+  </div>`).join('');
+  const friendHTML=fr.length?fr.map(f=>{const on=recToFriends.has(f.code),col=friendColor(f.code);return `<button class="rs-pick${on?' on':''}" onclick="toggleRecFriend('${escH(f.code)}')"><span class="fr-dot" style="background:${col}"></span><span class="rs-name">${escH(f.name)}</span><span class="pt-pick-check">${on?icon('check'):''}</span></button>`;}).join(''):`<p class="ai-desc">No accepted friends yet — <b onclick="openSheet('friendsSheet')" style="color:var(--a);cursor:pointer">add a friend</b> first (they have to accept).</p>`;
+  box.innerHTML=`<div class="dt-label">${icon('edit')} A note for each show</div>
+    <p class="ai-desc">Personalise each one — a romance and a dark thriller can carry different notes.</p>
+    <div class="rc-notes">${noteRows}</div>
+    <div class="dt-label" style="margin-top:18px">${icon('users')} Send to</div>
+    <div class="rs-list">${friendHTML}</div>
+    <button class="dt-watch" style="margin-top:14px" onclick="sendRecommend()"${(recToFriends.size&&fr.length)?'':' disabled'}>${icon('send')} Send${recToFriends.size?' to '+recToFriends.size:''}</button>`;
 }
 async function sendRecommend(){
-  if(!recToFriends.size||!recPickShows.size)return;
-  const items=[...recPickShows].map(id=>anime.find(a=>a.id===id)).filter(Boolean).map(a=>({aniId:a.aniId||0,title:a.title,img:a.img||'',genre:a.genre||'',kind:kindOf(a)==='read'?'read':'watch'}));
+  const fr=friendsList();
+  if(!recToFriends.size||!recPickShows.size||!fr.length){toast('Pick shows and a friend');return;}
+  const items=[...recPickShows].map(id=>anime.find(a=>a.id===id)).filter(Boolean).map(a=>({aniId:a.aniId||0,title:a.title,img:a.img||'',genre:a.genre||'',kind:kindOf(a)==='read'?'read':'watch',note:String(recItemNotes[a.id]||'').trim()}));
   if(!items.length){toast('Nothing to send');return;}
   const from={code:myFriendCode(),name:myFriendName()||'A friend'};
   let ok=0,fail=0;
   for(const code of [...recToFriends]){
-    try{
-      const r=await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({op:'rec_send',to:code,from,items,note:String(recNotes[code]||'').trim()})});
-      const j=r.ok?await r.json():{};
-      if(j&&j.ok)ok++;else fail++;
-    }catch(e){fail++;}
+    try{const r=await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({op:'rec_send',to:code,from,items})});const j=r.ok?await r.json():{};if(j&&j.ok)ok++;else fail++;}catch(e){fail++;}
   }
   closeAll();
   toast(ok?`Sent to ${ok} friend${ok>1?'s':''}${fail?` (${fail} failed)`:''}`:'Send failed — try again');
@@ -5504,7 +5594,7 @@ try{if(IS_NATIVE){const pc=localStorage.getItem('party_active');if(pc&&partyName
 try{if(sessionStorage.getItem('justUpdated')){sessionStorage.removeItem('justUpdated');setTimeout(()=>toast('✨ Updated to the latest version'),700);}}catch{}
 // Friends recommendations (public web build): show cached instantly, then refresh.
 try{loadRecsCache();}catch(e){}
-if(!IS_NATIVE){setTimeout(pullRecs,1100);try{document.addEventListener('visibilitychange',()=>{if(!document.hidden)pullRecs();});}catch(e){}}
+if(!IS_NATIVE){setTimeout(()=>{pullRecs();pullFriendReqs();},1100);try{document.addEventListener('visibilitychange',()=>{if(!document.hidden){pullRecs();pullFriendReqs();}});}catch(e){}}
 setTimeout(fetchCovers,1200);
 setTimeout(syncOnOpen,300);
 // If notifications are on, re-sync the tracked show list with the worker on load (fire-and-forget).

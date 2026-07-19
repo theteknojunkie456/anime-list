@@ -72,14 +72,14 @@ export default {
         img: String((it && it.img) || '').slice(0, 400),
         genre: String((it && it.genre) || '').slice(0, 200),
         kind: (it && it.kind) === 'read' ? 'read' : 'watch',
+        note: String((it && it.note) || '').slice(0, 500),   // per-show note
       })).filter(it => it.aniId || it.title);
       if (!items.length) return json({ error: 'no items' }, 400, cors);
-      const note = String(body.note || '').slice(0, 500);
       const key = 'rec:' + to;
       let list = [];
       try { const s = await env.LISTS.get(key); if (s) list = JSON.parse(s); } catch {}
       if (!Array.isArray(list)) list = [];
-      list.push({ id: fromCode.slice(0, 8) + Date.now().toString(36), from: { code: fromCode, name: fromName }, items, note, at: Date.now() });
+      list.push({ id: fromCode.slice(0, 8) + Date.now().toString(36), from: { code: fromCode, name: fromName }, items, at: Date.now() });
       if (list.length > 200) list = list.slice(list.length - 200);
       while (JSON.stringify(list).length > 2_000_000 && list.length > 1) list = list.slice(Math.ceil(list.length / 2));
       await env.LISTS.put(key, JSON.stringify(list));
@@ -92,6 +92,39 @@ export default {
       try { const s = await env.LISTS.get('rec:' + code); if (s) list = JSON.parse(s); } catch {}
       if (!Array.isArray(list)) list = [];
       return json({ recs: list }, 200, cors);
+    }
+
+    // ── friend requests (mutual) ─────────────────────────────────────────────
+    // Adding a friend sends a REQUEST to their code's frq:<code> mailbox. They
+    // accept → we post an 'accept' back to the requester's mailbox so BOTH sides
+    // become friends. Same shape for request/accept: {type, from:{code,name}}.
+    if (op === 'fr_send' || op === 'fr_accept') {
+      const to = String(body.to || '');
+      if (!/^[A-Za-z0-9]{10,64}$/.test(to)) return json({ error: 'bad to' }, 400, cors);
+      const from = (body.from && typeof body.from === 'object') ? body.from : {};
+      const fromCode = String(from.code || '');
+      const fromName = String(from.name || 'A friend').slice(0, 40);
+      if (!/^[A-Za-z0-9]{10,64}$/.test(fromCode)) return json({ error: 'bad from' }, 400, cors);
+      if (fromCode === to) return json({ error: 'self' }, 400, cors);
+      const key = 'frq:' + to;
+      let list = [];
+      try { const s = await env.LISTS.get(key); if (s) list = JSON.parse(s); } catch {}
+      if (!Array.isArray(list)) list = [];
+      const type = op === 'fr_accept' ? 'accept' : 'request';
+      // de-dupe: one live message of each type per (from → to)
+      list = list.filter(m => !(m && m.type === type && m.from && m.from.code === fromCode));
+      list.push({ id: type[0] + fromCode.slice(0, 8) + Date.now().toString(36), type, from: { code: fromCode, name: fromName }, at: Date.now() });
+      if (list.length > 200) list = list.slice(list.length - 200);
+      await env.LISTS.put(key, JSON.stringify(list));
+      return json({ ok: true }, 200, cors);
+    }
+    if (op === 'fr_pull') {
+      const code = String(body.code || '');
+      if (!/^[A-Za-z0-9]{10,64}$/.test(code)) return json({ error: 'bad code' }, 400, cors);
+      let list = [];
+      try { const s = await env.LISTS.get('frq:' + code); if (s) list = JSON.parse(s); } catch {}
+      if (!Array.isArray(list)) list = [];
+      return json({ reqs: list }, 200, cors);
     }
 
     return json({ error: 'bad op' }, 400, cors);

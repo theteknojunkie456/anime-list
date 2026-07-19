@@ -1856,7 +1856,7 @@ function load(){
     try{const d=s&&s.getItem(LSKEY);if(d&&!s.getItem(LSKEY+'_corrupt'))s.setItem(LSKEY+'_corrupt',d);}catch{}
     try{const bak=s&&s.getItem(LSKEY+'_bak');if(bak){parseInto(bak);return;}}catch{}
     anime=migrate(JSON.parse(JSON.stringify(DEFAULT_DATA)));
-    try{setTimeout(()=>toast('⚠️ Couldn’t read your saved list — a copy was kept. Restore from backup if it looks empty.'),800);}catch{}
+    try{setTimeout(()=>toast('Couldn’t read your saved list — a copy was kept. Restore from backup if it looks empty.'),800);}catch{}
   }
 }
 let saveWarned=false;let _writeChain=Promise.resolve();
@@ -1868,11 +1868,11 @@ function writeLocal(){
     const snap=JSON.stringify(anime);
     _writeChain=_writeChain.then(async()=>{
       try{const {iv,ct}=await encList(snap,cryptoKey);const env=JSON.stringify({v:2,enc:1,iv,ct,pw:envWraps.pw,rec:envWraps.rec,pfk:envWraps.pfk});s.setItem(LSKEY,env);backupLocal(s,env);saveWarned=false;}
-      catch{if(!saveWarned){saveWarned=true;toast('⚠️ Storage full — remove some uploaded covers');}}
+      catch{if(!saveWarned){saveWarned=true;toast('Storage full — remove some uploaded covers');}}
     });
     return _writeChain;
   }
-  try{const raw=JSON.stringify(anime);s.setItem(LSKEY,raw);backupLocal(s,raw);saveWarned=false;}catch{if(!saveWarned){saveWarned=true;toast('⚠️ Storage full — remove some uploaded covers');}}
+  try{const raw=JSON.stringify(anime);s.setItem(LSKEY,raw);backupLocal(s,raw);saveWarned=false;}catch{if(!saveWarned){saveWarned=true;toast('Storage full — remove some uploaded covers');}}
 }
 function save(){writeLocal();schedulePush();scheduleNotifyUpdate();}
 
@@ -1939,7 +1939,7 @@ async function changeAppPassword(){                   // re-wrap the same master
   envWraps={pw:await wrapMaster(cryptoKey,pw),rec:envWraps.rec};
   await writeLocal();schedulePush();
   if(el)el.value='';
-  toast('🔒 Password changed');renderLockUI();
+  toast('Password changed');renderLockUI();
 }
 async function regenRecovery(){                       // issue a fresh recovery key (old one stops working)
   if(!cryptoKey||!envWraps){toast('Unlock first');return;}
@@ -2039,7 +2039,7 @@ function showRecovery(code,title){
   sc.classList.add('on');
 }
 function copyRecovery(){
-  const c=document.getElementById('recCode').textContent,done=()=>toast('📋 Recovery key copied');
+  const c=document.getElementById('recCode').textContent,done=()=>toast('Recovery key copied');
   if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(c).then(done).catch(()=>{});
   else{try{const t=document.createElement('textarea');t.value=c;document.body.appendChild(t);t.select();document.execCommand('copy');t.remove();done();}catch{}}
 }
@@ -2201,14 +2201,14 @@ async function syncOnOpen(){
         try{arr=JSON.parse(await decList(res.data,cryptoKey));}catch{return;} // wrong master / corrupt → leave local intact
         envWraps={pw:res.data.pw||(envWraps&&envWraps.pw),rec:res.data.rec||(envWraps&&envWraps.rec),pfk:res.data.pfk||(envWraps&&envWraps.pfk)};
       }else if(Array.isArray(res.data)){arr=res.data;}
-      if(arr){anime=migrate(arr);writeLocal();setSyncAt(res.updatedAt);render();renderSyncUI();toast('☁️ Synced from cloud');return;}
+      if(arr){anime=migrate(arr);writeLocal();setSyncAt(res.updatedAt);render();renderSyncUI();toast('Synced from cloud');return;}
     }
     syncPush(); // local is current or newer — make sure the cloud has it
   }catch{}
 }
 function syncEnableNew(){
   setSyncCode(genCode());setSyncAt(0);
-  syncPush().then(()=>{renderSyncUI();toast('☁️ Cloud backup is on');});
+  syncPush().then(()=>{renderSyncUI();toast('Cloud backup is on');});
   renderSyncUI();
 }
 async function syncRestore(){
@@ -2223,16 +2223,16 @@ async function syncRestore(){
       setSyncAt(res.updatedAt||Date.now());
       cryptoKey=null;envWraps=null;
       renderSyncUI();renderLockUI();showLock();
-      toast('🔒 Enter this list’s password to unlock');
+      toast('Enter this list’s password to unlock');
     }else if(res&&Array.isArray(res.data)&&res.data.length){
-      anime=migrate(res.data);writeLocal();setSyncAt(res.updatedAt||Date.now());render();renderSyncUI();toast('☁️ Restored from cloud');
+      anime=migrate(res.data);writeLocal();setSyncAt(res.updatedAt||Date.now());render();renderSyncUI();toast('Restored from cloud');
     }else{ // nothing stored under that code yet — link this device and seed it
       setSyncAt(0);syncPush();renderSyncUI();toast('Code linked — this device now backs up here');
     }
   }catch{setSyncCode('');toast('Could not reach cloud — try again');}
 }
 function syncOff(){setSyncCode('');renderSyncUI();toast('Backup off — data stays on this device');}
-function copySyncCode(){const c=syncCode();if(!c)return;const done=()=>toast('📋 Code copied');if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(c).then(done).catch(()=>fallbackCopy(c,done));else fallbackCopy(c,done);}
+function copySyncCode(){const c=syncCode();if(!c)return;const done=()=>toast('Code copied');if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(c).then(done).catch(()=>fallbackCopy(c,done));else fallbackCopy(c,done);}
 function renderSyncUI(){
   const box=document.getElementById('syncBox');if(!box)return;
   const code=syncCode();
@@ -2268,7 +2268,7 @@ function pushSupported(){return ('Notification'in window)&&('PushManager'in wind
 function notifyAnimeIds(){return anime.filter(a=>kindOf(a)==='watch'&&(a.status==='watching'||a.status==='plan')&&a.aniId).map(a=>a.aniId);}
 async function getPushSub(){try{const reg=await navigator.serviceWorker.ready;return await reg.pushManager.getSubscription();}catch{return null;}}
 async function enableNotify(){
-  if(!pushSupported()){toast('📱 On iPhone: Add to Home Screen first (iOS 16.4+)');renderNotifyUI();return;}
+  if(!pushSupported()){toast('On iPhone: Add to Home Screen first (iOS 16.4+)');renderNotifyUI();return;}
   try{
     const perm=await Notification.requestPermission();
     if(perm!=='granted'){toast('Notifications not allowed');renderNotifyUI();return;}
@@ -2284,7 +2284,7 @@ async function enableNotify(){
     const r=await fetch(NOTIFY_URL+'/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({subscription:sub,animeIds:ids,tz:(Intl.DateTimeFormat().resolvedOptions().timeZone)||'UTC'})});
     if(!r.ok)throw new Error('subscribe '+r.status);
     setNotifyOn(true);
-    toast(ids.length?`🔔 Notifications on · tracking ${ids.length} show${ids.length!==1?'s':''}`:'🔔 Notifications on · open your shows so covers/ids load');
+    toast(ids.length?`Notifications on · tracking ${ids.length} show${ids.length!==1?'s':''}`:'Notifications on · open your shows so covers/ids load');
   }catch(e){toast('Could not turn on notifications — try again');}
   renderNotifyUI();
 }
@@ -3234,7 +3234,7 @@ function bumpEp(d){
   const a=anime.find(x=>x.id===detailId);if(!a)return;
   a.ep=Math.max(0,(a.ep||0)+d);
   if(a.epTotal)a.ep=Math.min(a.ep,a.epTotal);
-  if(a.epTotal&&a.ep===a.epTotal&&a.status!=='finished'){a.status='finished';toast('🎉 Marked as finished!');}
+  if(a.epTotal&&a.ep===a.epTotal&&a.status!=='finished'){a.status='finished';toast('Marked as finished!');}
   else if(a.ep>0&&a.status==='plan'){a.status='watching';}
   touch(a);save();renderDetail();render();alPushItem(a);
 }
@@ -3309,10 +3309,10 @@ function bgFileChosen(inp){
       c.getContext('2d').drawImage(img,0,0,c.width,c.height);
       URL.revokeObjectURL(img.src);
       const url=c.toDataURL('image/jpeg',0.8);
-      if(Math.round(url.length*0.75)>2600000)toast('⚠️ Photo is large — cloud sync may reject it. Try a smaller image.');
+      if(Math.round(url.length*0.75)>2600000)toast('Photo is large — cloud sync may reject it. Try a smaller image.');
       pendingBg=url;setBgPreview(url);
       dominantColor(url,hex=>{pendingBgAccent=hex||'';}); // derive accent from the uploaded image
-      toast('🖼 Background added');
+      toast('Background added');
     }catch{toast('Could not process that image');}
   };
   img.onerror=()=>{URL.revokeObjectURL(img.src);toast('Could not read that image');};
@@ -3329,7 +3329,7 @@ function coverFileChosen(inp){
     c.getContext('2d').drawImage(img,0,0,c.width,c.height);
     URL.revokeObjectURL(img.src);
     setCoverPreview(c.toDataURL('image/jpeg',0.82));
-    toast('📷 Cover added');
+    toast('Cover added');
   };
   img.onerror=()=>{URL.revokeObjectURL(img.src);toast('Could not read that image');};
   img.src=URL.createObjectURL(f);
@@ -4227,7 +4227,7 @@ function exportList(){
     if(a.rating)l+=` | ★${a.rating}`;
     return l;
   }).join('\n');
-  const done=()=>toast('📤 List copied — paste it anywhere');
+  const done=()=>toast('List copied — paste it anywhere');
   if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(lines).then(done).catch(()=>fallbackCopy(lines,done));}
   else fallbackCopy(lines,done);
 }
@@ -4551,7 +4551,7 @@ function pvMarkNext(){
   const ep=pvWatchEp; if(!ep) return;
   applyWatched(pvReturnId,ep);            // bank this episode as watched
   const total=a.epTotal||0;
-  if(total&&ep>=total){ toast('🎉 Finished '+a.title); closePlayer(); return; }
+  if(total&&ep>=total){ toast('Finished '+a.title); closePlayer(); return; }
   pvGoTo(a,ep+1);
   toast('Ep '+ep+' watched · now on Ep '+(ep+1));
 }
@@ -5245,7 +5245,7 @@ function saveKey(){
     return;
   }
   try{localStorage.setItem('anthropic_key',v);}catch{}
-  toast('✓ '+prov+' key saved');            // name the provider so they know it registered
+  toast(prov+' key saved');            // name the provider so they know it registered
   renderModelPicker();updateKeyBtn();       // <- updateKeyBtn was missing: button stayed "Add AI Key"
 }
 function aiErrorHTML(e){

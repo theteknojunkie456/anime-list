@@ -4391,24 +4391,54 @@ function watchEpisode(a){
   const next=Math.min(Math.max((a.ep||0)+1,1), total);
   return next;
 }
-// Build the in-frame URL for a custom source. It can use {title}/{slug}/{ep} tokens;
-// with no token we just open it and let them navigate/search. No custom source →
-// empty (default Watch never frames anything — it opens legal sites externally).
+// Tokens a custom-source template can use:
+//   {title}/{query}  the search text        {slug}            url-safe title
+//   {ep}/{episode}   next unwatched episode  {anilistId}/{malId}  the ids
+//   {titleEnglish}/{titleRomaji}/{titleNative}  AniList title variants (fall back to
+//     the main title until fetchCovers fills them in)
+// Search sites are less fragile than deep title URLs (slugs/domains churn), so a
+// {query}/{title} search template is the recommended shape.
+const SRC_TOKEN_RE=/\{(title|query|slug|ep|episode|titleenglish|titleromaji|titlenative|anilistid|malid)\}/i;
+const SRC_SEARCH_RE=/\{(title|query|slug|titleenglish|titleromaji|titlenative|anilistid|malid)\}/i; // any non-episode token
+function fillSourceTokens(template,a,ep){
+  const t=a.title||'', enc=encodeURIComponent;
+  const raw={ep:(ep||1),episode:(ep||1),anilistid:a.aniId||'',malid:a.malId||''};                    // inserted verbatim
+  const txt={title:t,query:t,slug:streamSlug(t),titleenglish:a.titleEn||t,titleromaji:a.titleRo||t,titlenative:a.titleNa||t}; // url-encoded
+  return String(template||'').replace(/\{(\w+)\}/g,(m,k)=>{
+    const key=k.toLowerCase();
+    if(key in raw)return String(raw[key]);
+    if(key in txt)return enc(txt[key]);
+    return m;   // unknown token → leave it untouched (don't silently blank it)
+  });
+}
+// Build the in-frame URL for a custom source. With no token we open it as-is and let
+// them navigate/search. No custom source → empty (default Watch opens legal sites
+// externally, never frames).
 function streamURL(a){
-  const slug=streamSlug(a.title), ep=watchEpisode(a);
-  const src=streamSource();
-  if(!src) return {url:'', ep};   // no custom source → nothing to frame (Watch opens legal sites externally)
-  if(/\{title\}|\{slug\}|\{ep\}/.test(src)){
-    return {url:src.replace(/\{title\}/g,encodeURIComponent(a.title)).replace(/\{slug\}/g,slug).replace(/\{ep\}/g,ep||1), ep};
-  }
+  const ep=watchEpisode(a), src=streamSource();
+  if(!src) return {url:'', ep};
+  if(SRC_TOKEN_RE.test(src)) return {url:fillSourceTokens(src,a,ep), ep};
   return {url:src, ep:null}; // plain custom URL — open it as-is
 }
 // The site's search for this exact title — the recovery when a deep-link 404s.
 function findUrl(a){
   const src=streamSource();
   if(!src) return 'about:blank';   // no source to search
-  if(/\{title\}|\{slug\}/.test(src)) return src.replace(/\{title\}/g,encodeURIComponent(a.title)).replace(/\{slug\}/g,streamSlug(a.title)).replace(/\{ep\}/g,'1');
+  if(SRC_SEARCH_RE.test(src)) return fillSourceTokens(src,a,1);
   try{return new URL(src.replace(/\{[^}]+\}/g,'x')).origin;}catch{return src;}   // {ep}-only/plain → the site's homepage, so its own search is at hand
+}
+// Preview what the current source template resolves to — so you can see (and fix) a
+// bad URL before ever hitting a 404. Samples a real watching title if you have one.
+function testSource(){
+  const raw=(document.getElementById('srcCustom')||{}).value||'';
+  const v=raw.trim()||streamSource();
+  const out=document.getElementById('srcTest'); if(!out)return;
+  if(!v){out.style.display='block';out.textContent='Enter a site or template first.';return;}
+  const sample=anime.find(a=>kindOf(a)==='watch'&&a.status==='watching'&&a.aniId)
+    ||anime.find(a=>kindOf(a)==='watch'&&a.aniId)
+    ||{title:'Cowboy Bebop',titleEn:'Cowboy Bebop',titleRo:'Cowboy Bebop',titleNa:'カウボーイビバップ',aniId:1,malId:1,epTotal:26,ep:0};
+  const built=SRC_TOKEN_RE.test(v)?fillSourceTokens(v,sample,watchEpisode(sample)||1):v;
+  out.style.display='block';out.textContent=`For “${sample.title}”:\n${built}`;
 }
 // Open whatever's playing in the browser — the escape hatch when a source won't frame.
 function pvOpenExternal(){
@@ -4443,7 +4473,7 @@ async function watchAnime(id){
   const f=document.getElementById('pvFrame');
   document.getElementById('playerView').classList.add('on');
   // binge controls light up only when the source can address a specific episode
-  pvCanNav=!!ep&&/\{ep\}/.test(src);
+  pvCanNav=!!ep&&/\{ep(isode)?\}/i.test(src);
   renderPvNav(a);
   // Only custom {ep} sources reach here (default Watch opened a legal site externally
   // above), so this is always the user's own embeddable player URL.
@@ -5003,8 +5033,12 @@ function renderSource(){
       <div class="src-sub">${custom&&!WATCH_PRESETS.some(p=>p.url===custom)?'Using '+host(custom):'Paste any streaming site below'}</div>
     </button>
     <input class="ai-prompt-in" id="srcCustom" placeholder="your own site — or a full URL" value="${custom&&!WATCH_PRESETS.some(p=>p.url===custom)?custom.replace(/"/g,'&quot;'):''}" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url" style="margin-top:10px">
-    <button class="parse-btn" onclick="saveSource()">Use this site</button>
-    <p class="ai-desc" style="margin-top:12px;font-size:11.5px">Optional tokens: <code>{title}</code>, <code>{slug}</code>, <code>{ep}</code> — e.g. <code>https://site.com/watch/{slug}/ep-{ep}</code>. With none, it just opens the site.</p>
+    <div style="display:flex;gap:8px">
+      <button class="parse-btn" style="flex:1" onclick="saveSource()">Use this site</button>
+      <button class="parse-btn" style="flex:0 0 auto;padding-left:16px;padding-right:16px" onclick="testSource()">${icon('search')} Test</button>
+    </div>
+    <div id="srcTest" style="display:none;margin-top:8px;padding:9px 11px;border-radius:9px;background:var(--bg2);color:var(--t2);font:12px/1.45 ui-monospace,Menlo,monospace;word-break:break-all;white-space:pre-wrap"></div>
+    <p class="ai-desc" style="margin-top:12px;font-size:11.5px">Tokens: <code>{query}</code>/<code>{title}</code>, <code>{slug}</code>, <code>{ep}</code>, <code>{titleRomaji}</code>, <code>{titleEnglish}</code>, <code>{titleNative}</code>, <code>{anilistId}</code>, <code>{malId}</code>. A <b>search</b> template — <code>https://site.com/search?keyword={query}</code> — is sturdiest (slugs &amp; domains change). Tap <b>Test</b> to preview the exact URL before saving.</p>
     ${IS_NATIVE?`
     <div class="dt-label" style="margin-top:22px">${icon('film')} Your streaming accounts</div>
     <p class="ai-desc">Tick the services you subscribe to. On a show, <b>Watch</b> then offers <b>“Open in …”</b> for each — opening that app on your phone where you're already signed in. We never see your password, and nothing is ever pirated.</p>
@@ -5539,8 +5573,8 @@ async function fetchCovers(){
         const type=read?'MANGA':'ANIME';
         // bannerImage = wide per-title scene art (may be null); coverImage.color = AniList's precomputed dominant hex
         const fields=read
-          ?'coverImage{large extraLarge color} bannerImage chapters volumes genres isAdult'
-          :'id coverImage{large extraLarge color} bannerImage episodes duration genres isAdult nextAiringEpisode{airingAt episode}';
+          ?'title{romaji english native} coverImage{large extraLarge color} bannerImage chapters volumes genres isAdult'
+          :'id title{romaji english native} coverImage{large extraLarge color} bannerImage episodes duration genres isAdult nextAiringEpisode{airingAt episode}';
         // Known season? Refresh that EXACT media by id — a title search would drift to
         // whatever AniList ranks first (often a different, currently-airing season),
         // pinning the wrong air date. Only unknown items fall back to a title search.
@@ -5570,6 +5604,8 @@ async function fetchCovers(){
         if(m&&isAdultMedia(m)){adultIds.push(a.id);return;}
         if(m){
           if(!a.img&&!a.imgTried)a.img=(m.coverImage&&m.coverImage.large)||'';
+          // AniList title variants — power the {titleEnglish}/{titleRomaji}/{titleNative} custom-source tokens
+          if(m.title){if(m.title.english)a.titleEn=m.title.english;if(m.title.romaji)a.titleRo=m.title.romaji;if(m.title.native)a.titleNa=m.title.native;}
           // per-title theming: wide banner art + AniList's dominant color (kept independent of any user-set bgImage/bgAccent)
           if(m.bannerImage)a.banner=m.bannerImage;
           if(m.coverImage&&m.coverImage.color)a.aniColor=m.coverImage.color;

@@ -15,8 +15,14 @@ from one codebase, split at runtime by the `IS_NATIVE` flag:
 
 | Build | Where | What it has |
 |---|---|---|
-| **Public web** | `theteknojunkie456.github.io/anime-list` (GitHub Pages) | Personal tracker **+ Friends**. No watch parties. |
-| **Official app** | TestFlight / native iOS (`ios-broadcast/`) | Everything above **+** watch parties, screen broadcast, "My Services", legal deep-link routing. |
+| **Public web** | `theteknojunkie456.github.io/anime-list` (GitHub Pages) | Personal tracker **+ Friends**, legal watch-routing (your own services + inline YouTube). No watch parties. |
+| **Official app** | TestFlight / native iOS (`ios-broadcast/`) | Everything above **+** watch parties, screen broadcast, "My Services". |
+
+> **Watch-routing moved to both builds.** `routeLegal()` used to be gated behind
+> `IS_NATIVE`; web fell back to one hardcoded free-search default, so web users
+> could never reach their own regional services. It now runs on both — nothing in
+> that path is native-only (official AniList links, user-added services, and a
+> licensed YouTube embed).
 
 ```js
 const IS_NATIVE = /WatchListNative/i.test(navigator.userAgent); // native WKWebView tags the UA

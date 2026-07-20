@@ -590,11 +590,15 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 /* Full-screen in-app player */
 .playerview{position:fixed;inset:0;z-index:120;background:#000;display:flex;flex-direction:column;transform:translateY(100%);transition:transform .38s cubic-bezier(.2,1,.28,1);}
 .playerview.on{transform:translateY(0);}
-.pv-top{flex-shrink:0;display:flex;align-items:center;gap:10px;padding:calc(var(--safe-t) + 10px) 12px 10px;background:#000;}
-.pv-title{flex:1;min-width:0;font-family:var(--fd);font-size:15px;font-weight:800;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.pv-ext{width:40px;height:40px;flex-shrink:0;border-radius:12px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);color:#fff;display:flex;align-items:center;justify-content:center;}
+.pv-top{flex-shrink:0;display:flex;align-items:center;gap:9px;padding:calc(var(--safe-t) + 12px) 14px 12px;background:linear-gradient(180deg,#161618 0%,#0a0a0c 100%);border-bottom:1px solid rgba(255,255,255,.06);}
+/* on the player's black surface the back button joins the glass button set (scoped so the share view's back is untouched) */
+.playerview .sv-back{width:40px;height:40px;border-radius:12px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);color:#fff;transition:background .15s,transform .12s;}
+.playerview .sv-back:active{transform:scale(.9);background:rgba(255,255,255,.15);}
+.pv-title{flex:1;min-width:0;font-family:var(--fd);font-size:15.5px;font-weight:800;letter-spacing:-.2px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.pv-title .pv-ep{margin-left:7px;color:var(--a2);font-weight:700;font-size:14px;}
+.pv-ext{width:40px;height:40px;flex-shrink:0;border-radius:12px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);color:#fff;display:flex;align-items:center;justify-content:center;transition:background .15s,transform .12s;}
 .pv-ext .ico{width:18px;height:18px;}
-.pv-ext:active{transform:scale(.92);}
+.pv-ext:active{transform:scale(.9);background:rgba(255,255,255,.15);}
 .pv-frame-wrap{flex:1;min-height:0;position:relative;background:#000;}
 .pv-frame{position:absolute;inset:0;width:100%;height:100%;border:0;}
 .pv-pause{position:absolute;inset:0;z-index:5;display:none;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:rgba(0,0,0,.82);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);color:#fff;text-align:center;padding:24px;}
@@ -609,12 +613,12 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 .pv-host-chat{width:48px;height:46px;flex-shrink:0;border-radius:13px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.16);color:#fff;display:flex;align-items:center;justify-content:center;}
 .pv-host-main:active,.pv-host-next:active,.pv-host-chat:active{transform:scale(.96);}
 .pv-host-chat .ico{width:19px;height:19px;}
-.pv-nav{flex-shrink:0;display:flex;align-items:center;gap:10px;padding:10px 12px calc(var(--safe-b) + 10px);background:#000;border-top:1px solid rgba(255,255,255,.08);}
-.pv-nav-arrow{width:48px;height:46px;flex-shrink:0;border-radius:13px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);color:#fff;display:flex;align-items:center;justify-content:center;transition:opacity .15s;}
+.pv-nav{flex-shrink:0;display:flex;align-items:center;gap:9px;padding:12px 14px calc(var(--safe-b) + 12px);background:linear-gradient(0deg,#161618 0%,#0a0a0c 100%);border-top:1px solid rgba(255,255,255,.06);}
+.pv-nav-arrow{width:50px;height:48px;flex-shrink:0;border-radius:14px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);color:#fff;display:flex;align-items:center;justify-content:center;transition:opacity .15s,transform .12s,background .15s;}
 .pv-nav-arrow .ico{width:22px;height:22px;}
-.pv-nav-arrow:active{transform:scale(.94);}
-.pv-nav-arrow:disabled{opacity:.3;pointer-events:none;}
-.pv-nav-mark{flex:1;height:46px;border-radius:13px;background:var(--a);border:0;color:var(--aFg,#fff);font-family:var(--fd);font-size:14.5px;font-weight:800;display:flex;align-items:center;justify-content:center;gap:7px;}
+.pv-nav-arrow:active{transform:scale(.93);background:rgba(255,255,255,.15);}
+.pv-nav-arrow:disabled{opacity:.28;pointer-events:none;}
+.pv-nav-mark{flex:1;height:48px;border-radius:14px;background:var(--a);border:0;color:var(--aFg,#fff);font-family:var(--fd);font-size:14.5px;font-weight:800;letter-spacing:-.1px;display:flex;align-items:center;justify-content:center;gap:7px;box-shadow:0 8px 22px -8px var(--glow);transition:transform .12s;}
 .pv-nav-mark:active{transform:scale(.98);}
 .pv-nav-mark:disabled{opacity:.5;pointer-events:none;}
 .dt-actions{display:flex;gap:8px;margin-top:10px;}
@@ -4557,7 +4561,7 @@ async function watchAnime(id){
   const ep=watchEpisode(a);
   pvWatchEp=ep;   // the episode we opened, so we can save progress on the way out
   pvOpenTime=Date.now();   // how long they stay is our only signal that they watched
-  document.getElementById('pvTitle').textContent=a.title+(ep?` · Ep ${ep}`:'');
+  document.getElementById('pvTitle').innerHTML=escH(a.title)+(ep?` <span class="pv-ep">Ep ${ep}</span>`:'');
   const ext=document.getElementById('pvExt');
   // The deep-link 404s when our slug ≠ the site's (romaji, a variant, season markers)
   // and we can't detect that across the frame — so this loads the site's SEARCH for
@@ -4629,7 +4633,7 @@ function pvGoTo(a,ep){
   const url=episodeURL(a,ep); if(!url) return;
   pvWatchEp=ep;
   document.getElementById('pvFrame').src=url;
-  document.getElementById('pvTitle').textContent=a.title+' · Ep '+ep;
+  document.getElementById('pvTitle').innerHTML=escH(a.title)+' <span class="pv-ep">Ep '+ep+'</span>';
   pvOpenTime=Date.now();                 // fresh clock — each episode earns its own auto-mark
   savePvSession(pvReturnId,ep,'watch');
   renderPvNav(a);

@@ -4403,6 +4403,7 @@ const ONB=[
   {ic:'lock',oc:'#51cf66',title:'Lock your list',body:'Add a <b>password</b> and everything gets encrypted. You\'ll get a one-time <b>recovery key</b> — the only way in if you forget the password. Save both.',cta:{label:'Set a password',sheet:'securitySheet'}},
   {ic:'key',oc:'#ffd43b',title:'Unlock with a glance',body:'Once a password is set, open the app with <b>Face ID</b> instead of typing it every time.',cta:{label:'Set up Face ID',sheet:'securitySheet'}},
   {ic:'bell',oc:'#ff6b6b',title:'Episode alerts',body:'Get a heads-up the moment a new episode of something you\'re watching airs. Only the shows you follow — no spam.',cta:{label:'Turn on alerts',sheet:'notifySheet'}},
+  {ic:'play',oc:'#f783ac',title:'Watch where you already pay',body:'Tap <b>Watch</b> and it lists where a show actually is, then remembers your pick. Not in the US? Add <b>TVING</b>, <b>Wavve</b>, <b>iQIYI</b>, <b>JioHotstar</b> and more in one tap — or paste any service\'s search page and we\'ll wire it up. Yours always show first.',cta:{label:'Pick your services',sheet:'sourceSheet'}},
   {ic:'compass',oc:'#20c997',title:'You\'re all set',body:'Tap <b>+</b> to add anything, or <b>Import</b> your whole list from Notes in one paste. The icons up top are Friends, schedule, AI and themes. Anything you skipped is waiting in <b>Settings</b>.',primary:'Start watching'},
 ];
 let onbIdx=0;
@@ -4454,7 +4455,7 @@ function renderSettings(){
     {ic:'lock',    col:'#51cf66', h:'Password',            p:encEnabled()?'On — your list is encrypted':'Off', go:"openSheet('securitySheet')"},
     {ic:'bell',    col:'#ff6b6b', h:'Notifications',       p:notifyOn()?'On — you\'ll be told when an episode airs':'Off', go:'openNotifySheet()'},
     {ic:'sparkles',col:'#c084fc', h:'AI & chat key',       p:getKey()?'On — '+(keyProvider(getKey())||'key')+' connected':'Off — add a free key to unlock chat', go:"openSheet('aiSheet')"},
-    {ic:'play',    col:'#20c997', h:'Watch & read sources', p:'Where Watch now / Read now open', go:"openSheet('sourceSheet')"},
+    {ic:'play',    col:'#20c997', h:'Sources', p:'Where Watch now / Read now open', go:"openSheet('sourceSheet')"},
     {ic:'refresh', col:'#748ffc', h:'AniList sync',         p:alConnected()?'On — '+alUser()+' · progress syncs both ways':'Off — connect to sync progress everywhere', go:"openSheet('anilistSheet')"},
     {ic:'clipboard',col:'#ff922b',h:'Import / Export',    p:'Paste a list in, or copy yours out', go:"openSheet('importSheet')"},
     {ic:'palette', col:'#f783ac', h:'Theme',               p:'Colours, or build your own', go:"openSheet('themeSheet')"},

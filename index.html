@@ -4842,10 +4842,10 @@ async function routeLegal(a){
   const pref=legalPref();
   // Check the user's own services first — someone who added one and picked it
   // wants it every time, and it won't be in AniList's list to match against.
-  const own=pref&&customServices().find(s=>s.name.toLowerCase()===pref);
-  if(own){ openExternal(customServiceURL(own,a)); toast(`Opening ${own.name} for “${a.title}”`); return; }
-  const hit=pref&&streams.find(s=>s.site.toLowerCase()===pref);
-  if(hit){ openExternal(hit.url); toast(`Opening ${hit.site} for “${a.title}”`); return; }
+  const own=pref&&!isHiddenSrc(pref)&&customServices().find(s=>s.name.toLowerCase()===pref);
+  if(own){ autoOpen(a,own.name,customServiceURL(own,a)); return; }
+  const hit=pref&&!isHiddenSrc(pref)&&streams.find(s=>s.site.toLowerCase()===pref);
+  if(hit){ autoOpen(a,hit.site,hit.url); return; }
   renderWatch(); openSheet('watchSheet');
 }
 // ─── YOUR OWN SERVICES ──────────────────────────────────────────────────────
@@ -4864,13 +4864,16 @@ const REGIONAL_SERVICES=[
   {name:'TVING',       region:'KR', url:'https://www.tving.com/search?keyword={query}'},
   {name:'Wavve',       region:'KR', url:'https://www.wavve.com/search?searchWord={query}'},
   {name:'Coupang Play',region:'KR', url:'https://www.coupangplay.com/search?q={query}'},
-  {name:'Laftel',      region:'KR', url:'https://laftel.net/search?keyword={query}'},
+  // unverified: blocks automated requests, so the search path couldn't be
+  // confirmed. Kept because dropping it loses Korea's anime-specific service —
+  // flagged in the UI so a wrong result reads as "check this" not "app broken".
+  {name:'Laftel',      region:'KR', url:'https://laftel.net/search?keyword={query}', unverified:true},
   {name:'U-NEXT',      region:'JP', url:'https://video.unext.jp/freeword?query={query}'},
   {name:'Bilibili',    region:'CN', url:'https://www.bilibili.tv/en/search?q={query}'},
   {name:'iQIYI',       region:'CN', url:'https://www.iq.com/search?query={query}'},
   {name:'WeTV',        region:'CN', url:'https://wetv.vip/en/search?q={query}'},
   {name:'Youku',       region:'CN', url:'https://www.youku.tv/search?q={query}'},
-  {name:'Showmax',     region:'Africa', url:'https://www.showmax.com/search?q={query}'},
+  {name:'Showmax',     region:'Africa', url:'https://www.showmax.com/search?q={query}', unverified:true},   // see Laftel note
   {name:'JioHotstar',  region:'IN', url:'https://www.hotstar.com/in/search?q={query}'},
   {name:'Aniplus Asia',region:'SEA', url:'https://www.aniplus-asia.com/?s={query}'},
   {name:'iflix',       region:'SEA', url:'https://www.iflix.com/search?q={query}'},
@@ -5463,14 +5466,16 @@ function renderSource(){
     <button class="parse-btn" style="margin-top:8px" onclick="addCustomServiceFromForm()">Add service</button>
     <div class="dt-label" style="margin-top:18px">${icon('sort')} Every source</div>
     <p class="ai-desc">Hide the ones you never use, or rename any of them. Applies to every show at once.</p>
-    ${allKnownSources().map(s=>{const off=isHiddenSrc(s.name);return `<div class="src-opt" style="display:flex;align-items:center;gap:8px${off?';opacity:.45':''}">
+    ${allKnownSources().map(s=>{const off=isHiddenSrc(s.name),q=escH(s.name).replace(/'/g,"\\'");
+      const sub=[s.kind,s.unverified?'unverified — tap Test':'',off?'hidden':''].filter(Boolean).join(' · ');
+      return `<div class="src-opt" style="display:flex;align-items:center;gap:10px${off?';opacity:.45':''}" onclick="renameSrcPrompt('${q}')">
       <div style="flex:1;min-width:0">
         <div class="src-name">${escH(srcLabel(s.name))}${srcLabel(s.name)!==s.name?` <span class="src-tag">${escH(s.name)}</span>`:''}</div>
-        <div class="src-sub">${escH(s.kind)}${off?' · hidden':''}</div>
+        <div class="src-sub">${escH(sub)}</div>
       </div>
-      <button class="src-chip" onclick="renameSrcPrompt('${escH(s.name).replace(/'/g,"\\'")}')">Rename</button>
-      <button class="src-chip${off?' on':''}" onclick="toggleHiddenSrc('${escH(s.name).replace(/'/g,"\\'")}')">${off?'Unhide':'Hide'}</button>
+      <button class="src-chip${off?' on':''}" onclick="event.stopPropagation();toggleHiddenSrc('${q}')">${off?'Unhide':'Hide'}</button>
     </div>`;}).join('')}
+    <p class="ai-desc" style="font-size:11.5px;opacity:.75">Tap a row to rename it.</p>
     <div class="dt-label" style="margin-top:16px">${icon('sort')} <code>{slug}</code> spelling</div>
     <p class="ai-desc">Which title fills <code>{slug}</code> — some sites index by romaji, some by English. Raises the direct-hit rate.</p>
     <div class="src-picks">
@@ -5553,27 +5558,48 @@ function closePlayer(){
 // app is the same signal as time-IN the frame — and a cleaner one: a framed tab
 // left open all afternoon still counted as watching, whereas coming back is an
 // unambiguous "I'm done". Same thresholds, same outcomes, no iframe required.
-let extId=null, extEp=0, extLeaveTime=0;
+let extId=null, extEp=0, extLeaveTime=0, extSource='';
+// Auto-opening a remembered pick used to bypass armExternalWatch, so the one
+// path people use most often tracked no progress at all. It also had no way to
+// fail: a service that's geo-blocked (iQIYI outside its region shows "video is
+// unavailable in your location") would reopen forever, because "they came
+// straight back" was never treated as a signal.
+function autoOpen(a,name,url){
+  extSource=name;
+  armExternalWatch(a,watchEpisode(a)||1);
+  openExternal(url);
+  toast(`Opening ${srcLabel(name)} for “${a.title}”`);
+}
+// Bounced back in seconds from a source we chose for them? Don't silently
+// unpick it — they may have just changed their mind. Offer the out instead.
+function offerHideSource(name){
+  showMWBar(`Couldn’t watch on <b>${schEsc(srcLabel(name))}</b>?`,'Hide it',()=>{
+    if(!isHiddenSrc(name))toggleHiddenSrc(name);
+    if(legalPref()===String(name).toLowerCase())setLegalPref('');
+  });
+}
 function armExternalWatch(a,ep){
   if(!a||kindOf(a)!=='watch'||!ep)return;
   extId=a.id; extEp=ep; extLeaveTime=Date.now();
-  try{localStorage.setItem('ext_watch',JSON.stringify({id:extId,ep:extEp,t:extLeaveTime}));}catch{}
+  try{localStorage.setItem('ext_watch',JSON.stringify({id:extId,ep:extEp,t:extLeaveTime,s:extSource}));}catch{}
 }
 // Survive a reload/eviction while they were away — mobile kills backgrounded tabs.
 function restoreExternalWatch(){
   if(extId)return;
   try{const s=JSON.parse(localStorage.getItem('ext_watch')||'null');
-    if(s&&s.id){extId=s.id;extEp=s.ep;extLeaveTime=s.t;}}catch{}
+    if(s&&s.id){extId=s.id;extEp=s.ep;extLeaveTime=s.t;extSource=s.s||'';}}catch{}
 }
 function clearExternalWatch(){
-  extId=null;extEp=0;extLeaveTime=0;
+  extId=null;extEp=0;extLeaveTime=0;extSource='';
   try{localStorage.removeItem('ext_watch');}catch{}
 }
 function settleExternalWatch(){
   restoreExternalWatch();
-  const id=extId, ep=extEp, elapsed=extLeaveTime?Date.now()-extLeaveTime:0;
+  const id=extId, ep=extEp, src=extSource, elapsed=extLeaveTime?Date.now()-extLeaveTime:0;
   if(!id||!ep){clearExternalWatch();return;}
   clearExternalWatch();
+  // Straight back from a source we picked for them → probably a dead end.
+  if(src&&elapsed<PEEK_MS){offerHideSource(src);return;}
   const a=anime.find(x=>x.id===id);
   if(!a||kindOf(a)!=='watch'||ep<=(a.ep||0))return;   // only if it actually advances
   if(elapsed>=AUTO_MARK_MS)autoMarkWatched(id,ep);

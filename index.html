@@ -4972,6 +4972,24 @@ function templatizeSearchURL(raw){
       return u.toString().replace(/__WLQ__/g,'{query}');}
   }
   // /search/cowboy-bebop style — templatize the last path segment instead.
+  // Episode-style paths: /watch/tomo-chan-is-a-girl/ep-7 → /watch/{slug}/ep-{ep}
+  // The episode marker must carry an ep/episode/e prefix. That's what keeps
+  // /watch/86/ep-3 safe: "86" is the TITLE, and a bare number is never read as
+  // an episode. The segment before the marker becomes {slug} unless it's
+  // structural ("watch", "anime"…), so numeric titles like 86 still template
+  // correctly rather than being baked in and sending every show to that title.
+  {
+    const segs=u.pathname.split('/').filter(Boolean);
+    const i=segs.length-1;
+    const m=i>=0&&/^(ep|episode|e)[-_]?(\d+)$/i.exec(segs[i]);
+    if(m){
+      segs[i]=segs[i].replace(/\d+$/,'{ep}');
+      const STRUCTURAL=/^(watch|anime|series|video|tv|show|title|play|stream|v|w)$/i;
+      if(i-1>=0&&!STRUCTURAL.test(segs[i-1]))segs[i-1]='{slug}';
+      u.pathname='/'+segs.join('/');
+      return decodeURIComponent(u.toString());
+    }
+  }
   // Skip segments like Amazon's "ref=x" — those are tracking crumbs, not queries.
   const segs=u.pathname.split('/').filter(Boolean);
   if(segs.length>=2&&/search|browse|find/i.test(segs[segs.length-2])&&!/=/.test(segs[segs.length-1])){

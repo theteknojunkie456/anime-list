@@ -4880,6 +4880,50 @@ function addRegional(name){
   const s=REGIONAL_SERVICES.find(x=>x.name===name);
   if(s&&addCustomService(s.name,s.url))renderSource();
 }
+// ─── HIDE / RENAME ANY SOURCE ───────────────────────────────────────────────
+// Everything in the Watch sheet is editable, not just the ones you add. Don't
+// use Tubi? Hide it and it's gone from every show. Call HIDIVE something else?
+// Rename it. Keyed by normalized name so it covers built-in presets, AniList's
+// official links, and your own services alike.
+const HIDE_KEY='hidden_sources', ALIAS_KEY='source_aliases';
+function srcKey(name){return String(name||'').toLowerCase().replace(/[^a-z0-9]/g,'');}
+function hiddenSrc(){try{const v=JSON.parse(localStorage.getItem(HIDE_KEY)||'[]');return Array.isArray(v)?v:[];}catch{return[];}}
+function isHiddenSrc(name){return hiddenSrc().includes(srcKey(name));}
+function toggleHiddenSrc(name){
+  const k=srcKey(name),list=hiddenSrc(),i=list.indexOf(k);
+  if(i>=0)list.splice(i,1);else list.push(k);
+  try{localStorage.setItem(HIDE_KEY,JSON.stringify(list));}catch{}
+  // A hidden source can't stay the remembered auto-open pick.
+  if(i<0&&legalPref()===String(name||'').toLowerCase())setLegalPref('');
+  toast(i>=0?`${name} is back`:`${name} hidden`);
+  renderSource();
+}
+function srcAliases(){try{const v=JSON.parse(localStorage.getItem(ALIAS_KEY)||'{}');return (v&&typeof v==='object')?v:{};}catch{return{};}}
+function srcLabel(name){const a=srcAliases()[srcKey(name)];return a||name;}
+function setSrcAlias(name,label){
+  const m=srcAliases(),k=srcKey(name);
+  label=String(label||'').trim();
+  if(label&&label!==name)m[k]=label;else delete m[k];
+  try{localStorage.setItem(ALIAS_KEY,JSON.stringify(m));}catch{}
+  renderSource();
+}
+function renameSrcPrompt(name){
+  const cur=srcLabel(name);
+  const next=window.prompt(`What should “${name}” be called?`,cur);
+  if(next===null)return;                       // cancelled
+  setSrcAlias(name,next);
+  toast(next.trim()&&next.trim()!==name?`Renamed to ${next.trim()}`:'Name reset');
+}
+// Every source the user could plausibly see, for the manage list in Settings.
+function allKnownSources(){
+  const seen=new Set(),out=[];
+  const add=(name,kind)=>{const k=srcKey(name);if(!k||seen.has(k))return;seen.add(k);out.push({name,kind});};
+  customServices().forEach(s=>add(s.name,'yours'));
+  PAID_SERVICES.forEach(s=>add(s.name,'subscription'));
+  WATCH_PRESETS.forEach(p=>add(p.name,'free'));
+  REGIONAL_SERVICES.forEach(s=>add(s.name,'regional'));
+  return out;
+}
 const CS_KEY='custom_services';
 function customServices(){try{const v=JSON.parse(localStorage.getItem(CS_KEY)||'[]');return Array.isArray(v)?v.filter(s=>s&&s.name&&s.url):[];}catch{return[];}}
 function writeCustomServices(list){try{localStorage.setItem(CS_KEY,JSON.stringify(list));}catch{}}
@@ -4958,14 +5002,17 @@ function renderWatch(){
   const avail=streams.slice().sort((x,y)=>prio(x)-prio(y)).map(s=>{const k=s.site.toLowerCase();return {label:s.site,url:s.url,site:k,tag:subHas(k)?'Your account':(s.free?'Free':'Subscription'),exact:true};});
   const mine=customServices().map(s=>({label:s.name,url:customServiceURL(s,a),site:s.name.toLowerCase(),tag:'Your service',exact:false}));
   const cat=WATCH_PRESETS.map(p=>({label:p.name,url:fillURL(p.url,a),site:p.name.toLowerCase(),tag:'Free · search',exact:false}));
-  watchOpts=mine.concat(avail,cat);
+  // Hidden sources are gone from every show; renames apply everywhere at once.
+  const dress=list=>list.filter(o=>!isHiddenSrc(o.label)).map(o=>({...o,label:srcLabel(o.label)}));
+  const myShown=dress(mine), availShown=dress(avail), catShown=dress(cat);
+  watchOpts=myShown.concat(availShown,catShown);
   const row=(o,i)=>`<button class="src-opt${legalPref()===o.site?' on':''}" onclick="watchOpen(${i})"><div class="src-name">${o.exact?icon('play')+' ':''}Watch on ${escH(o.label)}</div><div class="src-sub">${o.tag}${o.exact?' · straight to the show':''}</div></button>`;
   const sec=(label,items,off)=>items.length?`<div class="dt-label" style="margin-top:14px">${label}</div>`+items.map((o,i)=>row(o,off+i)).join(''):'';
   box.innerHTML=`<p class="ai-desc">Where do you want to watch <b>${escH(a.title)}</b>? Tap one and it remembers — next time it opens there automatically.</p>`
-    +sec(mine.length?'Your services':'',mine,0)
-    +sec(avail.length?'Available now — official':'',avail,mine.length)
-    +sec('Free — search',cat,mine.length+avail.length)
-    +(avail.length||mine.length?'':'<p class="ai-desc" style="margin-top:10px">No official link listed for this one — the free searches above usually still have it. Using a service we don’t list? Add it in Settings → Watch source.</p>');
+    +sec(myShown.length?'Your services':'',myShown,0)
+    +sec(availShown.length?'Available now — official':'',availShown,myShown.length)
+    +sec('Free — search',catShown,myShown.length+availShown.length)
+    +(availShown.length||myShown.length?'':'<p class="ai-desc" style="margin-top:10px">No official link listed for this one — the free searches above usually still have it. Using a service we don’t list? Add it in Settings → Sources.</p>');
 }
 // ─── IN-APP PLAYER ──────────────────────────────────────────────────────────
 // Plays inline ONLY where the host publishes an embed API and licenses it —
@@ -5414,6 +5461,16 @@ function renderSource(){
     <input class="ai-prompt-in" id="csURL" placeholder="paste a search page from your service" value="" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url" style="margin-top:10px" oninput="csHintName()">
     <input class="ai-prompt-in" id="csName" placeholder="name" value="" autocomplete="off" spellcheck="false" style="margin-top:8px">
     <button class="parse-btn" style="margin-top:8px" onclick="addCustomServiceFromForm()">Add service</button>
+    <div class="dt-label" style="margin-top:18px">${icon('sort')} Every source</div>
+    <p class="ai-desc">Hide the ones you never use, or rename any of them. Applies to every show at once.</p>
+    ${allKnownSources().map(s=>{const off=isHiddenSrc(s.name);return `<div class="src-opt" style="display:flex;align-items:center;gap:8px${off?';opacity:.45':''}">
+      <div style="flex:1;min-width:0">
+        <div class="src-name">${escH(srcLabel(s.name))}${srcLabel(s.name)!==s.name?` <span class="src-tag">${escH(s.name)}</span>`:''}</div>
+        <div class="src-sub">${escH(s.kind)}${off?' · hidden':''}</div>
+      </div>
+      <button class="src-chip" onclick="renameSrcPrompt('${escH(s.name).replace(/'/g,"\\'")}')">Rename</button>
+      <button class="src-chip${off?' on':''}" onclick="toggleHiddenSrc('${escH(s.name).replace(/'/g,"\\'")}')">${off?'Unhide':'Hide'}</button>
+    </div>`;}).join('')}
     <div class="dt-label" style="margin-top:16px">${icon('sort')} <code>{slug}</code> spelling</div>
     <p class="ai-desc">Which title fills <code>{slug}</code> — some sites index by romaji, some by English. Raises the direct-hit rate.</p>
     <div class="src-picks">

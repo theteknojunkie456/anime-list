@@ -223,17 +223,28 @@ own.
 
 ## 10. Watching / playback
 
-`watchAnime(id)` decides how to play:
-- **Web build, no custom source:** opens a free-legal preset (`WATCH_PRESETS`) in
-  the browser.
-- **Official app, no custom source:** `routeLegal(a)` uses AniList's official
-  `externalLinks` to open the exact title in a service the user subscribes to
-  ("My Services").
-- **User's own custom source:** plays **immersively** inside WatchList's own
-  chrome (`#playerView` / `#pvFrame`) — top bar, bottom nav, in-frame search.
+`watchAnime(id)` decides how to play. **One rule on both builds:** if the source
+is embeddable it plays inline, otherwise it opens in the browser.
 
-The custom-source field is a **neutral, user-configured URL** — the user chooses
-what goes in it.
+- **No custom source (either build):** `routeLegal(a)` lists where the title
+  actually is — the user's own services first, then AniList's official
+  `externalLinks`, then free searches — and remembers the pick.
+- **Embeddable source** → inline player. `embedTarget()` is an allowlist:
+  YouTube, archive.org, and a **private/LAN address** (your own Jellyfin/Plex/
+  Emby). Absence of a blocking header is not permission, so the list is explicit.
+- **Anything else** → `openExternal`, with `armExternalWatch()` starting the
+  time-away clock so progress is still tracked on return.
+
+Previously a custom source always framed and a preset always opened, so the same
+"watch" behaved differently depending on which settings field had been filled —
+and a custom source that blocks framing (TVING, Prime, Crunchyroll…) rendered a
+black rectangle.
+
+### What's new (§9 companion)
+Updates apply silently, so `RELEASE` in `index.html` carries a date-stamped,
+plain-language changelog and `maybeShowWhatsNew()` shows it once per version to
+**returning** users (new installs get the tutorial instead). **Bump `RELEASE.v`
+and write `notes` on every user-visible change** — plain sentences, no jargon.
 
 ---
 

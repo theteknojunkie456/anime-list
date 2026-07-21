@@ -1509,6 +1509,15 @@ body.recsel .pcard{position:relative;}
   <div id="watchBody"></div>
 </div>
 
+<div class="sheet" id="newsSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <div class="sheet-title"><i data-ic="sparkles"></i> What’s new</div>
+    <button class="sheet-cancel" onclick="closeAll()">Close</button>
+  </div>
+  <div id="newsBody"></div>
+</div>
+
 <!-- IN-APP PLAYER (full-screen) — official YouTube embed, licensed streams only -->
 <div class="ytview" id="ytView">
   <div class="pv-top">
@@ -6368,6 +6377,42 @@ function _updBusy(){
 }
 // Snapshot where you are (tab, filter, sort, scroll) so the post-reload app can put
 // you right back — the update should feel like nothing happened, not a jump to top.
+// ─── WHAT'S NEW ─────────────────────────────────────────────────────────────
+// The app updates itself silently (checkUpdate → _applyUpdate → reload), which
+// is good for staying current and bad for knowing anything changed. This tells
+// people what they got, in plain language.
+//
+// EDIT THIS on every user-visible change: bump `v` and write `notes` the way
+// you'd explain it to a friend — what they can now do, not what the code does.
+// No version numbers or jargon in the notes; the date IS the version.
+const RELEASE={
+  v:'2026-07-20',
+  title:'Watch where you already pay',
+  notes:[
+    'Tap <b>Watch</b> and you’ll see where a show actually is — then it remembers your pick.',
+    'Not in the US? Add <b>TVING</b>, <b>Wavve</b>, <b>iQIYI</b>, <b>JioHotstar</b> and more in one tap, or paste any service’s search page.',
+    'YouTube and your own media server now play <b>inside the app</b>.',
+    'Watching somewhere else? Your progress is still tracked when you come back.',
+  ],
+};
+const SEEN_REL='seen_release';
+function seenRelease(){try{return localStorage.getItem(SEEN_REL)||'';}catch{return '';}}
+function markReleaseSeen(){try{localStorage.setItem(SEEN_REL,RELEASE.v);}catch{}}
+// Only for people who were already here. A brand-new install gets the tutorial
+// instead — "what's new" is meaningless when everything is new.
+function maybeShowWhatsNew(){
+  const seen=seenRelease();
+  if(!seen){markReleaseSeen();return;}          // first run → nothing is "new"
+  if(seen===RELEASE.v)return;                   // already told them
+  if(appLocked)return;                          // wait until they're actually in
+  markReleaseSeen();
+  const box=document.getElementById('newsBody');
+  if(!box)return;
+  box.innerHTML=`<p class="ai-desc"><b>${escH(RELEASE.title)}</b></p>`
+    +RELEASE.notes.map(n=>`<div class="src-opt" style="pointer-events:none"><div class="src-sub" style="color:var(--t1)">${n}</div></div>`).join('')
+    +`<button class="parse-btn" style="margin-top:12px" onclick="closeAll()">Got it</button>`;
+  openSheet('newsSheet');
+}
 function _snapUpd(){
   try{const pg=document.getElementById('pageEl');
     sessionStorage.setItem('justUpdated',JSON.stringify({k:viewKind,f:filterStatus,s:sortMode,y:pg?Math.round(pg.scrollTop):0}));
@@ -6408,6 +6453,9 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeAll();closeCon
 // ─── INIT ───────────────────────────────────────────────────────────────────
 try{hydrateIcons();}catch{}
 load();try{purgeAdult();}catch{}try{if(!appLocked&&dedupeAnime())writeLocal();}catch{}loadTheme();try{_restoreUpd();}catch{}render();try{nativeScheduleNotifs();}catch{}
+// After the list is up — and after the tutorial has had its chance to claim a
+// new install — tell returning users what changed in the update they just got.
+try{setTimeout(maybeShowWhatsNew,900);}catch{}
 try{alCatchRedirect().then(()=>{if(!appLocked)alBootSync();}).catch(()=>{});}catch{}   // returning from AniList OAuth
 if(appLocked)showLock();   // stored list is ciphertext → gate the app until unlocked
 else try{restorePlayer();}catch{}   // came back mid-stream after an iOS reload → reopen it

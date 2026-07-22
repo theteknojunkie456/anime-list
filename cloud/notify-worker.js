@@ -422,6 +422,12 @@ async function handleFetch(request, env) {
       return handleInvite(body, env);
     case "/admin-register":
       return handleAdminRegister(body, env);
+    case "/cap":
+      return handleSetCap(body, env);
+    case "/message":
+      return handleMessageGet(env);
+    case "/message-set":
+      return handleMessageSet(body, env);
     default:
       return json({ ok: false, error: "not found" }, 404);
   }
@@ -547,7 +553,14 @@ async function handleBroadcast(body, env) {
 // deviceId is a client-generated opaque token. It isn't a secret — approval is
 // the gate, not the id — so trusting it as a KV key is fine here.
 
-const MAX_MEMBERS = 100;
+const DEFAULT_CAP = 50;
+// The cap lives in KV so the admin can raise/lower it from the control center
+// without a redeploy. Absent/invalid → the default.
+async function getCap(env) {
+  const raw = await env.SUBS.get("cfg:cap");
+  const n = parseInt(raw, 10);
+  return n > 0 ? n : DEFAULT_CAP;
+}
 const devKey = (id) => "dev:" + String(id || "").replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 64);
 
 async function countApproved(env) {
@@ -589,7 +602,7 @@ async function handleJoin(body, env) {
       } else {
         inv.uses = (inv.uses || 0) + 1;
         await env.SUBS.put("inv:" + inv.code, JSON.stringify(inv));
-        if (inv.mode === "auto" && (await countApproved(env)) < MAX_MEMBERS) status = "approved";
+        if (inv.mode === "auto" && (await countApproved(env)) < (await getCap(env))) status = "approved";
       }
     }
   }
@@ -654,7 +667,7 @@ async function handleMembers(body, env) {
   } while (cursor);
   devs.sort((a, b) => (b.joinedAt || 0) - (a.joinedAt || 0));
   const approved = devs.filter((d) => d.status === "approved").length;
-  return json({ ok: true, devices: devs, approved, cap: MAX_MEMBERS });
+  return json({ ok: true, devices: devs, approved, cap: await getCap(env) });
 }
 
 async function handleDecide(body, env, status) {
@@ -662,8 +675,9 @@ async function handleDecide(body, env, status) {
   const key = devKey(body.deviceId);
   const raw = await env.SUBS.get(key);
   if (!raw) return json({ ok: false, error: "device not found" }, 404);
-  if (status === "approved" && (await countApproved(env)) >= MAX_MEMBERS) {
-    return json({ ok: false, error: "at capacity (" + MAX_MEMBERS + ")" }, 409);
+  const cap = await getCap(env);
+  if (status === "approved" && (await countApproved(env)) >= cap) {
+    return json({ ok: false, error: "at capacity (" + cap + ")" }, 409);
   }
   const rec = JSON.parse(raw);
   rec.status = status; rec.decidedAt = Date.now();
@@ -685,6 +699,44 @@ async function handleInvite(body, env) {
   };
   await env.SUBS.put("inv:" + code, JSON.stringify(inv));
   return json({ ok: true, code, mode: inv.mode });
+}
+
+// Admin raises/lowers the member cap live.
+async function handleSetCap(body, env) {
+  if (!adminOK(body, env)) return json({ ok: false, error: "unauthorized" }, 401);
+  const n = parseInt(body.cap, 10);
+  if (!(n > 0) || n > 100000) return json({ ok: false, error: "cap must be 1–100000" }, 400);
+  await env.SUBS.put("cfg:cap", String(n));
+  return json({ ok: true, cap: n });
+}
+
+// ---------------------------------------------------------------------------
+// ON-SCREEN MESSAGE — an admin card everyone's app shows
+// ---------------------------------------------------------------------------
+// Not a push — an in-app card. The admin sets one; every client fetches it on
+// load/focus and shows it (a note, or a "watch anime on ___" nudge with a link).
+// Clients skip a card whose id they've already dismissed, so it shows once.
+
+// Public: clients poll this to get the current card (no auth).
+async function handleMessageGet(env) {
+  const raw = await env.SUBS.get("cfg:message");
+  return json({ ok: true, message: raw ? JSON.parse(raw) : null });
+}
+// Admin: set (or clear) the current card.
+async function handleMessageSet(body, env) {
+  if (!adminOK(body, env)) return json({ ok: false, error: "unauthorized" }, 401);
+  if (body.clear) { await env.SUBS.delete("cfg:message"); return json({ ok: true, cleared: true }); }
+  const msg = {
+    id: "m" + Date.now(),
+    title: String(body.title || "").slice(0, 80),
+    body: String(body.body || "").slice(0, 280),
+    ctaLabel: String(body.ctaLabel || "").slice(0, 40),
+    ctaUrl: String(body.ctaUrl || "").slice(0, 400),
+    at: Date.now(),
+  };
+  if (!msg.title && !msg.body) return json({ ok: false, error: "title or body required" }, 400);
+  await env.SUBS.put("cfg:message", JSON.stringify(msg));
+  return json({ ok: true, message: msg });
 }
 
 // ---------------------------------------------------------------------------

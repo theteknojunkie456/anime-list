@@ -15,6 +15,7 @@
      on every first load — and the tab shows a blank page icon. -->
 <link rel="icon" href="icons/icon-192.png" type="image/png">
 <title>WatchList</title>
+<!-- friends.html is auto-generated from index.html by the pre-commit hook — do not edit it by hand -->
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Manrope:wght@400..800&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -589,31 +590,38 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 /* Full-screen in-app player */
 .playerview{position:fixed;inset:0;z-index:120;background:#000;display:flex;flex-direction:column;transform:translateY(100%);transition:transform .38s cubic-bezier(.2,1,.28,1);}
 .playerview.on{transform:translateY(0);}
-.pv-top{flex-shrink:0;display:flex;align-items:center;gap:10px;padding:calc(var(--safe-t) + 10px) 12px 10px;background:#000;}
-.pv-title{flex:1;min-width:0;font-family:var(--fd);font-size:15px;font-weight:800;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.pv-ext{width:40px;height:40px;flex-shrink:0;border-radius:12px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);color:#fff;display:flex;align-items:center;justify-content:center;}
+.pv-top{flex-shrink:0;display:flex;align-items:center;gap:9px;padding:calc(var(--safe-t) + 12px) 14px 12px;background:linear-gradient(180deg,#161618 0%,#0a0a0c 100%);border-bottom:1px solid rgba(255,255,255,.06);}
+/* on the player's black surface the back button joins the glass button set (scoped so the share view's back is untouched) */
+.playerview .sv-back{width:40px;height:40px;border-radius:12px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);color:#fff;transition:background .15s,transform .12s;}
+.playerview .sv-back:active{transform:scale(.9);background:rgba(255,255,255,.15);}
+.pv-title{flex:1;min-width:0;font-family:var(--fd);font-size:15.5px;font-weight:800;letter-spacing:-.2px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.pv-title .pv-ep{margin-left:7px;color:var(--a2);font-weight:700;font-size:14px;}
+.pv-ext{width:40px;height:40px;flex-shrink:0;border-radius:12px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);color:#fff;display:flex;align-items:center;justify-content:center;transition:background .15s,transform .12s;}
 .pv-ext .ico{width:18px;height:18px;}
-.pv-ext:active{transform:scale(.92);}
+.pv-ext:active{transform:scale(.9);background:rgba(255,255,255,.15);}
 .pv-frame-wrap{flex:1;min-height:0;position:relative;background:#000;}
 .pv-frame{position:absolute;inset:0;width:100%;height:100%;border:0;}
 .pv-pause{position:absolute;inset:0;z-index:5;display:none;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:rgba(0,0,0,.82);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);color:#fff;text-align:center;padding:24px;}
 .pv-pause.on{display:flex;}
-.pv-pause-ico{font-size:48px;}
+.pv-pause-ico{width:54px;height:54px;position:relative;}
+.pv-pause-ico::before,.pv-pause-ico::after{content:"";position:absolute;top:6px;bottom:6px;width:15px;border-radius:5px;background:#fff;}
+.pv-pause-ico::before{left:8px;}
+.pv-pause-ico::after{right:8px;}
 .pv-pause-t{font-family:var(--fd);font-size:20px;font-weight:900;}
 .pv-pause-s{font-size:13px;color:rgba(255,255,255,.7);max-width:260px;line-height:1.4;}
-.pv-host{flex-shrink:0;display:flex;align-items:center;gap:9px;padding:10px 12px calc(var(--safe-b) + 10px);background:#000;border-top:1px solid rgba(255,255,255,.08);}
-.pv-host-main{flex:1;height:46px;border-radius:13px;background:var(--a);color:var(--aFg,#fff);border:0;font-family:var(--fd);font-size:14.5px;font-weight:800;display:flex;align-items:center;justify-content:center;}
-.pv-host-main.paused{background:#2fbf6b;}
-.pv-host-next{height:46px;padding:0 16px;border-radius:13px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.16);color:#fff;font-family:var(--fd);font-size:14px;font-weight:800;}
-.pv-host-chat{width:48px;height:46px;flex-shrink:0;border-radius:13px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.16);color:#fff;display:flex;align-items:center;justify-content:center;}
+.pv-host{flex-shrink:0;display:flex;align-items:center;gap:9px;padding:12px 14px calc(var(--safe-b) + 12px);background:linear-gradient(0deg,#161618 0%,#0a0a0c 100%);border-top:1px solid rgba(255,255,255,.06);}
+.pv-host-main{flex:1;height:48px;border-radius:14px;background:var(--a);color:var(--aFg,#fff);border:0;font-family:var(--fd);font-size:14.5px;font-weight:800;letter-spacing:-.1px;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 22px -8px var(--glow);}
+.pv-host-main.paused{background:#2fbf6b;box-shadow:0 8px 22px -8px rgba(47,191,107,.5);}
+.pv-host-next{height:48px;padding:0 16px;border-radius:14px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);color:#fff;font-family:var(--fd);font-size:14px;font-weight:800;}
+.pv-host-chat{width:50px;height:48px;flex-shrink:0;border-radius:14px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);color:#fff;display:flex;align-items:center;justify-content:center;}
 .pv-host-main:active,.pv-host-next:active,.pv-host-chat:active{transform:scale(.96);}
 .pv-host-chat .ico{width:19px;height:19px;}
-.pv-nav{flex-shrink:0;display:flex;align-items:center;gap:10px;padding:10px 12px calc(var(--safe-b) + 10px);background:#000;border-top:1px solid rgba(255,255,255,.08);}
-.pv-nav-arrow{width:48px;height:46px;flex-shrink:0;border-radius:13px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);color:#fff;display:flex;align-items:center;justify-content:center;transition:opacity .15s;}
+.pv-nav{flex-shrink:0;display:flex;align-items:center;gap:9px;padding:12px 14px calc(var(--safe-b) + 12px);background:linear-gradient(0deg,#161618 0%,#0a0a0c 100%);border-top:1px solid rgba(255,255,255,.06);}
+.pv-nav-arrow{width:50px;height:48px;flex-shrink:0;border-radius:14px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);color:#fff;display:flex;align-items:center;justify-content:center;transition:opacity .15s,transform .12s,background .15s;}
 .pv-nav-arrow .ico{width:22px;height:22px;}
-.pv-nav-arrow:active{transform:scale(.94);}
-.pv-nav-arrow:disabled{opacity:.3;pointer-events:none;}
-.pv-nav-mark{flex:1;height:46px;border-radius:13px;background:var(--a);border:0;color:var(--aFg,#fff);font-family:var(--fd);font-size:14.5px;font-weight:800;display:flex;align-items:center;justify-content:center;gap:7px;}
+.pv-nav-arrow:active{transform:scale(.93);background:rgba(255,255,255,.15);}
+.pv-nav-arrow:disabled{opacity:.28;pointer-events:none;}
+.pv-nav-mark{flex:1;height:48px;border-radius:14px;background:var(--a);border:0;color:var(--aFg,#fff);font-family:var(--fd);font-size:14.5px;font-weight:800;letter-spacing:-.1px;display:flex;align-items:center;justify-content:center;gap:7px;box-shadow:0 8px 22px -8px var(--glow);transition:transform .12s;}
 .pv-nav-mark:active{transform:scale(.98);}
 .pv-nav-mark:disabled{opacity:.5;pointer-events:none;}
 .dt-actions{display:flex;gap:8px;margin-top:10px;}
@@ -729,6 +737,22 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 .src-name{font-family:var(--fd);font-size:14px;font-weight:800;color:var(--t1);display:flex;align-items:center;gap:8px;}
 .src-tag{font-size:9.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--a2);background:var(--ag);border:1px solid var(--b2);border-radius:6px;padding:2px 6px;}
 .src-sub{font-size:12px;color:var(--t3);margin-top:3px;}
+/* Watch-sheet options (official app: where to watch, tagged by source type) */
+.wt-nudge{display:flex;align-items:center;gap:10px;width:100%;text-align:left;margin:4px 0 2px;padding:12px 13px;border-radius:13px;background:var(--ag);border:1px solid color-mix(in srgb,var(--a) 30%,transparent);color:var(--t1);font-size:12.5px;font-weight:600;line-height:1.35;transition:transform .12s;}
+.wt-nudge:active{transform:scale(.98);}
+.wt-nudge svg{width:18px;height:18px;color:var(--a2);flex-shrink:0;}
+.wt-nudge b{color:var(--a2);}
+.wt-opt{display:flex;align-items:center;gap:10px;width:100%;text-align:left;margin-top:8px;padding:12px 14px;border-radius:13px;background:var(--bg3);border:1px solid var(--b1);color:var(--t1);transition:border-color .15s,background .15s,transform .12s;}
+.wt-opt.on{border-color:var(--a);background:var(--ag);}
+.wt-opt:active{transform:scale(.98);}
+.wt-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;}
+.wt-name{font-family:var(--fd);font-size:14.5px;font-weight:700;letter-spacing:-.2px;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.wt-sub{font-size:11.5px;color:var(--t3);}
+.wt-tag{flex-shrink:0;font-size:10px;font-weight:800;letter-spacing:.03em;text-transform:uppercase;padding:5px 9px;border-radius:999px;}
+.wt-t-mine{background:var(--ag);color:var(--a2);}
+.wt-t-free{background:var(--finbg);color:var(--fin);}
+.wt-t-sub{background:var(--watbg);color:var(--wat);}
+.wt-t-search{background:var(--bg4);color:var(--t3);}
 .src-picks{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px;}
 /* AI summon glow — a flowing multi-hue light that hugs the rounded screen edges,
    in the spirit of iOS's Siri. It's a border-only aurora: a rotating conic
@@ -808,6 +832,7 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 .party-count{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.86);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);display:none;flex-direction:column;align-items:center;justify-content:center;gap:8px;}
 .party-count.on{display:flex;}
 .pc-num{font-family:var(--fd);font-size:120px;font-weight:900;color:#fff;line-height:1;animation:pcPop .9s ease;}
+.pc-num svg{width:.6em;height:.6em;fill:currentColor;stroke:currentColor;display:block;margin:0 auto;}
 .pc-lbl{font-size:15px;font-weight:700;color:rgba(255,255,255,.7);letter-spacing:.04em;}
 @keyframes pcPop{0%{transform:scale(.4);opacity:0;}30%{transform:scale(1.1);opacity:1;}100%{transform:scale(1);opacity:1;}}
 .shareview{position:fixed;inset:0;z-index:130;background:#000;display:none;transform:translateY(100%);transition:transform .38s cubic-bezier(.2,1,.28,1);}
@@ -1710,7 +1735,7 @@ body.recsel .pcard{position:relative;}
        (verified HLS plays), but the frame can't spawn pop-up tabs or redirect the
        whole app away — the two things streaming-ad networks do. -->
   <div class="pv-frame-wrap"><iframe id="pvFrame" class="pv-frame" sandbox="allow-scripts allow-same-origin allow-forms allow-presentation allow-orientation-lock" allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowfullscreen referrerpolicy="no-referrer"></iframe>
-    <div class="pv-pause" id="pvPause"><div class="pv-pause-ico">⏸</div><div class="pv-pause-t">Host paused</div><div class="pv-pause-s">Pause your video too — you'll all resume together</div></div>
+    <div class="pv-pause" id="pvPause"><div class="pv-pause-ico" aria-hidden="true"></div><div class="pv-pause-t">Host paused</div><div class="pv-pause-s">Pause your video too — you'll all resume together</div></div>
   </div>
   <!-- binge controls: only shown when a custom source can target a specific episode
        (an {ep} token) — hidden for search/plain sources and for reading, where
@@ -1722,8 +1747,8 @@ body.recsel .pcard{position:relative;}
   </div>
   <!-- host's party remote, right in the player — pause/next everyone without leaving the video -->
   <div class="pv-host" id="pvHostBar" style="display:none">
-    <button class="pv-host-main" id="pvHostPause">⏸ Pause everyone</button>
-    <button class="pv-host-next" onclick="partyNext()">⏭ Next</button>
+    <button class="pv-host-main" id="pvHostPause">Pause everyone</button>
+    <button class="pv-host-next" onclick="partyNext()">Next</button>
     <button class="pv-host-chat party-only" onclick="openSheet('partySheet')" aria-label="Party chat"><i data-ic="message"></i></button>
   </div>
 </div>
@@ -4056,7 +4081,7 @@ function partyCue(room){
   const tick=()=>{
     const left=Math.ceil((room.playAt-Date.now())/1000);
     if(left>0){num.textContent=left;num.style.animation='none';void num.offsetWidth;num.style.animation='';setTimeout(tick,Math.min(1000,room.playAt-Date.now()));}
-    else{num.textContent='▶';lbl.textContent='Playing!';setTimeout(()=>{ov.classList.remove('on');closeAll();if(room.title)watchParty(room.title,room.ep);},450);}
+    else{num.innerHTML=icon('play');lbl.textContent='Playing!';setTimeout(()=>{ov.classList.remove('on');closeAll();if(room.title)watchParty(room.title,room.ep);},450);}
   };
   tick();
 }
@@ -4136,7 +4161,7 @@ function renderPvHostBar(){
   bar.style.display=show?'':'none';
   if(!show)return;
   const paused=!!(partyRoom&&partyRoom.paused),pb=document.getElementById('pvHostPause');
-  pb.textContent=paused?'▶ Resume everyone':'⏸ Pause everyone';
+  pb.textContent=paused?'Resume everyone':'Pause everyone';
   pb.classList.toggle('paused',paused);
   pb.onclick=paused?partyPlay:partyPause;
 }
@@ -4271,7 +4296,7 @@ function renderParty(){
       ${q.img?`<img src="${q.img}" alt="">`:`<div class="ph">${((q.title||'?')[0]||'?').toUpperCase()}</div>`}
       <div class="pt-pick-info"><div class="pt-pick-t">${schEsc(q.title)}</div><div class="pt-pick-s">${q.ep?`Episode ${q.ep} · `:''}added by ${schEsc(q.by||'?')}</div></div>
       ${partyIsHost?`<button class="pt-qx" onclick="partyQueueRemoveAt(${i})" aria-label="Remove from queue">${icon('x')}</button>`:''}</div>`).join('')}</div>
-    ${partyIsHost?`<button class="pt-share" onclick="partyQueueNext()">▶ Play next from queue · 3·2·1</button>`:''}`:'';
+    ${partyIsHost?`<button class="pt-share" onclick="partyQueueNext()">${icon('play')} Play next from queue · 3·2·1</button>`:''}`:'';
   if(partyIsHost&&iShare){
     hostCtl=`<button class="pt-share live" onclick="stopShare()">${icon('x')} Stop screen share</button>
       <div class="pt-hint">Friends are watching your screen — perfectly in sync. ${Math.max(0,r.members.length-1)} connected.</div>`;
@@ -4291,10 +4316,10 @@ function renderParty(){
     if(r.playAt||r.paused){   // a session is running → the host is the remote
       const primary=r.paused
         ?`<button class="pt-play" onclick="partyPlay()">${icon('play')} Resume together · 3·2·1</button>`
-        :`<button class="pt-play" onclick="partyPause()">⏸ Pause everyone</button>`;
+        :`<button class="pt-play" onclick="partyPause()">Pause everyone</button>`;
       const shareBtn=IS_NATIVE?`<button class="pt-share" onclick="nativeBroadcast()">${icon('users')} Broadcast your screen</button>`:(canScreenShare()?`<button class="pt-share" onclick="startShare()">${icon('users')} Share your screen — real sync</button>`:'');
       hostCtl=`<p class="ai-desc" style="text-align:center">You're running the session — everyone follows you.</p>
-        ${primary}<button class="pt-share" onclick="partyNext()">⏭ Next episode</button>${shareBtn}
+        ${primary}<button class="pt-share" onclick="partyNext()">Next episode</button>${shareBtn}
         <div class="dt-label" style="margin-top:14px">Switch to something else</div>${picker}`;
     }else{
       const shareBlock=IS_NATIVE
@@ -4686,7 +4711,7 @@ async function watchAnime(id){
   const ep=watchEpisode(a);
   pvWatchEp=ep;   // the episode we opened, so we can save progress on the way out
   pvOpenTime=Date.now();   // how long they stay is our only signal that they watched
-  document.getElementById('pvTitle').textContent=a.title+(ep?` · Ep ${ep}`:'');
+  document.getElementById('pvTitle').innerHTML=escH(a.title)+(ep?` <span class="pv-ep">Ep ${ep}</span>`:'');
   const ext=document.getElementById('pvExt');
   // The deep-link 404s when our slug ≠ the site's (romaji, a variant, season markers)
   // and we can't detect that across the frame — so this loads the site's SEARCH for
@@ -4758,7 +4783,7 @@ function pvGoTo(a,ep){
   const url=episodeURL(a,ep); if(!url) return;
   pvWatchEp=ep;
   document.getElementById('pvFrame').src=url;
-  document.getElementById('pvTitle').textContent=a.title+' · Ep '+ep;
+  document.getElementById('pvTitle').innerHTML=escH(a.title)+' <span class="pv-ep">Ep '+ep+'</span>';
   pvOpenTime=Date.now();                 // fresh clock — each episode earns its own auto-mark
   savePvSession(pvReturnId,ep,'watch');
   renderPvNav(a);
@@ -5050,20 +5075,27 @@ function customServiceURL(s,a){
   return SRC_TOKEN_RE.test(s.url)?fillSourceTokens(s.url,a,watchEpisode(a)||1):fillURL(s.url,a);
 }
 let watchTarget=null, watchOpts=[];
+const WT_TAG={mine:['Your account','wt-t-mine'],yours:['Your service','wt-t-mine'],free:['Free','wt-t-free'],sub:['Subscription','wt-t-sub'],search:['Search','wt-t-search']};
 function renderWatch(){
   const a=watchTarget, box=document.getElementById('watchBody'); if(!a||!box)return;
   const streams=a.streams||[];
   const prio=s=>{const k=s.site.toLowerCase();return subHas(k)?0:(s.free?1:2);};
-  const avail=streams.slice().sort((x,y)=>prio(x)-prio(y)).map(s=>{const k=s.site.toLowerCase();return {label:s.site,url:s.url,site:k,tag:subHas(k)?'Your account':(s.free?'Free':'Subscription'),exact:true};});
-  const mine=customServices().map(s=>({label:s.name,url:customServiceURL(s,a),site:s.name.toLowerCase(),tag:'Your service',exact:false}));
-  const cat=WATCH_PRESETS.map(p=>({label:p.name,url:fillURL(p.url,a),site:p.name.toLowerCase(),tag:'Free · search',exact:false}));
+  const avail=streams.slice().sort((x,y)=>prio(x)-prio(y)).map(s=>{const k=s.site.toLowerCase();return {label:s.site,url:s.url,site:k,kind:subHas(k)?'mine':(s.free?'free':'sub'),exact:true};});
+  const mine=customServices().map(s=>({label:s.name,url:customServiceURL(s,a),site:s.name.toLowerCase(),kind:'yours',exact:false}));
+  const cat=WATCH_PRESETS.map(p=>({label:p.name,url:fillURL(p.url,a),site:p.name.toLowerCase(),kind:'search',exact:false}));
   // Hidden sources are gone from every show; renames apply everywhere at once.
   const dress=list=>list.filter(o=>!isHiddenSrc(o.label)).map(o=>({...o,label:srcLabel(o.label)}));
   const myShown=dress(mine), availShown=dress(avail), catShown=dress(cat);
   watchOpts=myShown.concat(availShown,catShown);
-  const row=(o,i)=>`<button class="src-opt${legalPref()===o.site?' on':''}" onclick="watchOpen(${i})"><div class="src-name">${o.exact?icon('play')+' ':''}Watch on ${escH(o.label)}</div><div class="src-sub">${o.tag}${o.exact?' · straight to the show':''}</div></button>`;
+  const row=(o,i)=>{const[tl,tc]=WT_TAG[o.kind]||WT_TAG.search;return `<button class="wt-opt${legalPref()===o.site?' on':''}" onclick="watchOpen(${i})">
+    <div class="wt-main"><div class="wt-name">${escH(o.label)}</div><div class="wt-sub">${o.exact?'straight to the show':'opens a title search'}</div></div>
+    <span class="wt-tag ${tc}">${tl}</span></button>`;};
   const sec=(label,items,off)=>items.length?`<div class="dt-label" style="margin-top:14px">${label}</div>`+items.map((o,i)=>row(o,off+i)).join(''):'';
+  // Native nudge: with no services ticked, the "Open in ___" routing has nothing to
+  // prefer — point them to My Services so it can open the apps they already pay for.
+  const nudge=(IS_NATIVE&&!myServices().length)?`<button class="wt-nudge" onclick="closeAll();setTimeout(()=>openSheet('sourceSheet'),260)">${icon('film')}<span>Set up <b>My Services</b> — so WatchList opens shows in the apps you already pay for.</span></button>`:'';
   box.innerHTML=`<p class="ai-desc">Where do you want to watch <b>${escH(a.title)}</b>? Tap one and it remembers — next time it opens there automatically.</p>`
+    +nudge
     +sec(myShown.length?'Your services':'',myShown,0)
     +sec(availShown.length?'Available now — official':'',availShown,myShown.length)
     +sec('Free — search',catShown,myShown.length+availShown.length)

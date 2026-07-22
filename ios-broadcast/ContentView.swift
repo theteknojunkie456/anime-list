@@ -88,8 +88,16 @@ struct WatchListShell: UIViewRepresentable {
             case "savepw":
                 if let pw = body["pw"] as? String, !pw.isEmpty { PWStore.save(pw) }
             case "openurl":   // legal streaming sites can't be framed — open in Safari
-                if let s = body["url"] as? String, let url = URL(string: s) {
-                    DispatchQueue.main.async { UIApplication.shared.open(url) }
+                if let s = body["url"] as? String {
+                    // fall back to percent-encoding if the raw string won't parse
+                    let url = URL(string: s)
+                        ?? s.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed).flatMap { URL(string: $0) }
+                    if let url = url {
+                        NSLog("WatchList: openurl → %@", url.absoluteString)
+                        DispatchQueue.main.async { UIApplication.shared.open(url, options: [:], completionHandler: nil) }
+                    } else {
+                        NSLog("WatchList: openurl FAILED to parse %@", s)
+                    }
                 }
             default: break
             }

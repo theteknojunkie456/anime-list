@@ -47,6 +47,9 @@ targets:
       path: Generated/App-Info.plist
       properties:
         CFBundleDisplayName: WatchList
+        # Uses only standard/exempt encryption (HTTPS) — declare it so TestFlight
+        # stops asking the export-compliance question on every upload.
+        ITSAppUsesNonExemptEncryption: false
         UILaunchScreen: {}
         UIRequiresFullScreen: true
         NSFaceIDUsageDescription: Unlock WatchList with Face ID.

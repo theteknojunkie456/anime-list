@@ -252,6 +252,9 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 .set-chev{flex-shrink:0;color:var(--t3);display:flex;}
 .set-chev .ico{width:16px;height:16px;}
 /* ── "How do I get a key" walkthrough ── */
+.key-cta{width:100%;display:flex;align-items:center;justify-content:center;gap:8px;padding:14px;border:none;border-radius:13px;background:linear-gradient(135deg,var(--a1),var(--a2));color:#fff;font-family:var(--fd);font-size:15px;font-weight:800;cursor:pointer;}
+.key-cta span{font-weight:600;font-size:12px;opacity:.85;}
+.key-cta:active{transform:scale(.98);}
 .keyhow{margin-top:14px;border-top:1px solid var(--b1);padding-top:12px;}
 .keyhow summary{font-size:12.5px;font-weight:700;color:var(--a2);cursor:pointer;list-style:none;padding:4px 0;min-height:32px;display:flex;align-items:center;}
 .keyhow summary::-webkit-details-marker{display:none;}
@@ -754,6 +757,35 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 .wt-t-sub{background:var(--watbg);color:var(--wat);}
 .wt-t-search{background:var(--bg4);color:var(--t3);}
 .src-picks{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px;}
+/* AI summon glow — a flowing multi-hue light that hugs the rounded screen edges,
+   in the spirit of iOS's Siri. It's a border-only aurora: a rotating conic
+   gradient, heavily blurred, masked so only the rim glows and the centre stays
+   clear. 'arming' breathes while fingers are held; 'fire' flares as it opens. */
+@property --aiAng{syntax:'<angle>';inherits:false;initial-value:0deg;}
+.ai-glow{position:fixed;inset:0;z-index:200;pointer-events:none;opacity:0;transition:opacity .3s;}
+.ai-glow::before{content:'';position:absolute;inset:0;border-radius:46px;padding:16px;
+  background:conic-gradient(from var(--aiAng),#ff2d55,#ff9500,#ffd60a,#30d158,#0a84ff,#5e5ce6,#bf5af2,#ff2d55);
+  filter:blur(17px) saturate(1.35);
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);mask-composite:exclude;}
+.ai-glow.arming{opacity:1;}
+.ai-glow.arming::before{animation:aiFlow 3.2s linear infinite,aiBreath 1.7s ease-in-out infinite;}
+.ai-glow.fire{opacity:1;animation:aiFadeOut .55s ease-out forwards;}
+.ai-glow.fire::before{animation:aiFlow 1s linear infinite;filter:blur(24px) saturate(1.6) brightness(1.6);padding:24px;}
+@keyframes aiFlow{to{--aiAng:360deg}}
+@keyframes aiBreath{0%,100%{opacity:.62;padding:14px}50%{opacity:1;padding:20px}}
+@keyframes aiFadeOut{0%{opacity:1}100%{opacity:0}}
+@media (prefers-reduced-motion:reduce){.ai-glow.arming::before,.ai-glow.fire::before{animation:aiFlow 8s linear infinite}}
+/* Collapsible section — keeps the sheet short; advanced stuff stays folded away */
+.src-fold{border:1px solid var(--b2);border-radius:12px;background:var(--bg2);margin-top:10px;overflow:hidden;}
+.src-fold>summary{list-style:none;cursor:pointer;padding:13px 14px;font-family:var(--fd);font-size:14px;font-weight:800;color:var(--t1);display:flex;align-items:center;gap:9px;}
+.src-fold>summary::-webkit-details-marker{display:none;}
+.src-fold>summary::after{content:'';margin-left:auto;width:8px;height:8px;border-right:2px solid var(--t3);border-bottom:2px solid var(--t3);transform:rotate(-45deg);transition:transform .2s;}
+.src-fold[open]>summary::after{transform:rotate(45deg);}
+.src-fold[open]>summary{border-bottom:1px solid var(--b2);}
+.src-fold>summary:active{background:var(--bg3);}
+.src-fold>*:not(summary){margin-left:14px;margin-right:14px;}
+.src-fold>*:last-child{margin-bottom:14px;}
 .src-chip{font-family:var(--fd);font-size:12.5px;font-weight:700;color:var(--t2);background:var(--bg3);border:1px solid var(--b1);border-radius:999px;padding:7px 13px;transition:border-color .15s,background .15s,color .15s;}
 .src-chip.on{border-color:var(--a);background:var(--ag);color:var(--a2);}
 .src-chip:active{transform:scale(.96);}
@@ -808,6 +840,13 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 @keyframes pcPop{0%{transform:scale(.4);opacity:0;}30%{transform:scale(1.1);opacity:1;}100%{transform:scale(1);opacity:1;}}
 .shareview{position:fixed;inset:0;z-index:130;background:#000;display:none;transform:translateY(100%);transition:transform .38s cubic-bezier(.2,1,.28,1);}
 .shareview.on{display:block;transform:translateY(0);}
+/* In-app player — mirrors .shareview so the transition feels identical */
+.ytview{position:fixed;inset:0;z-index:130;background:#000;display:none;transform:translateY(100%);transition:transform .38s cubic-bezier(.2,1,.28,1);}
+.ytview.on{display:block;transform:translateY(0);}
+.ytview .pv-top{position:absolute;top:0;left:0;right:0;z-index:3;background:linear-gradient(to bottom,rgba(0,0,0,.6),rgba(0,0,0,0));padding-bottom:26px;}
+.yt-stage{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;}
+.yt-frame{width:100%;aspect-ratio:16/9;max-height:100%;}
+.yt-frame iframe{width:100%;height:100%;border:0;display:block;}
 .sh-stage{position:absolute;inset:0;background:#000;display:flex;align-items:center;justify-content:center;}
 .sh-video{width:100%;height:100%;object-fit:contain;background:#000;}
 .sh-video.fill{object-fit:cover;}   /* tap to go edge-to-edge (crops a little) */
@@ -1236,8 +1275,11 @@ body.recsel .pcard{position:relative;}
   <button class="nbtn" onclick="openStats()"><span><i data-ic="chart"></i></span><small>Stats</small></button>
   <button class="nbtn add" onclick="openSheet_add()">＋</button>
   <button class="nbtn" onclick="openSheet('settingsSheet')"><span><i data-ic="settings"></i></span><small>Settings</small></button>
-  <button class="nbtn" onclick="openSheet('aiSheet')"><span><i data-ic="sparkles"></i></span><small>AI</small></button>
+  <button class="nbtn" onclick="openSheet('sourceSheet')"><span><i data-ic="play"></i></span><small>Sources</small></button>
 </div>
+
+<!-- AI SUMMON — edges glow while two fingers are held, then the AI opens -->
+<div class="ai-glow" id="aiGlow" aria-hidden="true"></div>
 
 <!-- OVERLAY -->
 <div class="overlay" id="overlay" onclick="closeAll()"></div>
@@ -1363,6 +1405,7 @@ body.recsel .pcard{position:relative;}
     <div class="chat-thread" id="chatThread"></div>
     <div class="chat-input-row">
       <input class="ai-prompt-in" id="chatPrompt" placeholder="Message your anime companion…" autocomplete="off" onkeydown="if(event.key==='Enter'){event.preventDefault();sendChat();}">
+      <button class="chat-send" id="chatMic" onclick="toggleDictation()" aria-label="Talk" style="display:none"><i data-ic="mic"></i></button>
       <button class="chat-send" onclick="sendChat()" aria-label="Send"><i data-ic="send"></i></button>
     </div>
     <button class="chat-clear" onclick="clearChat()"><i data-ic="plus"></i> New chat</button>
@@ -1392,8 +1435,12 @@ body.recsel .pcard{position:relative;}
     <div class="sheet-title"><i data-ic="key"></i> AI Key</div>
     <button class="sheet-cancel" onclick="closeKeySheet()">Done</button>
   </div>
-  <div style="display:flex;gap:8px;">
-    <input class="ai-prompt-in" id="apiKeyIn" type="password" placeholder="Paste your AI key…" autocomplete="off">
+  <!-- One-tap path: jump straight to Groq's key page, then paste from clipboard.
+       No typing a URL by hand, no hunting the menu — the two real friction points. -->
+  <button class="key-cta" onclick="getFreeKey()"><i data-ic="external"></i> Get a free key <span>Groq · no card · ~2 min</span></button>
+  <div style="display:flex;gap:8px;margin-top:10px;">
+    <input class="ai-prompt-in" id="apiKeyIn" type="password" placeholder="…then paste it here" autocomplete="off">
+    <button class="ai-run-btn" id="keyPasteBtn" onclick="pasteKey()" title="Paste from clipboard"><i data-ic="clipboard"></i></button>
     <button class="ai-run-btn" onclick="saveKeyAndClose()">Save</button>
   </div>
   <button class="chat-clear" onclick="removeKey()" style="margin-top:10px"><i data-ic="trash"></i> Remove key</button>
@@ -1405,9 +1452,9 @@ body.recsel .pcard{position:relative;}
     <summary>How do I get a free key? (2 minutes)</summary>
     <div class="keyhow-body">
       <p class="ai-desc" style="margin:0 0 12px">Groq is free, takes about two minutes, and <b style="color:var(--t1)">doesn't ask for a credit card</b>.</p>
-      <div class="keystep"><span class="keynum">1</span><div>Open <b>console.groq.com</b> in your browser.</div></div>
-      <div class="keystep"><span class="keynum">2</span><div>Tap <b>Sign up</b> — use your Google account, or an email address. Confirm the email if it asks.</div></div>
-      <div class="keystep"><span class="keynum">3</span><div>Once you're in, go to <b>console.groq.com/keys</b> (it's "API Keys" in the menu).</div></div>
+      <div class="keystep"><span class="keynum">1</span><div>Tap <b><a onclick="openExternal('https://console.groq.com/keys')" style="color:var(--a2);cursor:pointer">console.groq.com/keys</a></b> to open Groq.</div></div>
+      <div class="keystep"><span class="keynum">2</span><div>Tap <b>Sign up</b> — use your Google account, or an email address. Confirm the email if it asks. (It lands you right on the keys page.)</div></div>
+      <div class="keystep"><span class="keynum">3</span><div>Already had an account? You're on the API Keys page now.</div></div>
       <div class="keystep"><span class="keynum">4</span><div>Tap <b>Create API Key</b>. Give it any name — "WatchList" is fine.</div></div>
       <div class="keystep"><span class="keynum">5</span><div><b style="color:var(--a2)">Copy it straight away.</b> It starts with <code>gsk_</code>, and Groq only ever shows it once — if you close the box you'll just make a new one, which is fine.</div></div>
       <div class="keystep"><span class="keynum">6</span><div>Come back here, paste it in the box above, tap <b>Save</b>. Done.</div></div>
@@ -1525,6 +1572,24 @@ body.recsel .pcard{position:relative;}
     <button class="sheet-cancel" onclick="closeAll()">Close</button>
   </div>
   <div id="watchBody"></div>
+</div>
+
+<div class="sheet" id="newsSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <div class="sheet-title"><i data-ic="sparkles"></i> What’s new</div>
+    <button class="sheet-cancel" onclick="closeAll()">Close</button>
+  </div>
+  <div id="newsBody"></div>
+</div>
+
+<!-- IN-APP PLAYER (full-screen) — official YouTube embed, licensed streams only -->
+<div class="ytview" id="ytView">
+  <div class="pv-top">
+    <button class="sv-back" onclick="closeYT()" aria-label="Back"><i data-ic="chevron-left"></i></button>
+    <div class="pv-title" id="ytTitle">Watch</div>
+  </div>
+  <div class="yt-stage"><div class="yt-frame" id="ytFrame"></div></div>
 </div>
 
 <!-- 3·2·1 START CUE (full-screen) -->
@@ -1790,6 +1855,7 @@ body.recsel .pcard{position:relative;}
 <script>
 // ─── ICONS — inline monochrome line icons (Feather/Lucide style, currentColor) ──
 const ICONS={
+mic:'<path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v4M8 23h8"/>',
 calendar:'<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
 bell:'<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>',
 'bell-off':'<path d="M8.7 3A6 6 0 0 1 18 8c0 3 .5 5 1.3 6.5"/><path d="M17 17H3s3-2 3-9a4.67 4.67 0 0 1 .3-1.7"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/><path d="M2 2l20 20"/>',
@@ -3581,6 +3647,9 @@ function matchStatus(w){
 function parseImport(){
   const raw=document.getElementById('importPaste').value.trim();
   if(!raw){toast('Paste something first');return;}
+  // Scraped catalogue rows (JSON) go through the adapter — same box, no extra UI.
+  const scraped=parseScrapedPaste(raw);
+  if(scraped){importScraped(scraped);closeAll();return;}
   const lines=raw.split('\n').map(l=>l.trim()).filter(l=>l.length>2);
   importItems=lines.map((line,i)=>{
     let title=line.replace(/^[\d\-\*\•\.]+\s*/,'').trim();
@@ -4309,6 +4378,61 @@ function doImport(){
   toast(`Added ${toAdd.length}${dupes?` · ${dupes} already had`:''}`);
   setTimeout(fetchCovers,500);
 }
+// ─── SCRAPE SOURCE ADAPTER ──────────────────────────────────────────────────
+// Normalizes a scraped catalogue row into a library item. The scrape is a
+// DISCOVERY source only — it supplies a title and nothing we trust. Everything
+// that matters (real genres, art, episode counts, aniId, and therefore the
+// official streaming links behind routeLegal) comes from AniList via
+// fetchCovers, exactly like every other add path.
+//
+// The row's watch URL is deliberately dropped rather than stored: it points at
+// an unlicensed host, and §6 keeps every external source keyless and legal.
+// Playback stays on routeLegal — which lands on the exact official page anyway.
+// Recognizes a scraped catalogue paste: a JSON object or array carrying the
+// scraper's field names. Returns rows, or null so plain-text paste falls through
+// to the normal line parser untouched.
+function parseScrapedPaste(raw){
+  if(!/^[\[{]/.test(raw))return null;
+  let v; try{v=JSON.parse(raw);}catch{return null;}
+  const rows=Array.isArray(v)?v:[v];
+  const looksScraped=rows.some(r=>r&&typeof r==='object'&&
+    ('Title' in r)&&(('Title_URL' in r)||('nvbadgenew' in r)||('nvstatbadge' in r)));
+  return looksScraped?rows:null;
+}
+function scrapeItem(r){
+  const title=String(r.Title||'').trim(); if(!title)return null;
+  // "Movie" is a one-shot; series report their count via nvstatbadge ("CC 12").
+  const movie=/movie/i.test(r.nvbadgenew||'');
+  const cc=parseInt(String(r.nvstatbadge||'').replace(/[^0-9]/g,''),10);
+  // Genres arrive as fixed-arity padded slots (nvanimegenres, ...1, ...2) — the
+  // scraper pads to three, so a 5-genre title would be truncated. Collapse to a
+  // variable-length list and let AniList overwrite it with the real set.
+  const genres=Object.keys(r).filter(k=>/^nvanimegenres/.test(k))
+    .sort().map(k=>String(r[k]||'').trim()).filter(Boolean);
+  return {title, img:String(r.Image||''), epTotal:movie?1:(cc>0?cc:0),
+          genre:genres.join(', ')};
+}
+// Adds scraped rows to the watch list. Funnels through the same dedup + enrich
+// pipeline as doImport, so the adult gate (§7) and "no duplicates, ever" hold.
+function importScraped(rows){
+  const have=new Set();anime.forEach(a=>dupeKeys(a).forEach(k=>have.add(k)));
+  const parsed=(rows||[]).map(scrapeItem).filter(Boolean);
+  let added=0;
+  for(const it of parsed){
+    const keys=dupeKeys({title:it.title,kind:'watch'});   // no ids → normalized title
+    if(keys.some(k=>have.has(k)))continue;
+    keys.forEach(k=>have.add(k));
+    anime.unshift({id:uid(),title:it.title,status:'plan',kind:'watch',ep:0,
+      rating:0,fav:false,eps:'',epTotal:it.epTotal,time:'',genre:it.genre,
+      order:[],notes:'',img:it.img,upd:Date.now()});
+    added++;
+  }
+  dedupeAnime();save();render();
+  const dupes=parsed.length-added;
+  toast(`Added ${added}${dupes?` · ${dupes} already had`:''}`);
+  setTimeout(fetchCovers,500);
+  return added;
+}
 function exportList(){
   if(!anime.length){toast('Nothing to export yet');return;}
   const lines=anime.map(a=>{
@@ -4354,6 +4478,7 @@ const ONB=[
   {ic:'lock',oc:'#51cf66',title:'Lock your list',body:'Add a <b>password</b> and everything gets encrypted. You\'ll get a one-time <b>recovery key</b> — the only way in if you forget the password. Save both.',cta:{label:'Set a password',sheet:'securitySheet'}},
   {ic:'key',oc:'#ffd43b',title:'Unlock with a glance',body:'Once a password is set, open the app with <b>Face ID</b> instead of typing it every time.',cta:{label:'Set up Face ID',sheet:'securitySheet'}},
   {ic:'bell',oc:'#ff6b6b',title:'Episode alerts',body:'Get a heads-up the moment a new episode of something you\'re watching airs. Only the shows you follow — no spam.',cta:{label:'Turn on alerts',sheet:'notifySheet'}},
+  {ic:'play',oc:'#f783ac',title:'Watch where you already pay',body:'Tap <b>Watch</b> and it lists where a show actually is, then remembers your pick. Not in the US? Add <b>TVING</b>, <b>Wavve</b>, <b>iQIYI</b>, <b>JioHotstar</b> and more in one tap — or paste any service\'s search page and we\'ll wire it up. Yours always show first.',cta:{label:'Pick your services',sheet:'sourceSheet'}},
   {ic:'compass',oc:'#20c997',title:'You\'re all set',body:'Tap <b>+</b> to add anything, or <b>Import</b> your whole list from Notes in one paste. The icons up top are Friends, schedule, AI and themes. Anything you skipped is waiting in <b>Settings</b>.',primary:'Start watching'},
 ];
 let onbIdx=0;
@@ -4405,7 +4530,7 @@ function renderSettings(){
     {ic:'lock',    col:'#51cf66', h:'Password',            p:encEnabled()?'On — your list is encrypted':'Off', go:"openSheet('securitySheet')"},
     {ic:'bell',    col:'#ff6b6b', h:'Notifications',       p:notifyOn()?'On — you\'ll be told when an episode airs':'Off', go:'openNotifySheet()'},
     {ic:'sparkles',col:'#c084fc', h:'AI & chat key',       p:getKey()?'On — '+(keyProvider(getKey())||'key')+' connected':'Off — add a free key to unlock chat', go:"openSheet('aiSheet')"},
-    {ic:'play',    col:'#20c997', h:'Watch & read sources', p:'Where Watch now / Read now open', go:"openSheet('sourceSheet')"},
+    {ic:'play',    col:'#20c997', h:'Sources', p:'Where Watch now / Read now open', go:"openSheet('sourceSheet')"},
     {ic:'refresh', col:'#748ffc', h:'AniList sync',         p:alConnected()?'On — '+alUser()+' · progress syncs both ways':'Off — connect to sync progress everywhere', go:"openSheet('anilistSheet')"},
     {ic:'clipboard',col:'#ff922b',h:'Import / Export',    p:'Paste a list in, or copy yours out', go:"openSheet('importSheet')"},
     {ic:'palette', col:'#f783ac', h:'Theme',               p:'Colours, or build your own', go:"openSheet('themeSheet')"},
@@ -4570,13 +4695,25 @@ async function watchAnime(id){
   // custom source; else the default legal route. A pin/custom source with {ep} plays
   // in-frame; a bare preset opens in the browser.
   const src=effectiveSource(a);
-  if(!src){
-    if(IS_NATIVE){ await routeLegal(a); return; }   // official app → legal auto-routing (goes straight to the show)
-    openExternal(launchURL(a)); toast(`Opening ${sourceName()} for “${a.title}”`); return;   // web → free-legal default; set your own source in Settings
+  // Legal auto-routing now runs on BOTH builds. It used to be official-app only,
+  // which left web users with a single hardcoded free-search default — no way to
+  // reach their own services, and no inline player. Nothing here is native-only:
+  // it's official links, the user's own services, and a licensed YouTube embed.
+  if(!src){ await routeLegal(a); return; }
+  // ONE RULE, both paths: if the source is embeddable it plays inline; otherwise
+  // it opens in the browser and we track progress by time-away. Previously a
+  // custom source always framed and a preset always opened, so the same "watch"
+  // behaved differently depending on which settings field had been filled in —
+  // and a custom source that blocked framing (TVING, Prime, Wavve…) just showed
+  // a black rectangle with no way back to the show.
+  const ep0=watchEpisode(a);
+  if(!embedTarget(streamURL(a).url||src)){
+    armExternalWatch(a,ep0||1);
+    openExternal(launchURL(a));
+    toast(`Opening ${sourceName()} for “${a.title}”`);
+    return;
   }
-  // built-in legal presets (Tubi, Netflix…) can't be framed (DRM / X-Frame-Options) → browser
-  if(WATCH_PRESETS.some(p=>p.url===src)){ openExternal(launchURL(a)); toast(`Opening ${sourceName()} for “${a.title}”`); return; }
-  // YOUR OWN source → immersive in-app player (WatchList top + bottom chrome, in-frame search)
+  // EMBEDDABLE source → immersive in-app player (WatchList chrome, in-frame search)
   pvReturnId=id;
   const ep=watchEpisode(a);
   pvWatchEp=ep;   // the episode we opened, so we can save progress on the way out
@@ -4769,19 +4906,194 @@ async function routeLegal(a){
   const streams=await whereLegal(a);
   watchTarget=a;
   const pref=legalPref();
-  const hit=pref&&streams.find(s=>s.site.toLowerCase()===pref);
-  if(hit){ openExternal(hit.url); toast(`Opening ${hit.site} for “${a.title}”`); return; }
+  // Check the user's own services first — someone who added one and picked it
+  // wants it every time, and it won't be in AniList's list to match against.
+  const own=pref&&!isHiddenSrc(pref)&&customServices().find(s=>s.name.toLowerCase()===pref);
+  if(own){ autoOpen(a,own.name,customServiceURL(own,a)); return; }
+  const hit=pref&&!isHiddenSrc(pref)&&streams.find(s=>s.site.toLowerCase()===pref);
+  if(hit){ autoOpen(a,hit.site,hit.url); return; }
   renderWatch(); openSheet('watchSheet');
 }
+// ─── YOUR OWN SERVICES ──────────────────────────────────────────────────────
+// PAID_SERVICES and WATCH_PRESETS are US-centric, and AniList's externalLinks
+// rarely carry regional catalogues (TVING, Wavve, Coupang Play, U-NEXT, dAnime,
+// JioHotstar…). So a subscriber outside the US opens the Watch sheet and sees
+// nothing they can actually use. These let them add their own, as many as they
+// like, and have them rank ABOVE the built-ins — someone who typed a service in
+// by hand subscribes to it, which is a stronger signal than anything we infer.
+// Licensed services outside the US/EU, one tap to add. PAID_SERVICES and
+// WATCH_PRESETS are US-centric and AniList's externalLinks rarely list these, so
+// without them a subscriber in Seoul, Shanghai, Lagos or Mumbai opens Watch and
+// sees nothing they can use. Region is a label for grouping only — nothing is
+// hidden by location, since people travel, emigrate, and hold foreign accounts.
+const REGIONAL_SERVICES=[
+  {name:'TVING',       region:'KR', url:'https://www.tving.com/search?keyword={query}'},
+  {name:'Wavve',       region:'KR', url:'https://www.wavve.com/search?searchWord={query}'},
+  {name:'Coupang Play',region:'KR', url:'https://www.coupangplay.com/search?q={query}'},
+  // unverified: blocks automated requests, so the search path couldn't be
+  // confirmed. Kept because dropping it loses Korea's anime-specific service —
+  // flagged in the UI so a wrong result reads as "check this" not "app broken".
+  {name:'Laftel',      region:'KR', url:'https://laftel.net/search?keyword={query}', unverified:true},
+  {name:'U-NEXT',      region:'JP', url:'https://video.unext.jp/freeword?query={query}'},
+  {name:'Bilibili',    region:'CN', url:'https://www.bilibili.tv/en/search?q={query}'},
+  {name:'iQIYI',       region:'CN', url:'https://www.iq.com/search?query={query}'},
+  {name:'WeTV',        region:'CN', url:'https://wetv.vip/en/search?q={query}'},
+  {name:'Youku',       region:'CN', url:'https://www.youku.tv/search?q={query}'},
+  {name:'Showmax',     region:'Africa', url:'https://www.showmax.com/search?q={query}', unverified:true},   // see Laftel note
+  {name:'JioHotstar',  region:'IN', url:'https://www.hotstar.com/in/search?q={query}'},
+  {name:'Aniplus Asia',region:'SEA', url:'https://www.aniplus-asia.com/?s={query}'},
+  {name:'iflix',       region:'SEA', url:'https://www.iflix.com/search?q={query}'},
+];
+// One tap: add a regional service without pasting anything.
+function addRegional(name){
+  const s=REGIONAL_SERVICES.find(x=>x.name===name);
+  if(s&&addCustomService(s.name,s.url))renderSource();
+}
+// ─── HIDE / RENAME ANY SOURCE ───────────────────────────────────────────────
+// Everything in the Watch sheet is editable, not just the ones you add. Don't
+// use Tubi? Hide it and it's gone from every show. Call HIDIVE something else?
+// Rename it. Keyed by normalized name so it covers built-in presets, AniList's
+// official links, and your own services alike.
+const HIDE_KEY='hidden_sources', ALIAS_KEY='source_aliases';
+function srcKey(name){return String(name||'').toLowerCase().replace(/[^a-z0-9]/g,'');}
+function hiddenSrc(){try{const v=JSON.parse(localStorage.getItem(HIDE_KEY)||'[]');return Array.isArray(v)?v:[];}catch{return[];}}
+function isHiddenSrc(name){return hiddenSrc().includes(srcKey(name));}
+function toggleHiddenSrc(name){
+  const k=srcKey(name),list=hiddenSrc(),i=list.indexOf(k);
+  if(i>=0)list.splice(i,1);else list.push(k);
+  try{localStorage.setItem(HIDE_KEY,JSON.stringify(list));}catch{}
+  // A hidden source can't stay the remembered auto-open pick.
+  if(i<0&&legalPref()===String(name||'').toLowerCase())setLegalPref('');
+  toast(i>=0?`${name} is back`:`${name} hidden`);
+  renderSource();
+}
+function srcAliases(){try{const v=JSON.parse(localStorage.getItem(ALIAS_KEY)||'{}');return (v&&typeof v==='object')?v:{};}catch{return{};}}
+function srcLabel(name){const a=srcAliases()[srcKey(name)];return a||name;}
+function setSrcAlias(name,label){
+  const m=srcAliases(),k=srcKey(name);
+  label=String(label||'').trim();
+  if(label&&label!==name)m[k]=label;else delete m[k];
+  try{localStorage.setItem(ALIAS_KEY,JSON.stringify(m));}catch{}
+  renderSource();
+}
+function renameSrcPrompt(name){
+  const cur=srcLabel(name);
+  const next=window.prompt(`What should “${name}” be called?`,cur);
+  if(next===null)return;                       // cancelled
+  setSrcAlias(name,next);
+  toast(next.trim()&&next.trim()!==name?`Renamed to ${next.trim()}`:'Name reset');
+}
+// Every source the user could plausibly see, for the manage list in Settings.
+function allKnownSources(){
+  const seen=new Set(),out=[];
+  const add=(name,kind)=>{const k=srcKey(name);if(!k||seen.has(k))return;seen.add(k);out.push({name,kind});};
+  customServices().forEach(s=>add(s.name,'yours'));
+  PAID_SERVICES.forEach(s=>add(s.name,'subscription'));
+  WATCH_PRESETS.forEach(p=>add(p.name,'free'));
+  REGIONAL_SERVICES.forEach(s=>add(s.name,'regional'));
+  return out;
+}
+const CS_KEY='custom_services';
+function customServices(){try{const v=JSON.parse(localStorage.getItem(CS_KEY)||'[]');return Array.isArray(v)?v.filter(s=>s&&s.name&&s.url):[];}catch{return[];}}
+function writeCustomServices(list){try{localStorage.setItem(CS_KEY,JSON.stringify(list));}catch{}}
+// tving.com → "Tving", www.u-next.jp → "U-next". Good enough that nobody has to
+// think about it, and the field stays editable for the cases it gets wrong.
+function serviceNameFromURL(url){
+  try{
+    const h=new URL(url.replace(/\{[^}]+\}/g,'x')).hostname.replace(/^www\./,'');
+    const base=h.split('.')[0]||h;
+    return base.charAt(0).toUpperCase()+base.slice(1);
+  }catch{return '';}
+}
+function addCustomService(name,url){
+  url=normSrc(String(url||'').trim());
+  // Name is optional — derive it from the domain so pasting a URL is enough.
+  name=String(name||'').trim()||serviceNameFromURL(url);
+  if(!/^https?:\/\//i.test(url)){toast('That doesn’t look like a website address');return false;}
+  if(!name){toast('Give the service a name');return false;}
+  const list=customServices();
+  if(list.some(s=>s.name.toLowerCase()===name.toLowerCase())){toast(`${name} is already on your list`);return false;}
+  list.push({id:uid(),name,url});
+  writeCustomServices(list);
+  toast(`${name} added`);
+  return true;
+}
+function removeCustomService(id){
+  writeCustomServices(customServices().filter(s=>s.id!==id));
+  // Drop the remembered pick too, or Watch keeps auto-opening a service that's gone.
+  renderSource&&renderSource();
+  toast('Removed');
+}
+// Turn a real search URL into a template, so nobody has to learn the tokens.
+// Someone searches their own service for anything, copies the address bar, and
+// pastes it — we find the query parameter and swap its value for {query}.
+// Already-templated URLs pass through untouched.
+const SEARCH_PARAMS=['q','query','keyword','keywords','search','searchword','searchWord','phrase','term','text','title','wd','kw','k','s'];
+function templatizeSearchURL(raw){
+  if(SRC_TOKEN_RE.test(raw))return raw;             // already a template
+  let u; try{u=new URL(raw);}catch{return raw;}
+  for(const k of SEARCH_PARAMS){
+    const v=u.searchParams.get(k);
+    if(v!==null&&v!==''){u.searchParams.set(k,'__WLQ__');
+      return u.toString().replace(/__WLQ__/g,'{query}');}
+  }
+  // /search/cowboy-bebop style — templatize the last path segment instead.
+  // Episode-style paths: /watch/tomo-chan-is-a-girl/ep-7 → /watch/{slug}/ep-{ep}
+  // The episode marker must carry an ep/episode/e prefix. That's what keeps
+  // /watch/86/ep-3 safe: "86" is the TITLE, and a bare number is never read as
+  // an episode. The segment before the marker becomes {slug} unless it's
+  // structural ("watch", "anime"…), so numeric titles like 86 still template
+  // correctly rather than being baked in and sending every show to that title.
+  {
+    const segs=u.pathname.split('/').filter(Boolean);
+    const i=segs.length-1;
+    const m=i>=0&&/^(ep|episode|e)[-_]?(\d+)$/i.exec(segs[i]);
+    if(m){
+      segs[i]=segs[i].replace(/\d+$/,'{ep}');
+      const STRUCTURAL=/^(watch|anime|series|video|tv|show|title|play|stream|v|w)$/i;
+      if(i-1>=0&&!STRUCTURAL.test(segs[i-1]))segs[i-1]='{slug}';
+      u.pathname='/'+segs.join('/');
+      return decodeURIComponent(u.toString());
+    }
+  }
+  // Skip segments like Amazon's "ref=x" — those are tracking crumbs, not queries.
+  const segs=u.pathname.split('/').filter(Boolean);
+  if(segs.length>=2&&/search|browse|find/i.test(segs[segs.length-2])&&!/=/.test(segs[segs.length-1])){
+    segs[segs.length-1]='{query}';u.pathname='/'+segs.join('/');
+    return decodeURIComponent(u.toString());
+  }
+  return raw;
+}
+// Live hint: as they paste a URL, fill the name field for them if it's empty.
+function csHintName(){
+  const u=document.getElementById('csURL'),n=document.getElementById('csName');
+  if(!u||!n||n.value.trim())return;
+  n.value=serviceNameFromURL(u.value.trim())||'';
+}
+function addCustomServiceFromForm(){
+  const n=document.getElementById('csName'),u=document.getElementById('csURL');
+  if(!n||!u)return;
+  const url=templatizeSearchURL(normSrc(u.value.trim()));
+  if(addCustomService(n.value,url)){n.value='';u.value='';renderSource();}
+}
+// Build this title's URL for a custom service. A template with tokens gets them
+// filled; a bare domain falls back to the app's own search-URL builder.
+function customServiceURL(s,a){
+  return SRC_TOKEN_RE.test(s.url)?fillSourceTokens(s.url,a,watchEpisode(a)||1):fillURL(s.url,a);
+}
 let watchTarget=null, watchOpts=[];
-const WT_TAG={mine:['Your account','wt-t-mine'],free:['Free','wt-t-free'],sub:['Subscription','wt-t-sub'],search:['Search','wt-t-search']};
+const WT_TAG={mine:['Your account','wt-t-mine'],yours:['Your service','wt-t-mine'],free:['Free','wt-t-free'],sub:['Subscription','wt-t-sub'],search:['Search','wt-t-search']};
 function renderWatch(){
   const a=watchTarget, box=document.getElementById('watchBody'); if(!a||!box)return;
   const streams=a.streams||[];
   const prio=s=>{const k=s.site.toLowerCase();return subHas(k)?0:(s.free?1:2);};
   const avail=streams.slice().sort((x,y)=>prio(x)-prio(y)).map(s=>{const k=s.site.toLowerCase();return {label:s.site,url:s.url,site:k,kind:subHas(k)?'mine':(s.free?'free':'sub'),exact:true};});
+  const mine=customServices().map(s=>({label:s.name,url:customServiceURL(s,a),site:s.name.toLowerCase(),kind:'yours',exact:false}));
   const cat=WATCH_PRESETS.map(p=>({label:p.name,url:fillURL(p.url,a),site:p.name.toLowerCase(),kind:'search',exact:false}));
-  watchOpts=avail.concat(cat);
+  // Hidden sources are gone from every show; renames apply everywhere at once.
+  const dress=list=>list.filter(o=>!isHiddenSrc(o.label)).map(o=>({...o,label:srcLabel(o.label)}));
+  const myShown=dress(mine), availShown=dress(avail), catShown=dress(cat);
+  watchOpts=myShown.concat(availShown,catShown);
   const row=(o,i)=>{const[tl,tc]=WT_TAG[o.kind]||WT_TAG.search;return `<button class="wt-opt${legalPref()===o.site?' on':''}" onclick="watchOpen(${i})">
     <div class="wt-main"><div class="wt-name">${escH(o.label)}</div><div class="wt-sub">${o.exact?'straight to the show':'opens a title search'}</div></div>
     <span class="wt-tag ${tc}">${tl}</span></button>`;};
@@ -4791,11 +5103,81 @@ function renderWatch(){
   const nudge=(IS_NATIVE&&!myServices().length)?`<button class="wt-nudge" onclick="closeAll();setTimeout(()=>openSheet('sourceSheet'),260)">${icon('film')}<span>Set up <b>My Services</b> — so WatchList opens shows in the apps you already pay for.</span></button>`:'';
   box.innerHTML=`<p class="ai-desc">Where do you want to watch <b>${escH(a.title)}</b>? Tap one and it remembers — next time it opens there automatically.</p>`
     +nudge
-    +sec(avail.length?'Available now — official':'',avail,0)
-    +sec('Free — search',cat,avail.length)
-    +(avail.length?'':'<p class="ai-desc" style="margin-top:10px">No official link listed for this one — the free searches above usually still have it.</p>');
+    +sec(myShown.length?'Your services':'',myShown,0)
+    +sec(availShown.length?'Available now — official':'',availShown,myShown.length)
+    +sec('Free — search',catShown,myShown.length+availShown.length)
+    +(availShown.length||myShown.length?'':'<p class="ai-desc" style="margin-top:10px">No official link listed for this one — the free searches above usually still have it. Using a service we don’t list? Add it in Settings → Sources.</p>');
 }
-function watchOpen(i){const o=watchOpts[i],a=watchTarget;if(!o||!a)return;setLegalPref(o.site);openExternal(o.url);closeAll();toast(`Opening ${o.label}…`);}
+// ─── IN-APP PLAYER ──────────────────────────────────────────────────────────
+// Plays inline ONLY where the host publishes an embed API and licenses it —
+// which in practice means YouTube (Muse Asia, Ani-One and other rights-holders
+// stream full episodes there; see LEGAL_FREE_SITES). Everything else opens
+// externally, and that is not a policy choice we could code around: Crunchyroll,
+// Netflix, Hulu and Max all send X-Frame-Options/frame-ancestors that make an
+// iframe render blank. Embedding is a permission, not a technique.
+// Returns the video id for a YouTube URL, or '' for anything else.
+function ytId(url){
+  try{
+    const u=new URL(url);
+    const h=u.hostname.replace(/^www\./,'');
+    if(h==='youtu.be')return u.pathname.slice(1).split('/')[0]||'';
+    if(!/(^|\.)youtube(-nocookie)?\.com$/.test(h))return '';
+    if(u.pathname==='/watch')return u.searchParams.get('v')||'';
+    const m=u.pathname.match(/^\/(embed|v|shorts|live)\/([^/?#]+)/);
+    return m?m[2]:'';
+  }catch(e){return '';}
+}
+// Your own media server — Jellyfin, Plex, Emby — is on your network, serves your
+// own library, and doesn't block framing. That's the other genuinely embeddable
+// case, and private addressing is what makes the rule safe: a public streaming
+// site can never be at 192.168.x or *.local, so this can't become a way to frame
+// arbitrary sites.
+function isPrivateHost(h){
+  h=(h||'').toLowerCase();
+  return h==='localhost'||/\.local$|\.lan$|\.home$/.test(h)
+    ||/^127\./.test(h)||/^10\./.test(h)||/^192\.168\./.test(h)
+    ||/^172\.(1[6-9]|2\d|3[01])\./.test(h);
+}
+// Returns a URL safe to play inline, or '' meaning "open it in the browser".
+// Deliberately an allowlist: embedding is a permission the host grants, and the
+// absence of a blocking header is not the same as permission.
+function embedTarget(url){
+  const id=ytId(url);
+  if(id)return 'https://www.youtube-nocookie.com/embed/'+encodeURIComponent(id)+'?autoplay=1&rel=0&playsinline=1';
+  let u; try{u=new URL(url);}catch{return '';}
+  if(isPrivateHost(u.hostname))return url;                       // your own server
+  if(/(^|\.)archive\.org$/.test(u.hostname))                     // public-domain library
+    return url.replace('/details/','/embed/');
+  return '';
+}
+function openYT(target,label){
+  const v=document.getElementById('ytView'),f=document.getElementById('ytFrame'),t=document.getElementById('ytTitle');
+  if(!v||!f||!target)return false;
+  if(t)t.textContent=label||'Watch';
+  f.innerHTML='<iframe src="'+escH(target)+'" title="'+escH(label||'Watch')+
+    '" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>';
+  v.classList.add('on');
+  return true;
+}
+// Tearing the iframe down on close stops playback and frees the player —
+// leaving it mounted keeps audio running behind the list.
+function closeYT(){
+  const v=document.getElementById('ytView'),f=document.getElementById('ytFrame');
+  if(v)v.classList.remove('on');
+  if(f)f.innerHTML='';
+}
+function watchOpen(i){
+  const o=watchOpts[i],a=watchTarget;if(!o||!a)return;
+  setLegalPref(o.site);
+  // Exact-match links only: a search-preset URL isn't a video, so never embed it.
+  // Your own server is the exception — its search page IS the app.
+  let tgt='';
+  try{tgt=(o.exact||isPrivateHost(new URL(o.url).hostname))?embedTarget(o.url):'';}catch{}
+  if(tgt){closeAll();openYT(tgt,a.title);return;}
+  // Leaving the app — start the clock so progress still gets tracked.
+  armExternalWatch(a,watchEpisode(a)||1);
+  openExternal(o.url);closeAll();toast(`Opening ${o.label}…`);
+}
 
 // ═══ FRIENDS — recommend shows to friends (public web build only) ════════════
 // No accounts: each person has a random "friend code" (a shareable bearer token).
@@ -5145,32 +5527,64 @@ function renderSource(){
   const custom=streamSource(), rcustom=readSource();
   const host=u=>{try{return new URL(u.replace(/\{[^}]+\}/g,'x')).hostname;}catch{return u.slice(0,32);}};
   const chips=WATCH_PRESETS.map(p=>`<button class="src-chip${custom===p.url?' on':''}" onclick="setSource('${p.url}')">${p.name}</button>`).join('');
+  const myCount=customServices().length, hiddenCount=hiddenSrc().length;
   box.innerHTML=`
-    <div class="dt-label">${icon('play')} Watch source</div>
-    <p class="ai-desc">Where <b>Watch now</b> sends you — all <b>official, legal, and free</b> services (no paid tiers). It opens the site's search for your exact title in your browser.</p>
+    <p class="ai-desc" style="margin-top:2px">Tap <b>Watch</b> on any show and it opens where to watch. This is where you set that up — the basics are here, the rest is tucked away below.</p>
+
+    <div class="dt-label">${icon('play')} Where Watch takes you</div>
+    <p class="ai-desc">Free and legal. Opens the site's search for your exact title.</p>
     <button class="src-opt${!custom?' on':''}" onclick="setSource('')">
       <div class="src-name">Tubi <span class="src-tag">Default · Free</span></div>
-      <div class="src-sub">100% free, no account — opens Tubi's search for the title</div>
+      <div class="src-sub">No account needed</div>
     </button>
     <div class="src-picks">${chips}</div>
-    <button class="src-opt${custom&&!WATCH_PRESETS.some(p=>p.url===custom)?' on':''}" onclick="document.getElementById('srcCustom').focus()" style="margin-top:10px">
-      <div class="src-name">Your own site</div>
-      <div class="src-sub">${custom&&!WATCH_PRESETS.some(p=>p.url===custom)?'Using '+host(custom):'Paste any streaming site below'}</div>
-    </button>
-    <input class="ai-prompt-in" id="srcCustom" placeholder="your own site — or a full URL" value="${custom&&!WATCH_PRESETS.some(p=>p.url===custom)?custom.replace(/"/g,'&quot;'):''}" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url" style="margin-top:10px">
-    <div style="display:flex;gap:8px">
-      <button class="parse-btn" style="flex:1" onclick="saveSource()">Use this site</button>
-      <button class="parse-btn" style="flex:0 0 auto;width:auto;padding-left:16px;padding-right:16px" onclick="testSource()">${icon('search')} Test</button>
-    </div>
-    <div id="srcTest" style="display:none;margin-top:8px;padding:9px 11px;border-radius:9px;background:var(--bg2);color:var(--t2);font:12px/1.45 ui-monospace,Menlo,monospace;word-break:break-all;white-space:pre-wrap"></div>
-    <p class="ai-desc" style="margin-top:12px;font-size:11.5px">Tokens: <code>{query}</code>/<code>{title}</code>, <code>{slug}</code>, <code>{ep}</code>, <code>{titleRomaji}</code>, <code>{titleEnglish}</code>, <code>{titleNative}</code>, <code>{anilistId}</code>, <code>{malId}</code>. A <b>search</b> template — <code>https://site.com/search?keyword={query}</code> — is sturdiest (slugs &amp; domains change). Tap <b>Test</b> to preview the exact URL before saving.</p>
-    <div class="dt-label" style="margin-top:16px">${icon('sort')} <code>{slug}</code> spelling</div>
-    <p class="ai-desc">Which title fills <code>{slug}</code> — some sites index by romaji, some by English. Raises the direct-hit rate.</p>
-    <div class="src-picks">
-      <button class="src-chip${!slugPref()?' on':''}" onclick="setSlugPref('')">Auto</button>
-      <button class="src-chip${slugPref()==='romaji'?' on':''}" onclick="setSlugPref('romaji')">Romaji</button>
-      <button class="src-chip${slugPref()==='english'?' on':''}" onclick="setSlugPref('english')">English</button>
-    </div>
+    ${myCount?`
+    <div class="dt-label" style="margin-top:16px">${icon('film')} Your services</div>
+    <p class="ai-desc">These show first when you tap Watch. Tap one to remove it.</p>
+    ${customServices().map(s=>`<button class="src-opt" onclick="removeCustomService('${s.id}')"><div class="src-name">${escH(s.name)} <span class="src-tag">Tap to remove</span></div><div class="src-sub">${escH(host(s.url))}</div></button>`).join('')}`:''}
+
+    <details class="src-fold" style="margin-top:16px">
+      <summary>${icon('external')} Add your own service</summary>
+      <p class="ai-desc" style="margin-top:8px">Subscribe to something we don’t list? Tap a region to add it in one go, or paste your service’s search page.</p>
+      <div class="src-picks">${REGIONAL_SERVICES
+        .filter(s=>!customServices().some(c=>c.name.toLowerCase()===s.name.toLowerCase()))
+        .map(s=>`<button class="src-chip" onclick="addRegional('${escH(s.name)}')">${escH(s.name)} <span style="opacity:.55">${escH(s.region)}</span></button>`).join('')}</div>
+      <input class="ai-prompt-in" id="csURL" placeholder="paste a search page from your service" value="" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url" style="margin-top:10px" oninput="csHintName()">
+      <input class="ai-prompt-in" id="csName" placeholder="name" value="" autocomplete="off" spellcheck="false" style="margin-top:8px">
+      <button class="parse-btn" style="margin-top:8px" onclick="addCustomServiceFromForm()">Add service</button>
+    </details>
+
+    <details class="src-fold">
+      <summary>${icon('sort')} Manage every source${hiddenCount?` <span class="src-tag">${hiddenCount} hidden</span>`:''}</summary>
+      <p class="ai-desc" style="margin-top:8px">Tap a row to rename it, or Hide the ones you never use. Applies to every show.</p>
+      ${allKnownSources().map(s=>{const off=isHiddenSrc(s.name),q=escH(s.name).replace(/'/g,"\\'");
+        const sub=[s.kind,s.unverified?'unverified — tap Test':'',off?'hidden':''].filter(Boolean).join(' · ');
+        return `<div class="src-opt" style="display:flex;align-items:center;gap:10px${off?';opacity:.45':''}" onclick="renameSrcPrompt('${q}')">
+        <div style="flex:1;min-width:0">
+          <div class="src-name">${escH(srcLabel(s.name))}${srcLabel(s.name)!==s.name?` <span class="src-tag">${escH(s.name)}</span>`:''}</div>
+          <div class="src-sub">${escH(sub)}</div>
+        </div>
+        <button class="src-chip${off?' on':''}" onclick="event.stopPropagation();toggleHiddenSrc('${q}')">${off?'Unhide':'Hide'}</button>
+      </div>`;}).join('')}
+    </details>
+
+    <details class="src-fold">
+      <summary>${icon('sort')} Advanced — custom link &amp; tokens</summary>
+      <p class="ai-desc" style="margin-top:8px">Point Watch at your own site. A <b>search</b> link is sturdiest.</p>
+      <input class="ai-prompt-in" id="srcCustom" placeholder="https://site.com/search?keyword={query}" value="${custom&&!WATCH_PRESETS.some(p=>p.url===custom)?custom.replace(/"/g,'&quot;'):''}" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url">
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="parse-btn" style="flex:1" onclick="saveSource()">Use this site</button>
+        <button class="parse-btn" style="flex:0 0 auto;width:auto;padding-left:16px;padding-right:16px" onclick="testSource()">${icon('search')} Test</button>
+      </div>
+      <div id="srcTest" style="display:none;margin-top:8px;padding:9px 11px;border-radius:9px;background:var(--bg2);color:var(--t2);font:12px/1.45 ui-monospace,Menlo,monospace;word-break:break-all;white-space:pre-wrap"></div>
+      <p class="ai-desc" style="margin-top:10px;font-size:11.5px">Tokens: <code>{query}</code>, <code>{slug}</code>, <code>{ep}</code>, <code>{titleRomaji}</code>, <code>{titleEnglish}</code>, <code>{titleNative}</code>, <code>{anilistId}</code>, <code>{malId}</code>.</p>
+      <div class="ai-desc" style="margin-top:10px"><b><code>{slug}</code> spelling</b> — some sites index by romaji, some by English.</div>
+      <div class="src-picks">
+        <button class="src-chip${!slugPref()?' on':''}" onclick="setSlugPref('')">Auto</button>
+        <button class="src-chip${slugPref()==='romaji'?' on':''}" onclick="setSlugPref('romaji')">Romaji</button>
+        <button class="src-chip${slugPref()==='english'?' on':''}" onclick="setSlugPref('english')">English</button>
+      </div>
+    </details>
     ${IS_NATIVE?`
     <div class="dt-label" style="margin-top:22px">${icon('film')} Your streaming accounts</div>
     <p class="ai-desc">Tick the services you subscribe to. On a show, <b>Watch</b> then offers <b>“Open in …”</b> for each — opening that app on your phone where you're already signed in. We never see your password, and nothing is ever pirated.</p>
@@ -5240,6 +5654,63 @@ function closePlayer(){
   else if(elapsed>=PEEK_MS) markWatchedPrompt(id,ep,a.title);
   // < PEEK_MS: they barely opened it — say nothing
 }
+// ─── PROGRESS FOR EXTERNAL WATCHES ──────────────────────────────────────────
+// Opening in the browser used to mean losing progress tracking, because
+// pvFrame's clock only ran while the frame was mounted. But time-AWAY from the
+// app is the same signal as time-IN the frame — and a cleaner one: a framed tab
+// left open all afternoon still counted as watching, whereas coming back is an
+// unambiguous "I'm done". Same thresholds, same outcomes, no iframe required.
+let extId=null, extEp=0, extLeaveTime=0, extSource='';
+// Auto-opening a remembered pick used to bypass armExternalWatch, so the one
+// path people use most often tracked no progress at all. It also had no way to
+// fail: a service that's geo-blocked (iQIYI outside its region shows "video is
+// unavailable in your location") would reopen forever, because "they came
+// straight back" was never treated as a signal.
+function autoOpen(a,name,url){
+  extSource=name;
+  armExternalWatch(a,watchEpisode(a)||1);
+  openExternal(url);
+  toast(`Opening ${srcLabel(name)} for “${a.title}”`);
+}
+// Bounced back in seconds from a source we chose for them? Don't silently
+// unpick it — they may have just changed their mind. Offer the out instead.
+function offerHideSource(name){
+  showMWBar(`Couldn’t watch on <b>${schEsc(srcLabel(name))}</b>?`,'Hide it',()=>{
+    if(!isHiddenSrc(name))toggleHiddenSrc(name);
+    if(legalPref()===String(name).toLowerCase())setLegalPref('');
+  });
+}
+function armExternalWatch(a,ep){
+  if(!a||kindOf(a)!=='watch'||!ep)return;
+  extId=a.id; extEp=ep; extLeaveTime=Date.now();
+  try{localStorage.setItem('ext_watch',JSON.stringify({id:extId,ep:extEp,t:extLeaveTime,s:extSource}));}catch{}
+}
+// Survive a reload/eviction while they were away — mobile kills backgrounded tabs.
+function restoreExternalWatch(){
+  if(extId)return;
+  try{const s=JSON.parse(localStorage.getItem('ext_watch')||'null');
+    if(s&&s.id){extId=s.id;extEp=s.ep;extLeaveTime=s.t;extSource=s.s||'';}}catch{}
+}
+function clearExternalWatch(){
+  extId=null;extEp=0;extLeaveTime=0;extSource='';
+  try{localStorage.removeItem('ext_watch');}catch{}
+}
+function settleExternalWatch(){
+  restoreExternalWatch();
+  const id=extId, ep=extEp, src=extSource, elapsed=extLeaveTime?Date.now()-extLeaveTime:0;
+  if(!id||!ep){clearExternalWatch();return;}
+  clearExternalWatch();
+  // Straight back from a source we picked for them → probably a dead end.
+  if(src&&elapsed<PEEK_MS){offerHideSource(src);return;}
+  const a=anime.find(x=>x.id===id);
+  if(!a||kindOf(a)!=='watch'||ep<=(a.ep||0))return;   // only if it actually advances
+  if(elapsed>=AUTO_MARK_MS)autoMarkWatched(id,ep);
+  else if(elapsed>=PEEK_MS)markWatchedPrompt(id,ep,a.title);
+  // under PEEK_MS: they bounced straight back — say nothing
+}
+// Settle when they return to the app, however they return.
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)settleExternalWatch();});
+window.addEventListener('focus',()=>settleExternalWatch());
 // Core: advance progress + save. Returns the previous state so it can be undone.
 function applyWatched(id,ep){
   const a=anime.find(x=>x.id===id);if(!a)return null;
@@ -5501,6 +5972,25 @@ function updateKeyBtn(){
   else {b.innerHTML=icon('key')+' Add a free key to enable AI';b.classList.add('key-cta');}   // highlight when missing so it's not scrolled past
 }
 function openKeySheet(){const inp=document.getElementById('apiKeyIn');if(inp)inp.value=getKey();openSheet('keySheet');}
+// One tap to the exact page where the key is created — signing up lands you
+// straight there, so there's no menu to hunt. Open the how-to too, in case they
+// want the steps.
+function getFreeKey(){
+  openExternal('https://console.groq.com/keys');
+  const d=document.querySelector('#keySheet .keyhow');if(d)d.open=true;
+  toast('Sign up, create a key, copy it — then come back and paste');
+}
+// Paste the key without fiddling with the keyboard's paste menu. Clipboard read
+// is permission-gated and can fail silently (older Safari, denied permission) —
+// on failure we just focus the field so they can paste by hand.
+async function pasteKey(){
+  const inp=document.getElementById('apiKeyIn');if(!inp)return;
+  try{
+    const t=(await navigator.clipboard.readText()||'').trim();
+    if(t){inp.value=t;toast(keyProvider(t)?'Key pasted — tap Save':'Pasted — tap Save');}
+    else{inp.focus();}
+  }catch(e){inp.focus();toast('Tap the box and paste your key');}
+}
 function closeKeySheet(){openSheet('aiSheet');setAITab('chat');}
 function saveKeyAndClose(){saveKey();closeKeySheet();}
 function removeKey(){try{localStorage.removeItem('anthropic_key');}catch{}const inp=document.getElementById('apiKeyIn');if(inp)inp.value='';renderModelPicker();updateKeyBtn();toast('Key removed');}
@@ -6091,6 +6581,52 @@ function _updBusy(){
 }
 // Snapshot where you are (tab, filter, sort, scroll) so the post-reload app can put
 // you right back — the update should feel like nothing happened, not a jump to top.
+// ─── WHAT'S NEW ─────────────────────────────────────────────────────────────
+// The app updates itself silently (checkUpdate → _applyUpdate → reload), which
+// is good for staying current and bad for knowing anything changed. This tells
+// people what they got, in plain language.
+//
+// EDIT THIS on every user-visible change: bump `v` and write `notes` the way
+// you'd explain it to a friend — what they can now do, not what the code does.
+// No version numbers or jargon in the notes; the date IS the version.
+const RELEASE={
+  v:'2026-07-21',
+  title:'Sources, your way',
+  notes:[
+    'New <b>Sources</b> button in the bottom bar — set where <b>Watch</b> takes you.',
+    'Not in the US? Add <b>TVING</b>, <b>Wavve</b>, <b>iQIYI</b>, <b>JioHotstar</b> and more in one tap, or paste your own service. Yours show first.',
+    '<b>Hide</b> any source you never use, or <b>rename</b> any of them — across every show at once.',
+    'YouTube and your own media server now play <b>inside the app</b>.',
+    'The AI moved off the bar — hold <b>two fingers</b> anywhere to summon it, then chat or tap the mic to <b>talk</b>.',
+  ],
+};
+const SEEN_REL='seen_release';
+// True if this browser has ever held a list — even one locked behind a password
+// (the stored blob exists before it's decrypted). Lets "what's new" reach a
+// returning user on first rollout without mistaking them for a new install.
+function hasStoredList(){try{return !!localStorage.getItem(LSKEY)||localStorage.getItem(ENCFLAG)==='1';}catch{return false;}}
+function seenRelease(){try{return localStorage.getItem(SEEN_REL)||'';}catch{return '';}}
+function markReleaseSeen(){try{localStorage.setItem(SEEN_REL,RELEASE.v);}catch{}}
+// Only for people who were already here. A brand-new install gets the tutorial
+// instead — "what's new" is meaningless when everything is new.
+function maybeShowWhatsNew(){
+  const seen=seenRelease();
+  if(seen===RELEASE.v)return;                   // already told them
+  if(appLocked)return;                          // wait until they're actually in
+  // Distinguish a brand-new install from an existing user meeting this system for
+  // the first time. A returning user already has a list (or a stored one behind a
+  // lock); a fresh install has neither. Without this, the FIRST rollout would
+  // silently mark-seen and notify nobody — the one update that most needs telling.
+  const returning=!!seen || (Array.isArray(anime)&&anime.length>0) || hasStoredList();
+  markReleaseSeen();
+  if(!returning)return;                          // genuinely new → the tutorial covers it
+  const box=document.getElementById('newsBody');
+  if(!box)return;
+  box.innerHTML=`<p class="ai-desc"><b>${escH(RELEASE.title)}</b></p>`
+    +RELEASE.notes.map(n=>`<div class="src-opt" style="pointer-events:none"><div class="src-sub" style="color:var(--t1)">${n}</div></div>`).join('')
+    +`<button class="parse-btn" style="margin-top:12px" onclick="closeAll()">Got it</button>`;
+  openSheet('newsSheet');
+}
 function _snapUpd(){
   try{const pg=document.getElementById('pageEl');
     sessionStorage.setItem('justUpdated',JSON.stringify({k:viewKind,f:filterStatus,s:sortMode,y:pg?Math.round(pg.scrollTop):0}));
@@ -6126,11 +6662,71 @@ try{
 }catch(e){}
 
 // ─── KEYBOARD ───────────────────────────────────────────────────────────────
-document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeAll();closeConfirm();}});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeAll();closeConfirm();closeYT();}});
+
+// ─── SUMMON THE AI — two-finger hold anywhere ───────────────────────────────
+// The AI moved off the nav bar (Sources took its place), so it's reached by a
+// gesture instead: hold TWO fingers for ~600ms and the screen edges glow, then
+// the AI opens. Two fingers on purpose — one-finger holds collide with scrolling,
+// text selection, and poster long-press; two fingers almost never happen by
+// accident. Moving apart (a pinch/zoom) or lifting cancels it.
+const AI_HOLD_MS=600;
+let _aiTimer=null,_aiArmed=false,_aiStartSpread=0;
+function _spread(t){const a=t[0],b=t[1];return Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);}
+function _aiGlow(cls){const g=document.getElementById('aiGlow');if(!g)return;g.className='ai-glow'+(cls?' '+cls:'');}
+function _aiCancel(){clearTimeout(_aiTimer);_aiTimer=null;_aiArmed=false;_aiGlow('');}
+function _anySheetOpen(){return !!document.querySelector('.sheet.on')||document.getElementById('playerView')?.classList.contains('on')||document.getElementById('ytView')?.classList.contains('on');}
+document.addEventListener('touchstart',e=>{
+  if(e.touches.length!==2||_anySheetOpen()||appLocked)return;   // exactly two fingers, not mid-sheet, unlocked
+  _aiArmed=true;_aiStartSpread=_spread(e.touches);
+  _aiGlow('arming');
+  clearTimeout(_aiTimer);
+  _aiTimer=setTimeout(()=>{
+    _aiArmed=false;_aiGlow('fire');
+    try{navigator.vibrate&&navigator.vibrate(12);}catch{}
+    setTimeout(()=>{_aiGlow('');openSheet('aiSheet');setAITab('chat');},380);
+  },AI_HOLD_MS);
+},{passive:true});
+document.addEventListener('touchmove',e=>{
+  if(!_aiArmed)return;
+  // A real hold stays put; a pinch-to-zoom pulls the fingers apart — let that be zoom, not summon.
+  if(e.touches.length!==2||Math.abs(_spread(e.touches)-_aiStartSpread)>40)_aiCancel();
+},{passive:true});
+document.addEventListener('touchend',()=>{if(_aiArmed)_aiCancel();},{passive:true});
+document.addEventListener('touchcancel',_aiCancel,{passive:true});
+
+// ─── TALK TO IT — voice dictation into the chat box ─────────────────────────
+// "Chat or talk." The mic uses the browser's own speech recognition to dictate
+// into the chat input; it only appears where that's supported (Safari/Chrome),
+// so unsupported browsers just see the text box. Tap once to listen, again to
+// stop. It fills the field — the user still sends — so a misheard word is
+// fixable before it goes.
+const _SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+let _rec=null,_recOn=false;
+function toggleDictation(){
+  if(!_SR)return;
+  if(_recOn){try{_rec&&_rec.stop();}catch{}return;}
+  try{
+    _rec=new _SR();_rec.lang='en-US';_rec.interimResults=true;_rec.continuous=false;
+    const inp=document.getElementById('chatPrompt'),mic=document.getElementById('chatMic');
+    const base=inp?inp.value:'';
+    _rec.onstart=()=>{_recOn=true;if(mic)mic.classList.add('on');};
+    _rec.onerror=()=>{if(mic)mic.classList.remove('on');_recOn=false;};
+    _rec.onend=()=>{_recOn=false;if(mic)mic.classList.remove('on');};
+    _rec.onresult=e=>{let s='';for(let i=0;i<e.results.length;i++)s+=e.results[i][0].transcript;
+      if(inp)inp.value=(base?base+' ':'')+s;};
+    _rec.start();
+  }catch(e){_recOn=false;}
+}
+// Reveal the mic only if the browser can actually do speech.
+try{if(_SR){const m=document.getElementById('chatMic');if(m)m.style.display='';}}catch{}
 
 // ─── INIT ───────────────────────────────────────────────────────────────────
 try{hydrateIcons();}catch{}
 load();try{purgeAdult();}catch{}try{if(!appLocked&&dedupeAnime())writeLocal();}catch{}loadTheme();try{_restoreUpd();}catch{}render();try{nativeScheduleNotifs();}catch{}
+// After the list is up — and after the tutorial has had its chance to claim a
+// new install — tell returning users what changed in the update they just got.
+try{setTimeout(maybeShowWhatsNew,900);}catch{}
 try{alCatchRedirect().then(()=>{if(!appLocked)alBootSync();}).catch(()=>{});}catch{}   // returning from AniList OAuth
 if(appLocked)showLock();   // stored list is ciphertext → gate the app until unlocked
 else try{restorePlayer();}catch{}   // came back mid-stream after an iOS reload → reopen it

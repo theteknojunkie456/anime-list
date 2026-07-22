@@ -406,6 +406,8 @@ async function handleFetch(request, env) {
       return handleUpdate(body, env);
     case "/test":
       return handleTest(body, env);
+    case "/broadcast":
+      return handleBroadcast(body, env);
     default:
       return json({ ok: false, error: "not found" }, 404);
   }
@@ -457,6 +459,61 @@ async function handleTest(body, env) {
     return json({ ok: false, error: "push rejected", status }, 502);
   }
   return json({ ok: true, tracking: (record.animeIds || []).length });
+}
+
+/**
+ * Broadcast one push to EVERY subscriber — used to announce a new app version.
+ *
+ * Guarded by a shared secret (env.ADMIN_TOKEN): without it, anyone who found the
+ * URL could push a banner to every user. Send it as `token` in the body; a
+ * missing or wrong token is a 401, and if the secret isn't configured at all the
+ * endpoint stays disabled rather than open.
+ *
+ * Reaches everyone who ENABLED notifications — a real system notification even
+ * when the app is closed. Users who never turned notifications on can't receive
+ * a push (there's no subscription); they still get the in-app "What's new" sheet
+ * on next open. That split is a web-push fact, not a choice.
+ */
+async function handleBroadcast(body, env) {
+  if (!env.ADMIN_TOKEN) {
+    return json({ ok: false, error: "broadcast disabled (no ADMIN_TOKEN set)" }, 503);
+  }
+  if (body.token !== env.ADMIN_TOKEN) {
+    return json({ ok: false, error: "unauthorized" }, 401);
+  }
+  const title = typeof body.title === "string" && body.title ? body.title : "WatchList";
+  const bodyText = typeof body.body === "string" ? body.body : "";
+  if (!bodyText) {
+    return json({ ok: false, error: "body text required" }, 400);
+  }
+  const tag = typeof body.tag === "string" && body.tag ? body.tag : "watchlist-update";
+  const url = typeof body.url === "string" && body.url ? body.url : "/";
+
+  const subs = await loadAllSubs(env);
+  let sent = 0, dead = 0, failed = 0;
+  // Small batches with a pause — the same courtesy the scheduled sender shows the
+  // push services, so a broadcast to many users doesn't hammer them.
+  for (const batch of chunk(subs, 50)) {
+    for (const { key, record } of batch) {
+      let status;
+      try {
+        status = await sendPush(record.subscription, { title, body: bodyText, url, tag }, env);
+      } catch (e) {
+        failed++;
+        continue;
+      }
+      if (status === 404 || status === 410) {
+        await env.SUBS.delete(key);
+        dead++;
+      } else if (status >= 200 && status < 300) {
+        sent++;
+      } else {
+        failed++;
+      }
+    }
+    await sleep(200);
+  }
+  return json({ ok: true, sent, dead, failed, total: subs.length });
 }
 
 // ---------------------------------------------------------------------------

@@ -5524,6 +5524,12 @@ function sourceName(){
 }
 function renderSource(){
   const box=document.getElementById('sourceBody'); if(!box) return;
+  // Hiding/renaming rebuilds this whole sheet, which would snap open folds shut
+  // and jump the scroll to the top — so you couldn't hide several in a row.
+  // Snapshot which folds are open and where we're scrolled, and restore after.
+  const openFolds={};box.querySelectorAll('details[data-fold]').forEach(d=>{openFolds[d.dataset.fold]=d.open;});
+  const scroller=box.closest('.sheet')||box, prevScroll=scroller?scroller.scrollTop:0;
+  const O=k=>openFolds[k]?' open':'';
   const custom=streamSource(), rcustom=readSource();
   const host=u=>{try{return new URL(u.replace(/\{[^}]+\}/g,'x')).hostname;}catch{return u.slice(0,32);}};
   const chips=WATCH_PRESETS.map(p=>`<button class="src-chip${custom===p.url?' on':''}" onclick="setSource('${p.url}')">${p.name}</button>`).join('');
@@ -5543,7 +5549,7 @@ function renderSource(){
     <p class="ai-desc">These show first when you tap Watch. Tap one to remove it.</p>
     ${customServices().map(s=>`<button class="src-opt" onclick="removeCustomService('${s.id}')"><div class="src-name">${escH(s.name)} <span class="src-tag">Tap to remove</span></div><div class="src-sub">${escH(host(s.url))}</div></button>`).join('')}`:''}
 
-    <details class="src-fold" style="margin-top:16px">
+    <details class="src-fold" data-fold="add"${O('add')} style="margin-top:16px">
       <summary>${icon('external')} Add your own service</summary>
       <p class="ai-desc" style="margin-top:8px">Subscribe to something we don’t list? Tap a region to add it in one go, or paste your service’s search page.</p>
       <div class="src-picks">${REGIONAL_SERVICES
@@ -5554,7 +5560,7 @@ function renderSource(){
       <button class="parse-btn" style="margin-top:8px" onclick="addCustomServiceFromForm()">Add service</button>
     </details>
 
-    <details class="src-fold">
+    <details class="src-fold" data-fold="manage"${O('manage')}>
       <summary>${icon('sort')} Manage every source${hiddenCount?` <span class="src-tag">${hiddenCount} hidden</span>`:''}</summary>
       <p class="ai-desc" style="margin-top:8px">Tap a row to rename it, or Hide the ones you never use. Applies to every show.</p>
       ${allKnownSources().map(s=>{const off=isHiddenSrc(s.name),q=escH(s.name).replace(/'/g,"\\'");
@@ -5568,7 +5574,7 @@ function renderSource(){
       </div>`;}).join('')}
     </details>
 
-    <details class="src-fold">
+    <details class="src-fold" data-fold="adv"${O('adv')}>
       <summary>${icon('sort')} Advanced — custom link &amp; tokens</summary>
       <p class="ai-desc" style="margin-top:8px">Point Watch at your own site. A <b>search</b> link is sturdiest.</p>
       <input class="ai-prompt-in" id="srcCustom" placeholder="https://site.com/search?keyword={query}" value="${custom&&!WATCH_PRESETS.some(p=>p.url===custom)?custom.replace(/"/g,'&quot;'):''}" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url">
@@ -5604,6 +5610,8 @@ function renderSource(){
     </button>
     <input class="ai-prompt-in" id="rsrcCustom" placeholder="comick.io — or a full URL" value="${rcustom?rcustom.replace(/"/g,'&quot;'):''}" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url" style="margin-top:10px">
     <button class="parse-btn" onclick="saveReadSource()">Use this site</button>`;
+  // Put the fold you were using back where it was — same scroll, still open.
+  try{if(scroller)scroller.scrollTop=prevScroll;}catch{}
 }
 function setReadSource(v){
   try{if(v)localStorage.setItem('read_src',v);else localStorage.removeItem('read_src');}catch{}

@@ -2134,50 +2134,59 @@ function renderAdmin(){
     return;
   }
   box.innerHTML=`
-    <div class="dt-label">${icon('bell')} Broadcast to everyone</div>
-    <p class="ai-desc">Sends a push notification to all subscribers.</p>
-    <input class="ai-prompt-in" id="bcTitle" placeholder="Title" style="margin-bottom:8px">
-    <input class="ai-prompt-in" id="bcBody" placeholder="Message">
-    <button class="parse-btn" style="margin-top:8px" onclick="adminBroadcast()">Send to all</button>
-
-    <div class="dt-label" style="margin-top:18px">${icon('layers')} On-screen card</div>
-    <p class="ai-desc">Shows a card inside everyone’s app — a note, or a “watch on ___” nudge with a button. Optional.</p>
-    <input class="ai-prompt-in" id="msgTitle" placeholder="Card title (e.g. Watch anime on…)" style="margin-bottom:8px">
-    <input class="ai-prompt-in" id="msgBody" placeholder="Message" style="margin-bottom:8px">
-    <input class="ai-prompt-in" id="msgCta" placeholder="Button text (optional, e.g. Crunchyroll)" style="margin-bottom:8px">
-    <input class="ai-prompt-in" id="msgUrl" placeholder="Button link (optional)" inputmode="url">
-    <div style="display:flex;gap:8px;margin-top:8px">
-      <button class="parse-btn" style="flex:1" onclick="adminSetMessage()">Show to everyone</button>
-      <button class="parse-btn" style="flex:0 0 auto;width:auto;padding:0 16px" onclick="adminClearMessage()">Clear</button>
-    </div>
-
-    <div class="dt-label" style="margin-top:18px">${icon('play')} Recommended sources</div>
-    <p class="ai-desc">Everyone starts with the built-in services hidden. Set the ones you want the whole network to have and they show up under <b>Recommended</b> in each member’s Watch — no setup on their end. They can still hide any they don’t use.</p>
-    <div id="adminSrcList"><p class="ai-desc">Loading…</p></div>
-    <input class="ai-prompt-in" id="asURL" placeholder="paste a service’s search page (or a {query} link)" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url" style="margin-top:8px" oninput="asHintName()">
-    <input class="ai-prompt-in" id="asName" placeholder="name" autocomplete="off" spellcheck="false" style="margin-top:8px">
-    <button class="src-chip" style="margin-top:8px" onclick="adminSrcAddRow()">Add source</button>
-    <div style="display:flex;gap:8px;margin-top:10px">
-      <button class="parse-btn" style="flex:1" onclick="adminSrcPush()">Push to everyone</button>
-      <button class="parse-btn" style="flex:0 0 auto;width:auto;padding:0 16px" onclick="adminSrcClear()">Clear</button>
-    </div>
-
-    <div class="dt-label" style="margin-top:18px">${icon('external')} Invite links</div>
-    <p class="ai-desc">Share a link to let people join. <b>Request</b> = you approve each; <b>Auto</b> = approved on use.</p>
-    <div style="display:flex;gap:8px">
-      <button class="parse-btn" style="flex:1" onclick="adminInvite('request')">New request link</button>
-      <button class="parse-btn" style="flex:1" onclick="adminInvite('auto')">New auto link</button>
-    </div>
-    <div id="adminInviteOut" style="display:none;margin-top:8px;padding:9px 11px;border-radius:9px;background:var(--bg2);color:var(--t1);font:12px/1.45 ui-monospace,Menlo,monospace;word-break:break-all"></div>
-
-    <div class="dt-label" style="margin-top:18px">${icon('users')} Members <span id="adminCount" class="src-tag"></span></div>
-    <div style="display:flex;gap:8px;align-items:center;margin:6px 0 4px">
-      <span class="ai-desc" style="margin:0">Cap:</span>
-      <input class="ai-prompt-in" id="capIn" inputmode="numeric" style="flex:0 0 90px;text-align:center;padding:8px" placeholder="50">
-      <button class="src-chip" onclick="adminSetCap()">Set cap</button>
+    <div class="dt-label">${icon('users')} Members <span id="adminCount" class="src-tag"></span></div>
+    <div style="display:flex;gap:8px;align-items:center;margin:6px 0 10px">
+      <span class="ai-desc" style="margin:0">Cap</span>
+      <input class="ai-prompt-in" id="capIn" inputmode="numeric" style="flex:0 0 74px;text-align:center;padding:8px" placeholder="50">
+      <button class="src-chip" onclick="adminSetCap()">Set</button>
     </div>
     <div id="adminMembers"><p class="ai-desc">Loading…</p></div>
-    <button class="chat-clear" style="margin-top:12px" onclick="setAdminToken('');renderAdmin()"><i data-ic="trash"></i> Sign out of admin</button>`;
+
+    <details class="src-fold" style="margin-top:18px">
+      <summary>${icon('bell')} Broadcast a notification</summary>
+      <p class="ai-desc" style="margin-top:8px">A push notification to everyone.</p>
+      <input class="ai-prompt-in" id="bcTitle" placeholder="Title" style="margin-bottom:8px">
+      <input class="ai-prompt-in" id="bcBody" placeholder="Message">
+      <button class="parse-btn" style="margin-top:8px" onclick="adminBroadcast()">Send to all</button>
+    </details>
+
+    <details class="src-fold">
+      <summary>${icon('layers')} On-screen card</summary>
+      <p class="ai-desc" style="margin-top:8px">A note or “watch on ___” nudge shown inside everyone’s app.</p>
+      <input class="ai-prompt-in" id="msgTitle" placeholder="Card title (e.g. Watch anime on…)" style="margin-bottom:8px">
+      <input class="ai-prompt-in" id="msgBody" placeholder="Message" style="margin-bottom:8px">
+      <input class="ai-prompt-in" id="msgCta" placeholder="Button text (optional)" style="margin-bottom:8px">
+      <input class="ai-prompt-in" id="msgUrl" placeholder="Button link (optional)" inputmode="url">
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="parse-btn" style="flex:1" onclick="adminSetMessage()">Show to everyone</button>
+        <button class="parse-btn" style="flex:0 0 auto;width:auto;padding:0 16px" onclick="adminClearMessage()">Clear</button>
+      </div>
+    </details>
+
+    <details class="src-fold">
+      <summary>${icon('play')} Recommended sources</summary>
+      <p class="ai-desc" style="margin-top:8px">Services shown under <b>Recommended</b> in every member’s Watch — no setup on their end.</p>
+      <div id="adminSrcList"><p class="ai-desc">Loading…</p></div>
+      <input class="ai-prompt-in" id="asURL" placeholder="paste a service’s search page (or a {query} link)" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url" style="margin-top:8px" oninput="asHintName()">
+      <input class="ai-prompt-in" id="asName" placeholder="name" autocomplete="off" spellcheck="false" style="margin-top:8px">
+      <button class="src-chip" style="margin-top:8px" onclick="adminSrcAddRow()">Add source</button>
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button class="parse-btn" style="flex:1" onclick="adminSrcPush()">Push to everyone</button>
+        <button class="parse-btn" style="flex:0 0 auto;width:auto;padding:0 16px" onclick="adminSrcClear()">Clear</button>
+      </div>
+    </details>
+
+    <details class="src-fold">
+      <summary>${icon('external')} Invite links</summary>
+      <p class="ai-desc" style="margin-top:8px"><b>Request</b> = you approve each; <b>Auto</b> = approved on use.</p>
+      <div style="display:flex;gap:8px">
+        <button class="parse-btn" style="flex:1" onclick="adminInvite('request')">Request link</button>
+        <button class="parse-btn" style="flex:1" onclick="adminInvite('auto')">Auto link</button>
+      </div>
+      <div id="adminInviteOut" style="display:none;margin-top:8px;padding:9px 11px;border-radius:9px;background:var(--bg2);color:var(--t1);font:12px/1.45 ui-monospace,Menlo,monospace;word-break:break-all"></div>
+    </details>
+
+    <button class="chat-clear" style="margin-top:16px" onclick="setAdminToken('');renderAdmin()">${icon('trash')} Sign out of admin</button>`;
   loadMembers();
   loadAdminSources();
   // Register this device's push endpoint as the admin's, so join requests ping you.

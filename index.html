@@ -6208,13 +6208,79 @@ function renderChatThread(typing){
 function chatChip(btn){document.getElementById('chatPrompt').value=btn.textContent;sendChat();}
 function clearChat(){chatHistory=[];saveChat();renderChatThread(false);const inp=document.getElementById('chatPrompt');if(inp)inp.value='';}
 function copyMsg(i){const m=chatHistory[i];if(!m)return;try{navigator.clipboard.writeText(m.content);toast('Copied');}catch{toast('Copy failed');}}
+// ─── AI LIST COMMANDS ───────────────────────────────────────────────────────
+// Natural-language edits handled locally BEFORE the AI — instant, reliable on
+// every provider, and they work even with no API key. "add seven deadly sins",
+// "mark naruto as dropped", "remove bleach", "set frieren to episode 12",
+// "rate one piece 5".
+const _RANK={watching:0,plan:1,finished:2,dropped:3};
+function _findShow(q){
+  const n=normTitle(q); if(!n)return null;
+  let list=anime.filter(a=>normTitle(a.title)===n);
+  if(!list.length)list=anime.filter(a=>normTitle(a.title).startsWith(n));
+  if(!list.length)list=anime.filter(a=>{const t=normTitle(a.title);return t.includes(n)||n.includes(t);});
+  if(!list.length)return null;
+  list.sort((a,b)=>(_RANK[a.status]??9)-(_RANK[b.status]??9));   // prefer an active one
+  return list[0];
+}
+async function _aiAdd(title){
+  const t=title.trim().replace(/[.!?]+$/,''); if(!t)return 'What should I add?';
+  const keys=dupeKeys({title:t,kind:'watch'});
+  if(anime.some(a=>dupeKeys(a).some(k=>keys.includes(k))))return `“${t}” is already on your list.`;
+  anime.unshift({id:uid(),title:t,status:'plan',kind:'watch',ep:0,rating:0,fav:false,eps:'',epTotal:0,time:'',genre:'',order:[],notes:'',img:'',upd:Date.now()});
+  dedupeAnime();save();render();
+  setTimeout(fetchCovers,300);   // AniList fills the real title, art + adult gate
+  return `Added “${t}” to your Plan list. It’ll fill in the cover and details in a moment.`;
+}
+function _aiStatus(title,status){
+  const a=_findShow(title); if(!a)return `I couldn’t find “${title}” on your list.`;
+  a.status=status; if(status==='finished'&&a.epTotal)a.ep=a.epTotal; try{touch(a);}catch{a.upd=Date.now();} save(); render(); if(typeof detailId!=='undefined'&&detailId===a.id)renderDetail();
+  return `Marked “${a.title}” as ${status}.`;
+}
+function _aiRemove(title){
+  const a=_findShow(title); if(!a)return `I couldn’t find “${title}”.`;
+  anime=anime.filter(x=>x.id!==a.id); save(); render();
+  return `Removed “${a.title}” from your list.`;
+}
+function _aiEp(title,ep){
+  const a=_findShow(title); if(!a)return `I couldn’t find “${title}”.`;
+  a.ep=a.epTotal?Math.min(ep,a.epTotal):ep; if(a.status==='plan')a.status='watching'; try{touch(a);}catch{a.upd=Date.now();} save(); render();
+  return `“${a.title}” is now at episode ${a.ep}.`;
+}
+function _aiRate(title,n){
+  const a=_findShow(title); if(!a)return `I couldn’t find “${title}”.`;
+  a.rating=Math.max(0,Math.min(5,n)); try{touch(a);}catch{a.upd=Date.now();} save(); render();
+  return `Rated “${a.title}” ${a.rating}/5.`;
+}
+async function aiListCommand(text){
+  const s=text.trim(); let m;
+  if(m=s.match(/^(?:can you |could you |please |pls )?(?:mark|set|move|change|make)\s+(.+?)\s+(?:as|to)\s+(watch\w*|current\w*|ongoing|plan\w*|finish\w*|complet\w*|done|watched|drop\w*|quit|abandon\w*)\b/i))
+    return _aiStatus(m[1],matchStatus(m[2]));
+  if(m=s.match(/^(?:can you |could you |please )?(?:set|mark|update|put|move)\s+(.+?)\s+(?:to\s+|at\s+|on\s+)?(?:episode|ep|e)\s*(\d+)/i))
+    return _aiEp(m[1],parseInt(m[2],10));
+  if(m=s.match(/^(?:can you |could you |please )?(?:rate|give)\s+(.+?)\s+(\d)(?:\s*(?:\/\s*5|stars?|out of 5))?\b/i))
+    return _aiRate(m[1],parseInt(m[2],10));
+  if(m=s.match(/^(?:can you |could you |please )?(?:remove|delete|take off|get rid of)\s+(.+?)(?:\s+from\s+(?:my\s+)?(?:list|watchlist))?[.!]?$/i))
+    return _aiRemove(m[1]);
+  if(m=s.match(/^(?:can you |could you |please |pls |i want to |i wanna |i(?:'| a)?d like to |lemme |let me )?(?:add|put|track|start watching)\s+(.+?)(?:\s+(?:to|on|in)\s+(?:my\s+)?(?:list|watchlist|plan(?:\s*list)?))?[.!]?$/i))
+    return await _aiAdd(m[1]);
+  return null;
+}
 function sendChat(){
   const inp=document.getElementById('chatPrompt');const q=(inp.value||'').trim();
   if(!q)return;
-  if(!getKey()){toast('Add an AI key below to chat');return;}
   inp.value='';
   chatHistory.push({role:'user',content:q});
   renderChatThread(true);
+  // Try a local list command first — works with no key, instant, reliable.
+  (async()=>{
+    let res=null; try{res=await aiListCommand(q);}catch(e){}
+    if(res!=null){chatHistory.push({role:'assistant',content:res});renderChatThread(false);saveChat();return;}
+    if(!getKey()){chatHistory.push({role:'assistant',content:'Add an AI key below to chat — though I can add or update shows on your list without one (e.g. “add Frieren”, “mark Naruto as dropped”).'});renderChatThread(false);saveChat();return;}
+    _streamChat();
+  })();
+}
+function _streamChat(){
   const snapshot=chatHistory.slice();
   let added=false,idx=-1;
   const onTok=t=>{if(!added){chatHistory.push({role:'assistant',content:''});idx=chatHistory.length-1;added=true;}chatHistory[idx].content+=t;renderChatThread(false);};

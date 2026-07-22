@@ -1945,8 +1945,11 @@ const NET_KEY='wl_device', NET_STATUS='wl_net_status', NET_INVITE='wl_invite';
 // Effective switch: the global flag OR a per-device test flag, so you can trial
 // the whole join flow on your own phone (visit with ?gate=1) before turning it
 // on for everyone. ?gate=0 clears it.
-function gateOn(){try{return NETWORK_GATE||localStorage.getItem('wl_gate_test')==='1';}catch{return NETWORK_GATE;}}
-function captureGateTest(){try{const u=new URL(location.href);if(u.searchParams.has('gate')){localStorage.setItem('wl_gate_test',u.searchParams.get('gate')==='0'?'0':'1');u.searchParams.delete('gate');history.replaceState(null,'',u.pathname+u.search+u.hash);}}catch{}}
+function gateTestMode(){try{return localStorage.getItem('wl_gate_test')||'';}catch{return '';}}
+function gateOn(){const m=gateTestMode();return NETWORK_GATE||m==='1'||m==='force';}
+// ?gate=1 normal test · ?gate=force previews the join screen even on a device
+// that already has a list (no incognito, list untouched) · ?gate=0 turns it off.
+function captureGateTest(){try{const u=new URL(location.href);if(u.searchParams.has('gate')){const v=u.searchParams.get('gate');localStorage.setItem('wl_gate_test',v==='0'?'':(v==='force'?'force':'1'));u.searchParams.delete('gate');history.replaceState(null,'',u.pathname+u.search+u.hash);}}catch{}}
 function wlDevice(){try{let d=localStorage.getItem(NET_KEY);if(!d){d='d'+Math.random().toString(36).slice(2)+Date.now().toString(36);localStorage.setItem(NET_KEY,d);}return d;}catch{return 'd'+Date.now();}}
 function netStatus(){try{return localStorage.getItem(NET_STATUS)||'';}catch{return '';}}
 function setNetStatus(s){try{s?localStorage.setItem(NET_STATUS,s):localStorage.removeItem(NET_STATUS);}catch{}}
@@ -1963,9 +1966,10 @@ async function netCall(path,body){
 // The gate. Returns true if the app should stay HIDDEN behind the join screen.
 async function networkGate(){
   if(!gateOn())return false;                              // feature off → open to all
-  if(netStatus()==='approved')return false;               // cached approval → open, revalidate below
+  const force=gateTestMode()==='force';                   // preview mode ignores the shortcuts below
+  if(!force&&netStatus()==='approved')return false;       // cached approval → open, revalidate below
   // Grandfather: anyone already using the app keeps working, no request needed.
-  if(hasStoredList()||(Array.isArray(anime)&&anime.length)){setNetStatus('approved');try{netCall('/join',{deviceId:wlDevice(),name:'(existing)'});}catch{}return false;}
+  if(!force&&(hasStoredList()||(Array.isArray(anime)&&anime.length))){setNetStatus('approved');try{netCall('/join',{deviceId:wlDevice(),name:'(existing)'});}catch{}return false;}
   // New device → ask the network where it stands.
   let st='unknown';
   try{const inv=localStorage.getItem(NET_INVITE)||'';const j=await netCall('/join',{deviceId:wlDevice(),invite:inv});st=j.status||'unknown';}

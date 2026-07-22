@@ -5786,6 +5786,27 @@ async function sendFriendRequest(code,name){
 }
 function removeFriend(code){saveFriends(friendsList().filter(f=>f.code!==code));renderFriends();}
 function cancelOutgoing(code){saveFriendsOut(friendsOut().filter(f=>f.code!==code));renderFriends();}
+// A friend's display name: your own nickname (alias) wins, then the name they
+// gave themselves, then a neutral fallback. The alias is local-only and never
+// touched by name-sync (refreshFriendName only updates their self-name), so a
+// name you set sticks — even if they later rename themselves, and even if they
+// never named themselves at all (the "a friend" case).
+function friendLabel(f){return ((f&&(f.alias||f.name))||'').trim()||'Friend';}
+function friendDisplay(code,fallback){const f=friendsList().find(x=>x.code===code);return ((f&&(f.alias||f.name))||fallback||'').trim()||'A friend';}
+// Build a new friend record, carrying any name you typed when you added them
+// (kept on the outgoing request) forward as your local alias, so it survives
+// the accept instead of being replaced by their self-name.
+function newFriendObj(code,name,at){const o={code,name:name||'Friend',nameAt:at||0};const p=friendsOut().find(f=>f.code===code);if(p&&p.name&&p.name.trim())o.alias=p.name.trim().slice(0,40);return o;}
+function renameFriendPrompt(code){
+  const fr=friendsList(),f=fr.find(x=>x.code===code); if(!f)return;
+  const next=window.prompt('What do you want to call this friend?',f.alias||f.name||'');
+  if(next===null)return;                       // cancelled
+  const v=next.trim().slice(0,40);
+  if(v)f.alias=v; else delete f.alias;         // clearing it resets to their own name
+  saveFriends(fr);
+  toast(v?`Renamed to ${v}`:'Name reset');
+  renderFriends();
+}
 // Pull my mailbox: auto-add anyone who ACCEPTED my request; surface incoming requests.
 async function pullFriendReqs(){
   if(IS_NATIVE)return;
@@ -5800,7 +5821,7 @@ async function pullFriendReqs(){
       refreshFriendName(m.from.code,m.from.name,m.at);   // keep friend names current (newest wins)
       if(handled.includes(m.id))continue;
       if(m.type==='accept'){
-        if(!friends.some(f=>f.code===m.from.code)){friends.push({code:m.from.code,name:m.from.name||'Friend',nameAt:m.at||0});changed=true;}
+        if(!friends.some(f=>f.code===m.from.code)){friends.push(newFriendObj(m.from.code,m.from.name,m.at));changed=true;}
         saveFriendsOut(friendsOut().filter(f=>f.code!==m.from.code));
         addFrHandled(m.id);
       }else if(m.type==='request'){
@@ -5817,7 +5838,7 @@ async function acceptReq(id){
   const req=friendReqs.find(r=>r.id===id); if(!req)return;
   const c=req.from.code, n=req.from.name;
   let friends=friendsList();
-  if(!friends.some(f=>f.code===c)){friends.push({code:c,name:n||'Friend',nameAt:req.at||0});saveFriends(friends);}
+  if(!friends.some(f=>f.code===c)){friends.push(newFriendObj(c,n,req.at));saveFriends(friends);}
   addFrHandled(id); friendReqs=friendReqs.filter(r=>r.id!==id); renderFriends();
   try{const from={code:myFriendCode(),name:myFriendName()||'A friend'};await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({op:'fr_accept',to:c,from})});}catch(e){}
   toast("Friend added — you're connected");
@@ -5851,10 +5872,10 @@ function mergeFriendMsg(m){
   if(frHandled().includes(m.id))return;
   let friends=friendsList();
   if(m.type==='accept'){
-    if(!friends.some(f=>f.code===m.from.code)){friends.push({code:m.from.code,name:m.from.name||'Friend',nameAt:m.at||0});saveFriends(friends);}
+    if(!friends.some(f=>f.code===m.from.code)){friends.push(newFriendObj(m.from.code,m.from.name,m.at));saveFriends(friends);}
     saveFriendsOut(friendsOut().filter(f=>f.code!==m.from.code));
     addFrHandled(m.id);
-    try{toast(`${m.from.name} accepted your friend request`);}catch(e){}
+    try{toast(`${friendDisplay(m.from.code,m.from.name)} accepted your friend request`);}catch(e){}
   }else if(m.type==='request'){
     if(friends.some(f=>f.code===m.from.code)){addFrHandled(m.id);return;}
     if(!friendReqs.some(r=>r.id===m.id))friendReqs.push(m);
@@ -5935,11 +5956,11 @@ function recCard(k,rec){
   return `<div class="pcard rec-card" style="--fc:${col}" onclick="openRecDetail('${encodeURIComponent(k)}')">
     <div class="pcard-wrap rec-wrap">${img}<span class="rec-flag" style="background:${col}">${icon('users')}</span></div>
     <div class="pcard-title">${escH(it.title)}</div>
-    <div class="rec-by" style="color:${col}">${escH(s0.name)}${more}</div>
+    <div class="rec-by" style="color:${col}">${escH(friendDisplay(s0.code,s0.name))}${more}</div>
   </div>`;
 }
 function recNoteRows(rec){
-  return rec.senders.map(s=>{const col=friendColor(s.code);return `<div class="rec-badge" style="--fc:${col}"><div class="rec-badge-who">${icon('users')} ${escH(s.name)} recommends this</div>${s.note?`<div class="rec-badge-note">“${escH(s.note)}”</div>`:''}</div>`;}).join('');
+  return rec.senders.map(s=>{const col=friendColor(s.code);return `<div class="rec-badge" style="--fc:${col}"><div class="rec-badge-who">${icon('users')} ${escH(friendDisplay(s.code,s.name))} recommends this</div>${s.note?`<div class="rec-badge-note">“${escH(s.note)}”</div>`:''}</div>`;}).join('');
 }
 function friendRecBadge(a){
   if(IS_NATIVE||!a||!a.aniId)return '';
@@ -5987,7 +6008,7 @@ function renderFriends(){
   const code=myFriendCode(),name=myFriendName(),fr=friendsList(),out=friendsOut(),reqs=friendReqs;
   const reqHTML=reqs.length?`<div class="dt-label" style="margin-top:18px">${icon('inbox')} Friend requests · ${reqs.length}</div>`+reqs.map(r=>`<div class="fr-row"><span class="fr-dot" style="background:${friendColor(r.from.code)}"></span><div class="fr-info"><div class="fr-name">${escH(r.from.name)}</div><div class="fr-code">wants to be friends</div></div><button class="fr-accept" onclick="acceptReq('${escH(r.id)}')">${icon('check')} Accept</button><button class="fr-x" onclick="denyReq('${escH(r.id)}')" aria-label="Deny">${icon('x')}</button></div>`).join(''):'';
   const outHTML=out.length?`<div class="dt-label" style="margin-top:16px">Pending · ${out.length}</div>`+out.map(f=>`<div class="fr-row"><span class="fr-dot" style="background:${friendColor(f.code)};opacity:.4"></span><div class="fr-info"><div class="fr-name">${escH(f.name||f.code)}</div><div class="fr-code">request sent — waiting to accept</div></div><button class="fr-x" onclick="cancelOutgoing('${escH(f.code)}')" aria-label="Cancel">${icon('x')}</button></div>`).join(''):'';
-  const flist=fr.length?fr.map(f=>`<div class="fr-row"><span class="fr-dot" style="background:${friendColor(f.code)}"></span><div class="fr-info"><div class="fr-name">${escH(f.name)}</div><div class="fr-code">${escH(f.code)}</div></div><button class="fr-x" onclick="removeFriend('${escH(f.code)}')" aria-label="Remove friend">${icon('x')}</button></div>`).join(''):'<p class="ai-desc">No friends yet — share your code, or send a request below.</p>';
+  const flist=fr.length?fr.map(f=>`<div class="fr-row"><span class="fr-dot" style="background:${friendColor(f.code)}"></span><div class="fr-info"><div class="fr-name">${escH(friendLabel(f))}</div><div class="fr-code">${f.alias&&f.name&&f.alias!==f.name?'aka '+escH(f.name):escH(f.code)}</div></div><button class="fr-x" onclick="renameFriendPrompt('${escH(f.code)}')" aria-label="Rename friend">${icon('edit')}</button><button class="fr-x" onclick="removeFriend('${escH(f.code)}')" aria-label="Remove friend">${icon('x')}</button></div>`).join(''):'<p class="ai-desc">No friends yet — share your code, or send a request below.</p>';
   box.innerHTML=`
     <div class="dt-label">${icon('star')} Your name</div>
     <input class="ai-prompt-in" id="frName" placeholder="What friends see" value="${escH(name)}" maxlength="40" oninput="setMyFriendName(this.value)">
@@ -7233,11 +7254,11 @@ function _updBusy(){
 // you'd explain it to a friend — what they can now do, not what the code does.
 // No version numbers or jargon in the notes; the date IS the version.
 const RELEASE={
-  v:'2026-07-22.2',
-  title:'Pick your streaming sources',
+  v:'2026-07-22.3',
+  title:'Name your friends',
   notes:[
-    '<b>Watch</b> now starts as a clean slate — streaming services are hidden by default, so you’re not buried in ones you don’t use.',
-    'Tap the <b>Sources</b> button in the bottom bar and unhide the services you actually watch on — or add your own, regional ones included. Set it once and it sticks.',
+    'Give any friend your own name — tap the pencil next to them in <b>Friends</b>. No more a whole list that just says “Friend”.',
+    'The name is just for you and it sticks — even if your friend never named themselves, or renames themselves later.',
   ],
 };
 const SEEN_REL='seen_release';

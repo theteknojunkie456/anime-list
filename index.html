@@ -500,6 +500,8 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 .lock-title{font-size:21px;font-weight:900;letter-spacing:-.3px;margin-bottom:6px;color:var(--t1);}
 .lock-sub{font-size:13.5px;color:var(--t2);margin-bottom:22px;}
 .lock-in{width:100%;padding:14px 16px;border-radius:14px;border:1px solid var(--b2);background:var(--bg2);color:var(--t1);font-size:16px;text-align:center;outline:none;box-sizing:border-box;}
+.lock-in+.lock-in,#joinFields .lock-in{margin-top:10px;}
+.join-hint{font-size:12px;color:var(--t3);margin:6px 2px 0;}
 .lock-in:focus{border-color:var(--a);box-shadow:0 0 0 3px var(--ag);}
 .lock-btn{width:100%;margin-top:12px;padding:14px;border-radius:14px;border:none;background:var(--a);color:var(--aFg);font-weight:800;font-size:15px;cursor:pointer;}
 .lock-btn:active{transform:scale(.97);}
@@ -1244,8 +1246,19 @@ body.recsel .pcard{position:relative;}
   <div class="lock-card">
     <div class="lock-emoji" id="joinEmoji">✋</div>
     <div class="lock-title" id="joinTitle">Request to join</div>
-    <div class="lock-sub" id="joinSub">WatchList is invite-only. Send a request and you’ll get in once it’s approved.</div>
-    <input id="joinName" class="lock-in" type="text" placeholder="Your name (so they know it’s you)" autocomplete="name">
+    <div class="lock-sub" id="joinSub">WatchList is invite-only. Send a request and Admin will let you in.</div>
+    <div id="joinFields">
+      <input id="joinName" class="lock-in" type="text" placeholder="Your name" autocomplete="name">
+      <div class="join-hint">So Admin knows it’s you — you can change it later.</div>
+      <select id="joinSource" class="lock-in">
+        <option value="">How did you hear about WatchList?</option>
+        <option>A friend</option>
+        <option>Social media</option>
+        <option>A group / server</option>
+        <option>Search</option>
+        <option>Other</option>
+      </select>
+    </div>
     <button class="lock-btn" id="joinBtn" onclick="requestJoin()">Send request</button>
     <div class="lock-err" id="joinErr"></div>
     <a class="lock-alt" id="joinRetry" style="display:none" onclick="pollJoin(true)">Check again</a>
@@ -1583,6 +1596,15 @@ body.recsel .pcard{position:relative;}
     <button class="sheet-cancel" onclick="closeAll()">Close</button>
   </div>
   <div id="watchBody"></div>
+</div>
+
+<div class="sheet" id="adminSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <div class="sheet-title"><i data-ic="settings"></i> Admin</div>
+    <button class="sheet-cancel" onclick="closeAll()">Done</button>
+  </div>
+  <div id="adminBody"></div>
 </div>
 
 <div class="sheet" id="newsSheet">
@@ -1981,19 +2003,99 @@ async function networkGate(){
 function showJoinGate(st){
   const el=document.getElementById('joinScreen');if(!el)return;
   const t=document.getElementById('joinTitle'),s=document.getElementById('joinSub'),b=document.getElementById('joinBtn'),r=document.getElementById('joinRetry'),em=document.getElementById('joinEmoji');
-  if(st==='denied'){if(em)em.textContent='🚫';if(t)t.textContent='Not approved';if(s)s.textContent='Your request wasn’t approved. Reach out to whoever shared this with you.';if(b)b.style.display='none';if(r)r.style.display='';}
-  else if(st==='pending'){if(em)em.textContent='⏳';if(t)t.textContent='Waiting for approval';if(s)s.textContent='Your request was sent. You’ll be let in as soon as it’s approved.';if(b)b.style.display='none';if(r)r.style.display='';pollJoin();}
-  else{if(em)em.textContent='✋';if(t)t.textContent='Request to join';if(b)b.style.display='';if(r)r.style.display='none';}
+  const f=document.getElementById('joinFields');
+  if(st==='denied'){if(em)em.textContent='🚫';if(t)t.textContent='Not approved';if(s)s.textContent='Admin hasn’t approved this request. Ask whoever shared the link with you.';if(f)f.style.display='none';if(b)b.style.display='none';if(r)r.style.display='';}
+  else if(st==='pending'){if(em)em.textContent='⏳';if(t)t.textContent='Waiting for Admin';if(s)s.textContent='Your request was sent. You’ll be let in as soon as Admin approves it.';if(f)f.style.display='none';if(b)b.style.display='none';if(r)r.style.display='';pollJoin();}
+  else{if(em)em.textContent='✋';if(t)t.textContent='Request to join';if(s)s.textContent='WatchList is invite-only. Send a request and Admin will let you in.';if(f)f.style.display='';if(b)b.style.display='';if(r)r.style.display='none';}
   el.classList.add('on');
 }
 function hideJoinGate(){const el=document.getElementById('joinScreen');if(el)el.classList.remove('on');}
 async function requestJoin(){
   const nm=(document.getElementById('joinName')||{}).value||'';
+  const src=(document.getElementById('joinSource')||{}).value||'';
   const err=document.getElementById('joinErr');if(err)err.textContent='';
-  try{const inv=localStorage.getItem(NET_INVITE)||'';const j=await netCall('/join',{deviceId:wlDevice(),name:nm,invite:inv});
+  try{const inv=localStorage.getItem(NET_INVITE)||'';const j=await netCall('/join',{deviceId:wlDevice(),name:nm,source:src,invite:inv});
     if(j.status==='approved'){setNetStatus('approved');hideJoinGate();location.reload();return;}
     showJoinGate('pending');
   }catch{if(err)err.textContent='Couldn’t reach the network — try again.';}
+}
+// ─── ADMIN CONTROL CENTER ───────────────────────────────────────────────────
+// Reached via ?admin=1 (or openAdmin()). The panel is harmless to see — every
+// action is verified server-side against ADMIN_TOKEN, so without the token it
+// does nothing. The token is stored locally once entered, for convenience.
+const ADMIN_TK='wl_admin_token';
+function adminToken(){try{return localStorage.getItem(ADMIN_TK)||'';}catch{return '';}}
+function setAdminToken(t){try{t?localStorage.setItem(ADMIN_TK,t):localStorage.removeItem(ADMIN_TK);}catch{}}
+function openAdmin(){renderAdmin();openSheet('adminSheet');}
+async function adminCall(path,extra){return netCall(path,Object.assign({token:adminToken()},extra||{}));}
+function renderAdmin(){
+  const box=document.getElementById('adminBody');if(!box)return;
+  if(!adminToken()){
+    box.innerHTML=`<p class="ai-desc">Enter your admin token to manage the network.</p>
+      <input class="ai-prompt-in" id="adminTkIn" type="password" placeholder="admin token" autocomplete="off">
+      <button class="parse-btn" style="margin-top:8px" onclick="adminSaveToken()">Unlock admin</button>`;
+    return;
+  }
+  box.innerHTML=`
+    <div class="dt-label">${icon('bell')} Broadcast to everyone</div>
+    <p class="ai-desc">Sends a push notification to all subscribers.</p>
+    <input class="ai-prompt-in" id="bcTitle" placeholder="Title" style="margin-bottom:8px">
+    <input class="ai-prompt-in" id="bcBody" placeholder="Message">
+    <button class="parse-btn" style="margin-top:8px" onclick="adminBroadcast()">Send to all</button>
+
+    <div class="dt-label" style="margin-top:18px">${icon('external')} Invite links</div>
+    <p class="ai-desc">Share a link to let people join. <b>Request</b> = you approve each; <b>Auto</b> = approved on use.</p>
+    <div style="display:flex;gap:8px">
+      <button class="parse-btn" style="flex:1" onclick="adminInvite('request')">New request link</button>
+      <button class="parse-btn" style="flex:1" onclick="adminInvite('auto')">New auto link</button>
+    </div>
+    <div id="adminInviteOut" style="display:none;margin-top:8px;padding:9px 11px;border-radius:9px;background:var(--bg2);color:var(--t1);font:12px/1.45 ui-monospace,Menlo,monospace;word-break:break-all"></div>
+
+    <div class="dt-label" style="margin-top:18px">${icon('sort')} Members <span id="adminCount" class="src-tag"></span></div>
+    <div id="adminMembers"><p class="ai-desc">Loading…</p></div>
+    <button class="chat-clear" style="margin-top:12px" onclick="setAdminToken('');renderAdmin()"><i data-ic="trash"></i> Sign out of admin</button>`;
+  loadMembers();
+  // Register this device's push endpoint as the admin's, so join requests ping you.
+  try{getPushSub().then(sub=>{if(sub)adminCall('/admin-register',{subscription:sub});});}catch{}
+}
+function adminSaveToken(){const v=(document.getElementById('adminTkIn')||{}).value||'';if(!v.trim())return;setAdminToken(v.trim());renderAdmin();}
+async function loadMembers(){
+  const box=document.getElementById('adminMembers');if(!box)return;
+  let r;try{r=await adminCall('/members');}catch{box.innerHTML='<p class="ai-desc">Couldn’t reach the network.</p>';return;}
+  if(!r||!r.ok){box.innerHTML='<p class="ai-desc" style="color:var(--danger,#ff6b6b)">'+(r&&r.error==='unauthorized'?'Wrong admin token.':'Error loading members')+'</p>';if(r&&r.error==='unauthorized'){setAdminToken('');setTimeout(renderAdmin,900);}return;}
+  const cnt=document.getElementById('adminCount');if(cnt)cnt.textContent=`${r.approved}/${r.cap}`;
+  const devs=r.devices||[];
+  const pending=devs.filter(d=>d.status==='pending'), approved=devs.filter(d=>d.status==='approved'), denied=devs.filter(d=>d.status==='denied');
+  const row=(d,actions)=>`<div class="src-opt" style="display:flex;align-items:center;gap:8px">
+    <div style="flex:1;min-width:0"><div class="src-name">${escH(d.name||'(unnamed)')}</div><div class="src-sub">${d.status}${d.source?' · heard: '+escH(d.source):''}${d.invite?' · invite':''}</div></div>${actions}</div>`;
+  const ap=d=>`<button class="src-chip on" onclick="adminDecide('${d.id}','approve')">Approve</button>`;
+  const dn=d=>`<button class="src-chip" onclick="adminDecide('${d.id}','deny')">Deny</button>`;
+  box.innerHTML=
+    (pending.length?`<div class="ai-desc" style="margin:6px 0"><b>Pending (${pending.length})</b></div>`+pending.map(d=>row(d,ap(d)+dn(d))).join(''):'<p class="ai-desc">No pending requests.</p>')
+    +(approved.length?`<div class="ai-desc" style="margin:10px 0 6px"><b>Approved (${approved.length})</b></div>`+approved.map(d=>row(d,dn(d))).join(''):'')
+    +(denied.length?`<div class="ai-desc" style="margin:10px 0 6px;opacity:.7"><b>Denied (${denied.length})</b></div>`+denied.map(d=>row(d,ap(d))).join(''):'');
+}
+async function adminDecide(id,action){
+  try{const r=await adminCall('/'+action,{deviceId:id});if(r&&r.error)toast(r.error);}catch{toast('Failed');}
+  loadMembers();
+}
+async function adminBroadcast(){
+  const title=(document.getElementById('bcTitle')||{}).value||'WatchList';
+  const body=(document.getElementById('bcBody')||{}).value||'';
+  if(!body.trim()){toast('Write a message first');return;}
+  try{const r=await adminCall('/broadcast',{title,body,tag:'wl-admin-'+Date.now()});
+    toast(r&&r.ok?`Sent to ${r.sent}`:(r&&r.error||'Failed'));
+    if(r&&r.ok){const t=document.getElementById('bcBody');if(t)t.value='';}
+  }catch{toast('Failed to send');}
+}
+async function adminInvite(mode){
+  const out=document.getElementById('adminInviteOut');
+  try{const r=await adminCall('/invite',{mode});
+    if(r&&r.ok){const link=location.origin+location.pathname+'?invite='+r.code;
+      if(out){out.style.display='block';out.textContent=link;}
+      try{await navigator.clipboard.writeText(link);toast(`${mode} link copied`);}catch{toast('Link ready — tap to copy');}
+    }else toast((r&&r.error)||'Failed');
+  }catch{toast('Failed')}
 }
 let _pollT=null;
 async function pollJoin(once){
@@ -6851,6 +6953,8 @@ try{setTimeout(maybeShowWhatsNew,900);}catch{}
 // the link first, then run the gate — it overlays the app for unapproved devices.
 try{captureGateTest();captureInvite();}catch{}
 (async()=>{try{await networkGate();}catch{}})();
+// ?admin=1 opens the control center (harmless without the token).
+try{if(new URL(location.href).searchParams.get('admin')==='1'){const u=new URL(location.href);u.searchParams.delete('admin');history.replaceState(null,'',u.pathname+u.search+u.hash);setTimeout(openAdmin,300);}}catch{}
 try{alCatchRedirect().then(()=>{if(!appLocked)alBootSync();}).catch(()=>{});}catch{}   // returning from AniList OAuth
 if(appLocked)showLock();   // stored list is ciphertext → gate the app until unlocked
 else try{restorePlayer();}catch{}   // came back mid-stream after an iOS reload → reopen it

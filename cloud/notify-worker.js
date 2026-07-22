@@ -597,6 +597,7 @@ async function handleJoin(body, env) {
   const rec = {
     id, status,
     name: String(body.name || "").slice(0, 40),
+    source: String(body.source || "").slice(0, 40),   // how they heard about it
     invite: inviteCode,
     joinedAt: Date.now(),
   };

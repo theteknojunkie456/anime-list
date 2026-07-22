@@ -112,7 +112,7 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 
 /* ── HEADER ── */
 .hdr{padding:calc(var(--safe-t) + 12px) 18px 0;display:flex;align-items:center;justify-content:space-between;}
-.hdr-title{font-size:21px;font-weight:900;letter-spacing:-0.5px;display:flex;align-items:center;gap:8px;}
+.hdr-title{font-size:21px;font-weight:900;letter-spacing:-0.5px;display:flex;align-items:center;gap:8px;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;}
 .hdr-title::before{content:'';width:5px;height:18px;border-radius:99px;background:linear-gradient(180deg,var(--a2),var(--a));box-shadow:0 0 12px var(--glow);}
 .hbtn{
   width:36px;height:36px;border-radius:12px;font-size:16px;
@@ -7282,6 +7282,17 @@ try{captureGateTest();captureInvite();}catch{}
 try{setTimeout(fetchAdminCard,1400);window.addEventListener('focus',()=>{try{fetchAdminCard();}catch{}});}catch{}
 // Admin nav button appears only where your token is stored (your device only).
 try{injectAdminNav();}catch{}
+// Unlock admin the first time: PRESS AND HOLD the WatchList logo ~0.7s. A hold is
+// far more reliable on touch than rapid taps (which mobile treats as zoom).
+try{(function(){
+  const t=document.querySelector('.hdr-title'); if(!t)return;
+  let timer=null,fired=false;
+  const start=()=>{fired=false;clearTimeout(timer);timer=setTimeout(()=>{fired=true;try{navigator.vibrate&&navigator.vibrate(12);}catch{}openAdmin();},650);};
+  const cancel=()=>{clearTimeout(timer);};
+  t.addEventListener('touchstart',start,{passive:true});
+  t.addEventListener('touchend',cancel);t.addEventListener('touchmove',cancel,{passive:true});t.addEventListener('touchcancel',cancel);
+  t.addEventListener('mousedown',start);t.addEventListener('mouseup',cancel);t.addEventListener('mouseleave',cancel);
+})();}catch{}
 // ?admin=1 still works as an alternate first-time unlock (harmless without token).
 try{if(new URL(location.href).searchParams.get('admin')==='1'){const u=new URL(location.href);u.searchParams.delete('admin');history.replaceState(null,'',u.pathname+u.search+u.hash);setTimeout(openAdmin,300);}}catch{}
 try{alCatchRedirect().then(()=>{if(!appLocked)alBootSync();}).catch(()=>{});}catch{}   // returning from AniList OAuth

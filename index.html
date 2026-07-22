@@ -5289,7 +5289,6 @@ function restorePlayer(){
 // free tier in 2026; HIDIVE is paid — both excluded). WatchList opens the site's
 // search for your exact title in the browser (these services DRM / block framing).
 const WATCH_PRESETS=[
-  {name:'Tubi',          url:'https://tubitv.com/search/{title}'},
   {name:'Roku Channel',  url:'https://therokuchannel.roku.com/search/{title}'},
   {name:'Pluto TV',      url:'https://pluto.tv/en/search/details?query={title}'},
   {name:'VIZ (YouTube)', url:'https://www.youtube.com/@VIZMedia/search?query={title}'},
@@ -5299,7 +5298,7 @@ const WATCH_PRESETS=[
   {name:'Ani-One Asia',  url:'https://www.youtube.com/@AniOneAsia/search?query={title}'},
   {name:'Muse Asia',     url:'https://www.youtube.com/@MuseAsia/search?query={title}'},
 ];
-const LEGAL_DEFAULT=WATCH_PRESETS[0].url;   // Tubi — 100% free, no account, no paid tier
+const LEGAL_DEFAULT=WATCH_PRESETS[0].url;   // first preset — free, no account, no paid tier
 // ── Official-app only: "Open in [Service]" ──────────────────────────────────
 // The public web build uses ONLY the free-legal sources above. The official app
 // adds this: the user ticks the paid services they personally subscribe to, and
@@ -5326,7 +5325,7 @@ function fillURL(url,a){return url.replace(/\{title\}/g,encodeURIComponent(a.tit
 // the exact show (no slug-guessing, no 404s), free + subscription. We fetch them,
 // rank (your subscriptions → free → subscription), open the exact page, and
 // remember your pick so it just opens there next time.
-const LEGAL_FREE_SITES=new Set(['youtube','bilibili tv','bilibili','hoopla','tubi','tubi tv','pluto tv','the roku channel','roku','roku channel','retrocrush','plex','ani-one','ani-one asia','muse asia','iq','wetv','amazon freevee','freevee','crunchyroll (free)','pokemon tv']);
+const LEGAL_FREE_SITES=new Set(['youtube','bilibili tv','bilibili','hoopla','pluto tv','the roku channel','roku','roku channel','retrocrush','plex','ani-one','ani-one asia','muse asia','iq','wetv','amazon freevee','freevee','crunchyroll (free)','pokemon tv']);
 // map a My-Services id onto how the site appears in AniList (loose contains match)
 const SUB_MATCH={crunchyroll:'crunchyroll',netflix:'netflix',hidive:'hidive',hulu:'hulu',disney:'disney',max:'max',prime:'amazon',appletv:'apple'};
 async function whereLegal(a){
@@ -5402,7 +5401,7 @@ function addRegional(name){
 }
 // ─── HIDE / RENAME ANY SOURCE ───────────────────────────────────────────────
 // Everything in the Watch sheet is editable, not just the ones you add. Don't
-// use Tubi? Hide it and it's gone from every show. Call HIDIVE something else?
+// never use Pluto TV? Hide it and it's gone from every show. Call HIDIVE something else?
 // Rename it. Keyed by normalized name so it covers built-in presets, AniList's
 // official links, and your own services alike.
 const HIDE_KEY='hidden_sources', ALIAS_KEY='source_aliases';
@@ -5443,6 +5442,25 @@ function allKnownSources(){
   WATCH_PRESETS.forEach(p=>add(p.name,'free'));
   REGIONAL_SERVICES.forEach(s=>add(s.name,'regional'));
   return out;
+}
+// Everyone starts with every built-in service HIDDEN, so the Watch sheet is a
+// clean slate — you unhide the ones you use or add your own. Runs ONCE per
+// device (a version flag), merging onto anything already hidden, so it never
+// re-hides what someone later unhides. Doesn't touch custom services (yours).
+const HIDE_SEED_FLAG='hidden_seed_v1';
+function seedHiddenDefaults(){
+  try{
+    if(localStorage.getItem(HIDE_SEED_FLAG)==='1')return;
+    const names=[];
+    PAID_SERVICES.forEach(s=>names.push(s.name));
+    WATCH_PRESETS.forEach(p=>names.push(p.name));
+    REGIONAL_SERVICES.forEach(s=>names.push(s.name));
+    // common names AniList reports as official streaming links (so those hide too)
+    ['Crunchyroll','Netflix','Hulu','Disney+','Max','HBO Max','Amazon Prime Video','Prime Video','Apple TV','HIDIVE','Bilibili TV','Bilibili','iQ','iQIYI','WeTV','Youku','YouTube','Hoopla','Tubi','Tubi TV','Adult Swim','VRV','Funimation','Ani-One','Ani-One Asia','Muse Asia','Aniplus','Pluto TV','The Roku Channel','Roku','RetroCrush','Plex','Peacock','VIZ','Freevee','Amazon Freevee','Pokémon TV'].forEach(n=>names.push(n));
+    const keys=[...new Set([...hiddenSrc(),...names.map(srcKey)])].filter(Boolean);
+    localStorage.setItem(HIDE_KEY,JSON.stringify(keys));
+    localStorage.setItem(HIDE_SEED_FLAG,'1');
+  }catch{}
 }
 const CS_KEY='custom_services';
 function customServices(){try{const v=JSON.parse(localStorage.getItem(CS_KEY)||'[]');return Array.isArray(v)?v.filter(s=>s&&s.name&&s.url):[];}catch{return[];}}
@@ -5969,7 +5987,7 @@ function launchURL(a){
   return src.replace(/\{title\}/g,encodeURIComponent(a.title)).replace(/\{slug\}/g,slug).replace(/\{ep\}/g,String(watchEpisode(a)||1));
 }
 function sourceName(){
-  const s=streamSource(); if(!s)return 'Tubi';
+  const s=streamSource(); if(!s)return WATCH_PRESETS[0].name;
   const p=WATCH_PRESETS.find(x=>x.url===s); if(p)return p.name;
   try{return new URL(s.replace(/\{[^}]+\}/g,'x')).hostname.replace(/^www\./,'');}catch{return 'the site';}
 }
@@ -5991,7 +6009,7 @@ function renderSource(){
     <div class="dt-label">${icon('play')} Where Watch takes you</div>
     <p class="ai-desc">Free and legal. Opens the site's search for your exact title.</p>
     <button class="src-opt${!custom?' on':''}" onclick="setSource('')">
-      <div class="src-name">Tubi <span class="src-tag">Default · Free</span></div>
+      <div class="src-name">${escH(WATCH_PRESETS[0].name)} <span class="src-tag">Default · Free</span></div>
       <div class="src-sub">No account needed</div>
     </button>
     <div class="src-picks">${chips}</div>
@@ -7270,7 +7288,7 @@ try{if(_SR&&window.isSecureContext){const m=document.getElementById('chatMic');i
 
 // ─── INIT ───────────────────────────────────────────────────────────────────
 try{hydrateIcons();}catch{}
-load();try{purgeAdult();}catch{}try{if(!appLocked&&dedupeAnime())writeLocal();}catch{}loadTheme();try{_restoreUpd();}catch{}render();try{nativeScheduleNotifs();}catch{}
+load();try{purgeAdult();}catch{}try{if(!appLocked&&dedupeAnime())writeLocal();}catch{}loadTheme();try{seedHiddenDefaults();}catch{}try{_restoreUpd();}catch{}render();try{nativeScheduleNotifs();}catch{}
 // After the list is up — and after the tutorial has had its chance to claim a
 // new install — tell returning users what changed in the update they just got.
 try{setTimeout(maybeShowWhatsNew,900);}catch{}

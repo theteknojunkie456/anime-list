@@ -7286,12 +7286,16 @@ try{injectAdminNav();}catch{}
 // far more reliable on touch than rapid taps (which mobile treats as zoom).
 try{(function(){
   const t=document.querySelector('.hdr-title'); if(!t)return;
-  let timer=null,fired=false;
-  const start=()=>{fired=false;clearTimeout(timer);timer=setTimeout(()=>{fired=true;try{navigator.vibrate&&navigator.vibrate(12);}catch{}openAdmin();},650);};
-  const cancel=()=>{clearTimeout(timer);};
-  t.addEventListener('touchstart',start,{passive:true});
-  t.addEventListener('touchend',cancel);t.addEventListener('touchmove',cancel,{passive:true});t.addEventListener('touchcancel',cancel);
-  t.addEventListener('mousedown',start);t.addEventListener('mouseup',cancel);t.addEventListener('mouseleave',cancel);
+  let timer=null,sx=0,sy=0;
+  const pt=e=>e.touches&&e.touches[0]?e.touches[0]:e;
+  const start=e=>{const p=pt(e);sx=p.clientX;sy=p.clientY;clearTimeout(timer);
+    timer=setTimeout(()=>{try{navigator.vibrate&&navigator.vibrate(15);}catch{}openAdmin();},600);};
+  // Only cancel on a REAL drag (>12px) — a still finger always jitters a little,
+  // and cancelling on any move was killing the hold instantly.
+  const move=e=>{const p=pt(e);if(Math.abs(p.clientX-sx)>12||Math.abs(p.clientY-sy)>12)clearTimeout(timer);};
+  const cancel=()=>clearTimeout(timer);
+  t.addEventListener('pointerdown',start);t.addEventListener('pointermove',move);t.addEventListener('pointerup',cancel);t.addEventListener('pointercancel',cancel);t.addEventListener('pointerleave',cancel);
+  t.addEventListener('touchstart',start,{passive:true});t.addEventListener('touchmove',move,{passive:true});t.addEventListener('touchend',cancel);t.addEventListener('touchcancel',cancel);
 })();}catch{}
 // ?admin=1 still works as an alternate first-time unlock (harmless without token).
 try{if(new URL(location.href).searchParams.get('admin')==='1'){const u=new URL(location.href);u.searchParams.delete('admin');history.replaceState(null,'',u.pathname+u.search+u.hash);setTimeout(openAdmin,300);}}catch{}

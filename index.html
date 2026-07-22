@@ -6710,24 +6710,47 @@ document.addEventListener('touchcancel',_aiCancel,{passive:true});
 // stop. It fills the field — the user still sends — so a misheard word is
 // fixable before it goes.
 const _SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-let _rec=null,_recOn=false;
+let _rec=null,_recOn=false,_micWatch=null;
+// Retire the mic and reset state — used when voice turns out not to work here, so
+// a broken environment stops offering a button that hangs.
+function _micRetire(msg){
+  _recOn=false;clearTimeout(_micWatch);
+  try{_rec&&(_rec.abort?_rec.abort():_rec.stop());}catch{}
+  _rec=null;
+  const m=document.getElementById('chatMic');
+  if(m){m.classList.remove('on');m.style.display='none';}
+  if(msg)try{toast(msg);}catch{}
+}
 function toggleDictation(){
   if(!_SR)return;
-  if(_recOn){try{_rec&&_rec.stop();}catch{}return;}
+  const mic=document.getElementById('chatMic');
+  // Already listening → stop. Always recoverable with a second tap.
+  if(_recOn){try{_rec&&_rec.stop();}catch{}clearTimeout(_micWatch);_recOn=false;if(mic)mic.classList.remove('on');return;}
+  // Voice capture requires a secure context (https or the installed app). Over
+  // plain http (e.g. a LAN test server) the mic is blocked and start() hangs —
+  // which looked like a freeze. Don't even try; say why.
+  if(!window.isSecureContext){try{toast('Voice needs the installed app or https');}catch{}return;}
+  const inp=document.getElementById('chatPrompt');
   try{
     _rec=new _SR();_rec.lang='en-US';_rec.interimResults=true;_rec.continuous=false;
-    const inp=document.getElementById('chatPrompt'),mic=document.getElementById('chatMic');
     const base=inp?inp.value:'';
-    _rec.onstart=()=>{_recOn=true;if(mic)mic.classList.add('on');};
-    _rec.onerror=()=>{if(mic)mic.classList.remove('on');_recOn=false;};
-    _rec.onend=()=>{_recOn=false;if(mic)mic.classList.remove('on');};
+    let started=false;
+    _rec.onstart=()=>{started=true;_recOn=true;clearTimeout(_micWatch);if(mic)mic.classList.add('on');};
+    _rec.onerror=(ev)=>{clearTimeout(_micWatch);_recOn=false;if(mic)mic.classList.remove('on');
+      if(ev&&(ev.error==='not-allowed'||ev.error==='service-not-allowed'))try{toast('Allow microphone access to talk');}catch{}};
+    _rec.onend=()=>{clearTimeout(_micWatch);_recOn=false;if(mic)mic.classList.remove('on');};
     _rec.onresult=e=>{let s='';for(let i=0;i<e.results.length;i++)s+=e.results[i][0].transcript;
       if(inp)inp.value=(base?base+' ':'')+s;};
     _rec.start();
-  }catch(e){_recOn=false;}
+    // Watchdog: iOS Safari exposes the API but frequently never fires onstart —
+    // the button would sit "listening" forever. If nothing started shortly,
+    // treat voice as unavailable here and retire the mic instead of hanging.
+    _micWatch=setTimeout(()=>{if(!started)_micRetire('Voice isn’t available on this browser');},1500);
+  }catch(e){_micRetire('Voice isn’t available on this browser');}
 }
-// Reveal the mic only if the browser can actually do speech.
-try{if(_SR){const m=document.getElementById('chatMic');if(m)m.style.display='';}}catch{}
+// Reveal the mic only where speech can ACTUALLY run: API present AND a secure
+// context. Over the LAN-http test server this stays hidden, so no dead button.
+try{if(_SR&&window.isSecureContext){const m=document.getElementById('chatMic');if(m)m.style.display='';}}catch{}
 
 // ─── INIT ───────────────────────────────────────────────────────────────────
 try{hydrateIcons();}catch{}

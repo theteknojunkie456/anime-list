@@ -1239,7 +1239,7 @@ body.recsel .pcard{position:relative;}
 <div id="brightVeil" aria-hidden="true"></div>
 <div class="lockscreen" id="lockScreen">
   <div class="lock-card">
-    <div class="lock-emoji">🔒</div>
+    <div class="lock-ico"><i data-ic="lock"></i></div>
     <div class="lock-title" id="lockTitle">WatchList is locked</div>
     <div class="lock-sub" id="lockSub">Enter your password to open your list.</div>
     <button class="lock-btn" id="lockFace" style="display:none" onclick="tryUnlockFaceID()">Unlock with Face ID</button>
@@ -1251,7 +1251,7 @@ body.recsel .pcard{position:relative;}
 </div>
 <div class="lockscreen" id="recoveryScreen">
   <div class="lock-card">
-    <div class="lock-emoji">🔑</div>
+    <div class="lock-ico"><i data-ic="key"></i></div>
     <div class="lock-title" id="recTitle">Save your recovery key</div>
     <div class="lock-sub">This is the <b>only</b> way back into your list if you forget your password. Store it somewhere safe — a password manager, or email it to yourself. It won't be shown again.</div>
     <div class="rec-code" id="recCode"></div>
@@ -2070,6 +2070,34 @@ async function fetchAdminCard(){
     c.style.display='block';
   }catch{}
 }
+// ─── ADMIN-RECOMMENDED SOURCES (client) ─────────────────────────────────────
+// The admin curates a set of streaming services for the whole network. Since
+// every device starts with the built-ins hidden, this is what puts working
+// sources in front of members without each of them setting one up. We store the
+// list locally (so Watch/Sources can read it offline) and, once per push-id,
+// unhide exactly these names so they surface through the clean-slate default.
+// A member can still hide any of them afterward — their choice sticks until the
+// admin pushes a NEW set.
+const ADMIN_SRC_KEY='admin_sources', ADMIN_SRC_SEEN='admin_sources_seen';
+function adminSources(){try{const v=JSON.parse(localStorage.getItem(ADMIN_SRC_KEY)||'[]');return Array.isArray(v)?v.filter(s=>s&&s.name&&s.url):[];}catch{return[];}}
+async function fetchAdminSources(){
+  try{
+    const r=await netCall('/sources'); const set=r&&r.sources;
+    if(!set||!Array.isArray(set.list)){return;}
+    localStorage.setItem(ADMIN_SRC_KEY,JSON.stringify(set.list));
+    // Apply once per id: unhide these names so the admin's picks show through the
+    // default-hidden seed, without overriding a member's later manual hides.
+    let seen='';try{seen=localStorage.getItem(ADMIN_SRC_SEEN)||'';}catch{}
+    if(set.id&&set.id!==seen){
+      const keys=set.list.map(s=>srcKey(s.name));
+      const hid=hiddenSrc().filter(k=>!keys.includes(k));
+      try{localStorage.setItem(HIDE_KEY,JSON.stringify(hid));localStorage.setItem(ADMIN_SRC_SEEN,set.id);}catch{}
+    }
+    // If a source-related sheet is open, refresh it so the picks appear live.
+    try{if(document.getElementById('sourceSheet')&&document.getElementById('sourceSheet').classList.contains('on'))renderSource();}catch{}
+    try{if(document.getElementById('watchSheet')&&document.getElementById('watchSheet').classList.contains('on')&&watchTarget)renderWatch();}catch{}
+  }catch{}
+}
 // ─── ADMIN CONTROL CENTER ───────────────────────────────────────────────────
 // Reached via ?admin=1 (or openAdmin()). The panel is harmless to see — every
 // action is verified server-side against ADMIN_TOKEN, so without the token it
@@ -2123,6 +2151,17 @@ function renderAdmin(){
       <button class="parse-btn" style="flex:0 0 auto;width:auto;padding:0 16px" onclick="adminClearMessage()">Clear</button>
     </div>
 
+    <div class="dt-label" style="margin-top:18px">${icon('play')} Recommended sources</div>
+    <p class="ai-desc">Everyone starts with the built-in services hidden. Set the ones you want the whole network to have and they show up under <b>Recommended</b> in each member’s Watch — no setup on their end. They can still hide any they don’t use.</p>
+    <div id="adminSrcList"><p class="ai-desc">Loading…</p></div>
+    <input class="ai-prompt-in" id="asURL" placeholder="paste a service’s search page (or a {query} link)" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url" style="margin-top:8px" oninput="asHintName()">
+    <input class="ai-prompt-in" id="asName" placeholder="name" autocomplete="off" spellcheck="false" style="margin-top:8px">
+    <button class="src-chip" style="margin-top:8px" onclick="adminSrcAddRow()">Add source</button>
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <button class="parse-btn" style="flex:1" onclick="adminSrcPush()">Push to everyone</button>
+      <button class="parse-btn" style="flex:0 0 auto;width:auto;padding:0 16px" onclick="adminSrcClear()">Clear</button>
+    </div>
+
     <div class="dt-label" style="margin-top:18px">${icon('external')} Invite links</div>
     <p class="ai-desc">Share a link to let people join. <b>Request</b> = you approve each; <b>Auto</b> = approved on use.</p>
     <div style="display:flex;gap:8px">
@@ -2140,6 +2179,7 @@ function renderAdmin(){
     <div id="adminMembers"><p class="ai-desc">Loading…</p></div>
     <button class="chat-clear" style="margin-top:12px" onclick="setAdminToken('');renderAdmin()"><i data-ic="trash"></i> Sign out of admin</button>`;
   loadMembers();
+  loadAdminSources();
   // Register this device's push endpoint as the admin's, so join requests ping you.
   try{getPushSub().then(sub=>{if(sub)adminCall('/admin-register',{subscription:sub});});}catch{}
 }
@@ -2190,6 +2230,50 @@ async function adminSetMessage(){
 async function adminClearMessage(){
   try{const r=await adminCall('/message-set',{clear:true});toast(r&&r.ok?'Card cleared':(r&&r.error||'Failed'));
     ['msgTitle','msgBody','msgCta','msgUrl'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
+  }catch{toast('Failed');}
+}
+// ─── ADMIN: recommended sources editor ──────────────────────────────────────
+// A local draft the admin edits, then pushes as the network-wide set. Loaded
+// from the server so the panel opens showing what's currently live.
+let _adminSrcDraft=[];
+async function loadAdminSources(){
+  try{const r=await adminCall('/sources');_adminSrcDraft=(r&&r.sources&&Array.isArray(r.sources.list))?r.sources.list.slice():[];}
+  catch{_adminSrcDraft=[];}
+  renderAdminSrcRows();
+}
+function renderAdminSrcRows(){
+  const box=document.getElementById('adminSrcList');if(!box)return;
+  if(!_adminSrcDraft.length){box.innerHTML='<p class="ai-desc" style="opacity:.7">No recommended sources yet — add one below.</p>';return;}
+  const host=u=>{try{return new URL(String(u).replace(/\{[^}]+\}/g,'x')).hostname.replace(/^www\./,'');}catch{return String(u).slice(0,32);}};
+  box.innerHTML=_adminSrcDraft.map((s,i)=>`<div class="src-opt" style="display:flex;align-items:center;gap:10px">
+    <div style="flex:1;min-width:0"><div class="src-name">${escH(s.name)}</div><div class="src-sub">${escH(host(s.url))}</div></div>
+    <button class="src-chip" onclick="adminSrcRemove(${i})">Remove</button></div>`).join('');
+}
+function asHintName(){
+  const u=document.getElementById('asURL'),n=document.getElementById('asName');
+  if(!u||!n||n.value.trim())return;
+  n.value=serviceNameFromURL(u.value.trim())||'';
+}
+function adminSrcAddRow(){
+  const n=document.getElementById('asName'),u=document.getElementById('asURL');
+  if(!n||!u)return;
+  const url=templatizeSearchURL(normSrc(u.value.trim()));
+  const name=(n.value.trim())||serviceNameFromURL(url);
+  if(!/^https?:\/\//i.test(url)){toast('That doesn’t look like a website address');return;}
+  if(!name){toast('Give the service a name');return;}
+  if(_adminSrcDraft.some(s=>s.name.toLowerCase()===name.toLowerCase())){toast(`${name} is already on the list`);return;}
+  _adminSrcDraft.push({name,url});n.value='';u.value='';renderAdminSrcRows();
+}
+function adminSrcRemove(i){_adminSrcDraft.splice(i,1);renderAdminSrcRows();}
+async function adminSrcPush(){
+  if(!_adminSrcDraft.length){toast('Add at least one source, or Clear');return;}
+  try{const r=await adminCall('/sources-set',{list:_adminSrcDraft});
+    toast(r&&r.ok?`Pushed ${_adminSrcDraft.length} source${_adminSrcDraft.length>1?'s':''} to everyone`:(r&&r.error||'Failed'));
+  }catch{toast('Failed');}
+}
+async function adminSrcClear(){
+  try{const r=await adminCall('/sources-set',{clear:true});
+    if(r&&r.ok){_adminSrcDraft=[];renderAdminSrcRows();toast('Cleared for everyone');}else toast((r&&r.error)||'Failed');
   }catch{toast('Failed');}
 }
 async function adminInvite(mode){
@@ -5438,6 +5522,7 @@ function allKnownSources(){
   const seen=new Set(),out=[];
   const add=(name,kind)=>{const k=srcKey(name);if(!k||seen.has(k))return;seen.add(k);out.push({name,kind});};
   customServices().forEach(s=>add(s.name,'yours'));
+  adminSources().forEach(s=>add(s.name,'recommended'));
   PAID_SERVICES.forEach(s=>add(s.name,'subscription'));
   WATCH_PRESETS.forEach(p=>add(p.name,'free'));
   REGIONAL_SERVICES.forEach(s=>add(s.name,'regional'));
@@ -5551,18 +5636,23 @@ function customServiceURL(s,a){
   return SRC_TOKEN_RE.test(s.url)?fillSourceTokens(s.url,a,watchEpisode(a)||1):fillURL(s.url,a);
 }
 let watchTarget=null, watchOpts=[];
-const WT_TAG={mine:['Your account','wt-t-mine'],yours:['Your service','wt-t-mine'],free:['Free','wt-t-free'],sub:['Subscription','wt-t-sub'],search:['Search','wt-t-search']};
+const WT_TAG={mine:['Your account','wt-t-mine'],yours:['Your service','wt-t-mine'],reco:['Recommended','wt-t-mine'],free:['Free','wt-t-free'],sub:['Subscription','wt-t-sub'],search:['Search','wt-t-search']};
 function renderWatch(){
   const a=watchTarget, box=document.getElementById('watchBody'); if(!a||!box)return;
   const streams=a.streams||[];
   const prio=s=>{const k=s.site.toLowerCase();return subHas(k)?0:(s.free?1:2);};
   const avail=streams.slice().sort((x,y)=>prio(x)-prio(y)).map(s=>{const k=s.site.toLowerCase();return {label:s.site,url:s.url,site:k,kind:subHas(k)?'mine':(s.free?'free':'sub'),exact:true};});
   const mine=customServices().map(s=>({label:s.name,url:customServiceURL(s,a),site:s.name.toLowerCase(),kind:'yours',exact:false}));
+  // Admin-recommended services (network-wide picks) — templated like a custom
+  // service so tokens/search paths fill in the same way. Skipped if the admin's
+  // pick is a service the member already added by hand (no duplicate row).
+  const mineKeys=new Set(customServices().map(s=>srcKey(s.name)));
+  const reco=adminSources().filter(s=>!mineKeys.has(srcKey(s.name))).map(s=>({label:s.name,url:customServiceURL(s,a),site:s.name.toLowerCase(),kind:'reco',exact:false}));
   const cat=WATCH_PRESETS.map(p=>({label:p.name,url:fillURL(p.url,a),site:p.name.toLowerCase(),kind:'search',exact:false}));
   // Hidden sources are gone from every show; renames apply everywhere at once.
   const dress=list=>list.filter(o=>!isHiddenSrc(o.label)).map(o=>({...o,label:srcLabel(o.label)}));
-  const myShown=dress(mine), availShown=dress(avail), catShown=dress(cat);
-  watchOpts=myShown.concat(availShown,catShown);
+  const myShown=dress(mine), recoShown=dress(reco), availShown=dress(avail), catShown=dress(cat);
+  watchOpts=myShown.concat(recoShown,availShown,catShown);
   const row=(o,i)=>{const[tl,tc]=WT_TAG[o.kind]||WT_TAG.search;return `<button class="wt-opt${legalPref()===o.site?' on':''}" onclick="watchOpen(${i})">
     <div class="wt-main"><div class="wt-name">${escH(o.label)}</div><div class="wt-sub">${o.exact?'straight to the show':'opens a title search'}</div></div>
     <span class="wt-tag ${tc}">${tl}</span></button>`;};
@@ -5573,9 +5663,10 @@ function renderWatch(){
   box.innerHTML=`<p class="ai-desc">Where do you want to watch <b>${escH(a.title)}</b>? Tap one and it remembers — next time it opens there automatically.</p>`
     +nudge
     +sec(myShown.length?'Your services':'',myShown,0)
-    +sec(availShown.length?'Available now — official':'',availShown,myShown.length)
-    +sec('Free — search',catShown,myShown.length+availShown.length)
-    +(availShown.length||myShown.length?'':'<p class="ai-desc" style="margin-top:10px">Nothing here yet — your services start hidden. Tap <b>Sources</b> in the bottom bar to unhide the ones you use or add your own.</p>');
+    +sec(recoShown.length?'Recommended':'',recoShown,myShown.length)
+    +sec(availShown.length?'Available now — official':'',availShown,myShown.length+recoShown.length)
+    +sec('Free — search',catShown,myShown.length+recoShown.length+availShown.length)
+    +(availShown.length||myShown.length||recoShown.length?'':'<p class="ai-desc" style="margin-top:10px">Nothing here yet — your services start hidden. Tap <b>Sources</b> in the bottom bar to unhide the ones you use or add your own.</p>');
 }
 // ─── IN-APP PLAYER ──────────────────────────────────────────────────────────
 // Plays inline ONLY where the host publishes an embed API and licenses it —
@@ -6218,7 +6309,7 @@ function markWatchedPrompt(id,ep,title){
 function autoMarkWatched(id,ep){
   const prev=applyWatched(id,ep);if(!prev)return;
   const a=anime.find(x=>x.id===id);const finished=a&&a.status==='finished'&&prev.status!=='finished';
-  showMWBar(finished?`🎉 Finished — marked <b>${a.epTotal} episodes</b> watched`:`Marked <b>Ep ${ep}</b> watched`,'Undo',()=>{
+  showMWBar(finished?`Finished — marked <b>${a.epTotal} episodes</b> watched`:`Marked <b>Ep ${ep}</b> watched`,'Undo',()=>{
     const x=anime.find(y=>y.id===id);if(x){x.ep=prev.ep;x.status=prev.status;touch(x);save();render();if(detailId===id)renderDetail();}
     toast('Undone');
   });
@@ -7296,6 +7387,7 @@ try{captureGateTest();captureInvite();}catch{}
 (async()=>{try{await networkGate();}catch{}})();
 // Admin on-screen card: fetch on load and when the app regains focus.
 try{setTimeout(fetchAdminCard,1400);window.addEventListener('focus',()=>{try{fetchAdminCard();}catch{}});}catch{}
+try{setTimeout(fetchAdminSources,1600);window.addEventListener('focus',()=>{try{fetchAdminSources();}catch{}});}catch{}
 // Admin nav button appears only where your token is stored (your device only).
 try{injectAdminNav();}catch{}
 // Unlock admin the first time: PRESS AND HOLD the WatchList logo ~0.7s. A hold is

@@ -240,6 +240,16 @@ Previously a custom source always framed and a preset always opened, so the same
 and a custom source that blocks framing (TVING, Prime, Crunchyroll…) rendered a
 black rectangle.
 
+**Admin-recommended sources.** Built-in services are hidden by default (clean
+Watch sheet). An admin curates a network-wide set from the admin panel, pushed
+to the notify worker (`POST /sources-set`, admin-token-gated; stored at
+`cfg:sources`). Clients pull it (`POST /sources`) on boot and focus, cache it in
+`localStorage` (`admin_sources`), and surface it as a **Recommended** group in
+the Watch sheet. Each push carries an `id`; a new id unhides exactly the
+recommended names once (`admin_sources_seen`), so a member's later manual hide
+sticks until the admin pushes a fresh set. Templatized like custom sources via
+`customServiceURL()`.
+
 ### What's new (§9 companion)
 Updates apply silently, so `RELEASE` in `index.html` carries a date-stamped,
 plain-language changelog and `maybeShowWhatsNew()` shows it once per version to

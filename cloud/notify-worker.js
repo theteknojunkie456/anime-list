@@ -428,6 +428,10 @@ async function handleFetch(request, env) {
       return handleMessageGet(env);
     case "/message-set":
       return handleMessageSet(body, env);
+    case "/sources":
+      return handleSourcesGet(env);
+    case "/sources-set":
+      return handleSourcesSet(body, env);
     default:
       return json({ ok: false, error: "not found" }, 404);
   }
@@ -737,6 +741,33 @@ async function handleMessageSet(body, env) {
   if (!msg.title && !msg.body) return json({ ok: false, error: "title or body required" }, 400);
   await env.SUBS.put("cfg:message", JSON.stringify(msg));
   return json({ ok: true, message: msg });
+}
+
+// ---------------------------------------------------------------------------
+// ADMIN-CURATED SOURCES — the streaming services the admin recommends to the
+// whole network. Everyone starts with the built-ins hidden (a clean Watch
+// slate), so this is how the admin seeds working sources for all 50 members at
+// once instead of each person configuring their own. Clients apply a list once
+// per id (they unhide exactly these names), then it just shows in Watch.
+// ---------------------------------------------------------------------------
+
+// Public: clients poll this for the current recommended set (no auth).
+async function handleSourcesGet(env) {
+  const raw = await env.SUBS.get("cfg:sources");
+  return json({ ok: true, sources: raw ? JSON.parse(raw) : null });
+}
+// Admin: replace (or clear) the recommended set. `list` = [{name,url}].
+async function handleSourcesSet(body, env) {
+  if (!adminOK(body, env)) return json({ ok: false, error: "unauthorized" }, 401);
+  if (body.clear) { await env.SUBS.delete("cfg:sources"); return json({ ok: true, cleared: true }); }
+  const list = (Array.isArray(body.list) ? body.list : [])
+    .map((s) => ({ name: String(s && s.name || "").slice(0, 60), url: String(s && s.url || "").slice(0, 400) }))
+    .filter((s) => s.name && /^https?:\/\//i.test(s.url))
+    .slice(0, 40);
+  if (!list.length) return json({ ok: false, error: "at least one source required" }, 400);
+  const set = { id: "s" + Date.now(), list, at: Date.now() };
+  await env.SUBS.put("cfg:sources", JSON.stringify(set));
+  return json({ ok: true, sources: set });
 }
 
 // ---------------------------------------------------------------------------

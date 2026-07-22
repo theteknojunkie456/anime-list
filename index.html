@@ -1240,6 +1240,17 @@ body.recsel .pcard{position:relative;}
     <button class="lock-btn2" onclick="closeRecovery()">I've saved it</button>
   </div>
 </div>
+<div class="lockscreen" id="joinScreen">
+  <div class="lock-card">
+    <div class="lock-emoji" id="joinEmoji">✋</div>
+    <div class="lock-title" id="joinTitle">Request to join</div>
+    <div class="lock-sub" id="joinSub">WatchList is invite-only. Send a request and you’ll get in once it’s approved.</div>
+    <input id="joinName" class="lock-in" type="text" placeholder="Your name (so they know it’s you)" autocomplete="name">
+    <button class="lock-btn" id="joinBtn" onclick="requestJoin()">Send request</button>
+    <div class="lock-err" id="joinErr"></div>
+    <a class="lock-alt" id="joinRetry" style="display:none" onclick="pollJoin(true)">Check again</a>
+  </div>
+</div>
 <div id="app">
   <div class="hdr">
     <div class="hdr-title">WatchList</div>
@@ -1922,6 +1933,73 @@ const SYNC_URL='https://watchlist-sync.muhammad-dac.workers.dev';
 // Companion Web Push worker (see enableNotify/disableNotify/notifyUpdate below).
 // NOTE: this URL is a placeholder that may be corrected at deploy — it's the ONLY place it's defined.
 const NOTIFY_URL='https://watchlist-notify.muhammad-dac.workers.dev';
+// ─── INVITE-ONLY NETWORK (client) ───────────────────────────────────────────
+// OFF by default. Flip NETWORK_GATE to true (and deploy) ONLY after you've
+// tested it and approved your own device — otherwise you wall yourself out too.
+// Safety rails baked in: existing users (anyone who already has a list) are
+// grandfathered straight through, an approval is cached so the app opens
+// instantly next time, and a network failure NEVER locks out an already-approved
+// device. The public page still opens for anyone; this gates the *experience*.
+const NETWORK_GATE=false;
+const NET_KEY='wl_device', NET_STATUS='wl_net_status', NET_INVITE='wl_invite';
+// Effective switch: the global flag OR a per-device test flag, so you can trial
+// the whole join flow on your own phone (visit with ?gate=1) before turning it
+// on for everyone. ?gate=0 clears it.
+function gateOn(){try{return NETWORK_GATE||localStorage.getItem('wl_gate_test')==='1';}catch{return NETWORK_GATE;}}
+function captureGateTest(){try{const u=new URL(location.href);if(u.searchParams.has('gate')){localStorage.setItem('wl_gate_test',u.searchParams.get('gate')==='0'?'0':'1');u.searchParams.delete('gate');history.replaceState(null,'',u.pathname+u.search+u.hash);}}catch{}}
+function wlDevice(){try{let d=localStorage.getItem(NET_KEY);if(!d){d='d'+Math.random().toString(36).slice(2)+Date.now().toString(36);localStorage.setItem(NET_KEY,d);}return d;}catch{return 'd'+Date.now();}}
+function netStatus(){try{return localStorage.getItem(NET_STATUS)||'';}catch{return '';}}
+function setNetStatus(s){try{s?localStorage.setItem(NET_STATUS,s):localStorage.removeItem(NET_STATUS);}catch{}}
+// Capture ?invite=CODE from a shared link, remember it, and clean the URL.
+function captureInvite(){
+  try{const u=new URL(location.href),c=u.searchParams.get('invite');
+    if(c){localStorage.setItem(NET_INVITE,c.slice(0,40));u.searchParams.delete('invite');history.replaceState(null,'',u.pathname+u.search+u.hash);}
+  }catch{}
+}
+async function netCall(path,body){
+  const r=await fetch(NOTIFY_URL+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})});
+  return r.json();
+}
+// The gate. Returns true if the app should stay HIDDEN behind the join screen.
+async function networkGate(){
+  if(!gateOn())return false;                              // feature off → open to all
+  if(netStatus()==='approved')return false;               // cached approval → open, revalidate below
+  // Grandfather: anyone already using the app keeps working, no request needed.
+  if(hasStoredList()||(Array.isArray(anime)&&anime.length)){setNetStatus('approved');try{netCall('/join',{deviceId:wlDevice(),name:'(existing)'});}catch{}return false;}
+  // New device → ask the network where it stands.
+  let st='unknown';
+  try{const inv=localStorage.getItem(NET_INVITE)||'';const j=await netCall('/join',{deviceId:wlDevice(),invite:inv});st=j.status||'unknown';}
+  catch{ // can't reach the server: don't trap a brand-new user in a dead wall — let them in as a local-only guest.
+    return false; }
+  if(st==='approved'){setNetStatus('approved');return false;}
+  showJoinGate(st); return true;
+}
+function showJoinGate(st){
+  const el=document.getElementById('joinScreen');if(!el)return;
+  const t=document.getElementById('joinTitle'),s=document.getElementById('joinSub'),b=document.getElementById('joinBtn'),r=document.getElementById('joinRetry'),em=document.getElementById('joinEmoji');
+  if(st==='denied'){if(em)em.textContent='🚫';if(t)t.textContent='Not approved';if(s)s.textContent='Your request wasn’t approved. Reach out to whoever shared this with you.';if(b)b.style.display='none';if(r)r.style.display='';}
+  else if(st==='pending'){if(em)em.textContent='⏳';if(t)t.textContent='Waiting for approval';if(s)s.textContent='Your request was sent. You’ll be let in as soon as it’s approved.';if(b)b.style.display='none';if(r)r.style.display='';pollJoin();}
+  else{if(em)em.textContent='✋';if(t)t.textContent='Request to join';if(b)b.style.display='';if(r)r.style.display='none';}
+  el.classList.add('on');
+}
+function hideJoinGate(){const el=document.getElementById('joinScreen');if(el)el.classList.remove('on');}
+async function requestJoin(){
+  const nm=(document.getElementById('joinName')||{}).value||'';
+  const err=document.getElementById('joinErr');if(err)err.textContent='';
+  try{const inv=localStorage.getItem(NET_INVITE)||'';const j=await netCall('/join',{deviceId:wlDevice(),name:nm,invite:inv});
+    if(j.status==='approved'){setNetStatus('approved');hideJoinGate();location.reload();return;}
+    showJoinGate('pending');
+  }catch{if(err)err.textContent='Couldn’t reach the network — try again.';}
+}
+let _pollT=null;
+async function pollJoin(once){
+  clearTimeout(_pollT);
+  try{const j=await netCall('/status',{deviceId:wlDevice()});
+    if(j.status==='approved'){setNetStatus('approved');hideJoinGate();location.reload();return;}
+    if(j.status==='denied'){showJoinGate('denied');return;}
+  }catch{}
+  if(!once)_pollT=setTimeout(pollJoin,15000);   // keep checking while they wait
+}
 const VAPID_PUBLIC='BFd59SP6lLx5EVs5QQds2HiZJNg2MO9EG8NRtlIlQcfqlP4tUCL5f6B_L8ov2liY2FkBp04TyliTn9t2fmvK43c';
 // Standard VAPID applicationServerKey decoder (URL-safe base64 → Uint8Array).
 function urlBase64ToUint8Array(b64){
@@ -6765,6 +6843,10 @@ load();try{purgeAdult();}catch{}try{if(!appLocked&&dedupeAnime())writeLocal();}c
 // After the list is up — and after the tutorial has had its chance to claim a
 // new install — tell returning users what changed in the update they just got.
 try{setTimeout(maybeShowWhatsNew,900);}catch{}
+// Invite-only network (no-op unless NETWORK_GATE is on). Capture any invite from
+// the link first, then run the gate — it overlays the app for unapproved devices.
+try{captureGateTest();captureInvite();}catch{}
+(async()=>{try{await networkGate();}catch{}})();
 try{alCatchRedirect().then(()=>{if(!appLocked)alBootSync();}).catch(()=>{});}catch{}   // returning from AniList OAuth
 if(appLocked)showLock();   // stored list is ciphertext → gate the app until unlocked
 else try{restorePlayer();}catch{}   // came back mid-stream after an iOS reload → reopen it

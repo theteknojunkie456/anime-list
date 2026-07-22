@@ -730,6 +730,35 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 .src-tag{font-size:9.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--a2);background:var(--ag);border:1px solid var(--b2);border-radius:6px;padding:2px 6px;}
 .src-sub{font-size:12px;color:var(--t3);margin-top:3px;}
 .src-picks{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px;}
+/* AI summon glow — a flowing multi-hue light that hugs the rounded screen edges,
+   in the spirit of iOS's Siri. It's a border-only aurora: a rotating conic
+   gradient, heavily blurred, masked so only the rim glows and the centre stays
+   clear. 'arming' breathes while fingers are held; 'fire' flares as it opens. */
+@property --aiAng{syntax:'<angle>';inherits:false;initial-value:0deg;}
+.ai-glow{position:fixed;inset:0;z-index:200;pointer-events:none;opacity:0;transition:opacity .3s;}
+.ai-glow::before{content:'';position:absolute;inset:0;border-radius:46px;padding:16px;
+  background:conic-gradient(from var(--aiAng),#ff2d55,#ff9500,#ffd60a,#30d158,#0a84ff,#5e5ce6,#bf5af2,#ff2d55);
+  filter:blur(17px) saturate(1.35);
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);mask-composite:exclude;}
+.ai-glow.arming{opacity:1;}
+.ai-glow.arming::before{animation:aiFlow 3.2s linear infinite,aiBreath 1.7s ease-in-out infinite;}
+.ai-glow.fire{opacity:1;animation:aiFadeOut .55s ease-out forwards;}
+.ai-glow.fire::before{animation:aiFlow 1s linear infinite;filter:blur(24px) saturate(1.6) brightness(1.6);padding:24px;}
+@keyframes aiFlow{to{--aiAng:360deg}}
+@keyframes aiBreath{0%,100%{opacity:.62;padding:14px}50%{opacity:1;padding:20px}}
+@keyframes aiFadeOut{0%{opacity:1}100%{opacity:0}}
+@media (prefers-reduced-motion:reduce){.ai-glow.arming::before,.ai-glow.fire::before{animation:aiFlow 8s linear infinite}}
+/* Collapsible section — keeps the sheet short; advanced stuff stays folded away */
+.src-fold{border:1px solid var(--b2);border-radius:12px;background:var(--bg2);margin-top:10px;overflow:hidden;}
+.src-fold>summary{list-style:none;cursor:pointer;padding:13px 14px;font-family:var(--fd);font-size:14px;font-weight:800;color:var(--t1);display:flex;align-items:center;gap:9px;}
+.src-fold>summary::-webkit-details-marker{display:none;}
+.src-fold>summary::after{content:'';margin-left:auto;width:8px;height:8px;border-right:2px solid var(--t3);border-bottom:2px solid var(--t3);transform:rotate(-45deg);transition:transform .2s;}
+.src-fold[open]>summary::after{transform:rotate(45deg);}
+.src-fold[open]>summary{border-bottom:1px solid var(--b2);}
+.src-fold>summary:active{background:var(--bg3);}
+.src-fold>*:not(summary){margin-left:14px;margin-right:14px;}
+.src-fold>*:last-child{margin-bottom:14px;}
 .src-chip{font-family:var(--fd);font-size:12.5px;font-weight:700;color:var(--t2);background:var(--bg3);border:1px solid var(--b1);border-radius:999px;padding:7px 13px;transition:border-color .15s,background .15s,color .15s;}
 .src-chip.on{border-color:var(--a);background:var(--ag);color:var(--a2);}
 .src-chip:active{transform:scale(.96);}
@@ -1218,8 +1247,11 @@ body.recsel .pcard{position:relative;}
   <button class="nbtn" onclick="openStats()"><span><i data-ic="chart"></i></span><small>Stats</small></button>
   <button class="nbtn add" onclick="openSheet_add()">＋</button>
   <button class="nbtn" onclick="openSheet('settingsSheet')"><span><i data-ic="settings"></i></span><small>Settings</small></button>
-  <button class="nbtn" onclick="openSheet('aiSheet')"><span><i data-ic="sparkles"></i></span><small>AI</small></button>
+  <button class="nbtn" onclick="openSheet('sourceSheet')"><span><i data-ic="play"></i></span><small>Sources</small></button>
 </div>
+
+<!-- AI SUMMON — edges glow while two fingers are held, then the AI opens -->
+<div class="ai-glow" id="aiGlow" aria-hidden="true"></div>
 
 <!-- OVERLAY -->
 <div class="overlay" id="overlay" onclick="closeAll()"></div>
@@ -1345,6 +1377,7 @@ body.recsel .pcard{position:relative;}
     <div class="chat-thread" id="chatThread"></div>
     <div class="chat-input-row">
       <input class="ai-prompt-in" id="chatPrompt" placeholder="Message your anime companion…" autocomplete="off" onkeydown="if(event.key==='Enter'){event.preventDefault();sendChat();}">
+      <button class="chat-send" id="chatMic" onclick="toggleDictation()" aria-label="Talk" style="display:none"><i data-ic="mic"></i></button>
       <button class="chat-send" onclick="sendChat()" aria-label="Send"><i data-ic="send"></i></button>
     </div>
     <button class="chat-clear" onclick="clearChat()"><i data-ic="plus"></i> New chat</button>
@@ -1790,6 +1823,7 @@ body.recsel .pcard{position:relative;}
 <script>
 // ─── ICONS — inline monochrome line icons (Feather/Lucide style, currentColor) ──
 const ICONS={
+mic:'<path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v4M8 23h8"/>',
 calendar:'<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
 bell:'<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>',
 'bell-off':'<path d="M8.7 3A6 6 0 0 1 18 8c0 3 .5 5 1.3 6.5"/><path d="M17 17H3s3-2 3-9a4.67 4.67 0 0 1 .3-1.7"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/><path d="M2 2l20 20"/>',
@@ -5454,53 +5488,64 @@ function renderSource(){
   const custom=streamSource(), rcustom=readSource();
   const host=u=>{try{return new URL(u.replace(/\{[^}]+\}/g,'x')).hostname;}catch{return u.slice(0,32);}};
   const chips=WATCH_PRESETS.map(p=>`<button class="src-chip${custom===p.url?' on':''}" onclick="setSource('${p.url}')">${p.name}</button>`).join('');
+  const myCount=customServices().length, hiddenCount=hiddenSrc().length;
   box.innerHTML=`
-    <div class="dt-label">${icon('play')} Watch source</div>
-    <p class="ai-desc">Where <b>Watch now</b> sends you — all <b>official, legal, and free</b> services (no paid tiers). It opens the site's search for your exact title in your browser.</p>
+    <p class="ai-desc" style="margin-top:2px">Tap <b>Watch</b> on any show and it opens where to watch. This is where you set that up — the basics are here, the rest is tucked away below.</p>
+
+    <div class="dt-label">${icon('play')} Where Watch takes you</div>
+    <p class="ai-desc">Free and legal. Opens the site's search for your exact title.</p>
     <button class="src-opt${!custom?' on':''}" onclick="setSource('')">
       <div class="src-name">Tubi <span class="src-tag">Default · Free</span></div>
-      <div class="src-sub">100% free, no account — opens Tubi's search for the title</div>
+      <div class="src-sub">No account needed</div>
     </button>
     <div class="src-picks">${chips}</div>
-    <button class="src-opt${custom&&!WATCH_PRESETS.some(p=>p.url===custom)?' on':''}" onclick="document.getElementById('srcCustom').focus()" style="margin-top:10px">
-      <div class="src-name">Your own site</div>
-      <div class="src-sub">${custom&&!WATCH_PRESETS.some(p=>p.url===custom)?'Using '+host(custom):'Paste any streaming site below'}</div>
-    </button>
-    <input class="ai-prompt-in" id="srcCustom" placeholder="your own site — or a full URL" value="${custom&&!WATCH_PRESETS.some(p=>p.url===custom)?custom.replace(/"/g,'&quot;'):''}" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url" style="margin-top:10px">
-    <div style="display:flex;gap:8px">
-      <button class="parse-btn" style="flex:1" onclick="saveSource()">Use this site</button>
-      <button class="parse-btn" style="flex:0 0 auto;width:auto;padding-left:16px;padding-right:16px" onclick="testSource()">${icon('search')} Test</button>
-    </div>
-    <div id="srcTest" style="display:none;margin-top:8px;padding:9px 11px;border-radius:9px;background:var(--bg2);color:var(--t2);font:12px/1.45 ui-monospace,Menlo,monospace;word-break:break-all;white-space:pre-wrap"></div>
-    <p class="ai-desc" style="margin-top:12px;font-size:11.5px">Tokens: <code>{query}</code>/<code>{title}</code>, <code>{slug}</code>, <code>{ep}</code>, <code>{titleRomaji}</code>, <code>{titleEnglish}</code>, <code>{titleNative}</code>, <code>{anilistId}</code>, <code>{malId}</code>. A <b>search</b> template — <code>https://site.com/search?keyword={query}</code> — is sturdiest (slugs &amp; domains change). Tap <b>Test</b> to preview the exact URL before saving.</p>
-    <div class="dt-label" style="margin-top:18px">${icon('play')} Your services</div>
-    <p class="ai-desc">Yours show up first in Watch. Tap to add — or paste any other site below.</p>
-    ${customServices().map(s=>`<button class="src-opt" onclick="removeCustomService('${s.id}')"><div class="src-name">${escH(s.name)} <span class="src-tag">Tap to remove</span></div><div class="src-sub">${escH(host(s.url))}</div></button>`).join('')}
-    <div class="src-picks">${REGIONAL_SERVICES
-      .filter(s=>!customServices().some(c=>c.name.toLowerCase()===s.name.toLowerCase()))
-      .map(s=>`<button class="src-chip" onclick="addRegional('${escH(s.name)}')">${escH(s.name)} <span style="opacity:.55">${escH(s.region)}</span></button>`).join('')}</div>
-    <input class="ai-prompt-in" id="csURL" placeholder="paste a search page from your service" value="" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url" style="margin-top:10px" oninput="csHintName()">
-    <input class="ai-prompt-in" id="csName" placeholder="name" value="" autocomplete="off" spellcheck="false" style="margin-top:8px">
-    <button class="parse-btn" style="margin-top:8px" onclick="addCustomServiceFromForm()">Add service</button>
-    <div class="dt-label" style="margin-top:18px">${icon('sort')} Every source</div>
-    <p class="ai-desc">Hide the ones you never use, or rename any of them. Applies to every show at once.</p>
-    ${allKnownSources().map(s=>{const off=isHiddenSrc(s.name),q=escH(s.name).replace(/'/g,"\\'");
-      const sub=[s.kind,s.unverified?'unverified — tap Test':'',off?'hidden':''].filter(Boolean).join(' · ');
-      return `<div class="src-opt" style="display:flex;align-items:center;gap:10px${off?';opacity:.45':''}" onclick="renameSrcPrompt('${q}')">
-      <div style="flex:1;min-width:0">
-        <div class="src-name">${escH(srcLabel(s.name))}${srcLabel(s.name)!==s.name?` <span class="src-tag">${escH(s.name)}</span>`:''}</div>
-        <div class="src-sub">${escH(sub)}</div>
+    ${myCount?`
+    <div class="dt-label" style="margin-top:16px">${icon('film')} Your services</div>
+    <p class="ai-desc">These show first when you tap Watch. Tap one to remove it.</p>
+    ${customServices().map(s=>`<button class="src-opt" onclick="removeCustomService('${s.id}')"><div class="src-name">${escH(s.name)} <span class="src-tag">Tap to remove</span></div><div class="src-sub">${escH(host(s.url))}</div></button>`).join('')}`:''}
+
+    <details class="src-fold" style="margin-top:16px">
+      <summary>${icon('external')} Add your own service</summary>
+      <p class="ai-desc" style="margin-top:8px">Subscribe to something we don’t list? Tap a region to add it in one go, or paste your service’s search page.</p>
+      <div class="src-picks">${REGIONAL_SERVICES
+        .filter(s=>!customServices().some(c=>c.name.toLowerCase()===s.name.toLowerCase()))
+        .map(s=>`<button class="src-chip" onclick="addRegional('${escH(s.name)}')">${escH(s.name)} <span style="opacity:.55">${escH(s.region)}</span></button>`).join('')}</div>
+      <input class="ai-prompt-in" id="csURL" placeholder="paste a search page from your service" value="" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url" style="margin-top:10px" oninput="csHintName()">
+      <input class="ai-prompt-in" id="csName" placeholder="name" value="" autocomplete="off" spellcheck="false" style="margin-top:8px">
+      <button class="parse-btn" style="margin-top:8px" onclick="addCustomServiceFromForm()">Add service</button>
+    </details>
+
+    <details class="src-fold">
+      <summary>${icon('sort')} Manage every source${hiddenCount?` <span class="src-tag">${hiddenCount} hidden</span>`:''}</summary>
+      <p class="ai-desc" style="margin-top:8px">Tap a row to rename it, or Hide the ones you never use. Applies to every show.</p>
+      ${allKnownSources().map(s=>{const off=isHiddenSrc(s.name),q=escH(s.name).replace(/'/g,"\\'");
+        const sub=[s.kind,s.unverified?'unverified — tap Test':'',off?'hidden':''].filter(Boolean).join(' · ');
+        return `<div class="src-opt" style="display:flex;align-items:center;gap:10px${off?';opacity:.45':''}" onclick="renameSrcPrompt('${q}')">
+        <div style="flex:1;min-width:0">
+          <div class="src-name">${escH(srcLabel(s.name))}${srcLabel(s.name)!==s.name?` <span class="src-tag">${escH(s.name)}</span>`:''}</div>
+          <div class="src-sub">${escH(sub)}</div>
+        </div>
+        <button class="src-chip${off?' on':''}" onclick="event.stopPropagation();toggleHiddenSrc('${q}')">${off?'Unhide':'Hide'}</button>
+      </div>`;}).join('')}
+    </details>
+
+    <details class="src-fold">
+      <summary>${icon('sort')} Advanced — custom link &amp; tokens</summary>
+      <p class="ai-desc" style="margin-top:8px">Point Watch at your own site. A <b>search</b> link is sturdiest.</p>
+      <input class="ai-prompt-in" id="srcCustom" placeholder="https://site.com/search?keyword={query}" value="${custom&&!WATCH_PRESETS.some(p=>p.url===custom)?custom.replace(/"/g,'&quot;'):''}" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url">
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="parse-btn" style="flex:1" onclick="saveSource()">Use this site</button>
+        <button class="parse-btn" style="flex:0 0 auto;width:auto;padding-left:16px;padding-right:16px" onclick="testSource()">${icon('search')} Test</button>
       </div>
-      <button class="src-chip${off?' on':''}" onclick="event.stopPropagation();toggleHiddenSrc('${q}')">${off?'Unhide':'Hide'}</button>
-    </div>`;}).join('')}
-    <p class="ai-desc" style="font-size:11.5px;opacity:.75">Tap a row to rename it.</p>
-    <div class="dt-label" style="margin-top:16px">${icon('sort')} <code>{slug}</code> spelling</div>
-    <p class="ai-desc">Which title fills <code>{slug}</code> — some sites index by romaji, some by English. Raises the direct-hit rate.</p>
-    <div class="src-picks">
-      <button class="src-chip${!slugPref()?' on':''}" onclick="setSlugPref('')">Auto</button>
-      <button class="src-chip${slugPref()==='romaji'?' on':''}" onclick="setSlugPref('romaji')">Romaji</button>
-      <button class="src-chip${slugPref()==='english'?' on':''}" onclick="setSlugPref('english')">English</button>
-    </div>
+      <div id="srcTest" style="display:none;margin-top:8px;padding:9px 11px;border-radius:9px;background:var(--bg2);color:var(--t2);font:12px/1.45 ui-monospace,Menlo,monospace;word-break:break-all;white-space:pre-wrap"></div>
+      <p class="ai-desc" style="margin-top:10px;font-size:11.5px">Tokens: <code>{query}</code>, <code>{slug}</code>, <code>{ep}</code>, <code>{titleRomaji}</code>, <code>{titleEnglish}</code>, <code>{titleNative}</code>, <code>{anilistId}</code>, <code>{malId}</code>.</p>
+      <div class="ai-desc" style="margin-top:10px"><b><code>{slug}</code> spelling</b> — some sites index by romaji, some by English.</div>
+      <div class="src-picks">
+        <button class="src-chip${!slugPref()?' on':''}" onclick="setSlugPref('')">Auto</button>
+        <button class="src-chip${slugPref()==='romaji'?' on':''}" onclick="setSlugPref('romaji')">Romaji</button>
+        <button class="src-chip${slugPref()==='english'?' on':''}" onclick="setSlugPref('english')">English</button>
+      </div>
+    </details>
     ${IS_NATIVE?`
     <div class="dt-label" style="margin-top:22px">${icon('film')} Your streaming accounts</div>
     <p class="ai-desc">Tick the services you subscribe to. On a show, <b>Watch</b> then offers <b>“Open in …”</b> for each — opening that app on your phone where you're already signed in. We never see your password, and nothing is ever pirated.</p>
@@ -6487,26 +6532,36 @@ function _updBusy(){
 // you'd explain it to a friend — what they can now do, not what the code does.
 // No version numbers or jargon in the notes; the date IS the version.
 const RELEASE={
-  v:'2026-07-20',
-  title:'Watch where you already pay',
+  v:'2026-07-21',
+  title:'Sources, your way',
   notes:[
-    'Tap <b>Watch</b> and you’ll see where a show actually is — then it remembers your pick.',
-    'Not in the US? Add <b>TVING</b>, <b>Wavve</b>, <b>iQIYI</b>, <b>JioHotstar</b> and more in one tap, or paste any service’s search page.',
+    'New <b>Sources</b> button in the bottom bar — set where <b>Watch</b> takes you.',
+    'Not in the US? Add <b>TVING</b>, <b>Wavve</b>, <b>iQIYI</b>, <b>JioHotstar</b> and more in one tap, or paste your own service. Yours show first.',
+    '<b>Hide</b> any source you never use, or <b>rename</b> any of them — across every show at once.',
     'YouTube and your own media server now play <b>inside the app</b>.',
-    'Watching somewhere else? Your progress is still tracked when you come back.',
+    'The AI moved off the bar — hold <b>two fingers</b> anywhere to summon it, then chat or tap the mic to <b>talk</b>.',
   ],
 };
 const SEEN_REL='seen_release';
+// True if this browser has ever held a list — even one locked behind a password
+// (the stored blob exists before it's decrypted). Lets "what's new" reach a
+// returning user on first rollout without mistaking them for a new install.
+function hasStoredList(){try{return !!localStorage.getItem(LSKEY)||localStorage.getItem(ENCFLAG)==='1';}catch{return false;}}
 function seenRelease(){try{return localStorage.getItem(SEEN_REL)||'';}catch{return '';}}
 function markReleaseSeen(){try{localStorage.setItem(SEEN_REL,RELEASE.v);}catch{}}
 // Only for people who were already here. A brand-new install gets the tutorial
 // instead — "what's new" is meaningless when everything is new.
 function maybeShowWhatsNew(){
   const seen=seenRelease();
-  if(!seen){markReleaseSeen();return;}          // first run → nothing is "new"
   if(seen===RELEASE.v)return;                   // already told them
   if(appLocked)return;                          // wait until they're actually in
+  // Distinguish a brand-new install from an existing user meeting this system for
+  // the first time. A returning user already has a list (or a stored one behind a
+  // lock); a fresh install has neither. Without this, the FIRST rollout would
+  // silently mark-seen and notify nobody — the one update that most needs telling.
+  const returning=!!seen || (Array.isArray(anime)&&anime.length>0) || hasStoredList();
   markReleaseSeen();
+  if(!returning)return;                          // genuinely new → the tutorial covers it
   const box=document.getElementById('newsBody');
   if(!box)return;
   box.innerHTML=`<p class="ai-desc"><b>${escH(RELEASE.title)}</b></p>`
@@ -6550,6 +6605,63 @@ try{
 
 // ─── KEYBOARD ───────────────────────────────────────────────────────────────
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeAll();closeConfirm();closeYT();}});
+
+// ─── SUMMON THE AI — two-finger hold anywhere ───────────────────────────────
+// The AI moved off the nav bar (Sources took its place), so it's reached by a
+// gesture instead: hold TWO fingers for ~600ms and the screen edges glow, then
+// the AI opens. Two fingers on purpose — one-finger holds collide with scrolling,
+// text selection, and poster long-press; two fingers almost never happen by
+// accident. Moving apart (a pinch/zoom) or lifting cancels it.
+const AI_HOLD_MS=600;
+let _aiTimer=null,_aiArmed=false,_aiStartSpread=0;
+function _spread(t){const a=t[0],b=t[1];return Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);}
+function _aiGlow(cls){const g=document.getElementById('aiGlow');if(!g)return;g.className='ai-glow'+(cls?' '+cls:'');}
+function _aiCancel(){clearTimeout(_aiTimer);_aiTimer=null;_aiArmed=false;_aiGlow('');}
+function _anySheetOpen(){return !!document.querySelector('.sheet.on')||document.getElementById('playerView')?.classList.contains('on')||document.getElementById('ytView')?.classList.contains('on');}
+document.addEventListener('touchstart',e=>{
+  if(e.touches.length!==2||_anySheetOpen()||appLocked)return;   // exactly two fingers, not mid-sheet, unlocked
+  _aiArmed=true;_aiStartSpread=_spread(e.touches);
+  _aiGlow('arming');
+  clearTimeout(_aiTimer);
+  _aiTimer=setTimeout(()=>{
+    _aiArmed=false;_aiGlow('fire');
+    try{navigator.vibrate&&navigator.vibrate(12);}catch{}
+    setTimeout(()=>{_aiGlow('');openSheet('aiSheet');setAITab('chat');},380);
+  },AI_HOLD_MS);
+},{passive:true});
+document.addEventListener('touchmove',e=>{
+  if(!_aiArmed)return;
+  // A real hold stays put; a pinch-to-zoom pulls the fingers apart — let that be zoom, not summon.
+  if(e.touches.length!==2||Math.abs(_spread(e.touches)-_aiStartSpread)>40)_aiCancel();
+},{passive:true});
+document.addEventListener('touchend',()=>{if(_aiArmed)_aiCancel();},{passive:true});
+document.addEventListener('touchcancel',_aiCancel,{passive:true});
+
+// ─── TALK TO IT — voice dictation into the chat box ─────────────────────────
+// "Chat or talk." The mic uses the browser's own speech recognition to dictate
+// into the chat input; it only appears where that's supported (Safari/Chrome),
+// so unsupported browsers just see the text box. Tap once to listen, again to
+// stop. It fills the field — the user still sends — so a misheard word is
+// fixable before it goes.
+const _SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+let _rec=null,_recOn=false;
+function toggleDictation(){
+  if(!_SR)return;
+  if(_recOn){try{_rec&&_rec.stop();}catch{}return;}
+  try{
+    _rec=new _SR();_rec.lang='en-US';_rec.interimResults=true;_rec.continuous=false;
+    const inp=document.getElementById('chatPrompt'),mic=document.getElementById('chatMic');
+    const base=inp?inp.value:'';
+    _rec.onstart=()=>{_recOn=true;if(mic)mic.classList.add('on');};
+    _rec.onerror=()=>{if(mic)mic.classList.remove('on');_recOn=false;};
+    _rec.onend=()=>{_recOn=false;if(mic)mic.classList.remove('on');};
+    _rec.onresult=e=>{let s='';for(let i=0;i<e.results.length;i++)s+=e.results[i][0].transcript;
+      if(inp)inp.value=(base?base+' ':'')+s;};
+    _rec.start();
+  }catch(e){_recOn=false;}
+}
+// Reveal the mic only if the browser can actually do speech.
+try{if(_SR){const m=document.getElementById('chatMic');if(m)m.style.display='';}}catch{}
 
 // ─── INIT ───────────────────────────────────────────────────────────────────
 try{hydrateIcons();}catch{}

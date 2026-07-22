@@ -1980,11 +1980,20 @@ const NET_KEY='wl_device', NET_STATUS='wl_net_status', NET_INVITE='wl_invite';
 // Effective switch: the global flag OR a per-device test flag, so you can trial
 // the whole join flow on your own phone (visit with ?gate=1) before turning it
 // on for everyone. ?gate=0 clears it.
-function gateTestMode(){try{return localStorage.getItem('wl_gate_test')||'';}catch{return '';}}
+// Test flag lives in sessionStorage — it clears when the tab/app closes, so a
+// preview can never permanently trap you the way a persisted flag did.
+function gateTestMode(){try{return sessionStorage.getItem('wl_gate_test')||'';}catch{return '';}}
 function gateOn(){const m=gateTestMode();return NETWORK_GATE||m==='1'||m==='force';}
 // ?gate=1 normal test · ?gate=force previews the join screen even on a device
 // that already has a list (no incognito, list untouched) · ?gate=0 turns it off.
-function captureGateTest(){try{const u=new URL(location.href);if(u.searchParams.has('gate')){const v=u.searchParams.get('gate');localStorage.setItem('wl_gate_test',v==='0'?'':(v==='force'?'force':'1'));u.searchParams.delete('gate');history.replaceState(null,'',u.pathname+u.search+u.hash);}}catch{}}
+function captureGateTest(){try{
+  // one-time cleanup of the old persisted flag that could get stuck
+  try{localStorage.removeItem('wl_gate_test');}catch{}
+  const u=new URL(location.href);
+  if(u.searchParams.has('gate')){const v=u.searchParams.get('gate');
+    if(v==='0')sessionStorage.removeItem('wl_gate_test');else sessionStorage.setItem('wl_gate_test',v==='force'?'force':'1');
+    u.searchParams.delete('gate');history.replaceState(null,'',u.pathname+u.search+u.hash);}
+}catch{}}
 function wlDevice(){try{let d=localStorage.getItem(NET_KEY);if(!d){d='d'+Math.random().toString(36).slice(2)+Date.now().toString(36);localStorage.setItem(NET_KEY,d);}return d;}catch{return 'd'+Date.now();}}
 function netStatus(){try{return localStorage.getItem(NET_STATUS)||'';}catch{return '';}}
 function setNetStatus(s){try{s?localStorage.setItem(NET_STATUS,s):localStorage.removeItem(NET_STATUS);}catch{}}
@@ -3910,34 +3919,110 @@ function parseImport(){
   // Scraped catalogue rows (JSON) go through the adapter — same box, no extra UI.
   const scraped=parseScrapedPaste(raw);
   if(scraped){importScraped(scraped);closeAll();return;}
-  const lines=raw.split('\n').map(l=>l.trim()).filter(l=>l.length>2);
-  importItems=lines.map((line,i)=>{
-    let title=line.replace(/^[\d\-\*\•\.]+\s*/,'').trim();
-    let status='plan',ep=0,rating=0;
-    if(title.includes('|')){
-      const parts=title.split('|').map(s=>s.trim()).filter(Boolean);
-      title=parts[0];
-      for(const p of parts.slice(1)){
-        const em=/(?:ep(?:isode)?s?\.?\s*)?(\d+)\s*(?:\/\s*\d+)?$/i.exec(p.replace(/ep(?:isode)?s?\.?\s*/i,''));
-        if(/watch|current|ongoing|finish|done|complet|drop|quit|plan/i.test(p))status=matchStatus(p);
-        else if(/★|star|rat/i.test(p))rating=Math.min(5,parseFloat(p.replace(/[^\d.]/g,''))||0);
-        else if(/^\s*ep/i.test(p)||/^\d+(\s*\/\s*\d+)?$/.test(p))ep=parseInt(p.replace(/[^\d]/g,' ').trim().split(/\s+/)[0])||0;
-        else if(em&&/\d/.test(p))ep=+em[1]||ep;
-      }
-    }else{
-      const m=title.match(/[-–—]\s*(watching|watch|current|ongoing|wip)\b/i);
-      const m2=title.match(/[-–—]\s*(finished|done|completed|watched|complete)\b/i);
-      const m3=title.match(/[-–—]\s*(dropped|quit)\b/i);
-      const me=title.match(/[-–—(\[]\s*ep(?:isode)?\.?\s*(\d+)/i);
-      if(m){status='watching';title=title.slice(0,m.index).trim();}
-      else if(m2){status='finished';title=title.slice(0,m2.index).trim();}
-      else if(m3){status='dropped';title=title.slice(0,m3.index).trim();}
-      if(me){ep=+me[1];if(status==='plan')status='watching';if(me.index<title.length)title=title.slice(0,me.index).trim();}
-    }
-    return{id:i,title,status,ep,rating,selected:true};
-  }).filter(x=>x.title.length>0);
+  importItems=parseMessyList(raw);
   renderPreview();
   document.getElementById('importActions').style.display=importItems.length?'flex':'none';
+}
+// Turn a messy pasted list into clean items. Understands section headers
+// ("Watching:", "## Completed", "Plan to Watch (23)") that set the status for the
+// lines under them; many separators (| , tab, " - ", " — ", " : "); episode and
+// rating in assorted shapes; list markers and dividers; and de-dupes as it goes.
+function _impStatus(w){
+  w=(w||'').toLowerCase();
+  if(/on[-\s]?hold|paused|hiatus/.test(w))return 'plan';
+  if(/plan|to[-\s]?watch|to[-\s]?read|want\s+to|backlog|queue|wishlist|ptw/.test(w))return 'plan';
+  if(/watching|currently|current|ongoing|in[-\s]?progress|reading|cw\b/.test(w))return 'watching';
+  if(/finish|complet|\bdone\b|watched|\bread\b|\bcompleted\b/.test(w))return 'finished';
+  if(/drop|quit|abandon/.test(w))return 'dropped';
+  return '';
+}
+// A section header is a line that IS a status phrase — nothing else. Must match
+// start-to-end, so "Bleach - dropped" (a title) is NOT mistaken for a header.
+// Strips markdown/list markers and a trailing "(12)" count first.
+const _HDR_RE=/^(?:currently\s+)?(?:watching|watched|completed?|finished|in\s+progress|plan(?:ned|ning)?(?:\s+to\s+(?:watch|read))?|to\s+(?:watch|read)|ptw|cw|dropped|on[-\s]?hold|paused|hiatus|reading|to\s+read|favou?rites?|watch\s*list|read\s*list)$/i;
+function _impHeader(line){
+  if(/\|/.test(line))return '';
+  const h=line.replace(/^[#>*\-–—\s]+/,'').replace(/[*_~`]/g,'').replace(/\(\s*\d+\s*\)\s*$/,'').replace(/[:：\s]+$/,'').trim();
+  if(!h||!_HDR_RE.test(h))return '';
+  return _impStatus(h)||'';
+}
+function _impLine(line,ctx){
+  line=line.replace(/^\s*(?:\d+[.)]\s+|[-*•·▪‣>]\s+)/,'').trim();   // strip list markers
+  if(!line||/^[-=_*~#]{2,}\s*$/.test(line))return null;             // blank / divider
+  let parts;
+  if(/\|/.test(line))parts=line.split('|');
+  else if(/\t/.test(line))parts=line.split('\t');
+  else if(/\s[-–—:：]\s/.test(line))parts=line.split(/\s[-–—:：]\s/);
+  else parts=[line];
+  let title=parts[0].trim();
+  // Shorthand tags in ()/[] at the end:
+  //   w · wt · webtoon · manga · novel · ln → it's a comic → the Reading list
+  //   m · movie · film · anime movie · ova  → keep it (a movie), just drop the tag
+  //   g · game · ps2 · pc · xbox · switch   → not anime/manga → skip the line
+  let isRead=false,skip=false;
+  const mk=title.match(/[\(\[]\s*(wt|w|webtoon|toon|manga|novel|ln|light\s*novel|r|reading|m|movie|film|anime\s*movie|ova|g|game|ps[0-9]?|pc|xbox|switch)\s*[\)\]]\s*$/i);
+  if(mk){const t=mk[1].toLowerCase().replace(/\s+/g,'');
+    if(/^(wt|w|webtoon|toon|manga|novel|ln|lightnovel|r|reading)$/.test(t))isRead=true;
+    else if(/^(g|game|ps[0-9]?|pc|xbox|switch)$/.test(t))skip=true;
+    // movie tags fall through — kept, just stripped
+    title=title.slice(0,mk.index).trim();
+  }
+  if(skip)return null;
+  const attrs=parts.slice(1).join(' • '), hay=attrs||line;
+  // status: attributes → inline (finished)/": done" on the title → section context.
+  let status=_impStatus(attrs);
+  if(!status){const pm=title.match(/[\(\[]\s*(plan\w*|watch\w*|current|ongoing|finish\w*|complet\w*|done|watched|drop\w*|quit|on[-\s]?hold|paused)\s*[\)\]]/i);
+    if(pm)status=_impStatus(pm[1]);}
+  if(!status){const tm=title.match(/[-–—:：|]\s*(done|watched|watching|finished|completed?|dropped|reading|plan\w*)\s*$/i);
+    if(tm)status=_impStatus(tm[1]);}
+  if(!status)status=ctx||'plan';
+  // episode: "ep 5", "episode 5", "e5", "#5", "5/12"
+  let ep=0,em=hay.match(/\b(?:ep(?:isode)?s?\.?\s*|e|#)\s*(\d{1,4})(?:\s*\/\s*\d+)?\b/i)||attrs.match(/\b(\d{1,4})\s*\/\s*\d+\b/);
+  if(em)ep=parseInt(em[1],10)||0;
+  // rating: "4/5", "★4", "8/10", "rated 4"
+  let rating=0,rm=hay.match(/(?:★|rated?\s*)\s*(\d(?:\.\d)?)|(\d(?:\.\d)?)\s*(?:\/\s*5|★|stars?)/i);
+  if(rm)rating=Math.min(5,parseFloat(rm[1]||rm[2])||0);
+  else{const r10=hay.match(/\b(\d{1,2}(?:\.\d)?)\s*\/\s*10\b/);if(r10)rating=Math.round(parseFloat(r10[1])/2*10)/10;}
+  // Scrub leftover attributes the split didn't peel off — a trailing "(finished)",
+  // "★5", "9/10", "ep 12", or ": done" — while leaving numbers that belong to the
+  // title (86, Gundam 00, Mob Psycho 100) intact, since those carry no ep/rating cue.
+  title=title
+    .replace(/[\(\[]\s*(?:plan\w*|watch\w*|current|ongoing|finish\w*|complet\w*|done|watched|drop\w*|quit|on[-\s]?hold|paused|hiatus)\s*[\)\]]/ig,' ')
+    .replace(/★+\s*\d(?:\.\d)?/g,' ')
+    .replace(/(?:^|\s)\d{1,2}(?:\.\d)?\s*\/\s*(?:5|10)(?=\s|$)/g,' ')
+    .replace(/(?:^|\s)(?:ep(?:isode)?s?\.?|e)\s*\d{1,4}(?:\s*\/\s*\d+)?(?=\s|$)/ig,' ')
+    .replace(/[-–—:：|]\s*(?:done|watched|watching|finished|completed?|dropped|reading|plan\w*)\s*$/i,'')
+    .replace(/\s{2,}/g,' ').replace(/\s*[|\-–—:：(\[]\s*$/,'').trim();
+  if(!title||/^\d+$/.test(title)||title.length<2)return null;
+  // Common list-title banners aren't shows.
+  if(/^(?:my\s+)?(?:anime|manga)?\s*(?:watch\s*)?list$/i.test(title))return null;
+  return {title:_titleCase(title),status,ep,rating,kind:isRead?'read':''};
+}
+// Tidy capitalization on messy input ("dr stone" → "Dr Stone") without wrecking
+// stylised names: any word that already contains a capital is left alone (JoJo,
+// Re:Zero, FMA), and minor words stay lowercase unless they lead.
+const _MINOR=new Set(['of','the','in','on','to','a','an','and','or','no','ga','wa','ni','vs','de','wo']);
+function _titleCase(s){
+  let wi=0;
+  return s.split(/(\s+)/).map(tok=>{
+    if(/^\s+$/.test(tok)||!tok)return tok;
+    const first=(wi++)===0;
+    if(/[A-Z]/.test(tok))return tok;                 // already stylised → keep
+    const lw=tok.toLowerCase();
+    if(!first&&_MINOR.has(lw))return lw;
+    return tok.charAt(0).toUpperCase()+tok.slice(1);
+  }).join('');
+}
+function parseMessyList(raw){
+  const out=[],seen=new Set();let ctx='plan';
+  for(const rawLine of raw.split(/\r?\n/)){
+    const line=rawLine.trim(); if(!line)continue;
+    const hs=_impHeader(line); if(hs){ctx=hs;continue;}
+    const it=_impLine(line,ctx); if(!it)continue;
+    const key=normTitle(it.title); if(!key||seen.has(key))continue; seen.add(key);
+    out.push({id:out.length,title:it.title,status:it.status,ep:it.ep,rating:it.rating,kind:it.kind||'',selected:true});
+  }
+  return out;
 }
 function renderPreview(){
   const existing=new Set(anime.map(a=>a.title.toLowerCase().trim()));
@@ -4628,11 +4713,11 @@ function doImport(){
   const toAdd=[];
   for(const x of importItems){
     if(!x.selected)continue;
-    const keys=dupeKeys({title:x.title,kind:viewKind});   // paste has no ids → match on normalized title
+    const keys=dupeKeys({title:x.title,kind:x.kind||viewKind});   // paste has no ids → match on normalized title
     if(keys.some(k=>have.has(k)))continue;
     keys.forEach(k=>have.add(k));toAdd.push(x);
   }
-  toAdd.forEach(item=>anime.unshift({id:uid(),title:item.title,status:item.status,kind:viewKind,ep:item.ep||0,rating:item.rating||0,fav:false,eps:'',epTotal:0,time:'',genre:'',order:[],notes:'',img:'',upd:Date.now()}));
+  toAdd.forEach(item=>anime.unshift({id:uid(),title:item.title,status:item.status,kind:item.kind||viewKind,ep:item.ep||0,rating:item.rating||0,fav:false,eps:'',epTotal:0,time:'',genre:'',order:[],notes:'',img:'',upd:Date.now()}));
   dedupeAnime();save();closeAll();render();
   const dupes=importItems.filter(x=>x.selected).length-toAdd.length;
   toast(`Added ${toAdd.length}${dupes?` · ${dupes} already had`:''}`);
@@ -4732,8 +4817,12 @@ function maybeShowTutorial(){
   showOnb();   // brand-new install → the swipeable welcome + setup flow
 }
 // ─── ONBOARDING (swipeable welcome + setup) ─────────────────────────────────
+const _iOS=/iP(hone|ad|od)/.test(navigator.userAgent)||(/Macintosh/.test(navigator.userAgent)&&navigator.maxTouchPoints>1);
 const ONB=[
   {ic:'sparkles',oc:'#c084fc',title:'Welcome to WatchList',body:'Track every anime & manga, see the total time to binge a whole series, watch on free legal sources, and swap recommendations with friends — all in one place.'},
+  {ic:'upload',oc:'#4dabf7',imp:'Recommended',title:'Add to your Home Screen',body:_iOS
+    ? 'Tap the <b>Share</b> button in Safari’s toolbar (the box with an ↑), scroll down, and tap <b>Add to Home Screen</b>. WatchList then opens full-screen like a real app — and on iPhone it’s the <b>only</b> way episode alerts can reach you.'
+    : 'Open your browser’s menu and tap <b>Install app</b> (or <b>Add to Home screen</b>). WatchList opens full-screen like a real app, and notifications work.'},
   {ic:'cloud',oc:'#4dabf7',imp:'Recommended',title:'Never lose your list',body:'Your list lives on this device. Turn on <b>Cloud backup</b> for a key that restores it anywhere. <b>Save that key somewhere safe</b> — your Notes app is perfect. It\'s the only way back.',cta:{label:'Set up backup',sheet:'backupSheet'}},
   {ic:'lock',oc:'#51cf66',title:'Lock your list',body:'Add a <b>password</b> and everything gets encrypted. You\'ll get a one-time <b>recovery key</b> — the only way in if you forget the password. Save both.',cta:{label:'Set a password',sheet:'securitySheet'}},
   {ic:'key',oc:'#ffd43b',title:'Unlock with a glance',body:'Once a password is set, open the app with <b>Face ID</b> instead of typing it every time.',cta:{label:'Set up Face ID',sheet:'securitySheet'}},

@@ -3644,8 +3644,15 @@ function matchStatus(w){
   if(/drop|quit|abandon/.test(w))return'dropped';
   return'plan';
 }
+// A list that got URL-encoded somewhere in a copy/paste round-trip (spaces as
+// %20, the "|" separator as %7C, newlines as %0A) is still your list — decode it
+// so it imports cleanly instead of coming in as one garbled line.
+function maybeDecodeList(t){
+  if(!/%(20|7C|0A|3A|27|21|2C)/i.test(t))return t;   // looks percent-encoded
+  try{const d=decodeURIComponent(t.replace(/\+/g,' '));return d.includes('|')||d.includes('\n')?d:t;}catch{return t;}
+}
 function parseImport(){
-  const raw=document.getElementById('importPaste').value.trim();
+  const raw=maybeDecodeList(document.getElementById('importPaste').value.trim());
   if(!raw){toast('Paste something first');return;}
   // Scraped catalogue rows (JSON) go through the adapter — same box, no extra UI.
   const scraped=parseScrapedPaste(raw);

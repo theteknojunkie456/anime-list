@@ -1196,6 +1196,16 @@ body.recsel .pcard{position:relative;}
 .pcard-fav .ico{fill:currentColor;}
 .dt-fav.on .ico{fill:currentColor;}
 .empty-icon .ico{width:1em;height:1em;vertical-align:-0.08em;}
+/* Popular shelf — horizontal poster rail on the empty home */
+.pop-shelf{display:grid;grid-auto-flow:column;grid-auto-columns:112px;gap:12px;overflow-x:auto;padding:2px 2px 10px;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;}
+.pop-shelf::-webkit-scrollbar{display:none;}
+.pop-card{scroll-snap-align:start;background:none;border:none;padding:0;cursor:pointer;text-align:left;display:flex;flex-direction:column;gap:7px;}
+.pop-cover{width:112px;height:158px;border-radius:12px;background:var(--bg2) center/cover no-repeat;border:1px solid var(--b2);box-shadow:0 6px 16px rgba(0,0,0,.28);position:relative;transition:transform .15s;}
+.pop-cover::after{content:'＋';position:absolute;right:6px;bottom:6px;width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,var(--a1),var(--a2));color:#fff;font-size:17px;font-weight:700;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 8px rgba(0,0,0,.35);}
+.pop-card:active .pop-cover{transform:scale(.95);}
+.pop-name{font-size:12px;color:var(--t2);line-height:1.3;max-width:112px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.pop-loading{color:var(--t3);font-size:13px;display:flex;align-items:center;gap:8px;padding:20px 2px;}
+.pop-loading svg{width:16px;height:16px;animation:spin 1s linear infinite;}
 .sched-spin .ico{width:1em;height:1em;}
 .sched-bell .ico{width:1em;height:1em;vertical-align:-0.12em;}
 /* FOR YOU (recommendations) */
@@ -3270,7 +3280,11 @@ function renderHome(){
   if(!pool.length){
     el.innerHTML=isRead
       ?`<div class="empty"><div class="empty-icon">${icon('book')}</div><p>Your reading list is empty.<br>Add a manhwa, webtoon, manga or light novel — tap ＋ and choose Read.</p><button class="hero-cta" onclick="openSheet_add()">＋ Add something to read</button></div>`
-      :`<div class="empty"><div class="empty-icon">${icon('inbox')}</div><p>Your list is empty.<br>Add a title or import your whole list from Notes in one paste.</p><button class="hero-cta" onclick="openSheet('importSheet')">${icon('clipboard')} Import a list</button></div>`;
+      :`<div class="empty"><div class="empty-icon">${icon('inbox')}</div><p>Your list is empty.<br>Add a title or import your whole list from Notes in one paste.</p><button class="hero-cta" onclick="openSheet('importSheet')">${icon('clipboard')} Import a list</button></div>
+         <div class="dt-label" style="margin:26px 0 2px">${icon('trophy')} Popular right now — tap to add</div>
+         <p class="ai-desc" style="margin-bottom:12px">New here? Start with what everyone’s watching.</p>
+         <div class="pop-shelf" id="popularShelf"><div class="pop-loading">${icon('loader')} Loading…</div></div>`;
+    if(!isRead)loadPopularShelf();
     return;
   }
   const watching=sorted(pool.filter(a=>a.status==='watching'));
@@ -4049,6 +4063,36 @@ ${raw.slice(0,6000)}`;
     toast('AI cleanup didn’t work — using the plain parse');
     parseImport();   // fall back to the reliable regex import
   }finally{ if(btn){btn.disabled=false;btn.innerHTML=was;} }
+}
+// ─── POPULAR SHELF (empty-state onboarding) ─────────────────────────────────
+// A newbie with no list shouldn't hit a dead end. Pull what's genuinely popular
+// from AniList (so it stays fresh on its own) and let them tap to add. Cached
+// for the session so it doesn't refetch on every render.
+let _popCache=null;
+async function loadPopularShelf(){
+  const box=document.getElementById('popularShelf'); if(!box)return;
+  try{
+    if(!_popCache){
+      const q=`query{Page(perPage:14){media(type:ANIME,sort:POPULARITY_DESC,isAdult:false){id title{romaji english} coverImage{large} episodes}}}`;
+      const r=await fetch('https://graphql.anilist.co',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query:q})});
+      const d=await r.json(); _popCache=(((d.data||{}).Page||{}).media||[]);
+    }
+    if(!_popCache.length){box.innerHTML='';return;}
+    box.innerHTML=_popCache.map(m=>{
+      const t=(m.title.english||m.title.romaji||'').replace(/'/g,'&#39;');
+      const img=(m.coverImage||{}).large||'';
+      return `<button class="pop-card" onclick="addPopular(${m.id},'${t.replace(/"/g,'&quot;')}','${img}',${m.episodes||0})">
+        <div class="pop-cover" style="background-image:url('${img}')"></div>
+        <div class="pop-name">${escH(m.title.english||m.title.romaji||'')}</div></button>`;
+    }).join('');
+  }catch(e){box.innerHTML='';}
+}
+function addPopular(aniId,title,img,eps){
+  const t=String(title||'').trim(); if(!t)return;
+  if(anime.some(a=>a.aniId===aniId||normTitle(a.title)===normTitle(t))){toast(`“${t}” is already on your list`);return;}
+  anime.unshift({id:uid(),title:t,status:'plan',kind:'watch',ep:0,epTotal:eps||0,rating:0,fav:false,eps:'',time:'',genre:'',order:[],notes:'',img:img||'',aniId,upd:Date.now()});
+  dedupeAnime();save();render();setTimeout(fetchCovers,300);
+  toast(`Added “${t}” to Plan`);
 }
 function parseMessyList(raw){
   const out=[],seen=new Set();let ctx='plan';

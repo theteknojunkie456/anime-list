@@ -816,6 +816,8 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 .pt-chip{display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;color:var(--t1);background:var(--bg3);border:1px solid var(--b1);border-radius:999px;padding:6px 12px;}
 .pt-chip .dot{width:7px;height:7px;border-radius:50%;background:#3ecf7e;box-shadow:0 0 6px #3ecf7e;}
 .pt-chip.host .dot{background:var(--a2);box-shadow:0 0 6px var(--a2);}
+.pt-host{display:inline-flex;margin-left:4px;}
+.pt-host .ico{width:11px;height:11px;color:var(--a2);}
 .pt-now{display:flex;align-items:center;gap:11px;background:var(--bg3);border:1px solid var(--b1);border-radius:14px;padding:11px 13px;margin-bottom:12px;}
 .pt-now img{width:44px;height:62px;border-radius:8px;object-fit:cover;flex-shrink:0;background:var(--bg4);}
 .pt-now-t{font-family:var(--fd);font-size:14px;font-weight:800;color:var(--t1);}
@@ -1005,6 +1007,7 @@ body.recsel .pcard{position:relative;}
 .tswatch{position:relative;height:52px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:17px;}
 .tswatch::after{content:'';position:absolute;inset:0;background:linear-gradient(to bottom,transparent 40%,rgba(0,0,0,0.5));}
 .tswatch span{position:relative;z-index:1;}
+.tswatch .tinit{font-family:var(--fd);font-weight:900;font-size:19px;line-height:1;}
 .taccent-bar{width:20px;height:2.5px;border-radius:2px;position:relative;z-index:1;}
 .tdel{position:absolute;top:2px;right:2px;width:22px;height:22px;border-radius:50%;background:rgba(0,0,0,0.6);color:#fff;font-size:11px;display:flex;align-items:center;justify-content:center;z-index:2;}
 .tname{font-size:9.5px;font-weight:800;text-align:center;padding:6px 2px;color:var(--t2);text-transform:uppercase;letter-spacing:0.04em;background:var(--bg3);}
@@ -1848,10 +1851,7 @@ body.recsel .pcard{position:relative;}
   </div>
   <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--b1);">
     <div class="flabel" style="margin-bottom:10px">Make your own</div>
-    <div style="display:flex;gap:8px;margin-bottom:12px;">
-      <input class="finput" id="ctName" placeholder="Theme name…" maxlength="14" style="flex:1" autocomplete="off">
-      <input class="finput" id="ctEmoji" placeholder="✨" maxlength="2" style="width:56px;text-align:center" autocomplete="off">
-    </div>
+    <input class="finput" id="ctName" placeholder="Theme name…" maxlength="14" style="width:100%;margin-bottom:12px" autocomplete="off">
     <div style="display:flex;gap:16px;align-items:flex-end;">
       <label class="cpick-lbl">Accent<input type="color" class="cpick" id="ctAccent" value="#e03d55"></label>
       <label class="cpick-lbl">Background<input type="color" class="cpick" id="ctBg" value="#111114"></label>
@@ -2869,13 +2869,13 @@ function openNotifySheet(){openSheet('notifySheet');renderNotifyUI();}
 
 // ─── THEMES ────────────────────────────────────────────────────────────────
 const THEMES=[
-  {id:'default', name:'Default', emoji:'🌑', bg:'#111114', accent:'#e03d55'},
-  {id:'naruto',  name:'Naruto',  emoji:'🍥', bg:'#0e0f18', accent:'#f57800'},
-  {id:'sasuke',  name:'Sasuke',  emoji:'⚡', bg:'#0b0b18', accent:'#7730e8'},
-  {id:'luffy',   name:'Luffy',   emoji:'🏴‍☠️',bg:'#0b1420', accent:'#d03838'},
-  {id:'sanji',   name:'Sanji',   emoji:'🔥', bg:'#0c1016', accent:'#c89a0e'},
-  {id:'zoro',    name:'Zoro',    emoji:'⚔️', bg:'#0a140c', accent:'#26a040'},
-  {id:'chopper', name:'Chopper', emoji:'🦌', bg:'#150f1c', accent:'#d84872'},
+  {id:'default', name:'Default', bg:'#111114', accent:'#e03d55'},
+  {id:'naruto',  name:'Naruto',  bg:'#0e0f18', accent:'#f57800'},
+  {id:'sasuke',  name:'Sasuke',  bg:'#0b0b18', accent:'#7730e8'},
+  {id:'luffy',   name:'Luffy',   bg:'#0b1420', accent:'#d03838'},
+  {id:'sanji',   name:'Sanji',   bg:'#0c1016', accent:'#c89a0e'},
+  {id:'zoro',    name:'Zoro',    bg:'#0a140c', accent:'#26a040'},
+  {id:'chopper', name:'Chopper', bg:'#150f1c', accent:'#d84872'},
 ];
 function customThemes(){try{const s=store();return JSON.parse((s&&s.getItem('custom_themes'))||'[]');}catch{return[];}}
 function setCustomThemes(l){try{const s=store();if(s)s.setItem('custom_themes',JSON.stringify(l));}catch{}}
@@ -2994,8 +2994,7 @@ function applyTheme(id,persist=true){
 }
 function saveCustomTheme(){
   const name=(document.getElementById('ctName').value.trim()||'Custom').replace(/[<>"'&]/g,'').slice(0,14);
-  const emoji=(document.getElementById('ctEmoji').value.trim()||'✨').replace(/[<>"'&]/g,'').slice(0,4);
-  const t={id:'c'+uid(),name,emoji,accent:document.getElementById('ctAccent').value,bg:document.getElementById('ctBg').value};
+  const t={id:'c'+uid(),name,accent:document.getElementById('ctAccent').value,bg:document.getElementById('ctBg').value};
   setCustomThemes([...customThemes(),t]);
   document.getElementById('ctName').value='';
   applyTheme(t.id);
@@ -3017,7 +3016,7 @@ function renderThemeGrid(){
     return `
     <button class="topt${curTheme===t.id?' on':''}" onclick="applyTheme('${t.id}')">
       <div class="tswatch" style="background:linear-gradient(135deg,${sbg} 0%,${sbg}dd 100%)">
-        <span>${t.emoji}</span>
+        <span class="tinit" style="color:${t.accent}">${escH(((t.name||'?').trim()[0]||'?').toUpperCase())}</span>
         <div class="taccent-bar" style="background:${t.accent}"></div>
         ${t.custom?`<div class="tdel" onclick="event.stopPropagation();deleteCustomTheme('${t.id}')">${icon('x')}</div>`:''}
       </div>
@@ -4829,7 +4828,7 @@ function renderParty(){
   }
   const r=partyRoom||{members:[],chat:[]};
   const meUid=partyUid();
-  const members=r.members.map(m=>`<span class="pt-chip${m.uid===r.host?' host':''}"><span class="dot"></span>${schEsc(m.name)}${m.uid===r.host?' 👑':''}</span>`).join('');
+  const members=r.members.map(m=>`<span class="pt-chip${m.uid===r.host?' host':''}"><span class="dot"></span>${schEsc(m.name)}${m.uid===r.host?`<span class="pt-host">${icon('star')}</span>`:''}</span>`).join('');
   const now=r.title?`<div class="pt-now">${r.img?`<img src="${r.img}" alt="">`:''}<div><div class="pt-now-t">${schEsc(r.title)}</div><div class="pt-now-s">${r.ep?`Episode ${r.ep}`:'Ready'} · ${r.members.length} watching</div></div></div>`:'';
   let hostCtl='';
   const sharing=!!r.sharing, iShare=r.sharing===meUid;
@@ -4894,7 +4893,7 @@ function renderParty(){
     <div class="pt-members">${members}</div>
     ${now}${queueBlock}${hostCtl}
     <div class="pt-reactbar">${PARTY_EMOJI.map(e=>`<button class="pt-react" onclick="partyReact('${e}')">${e}</button>`).join('')}</div>
-    <div class="pt-chat" id="ptChat">${chat||'<div class="pt-sys">Say hi 👋</div>'}</div>
+    <div class="pt-chat" id="ptChat">${chat||'<div class="pt-sys">Say hi</div>'}</div>
     <div class="pt-chatbar"><input id="ptMsg" placeholder="Message…" maxlength="300" onkeydown="if(event.key==='Enter')partySend()"><button class="pt-send" onclick="partySend()">${icon('send')}</button></div>
     <button class="src-opt" style="margin-top:14px" onclick="partyEnd()"><div class="src-name" style="color:var(--t2)">${partyIsHost?'End the party':'Leave the party'}</div></button>`;
   const cc=document.getElementById('ptChat');if(cc)cc.scrollTop=cc.scrollHeight;

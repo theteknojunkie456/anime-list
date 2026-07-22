@@ -1283,7 +1283,7 @@ body.recsel .pcard{position:relative;}
 </div>
 <div id="app">
   <div class="hdr">
-    <div class="hdr-title">WatchList</div>
+    <div class="hdr-title" onclick="adminTap()">WatchList</div>
     <div class="hdr-actions">
       <button class="hbtn friend-only" onclick="openFriends()" title="Friends" aria-label="Friends"><i data-ic="users"></i></button>
       <button class="hbtn party-only" onclick="openSheet('partySheet')" title="Watch party" aria-label="Watch party"><i data-ic="users"></i></button>
@@ -2078,6 +2078,24 @@ const ADMIN_TK='wl_admin_token';
 function adminToken(){try{return localStorage.getItem(ADMIN_TK)||'';}catch{return '';}}
 function setAdminToken(t){try{t?localStorage.setItem(ADMIN_TK,t):localStorage.removeItem(ADMIN_TK);}catch{}}
 function openAdmin(){renderAdmin();openSheet('adminSheet');}
+// Secret unlock: tap the WatchList logo 5× fast to bring up admin the first time
+// (to enter your token). After that, a nav button appears — see injectAdminNav.
+let _adminTaps=0,_adminTapT=null;
+function adminTap(){
+  clearTimeout(_adminTapT);_adminTaps++;
+  if(_adminTaps>=5){_adminTaps=0;openAdmin();return;}
+  _adminTapT=setTimeout(()=>{_adminTaps=0;},1400);
+}
+// Adds an Admin button to the bottom nav — but ONLY on a device where your token
+// is stored, so it's your row and nobody else's.
+function injectAdminNav(){
+  if(!adminToken())return;
+  const nav=document.querySelector('.nav'); if(!nav||document.getElementById('nav-admin'))return;
+  const b=document.createElement('button');
+  b.className='nbtn';b.id='nav-admin';b.onclick=openAdmin;
+  b.innerHTML='<span>'+icon('users')+'</span><small>Admin</small>';
+  nav.appendChild(b);
+}
 async function adminCall(path,extra){return netCall(path,Object.assign({token:adminToken()},extra||{}));}
 function renderAdmin(){
   const box=document.getElementById('adminBody');if(!box)return;
@@ -2125,7 +2143,7 @@ function renderAdmin(){
   // Register this device's push endpoint as the admin's, so join requests ping you.
   try{getPushSub().then(sub=>{if(sub)adminCall('/admin-register',{subscription:sub});});}catch{}
 }
-function adminSaveToken(){const v=(document.getElementById('adminTkIn')||{}).value||'';if(!v.trim())return;setAdminToken(v.trim());renderAdmin();}
+function adminSaveToken(){const v=(document.getElementById('adminTkIn')||{}).value||'';if(!v.trim())return;setAdminToken(v.trim());renderAdmin();injectAdminNav();}
 async function loadMembers(){
   const box=document.getElementById('adminMembers');if(!box)return;
   let r;try{r=await adminCall('/members');}catch{box.innerHTML='<p class="ai-desc">Couldn’t reach the network.</p>';return;}
@@ -7262,7 +7280,9 @@ try{captureGateTest();captureInvite();}catch{}
 (async()=>{try{await networkGate();}catch{}})();
 // Admin on-screen card: fetch on load and when the app regains focus.
 try{setTimeout(fetchAdminCard,1400);window.addEventListener('focus',()=>{try{fetchAdminCard();}catch{}});}catch{}
-// ?admin=1 opens the control center (harmless without the token).
+// Admin nav button appears only where your token is stored (your device only).
+try{injectAdminNav();}catch{}
+// ?admin=1 still works as an alternate first-time unlock (harmless without token).
 try{if(new URL(location.href).searchParams.get('admin')==='1'){const u=new URL(location.href);u.searchParams.delete('admin');history.replaceState(null,'',u.pathname+u.search+u.hash);setTimeout(openAdmin,300);}}catch{}
 try{alCatchRedirect().then(()=>{if(!appLocked)alBootSync();}).catch(()=>{});}catch{}   // returning from AniList OAuth
 if(appLocked)showLock();   // stored list is ciphertext → gate the app until unlocked

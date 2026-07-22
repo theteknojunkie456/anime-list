@@ -408,6 +408,20 @@ async function handleFetch(request, env) {
       return handleTest(body, env);
     case "/broadcast":
       return handleBroadcast(body, env);
+    case "/join":
+      return handleJoin(body, env);
+    case "/status":
+      return handleStatus(body, env);
+    case "/members":
+      return handleMembers(body, env);
+    case "/approve":
+      return handleDecide(body, env, "approved");
+    case "/deny":
+      return handleDecide(body, env, "denied");
+    case "/invite":
+      return handleInvite(body, env);
+    case "/admin-register":
+      return handleAdminRegister(body, env);
     default:
       return json({ ok: false, error: "not found" }, 404);
   }
@@ -514,6 +528,162 @@ async function handleBroadcast(body, env) {
     await sleep(200);
   }
   return json({ ok: true, sent, dead, failed, total: subs.length });
+}
+
+// ---------------------------------------------------------------------------
+// MEMBERSHIP — invite-only network with admin approval
+// ---------------------------------------------------------------------------
+//
+// The public page opens for anyone (a static site can't stop that), but the
+// NETWORK — cloud sync, notifications, friends, admin messages — is gated to
+// devices the admin approves. Manual approval is the point: it's the bot filter
+// and it caps the network at real people you recognise.
+//
+// KV (in SUBS), all with distinct prefixes so they never collide with "sub:":
+//   dev:<deviceId>   {id,status:'pending'|'approved'|'denied',name,invite,joinedAt,decidedAt}
+//   inv:<code>       {code,mode:'request'|'auto',uses,maxUses,createdAt}
+//   admin:endpoint   the admin's push endpoint, so joins can ping just them
+//
+// deviceId is a client-generated opaque token. It isn't a secret — approval is
+// the gate, not the id — so trusting it as a KV key is fine here.
+
+const MAX_MEMBERS = 100;
+const devKey = (id) => "dev:" + String(id || "").replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 64);
+
+async function countApproved(env) {
+  let cursor, n = 0;
+  do {
+    const page = await env.SUBS.list({ prefix: "dev:", cursor });
+    for (const k of page.keys) {
+      const raw = await env.SUBS.get(k.name);
+      if (raw) { try { if (JSON.parse(raw).status === "approved") n++; } catch {} }
+    }
+    cursor = page.list_complete ? null : page.cursor;
+  } while (cursor);
+  return n;
+}
+
+// A device announces itself. New devices land 'pending' (or 'approved' if they
+// carried a valid auto-invite), and the admin is pinged once about a new request.
+async function handleJoin(body, env) {
+  const id = String(body.deviceId || "").replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 64);
+  if (!id) return json({ ok: false, error: "deviceId required" }, 400);
+  const key = devKey(id);
+  const existing = await env.SUBS.get(key);
+  if (existing) {
+    // Already known — just report status, don't re-notify.
+    const rec = JSON.parse(existing);
+    return json({ ok: true, status: rec.status, name: rec.name || "" });
+  }
+
+  // Optional invite: an 'auto' code approves on the spot (still counts toward the
+  // cap); a 'request' code just tags where they came from.
+  let status = "pending", inviteCode = "";
+  if (body.invite) {
+    const iraw = await env.SUBS.get("inv:" + String(body.invite).slice(0, 40));
+    if (iraw) {
+      const inv = JSON.parse(iraw);
+      inviteCode = inv.code;
+      if (inv.maxUses && inv.uses >= inv.maxUses) {
+        // used up — falls through as a plain pending request
+      } else {
+        inv.uses = (inv.uses || 0) + 1;
+        await env.SUBS.put("inv:" + inv.code, JSON.stringify(inv));
+        if (inv.mode === "auto" && (await countApproved(env)) < MAX_MEMBERS) status = "approved";
+      }
+    }
+  }
+
+  const rec = {
+    id, status,
+    name: String(body.name || "").slice(0, 40),
+    invite: inviteCode,
+    joinedAt: Date.now(),
+  };
+  await env.SUBS.put(key, JSON.stringify(rec));
+
+  // Ping the admin about a genuinely new pending request (best-effort).
+  if (status === "pending") {
+    try {
+      const aep = await env.SUBS.get("admin:endpoint");
+      if (aep) {
+        const asub = JSON.parse(aep);
+        await sendPush(asub, {
+          title: "WatchList — new join request",
+          body: (rec.name || "Someone") + " wants in. Open the admin panel to approve.",
+          url: "/", tag: "wl-join",
+        }, env);
+      }
+    } catch {}
+  }
+  return json({ ok: true, status });
+}
+
+// Client polls this to know whether the network is open to it yet.
+async function handleStatus(body, env) {
+  const raw = await env.SUBS.get(devKey(body.deviceId));
+  if (!raw) return json({ ok: true, status: "unknown" });
+  const rec = JSON.parse(raw);
+  return json({ ok: true, status: rec.status });
+}
+
+// --- admin-only below (all guarded by ADMIN_TOKEN) ---
+
+function adminOK(body, env) { return env.ADMIN_TOKEN && body.token === env.ADMIN_TOKEN; }
+
+// The admin's own device registers its push endpoint here, so join requests can
+// notify just them rather than broadcasting.
+async function handleAdminRegister(body, env) {
+  if (!adminOK(body, env)) return json({ ok: false, error: "unauthorized" }, 401);
+  if (!body.subscription || !body.subscription.endpoint) return json({ ok: false, error: "subscription required" }, 400);
+  await env.SUBS.put("admin:endpoint", JSON.stringify(body.subscription));
+  return json({ ok: true });
+}
+
+async function handleMembers(body, env) {
+  if (!adminOK(body, env)) return json({ ok: false, error: "unauthorized" }, 401);
+  let cursor; const devs = [];
+  do {
+    const page = await env.SUBS.list({ prefix: "dev:", cursor });
+    for (const k of page.keys) {
+      const raw = await env.SUBS.get(k.name);
+      if (raw) { try { devs.push(JSON.parse(raw)); } catch {} }
+    }
+    cursor = page.list_complete ? null : page.cursor;
+  } while (cursor);
+  devs.sort((a, b) => (b.joinedAt || 0) - (a.joinedAt || 0));
+  const approved = devs.filter((d) => d.status === "approved").length;
+  return json({ ok: true, devices: devs, approved, cap: MAX_MEMBERS });
+}
+
+async function handleDecide(body, env, status) {
+  if (!adminOK(body, env)) return json({ ok: false, error: "unauthorized" }, 401);
+  const key = devKey(body.deviceId);
+  const raw = await env.SUBS.get(key);
+  if (!raw) return json({ ok: false, error: "device not found" }, 404);
+  if (status === "approved" && (await countApproved(env)) >= MAX_MEMBERS) {
+    return json({ ok: false, error: "at capacity (" + MAX_MEMBERS + ")" }, 409);
+  }
+  const rec = JSON.parse(raw);
+  rec.status = status; rec.decidedAt = Date.now();
+  await env.SUBS.put(key, JSON.stringify(rec));
+  return json({ ok: true, status });
+}
+
+async function handleInvite(body, env) {
+  if (!adminOK(body, env)) return json({ ok: false, error: "unauthorized" }, 401);
+  // Short readable code; 'request' (default) sends a request you approve, 'auto'
+  // approves on use (for people you trust to share it).
+  const code = (Math.random().toString(36).slice(2, 8) + Math.random().toString(36).slice(2, 6)).toUpperCase();
+  const inv = {
+    code,
+    mode: body.mode === "auto" ? "auto" : "request",
+    uses: 0,
+    maxUses: Number(body.maxUses) || 0, // 0 = unlimited
+    createdAt: Date.now(),
+  };
+  await env.SUBS.put("inv:" + code, JSON.stringify(inv));
+  return json({ ok: true, code, mode: inv.mode });
 }
 
 // ---------------------------------------------------------------------------

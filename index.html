@@ -252,6 +252,9 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 .set-chev{flex-shrink:0;color:var(--t3);display:flex;}
 .set-chev .ico{width:16px;height:16px;}
 /* ── "How do I get a key" walkthrough ── */
+.key-cta{width:100%;display:flex;align-items:center;justify-content:center;gap:8px;padding:14px;border:none;border-radius:13px;background:linear-gradient(135deg,var(--a1),var(--a2));color:#fff;font-family:var(--fd);font-size:15px;font-weight:800;cursor:pointer;}
+.key-cta span{font-weight:600;font-size:12px;opacity:.85;}
+.key-cta:active{transform:scale(.98);}
 .keyhow{margin-top:14px;border-top:1px solid var(--b1);padding-top:12px;}
 .keyhow summary{font-size:12.5px;font-weight:700;color:var(--a2);cursor:pointer;list-style:none;padding:4px 0;min-height:32px;display:flex;align-items:center;}
 .keyhow summary::-webkit-details-marker{display:none;}
@@ -1432,8 +1435,12 @@ body.recsel .pcard{position:relative;}
     <div class="sheet-title"><i data-ic="key"></i> AI Key</div>
     <button class="sheet-cancel" onclick="closeKeySheet()">Done</button>
   </div>
-  <div style="display:flex;gap:8px;">
-    <input class="ai-prompt-in" id="apiKeyIn" type="password" placeholder="Paste your AI key…" autocomplete="off">
+  <!-- One-tap path: jump straight to Groq's key page, then paste from clipboard.
+       No typing a URL by hand, no hunting the menu — the two real friction points. -->
+  <button class="key-cta" onclick="getFreeKey()"><i data-ic="external"></i> Get a free key <span>Groq · no card · ~2 min</span></button>
+  <div style="display:flex;gap:8px;margin-top:10px;">
+    <input class="ai-prompt-in" id="apiKeyIn" type="password" placeholder="…then paste it here" autocomplete="off">
+    <button class="ai-run-btn" id="keyPasteBtn" onclick="pasteKey()" title="Paste from clipboard"><i data-ic="clipboard"></i></button>
     <button class="ai-run-btn" onclick="saveKeyAndClose()">Save</button>
   </div>
   <button class="chat-clear" onclick="removeKey()" style="margin-top:10px"><i data-ic="trash"></i> Remove key</button>
@@ -1445,9 +1452,9 @@ body.recsel .pcard{position:relative;}
     <summary>How do I get a free key? (2 minutes)</summary>
     <div class="keyhow-body">
       <p class="ai-desc" style="margin:0 0 12px">Groq is free, takes about two minutes, and <b style="color:var(--t1)">doesn't ask for a credit card</b>.</p>
-      <div class="keystep"><span class="keynum">1</span><div>Open <b>console.groq.com</b> in your browser.</div></div>
-      <div class="keystep"><span class="keynum">2</span><div>Tap <b>Sign up</b> — use your Google account, or an email address. Confirm the email if it asks.</div></div>
-      <div class="keystep"><span class="keynum">3</span><div>Once you're in, go to <b>console.groq.com/keys</b> (it's "API Keys" in the menu).</div></div>
+      <div class="keystep"><span class="keynum">1</span><div>Tap <b><a onclick="openExternal('https://console.groq.com/keys')" style="color:var(--a2);cursor:pointer">console.groq.com/keys</a></b> to open Groq.</div></div>
+      <div class="keystep"><span class="keynum">2</span><div>Tap <b>Sign up</b> — use your Google account, or an email address. Confirm the email if it asks. (It lands you right on the keys page.)</div></div>
+      <div class="keystep"><span class="keynum">3</span><div>Already had an account? You're on the API Keys page now.</div></div>
       <div class="keystep"><span class="keynum">4</span><div>Tap <b>Create API Key</b>. Give it any name — "WatchList" is fine.</div></div>
       <div class="keystep"><span class="keynum">5</span><div><b style="color:var(--a2)">Copy it straight away.</b> It starts with <code>gsk_</code>, and Groq only ever shows it once — if you close the box you'll just make a new one, which is fine.</div></div>
       <div class="keystep"><span class="keynum">6</span><div>Come back here, paste it in the box above, tap <b>Save</b>. Done.</div></div>
@@ -5965,6 +5972,25 @@ function updateKeyBtn(){
   else {b.innerHTML=icon('key')+' Add a free key to enable AI';b.classList.add('key-cta');}   // highlight when missing so it's not scrolled past
 }
 function openKeySheet(){const inp=document.getElementById('apiKeyIn');if(inp)inp.value=getKey();openSheet('keySheet');}
+// One tap to the exact page where the key is created — signing up lands you
+// straight there, so there's no menu to hunt. Open the how-to too, in case they
+// want the steps.
+function getFreeKey(){
+  openExternal('https://console.groq.com/keys');
+  const d=document.querySelector('#keySheet .keyhow');if(d)d.open=true;
+  toast('Sign up, create a key, copy it — then come back and paste');
+}
+// Paste the key without fiddling with the keyboard's paste menu. Clipboard read
+// is permission-gated and can fail silently (older Safari, denied permission) —
+// on failure we just focus the field so they can paste by hand.
+async function pasteKey(){
+  const inp=document.getElementById('apiKeyIn');if(!inp)return;
+  try{
+    const t=(await navigator.clipboard.readText()||'').trim();
+    if(t){inp.value=t;toast(keyProvider(t)?'Key pasted — tap Save':'Pasted — tap Save');}
+    else{inp.focus();}
+  }catch(e){inp.focus();toast('Tap the box and paste your key');}
+}
 function closeKeySheet(){openSheet('aiSheet');setAITab('chat');}
 function saveKeyAndClose(){saveKey();closeKeySheet();}
 function removeKey(){try{localStorage.removeItem('anthropic_key');}catch{}const inp=document.getElementById('apiKeyIn');if(inp)inp.value='';renderModelPicker();updateKeyBtn();toast('Key removed');}

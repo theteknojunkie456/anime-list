@@ -14,6 +14,11 @@ on:
 jobs:
   announce:
     runs-on: ubuntu-latest
+    # Job-level env so the token is visible to step `if:` conditions. A step's own
+    # `env:` is NOT in scope when its `if:` is evaluated — that was the bug: the
+    # broadcast skipped even when the secret was set.
+    env:
+      NOTIFY_ADMIN_TOKEN: ${{ secrets.NOTIFY_ADMIN_TOKEN }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -34,6 +39,4 @@ jobs:
 
       - name: Broadcast
         if: steps.check.outputs.changed == 'true' && env.NOTIFY_ADMIN_TOKEN != ''
-        env:
-          NOTIFY_ADMIN_TOKEN: ${{ secrets.NOTIFY_ADMIN_TOKEN }}
         run: node scripts/announce.mjs

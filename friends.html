@@ -2496,7 +2496,8 @@ function setLockMode(rec){
 }
 function toggleLockMode(){setLockMode(!lockRecMode);}
 function _unlockErr(i,err,msg){if(err)err.textContent=msg;const card=document.querySelector('.lock-card');if(card){card.classList.remove('shake');void card.offsetWidth;card.classList.add('shake');}if(i){i.value='';i.focus();}}
-function finishUnlock(){hideLock();render();renderLockUI();setTimeout(syncOnOpen,200);try{setTimeout(fetchCovers,600);}catch{}try{restorePlayer();}catch{}try{alBootSync();}catch{}}
+var _pendingPartyJoin=null;   // an invite that arrived while the list was locked
+function finishUnlock(){hideLock();render();renderLockUI();setTimeout(syncOnOpen,200);try{setTimeout(fetchCovers,600);}catch{}try{restorePlayer();}catch{}try{alBootSync();}catch{}try{if(_pendingPartyJoin){var _pc=_pendingPartyJoin;_pendingPartyJoin=null;setTimeout(function(){try{window.wlJoinParty(_pc);}catch(e){}},350);}}catch{}}
 async function tryUnlock(){                            // unlock with the password
   const i=document.getElementById('lockPw'),err=document.getElementById('lockErr');
   const pw=i?i.value:'';if(!pw)return;if(err)err.textContent='';
@@ -4751,6 +4752,9 @@ window.wlJoinParty=function(code){
   try{
     code=String(code||'').trim().toUpperCase();
     if(!/^[A-Z0-9]{5,8}$/.test(code))return;
+    if(typeof appLocked!=='undefined'&&appLocked){_pendingPartyJoin=code;toast('Unlock WatchList to join the party');return;}   // hold until unlocked
+    if(partyActive()&&partyCode===code){openSheet('partySheet');toast('You\u2019re already in this party');return;}            // already here
+    if(partyActive()&&partyCode!==code){try{partyEnd(true);}catch(e){}}                                                        // switch parties cleanly
     try{closeAll();}catch(e){}
     openSheet('partySheet');
     if(partyName()){partyJoin(code);return;}

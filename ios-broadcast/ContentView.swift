@@ -43,6 +43,12 @@ struct WatchListShell: UIViewRepresentable {
         wv.isOpaque = false
         wv.backgroundColor = UIColor(red: 0x0a/255.0, green: 0x0a/255.0, blue: 0x0c/255.0, alpha: 1)
         wv.scrollView.backgroundColor = wv.backgroundColor
+        // WKWebView ignores the page's user-scalable=no and still pinch-zooms, which
+        // swallows the web app's two-finger "summon AI" gesture. Disable webview zoom
+        // so two fingers reach the page.
+        wv.scrollView.pinchGestureRecognizer?.isEnabled = false
+        wv.scrollView.minimumZoomScale = 1; wv.scrollView.maximumZoomScale = 1
+        wv.scrollView.bouncesZoom = false
         wv.allowsBackForwardNavigationGestures = true
         wv.navigationDelegate = context.coordinator
         context.coordinator.web = wv
@@ -64,8 +70,11 @@ struct WatchListShell: UIViewRepresentable {
 
         // page loaded → if we saved the password, Face ID → auto-unlock the web lock
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-            guard PWStore.hasSaved() else { return }
+            let saved = PWStore.hasSaved()
+            NSLog("WatchList: page loaded — password in Keychain? %@", saved ? "yes" : "no (unlock once in the app to save it)")
+            guard saved else { return }
             PWStore.load { pw in
+                NSLog("WatchList: Face ID unlock → %@", pw != nil ? "got password, filling" : "no password (denied/failed)")
                 guard let pw, let web = self.web,
                       let d = try? JSONSerialization.data(withJSONObject: [pw]),
                       let arr = String(data: d, encoding: .utf8) else { return }
@@ -86,7 +95,7 @@ struct WatchListShell: UIViewRepresentable {
             case "notify":
                 if let items = body["items"] as? [[String: Any]] { Notifier.schedule(items) }
             case "savepw":
-                if let pw = body["pw"] as? String, !pw.isEmpty { PWStore.save(pw) }
+                if let pw = body["pw"] as? String, !pw.isEmpty { PWStore.save(pw); NSLog("WatchList: password saved to Keychain (Face ID armed for next launch)") }
             case "openurl":   // legal streaming sites can't be framed — open in Safari
                 if let s = body["url"] as? String {
                     // fall back to percent-encoding if the raw string won't parse

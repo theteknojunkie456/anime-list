@@ -936,6 +936,9 @@ body.recsel .pcard{position:relative;}
 .react-layer{position:fixed;inset:0;z-index:210;pointer-events:none;overflow:hidden;}
 .react-fly{position:absolute;bottom:22%;font-size:34px;will-change:transform,opacity;animation:reactFly 2s ease-out forwards;filter:drop-shadow(0 2px 6px rgba(0,0,0,.4));}
 @keyframes reactFly{0%{transform:translateY(6px) scale(.6);opacity:0;}18%{opacity:1;transform:translateY(0) scale(1.08);}75%{opacity:1;}100%{transform:translateY(-26vh) scale(1);opacity:0;}}
+.pt-invite{display:flex;flex-wrap:wrap;gap:7px;margin-top:8px;}
+.pt-invite-btn{display:flex;align-items:center;gap:6px;padding:8px 12px;border-radius:999px;background:var(--bg3);border:1px solid var(--b1);color:var(--t1);font-family:var(--fd);font-size:12.5px;font-weight:700;}
+.pt-invite-btn:active{transform:scale(.96);}
 .pt-reactbar{display:flex;gap:6px;justify-content:space-between;margin:12px 0 2px;}
 .pt-react{flex:1;height:42px;border-radius:12px;background:var(--bg3);border:1px solid var(--b1);font-size:21px;display:flex;align-items:center;justify-content:center;transition:transform .1s,background .15s;}
 .pt-react:active{transform:scale(1.25);background:var(--ag);}
@@ -4566,6 +4569,15 @@ const IS_NATIVE=/WatchListNative/i.test(navigator.userAgent||'');
 // app (WatchListNative UA) shows parties. CSS keys off body.no-party.
 if(!IS_NATIVE){try{document.body.classList.add('no-party');}catch(e){}}
 function nativeBroadcast(){try{window.webkit.messageHandlers.wl.postMessage({type:'broadcast',code:partyCode||''});}catch(e){toast('Broadcasting needs the WatchList app');}}
+// (4) A 3-2-1 count before the screen broadcast fires — same overlay as "Start together".
+function broadcastCountdown(){
+  const ov=document.getElementById('partyCount'),num=document.getElementById('pcNum'),lbl=document.getElementById('pcLbl');
+  if(!ov||!num||!lbl){nativeBroadcast();return;}
+  lbl.textContent='Broadcasting in…';ov.classList.add('on');let n=3;
+  const step=()=>{ if(n>0){num.textContent=n;num.style.animation='none';void num.offsetWidth;num.style.animation='';n--;setTimeout(step,1000);}
+    else{num.innerHTML=icon('play');lbl.textContent='Broadcasting!';setTimeout(()=>{ov.classList.remove('on');nativeBroadcast();},550);} };
+  step();
+}
 function nativeNotifyCode(){if(!IS_NATIVE)return;try{window.webkit.messageHandlers.wl.postMessage({type:'code',code:partyCode||''});}catch(e){}}
 // Inside the app there's no web push — so hand the native shell every upcoming
 // episode air time and let it schedule free on-device local notifications instead.
@@ -4869,13 +4881,13 @@ function renderParty(){
       const primary=r.paused
         ?`<button class="pt-play" onclick="partyPlay()">${icon('play')} Resume together · 3·2·1</button>`
         :`<button class="pt-play" onclick="partyPause()">Pause everyone</button>`;
-      const shareBtn=IS_NATIVE?`<button class="pt-share" onclick="nativeBroadcast()">${icon('users')} Broadcast your screen</button>`:(canScreenShare()?`<button class="pt-share" onclick="startShare()">${icon('users')} Share your screen — real sync</button>`:'');
+      const shareBtn=IS_NATIVE?`<button class="pt-share" onclick="broadcastCountdown()">${icon('users')} Broadcast your screen</button>`:(canScreenShare()?`<button class="pt-share" onclick="startShare()">${icon('users')} Share your screen — real sync</button>`:'');
       hostCtl=`<p class="ai-desc" style="text-align:center">You're running the session — everyone follows you.</p>
         ${primary}<button class="pt-share" onclick="partyNext()">Next episode</button>${shareBtn}
         <div class="dt-label" style="margin-top:14px">Switch to something else</div>${picker}`;
     }else{
       const shareBlock=IS_NATIVE
-        ?`<button class="pt-share" onclick="nativeBroadcast()">${icon('users')} Broadcast your screen</button><div class="pt-hint">Streams your iPhone screen to everyone in this party — no computer needed.</div>`
+        ?`<button class="pt-share" onclick="broadcastCountdown()">${icon('users')} Broadcast your screen</button><div class="pt-hint">Streams your iPhone screen to everyone in this party — no computer needed.</div>`
         :`<button class="pt-share" onclick="startShare()">${icon('users')} Share your screen — real sync</button>`
           +(canScreenShare()?`<div class="pt-hint">Everyone watches your screen, perfectly synced. Open the anime in another tab, then share it.</div>`
             :`<div class="pt-hint">Needs a computer to host. On a phone, use “Start together” below.</div>`);
@@ -4897,10 +4909,12 @@ function renderParty(){
         <span class="pt-pick-q">+ Queue</span></button>`;}).join('')}</div>`;
   }
   const chat=r.chat.map(m=>m.sys?`<div class="pt-sys">${schEsc(m.msg)}</div>`:`<div class="pt-msg${m.uid===meUid?' me':''}"><span class="who">${schEsc(m.name)}</span>${schEsc(m.msg)}</div>`).join('');
+  const _friends=friendsList();
+  const inviteBlock=_friends.length?`<div class="dt-label" style="margin-top:14px">${icon('users')} Invite friends</div><div class="pt-invite">${_friends.map(f=>`<button class="pt-invite-btn" onclick="partyInviteFriend('${escH(f.code)}')"><span class="fr-dot" style="background:${friendColor(f.code)}"></span>${escH(f.name)}</button>`).join('')}</div>`:'';
   box.innerHTML=`
     <div class="pt-code"><div class="pt-code-val">${r.code}</div><button class="pt-code-cta" onclick="partyCopyCode()" aria-label="Copy code">${icon('copy')}</button></div>
     <div class="pt-members">${members}</div>
-    ${now}${queueBlock}${hostCtl}
+    ${now}${queueBlock}${hostCtl}${inviteBlock}
     <div class="pt-reactbar">${PARTY_EMOJI.map(e=>`<button class="pt-react" onclick="partyReact('${e}')">${e}</button>`).join('')}</div>
     <div class="pt-chat" id="ptChat">${chat||'<div class="pt-sys">Say hi</div>'}</div>
     <div class="pt-chatbar"><input id="ptMsg" placeholder="Message…" maxlength="300" onkeydown="if(event.key==='Enter')partySend()"><button class="pt-send" onclick="partySend()">${icon('send')}</button></div>
@@ -5894,6 +5908,21 @@ function mergeFriendMsg(m){
 // Live channel: a WebSocket to our friend code so requests + recs arrive instantly.
 // On a ping we pull the fresh data; auto-reconnects; a keepalive stops idle drops.
 let friendWS=null, friendWSRetry=0;
+async function partyInviteFriend(code){
+  if(!partyCode){toast('Start or join a party first');return;}
+  const from={code:myFriendCode(),name:myFriendName()||'A friend'};
+  try{await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({op:'party_invite',to:code,from,party:partyCode})});toast('Invite sent');}
+  catch(e){toast('Could not send invite');}
+}
+function onPartyInvite(data){
+  const code=String(data.party||'');if(!code)return;
+  const name=(data.from&&data.from.name)||'A friend';
+  askConfirm({title:'Watch party invite',msg:name+' invited you to their watch party — join now?',yes:'Join',onYes:()=>{
+    if(typeof IS_NATIVE!=='undefined'&&!IS_NATIVE){toast('Watch parties are in the WatchList app');return;}
+    try{closeAll();}catch(e){}
+    partyJoin(code);openSheet('partySheet');
+  }});
+}
 function connectFriendWS(){
   if(IS_NATIVE)return;
   const code=myFriendCode(); if(!code)return;
@@ -5906,6 +5935,7 @@ function connectFriendWS(){
       let d=null; try{d=JSON.parse(e.data);}catch(err){}
       if(d&&d.kind==='rec'){ if(d.data)mergeRec(d.data); setTimeout(pullRecs,3000); }        // instant merge + reconcile once KV is consistent
       else if(d&&d.kind==='fr'){ if(d.data)mergeFriendMsg(d.data); setTimeout(pullFriendReqs,3000); }
+      else if(d&&d.kind==='party_invite'){ if(d.data)onPartyInvite(d.data); }
       else { pullRecs(); pullFriendReqs(); }   // plain-ping fallback
     };
     ws.onclose=()=>{if(friendWS===ws)friendWS=null;friendWSRetry=Math.min(friendWSRetry+1,6);setTimeout(connectFriendWS,700*friendWSRetry);};

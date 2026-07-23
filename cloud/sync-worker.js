@@ -132,6 +132,20 @@ export default {
       ctx.waitUntil(notifyChan(env, to, 'fr', message));
       return json({ ok: true }, 200, cors);
     }
+    // ── watch-party invite ──────────────────────────────────────
+    // Live invite to your party code, pushed to a friend's channel. Real-time
+    // only — an invite that lands after you've left the party is stale anyway.
+    if (op === 'party_invite') {
+      const to = String(body.to || '');
+      if (!/^[A-Za-z0-9]{10,64}$/.test(to)) return json({ error: 'bad to' }, 400, cors);
+      const from = (body.from && typeof body.from === 'object') ? body.from : {};
+      const fromCode = String(from.code || '');
+      const fromName = String(from.name || 'A friend').slice(0, 40);
+      const party = String(body.party || '').slice(0, 12);
+      if (!party) return json({ error: 'no party' }, 400, cors);
+      ctx.waitUntil(notifyChan(env, to, 'party_invite', { from: { code: fromCode, name: fromName }, party }));
+      return json({ ok: true }, 200, cors);
+    }
     if (op === 'fr_pull') {
       const code = String(body.code || '');
       if (!/^[A-Za-z0-9]{10,64}$/.test(code)) return json({ error: 'bad code' }, 400, cors);

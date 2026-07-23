@@ -16,7 +16,7 @@ final class WebRTCBroadcaster {
     // called to hand a completed offer/answer back to the party signaling layer
     var onOffer: ((_ toUid: String, _ sdp: String) -> Void)?
 
-    private let iceServers = ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"]
+    private let stunURLs = ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"]
 
     init() {
         RTCInitializeSSL()
@@ -24,17 +24,31 @@ final class WebRTCBroadcaster {
         let decoder = RTCDefaultVideoDecoderFactory()
         factory = RTCPeerConnectionFactory(encoderFactory: encoder, decoderFactory: decoder)
         videoSource = factory.videoSource()
+        // A Broadcast Upload Extension is capped at ~50 MB RAM; encoding the full
+        // native screen (e.g. 1170×2532) can blow past that and iOS kills us mid-stream.
+        // Cap the encoded size at 720p — plenty for a phone viewer, far lighter on RAM/CPU.
+        videoSource.adaptOutputFormat(toWidth: 720, height: 1280, fps: 30)
         capturer = RTCVideoCapturer(delegate: videoSource)   // we feed frames manually
         videoTrack = factory.videoTrack(with: videoSource, trackId: "screen0")
     }
 
     private func config() -> RTCConfiguration {
         let c = RTCConfiguration()
+        // STUN finds our public address; TURN *relays* the media when the two peers
+        // can't reach each other directly — the normal case across networks (broadcaster
+        // on Wi-Fi, viewer on cellular, or behind symmetric NAT). The web viewer already
+        // uses these same relays; the broadcaster MUST too or cross-network parties never
+        // connect. Free openrelay.metered.ca relays, matching RTC_CFG in the web app.
+        //
         // Use the urlStrings:username:credential: initializer, NOT urlStrings: alone —
         // the single-arg form compiles to the selector `initWithURLStrings:`, which
-        // App Store validation rejects as a non-public selector (code 50). STUN needs
-        // no creds, so pass nil.
-        c.iceServers = [RTCIceServer(urlStrings: iceServers, username: nil, credential: nil)]
+        // App Store validation rejects as a non-public selector (code 50).
+        c.iceServers = [
+            RTCIceServer(urlStrings: stunURLs, username: nil, credential: nil),
+            RTCIceServer(urlStrings: ["turn:openrelay.metered.ca:80"], username: "openrelayproject", credential: "openrelayproject"),
+            RTCIceServer(urlStrings: ["turn:openrelay.metered.ca:443"], username: "openrelayproject", credential: "openrelayproject"),
+            RTCIceServer(urlStrings: ["turn:openrelay.metered.ca:443?transport=tcp"], username: "openrelayproject", credential: "openrelayproject"),
+        ]
         c.sdpSemantics = .unifiedPlan
         return c
     }

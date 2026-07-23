@@ -30,7 +30,11 @@ final class WebRTCBroadcaster {
 
     private func config() -> RTCConfiguration {
         let c = RTCConfiguration()
-        c.iceServers = [RTCIceServer(urlStrings: iceServers)]
+        // Use the urlStrings:username:credential: initializer, NOT urlStrings: alone —
+        // the single-arg form compiles to the selector `initWithURLStrings:`, which
+        // App Store validation rejects as a non-public selector (code 50). STUN needs
+        // no creds, so pass nil.
+        c.iceServers = [RTCIceServer(urlStrings: iceServers, username: nil, credential: nil)]
         c.sdpSemantics = .unifiedPlan
         return c
     }

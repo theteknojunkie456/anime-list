@@ -4840,7 +4840,7 @@ function renderParty(){
   if(!partyActive()){
     const nm=partyName();
     box.innerHTML=`
-      <p class="ai-desc">Watch together with friends: everyone hits play on a shared <b>3·2·1</b> count, with a live chat to talk through it. <span style="opacity:.75">Playback isn’t frame-synced — you all just start together.</span></p>
+      <p class="ai-desc">${IS_NATIVE?`Watch together with friends: broadcast your screen on a shared <b>3·2·1</b> count, with a live chat to talk through it.`:`Watch together with friends: everyone hits play on a shared <b>3·2·1</b> count, with a live chat to talk through it. <span style="opacity:.75">Playback isn’t frame-synced — you all just start together.</span>`}</p>
       <div class="dt-label">${icon('users')} Your name</div>
       <input class="ai-prompt-in" id="ptName" placeholder="e.g. ${nm||'Alex'}" value="${nm?nm.replace(/"/g,'&quot;'):''}" maxlength="24" autocomplete="off">
       <button class="parse-btn" onclick="partyCreate()">${icon('users')} Start a party</button>
@@ -4890,12 +4890,15 @@ function renderParty(){
         ${primary}<button class="pt-share" onclick="partyNext()">Next episode</button>${shareBtn}
         <div class="dt-label" style="margin-top:14px">Switch to something else</div>${picker}`;
     }else{
-      const shareBlock=IS_NATIVE
-        ?`<button class="pt-share" onclick="broadcastCountdown()">${icon('users')} Broadcast your screen</button><div class="pt-hint">Streams your iPhone screen to everyone in this party — no computer needed.</div>`
-        :`<button class="pt-share" onclick="startShare()">${icon('users')} Share your screen — real sync</button>`
+      if(IS_NATIVE){
+        // Native party = one host broadcasts their screen. Keep the 3·2·1 countdown; it now opens the host's broadcast.
+        hostCtl=`${picker}<button class="pt-play" onclick="broadcastCountdown()">${icon('play')} Start together · 3·2·1</button><div class="pt-hint">Counts down 3·2·1, then streams your iPhone screen to everyone in this party — no computer needed.</div>`;
+      }else{
+        const shareBlock=`<button class="pt-share" onclick="startShare()">${icon('users')} Share your screen — real sync</button>`
           +(canScreenShare()?`<div class="pt-hint">Everyone watches your screen, perfectly synced. Open the anime in another tab, then share it.</div>`
             :`<div class="pt-hint">Needs a computer to host. On a phone, use “Start together” below.</div>`);
-      hostCtl=`${shareBlock}${picker}<button class="pt-play" onclick="partyPlay()"${r.title?'':' disabled'}>${icon('play')} Start together · 3·2·1</button>`;
+        hostCtl=`${shareBlock}${picker}<button class="pt-play" onclick="partyPlay()"${r.title?'':' disabled'}>${icon('play')} Start together · 3·2·1</button>`;
+      }
     }
   }else if(sharing){
     hostCtl=`<button class="pt-play" onclick="reopenShareView()">${icon('play')} Watch the shared screen</button>

@@ -1007,7 +1007,6 @@ body.recsel .pcard{position:relative;}
 .tswatch{position:relative;height:52px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:17px;}
 .tswatch::after{content:'';position:absolute;inset:0;background:linear-gradient(to bottom,transparent 40%,rgba(0,0,0,0.5));}
 .tswatch span{position:relative;z-index:1;}
-.tswatch .tinit{font-family:var(--fd);font-weight:900;font-size:19px;line-height:1;}
 .taccent-bar{width:20px;height:2.5px;border-radius:2px;position:relative;z-index:1;}
 .tdel{position:absolute;top:2px;right:2px;width:22px;height:22px;border-radius:50%;background:rgba(0,0,0,0.6);color:#fff;font-size:11px;display:flex;align-items:center;justify-content:center;z-index:2;}
 .tname{font-size:9.5px;font-weight:800;text-align:center;padding:6px 2px;color:var(--t2);text-transform:uppercase;letter-spacing:0.04em;background:var(--bg3);}
@@ -1851,7 +1850,10 @@ body.recsel .pcard{position:relative;}
   </div>
   <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--b1);">
     <div class="flabel" style="margin-bottom:10px">Make your own</div>
-    <input class="finput" id="ctName" placeholder="Theme name…" maxlength="14" style="width:100%;margin-bottom:12px" autocomplete="off">
+    <div style="display:flex;gap:8px;margin-bottom:12px;">
+      <input class="finput" id="ctName" placeholder="Theme name…" maxlength="14" style="flex:1" autocomplete="off">
+      <input class="finput" id="ctEmoji" placeholder="✨" maxlength="2" style="width:56px;text-align:center" autocomplete="off">
+    </div>
     <div style="display:flex;gap:16px;align-items:flex-end;">
       <label class="cpick-lbl">Accent<input type="color" class="cpick" id="ctAccent" value="#e03d55"></label>
       <label class="cpick-lbl">Background<input type="color" class="cpick" id="ctBg" value="#111114"></label>
@@ -2869,13 +2871,13 @@ function openNotifySheet(){openSheet('notifySheet');renderNotifyUI();}
 
 // ─── THEMES ────────────────────────────────────────────────────────────────
 const THEMES=[
-  {id:'default', name:'Default', bg:'#111114', accent:'#e03d55'},
-  {id:'naruto',  name:'Naruto',  bg:'#0e0f18', accent:'#f57800'},
-  {id:'sasuke',  name:'Sasuke',  bg:'#0b0b18', accent:'#7730e8'},
-  {id:'luffy',   name:'Luffy',   bg:'#0b1420', accent:'#d03838'},
-  {id:'sanji',   name:'Sanji',   bg:'#0c1016', accent:'#c89a0e'},
-  {id:'zoro',    name:'Zoro',    bg:'#0a140c', accent:'#26a040'},
-  {id:'chopper', name:'Chopper', bg:'#150f1c', accent:'#d84872'},
+  {id:'default', name:'Default', emoji:'🌑', bg:'#111114', accent:'#e03d55'},
+  {id:'naruto',  name:'Naruto',  emoji:'🍥', bg:'#0e0f18', accent:'#f57800'},
+  {id:'sasuke',  name:'Sasuke',  emoji:'⚡', bg:'#0b0b18', accent:'#7730e8'},
+  {id:'luffy',   name:'Luffy',   emoji:'🏴‍☠️',bg:'#0b1420', accent:'#d03838'},
+  {id:'sanji',   name:'Sanji',   emoji:'🔥', bg:'#0c1016', accent:'#c89a0e'},
+  {id:'zoro',    name:'Zoro',    emoji:'⚔️', bg:'#0a140c', accent:'#26a040'},
+  {id:'chopper', name:'Chopper', emoji:'🦌', bg:'#150f1c', accent:'#d84872'},
 ];
 function customThemes(){try{const s=store();return JSON.parse((s&&s.getItem('custom_themes'))||'[]');}catch{return[];}}
 function setCustomThemes(l){try{const s=store();if(s)s.setItem('custom_themes',JSON.stringify(l));}catch{}}
@@ -2994,7 +2996,8 @@ function applyTheme(id,persist=true){
 }
 function saveCustomTheme(){
   const name=(document.getElementById('ctName').value.trim()||'Custom').replace(/[<>"'&]/g,'').slice(0,14);
-  const t={id:'c'+uid(),name,accent:document.getElementById('ctAccent').value,bg:document.getElementById('ctBg').value};
+  const emoji=(document.getElementById('ctEmoji').value.trim()||'✨').replace(/[<>"'&]/g,'').slice(0,4);
+  const t={id:'c'+uid(),name,emoji,accent:document.getElementById('ctAccent').value,bg:document.getElementById('ctBg').value};
   setCustomThemes([...customThemes(),t]);
   document.getElementById('ctName').value='';
   applyTheme(t.id);
@@ -3016,7 +3019,7 @@ function renderThemeGrid(){
     return `
     <button class="topt${curTheme===t.id?' on':''}" onclick="applyTheme('${t.id}')">
       <div class="tswatch" style="background:linear-gradient(135deg,${sbg} 0%,${sbg}dd 100%)">
-        <span class="tinit" style="color:${t.accent}">${escH(((t.name||'?').trim()[0]||'?').toUpperCase())}</span>
+        <span>${t.emoji}</span>
         <div class="taccent-bar" style="background:${t.accent}"></div>
         ${t.custom?`<div class="tdel" onclick="event.stopPropagation();deleteCustomTheme('${t.id}')">${icon('x')}</div>`:''}
       </div>

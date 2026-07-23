@@ -4,6 +4,7 @@ import ReplayKit
 import UserNotifications
 import Security
 import Combine
+import LocalAuthentication
 
 // The native app IS WatchList: it loads the full web app in a web view and adds the
 // things a web view can't do itself —
@@ -100,11 +101,29 @@ struct WatchListShell: UIViewRepresentable {
             guard saved else { return }
             PWStore.load { pw in
                 NSLog("WatchList: Face ID unlock → %@", pw != nil ? "got password, filling" : "no password (denied/failed)")
-                guard let pw, let web = self.web,
-                      let d = try? JSONSerialization.data(withJSONObject: [pw]),
-                      let arr = String(data: d, encoding: .utf8) else { return }
-                let jsPw = String(arr.dropFirst().dropLast())   // ["pw"] → "pw" (escaped JS literal)
-                web.evaluateJavaScript("window.wlNativeUnlock && window.wlNativeUnlock(\(jsPw))", completionHandler: nil)
+                if let pw { self.fillPassword(pw) }
+            }
+        }
+
+        // Fill the web lock's password field and submit it.
+        private func fillPassword(_ pw: String) {
+            guard let web = self.web,
+                  let d = try? JSONSerialization.data(withJSONObject: [pw]),
+                  let arr = String(data: d, encoding: .utf8) else { return }
+            let jsPw = String(arr.dropFirst().dropLast())   // ["pw"] → "pw" (escaped JS literal)
+            web.evaluateJavaScript("window.wlNativeUnlock && window.wlNativeUnlock(\(jsPw))", completionHandler: nil)
+        }
+
+        // The web lock's "Unlock with Face ID" button (native build) posts {type:"faceid"}.
+        func triggerFaceID() {
+            guard PWStore.hasSaved() else {
+                NSLog("WatchList: Face ID tapped but no saved password — need one password unlock first")
+                web?.evaluateJavaScript("window.wlFaceMsg && window.wlFaceMsg('Unlock with your password once to turn on Face ID.')", completionHandler: nil)
+                return
+            }
+            PWStore.load { pw in
+                NSLog("WatchList: Face ID (manual) → %@", pw != nil ? "got password, filling" : "no password (denied/failed)")
+                if let pw { self.fillPassword(pw) }
             }
         }
 
@@ -121,6 +140,8 @@ struct WatchListShell: UIViewRepresentable {
                 if let items = body["items"] as? [[String: Any]] { Notifier.schedule(items) }
             case "savepw":
                 if let pw = body["pw"] as? String, !pw.isEmpty { PWStore.save(pw); NSLog("WatchList: password saved to Keychain (Face ID armed for next launch)") }
+            case "faceid":
+                DispatchQueue.main.async { self.triggerFaceID() }
             case "openurl":   // legal streaming sites can't be framed — open in Safari
                 if let s = body["url"] as? String {
                     // fall back to percent-encoding if the raw string won't parse
@@ -148,30 +169,47 @@ enum PWStore {
         [kSecClass as String: kSecClassGenericPassword,
          kSecAttrService as String: service, kSecAttrAccount as String: account]
     }
+    // Store the password in a PLAIN, device-only Keychain item — no biometric access
+    // control on the item itself. Face ID is enforced separately at read time via
+    // LAContext (below). This is far more reliable than a biometryCurrentSet item,
+    // which can fail to add/read silently — and LAContext returns real error codes.
     static func save(_ pw: String) {
         guard let data = pw.data(using: .utf8) else { return }
-        SecItemDelete(base() as CFDictionary)
+        SecItemDelete(base() as CFDictionary)   // clears any old biometry-gated item too
         var q = base()
         q[kSecValueData as String] = data
-        if let ac = SecAccessControlCreateWithFlags(nil, kSecAttrAccessibleWhenUnlockedThisDeviceOnly, .biometryCurrentSet, nil) {
-            q[kSecAttrAccessControl as String] = ac
-        }
-        SecItemAdd(q as CFDictionary, nil)
+        q[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+        let st = SecItemAdd(q as CFDictionary, nil)
+        NSLog("WatchList: PWStore.save SecItemAdd status=%d (%@)", Int(st), st == errSecSuccess ? "ok" : "FAILED")
     }
     static func hasSaved() -> Bool {
         var q = base()
-        q[kSecUseAuthenticationUI as String] = kSecUseAuthenticationUISkip   // don't prompt just to check existence
+        q[kSecUseAuthenticationUI as String] = kSecUseAuthenticationUISkip
         let s = SecItemCopyMatching(q as CFDictionary, nil)
-        return s == errSecSuccess || s == errSecInteractionNotAllowed
+        return s == errSecSuccess
     }
-    static func load(completion: @escaping (String?) -> Void) {
+    // Read the stored password (no prompt — item isn't biometry-gated).
+    private static func read() -> String? {
         var q = base()
         q[kSecReturnData as String] = true
-        q[kSecUseOperationPrompt as String] = "Unlock WatchList"
-        DispatchQueue.global(qos: .userInitiated).async {
-            var out: CFTypeRef?
-            let status = SecItemCopyMatching(q as CFDictionary, &out)
-            let pw = status == errSecSuccess ? (out as? Data).flatMap { String(data: $0, encoding: .utf8) } : nil
+        var out: CFTypeRef?
+        let st = SecItemCopyMatching(q as CFDictionary, &out)
+        if st != errSecSuccess { NSLog("WatchList: PWStore.read status=%d", Int(st)); return nil }
+        return (out as? Data).flatMap { String(data: $0, encoding: .utf8) }
+    }
+    // Prompt Face ID via LAContext; on success, hand back the stored password.
+    static func load(completion: @escaping (String?) -> Void) {
+        let ctx = LAContext()
+        ctx.localizedFallbackTitle = ""   // no "Enter Password" — the app has its own lock
+        var err: NSError?
+        guard ctx.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &err) else {
+            NSLog("WatchList: Face ID unavailable — %@", err?.localizedDescription ?? "unknown")
+            DispatchQueue.main.async { completion(nil) }
+            return
+        }
+        ctx.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: "Unlock WatchList") { ok, e in
+            NSLog("WatchList: Face ID evaluate → %@ %@", ok ? "success" : "fail", e?.localizedDescription ?? "")
+            let pw = ok ? read() : nil
             DispatchQueue.main.async { completion(pw) }
         }
     }

@@ -4746,6 +4746,32 @@ function partyQueueAdd(id){
 function partyQueueRemoveAt(i){const q=partyRoom&&partyRoom.queue&&partyRoom.queue[i];if(q)wsSend({t:'queue-remove',qid:q.id});}
 function partyQueueNext(){if(!partyIsHost||!partyRoom||!(partyRoom.queue||[]).length)return;wsSend({t:'queue-next'});}
 function partyCopyCode(){try{navigator.clipboard.writeText(partyCode);toast('Code copied');}catch{toast(partyCode);}}
+// A tapped invite link — watchlist://party/CODE opened via the app, or ?party=CODE — lands here.
+window.wlJoinParty=function(code){
+  try{
+    code=String(code||'').trim().toUpperCase();
+    if(!/^[A-Z0-9]{5,8}$/.test(code))return;
+    try{closeAll();}catch(e){}
+    openSheet('partySheet');
+    if(partyName()){partyJoin(code);return;}
+    try{renderParty();}catch(e){}
+    setTimeout(()=>{try{const j=document.getElementById('ptJoin');if(j)j.value=code;const n=document.getElementById('ptName');if(n)n.focus();}catch(e){}},60);
+    toast('Add your name, then tap Join');
+  }catch(e){}
+};
+// Share a one-tap invite LINK. It opens everywhere; on the other side it bridges into the app.
+function sharePartyLink(){
+  if(!partyCode){toast('Start a party first');return;}
+  const link=location.origin+location.pathname.replace(/[^/]*$/,'')+'?party='+partyCode;
+  if(navigator.share){navigator.share({title:'WatchList watch party',text:'Join my watch party on WatchList',url:link}).catch(()=>{});return;}
+  const done=()=>toast('Invite link copied');
+  if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(link).then(done).catch(()=>toast(link));
+  else toast(link);
+}
+// Opened an invite link in a browser (parties live in the app) → offer to jump straight into it.
+function partyInviteBridge(code){
+  askConfirm({title:'Watch party invite',msg:'You\u2019re invited to a watch party (code '+code+'). Watch parties open in the WatchList app \u2014 tap below to launch it, or enter the code in the app.',yes:'Open WatchList',onYes:()=>{try{location.href='watchlist://party/'+code;}catch(e){}}});
+}
 
 // ── screen share (WebRTC, peer-to-peer — no server carries the video) ──────────
 // The desktop host captures a tab/window and streams it straight to each viewer;
@@ -4919,7 +4945,7 @@ function renderParty(){
   const _friends=friendsList();
   const inviteBlock=_friends.length?`<div class="dt-label" style="margin-top:14px">${icon('users')} Invite friends</div><div class="pt-invite">${_friends.map(f=>`<button class="pt-invite-btn" onclick="partyInviteFriend('${escH(f.code)}')"><span class="fr-dot" style="background:${friendColor(f.code)}"></span>${escH(f.name)}</button>`).join('')}</div>`:'';
   box.innerHTML=`
-    <div class="pt-code"><div class="pt-code-val">${r.code}</div><button class="pt-code-cta" onclick="partyCopyCode()" aria-label="Copy code">${icon('copy')}</button></div>
+    <div class="pt-code"><div class="pt-code-val">${r.code}</div><button class="pt-code-cta" onclick="sharePartyLink()" aria-label="Share invite link">${icon('share')}</button><button class="pt-code-cta" onclick="partyCopyCode()" aria-label="Copy code">${icon('copy')}</button></div>
     <div class="pt-members">${members}</div>
     ${now}${queueBlock}${hostCtl}${inviteBlock}
     <div class="pt-reactbar">${PARTY_EMOJI.map(e=>`<button class="pt-react" onclick="partyReact('${e}')">${e}</button>`).join('')}</div>
@@ -7499,6 +7525,13 @@ try{(function(){
 })();}catch{}
 // ?admin=1 still works as an alternate first-time unlock (harmless without token).
 try{if(new URL(location.href).searchParams.get('admin')==='1'){const u=new URL(location.href);u.searchParams.delete('admin');history.replaceState(null,'',u.pathname+u.search+u.hash);setTimeout(openAdmin,300);}}catch{}
+// A shared invite link ?party=CODE — in the app auto-join it; in a browser bridge into the app.
+try{(function(){var code=(new URL(location.href).searchParams.get('party')||'').trim().toUpperCase();
+  if(!/^[A-Z0-9]{5,8}$/.test(code))return;
+  var u=new URL(location.href);u.searchParams.delete('party');history.replaceState(null,'',u.pathname+u.search+u.hash);
+  if(typeof IS_NATIVE!=='undefined'&&IS_NATIVE){setTimeout(function(){try{window.wlJoinParty(code);}catch(e){}},600);}
+  else{setTimeout(function(){try{partyInviteBridge(code);}catch(e){}},500);}
+})();}catch(e){}
 try{alCatchRedirect().then(()=>{if(!appLocked)alBootSync();}).catch(()=>{});}catch{}   // returning from AniList OAuth
 if(appLocked)showLock();   // stored list is ciphertext → gate the app until unlocked
 else try{restorePlayer();}catch{}   // came back mid-stream after an iOS reload → reopen it

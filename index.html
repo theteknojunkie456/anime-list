@@ -2116,6 +2116,10 @@ async function fetchAdminSources(){
 // does nothing. The token is stored locally once entered, for convenience.
 const ADMIN_TK='wl_admin_token';
 function adminToken(){try{return localStorage.getItem(ADMIN_TK)||'';}catch{return '';}}
+const ADMIN_CK='wl_admin_ck';
+// Admin = this device's token OR a cloud key that matches yours (so admin follows your key).
+function isAdminDevice(){try{return !!adminToken()||(!!syncCode()&&syncCode()===localStorage.getItem(ADMIN_CK));}catch{return !!adminToken();}}
+function bindAdminKey(){try{if(adminToken()){const c=syncCode();if(c)localStorage.setItem(ADMIN_CK,c);}}catch{}}
 function setAdminToken(t){try{t?localStorage.setItem(ADMIN_TK,t):localStorage.removeItem(ADMIN_TK);}catch{}}
 function openAdmin(){renderAdmin();openSheet('adminSheet');}
 // Secret unlock: tap the WatchList logo 5× fast to bring up admin the first time
@@ -7474,6 +7478,7 @@ try{setTimeout(fetchAdminCard,1400);window.addEventListener('focus',()=>{try{fet
 try{setTimeout(fetchAdminSources,1600);window.addEventListener('focus',()=>{try{fetchAdminSources();}catch{}});}catch{}
 // Admin nav button appears only where your token is stored (your device only).
 try{injectAdminNav();}catch{}
+try{bindAdminKey();}catch{}
 // Unlock admin the first time: PRESS AND HOLD the WatchList logo ~0.7s. A hold is
 // far more reliable on touch than rapid taps (which mobile treats as zoom).
 try{(function(){
@@ -7481,7 +7486,7 @@ try{(function(){
   let timer=null,sx=0,sy=0;
   const pt=e=>e.touches&&e.touches[0]?e.touches[0]:e;
   const start=e=>{const p=pt(e);sx=p.clientX;sy=p.clientY;clearTimeout(timer);
-    timer=setTimeout(()=>{try{navigator.vibrate&&navigator.vibrate(15);}catch{}openAdmin();},600);};
+    timer=setTimeout(()=>{if(!isAdminDevice())return;try{navigator.vibrate&&navigator.vibrate(15);}catch{}openAdmin();},600);};
   // Only cancel on a REAL drag (>12px) — a still finger always jitters a little,
   // and cancelling on any move was killing the hold instantly.
   const move=e=>{const p=pt(e);if(Math.abs(p.clientX-sx)>12||Math.abs(p.clientY-sy)>12)clearTimeout(timer);};

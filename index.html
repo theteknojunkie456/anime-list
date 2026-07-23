@@ -4770,7 +4770,12 @@ function sharePartyLink(){
 }
 // Opened an invite link in a browser (parties live in the app) → offer to jump straight into it.
 function partyInviteBridge(code){
-  askConfirm({title:'Watch party invite',msg:'You\u2019re invited to a watch party (code '+code+'). Watch parties open in the WatchList app \u2014 tap below to launch it, or enter the code in the app.',yes:'Open WatchList',onYes:()=>{try{location.href='watchlist://party/'+code;}catch(e){}}});
+  var isiOS=/iP(hone|od|ad)/.test(navigator.userAgent||'')||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+  if(isiOS){
+    askConfirm({title:'Watch party invite',msg:'You\u2019re invited to a watch party (code '+code+'). Tap below to open it in the WatchList app.',yes:'Open WatchList',onYes:()=>{try{location.href='watchlist://party/'+code;}catch(e){}}});
+  }else{
+    askConfirm({title:'Watch party invite',msg:'You\u2019re invited to a watch party. Watch parties run in the WatchList app on iPhone \u2014 open this link on your iPhone to join. Party code: '+code+'.',yes:'Got it'});
+  }
 }
 
 // ── screen share (WebRTC, peer-to-peer — no server carries the video) ──────────

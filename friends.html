@@ -4945,7 +4945,7 @@ function renderParty(){
   const _friends=friendsList();
   const inviteBlock=_friends.length?`<div class="dt-label" style="margin-top:14px">${icon('users')} Invite friends</div><div class="pt-invite">${_friends.map(f=>`<button class="pt-invite-btn" onclick="partyInviteFriend('${escH(f.code)}')"><span class="fr-dot" style="background:${friendColor(f.code)}"></span>${escH(f.name)}</button>`).join('')}</div>`:'';
   box.innerHTML=`
-    <div class="pt-code"><div class="pt-code-val">${r.code}</div><button class="pt-code-cta" onclick="sharePartyLink()" aria-label="Share invite link">${icon('share')}</button><button class="pt-code-cta" onclick="partyCopyCode()" aria-label="Copy code">${icon('copy')}</button></div>
+    <div class="pt-code"><div class="pt-code-val">${r.code}</div><button class="pt-code-cta" onclick="sharePartyLink()" aria-label="Share invite link">${icon('send')}</button><button class="pt-code-cta" onclick="partyCopyCode()" aria-label="Copy code">${icon('copy')}</button></div>
     <div class="pt-members">${members}</div>
     ${now}${queueBlock}${hostCtl}${inviteBlock}
     <div class="pt-reactbar">${PARTY_EMOJI.map(e=>`<button class="pt-react" onclick="partyReact('${e}')">${e}</button>`).join('')}</div>

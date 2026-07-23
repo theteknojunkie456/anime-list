@@ -3,6 +3,7 @@ import WebKit
 import ReplayKit
 import UserNotifications
 import Security
+import Combine
 
 // The native app IS WatchList: it loads the full web app in a web view and adds the
 // things a web view can't do itself —
@@ -52,6 +53,7 @@ struct WatchListShell: UIViewRepresentable {
         wv.allowsBackForwardNavigationGestures = true
         wv.navigationDelegate = context.coordinator
         context.coordinator.web = wv
+        context.coordinator.observeLinks()
 
         broadcaster.picker.frame = CGRect(x: -20, y: -20, width: 1, height: 1)
         broadcaster.picker.alpha = 0.01
@@ -68,10 +70,33 @@ struct WatchListShell: UIViewRepresentable {
         weak var web: WKWebView?
         init(broadcaster: BroadcastController) { self.broadcaster = broadcaster }
 
+        // Deep-link → join-party plumbing. A tapped invite link (watchlist://party/CODE)
+        // sets LinkRouter.pendingParty; we forward it to the web app's window.wlJoinParty
+        // once the page has finished loading.
+        var pageLoaded = false
+        var pendingParty: String?
+        private var linkSub: AnyCancellable?
+        func observeLinks() {
+            linkSub = LinkRouter.shared.$pendingParty.sink { [weak self] code in
+                guard let self, let code, !code.isEmpty else { return }
+                self.pendingParty = code
+                self.flushParty()
+            }
+        }
+        func flushParty() {
+            guard pageLoaded, let code = pendingParty, let web = web else { return }
+            let safe = code.filter { $0.isLetter || $0.isNumber }   // never inject anything but A–Z/0–9
+            guard safe.count >= 5 else { pendingParty = nil; return }
+            web.evaluateJavaScript("window.wlJoinParty && window.wlJoinParty('\(safe)')", completionHandler: nil)
+            pendingParty = nil
+        }
+
         // page loaded → if we saved the password, Face ID → auto-unlock the web lock
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
             let saved = PWStore.hasSaved()
             NSLog("WatchList: page loaded — password in Keychain? %@", saved ? "yes" : "no (unlock once in the app to save it)")
+            pageLoaded = true
+            flushParty()   // a pending invite link → join now that the web app is up
             guard saved else { return }
             PWStore.load { pw in
                 NSLog("WatchList: Face ID unlock → %@", pw != nil ? "got password, filling" : "no password (denied/failed)")

@@ -2129,12 +2129,9 @@ function adminTap(){
 // Adds an Admin button to the bottom nav — but ONLY on a device where your token
 // is stored, so it's your row and nobody else's.
 function injectAdminNav(){
-  if(!adminToken())return;
-  const nav=document.querySelector('.nav'); if(!nav||document.getElementById('nav-admin'))return;
-  const b=document.createElement('button');
-  b.className='nbtn';b.id='nav-admin';b.onclick=openAdmin;
-  b.innerHTML='<span>'+icon('users')+'</span><small>Admin</small>';
-  nav.appendChild(b);
+  // Admin no longer lives in the bottom bar — keeps it at 5 tabs with the + centered.
+  // Open admin by PRESS-AND-HOLDING the WatchList logo (see the hold handler below).
+  const ex=document.getElementById('nav-admin'); if(ex)ex.remove();
 }
 async function adminCall(path,extra){return netCall(path,Object.assign({token:adminToken()},extra||{}));}
 function renderAdmin(){

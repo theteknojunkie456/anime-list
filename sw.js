@@ -1,4 +1,4 @@
-const CACHE = 'animelist-v6';
+const CACHE = 'animelist-v7';
 const ASSETS = ['./index.html', './friends.html', './manifest.json'];
 
 self.addEventListener('install', e => {

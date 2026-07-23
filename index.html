@@ -7238,7 +7238,15 @@ try{
 // it waits for a calm moment (next refocus / when you're idle).
 let _bootVer=null,_updateReady=false,_updSnap=null;
 async function _liveVer(){
-  try{const r=await fetch('./?_ck='+Date.now(),{method:'HEAD',cache:'no-store'});return r.headers.get('etag')||r.headers.get('last-modified')||'';}catch(e){return '';}
+  const u='./?_ck='+Date.now();
+  try{
+    let r=await fetch(u,{method:'HEAD',cache:'no-store'});
+    let v=r.headers.get('etag')||r.headers.get('last-modified')||'';
+    // Some hosts/proxies don't return a version header on HEAD — fall back to a
+    // no-store GET, which reliably carries the ETag on GitHub Pages.
+    if(!v){r=await fetch(u,{cache:'no-store'});v=r.headers.get('etag')||r.headers.get('last-modified')||'';}
+    return v;
+  }catch(e){return '';}
 }
 function _updBusy(){
   const pv=document.getElementById('playerView'); if(pv&&pv.classList.contains('on'))return true;   // watching
@@ -7317,11 +7325,19 @@ async function checkUpdate(){
   if(v!==_bootVer){_updateReady=true;_applyUpdate();}
 }
 try{
-  setTimeout(checkUpdate,4000);                                                         // learn current version after boot
-  setInterval(checkUpdate,60000);                                                       // poll every minute
-  document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkUpdate();});// and on refocus
-  window.addEventListener('focus',()=>{if(_updateReady)_applyUpdate();});
-  window.addEventListener('online',()=>{checkUpdate();});                               // and the moment the network is back
+  setTimeout(checkUpdate,3000);                                                         // learn the running version shortly after boot
+  setInterval(checkUpdate,30000);                                                       // then poll every 30s
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkUpdate();});// on refocus
+  window.addEventListener('focus',()=>{checkUpdate();});                                 // re-poll (not just apply a pending one)
+  window.addEventListener('online',()=>{checkUpdate();});                               // the moment the network is back
+  // iOS standalone PWAs (and Safari's back/forward cache) resume the page via
+  // `pageshow` — a signal the events above routinely miss, which is why a patch
+  // could sit unseen until a manual reload. Re-check the instant the page is
+  // shown again, and nudge the service worker to look for a new build too.
+  window.addEventListener('pageshow',()=>{
+    try{if(navigator.serviceWorker&&navigator.serviceWorker.getRegistration)navigator.serviceWorker.getRegistration().then(r=>{if(r)r.update().catch(()=>{});}).catch(()=>{});}catch(_){}
+    checkUpdate();
+  });
 }catch(e){}
 
 // ─── KEYBOARD ───────────────────────────────────────────────────────────────

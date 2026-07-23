@@ -1287,8 +1287,7 @@ body.recsel .pcard{position:relative;}
   <div class="hdr">
     <div class="hdr-title" onclick="adminTap()">WatchList</div>
     <div class="hdr-actions">
-      <button class="hbtn friend-only" onclick="openFriends()" title="Friends" aria-label="Friends"><i data-ic="users"></i></button>
-      <button class="hbtn party-only" onclick="openSheet('partySheet')" title="Watch party" aria-label="Watch party"><i data-ic="users"></i></button>
+      <button class="hbtn" onclick="openHub()" title="Friends & Watch Party" aria-label="Friends and Watch Party"><i data-ic="users"></i></button>
       <button class="hbtn" onclick="openForYou()" title="For You — tailored recommendations" aria-label="For You recommendations"><i data-ic="compass"></i></button>
       <button class="hbtn" onclick="openSchedule()" title="Weekly airing schedule" aria-label="Weekly airing schedule"><i data-ic="calendar"></i></button>
       <button class="hbtn" id="notifyBell" onclick="openNotifySheet()" title="Episode notifications" aria-label="Notifications"><i data-ic="bell-off"></i></button>
@@ -1560,6 +1559,13 @@ body.recsel .pcard{position:relative;}
 </div>
 
 <!-- WATCH PARTY SHEET -->
+<!-- Friends & Watch Party chooser (official app: both live behind one header button) -->
+<div class="sheet" id="hubSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header"><div class="sheet-title">Social</div><button class="sheet-cancel" onclick="closeAll()">Done</button></div>
+  <button class="dt-watch" onclick="closeAll();setTimeout(openFriends,240)"><i data-ic="users"></i> Friends</button>
+  <button class="dt-watch" style="margin-top:10px;background:var(--bg4);color:var(--t1)" onclick="closeAll();setTimeout(function(){openSheet('partySheet')},240)"><i data-ic="play"></i> Watch Party</button>
+</div>
 <div class="sheet" id="partySheet">
   <div class="sheet-handle"></div>
   <div class="sheet-header">
@@ -5939,7 +5945,6 @@ function recByAni(){
   return m;
 }
 function friendRecRowHTML(){
-  if(IS_NATIVE)return '';
   const map=recByAni();
   const mineAni=new Set(anime.map(a=>a.aniId).filter(Boolean));
   const mineTitle=new Set(anime.map(a=>normTitle(a.title)).filter(Boolean));
@@ -6005,6 +6010,7 @@ function addRecToList(watchAfter){
   else{toast(existing?'Already on your list':'Added to your list');openDetail(id);}
 }
 function openFriends(){renderFriends();openSheet('friendsSheet');pullRecs();pullFriendReqs();}
+function openHub(){ if(typeof IS_NATIVE!=='undefined'&&IS_NATIVE) openSheet('hubSheet'); else openFriends(); }
 function renderFriends(){
   const box=document.getElementById('friendsBody');if(!box)return;
   const code=myFriendCode(),name=myFriendName(),fr=friendsList(),out=friendsOut(),reqs=friendReqs;
@@ -7468,7 +7474,7 @@ try{if(IS_NATIVE){const pc=localStorage.getItem('party_active');if(pc&&partyName
 try{if(_updSnap){const pg=document.getElementById('pageEl'),y=_updSnap.y||0;if(y&&pg)requestAnimationFrame(()=>requestAnimationFrame(()=>{try{pg.scrollTop=y;}catch(e){}}));setTimeout(()=>toast('Updated to the latest version'),700);_updSnap=null;}}catch{}
 // Friends recommendations (public web build): show cached instantly, then refresh.
 try{loadRecsCache();}catch(e){}
-if(!IS_NATIVE){
+{
   setTimeout(()=>{pullRecs();pullFriendReqs();connectFriendWS();},1100);
   // keepalive so Cloudflare doesn't drop the idle socket
   setInterval(()=>{try{if(friendWS&&friendWS.readyState===1)friendWS.send('p');}catch(e){}},25000);

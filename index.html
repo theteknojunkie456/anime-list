@@ -2028,6 +2028,7 @@ async function netCall(path,body){
 }
 // The gate. Returns true if the app should stay HIDDEN behind the join screen.
 async function networkGate(){
+  if(typeof IS_NATIVE!=='undefined'&&IS_NATIVE)return false;   // official app: always open, no cap/gate
   if(!gateOn())return false;                              // feature off → open to all
   const force=gateTestMode()==='force';                   // preview mode ignores the shortcuts below
   if(!force&&netStatus()==='approved')return false;       // cached approval → open, revalidate below
@@ -2767,6 +2768,7 @@ function pushSupported(){return ('Notification'in window)&&('PushManager'in wind
 function notifyAnimeIds(){return anime.filter(a=>kindOf(a)==='watch'&&(a.status==='watching'||a.status==='plan')&&a.aniId).map(a=>a.aniId);}
 async function getPushSub(){try{const reg=await navigator.serviceWorker.ready;return await reg.pushManager.getSubscription();}catch{return null;}}
 async function enableNotify(){
+  if(typeof IS_NATIVE!=='undefined'&&IS_NATIVE){setNotifyOn(true);try{nativeScheduleNotifs();}catch{}toast('Notifications on');renderNotifyUI();return;}
   if(!pushSupported()){toast('On iPhone: Add to Home Screen first (iOS 16.4+)');renderNotifyUI();return;}
   try{
     const perm=await Notification.requestPermission();
@@ -2788,6 +2790,7 @@ async function enableNotify(){
   renderNotifyUI();
 }
 async function disableNotify(){
+  if(typeof IS_NATIVE!=='undefined'&&IS_NATIVE){setNotifyOn(false);try{window.webkit.messageHandlers.wl.postMessage({type:'notify',items:[]});}catch{}toast('Notifications off');renderNotifyUI();return;}
   try{
     const sub=await getPushSub();
     if(sub){
@@ -2840,11 +2843,11 @@ function nextAiring(){
     rel:days<=0?'today':days===1?'tomorrow':'in '+days+' days'};
 }
 function notifyUIHTML(){
-  if(!pushSupported()){
+  if(!pushSupported()&&!(typeof IS_NATIVE!=='undefined'&&IS_NATIVE)){
     return`<div class="dt-label">${icon('bell')} Episode notifications</div>
       <p class="ai-desc">Get notified when a new episode of your Watching/Plan shows airs. <strong style="color:var(--t1)">On iPhone/iPad</strong> this needs Safari's <strong style="color:var(--t1)">Add to Home Screen</strong> (iOS 16.4+): install the app, open it from your Home Screen, then turn this on.</p>`;
   }
-  const granted=('Notification'in window)&&Notification.permission==='granted';
+  const granted=(typeof IS_NATIVE!=='undefined'&&IS_NATIVE)?true:(('Notification'in window)&&Notification.permission==='granted');
   const on=notifyOn()&&granted;
   if(on){
     const n=notifyAnimeIds().length, nx=nextAiring();
@@ -2853,7 +2856,7 @@ function notifyUIHTML(){
       : `Tracking <b>${n}</b> show${n!==1?'s':''}. <b>Nothing's airing soon</b> — most of your list has finished, so it'll stay quiet until something new drops. That's expected, not a fault.`;
     return`<div class="dt-label">${icon('bell')} Episode notifications · ON</div>
       <p class="ai-desc">${status}</p>
-      <button class="parse-btn" style="margin-top:0" onclick="sendTestNotify()">Send a test notification</button>
+      ${(typeof IS_NATIVE!=='undefined'&&IS_NATIVE)?'':`<button class="parse-btn" style="margin-top:0" onclick="sendTestNotify()">Send a test notification</button>`}
       <button class="imp-all" style="width:100%;margin-top:8px" onclick="disableNotify()">Turn off notifications</button>`;
   }
   return`<div class="dt-label">${icon('bell')} Episode notifications · OFF</div>
@@ -2863,7 +2866,7 @@ function notifyUIHTML(){
 // Bell in the app header mirrors the on/off state (accent + filled bell when ON, muted when OFF).
 function renderNotifyBell(){
   const b=document.getElementById('notifyBell');if(!b)return;
-  const granted=('Notification'in window)&&Notification.permission==='granted';
+  const granted=(typeof IS_NATIVE!=='undefined'&&IS_NATIVE)?true:(('Notification'in window)&&Notification.permission==='granted');
   const on=notifyOn()&&granted;
   b.classList.toggle('bell-on',on);
   b.innerHTML=icon(on?'bell':'bell-off');

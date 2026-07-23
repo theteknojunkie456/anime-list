@@ -3571,7 +3571,8 @@ function renderDetail(){
     <div class="dt-label" style="margin-top:18px"></div>
     <div id="ai-box-detail"></div>
     ${(kindOf(a)==='watch'&&a.aniId)?`<button class="dt-watch" onclick="watchAnime('${a.id}')">${icon('play')} Watch now</button>
-    <button class="dt-pin-toggle" onclick="togglePin()">${icon('external')} ${a.srcUrl?'Direct link pinned — edit':'Pin a direct link for this show'}</button>
+    ${titleWatchPickerHTML(a)}
+    <button class="dt-pin-toggle" onclick="togglePin()">${icon('external')} ${a.srcUrl?'Advanced: edit the direct link':'Advanced: paste a direct episode link'}</button>
     <div id="dtPin" style="display:none">
       <input class="ai-prompt-in" id="dtPinIn" placeholder="https://site.com/watch/slug/ep-{ep}" value="${escH(a.srcUrl||'')}" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url">
       <div style="display:flex;gap:8px;margin-top:8px">
@@ -5207,6 +5208,42 @@ function streamSlug(title){
 // custom source, then (empty) to the default free-legal route. No scraping: you
 // supply the mapping, the app just remembers it.
 function effectiveSource(a){return (a&&a.srcUrl&&String(a.srcUrl).trim())||streamSource();}
+// Personalized list of streaming services offered as a per-title "Watch on" choice:
+// the paid services you picked as yours first (official app only), then the free/legal
+// presets, then any custom services you added. Web build stays free/legal only.
+function watchServices(){
+  var out=[];
+  if(typeof IS_NATIVE!=='undefined'&&IS_NATIVE){
+    var mine=myServices();
+    PAID_SERVICES.forEach(function(x){if(mine.indexOf(x.id)>=0)out.push({name:x.name,url:x.url});});
+    PAID_SERVICES.forEach(function(x){if(mine.indexOf(x.id)<0)out.push({name:x.name,url:x.url});});
+  }
+  WATCH_PRESETS.forEach(function(x){out.push({name:x.name,url:x.url});});
+  customServices().forEach(function(x){out.push({name:x.name,url:x.url});});
+  return out;
+}
+// Friendly per-title picker — tap a service and Watch opens there for THIS show only.
+// Sets a.srcUrl under the hood (same override the raw-link pin uses).
+function titleWatchPickerHTML(a){
+  var cur=(a&&a.srcUrl&&String(a.srcUrl).trim())||'';
+  var svcs=watchServices();
+  var known=svcs.some(function(x){return x.url===cur;});
+  var chips=svcs.map(function(x){return '<button class="src-chip'+(cur===x.url?' on':'')+'" data-u="'+escH(x.url)+'" onclick="setTitleService(\''+a.id+'\',this.dataset.u)">'+escH(x.name)+'</button>';}).join('');
+  return '<div class="dt-label" style="margin-top:14px">'+icon('play')+' Watch this on</div>'
+    +'<p class="ai-desc" style="font-size:11.5px">Pick where <b>Watch now</b> opens for this show \u2014 just this one. Leave it on <b>Default</b> to use your usual source.</p>'
+    +'<div class="src-picks">'
+    +'<button class="src-chip'+(!cur?' on':'')+'" onclick="setTitleService(\''+a.id+'\',\'\')">Default</button>'
+    +chips
+    +((cur&&!known)?'<button class="src-chip on" onclick="togglePin()">Custom link \u2713</button>':'')
+    +'</div>';
+}
+function setTitleService(id,url){
+  var a=anime.find(function(x){return x.id===id;});if(!a)return;
+  url=(url||'').trim();
+  if(url){a.srcUrl=url;}else{delete a.srcUrl;}
+  touch(a);save();renderDetail();
+  toast(url?'Watch opens here now':'Using your default source');
+}
 // Which title spelling feeds {slug}: 'romaji' | 'english' | '' (the main title).
 // Some sites index by romaji, some by English — this lifts the direct-hit rate.
 function slugPref(){try{return localStorage.getItem('slug_src')||'';}catch{return'';}}

@@ -1247,7 +1247,7 @@ body.recsel .pcard{position:relative;}
     <div class="lock-ico"><i data-ic="lock"></i></div>
     <div class="lock-title" id="lockTitle">WatchList is locked</div>
     <div class="lock-sub" id="lockSub">Enter your password to open your list.</div>
-    <button class="lock-btn" id="lockFace" style="display:none" onclick="tryUnlockFaceID()">Unlock with Face ID</button>
+    <button class="lock-btn" id="lockFace" style="display:none" onclick="doFaceUnlock()">Unlock with Face ID</button>
     <input id="lockPw" class="lock-in" type="password" placeholder="Password" autocomplete="current-password" onkeydown="if(event.key==='Enter')tryUnlock()">
     <button class="lock-btn" id="lockBtn" onclick="tryUnlock()">Unlock</button>
     <div class="lock-err" id="lockErr"></div>
@@ -2468,14 +2468,14 @@ function showLock(){
   const i=document.getElementById('lockPw');if(i)i.value='';
   setLockMode(false);   // sets Face ID vs password emphasis, and focuses only when it should
   // prompt straight away — no reason to make you tap a button to ask for Face ID
-  if(faceIDOn())setTimeout(()=>{try{tryUnlockFaceID(true);}catch{}},300);
+  if(faceIDOn()&&!(typeof IS_NATIVE!=='undefined'&&IS_NATIVE))setTimeout(()=>{try{tryUnlockFaceID(true);}catch{}},300);
 }
 function hideLock(){appLocked=false;const el=document.getElementById('lockScreen');if(el)el.classList.remove('on');}
 function setLockMode(rec){
   lockRecMode=rec;
   const t=document.getElementById('lockTitle'),s=document.getElementById('lockSub'),i=document.getElementById('lockPw'),b=document.getElementById('lockBtn'),l=document.getElementById('lockAlt'),e=document.getElementById('lockErr');
   if(e)e.textContent='';
-  const f=document.getElementById('lockFace');if(f)f.style.display=(!rec&&faceIDOn())?'block':'none'; // no Face ID while entering a recovery key
+  const f=document.getElementById('lockFace');if(f)f.style.display=(!rec&&faceAvail())?'block':'none'; // no Face ID while entering a recovery key
   if(!i)return;i.value='';
   if(rec){
     t.textContent='Enter recovery key';s.textContent='Use the recovery key you saved when you set your password.';
@@ -2487,12 +2487,12 @@ function setLockMode(rec){
     b.textContent='Unlock';b.setAttribute('onclick','tryUnlock()');l.textContent='Forgot password? Use recovery key';
     // when Face ID is on it's the way in — give it the primary button and demote
     // the password, rather than leading with a field you won't type in
-    const face=faceIDOn();
+    const face=faceAvail();
     s.textContent=face?'Unlock with Face ID — or use your password below.':'Enter your password to open your list.';
     if(f)f.className=face?'lock-btn':'lock-btn2';
     b.className=face?'lock-btn2':'lock-btn';
   }
-  if(!faceIDOn()||rec)i.focus();   // don't throw up the keyboard over a Face ID screen
+  if(!faceAvail()||rec)i.focus();   // don't throw up the keyboard over a Face ID screen
 }
 function toggleLockMode(){setLockMode(!lockRecMode);}
 function _unlockErr(i,err,msg){if(err)err.textContent=msg;const card=document.querySelector('.lock-card');if(card){card.classList.remove('shake');void card.offsetWidth;card.classList.add('shake');}if(i){i.value='';i.focus();}}
@@ -2569,6 +2569,14 @@ async function faceIDPossible(){
   try{return await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();}catch{return false;}
 }
 function faceIDOn(){try{const e=JSON.parse(store().getItem(LSKEY));return !!(e&&e.pfk);}catch{return false;}}
+// Native app: Face ID goes through iOS (LAContext) via the native bridge — independent
+// of the web passkey (pfk). So it's "available" whenever native, or when a passkey exists.
+function faceAvail(){return (typeof IS_NATIVE!=='undefined'&&IS_NATIVE)||faceIDOn();}
+function doFaceUnlock(){
+  if(typeof IS_NATIVE!=='undefined'&&IS_NATIVE){try{window.webkit.messageHandlers.wl.postMessage({type:'faceid'});}catch(e){}return;}
+  tryUnlockFaceID();
+}
+window.wlFaceMsg=function(m){try{var e=document.getElementById('lockErr');if(e)e.textContent=m||'';}catch(e){}};
 // STABLE user id. With a random one, every re-enable filed a separate "account"
 // and iOS stacked up duplicate passkeys, forcing a picker before it would scan.
 // Same rp + same user.id + resident key ⇒ re-registering REPLACES the old one.

@@ -1105,6 +1105,7 @@ body.recsel .pcard{position:relative;}
 .sched-today-pill{margin-left:auto;font-size:8.5px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:var(--a2);background:var(--ag);border:1px solid var(--a);padding:2.5px 9px;border-radius:99px;}
 .sched-day-body{display:flex;flex-direction:column;}
 .sched-row{display:flex;align-items:center;gap:11px;padding:9px 14px;min-height:44px;cursor:pointer;border-top:1px solid var(--bn2);transition:background .14s;}
+.sched-new{display:inline-block;margin-left:6px;padding:1px 6px;border-radius:6px;font-size:9px;font-weight:800;letter-spacing:.4px;background:var(--a);color:var(--aFg);vertical-align:middle;}
 .sched-row:active{background:var(--bg4);}
 @media(hover:hover){.sched-row:hover{background:var(--bg4);}.sched-arrow:hover{border-color:var(--b3);}.sched-today-btn:hover{filter:brightness(1.08);}}
 .sched-thumb{width:34px;height:48px;border-radius:8px;object-fit:cover;background:var(--bg4);border:1px solid var(--b2);flex-shrink:0;}
@@ -2804,7 +2805,8 @@ function notifyOn(){try{return localStorage.getItem('notify_on')==='1';}catch{re
 function setNotifyOn(v){try{if(v)localStorage.setItem('notify_on','1');else localStorage.removeItem('notify_on');}catch{}}
 function pushSupported(){return ('Notification'in window)&&('PushManager'in window)&&('serviceWorker'in navigator);}
 // aniIds of the shows we want the worker to poll: Watching/Plan watch items that have a captured AniList id.
-function notifyAnimeIds(){return anime.filter(a=>kindOf(a)==='watch'&&(a.status==='watching'||a.status==='plan'||a.status==='finished')&&a.aniId).map(a=>a.aniId);}
+function upcomingRelated(){try{return (JSON.parse(localStorage.getItem('upcoming_related')||'[]')||[]).filter(r=>r&&r.aniId);}catch(e){return[];}}
+function notifyAnimeIds(){const own=anime.filter(a=>kindOf(a)==='watch'&&(a.status==='watching'||a.status==='plan'||a.status==='finished')&&a.aniId).map(a=>a.aniId);const rel=upcomingRelated().map(r=>r.aniId).filter(Boolean);return [...new Set(own.concat(rel))];}
 async function getPushSub(){try{const reg=await navigator.serviceWorker.ready;return await reg.pushManager.getSubscription();}catch{return null;}}
 async function enableNotify(){
   if(typeof IS_NATIVE!=='undefined'&&IS_NATIVE){setNotifyOn(true);try{nativeScheduleNotifs();}catch{}toast('Notifications on');renderNotifyUI();return;}
@@ -4686,9 +4688,10 @@ function nativeScheduleNotifs(){
   if(!IS_NATIVE)return;
   try{
     const now=Date.now()/1000;
-    const items=anime.filter(a=>kindOf(a)==='watch'&&(a.status==='watching'||a.status==='plan'||a.status==='finished')&&a.airAt&&a.airAt>now)
-      .sort((x,y)=>x.airAt-y.airAt).slice(0,60)
+    const _list=anime.filter(a=>kindOf(a)==='watch'&&(a.status==='watching'||a.status==='plan'||a.status==='finished')&&a.airAt&&a.airAt>now)
       .map(a=>({title:a.title,at:a.airAt,ep:a.airEp||0}));
+    upcomingRelated().forEach(r=>{if(r.airAt&&r.airAt>now)_list.push({title:r.title,at:r.airAt,ep:r.airEp||0});});
+    const items=_list.sort((x,y)=>x.at-y.at).slice(0,60);
     window.webkit.messageHandlers.wl.postMessage({type:'notify',items});
   }catch(e){}
 }
@@ -7084,7 +7087,7 @@ async function fetchCovers(){
       await pause(1000); // stay comfortably under AniList's per-minute limit
     }
     if(adultRemoved)toast(`Blocked ${adultRemoved} adult title${adultRemoved!==1?'s':''} — not allowed`);
-  }finally{coverRunning=false;}
+  }finally{coverRunning=false;try{checkResumedDone();}catch(e){}try{scanUpcomingRelated();}catch(e){}}
 }
 // ─── AUTOFILL ───────────────────────────────────────────────────────────────
 // Searching used to take the first hit from the first API that answered. Jikan
@@ -7281,7 +7284,66 @@ function schedDayKey(d){return d.getFullYear()*10000+(d.getMonth()+1)*100+d.getD
 function schedFmt(d){return d.toLocaleDateString([],{month:'short',day:'numeric'});}
 function schedLabel(off){return off===0?'This Week':off===-1?'Last Week':off===1?'Next Week':(off<0?(-off)+' weeks ago':'In '+off+' weeks');}
 function schedGo(dir){if(dir==='today')schedOffset=0;else schedOffset+=dir;renderSchedule();}
-function schedWatchItems(){return anime.filter(a=>kindOf(a)==='watch'&&(a.status==='watching'||a.status==='plan'));}
+function schedWatchItems(){const own=anime.filter(a=>kindOf(a)==='watch'&&(a.status==='watching'||a.status==='plan'));const rel=upcomingRelated().map(r=>({id:'rel:'+r.aniId,title:r.title,img:r.img||'',aniId:r.aniId,airAt:r.airAt||0,airEp:r.airEp||0}));return own.concat(rel);}
+// Scan every tracked show's AniList relations for NEW seasons/OVAs/movies/specials not
+// yet in your list; stash the upcoming ones so they flow into the schedule + notifications.
+async function scanUpcomingRelated(){
+  try{
+    const last=+(localStorage.getItem('rel_scan_at')||0);
+    if(Date.now()-last < 20*3600*1000) return;
+    const shows=anime.filter(a=>kindOf(a)==='watch'&&a.aniId&&(a.status==='watching'||a.status==='plan'||a.status==='finished'));
+    if(!shows.length){try{localStorage.setItem('rel_scan_at',String(Date.now()));}catch(e){}return;}
+    const own=new Set(anime.filter(a=>a.aniId).map(a=>a.aniId));
+    const WANT_REL={SEQUEL:1,SIDE_STORY:1}, WANT_FMT={TV:1,TV_SHORT:1,MOVIE:1,SPECIAL:1,OVA:1,ONA:1};
+    const found=new Map();
+    for(let i=0;i<shows.length;i+=20){
+      const batch=shows.slice(i,i+20);
+      const q='{'+batch.map((a,j)=>`r${j}:Media(id:${a.aniId},type:ANIME){id title{romaji english} relations{edges{relationType node{id type isAdult format status title{romaji english native} coverImage{large color} bannerImage episodes duration genres nextAiringEpisode{airingAt episode}}}}}`).join(' ')+'}';
+      let data=null;
+      try{const r=await fetch('https://graphql.anilist.co',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({query:q})});if(r.status===429){await pause(6000);i-=20;continue;}if(r.ok)data=(await r.json()).data;}catch(e){}
+      if(data){batch.forEach((a,j)=>{
+        const node=data['r'+j];if(!node||!node.relations)return;
+        const parent=(node.title&&(node.title.english||node.title.romaji))||a.title;
+        (node.relations.edges||[]).forEach(e=>{
+          const n=e.node;if(!n||n.type!=='ANIME')return;
+          if(!WANT_REL[e.relationType]||!WANT_FMT[n.format])return;
+          if(n.status!=='RELEASING'&&n.status!=='NOT_YET_RELEASED')return;
+          if(own.has(n.id)||found.has(n.id))return;
+          if(isAdultMedia(n))return;
+          const na=n.nextAiringEpisode;
+          found.set(n.id,{aniId:n.id,title:(n.title&&(n.title.english||n.title.romaji))||('Anime #'+n.id),titleEn:(n.title&&n.title.english)||'',titleRo:(n.title&&n.title.romaji)||'',format:n.format,status:n.status,airAt:(na&&na.airingAt)||0,airEp:(na&&na.episode)||0,img:(n.coverImage&&n.coverImage.large)||'',banner:n.bannerImage||'',aniColor:(n.coverImage&&n.coverImage.color)||'',epTotal:n.episodes||0,dur:n.duration||0,genre:(n.genres&&n.genres.slice(0,3).join(', '))||'',from:parent,rel:e.relationType});
+        });
+      });}
+      if(i+20<shows.length)await pause(1200);
+    }
+    try{localStorage.setItem('upcoming_related',JSON.stringify([...found.values()]));}catch(e){}
+    try{localStorage.setItem('rel_scan_at',String(Date.now()));}catch(e){}
+    try{nativeScheduleNotifs();}catch(e){}
+    try{if(!(typeof IS_NATIVE!=='undefined'&&IS_NATIVE)&&notifyOn())notifyUpdate();}catch(e){}
+  }catch(e){}
+}
+// Tap an upcoming-related row in the schedule -> add it to Plan so it's fully tracked.
+function addRelatedSched(aniId){
+  aniId=+aniId;
+  const r=upcomingRelated().find(x=>x.aniId===aniId);if(!r)return;
+  if(anime.some(a=>a.aniId===aniId)){toast('Already in your list');return;}
+  anime.unshift({id:uid(),kind:'watch',status:'plan',title:r.title,titleEn:r.titleEn||'',titleRo:r.titleRo||'',aniId:r.aniId,malId:0,img:r.img||'',banner:r.banner||'',aniColor:r.aniColor||'',bgImage:'',bgAccent:'',eps:r.epTotal?r.epTotal+' eps':'',epTotal:r.epTotal||0,ep:0,airAt:r.airAt||0,airEp:r.airEp||0,dur:r.dur||0,time:'',genre:r.genre||'',order:[],notes:'',rating:0,fav:false,upd:Date.now()});
+  save();render();toast('\u201c'+r.title+'\u201d added to Plan');
+  try{nativeScheduleNotifs();}catch(e){}
+  setTimeout(fetchCovers,300);
+}
+// A show you marked Done is airing new episodes again -> offer to move it back to Watching.
+function checkResumedDone(){
+  try{
+    const now=Date.now()/1000;
+    const resumed=anime.filter(a=>kindOf(a)==='watch'&&a.status==='finished'&&a.airAt&&a.airAt>now&&!a.resumeAsked);
+    if(!resumed.length)return;
+    resumed.forEach(a=>{a.resumeAsked=true;});save();
+    const one=resumed.length===1;
+    const msg=(one?'\u201c'+resumed[0].title+'\u201d is':(resumed.length+' shows you marked Done are'))+' airing new episodes again. Move '+(one?'it':'them')+' back to Watching so you get episode alerts and it lands on your schedule?';
+    askConfirm({title:'Airing again',msg:msg,yes:'Move to Watching',onYes:function(){resumed.forEach(a=>{a.status='watching';touch(a);try{alPushItem&&alPushItem(a);}catch(e){}});save();render();toast('Moved to Watching');try{nativeScheduleNotifs();}catch(e){}}});
+  }catch(e){}
+}
 function renderSchedule(){
   const body=document.getElementById('scheduleBody');if(!body)return;
   const ws=schedWeekStart(schedOffset),we=new Date(ws);we.setDate(we.getDate()+6);
@@ -7341,7 +7403,7 @@ function renderSchedDays(ws,eps){
         const ch=((e.title||'?').charAt(0)||'?').replace(/[^A-Za-z0-9]/g,'')||'?';
         const thumb=e.img?'<img class="sched-thumb" src="'+e.img+'" alt="" loading="lazy" onerror="this.outerHTML=schPh(\''+ch+'\')">':schPh(ch);
         const bell=notifSet&&e.aniId&&notifSet.has(e.aniId)?'<span class="sched-bell" title="Notifications on">'+icon('bell')+'</span>':'';
-        rows+='<div class="sched-row" onclick="openDetail(\''+e.id+'\')">'+thumb+'<div class="sched-row-main"><div class="sched-row-title">'+schEsc(e.title)+bell+'</div><div class="sched-row-sub">Ep '+(e.episode||'?')+' · '+t+'</div></div></div>';
+        var _isRel=e.id&&(''+e.id).indexOf('rel:')===0;var _click=_isRel?("addRelatedSched('"+e.aniId+"')"):("openDetail('"+e.id+"')");var _newt=_isRel?'<span class="sched-new">NEW</span>':'';rows+='<div class="sched-row" onclick="'+_click+'">'+thumb+'<div class="sched-row-main"><div class="sched-row-title">'+schEsc(e.title)+_newt+bell+'</div><div class="sched-row-sub">Ep '+(e.episode||'?')+' \u00b7 '+t+'</div></div></div>';
       });
     }else rows='<div class="sched-empty-day">—</div>';
     html+='<div class="'+cls+'"><div class="sched-day-head"><span class="sched-day-name">'+day.toLocaleDateString([],{weekday:'long'})+'</span><span class="sched-day-date">'+schedFmt(day)+'</span>'+pill+'</div><div class="sched-day-body">'+rows+'</div></div>';

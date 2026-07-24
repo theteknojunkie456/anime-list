@@ -2369,6 +2369,7 @@ function migrate(list){
   // Defensive: drop non-object entries and guarantee id/title/status so one malformed
   // item (from a bad import, a truncated paste, a future format change) can't crash render.
   const mapped=(Array.isArray(list)?list:[]).filter(a=>a&&typeof a==='object').map(a=>({id:uid(),title:'',status:'plan',ep:0,rating:0,fav:false,upd:0,epTotal:parseEpTotal(a.eps),img:'',order:[],notes:'',genre:'',eps:'',time:'',kind:'watch',banner:'',aniColor:'',bgImage:'',bgAccent:'',bannerTried:false,...a}));
+  mapped.forEach(a=>{a.img=safeImg(a.img);a.banner=safeImg(a.banner);a.bgImage=safeImg(a.bgImage);});
   return dedupeList(mapped).kept;   // never load a list with duplicates
 }
 function load(){
@@ -2494,16 +2495,31 @@ async function upgradeToV2(pw){                        // migrate an older (v1) 
   showRecovery(rec,'Security upgraded — save your recovery key');
 }
 let lockRecMode=false;
+let _lockTapH=null;
 function showLock(){
   appLocked=true;lockRecMode=false;
   const el=document.getElementById('lockScreen');if(!el)return;
   el.classList.add('on');
   const i=document.getElementById('lockPw');if(i)i.value='';
   setLockMode(false);   // sets Face ID vs password emphasis, and focuses only when it should
-  // prompt straight away — no reason to make you tap a button to ask for Face ID
-  if(faceIDOn()&&!(typeof IS_NATIVE!=='undefined'&&IS_NATIVE))setTimeout(()=>{try{tryUnlockFaceID(true);}catch{}},300);
+  if(_lockTapH){el.removeEventListener('pointerdown',_lockTapH);_lockTapH=null;}
+  // Browsers refuse an un-prompted biometric prompt, so the auto-attempt below is
+  // usually blocked — the FIRST tap is what gives WebAuthn the activation it needs.
+  // So instead of making you aim at the button, ANY tap on the lock fires Face ID
+  // (tapping the password field, its Unlock button, or the recovery link still do
+  // their own thing). That collapses the app side to a single tap.
+  if(faceIDOn()&&!(typeof IS_NATIVE!=='undefined'&&IS_NATIVE)){
+    setTimeout(()=>{try{tryUnlockFaceID(true);}catch{}},300);
+    _lockTapH=function(ev){
+      const t=ev.target;
+      if(t&&(t.id==='lockPw'||t.id==='lockBtn'||t.id==='lockFace'||(t.closest&&t.closest('#lockAlt'))))return;
+      el.removeEventListener('pointerdown',_lockTapH);_lockTapH=null;
+      try{doFaceUnlock();}catch(e){}
+    };
+    el.addEventListener('pointerdown',_lockTapH);
+  }
 }
-function hideLock(){appLocked=false;const el=document.getElementById('lockScreen');if(el)el.classList.remove('on');}
+function hideLock(){appLocked=false;const el=document.getElementById('lockScreen');if(el){el.classList.remove('on');if(_lockTapH){el.removeEventListener('pointerdown',_lockTapH);_lockTapH=null;}}}
 function setLockMode(rec){
   lockRecMode=rec;
   const t=document.getElementById('lockTitle'),s=document.getElementById('lockSub'),i=document.getElementById('lockPw'),b=document.getElementById('lockBtn'),l=document.getElementById('lockAlt'),e=document.getElementById('lockErr');
@@ -2521,7 +2537,7 @@ function setLockMode(rec){
     // when Face ID is on it's the way in — give it the primary button and demote
     // the password, rather than leading with a field you won't type in
     const face=faceAvail();
-    s.textContent=face?'Unlock with Face ID — or use your password below.':'Enter your password to open your list.';
+    s.textContent=face?'Tap anywhere to unlock with Face ID — or use your password below.':'Enter your password to open your list.';
     if(f)f.className=face?'lock-btn':'lock-btn2';
     b.className=face?'lock-btn2':'lock-btn';
   }
@@ -3433,7 +3449,7 @@ function posterCard(a,nSeas){
       ${durBadge}
     </div>
     ${bar}
-    <div class="pcard-title">${title}</div>
+    <div class="pcard-title">${schEsc(title)}</div>
     ${airHTML}
   </div>`;
 }
@@ -3464,7 +3480,7 @@ function bbSlideHTML(a){
     ${bg}<div class="hero-shade"></div>
     <div class="hero-body">
       <div class="hero-kicker">${kicker}</div>
-      <div class="hero-title">${a.title}</div>
+      <div class="hero-title">${schEsc(a.title)}</div>
       <div class="hero-meta">${[a.eps,a.time,(a.genre||'').split(',')[0]].filter(Boolean).join(' · ')}</div>
       ${a.epTotal?`<div class="hero-prog"><div class="pbar"><div class="pfill" style="width:${Math.round(p*100)}%"></div></div><span>${a.ep||0} / ${a.epTotal}</span></div>`:''}
       ${airHTML}
@@ -3675,7 +3691,7 @@ function renderDetail(){
     const filmsHTML=grouped?`<details class="films-acc"><summary>${icon('film')} ${films.length} side films — optional, watch any time</summary><ol class="order-list">${films.map(s=>li(s,true)).join('')}</ol></details>`:'';
     orderHTML=`<div class="dt-label">${read?'Read order':'Watch order'}</div><ol class="order-list">${main.map(s=>li(s,false)).join('')}</ol>${filmsHTML}`;
   }
-  const notesHTML=(a.notes&&a.notes.trim())?`<div class="dt-label">Notes</div><div class="dt-note">${a.notes}</div>`:'';
+  const notesHTML=(a.notes&&a.notes.trim())?`<div class="dt-label">Notes</div><div class="dt-note">${schEsc(a.notes)}</div>`:'';
   // Seasons/parts. For watch items with an AniList id we show the WHOLE franchise
   // (every season, even ones not on your list), filled async by loadFranchise().
   // Everything else falls back to just the seasons already on your list.
@@ -3699,7 +3715,7 @@ function renderDetail(){
       ${bannerHTML}
       ${cover}
       <div class="dt-info">
-        <div class="dt-title">${a.title}</div>
+        <div class="dt-title">${schEsc(a.title)}</div>
         <div class="dt-meta">${[a.eps, kindOf(a)==='read'?a.time:''].filter(Boolean).join(' · ')}</div>
         ${(()=>{if(kindOf(a)!=='watch')return '';const tw=totalWatchMins(a),fm=filmMins(a);if(!tw)return '';return `<div class="dt-runtime">${icon('clock')} <b>${fmtWatch(tw)}</b> to watch${a.epTotal?` all ${a.epTotal} episodes`:''}${fm?`<span class="dt-runtime-films"> + ${fmtWatch(fm)} of films</span>`:''}</div>`;})()}
         ${(()=>{const air=airingInfo(a);return air?`<div class="dt-air">${icon('calendar')} Ep ${air.ep} · airs ${air.when}</div>`:'';})()}
@@ -5057,14 +5073,14 @@ function renderParty(){
   const r=partyRoom||{members:[],chat:[]};
   const meUid=partyUid();
   const members=r.members.map(m=>`<span class="pt-chip${m.uid===r.host?' host':''}"><span class="dot"></span>${schEsc(m.name)}${m.uid===r.host?`<span class="pt-host">${icon('star')}</span>`:''}</span>`).join('');
-  const now=r.title?`<div class="pt-now">${r.img?`<img src="${r.img}" alt="">`:''}<div><div class="pt-now-t">${schEsc(r.title)}</div><div class="pt-now-s">${r.ep?`Episode ${r.ep}`:'Ready'} · ${r.members.length} watching</div></div></div>`:'';
+  const now=r.title?`<div class="pt-now">${r.img?`<img src="${safeImg(r.img)}" alt="">`:''}<div><div class="pt-now-t">${schEsc(r.title)}</div><div class="pt-now-s">${r.ep?`Episode ${r.ep}`:'Ready'} · ${r.members.length} watching</div></div></div>`:'';
   let hostCtl='';
   const sharing=!!r.sharing, iShare=r.sharing===meUid;
   // Shared "Up next" queue — visible to everyone; the host can remove items and pull the head.
   const qlist=r.queue||[];
   const queueBlock=qlist.length?`<div class="dt-label" style="margin-top:14px">Up next · ${qlist.length}</div>
     <div class="pt-picklist">${qlist.map((q,i)=>`<div class="pt-pick pt-qitem">
-      ${q.img?`<img src="${q.img}" alt="">`:`<div class="ph">${((q.title||'?')[0]||'?').toUpperCase()}</div>`}
+      ${q.img?`<img src="${safeImg(q.img)}" alt="">`:`<div class="ph">${((q.title||'?')[0]||'?').toUpperCase()}</div>`}
       <div class="pt-pick-info"><div class="pt-pick-t">${schEsc(q.title)}</div><div class="pt-pick-s">${q.ep?`Episode ${q.ep} · `:''}added by ${schEsc(q.by||'?')}</div></div>
       ${partyIsHost?`<button class="pt-qx" onclick="partyQueueRemoveAt(${i})" aria-label="Remove from queue">${icon('x')}</button>`:''}</div>`).join('')}</div>`:'';
   if(partyIsHost&&iShare){
@@ -5339,7 +5355,7 @@ function behindHTML(){
   const {a,behind}=items[0];
   const more=items.length>1?` · +${items.length-1} more show${items.length>2?'s':''}`:'';
   return`<div class="nudge behind" style="${accentVars(a)}">${icon('play')}
-    <div class="nudge-t"><b>${a.title}</b> — ${behind} new episode${behind!==1?'s':''} since you last watched${more}</div>
+    <div class="nudge-t"><b>${schEsc(a.title)}</b> — ${behind} new episode${behind!==1?'s':''} since you last watched${more}</div>
     <button class="nudge-go" onclick="resumeWatch('${a.id}')">Resume</button>
   </div>`;
 }
@@ -5668,6 +5684,13 @@ const PAID_SERVICES=[
   {id:'appletv',    name:'Apple TV',    url:'https://tv.apple.com/search?term={title}'},
 ];
 function escH(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+// Image URLs can arrive from OTHER people (friend recs, party queue/now-playing). If one
+// is dropped into src="${...}" or url('${...}') raw, a value like  x" onerror="…  breaks
+// out and runs script in your browser. Allow only real image URLs with no breakout chars.
+function safeImg(u){u=String(u==null?'':u);return(/^(https?:\/\/|data:image\/|blob:)/i.test(u)&&!/["'<>\\\s]/.test(u))?u:'';}
+function safeCode(c){return String(c==null?'':c).replace(/[^A-Za-z0-9]/g,'').slice(0,64);}
+function safeId(x){return String(x==null?'':x).replace(/[^A-Za-z0-9._:-]/g,'').slice(0,80);}
+function safeText(s){return String(s==null?'':s).replace(/[<>]/g,'').slice(0,4000);}
 function myServices(){try{return JSON.parse(localStorage.getItem('my_services')||'[]');}catch{return[];}}
 function toggleService(id){let s=myServices();s=s.includes(id)?s.filter(x=>x!==id):s.concat(id);try{localStorage.setItem('my_services',JSON.stringify(s));}catch{}renderSource();}
 function fillURL(url,a){return url.replace(/\{title\}/g,encodeURIComponent(a.title)).replace(/\{slug\}/g,streamSlug(a.title)).replace(/\{ep\}/g,String(watchEpisode(a)||1));}
@@ -6054,7 +6077,7 @@ function friendDisplay(code,fallback){const f=friendsList().find(x=>x.code===cod
 // Build a new friend record, carrying any name you typed when you added them
 // (kept on the outgoing request) forward as your local alias, so it survives
 // the accept instead of being replaced by their self-name.
-function newFriendObj(code,name,at){const o={code,name:name||'Friend',nameAt:at||0};const p=friendsOut().find(f=>f.code===code);if(p&&p.name&&p.name.trim())o.alias=p.name.trim().slice(0,40);return o;}
+function newFriendObj(code,name,at){code=safeCode(code);const o={code,name:name||'Friend',nameAt:at||0};const p=friendsOut().find(f=>f.code===code);if(p&&p.name&&p.name.trim())o.alias=p.name.trim().slice(0,40);return o;}
 function renameFriendPrompt(code){
   const fr=friendsList(),f=fr.find(x=>x.code===code); if(!f)return;
   const next=window.prompt('What do you want to call this friend?',f.alias||f.name||'');
@@ -6076,6 +6099,7 @@ async function pullFriendReqs(){
     const handled=frHandled(); let friends=friendsList(); let changed=false; const incoming=[];
     for(const m of msgs){
       if(!m||!m.from||!m.from.code)continue;
+      m.from.code=safeCode(m.from.code); m.id=safeId(m.id); if(!m.from.code)continue;
       refreshFriendName(m.from.code,m.from.name,m.at);   // keep friend names current (newest wins)
       if(handled.includes(m.id))continue;
       if(m.type==='accept'){
@@ -6126,6 +6150,7 @@ function mergeRec(env){
 // Merge a pushed friend request / accept instantly.
 function mergeFriendMsg(m){
   if(!m||!m.from||!m.from.code)return;
+  m.from.code=safeCode(m.from.code); m.id=safeId(m.id); if(!m.from.code)return;
   refreshFriendName(m.from.code,m.from.name,m.at);
   if(frHandled().includes(m.id))return;
   let friends=friendsList();
@@ -6201,7 +6226,7 @@ function recByAni(){
   recsIn.forEach(env=>{(env.items||[]).forEach(it=>{
     const k=it.aniId?('a'+it.aniId):('t'+String(it.title||'').toLowerCase());
     if(!m[k])m[k]={item:it,senders:[]};
-    const code=(env.from&&env.from.code)||'', name=(env.from&&env.from.name)||'A friend', note=it.note||'', at=env.at||0;
+    const code=safeCode((env.from&&env.from.code)||''), name=(env.from&&env.from.name)||'A friend', note=it.note||'', at=env.at||0;
     // one entry per friend even if they recommended it more than once; keep their
     // most recent name, and their most recent NON-empty note.
     const ex=m[k].senders.find(s=>s.code===code);
@@ -6267,7 +6292,7 @@ function addRecToList(watchAfter){
     id=uid();
     const noteLines=rec.senders.map(s=>`${s.name}: ${s.note||'recommended this'}`).join('\n');
     // add it like any freshly-added show: top of the list, marked recent, then enriched
-    anime.unshift({id,title:it.title,status:'plan',kind:it.kind==='read'?'read':'watch',aniId:it.aniId||0,img:it.img||'',eps:'',epTotal:0,time:'',genre:it.genre||'',order:[],notes:noteLines,rating:0,fav:false,upd:Date.now()});
+    anime.unshift({id,title:safeText(it.title),status:'plan',kind:it.kind==='read'?'read':'watch',aniId:it.aniId||0,img:safeImg(it.img),eps:'',epTotal:0,time:'',genre:safeText(it.genre),order:[],notes:noteLines,rating:0,fav:false,upd:Date.now()});
     dedupeAnime();save();setTimeout(fetchCovers,300);   // pull episode counts / banner / airing
   }
   render();closeAll();

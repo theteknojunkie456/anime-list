@@ -3888,7 +3888,7 @@ function toggleFav(){
 function openSheet(id){
   // Watch parties live only in the official app. On the public web build there's
   // no way in — the entry buttons are hidden (body.no-party) and this is the backstop.
-  if(id==='partySheet'&&!IS_NATIVE)return;
+  /* party sheet works on web now — browser can join + watch a broadcast */
   closeAll();
   document.getElementById('overlay').classList.add('on');
   document.getElementById(id).classList.add('on');
@@ -6096,7 +6096,7 @@ function onPartyInvite(data){
   const code=String(data.party||'');if(!code)return;
   const name=(data.from&&data.from.name)||'A friend';
   askConfirm({title:'Watch party invite',msg:name+' invited you to their watch party — join now?',yes:'Join',onYes:()=>{
-    if(typeof IS_NATIVE!=='undefined'&&!IS_NATIVE){toast('Watch parties are in the WatchList app');return;}
+    /* web can join + view parties now */
     try{closeAll();}catch(e){}
     partyJoin(code);openSheet('partySheet');
   }});
@@ -6218,7 +6218,7 @@ function addRecToList(watchAfter){
   else{toast(existing?'Already on your list':'Added to your list');openDetail(id);}
 }
 function openFriends(){renderFriends();openSheet('friendsSheet');pullRecs();pullFriendReqs();}
-function openHub(){ if(typeof IS_NATIVE!=='undefined'&&IS_NATIVE) openSheet('hubSheet'); else openFriends(); }
+function openHub(){ openSheet('hubSheet'); }
 function renderFriends(){
   const box=document.getElementById('friendsBody');if(!box)return;
   const code=myFriendCode(),name=myFriendName(),fr=friendsList(),out=friendsOut(),reqs=friendReqs;
@@ -7735,7 +7735,7 @@ try{(function(){var code=(new URL(location.href).searchParams.get('party')||'').
   if(!/^[A-Z0-9]{5,8}$/.test(code))return;
   var u=new URL(location.href);u.searchParams.delete('party');history.replaceState(null,'',u.pathname+u.search+u.hash);
   if(typeof IS_NATIVE!=='undefined'&&IS_NATIVE){setTimeout(function(){try{window.wlJoinParty(code);}catch(e){}},600);}
-  else{setTimeout(function(){try{partyInviteBridge(code);}catch(e){}},500);}
+  else{setTimeout(function(){try{window.wlJoinParty(code);}catch(e){}},600);}
 })();}catch(e){}
 try{alCatchRedirect().then(()=>{if(!appLocked)alBootSync();}).catch(()=>{});}catch{}   // returning from AniList OAuth
 if(appLocked)showLock();   // stored list is ciphertext → gate the app until unlocked

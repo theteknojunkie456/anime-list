@@ -3257,13 +3257,13 @@ function renderGlowRow(){
   const modes=specials.map(function(x){var id=x[0],lb=x[1],bg=x[2],off=(id==='off');
     return '<button class="glow-mode'+(m===id?' on':'')+'" onclick="setGlow(\''+id+'\')" aria-label="'+lb+'">'
       +'<span class="glow-sw'+(off?' glow-off':'')+'" style="background:'+(bg||'var(--bg4)')+'"></span>'
-      +'<span class="glow-lb">'+lb+'</span></button>';}).join('');
+      +'<span class="glow-lb">'+lb+'</span></button>';});
   var isCustom=/^#[0-9a-fA-F]{3,8}$/.test(m);
   var cur=isCustom?m:'#8b5cff';
   var custom='<label class="glow-mode'+(isCustom?' on':'')+'" aria-label="Custom glow color">'
     +'<span class="glow-sw glow-cpick" style="background:'+cur+'"><input type="color" value="'+cur+'" oninput="glowColorLive(this.value)"></span>'
     +'<span class="glow-lb">Custom</span></label>';
-  row.innerHTML='<div class="glow-modes">'+modes+custom+'</div>';
+  row.innerHTML='<div class="glow-modes">'+modes[0]+modes[1]+custom+modes[2]+'</div>';
 }
 let heroAmb='',_ambRAF=0;
 function onPageScroll(){

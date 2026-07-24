@@ -2804,7 +2804,7 @@ function notifyOn(){try{return localStorage.getItem('notify_on')==='1';}catch{re
 function setNotifyOn(v){try{if(v)localStorage.setItem('notify_on','1');else localStorage.removeItem('notify_on');}catch{}}
 function pushSupported(){return ('Notification'in window)&&('PushManager'in window)&&('serviceWorker'in navigator);}
 // aniIds of the shows we want the worker to poll: Watching/Plan watch items that have a captured AniList id.
-function notifyAnimeIds(){return anime.filter(a=>kindOf(a)==='watch'&&(a.status==='watching'||a.status==='plan')&&a.aniId).map(a=>a.aniId);}
+function notifyAnimeIds(){return anime.filter(a=>kindOf(a)==='watch'&&(a.status==='watching'||a.status==='plan'||a.status==='finished')&&a.aniId).map(a=>a.aniId);}
 async function getPushSub(){try{const reg=await navigator.serviceWorker.ready;return await reg.pushManager.getSubscription();}catch{return null;}}
 async function enableNotify(){
   if(typeof IS_NATIVE!=='undefined'&&IS_NATIVE){setNotifyOn(true);try{nativeScheduleNotifs();}catch{}toast('Notifications on');renderNotifyUI();return;}
@@ -4686,7 +4686,7 @@ function nativeScheduleNotifs(){
   if(!IS_NATIVE)return;
   try{
     const now=Date.now()/1000;
-    const items=anime.filter(a=>kindOf(a)==='watch'&&(a.status==='watching'||a.status==='plan')&&a.airAt&&a.airAt>now)
+    const items=anime.filter(a=>kindOf(a)==='watch'&&(a.status==='watching'||a.status==='plan'||a.status==='finished')&&a.airAt&&a.airAt>now)
       .sort((x,y)=>x.airAt-y.airAt).slice(0,60)
       .map(a=>({title:a.title,at:a.airAt,ep:a.airEp||0}));
     window.webkit.messageHandlers.wl.postMessage({type:'notify',items});

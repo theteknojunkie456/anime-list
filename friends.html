@@ -2917,6 +2917,7 @@ function openNotifySheet(){openSheet('notifySheet');renderNotifyUI();}
 // ─── THEMES ────────────────────────────────────────────────────────────────
 const THEMES=[
   {id:'default', name:'Default', emoji:'🌑', bg:'#111114', accent:'#e03d55'},
+  {id:'light',   name:'Light',   emoji:'☀️', bg:'#ffffff', accent:'#7c5cff', custom:true, builtin:true, darken:false},
   {id:'naruto',  name:'Naruto',  emoji:'🍥', bg:'#0e0f18', accent:'#f57800'},
   {id:'sasuke',  name:'Sasuke',  emoji:'⚡', bg:'#0b0b18', accent:'#7730e8'},
   {id:'luffy',   name:'Luffy',   emoji:'🏴‍☠️',bg:'#0b1420', accent:'#d03838'},
@@ -3084,7 +3085,7 @@ function renderThemeGrid(){
       <div class="tswatch" style="background:linear-gradient(135deg,${sbg} 0%,${sbg}dd 100%)">
         <span>${t.emoji}</span>
         <div class="taccent-bar" style="background:${t.accent}"></div>
-        ${t.custom?`<div class="tdel" onclick="event.stopPropagation();deleteCustomTheme('${t.id}')">${icon('x')}</div>`:''}
+        ${t.custom&&!t.builtin?`<div class="tdel" onclick="event.stopPropagation();deleteCustomTheme('${t.id}')">${icon('x')}</div>`:''}
       </div>
       <div class="tname">${t.name}</div>
     </button>`;

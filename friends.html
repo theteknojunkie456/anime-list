@@ -2016,6 +2016,7 @@ const STATUS_META={
 // ─── STORAGE ───────────────────────────────────────────────────────────────
 const LSKEY='animelist_friends_v4';
 const SYNC_URL='https://watchlist-sync.muhammad-dac.workers.dev';
+const SYNC_CAP=20000000; // keep in step with the worker's push cap (cloud/sync-worker.js)
 // Companion Web Push worker (see enableNotify/disableNotify/notifyUpdate below).
 // NOTE: this URL is a placeholder that may be corrected at deploy — it's the ONLY place it's defined.
 const NOTIFY_URL='https://watchlist-notify.muhammad-dac.workers.dev';
@@ -2712,14 +2713,55 @@ function syncCode(){try{return localStorage.getItem('sync_'+LSKEY)||'';}catch{re
 function setSyncCode(c){try{if(c)localStorage.setItem('sync_'+LSKEY,c);else localStorage.removeItem('sync_'+LSKEY);}catch{}}
 function syncAt(){try{return +localStorage.getItem('syncat_'+LSKEY)||0;}catch{return 0;}}
 function setSyncAt(t){try{localStorage.setItem('syncat_'+LSKEY,String(t||0));}catch{}}
+// One sync code should carry your WHOLE setup, not just the titles. `extra` is a flat
+// snapshot of app state — appearance, friends, friend recs, source prefs, onboarding,
+// everything — so a second device (the iOS app or another browser) comes up identical.
+// The denylist is what must stay on THIS device: the sync code + its clock, AniList
+// auth, your AI key, the encryption flag, the raw list (already synced as `list`), and
+// per-device party identity. Anything new syncs automatically. Raw strings in and out —
+// values are already JSON in localStorage, so there's nothing to reparse.
+function syncSkip(k){
+  if(!k)return true;
+  if(k===LSKEY||k===ENCFLAG||k==='anthropic_key'||k==='_t'||k==='wl_gate_test')return true;
+  if(k==='party_uid'||k==='party_active')return true; // party_name (your display name) DOES sync
+  return k.indexOf('sync_')===0||k.indexOf('syncat_')===0||k.indexOf('al_')===0||k.indexOf('ai_model_')===0;
+}
+function collectExtra(){
+  const out={};
+  try{const s=store();if(!s)return out;
+    for(let i=0;i<s.length;i++){const k=s.key(i);if(syncSkip(k))continue;const v=s.getItem(k);if(typeof v==='string')out[k]=v;}
+  }catch(e){}
+  return out;
+}
+function applyExtra(x){
+  if(!x||typeof x!=='object')return;
+  try{for(const k in x){if(syncSkip(k))continue;if(typeof x[k]==='string'){try{localStorage.setItem(k,x[k]);}catch(e){}}}}catch(e){}
+  // repaint everything the synced state drives
+  try{const at=localStorage.getItem('animetheme');if(at&&typeof applyTheme==='function')applyTheme(at);}catch(e){}
+  try{if(typeof applyGlow==='function')applyGlow();}catch(e){}
+  try{if(typeof applyAmbient==='function')applyAmbient();}catch(e){}
+  try{if(typeof renderThemeGrid==='function')renderThemeGrid();}catch(e){}
+  try{if(typeof renderFriends==='function')renderFriends();}catch(e){}
+  try{if(typeof render==='function')render();}catch(e){}
+}
+// A pulled blob is either the new {v:3,list,extra} wrapper, or (older backups) the bare
+// list array / v2 encrypted envelope. Peel the wrapper; leave the older shapes untouched.
+function unwrapSync(data){
+  if(data&&typeof data==='object'&&data.v===3)return {inner:data.list,extra:data.extra};
+  return {inner:data,extra:null};
+}
+function fmtBytes(n){return n<1024?n+' B':n<1048576?(n/1024).toFixed(0)+' KB':(n/1048576).toFixed(2)+' MB';}
+function syncPayloadSize(){try{return new Blob([JSON.stringify({v:3,list:anime,extra:collectExtra()})]).size;}catch(e){try{return JSON.stringify(anime).length;}catch(_){return 0;}}}
 function genCode(){let s='';const c='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';for(let i=0;i<20;i++)s+=c[Math.floor(Math.random()*c.length)];return s;}
 let pushT;
 function schedulePush(){if(!syncCode()||!SYNC_URL)return;clearTimeout(pushT);pushT=setTimeout(syncPush,2500);}
 async function syncPush(){
   const code=syncCode();if(!code||!SYNC_URL)return;
   try{
-    let payload=anime;
-    if(cryptoKey&&envWraps){payload=await buildEnvelope();} // ciphertext (master-key envelope) to cloud
+    let list=anime;
+    if(cryptoKey&&envWraps){list=await buildEnvelope();} // ciphertext (master-key envelope) to cloud
+    // v3 wrapper: the (maybe-encrypted) list + a plaintext extra bundle (themes + friends).
+    const payload={v:3,list,extra:collectExtra()};
     const r=await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({op:'push',code,data:payload})});
     const d=await r.json();if(d&&d.ok)setSyncAt(d.updatedAt);
   }catch{}
@@ -2734,12 +2776,14 @@ async function syncOnOpen(){
   try{
     const res=await syncPull();
     if(res&&res.data&&res.updatedAt>syncAt()){ // another device wrote a newer copy
+      const {inner,extra}=unwrapSync(res.data);
+      if(extra)applyExtra(extra);              // themes + friends are plaintext — apply even if the list stays locked
       let arr=null;
-      if(res.data&&res.data.v===2){
-        if(!cryptoKey)return;                  // encrypted remote — can't read until unlocked
-        try{arr=JSON.parse(await decList(res.data,cryptoKey));}catch{return;} // wrong master / corrupt → leave local intact
-        envWraps={pw:res.data.pw||(envWraps&&envWraps.pw),rec:res.data.rec||(envWraps&&envWraps.rec),pfk:res.data.pfk||(envWraps&&envWraps.pfk)};
-      }else if(Array.isArray(res.data)){arr=res.data;}
+      if(inner&&inner.v===2){
+        if(!cryptoKey)return;                  // encrypted list — adopt it after unlock (extra already applied)
+        try{arr=JSON.parse(await decList(inner,cryptoKey));}catch{return;} // wrong master / corrupt → leave local intact
+        envWraps={pw:inner.pw||(envWraps&&envWraps.pw),rec:inner.rec||(envWraps&&envWraps.rec),pfk:inner.pfk||(envWraps&&envWraps.pfk)};
+      }else if(Array.isArray(inner)){arr=inner;}
       if(arr){anime=migrate(arr);writeLocal();setSyncAt(res.updatedAt);render();renderSyncUI();toast('Synced from cloud');return;}
     }
     syncPush(); // local is current or newer — make sure the cloud has it
@@ -2757,14 +2801,16 @@ async function syncRestore(){
     try{
       setSyncCode(raw);
       const res=await syncPull();
-      if(res&&isEnvelope(res.data)){ // encrypted backup — store it and ask for the password to unlock
-        try{store().setItem(LSKEY,JSON.stringify(res.data));localStorage.setItem(ENCFLAG,'1');}catch{}
+      const {inner,extra}=unwrapSync(res&&res.data);
+      if(extra)applyExtra(extra);   // bring over themes + friends right away
+      if(inner&&isEnvelope(inner)){ // encrypted backup — store it and ask for the password to unlock
+        try{store().setItem(LSKEY,JSON.stringify(inner));localStorage.setItem(ENCFLAG,'1');}catch{}
         setSyncAt(res.updatedAt||Date.now());
         cryptoKey=null;envWraps=null;
         renderSyncUI();renderLockUI();showLock();
         toast('Enter this list’s password to unlock');
-      }else if(res&&Array.isArray(res.data)&&res.data.length){
-        anime=migrate(res.data);writeLocal();setSyncAt(res.updatedAt||Date.now());render();renderSyncUI();toast('Restored from cloud');
+      }else if(inner&&Array.isArray(inner)&&inner.length){
+        anime=migrate(inner);writeLocal();setSyncAt(res.updatedAt||Date.now());render();renderSyncUI();toast('Restored from cloud');
       }else{ // nothing stored under that code yet — link this device and seed it
         setSyncAt(0);syncPush();renderSyncUI();toast('Code linked — this device now backs up here');
       }
@@ -2778,13 +2824,15 @@ function copySyncCode(){const c=syncCode();if(!c)return;const done=()=>toast('Co
 function renderSyncUI(){
   const box=document.getElementById('syncBox');if(!box)return;
   const code=syncCode();
+  const used=syncPayloadSize(),pct=Math.min(100,Math.round(used/SYNC_CAP*100));
+  const meter=`<div style="height:7px;border-radius:99px;background:var(--bg4);overflow:hidden;margin:9px 0 2px"><div style="height:100%;width:100%;transform:scaleX(${Math.max(0,Math.min(1,used/SYNC_CAP)).toFixed(3)});transform-origin:left;background:var(--a);border-radius:99px;transition:transform .3s"></div></div><p class="ai-desc" style="margin:4px 0 0">Backed up: <b style="color:var(--t1)">${fmtBytes(used)}</b> of ${fmtBytes(SYNC_CAP)} · ${pct}% — list, themes, friends &amp; settings.</p>`;
   if(code){
     const pretty=code.replace(/(.{4})/g,'$1 ').trim();
     // This panel used to explain how to *use* the code but never said to keep it.
     // A code you didn't save is a backup you don't have — which is exactly how a
     // list gets lost. Say it first, and say it plainly.
-    box.innerHTML=`<div class="dt-label">${icon('cloud')} Cloud backup · ON</div>
-      <p class="ai-desc"><b style="color:var(--a2)">Save this code somewhere safe</b> — a password manager, or email it to yourself. It's the only way back to your list if you lose or reinstall the app. Anyone with it can read your list, so keep it to yourself.</p>
+    box.innerHTML=`<div class="dt-label">${icon('cloud')} Cloud backup · ON</div>${meter}
+      <p class="ai-desc"><b style="color:var(--a2)">Save this code somewhere safe</b> — a password manager, or email it to yourself. It's the only way back to your list if you lose or reinstall the app. Anyone with it can read your list and settings, so keep it to yourself.</p>
       <div class="synccode">${pretty}</div>
       <div style="display:flex;gap:8px;margin-top:10px;">
         <button class="parse-btn" style="margin:0;flex:1" onclick="copySyncCode()">${icon('clipboard')} Copy code</button>
@@ -2792,7 +2840,7 @@ function renderSyncUI(){
       </div>
       <p class="ai-desc" style="margin-top:10px">On another device: install the app, open this panel, paste the code, tap <b>Use code</b>.</p>`;
   }else{
-    box.innerHTML=`<div class="dt-label">${icon('cloud')} Cloud backup · OFF</div>
+    box.innerHTML=`<div class="dt-label">${icon('cloud')} Cloud backup · OFF</div>${meter}
       <p class="ai-desc">Back up your list to the cloud so it survives losing your phone and syncs across your devices. Private — only someone with your secret code can open it.</p>
       <button class="parse-btn" style="margin-top:0" onclick="syncEnableNew()">Turn on cloud backup</button>
       <div style="display:flex;gap:8px;margin-top:8px;">
@@ -3941,7 +3989,7 @@ function bgFileChosen(inp){
   const img=new Image();
   img.onload=()=>{
     try{
-      // compress+resize: max ~1280px long edge, JPEG q0.8 → data URL (raw photos would blow past localStorage / the 3MB sync cap)
+      // compress+resize: max ~1280px long edge, JPEG q0.8 → data URL (raw photos would blow past localStorage / the 20MB sync cap)
       const sc=Math.min(1280/img.width,1280/img.height,1);
       const c=document.createElement('canvas');
       c.width=Math.max(1,Math.round(img.width*sc));c.height=Math.max(1,Math.round(img.height*sc));

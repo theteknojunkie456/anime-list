@@ -58,7 +58,9 @@ export default {
         return json(stored ? JSON.parse(stored) : { data: null, updatedAt: 0 }, 200, cors);
       }
       const payload = JSON.stringify({ data: body.data ?? null, updatedAt: Date.now() });
-      if (payload.length > 3_000_000) return json({ error: 'too big' }, 413, cors);
+      // The blob now carries the whole setup (list + themes + friends + settings), not
+      // just titles, so give it real room. Cloudflare KV allows 25 MB/value; keep headroom.
+      if (payload.length > 20_000_000) return json({ error: 'too big' }, 413, cors);
       await env.LISTS.put(key, payload);
       return json({ ok: true, updatedAt: Date.now() }, 200, cors);
     }

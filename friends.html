@@ -85,15 +85,20 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 
 /* ── SHELL ── */
 @property --amb{syntax:'<color>';inherits:true;initial-value:transparent;}
-.glow-row{display:flex;flex-wrap:wrap;gap:11px;align-items:flex-start;}
-.glow-opt{display:flex;flex-direction:column;align-items:center;gap:5px;background:none;border:none;padding:0;cursor:pointer;-webkit-tap-highlight-color:transparent;}
-.glow-sw{width:34px;height:34px;border-radius:50%;border:2px solid var(--b3);box-shadow:inset 0 0 10px rgba(255,255,255,.12),0 2px 8px rgba(0,0,0,.4);transition:transform .14s,border-color .15s,box-shadow .15s;}
-.glow-opt:active .glow-sw{transform:scale(.9);}
-.glow-opt.on .glow-sw{border-color:var(--a2);transform:scale(1.08);box-shadow:0 0 0 3px var(--ag),0 3px 12px rgba(0,0,0,.45);}
+.glow-modes{display:flex;gap:18px;}
+.glow-mode,.glow-col{background:none;border:none;padding:0;cursor:pointer;-webkit-tap-highlight-color:transparent;}
+.glow-mode{display:flex;flex-direction:column;align-items:center;gap:7px;}
+.glow-mode .glow-sw{width:44px;height:44px;}
+.glow-colors{display:flex;flex-wrap:wrap;gap:12px;margin-top:16px;}
+.glow-col{line-height:0;}
+.glow-col .glow-sw{width:32px;height:32px;}
+.glow-sw{border-radius:50%;border:2px solid var(--b3);box-shadow:inset 0 0 12px rgba(255,255,255,.14),0 2px 8px rgba(0,0,0,.42);transition:transform .14s,border-color .15s,box-shadow .15s;}
+.glow-mode:active .glow-sw,.glow-col:active .glow-sw{transform:scale(.9);}
+.glow-mode.on .glow-sw,.glow-col.on .glow-sw{border-color:var(--a2);transform:scale(1.06);box-shadow:0 0 0 3px var(--ag),0 3px 12px rgba(0,0,0,.45);}
 .glow-off{position:relative;background:var(--bg4);overflow:hidden;}
-.glow-off::after{content:'';position:absolute;top:50%;left:14%;right:14%;height:2px;background:var(--t3);transform:translateY(-1px) rotate(-45deg);}
-.glow-lb{font-size:10px;font-weight:700;color:var(--t2);letter-spacing:.2px;}
-.glow-opt.on .glow-lb{color:var(--a2);}
+.glow-off::after{content:'';position:absolute;top:50%;left:16%;right:16%;height:2px;background:var(--t3);transform:translateY(-1px) rotate(-45deg);}
+.glow-lb{font-size:11px;font-weight:700;color:var(--t2);letter-spacing:.2px;}
+.glow-mode.on .glow-lb{color:var(--a2);}
 /* iOS paints a solid #000 status bar above us (status-bar-style:black), so the
    first ~200px ramp from black — a long, smooth falloff, not a hard edge — and
    the glow blooms lower, behind the artwork rather than behind the chrome.
@@ -1868,7 +1873,7 @@ body.recsel .pcard{position:relative;}
   </div>
   <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--b1);">
     <div class="flabel" style="margin-bottom:4px">Background glow</div>
-    <p class="ai-desc" style="font-size:11px;margin:0 0 12px">Adaptive follows what you\u2019re browsing. Or lock it to your theme, a color, or off.</p>
+    <p class="ai-desc" style="font-size:11.5px;margin:0 0 14px">Follows what you’re browsing — or lock it to your theme, a color, or off.</p>
     <div class="glow-row" id="glowRow"></div>
   </div>
   <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--b1);">
@@ -3216,14 +3221,14 @@ function renderGlowRow(){
   const row=document.getElementById('glowRow');if(!row)return;
   const m=glowMode();
   const specials=[['adaptive','Adaptive','conic-gradient(from 210deg,#ff5f8f,#f5a623,#33c65a,#3b9eff,#8b5cff,#ff5f8f)'],['theme','Theme','var(--a)'],['off','Off','']];
-  let html=specials.map(function(x){var id=x[0],lb=x[1],bg=x[2],off=(id==='off');
-    return '<button class="glow-opt'+(m===id?' on':'')+'" onclick="setGlow(\''+id+'\')" aria-label="'+lb+'">'
+  const modes=specials.map(function(x){var id=x[0],lb=x[1],bg=x[2],off=(id==='off');
+    return '<button class="glow-mode'+(m===id?' on':'')+'" onclick="setGlow(\''+id+'\')" aria-label="'+lb+'">'
       +'<span class="glow-sw'+(off?' glow-off':'')+'" style="background:'+(bg||'var(--bg4)')+'"></span>'
       +'<span class="glow-lb">'+lb+'</span></button>';}).join('');
-  html+=GLOW_SWATCHES.map(function(c){
-    return '<button class="glow-opt'+(m===c?' on':'')+'" onclick="setGlow(\''+c+'\')" aria-label="glow color">'
-      +'<span class="glow-sw" style="background:'+c+'"></span><span class="glow-lb">&nbsp;</span></button>';}).join('');
-  row.innerHTML=html;
+  const cols=GLOW_SWATCHES.map(function(c){
+    return '<button class="glow-col'+(m===c?' on':'')+'" onclick="setGlow(\''+c+'\')" aria-label="glow color">'
+      +'<span class="glow-sw" style="background:'+c+'"></span></button>';}).join('');
+  row.innerHTML='<div class="glow-modes">'+modes+'</div><div class="glow-colors">'+cols+'</div>';
 }
 let heroAmb='',_ambRAF=0;
 function onPageScroll(){

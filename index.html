@@ -3242,6 +3242,13 @@ function setGlow(m){
   applyAmbient();renderGlowRow();
   toast(m==='off'?'Glow off':m==='adaptive'?'Glow follows what you browse':m==='theme'?'Glow matches your theme':'Glow color set');
 }
+// Live glow-color update while the native color picker is OPEN. Applies + saves but does
+// NOT rebuild the row — rebuilding removes the <input> and iOS closes the picker mid-pick.
+function glowColorLive(m){
+  try{const s=store();if(s)s.setItem('glow_mode',m);}catch(e){}
+  applyAmbient();
+  try{var sw=document.querySelector('.glow-cpick');if(sw)sw.style.background=m;}catch(e){}
+}
 const GLOW_SWATCHES=['#8b5cff','#3b9eff','#1fc2b0','#33c65a','#f5a623','#ff5f8f','#e0445c','#e8e8f0'];
 function renderGlowRow(){
   const row=document.getElementById('glowRow');if(!row)return;
@@ -3254,7 +3261,7 @@ function renderGlowRow(){
   var isCustom=/^#[0-9a-fA-F]{3,8}$/.test(m);
   var cur=isCustom?m:'#8b5cff';
   var custom='<label class="glow-mode'+(isCustom?' on':'')+'" aria-label="Custom glow color">'
-    +'<span class="glow-sw glow-cpick" style="background:'+cur+'"><input type="color" value="'+cur+'" onchange="setGlow(this.value)"></span>'
+    +'<span class="glow-sw glow-cpick" style="background:'+cur+'"><input type="color" value="'+cur+'" oninput="glowColorLive(this.value)"></span>'
     +'<span class="glow-lb">Custom</span></label>';
   row.innerHTML='<div class="glow-modes">'+modes+custom+'</div>';
 }

@@ -1278,7 +1278,7 @@ body.recsel .pcard{position:relative;}
     <div class="lock-ico"><i data-ic="lock"></i></div>
     <div class="lock-title" id="lockTitle">WatchList is locked</div>
     <div class="lock-sub" id="lockSub">Enter your password to open your list.</div>
-    <button class="lock-btn" id="lockFace" style="display:none" onclick="doFaceUnlock()">Unlock with Face ID</button>
+    <button class="lock-btn" id="lockFace" style="display:none" onclick="doFaceUnlock()">Unlock</button>
     <input id="lockPw" class="lock-in" type="password" placeholder="Password" autocomplete="current-password" onkeydown="if(event.key==='Enter')tryUnlock()">
     <button class="lock-btn" id="lockBtn" onclick="tryUnlock()">Unlock</button>
     <div class="lock-err" id="lockErr"></div>
@@ -1801,7 +1801,7 @@ body.recsel .pcard{position:relative;}
 
   <div class="tut-step">
     <div class="tut-ico" style="--rc:var(--drp)"><i data-ic="lock"></i></div>
-    <div><div class="tut-h">Lock it (optional)</div><div class="tut-p">A password encrypts your whole list — unreadable without it, here and in the cloud. You'll get a one-time <b>recovery key</b>; it's the only way back in if you forget the password. Save both. Lose both and the list is gone for good — there's no backdoor. On iPhone you can turn on <b>Face ID</b> so it's one glance to open.</div></div>
+    <div><div class="tut-h">Lock it (optional)</div><div class="tut-p">A password encrypts your whole list — unreadable without it, here and in the cloud. You'll get a one-time <b>recovery key</b>; it's the only way back in if you forget the password. Save both. Lose both and the list is gone for good — there's no backdoor. You can also unlock with <b>Face ID or your fingerprint</b> instead of typing — whatever your device supports.</div></div>
   </div>
 
   <button class="tut-done" onclick="closeTutorial()">Got it</button>
@@ -2525,11 +2525,23 @@ function showLock(){
   }
 }
 function hideLock(){appLocked=false;const el=document.getElementById('lockScreen');if(el){el.classList.remove('on');if(_lockTapH){el.removeEventListener('pointerdown',_lockTapH);_lockTapH=null;}}}
+// The web unlock is WebAuthn — the platform authenticator differs by device, so name
+// it for what it actually is: Face ID on iPhone/iPad, Touch ID on a Mac, Windows Hello
+// on Windows, and a neutral term elsewhere. "Face ID" on a desktop makes no sense.
+// (The native iOS app is always Face ID, via LAContext.)
+function bioName(){
+  if(typeof IS_NATIVE!=='undefined'&&IS_NATIVE)return 'Face ID';
+  const ua=navigator.userAgent||'',plat=navigator.platform||'',mt=navigator.maxTouchPoints||0;
+  if(/iPhone|iPod|iPad/.test(ua)||(plat==='MacIntel'&&mt>1))return 'Face ID';   // Apple mobile (iPadOS reports as MacIntel+touch)
+  if(/Mac/i.test(plat)||/Macintosh/.test(ua))return 'Touch ID';                 // desktop Mac → fingerprint
+  if(/Win/i.test(plat)||/Windows/.test(ua))return 'Windows Hello';
+  return 'biometric unlock';
+}
 function setLockMode(rec){
   lockRecMode=rec;
   const t=document.getElementById('lockTitle'),s=document.getElementById('lockSub'),i=document.getElementById('lockPw'),b=document.getElementById('lockBtn'),l=document.getElementById('lockAlt'),e=document.getElementById('lockErr');
   if(e)e.textContent='';
-  const f=document.getElementById('lockFace');if(f)f.style.display=(!rec&&faceAvail())?'block':'none'; // no Face ID while entering a recovery key
+  const f=document.getElementById('lockFace');if(f){f.style.display=(!rec&&faceAvail())?'block':'none';f.textContent='Unlock with '+bioName();} // no biometric while entering a recovery key
   if(!i)return;i.value='';
   if(rec){
     t.textContent='Enter recovery key';s.textContent='Use the recovery key you saved when you set your password.';
@@ -2542,7 +2554,7 @@ function setLockMode(rec){
     // when Face ID is on it's the way in — give it the primary button and demote
     // the password, rather than leading with a field you won't type in
     const face=faceAvail();
-    s.textContent=face?'Tap anywhere to unlock with Face ID — or use your password below.':'Enter your password to open your list.';
+    s.textContent=face?('Tap anywhere to unlock with '+bioName()+' — or use your password below.'):'Enter your password to open your list.';
     if(f)f.className=face?'lock-btn':'lock-btn2';
     b.className=face?'lock-btn2':'lock-btn';
   }
@@ -2602,13 +2614,14 @@ function closeRecovery(){const sc=document.getElementById('recoveryScreen');if(s
 async function renderFaceIDUI(){
   const box=document.getElementById('faceBox');if(!box)return;
   if(!await faceIDPossible()){box.innerHTML='';return;}
+  const B=bioName();
   box.innerHTML=faceIDOn()
-    ? `<div class="dt-label" style="margin-top:16px">${icon('key')} Face ID · ON</div>
-       <p class="ai-desc">Unlock with Face ID instead of typing your password. Your password and recovery key still work.</p>
-       <button class="imp-all" style="width:100%" onclick="disableFaceID()">Turn off Face ID unlock</button>`
-    : `<div class="dt-label" style="margin-top:16px">${icon('key')} Face ID</div>
-       <p class="ai-desc">Skip typing your password — unlock with Face ID. It derives a key from your passkey, so your list stays just as encrypted.</p>
-       <button class="parse-btn" style="margin-top:0" onclick="enableFaceID()">Turn on Face ID unlock</button>`;
+    ? `<div class="dt-label" style="margin-top:16px">${icon('key')} ${B} · ON</div>
+       <p class="ai-desc">Unlock with ${B} instead of typing your password. Your password and recovery key still work.</p>
+       <button class="imp-all" style="width:100%" onclick="disableFaceID()">Turn off ${B} unlock</button>`
+    : `<div class="dt-label" style="margin-top:16px">${icon('key')} ${B}</div>
+       <p class="ai-desc">Skip typing your password — unlock with ${B}. It derives a key from your passkey, so your list stays just as encrypted.</p>
+       <button class="parse-btn" style="margin-top:0" onclick="enableFaceID()">Turn on ${B} unlock</button>`;
 }
 
 // ─── FACE ID UNLOCK (WebAuthn passkey + PRF) ────────────────────────────────
@@ -2674,17 +2687,17 @@ async function enableFaceID(){
     // so it rides along for free and lets unlock skip the passkey picker
     envWraps={pw:envWraps.pw,rec:envWraps.rec,pfk:{...await wrapMaster(cryptoKey,secret),id}};
     await writeLocal();schedulePush();
-    toast('Face ID unlock is on');renderLockUI();
+    toast(bioName()+' unlock is on');renderLockUI();
   }catch(e){
     const m=e&&e.message;
-    toast(m==='no-prf'?'This device can’t derive a key from Face ID yet (needs iOS 18.4+)':'Face ID setup cancelled');
+    toast(m==='no-prf'?('This device can’t derive a key from '+bioName()+' yet'):(bioName()+' setup cancelled'));
   }
 }
 async function disableFaceID(){
   if(!envWraps)return;
   envWraps={pw:envWraps.pw,rec:envWraps.rec};
   await writeLocal();schedulePush();
-  toast('Face ID unlock removed');renderLockUI();
+  toast(bioName()+' unlock removed');renderLockUI();
 }
 // auto=true → fired automatically on open: fail silently, the buttons are right there
 async function tryUnlockFaceID(auto){
@@ -2699,7 +2712,7 @@ async function tryUnlockFaceID(auto){
     finishUnlock();
   }catch(e){
     if(auto)return;   // Safari may refuse an un-prompted get(), or you dismissed it — say nothing
-    if(err)err.textContent=(e&&e.message==='cancelled')?'':'Face ID didn’t work — use your password';
+    if(err)err.textContent=(e&&e.message==='cancelled')?'':(bioName()+' didn’t work — use your password');
   }
 }
 function renderLockUI(){
@@ -5299,7 +5312,7 @@ const ONB=[
     : 'Open your browser’s menu and tap <b>Install app</b> (or <b>Add to Home screen</b>). WatchList opens full-screen like a real app, and notifications work.'},
   {ic:'cloud',oc:'#4dabf7',imp:'Recommended',title:'Never lose your list',body:'Your list lives on this device. Turn on <b>Cloud backup</b> for a key that restores it anywhere. <b>Save that key somewhere safe</b> — your Notes app is perfect. It\'s the only way back.',cta:{label:'Set up backup',sheet:'backupSheet'}},
   {ic:'lock',oc:'#51cf66',title:'Lock your list',body:'Add a <b>password</b> and everything gets encrypted. You\'ll get a one-time <b>recovery key</b> — the only way in if you forget the password. Save both.',cta:{label:'Set a password',sheet:'securitySheet'}},
-  {ic:'key',oc:'#ffd43b',title:'Unlock with a glance',body:'Once a password is set, open the app with <b>Face ID</b> instead of typing it every time.',cta:{label:'Set up Face ID',sheet:'securitySheet'}},
+  {ic:'key',oc:'#ffd43b',title:'Unlock without typing',body:'Once a password is set, open the app with <b>'+bioName()+'</b> instead of typing it every time.',cta:{label:'Set up '+bioName(),sheet:'securitySheet'}},
   {ic:'bell',oc:'#ff6b6b',title:'Episode alerts',body:'Get a heads-up the moment a new episode of something you\'re watching airs. Only the shows you follow — no spam.',cta:{label:'Turn on alerts',sheet:'notifySheet'}},
   {ic:'play',oc:'#f783ac',title:'Watch where you already pay',body:'Tap <b>Watch</b> and it lists where a show actually is, then remembers your pick. Not in the US? Add <b>TVING</b>, <b>Wavve</b>, <b>iQIYI</b>, <b>JioHotstar</b> and more in one tap — or paste any service\'s search page and we\'ll wire it up. Yours always show first.',cta:{label:'Pick your services',sheet:'sourceSheet'}},
   {ic:'compass',oc:'#20c997',title:'You\'re all set',body:'Tap <b>+</b> to add anything, or <b>Import</b> your whole list from Notes in one paste. The icons up top are Friends, schedule, AI and themes. Anything you skipped is waiting in <b>Settings</b>.',primary:'Start watching'},

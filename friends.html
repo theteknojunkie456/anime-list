@@ -99,6 +99,9 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 .glow-off::after{content:'';position:absolute;top:50%;left:16%;right:16%;height:2px;background:var(--t3);transform:translateY(-1px) rotate(-45deg);}
 .glow-lb{font-size:11px;font-weight:700;color:var(--t2);letter-spacing:.2px;}
 .glow-mode.on .glow-lb{color:var(--a2);}
+.ct-dk{display:flex;align-items:center;gap:9px;font-size:12.5px;font-weight:600;color:var(--t2);margin-bottom:13px;cursor:pointer;}
+.ct-dk input{width:17px;height:17px;accent-color:var(--a);flex-shrink:0;margin:0;}
+.ct-dk span{opacity:.6;font-weight:500;}
 /* iOS paints a solid #000 status bar above us (status-bar-style:black), so the
    first ~200px ramp from black — a long, smooth falloff, not a hard edge — and
    the glow blooms lower, behind the artwork rather than behind the chrome.
@@ -1882,6 +1885,7 @@ body.recsel .pcard{position:relative;}
       <input class="finput" id="ctName" placeholder="Theme name…" maxlength="14" style="flex:1" autocomplete="off">
       <input class="finput" id="ctEmoji" placeholder="✨" maxlength="2" style="width:56px;text-align:center" autocomplete="off">
     </div>
+    <label class="ct-dk"><input type="checkbox" id="ctDarken" checked>Darken background<span> — turn off for a light theme</span></label>
     <div style="display:flex;gap:16px;align-items:flex-end;">
       <label class="cpick-lbl">Accent<input type="color" class="cpick" id="ctAccent" value="#e03d55"></label>
       <label class="cpick-lbl">Background<input type="color" class="cpick" id="ctBg" value="#111114"></label>
@@ -3003,7 +3007,22 @@ function dominantColor(src,cb){
 const CUSTOM_VARS=['--bg','--bg2','--bg3','--bg4','--bg5','--b1','--b2','--b3','--t1','--t2','--t3','--a','--aFg','--a2','--ag','--glow','--topgrad'];
 function applyCustomVars(t){
   const st=document.documentElement.style;
-  const bg=darkenBg(t.bg);          // a light pick can't produce a broken theme
+  const darken=t.darken!==false;
+  // Darken off + a light pick -> a genuine LIGHT theme: keep the bright bg, flip text dark,
+  // and stack surfaces darker (not lighter) so cards read against the page.
+  if(!darken && relLum(t.bg)>0.5){
+    const bg=t.bg;
+    const v={
+      '--bg':bg,'--bg2':mix(bg,'#000000',0.035),'--bg3':mix(bg,'#000000',0.07),'--bg4':mix(bg,'#000000',0.11),'--bg5':mix(bg,'#000000',0.15),
+      '--b1':rgba(t.accent,0.12),'--b2':rgba(t.accent,0.20),'--b3':rgba(t.accent,0.32),
+      '--t1':ensureAA(mix('#15151a',t.accent,0.12),bg,7),'--t2':ensureAA(mix('#45454f',t.accent,0.18),bg,4.5),'--t3':ensureAA(mix('#6c6a76',t.accent,0.14),bg,3),
+      '--a':t.accent,'--aFg':accentFg(t.accent),'--a2':mix(t.accent,'#000000',0.16),'--ag':rgba(t.accent,0.16),'--glow':rgba(t.accent,0.24),
+      '--topgrad':`linear-gradient(180deg,${mix(t.accent,'#ffffff',0.72)} 0%,${bg} 100%)`
+    };
+    CUSTOM_VARS.forEach(k=>st.setProperty(k,v[k]));
+    return;
+  }
+  const bg=darken?darkenBg(t.bg):t.bg;   // darken off + a dark pick -> use it raw
   const bg5=mix(bg,'#ffffff',0.16);
   const v={
     '--bg':bg,'--bg2':mix(bg,'#ffffff',0.04),'--bg3':mix(bg,'#ffffff',0.08),'--bg4':mix(bg,'#ffffff',0.12),'--bg5':bg5,
@@ -3039,7 +3058,8 @@ function applyTheme(id,persist=true){
 function saveCustomTheme(){
   const name=(document.getElementById('ctName').value.trim()||'Custom').replace(/[<>"'&]/g,'').slice(0,14);
   const emoji=(document.getElementById('ctEmoji').value.trim()||'✨').replace(/[<>"'&]/g,'').slice(0,4);
-  const t={id:'c'+uid(),name,emoji,accent:document.getElementById('ctAccent').value,bg:document.getElementById('ctBg').value};
+  const darken=(document.getElementById('ctDarken')||{checked:true}).checked!==false;
+  const t={id:'c'+uid(),name,emoji,accent:document.getElementById('ctAccent').value,bg:document.getElementById('ctBg').value,darken};
   setCustomThemes([...customThemes(),t]);
   document.getElementById('ctName').value='';
   applyTheme(t.id);
@@ -3058,7 +3078,7 @@ function renderThemeGrid(){
   g.innerHTML=allThemes().map(t=>{
     // Show the swatch in the SAME dark background the theme actually applies —
     // otherwise a custom tile previews bright while the real theme is dark.
-    const sbg=t.custom?darkenBg(t.bg):t.bg;
+    const sbg=t.custom?(t.darken===false?t.bg:darkenBg(t.bg)):t.bg;
     return `
     <button class="topt${curTheme===t.id?' on':''}" onclick="applyTheme('${t.id}')">
       <div class="tswatch" style="background:linear-gradient(135deg,${sbg} 0%,${sbg}dd 100%)">

@@ -10,8 +10,9 @@ Each file below is tagged with the target(s) it belongs to.
 | `ContentView.swift` | App | The single screen: type your name, **Start a party** (get a code) or **Join** one, and the system **Start Broadcast** button. |
 | `AppGroup.swift` | **Both** | The shared cubbyhole — the party code/name the app saves and the extension reads. Also holds your worker URL. **Set `id` to your App Group string.** |
 | `PartySignaling.swift` | BroadcastExt | Talks to your party backend over a WebSocket — learns who's watching, trades the WebRTC "handshake" (offer/answer). Same protocol the web uses. |
-| `WebRTCBroadcaster.swift` | BroadcastExt | The video engine: turns your screen into one video track and opens a connection to each viewer. |
-| `SampleHandler.swift` | BroadcastExt | The extension itself — iOS hands it every screen frame; it pushes them into WebRTC. Wires everything together. |
+| `WebRTCBroadcaster.swift` | BroadcastExt | The A/V engine: turns your screen into one video track and the app-audio into one audio track, and opens a connection to each viewer. |
+| `BroadcastAudioDevice.swift` | BroadcastExt | A custom WebRTC audio device that forwards the app-audio ReplayKit captures into WebRTC — *without* opening the mic or an AVAudioSession (which the extension can't afford). This is what makes host audio possible. |
+| `SampleHandler.swift` | BroadcastExt | The extension itself — iOS hands it every screen frame **and audio buffer**; it pushes them into WebRTC. Wires everything together. |
 | `README.md` | — | The step-by-step Xcode setup. |
 | `FILES.md` | — | This file. |
 
@@ -26,4 +27,4 @@ When you drag a file into Xcode, click it and check the right box under
 **File Inspector → Target Membership**:
 - App only: `WatchListBroadcastApp`, `ContentView`
 - Both: `AppGroup`
-- BroadcastExt only: `PartySignaling`, `WebRTCBroadcaster`, `SampleHandler`
+- BroadcastExt only: `PartySignaling`, `WebRTCBroadcaster`, `BroadcastAudioDevice`, `SampleHandler`

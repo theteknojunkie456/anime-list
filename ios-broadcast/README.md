@@ -2,9 +2,10 @@
 
 This is the **iPhone-host** piece that the web can't do. It's a small native app +
 a **ReplayKit Broadcast Upload Extension** (the exact mechanism Zoom/Discord use)
-that captures your iPhone screen and streams it, over **WebRTC**, straight to your
-friends. Your friends need **nothing new** — they watch in **WatchList's existing
-web screen-share viewer**, on any device. This app only replaces the *host* half.
+that captures your iPhone screen **and its audio** and streams both, over **WebRTC**,
+straight to your friends. Your friends need **nothing new** — they watch in
+**WatchList's existing web screen-share viewer**, on any device. This app only
+replaces the *host* half.
 
 It talks to the **same party backend** you already run — it connects to the room
 over the same WebSocket and speaks the same signaling (`share` + `signal` offer/
@@ -45,15 +46,25 @@ you ever change the file list, regenerate with `xcodegen generate`.)
    their phones/computers.
 2. Tap **Start Broadcast** → in iOS's picker choose **WatchListBroadcast** → **Start
    Broadcast**. Open your anime and play.
-3. The extension connects to the party as **host** and streams your screen over
-   WebRTC to everyone in the room. Your play/pause/seek is what they see — they're
-   watching your actual pixels, perfectly synced.
+3. The extension connects to the party as **host** and streams your screen **and its
+   sound** over WebRTC to everyone in the room. Your play/pause/seek is what they see —
+   they're watching your actual pixels, with the show's audio, perfectly synced.
+   (On the viewer, iOS blocks autoplay-with-sound until the first tap — the viewer
+   already prompts "Black screen? Tap once," and that same tap unmutes the audio.)
 
 ## The gotchas (where the real work is)
 - **Extension memory (~50 MB):** the broadcast extension is a separate process with
   a hard memory cap. WebRTC video encode fits but is tight — keep the capture scale
   modest (downscale big screens), avoid retaining buffers. This is the #1 thing to
   watch; if it gets killed at runtime, downscale / framerate-limit first.
+- **Audio is app-audio, not the mic:** the usual reason "iOS broadcast can't do audio"
+  is that WebRTC's stock audio path opens the mic via `AVAudioSession(.playAndRecord)`,
+  which fights ReplayKit for the session and busts the memory cap inside the extension.
+  We dodge that with `BroadcastAudioDevice` — a custom `RTCAudioDevice` (injected via
+  `RTCPeerConnectionFactory(...audioDevice:)`) that **never touches AVAudioSession or
+  the mic**; it just resamples ReplayKit's `.audioApp` buffers to 48 kHz mono and feeds
+  them into WebRTC's ADM. So viewers hear the *show*, not your room. It's send-only
+  (playout is a deliberate no-op — the extension must not play anything back).
 - **7-day expiry (free account):** apps signed with a free Apple ID stop launching
   after 7 days — just press ▶ Run again from Xcode to renew.
 - **libwebrtc API drift:** `stasel/WebRTC`'s types are stable but method signatures

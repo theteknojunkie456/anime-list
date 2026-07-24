@@ -25,8 +25,12 @@ class SampleHandler: RPBroadcastSampleHandler, PartySignalingDelegate {
     }
 
     override func processSampleBuffer(_ sampleBuffer: CMSampleBuffer, with sampleBufferType: RPSampleBufferType) {
-        if sampleBufferType == .video { broadcaster.push(sampleBuffer: sampleBuffer) }
-        // (.audioApp / .audioMic could be added as WebRTC audio tracks later)
+        switch sampleBufferType {
+        case .video:    broadcaster.push(sampleBuffer: sampleBuffer)
+        case .audioApp: broadcaster.pushAudio(sampleBuffer: sampleBuffer)   // the media the host is playing
+        case .audioMic: break                                              // ignore the room mic — app audio only
+        @unknown default: break
+        }
     }
 
     override func broadcastFinished() {

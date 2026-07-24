@@ -11,6 +11,10 @@ final class WebRTCBroadcaster {
     private let videoSource: RTCVideoSource
     private let videoTrack: RTCVideoTrack
     private let capturer: RTCVideoCapturer
+    // Custom audio device: forwards ReplayKit's app-audio into WebRTC (see BroadcastAudioDevice).
+    private let audioDevice = BroadcastAudioDevice()
+    private let audioSource: RTCAudioSource
+    private let audioTrack: RTCAudioTrack
     private var peers: [String: Peer] = [:]
 
     // called to hand a completed offer/answer back to the party signaling layer
@@ -22,7 +26,12 @@ final class WebRTCBroadcaster {
         RTCInitializeSSL()
         let encoder = RTCDefaultVideoEncoderFactory()
         let decoder = RTCDefaultVideoDecoderFactory()
-        factory = RTCPeerConnectionFactory(encoderFactory: encoder, decoderFactory: decoder)
+        // Inject our custom audio device so the app-audio ReplayKit captures becomes a
+        // real WebRTC audio track instead of the mic (which the extension can't open).
+        factory = RTCPeerConnectionFactory(encoderFactory: encoder, decoderFactory: decoder, audioDevice: audioDevice)
+        let audioConstraints = RTCMediaConstraints(mandatoryConstraints: nil, optionalConstraints: nil)
+        audioSource = factory.audioSource(with: audioConstraints)
+        audioTrack = factory.audioTrack(with: audioSource, trackId: "audio0")
         videoSource = factory.videoSource()
         // A Broadcast Upload Extension is capped at ~50 MB RAM; encoding the full
         // native screen (e.g. 1170×2532) can blow past that and iOS kills us mid-stream.
@@ -59,6 +68,7 @@ final class WebRTCBroadcaster {
         let constraints = RTCMediaConstraints(mandatoryConstraints: nil, optionalConstraints: nil)
         guard let pc = factory.peerConnection(with: config(), constraints: constraints, delegate: nil) else { return }
         pc.add(videoTrack, streamIds: ["screen"])
+        pc.add(audioTrack, streamIds: ["screen"])   // same stream id → viewer bundles A/V together
         let peer = Peer(uid: uid, pc: pc) { [weak self] sdp in self?.onOffer?(uid, sdp) }
         pc.delegate = peer
         peers[uid] = peer
@@ -82,6 +92,11 @@ final class WebRTCBroadcaster {
         let ts = Int64(CMTimeGetSeconds(CMSampleBufferGetPresentationTimeStamp(sampleBuffer)) * 1_000_000_000)
         let frame = RTCVideoFrame(buffer: rtcBuffer, rotation: ._0, timeStampNs: ts)
         videoSource.capturer(capturer, didCapture: frame)
+    }
+
+    // Feed one ReplayKit app-audio buffer into the shared audio track.
+    func pushAudio(sampleBuffer: CMSampleBuffer) {
+        audioDevice.push(sampleBuffer: sampleBuffer)
     }
 }
 

@@ -102,6 +102,9 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 .ct-dk{display:flex;align-items:center;gap:9px;font-size:12.5px;font-weight:600;color:var(--t2);margin-bottom:13px;cursor:pointer;}
 .ct-dk input{width:17px;height:17px;accent-color:var(--a);flex-shrink:0;margin:0;}
 .ct-dk span{opacity:.6;font-weight:500;}
+.seg-appear{display:flex;gap:5px;background:var(--bg3);border-radius:13px;padding:4px;margin-bottom:16px;}
+.seg-btn{flex:1;padding:10px;border-radius:10px;border:none;background:none;color:var(--t2);font-family:var(--fd);font-size:13.5px;font-weight:800;letter-spacing:.2px;transition:background .18s,color .18s;cursor:pointer;}
+.seg-btn.on{background:var(--a);color:var(--aFg);box-shadow:0 4px 12px -4px var(--glow);}
 /* iOS paints a solid #000 status bar above us (status-bar-style:black), so the
    first ~200px ramp from black — a long, smooth falloff, not a hard edge — and
    the glow blooms lower, behind the artwork rather than behind the chrome.
@@ -1865,6 +1868,10 @@ body.recsel .pcard{position:relative;}
     <div class="sheet-title"><i data-ic="palette"></i> Theme</div>
     <button class="sheet-cancel" onclick="closeAll()">Done</button>
   </div>
+  <div class="seg-appear">
+    <button class="seg-btn" id="segDark" onclick="setLightMode(false)">Dark</button>
+    <button class="seg-btn" id="segLight" onclick="setLightMode(true)">Light</button>
+  </div>
   <div class="theme-grid" id="themeGrid"></div>
   <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--b1);">
     <div class="flabel" style="margin-bottom:10px">Background brightness</div>
@@ -1885,7 +1892,6 @@ body.recsel .pcard{position:relative;}
       <input class="finput" id="ctName" placeholder="Theme name…" maxlength="14" style="flex:1" autocomplete="off">
       <input class="finput" id="ctEmoji" placeholder="✨" maxlength="2" style="width:56px;text-align:center" autocomplete="off">
     </div>
-    <label class="ct-dk"><input type="checkbox" id="ctDarken" checked>Darken background<span> — turn off for a light theme</span></label>
     <div style="display:flex;gap:16px;align-items:flex-end;">
       <label class="cpick-lbl">Accent<input type="color" class="cpick" id="ctAccent" value="#e03d55"></label>
       <label class="cpick-lbl">Background<input type="color" class="cpick" id="ctBg" value="#111114"></label>
@@ -2917,7 +2923,6 @@ function openNotifySheet(){openSheet('notifySheet');renderNotifyUI();}
 // ─── THEMES ────────────────────────────────────────────────────────────────
 const THEMES=[
   {id:'default', name:'Default', emoji:'🌑', bg:'#111114', accent:'#e03d55'},
-  {id:'light',   name:'Light',   emoji:'☀️', bg:'#ffffff', accent:'#7c5cff', custom:true, builtin:true, darken:false},
   {id:'naruto',  name:'Naruto',  emoji:'🍥', bg:'#0e0f18', accent:'#f57800'},
   {id:'sasuke',  name:'Sasuke',  emoji:'⚡', bg:'#0b0b18', accent:'#7730e8'},
   {id:'luffy',   name:'Luffy',   emoji:'🏴‍☠️',bg:'#0b1420', accent:'#d03838'},
@@ -3054,6 +3059,7 @@ function applyTheme(id,persist=true){
   if(t.custom)applyCustomVars(t);
   if(persist){try{const s=store();if(s)s.setItem('animetheme',t.id);}catch{}}
   try{applyAmbient();}catch(e){}
+  try{applyLight();}catch(e){}
   renderThemeGrid();
 }
 function saveCustomTheme(){
@@ -3072,9 +3078,30 @@ function deleteCustomTheme(id){
   if(curTheme===id)applyTheme('default');else renderThemeGrid();
   toast('Theme deleted');
 }
+const LIGHT_KEYS=['--bg','--bg2','--bg3','--bg4','--bg5','--b1','--b2','--b3','--t1','--t2','--t3','--a2','--aFg','--ag','--glow','--topgrad'];
+function lightMode(){try{const s=store();return (s&&s.getItem('light_mode'))==='1';}catch(e){return false;}}
+// Light/Dark overlay: keeps the current theme's accent (--a), flips surfaces bright and
+// text dark. Sits on top of ANY theme, so every theme gets a light variant.
+function applyLight(){
+  const st=document.documentElement.style;
+  if(!lightMode()){LIGHT_KEYS.forEach(k=>st.removeProperty(k));try{document.body.classList.remove('lightmode');}catch(e){}return;}
+  const acc=((getComputedStyle(document.documentElement).getPropertyValue('--a')||'').trim())||'#7c5cff';
+  const bg='#ffffff';
+  const v={
+    '--bg':bg,'--bg2':mix(bg,'#000000',0.035),'--bg3':mix(bg,'#000000',0.07),'--bg4':mix(bg,'#000000',0.11),'--bg5':mix(bg,'#000000',0.15),
+    '--b1':rgba(acc,0.12),'--b2':rgba(acc,0.20),'--b3':rgba(acc,0.30),
+    '--t1':ensureAA(mix('#15151a',acc,0.10),bg,7),'--t2':ensureAA(mix('#45454f',acc,0.16),bg,4.5),'--t3':ensureAA(mix('#6c6a76',acc,0.12),bg,3),
+    '--a2':mix(acc,'#000000',0.14),'--aFg':accentFg(acc),'--ag':rgba(acc,0.16),'--glow':rgba(acc,0.22),
+    '--topgrad':`linear-gradient(180deg,${mix(acc,'#ffffff',0.72)} 0%,${bg} 100%)`
+  };
+  LIGHT_KEYS.forEach(k=>st.setProperty(k,v[k]));
+  try{document.body.classList.add('lightmode');}catch(e){}
+}
+function setLightMode(on){try{const s=store();if(s)s.setItem('light_mode',on?'1':'0');}catch(e){}applyLight();renderThemeGrid();}
 function renderThemeGrid(){
   const bs=document.getElementById('brightSlider');if(bs)bs.value=bgBright();
   try{renderGlowRow();}catch(e){}
+  try{const lm=lightMode(),sd=document.getElementById('segDark'),sl=document.getElementById('segLight');if(sd)sd.classList.toggle('on',!lm);if(sl)sl.classList.toggle('on',lm);}catch(e){}
   const g=document.getElementById('themeGrid');if(!g)return;
   g.innerHTML=allThemes().map(t=>{
     // Show the swatch in the SAME dark background the theme actually applies —
@@ -3085,7 +3112,7 @@ function renderThemeGrid(){
       <div class="tswatch" style="background:linear-gradient(135deg,${sbg} 0%,${sbg}dd 100%)">
         <span>${t.emoji}</span>
         <div class="taccent-bar" style="background:${t.accent}"></div>
-        ${t.custom&&!t.builtin?`<div class="tdel" onclick="event.stopPropagation();deleteCustomTheme('${t.id}')">${icon('x')}</div>`:''}
+        ${t.custom?`<div class="tdel" onclick="event.stopPropagation();deleteCustomTheme('${t.id}')">${icon('x')}</div>`:''}
       </div>
       <div class="tname">${t.name}</div>
     </button>`;

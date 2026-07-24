@@ -85,11 +85,13 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 
 /* ── SHELL ── */
 @property --amb{syntax:'<color>';inherits:true;initial-value:transparent;}
-.glow-modes{display:flex;gap:18px;}
+.glow-modes{display:flex;flex-wrap:wrap;gap:18px;}
 .glow-mode,.glow-col{background:none;border:none;padding:0;cursor:pointer;-webkit-tap-highlight-color:transparent;}
 .glow-mode{display:flex;flex-direction:column;align-items:center;gap:7px;}
 .glow-mode .glow-sw{width:44px;height:44px;}
 .glow-colors{display:flex;flex-wrap:wrap;gap:12px;margin-top:16px;}
+.glow-cpick{position:relative;overflow:hidden;}
+.glow-cpick input[type=color]{position:absolute;inset:0;width:100%;height:100%;opacity:0;border:none;padding:0;margin:0;cursor:pointer;}
 .glow-col{line-height:0;}
 .glow-col .glow-sw{width:32px;height:32px;}
 .glow-sw{display:block;border-radius:50%;border:2px solid var(--b3);box-shadow:inset 0 0 12px rgba(255,255,255,.14),0 2px 8px rgba(0,0,0,.42);transition:transform .14s,border-color .15s,box-shadow .15s;}
@@ -3245,10 +3247,12 @@ function renderGlowRow(){
     return '<button class="glow-mode'+(m===id?' on':'')+'" onclick="setGlow(\''+id+'\')" aria-label="'+lb+'">'
       +'<span class="glow-sw'+(off?' glow-off':'')+'" style="background:'+(bg||'var(--bg4)')+'"></span>'
       +'<span class="glow-lb">'+lb+'</span></button>';}).join('');
-  const cols=GLOW_SWATCHES.map(function(c){
-    return '<button class="glow-col'+(m===c?' on':'')+'" onclick="setGlow(\''+c+'\')" aria-label="glow color">'
-      +'<span class="glow-sw" style="background:'+c+'"></span></button>';}).join('');
-  row.innerHTML='<div class="glow-modes">'+modes+'</div><div class="glow-colors">'+cols+'</div>';
+  var isCustom=/^#[0-9a-fA-F]{3,8}$/.test(m);
+  var cur=isCustom?m:'#8b5cff';
+  var custom='<label class="glow-mode'+(isCustom?' on':'')+'" aria-label="Custom glow color">'
+    +'<span class="glow-sw glow-cpick" style="background:'+cur+'"><input type="color" value="'+cur+'" onchange="setGlow(this.value)"></span>'
+    +'<span class="glow-lb">Custom</span></label>';
+  row.innerHTML='<div class="glow-modes">'+modes+custom+'</div>';
 }
 let heroAmb='',_ambRAF=0;
 function onPageScroll(){

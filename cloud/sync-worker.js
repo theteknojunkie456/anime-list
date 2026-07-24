@@ -285,7 +285,7 @@ export class PartyRoom {
         room.playAt = Date.now() + 3600; this.sys(room, '▶ Starting in 3…');
         room.rev++; await this.save(); this.broadcast(); return;
       }
-      case 'share': { if (!isHost) return; room.sharing = msg.on ? uid : ''; this.sys(room, msg.on ? `${name} started screen sharing` : `${name} stopped sharing`); room.rev++; await this.save(); this.broadcast(); return; }
+      case 'share': { room.sharing = msg.on ? uid : (room.sharing === uid ? '' : room.sharing); this.sys(room, msg.on ? `${name} started screen sharing` : `${name} stopped sharing`); room.rev++; await this.save(); this.broadcast(); return; }   // the broadcaster flags itself as the sharer — on iOS the ReplayKit extension joins under its own uid (not the room host), so a host-only gate would silently drop its "share" and viewers would never see the broadcast start
       case 'signal': {
         const to = String(msg.to || ''); if (!to) return;
         this.sendTo(to, { t: 'signal', from: uid, kind: msg.kind, data: msg.data });

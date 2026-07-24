@@ -887,6 +887,8 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 .shareview .pv-top{position:absolute;top:0;left:0;right:0;z-index:3;background:linear-gradient(to bottom,rgba(0,0,0,.6),rgba(0,0,0,0));padding-bottom:26px;}
 .sh-fit-hint{position:absolute;bottom:calc(var(--safe-b) + 14px);left:50%;transform:translateX(-50%);z-index:3;font-size:11.5px;color:rgba(255,255,255,.55);background:rgba(0,0,0,.4);padding:5px 12px;border-radius:99px;pointer-events:none;transition:opacity .4s;}
 .sh-wait{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;color:rgba(255,255,255,.7);font-size:14px;font-weight:600;}
+#shStatus{max-width:300px;text-align:center;line-height:1.45;padding:0 22px;}
+#shStatus.sh-err{color:#ff8b8b;}
 .sh-wait.gone{display:none;}
 .sh-spin{width:34px;height:34px;border-radius:50%;border:3px solid rgba(255,255,255,.18);border-top-color:#fff;animation:shSpin .8s linear infinite;}
 @keyframes shSpin{to{transform:rotate(360deg);}}
@@ -1692,7 +1694,7 @@ body.recsel .pcard{position:relative;}
   </div>
   <div class="sh-stage">
     <video id="shareVideo" class="sh-video" autoplay playsinline onclick="this.classList.toggle('fill')"></video>
-    <div class="sh-wait" id="shareWait"><div class="sh-spin"></div><div>Connecting to the host…</div></div>
+    <div class="sh-wait" id="shareWait"><div class="sh-spin"></div><div id="shStatus">Connecting to the host…</div></div>
     <div class="sh-fit-hint" id="shFitHint">Tap the video to fill the screen</div>
   </div>
 </div>
@@ -4921,13 +4923,32 @@ async function pcConnectToViewer(vid){                 // HOST → each viewer
   try{const offer=await pc.createOffer();await pc.setLocalDescription(offer);await iceComplete(pc);
     wsSend({t:'signal',to:vid,kind:'offer',data:pc.localDescription});}catch{pcClose(vid);}
 }
+// Live status under the spinner — turns a mystery black screen into an explained one,
+// and logs each WebRTC step to the console so a stuck connection is diagnosable.
+function setShareStatus(txt,err){try{const el=document.getElementById('shStatus');if(el){el.textContent=txt;el.className=err?'sh-err':'';}console.log('[party] '+txt);}catch(e){}}
+// Open the share viewer in a "connecting" state (spinner + status), before any frame.
+function showConnectingShare(){
+  const sv=document.getElementById('shareView');if(!sv)return;
+  document.getElementById('shareTitle').textContent=(partyRoom&&partyRoom.title)?partyRoom.title:'Watch party';
+  const sw=document.getElementById('shareWait');if(sw)sw.classList.remove('gone');
+  if(!sv.classList.contains('on')){closeAll();sv.classList.add('on');}
+}
 async function pcHandleOffer(from,offer){              // VIEWER answers the host
   pcClose(from);
+  console.log('[party] offer received from '+from);
+  showConnectingShare();setShareStatus('Connecting to the host’s screen…');
   const pc=new RTCPeerConnection(RTC_CFG);pcs[from]=pc;
-  pc.ontrack=e=>{showShareView(e.streams[0]);};
-  pc.onconnectionstatechange=()=>{if(['failed','closed','disconnected'].includes(pc.connectionState)){pcClose(from);if(!Object.keys(pcs).length)hideShareView();}};
+  pc.ontrack=e=>{console.log('[party] video track received');showShareView(e.streams[0]);};
+  pc.oniceconnectionstatechange=()=>{const st=pc.iceConnectionState;console.log('[party] ICE '+st);
+    if(st==='checking')setShareStatus('Connecting to the host’s screen…');
+    else if(st==='connected'||st==='completed')setShareStatus('Connected — starting the video…');
+    else if(st==='failed')setShareStatus('Couldn’t reach the host. The network relay may be blocked — leave and rejoin, or check the host is still broadcasting.',true);
+    else if(st==='disconnected')setShareStatus('Connection dropped — trying to recover…',true);};
+  pc.onconnectionstatechange=()=>{console.log('[party] PC '+pc.connectionState);
+    if(['failed','closed'].includes(pc.connectionState)){pcClose(from);}};   // keep the view up with its status; rtcTick tears down when the host actually stops
   try{await pc.setRemoteDescription(offer);const ans=await pc.createAnswer();await pc.setLocalDescription(ans);await iceComplete(pc);
-    wsSend({t:'signal',to:from,kind:'answer',data:pc.localDescription});}catch{pcClose(from);}
+    wsSend({t:'signal',to:from,kind:'answer',data:pc.localDescription});console.log('[party] answer sent to '+from);}
+  catch(e){console.log('[party] handshake error: '+(e&&e.message));setShareStatus('Couldn’t start the connection'+(e&&e.message?' ('+e.message+')':'')+'. Try leaving and rejoining.',true);pcClose(from);}
 }
 async function pcHandleAnswer(from,answer){            // HOST receives the viewer's answer
   const pc=pcs[from];if(pc&&!pc.currentRemoteDescription)try{await pc.setRemoteDescription(answer);}catch{}
@@ -4954,7 +4975,7 @@ function reopenShareView(){
   closeAll();document.getElementById('shareView').classList.add('on');
   if(v&&v.srcObject){const p=v.play&&v.play();if(p&&p.catch)p.catch(()=>{});document.getElementById('shareWait').classList.add('gone');
     const hint=document.getElementById('shFitHint');if(hint){hint.textContent='Black screen? Tap once.';hint.style.opacity='1';setTimeout(()=>{hint.style.opacity='0';},5000);}}
-  else{document.getElementById('shareWait').classList.remove('gone');}   // no stream yet → show the spinner, not black
+  else{document.getElementById('shareWait').classList.remove('gone');setShareStatus('Waiting for the host’s video…');}   // no stream yet → show the spinner, not black
 }
 // On each state push: keep the mesh in sync with who's present and what's shared.
 function rtcTick(room){

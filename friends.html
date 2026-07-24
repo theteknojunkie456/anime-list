@@ -4736,11 +4736,8 @@ function applyRoom(room){
   partyRoom=room; partyIsHost=(room.host===partyUid());
   updatePartyPill();
   if(document.getElementById('partySheet').classList.contains('on'))renderParty();
-  // the 3·2·1 cue: a fresh future playAt → count everyone in, then open the player
-  if(room.playAt&&room.playAt>Date.now()&&room.playAt!==partySeenPlay){partySeenPlay=room.playAt;partyCue(room);}
   try{rtcTick(room);}catch(e){}          // drive the screen-share mesh
   try{processReacts(room.reacts);}catch(e){}   // float everyone's emoji
-  try{followHost(room);}catch(e){}       // viewers follow the host's remote
   try{renderPvHostBar();}catch(e){}      // keep the host's in-player remote current
 }
 function handleSignalMsg(m){try{if(m.kind==='offer')pcHandleOffer(m.from,m.data);else if(m.kind==='answer')pcHandleAnswer(m.from,m.data);}catch(e){}}
@@ -4902,9 +4899,12 @@ function iceComplete(pc){return new Promise(res=>{if(pc.iceGatheringState==='com
 async function startShare(){
   if(!canScreenShare()){toast('Screen sharing needs a computer — iPhones can’t share a screen');return;}
   if(!partyIsHost){toast('Only the host can share');return;}
-  let s;try{s=await navigator.mediaDevices.getDisplayMedia({video:{frameRate:30},audio:true});}catch{toast('Screen share cancelled');return;}
+  let s;try{s=await navigator.mediaDevices.getDisplayMedia({video:{frameRate:30},audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false},systemAudio:'include'});}catch{toast('Screen share cancelled');return;}
   localStream=s;
   s.getVideoTracks()[0].onended=()=>stopShare();   // browser's own "Stop sharing" bar
+  // Audio rides along only if the OS/browser captured it. On macOS that means sharing a
+  // Chrome TAB with "Also share tab audio" ticked — whole-screen/window audio isn't captured.
+  if(!s.getAudioTracks().length)toast('Sharing video — for sound, share a Chrome tab and tick “Also share tab audio”');
   wsSend({t:'share',on:true});
   renderParty();toast('Sharing — friends will connect in a moment');
 }
@@ -4995,7 +4995,7 @@ function renderParty(){
   if(!partyActive()){
     const nm=partyName();
     box.innerHTML=`
-      <p class="ai-desc">${IS_NATIVE?`Watch together with friends: broadcast your screen on a shared <b>3·2·1</b> count, with a live chat to talk through it.`:`Watch together with friends: everyone hits play on a shared <b>3·2·1</b> count, with a live chat to talk through it. <span style="opacity:.75">Playback isn’t frame-synced — you all just start together.</span>`}</p>
+      <p class="ai-desc">${IS_NATIVE?`Watch together with friends: broadcast your screen so everyone sees it live, with a chat to talk through it.`:`Watch together with friends: the host shares their screen and everyone watches in sync, with a chat to talk through it.`}</p>
       <div class="dt-label">${icon('users')} Your name</div>
       <input class="ai-prompt-in" id="ptName" placeholder="e.g. ${nm||'Alex'}" value="${nm?nm.replace(/"/g,'&quot;'):''}" maxlength="24" autocomplete="off">
       <button class="parse-btn" onclick="partyCreate()">${icon('users')} Start a party</button>
@@ -5018,8 +5018,7 @@ function renderParty(){
     <div class="pt-picklist">${qlist.map((q,i)=>`<div class="pt-pick pt-qitem">
       ${q.img?`<img src="${q.img}" alt="">`:`<div class="ph">${((q.title||'?')[0]||'?').toUpperCase()}</div>`}
       <div class="pt-pick-info"><div class="pt-pick-t">${schEsc(q.title)}</div><div class="pt-pick-s">${q.ep?`Episode ${q.ep} · `:''}added by ${schEsc(q.by||'?')}</div></div>
-      ${partyIsHost?`<button class="pt-qx" onclick="partyQueueRemoveAt(${i})" aria-label="Remove from queue">${icon('x')}</button>`:''}</div>`).join('')}</div>
-    ${partyIsHost?`<button class="pt-share" onclick="partyQueueNext()">${icon('play')} Play next from queue · 3·2·1</button>`:''}`:'';
+      ${partyIsHost?`<button class="pt-qx" onclick="partyQueueRemoveAt(${i})" aria-label="Remove from queue">${icon('x')}</button>`:''}</div>`).join('')}</div>`:'';
   if(partyIsHost&&iShare){
     hostCtl=`<button class="pt-share live" onclick="stopShare()">${icon('x')} Stop screen share</button>
       <div class="pt-hint">Friends are watching your screen — perfectly in sync. ${Math.max(0,r.members.length-1)} connected.</div>`;
@@ -5036,24 +5035,14 @@ function renderParty(){
     const picker=watchable.length
       ?`<div class="dt-label" style="margin-top:14px">Pick what to watch</div><div class="pt-picklist">${watchable.map(row).join('')}</div>`
       :`<p class="ai-desc" style="margin-top:14px">Add some anime to your watch list to pick from here.</p>`;
-    if(r.playAt||r.paused){   // a session is running → the host is the remote
-      const primary=r.paused
-        ?`<button class="pt-play" onclick="partyPlay()">${icon('play')} Resume together · 3·2·1</button>`
-        :`<button class="pt-play" onclick="partyPause()">Pause everyone</button>`;
-      const shareBtn=IS_NATIVE?`<button class="pt-share" onclick="broadcastCountdown()">${icon('users')} Broadcast your screen</button>`:(canScreenShare()?`<button class="pt-share" onclick="startShare()">${icon('users')} Share your screen — real sync</button>`:'');
-      hostCtl=`<p class="ai-desc" style="text-align:center">You're running the session — everyone follows you.</p>
-        ${primary}<button class="pt-share" onclick="partyNext()">Next episode</button>${shareBtn}
-        <div class="dt-label" style="margin-top:14px">Switch to something else</div>${picker}`;
+    if(IS_NATIVE){
+      // One host broadcasts their iPhone screen; everyone in the party watches it live.
+      hostCtl=`${picker}<button class="pt-share" onclick="nativeBroadcast()">${icon('users')} Broadcast your screen</button><div class="pt-hint">Streams your iPhone screen to everyone in this party — no computer needed.</div>`;
     }else{
-      if(IS_NATIVE){
-        // Native party = one host broadcasts their screen. Keep the 3·2·1 countdown; it now opens the host's broadcast.
-        hostCtl=`${picker}<button class="pt-play" onclick="broadcastCountdown()">${icon('play')} Start together · 3·2·1</button><div class="pt-hint">Counts down 3·2·1, then streams your iPhone screen to everyone in this party — no computer needed.</div>`;
-      }else{
-        const shareBlock=`<button class="pt-share" onclick="startShare()">${icon('users')} Share your screen — real sync</button>`
-          +(canScreenShare()?`<div class="pt-hint">Everyone watches your screen, perfectly synced. Open the anime in another tab, then share it.</div>`
-            :`<div class="pt-hint">Needs a computer to host. On a phone, use “Start together” below.</div>`);
-        hostCtl=`${shareBlock}${picker}<button class="pt-play" onclick="partyPlay()"${r.title?'':' disabled'}>${icon('play')} Start together · 3·2·1</button>`;
-      }
+      hostCtl=`<button class="pt-share" onclick="startShare()">${icon('users')} Share your screen</button>`
+        +(canScreenShare()?`<div class="pt-hint">Everyone watches your screen, perfectly in sync. On a Mac, share a <b>Chrome tab</b> and tick “Also share tab audio” to include sound.</div>`
+          :`<div class="pt-hint">Screen sharing needs a computer. On a phone, host from the WatchList app’s broadcast.</div>`)
+        +picker;
     }
   }else if(sharing){
     hostCtl=`<button class="pt-play" onclick="reopenShareView()">${icon('play')} Watch the shared screen</button>
@@ -7811,7 +7800,10 @@ try{(function(){
 })();}catch(e){}
 try{document.getElementById('apiKeyIn').value=getKey();}catch{}
 // rejoin a live party after a reload — official app only; the public web build has no parties
-try{if(IS_NATIVE){const pc=localStorage.getItem('party_active');if(pc&&partyName())setTimeout(()=>partyJoin(pc),400);}}catch{}
+// Coming back from a lock / backgrounded app: if we're still in a party but the socket
+// dropped while away, reconnect — don't sit there silently dead.
+document.addEventListener('visibilitychange',function(){if(!document.hidden&&partyCode&&(!partyWS||partyWS.readyState>1)){partyReconn=0;try{partyConnect(partyCode,false);}catch(e){}}});
+try{const pc=localStorage.getItem('party_active');if(pc&&partyName())setTimeout(()=>partyJoin(pc),400);}catch{}
 try{if(_updSnap){const pg=document.getElementById('pageEl'),y=_updSnap.y||0;if(y&&pg)requestAnimationFrame(()=>requestAnimationFrame(()=>{try{pg.scrollTop=y;}catch(e){}}));setTimeout(()=>toast('Updated to the latest version'),700);_updSnap=null;}}catch{}
 // Friends recommendations (public web build): show cached instantly, then refresh.
 try{loadRecsCache();}catch(e){}

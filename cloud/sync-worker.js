@@ -231,6 +231,7 @@ export class PartyRoom {
     const fresh = !room.members[uid];
     room.members[uid] = { name };
     if (fresh && !create) this.sys(room, `${name} joined`);
+    try { await this.state.storage.deleteAlarm(); } catch (e) {}   // someone's back → cancel the pending empty-room cleanup
     room.rev++;
     await this.save();
     this.broadcast();
@@ -314,7 +315,13 @@ export class PartyRoom {
     if (room.host === uid) { const rest = Object.keys(room.members); if (rest.length) { room.host = rest[0]; this.sys(room, `${room.members[rest[0]].name} is now host`); } }
     room.rev++;
     if (Object.keys(room.members).length) { await this.save(); this.broadcast(); }
-    else { await this.state.storage.deleteAll(); this.room = null; }   // empty → gone
+    else { await this.save(); await this.state.storage.setAlarm(Date.now() + 300000); }   // empty → hold the room 5 min so a lock/reconnect can rejoin the same code; alarm() deletes it if still empty
+  }
+  // Grace period elapsed: only now do we actually discard the room, and only if no one
+  // came back. This is what lets a party survive both phones auto-locking at once.
+  async alarm() {
+    const room = await this.getRoom();
+    if (!room || !Object.keys(room.members || {}).length) { await this.state.storage.deleteAll(); this.room = null; }
   }
 
   cap(room) { if (room.chat.length > CHAT_CAP) room.chat = room.chat.slice(-CHAT_CAP); }

@@ -255,7 +255,10 @@ export class PartyRoom {
       }
       case 'react': {
         const emoji = String(msg.emoji || '').slice(0, 8);
-        if (emoji) { room.reacts = (room.reacts || []).filter(r => Date.now() - r.t < 8000); room.reacts.push({ id: uid + '-' + Date.now() + '-' + ((Math.random() * 1e4) | 0), emoji, uid, t: Date.now() }); if (room.reacts.length > 24) room.reacts = room.reacts.slice(-24); room.rev++; await this.save(); this.broadcast(); }
+        // Reactions are transient confetti (8s life). Don't persist them to durable
+        // storage and don't re-send the whole room — just fan out a tiny {t:'react'}.
+        // That removes a disk write + a full-state broadcast from every single tap.
+        if (emoji) { const rc = { id: uid + '-' + Date.now() + '-' + ((Math.random() * 1e4) | 0), emoji, uid, t: Date.now() }; room.reacts = (room.reacts || []).filter(r => Date.now() - r.t < 8000); room.reacts.push(rc); if (room.reacts.length > 24) room.reacts = room.reacts.slice(-24); this.broadcastReact(rc); }
         return;
       }
       case 'set': {
@@ -334,6 +337,7 @@ export class PartyRoom {
       members: Object.entries(r.members).map(([uid, m]) => ({ uid, name: m.name })), chat: r.chat, reacts: (r.reacts || []).filter(x => Date.now() - x.t < 8000), rev: r.rev };
   }
   broadcast() { const s = JSON.stringify({ t: 'state', room: this.view() }); for (const ws of this.state.getWebSockets()) { try { ws.send(s); } catch {} } }
+  broadcastReact(rc) { const s = JSON.stringify({ t: 'react', r: rc }); for (const ws of this.state.getWebSockets()) { try { ws.send(s); } catch {} } }
   sendTo(uid, obj) { const s = JSON.stringify(obj); for (const ws of this.state.getWebSockets(uid)) { try { ws.send(s); } catch {} } }
 }
 

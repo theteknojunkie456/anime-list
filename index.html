@@ -4785,6 +4785,7 @@ function partyConnect(code,create){
   ws.onopen=()=>{partyReconn=0;updatePartyPill();};
   ws.onmessage=e=>{let m;try{m=JSON.parse(e.data);}catch{return;}
     if(m.t==='state')applyRoom(m.room);
+    else if(m.t==='react')processReacts(m.r?[m.r]:m.reacts);   // lightweight: float the emoji, no full-state churn
     else if(m.t==='signal')handleSignalMsg(m);
     else if(m.t==='error'){toast(m.msg||'Party error');partyEnd(true);}
   };
@@ -4795,13 +4796,29 @@ function partyConnect(code,create){
 }
 function partyActive(){return !!partyCode;}
 function updatePartyPill(){const el=document.getElementById('partyPill');if(!el)return;const sheetOpen=document.getElementById('partySheet').classList.contains('on');el.classList.toggle('on',partyActive()&&!sheetOpen);const t=document.getElementById('ppText');if(t)t.textContent=partyRoom?`Party · ${partyRoom.members.length}`:'Party';}
+// A signature of only the fields renderParty actually draws (reactions excluded —
+// they float via processReacts). If it's unchanged, a re-render would be identical, so
+// we skip it: that alone kills the reaction/presence re-render storm that made the
+// whole party feel laggy. Real changes are coalesced to one render per frame.
+let _prSig='',_prPend=false;
+function _partyRenderSig(r){
+  const c=r.chat||[],m=r.members||[],q=r.queue||[];
+  return m.map(x=>x.uid+':'+x.name).join(',')+'|'+r.host+'|'+c.length+':'+((c[c.length-1]||{}).id||'')+'|'+q.length+':'+((q[q.length-1]||{}).id||'')+'|'+(r.title||'')+'|'+(r.ep||'')+'|'+(r.sharing||'')+'|'+(r.playAt||0)+'|'+(r.paused?1:0);
+}
+function _schedulePartyRender(){
+  if(_prPend)return;_prPend=true;
+  requestAnimationFrame(()=>{_prPend=false;try{if(document.getElementById('partySheet').classList.contains('on'))renderParty();}catch(e){}});
+}
 function applyRoom(room){
   if(!room)return;
   partyRoom=room; partyIsHost=(room.host===partyUid());
   updatePartyPill();
-  if(document.getElementById('partySheet').classList.contains('on'))renderParty();
+  if(document.getElementById('partySheet').classList.contains('on')){
+    const sig=_partyRenderSig(room);
+    if(sig!==_prSig){_prSig=sig;_schedulePartyRender();}   // only when something visible actually changed
+  }
   try{rtcTick(room);}catch(e){}          // drive the screen-share mesh
-  try{processReacts(room.reacts);}catch(e){}   // float everyone's emoji
+  try{processReacts(room.reacts);}catch(e){}   // float everyone's emoji (from a full-state sync)
   try{renderPvHostBar();}catch(e){}      // keep the host's in-player remote current
 }
 function handleSignalMsg(m){try{if(m.kind==='offer')pcHandleOffer(m.from,m.data);else if(m.kind==='answer')pcHandleAnswer(m.from,m.data);}catch(e){}}

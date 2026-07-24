@@ -67,8 +67,15 @@ final class WebRTCBroadcaster {
         guard peers[uid] == nil else { return }
         let constraints = RTCMediaConstraints(mandatoryConstraints: nil, optionalConstraints: nil)
         guard let pc = factory.peerConnection(with: config(), constraints: constraints, delegate: nil) else { return }
-        pc.add(videoTrack, streamIds: ["screen"])
+        let vsender = pc.add(videoTrack, streamIds: ["screen"])
         pc.add(audioTrack, streamIds: ["screen"])   // same stream id → viewer bundles A/V together
+        // Cap the encoder: a phone's uplink can't sustain screen-video's bitrate spikes,
+        // and unbounded, the excess just buffers → felt as lag. 2 Mbps is plenty for 720p.
+        if let vsender = vsender {
+            let params = vsender.parameters
+            params.encodings.forEach { $0.maxBitrateBps = 2_000_000; $0.maxFramerate = 30 }
+            vsender.parameters = params
+        }
         let peer = Peer(uid: uid, pc: pc) { [weak self] sdp in self?.onOffer?(uid, sdp) }
         pc.delegate = peer
         peers[uid] = peer

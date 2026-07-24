@@ -1206,8 +1206,13 @@ body.recsel .pcard{position:relative;}
 /* WIDE / tablet: center the content so lines & cards don't stretch absurdly,
    and let the hero + poster grid breathe with more columns. */
 @media (min-width:900px){
+  /* These are flex-column children of #app. Centering them with margin:auto ALONE
+     silently disables flexbox's cross-axis stretch, so each collapses to its content
+     width (a narrow ~300px column floating in the middle of the screen) and max-width
+     never engages. width:100% restores the stretch → they fill up to the 1180 cap,
+     then the auto margins center that. */
   .hdr,.search-row,.ctrl-row,.page{
-    max-width:1180px;margin-left:auto;margin-right:auto;
+    width:100%;max-width:1180px;margin-left:auto;margin-right:auto;
   }
   .confirm-box{max-width:440px;margin-left:auto;margin-right:auto;}
   .nav{justify-content:center;gap:46px;}
@@ -1326,7 +1331,7 @@ body.recsel .pcard{position:relative;}
   <div class="search-row">
     <div class="search-wrap">
       <span class="search-ico"><i data-ic="search"></i></span>
-      <input class="search-in" type="search" id="searchIn" placeholder="Search titles, genres…" oninput="renderHome()">
+      <input class="search-in" type="search" id="searchIn" placeholder="Search titles, genres…" oninput="onSearchInput()">
     </div>
     <div class="kind-seg" id="kindSeg"></div>
   </div>
@@ -3160,7 +3165,7 @@ function renderThemeGrid(){
         <div class="taccent-bar" style="background:${t.accent}"></div>
         ${t.custom?`<div class="tdel" onclick="event.stopPropagation();deleteCustomTheme('${t.id}')">${icon('x')}</div>`:''}
       </div>
-      <div class="tname">${t.name}</div>
+      <div class="tname">${schEsc(t.name)}</div>
     </button>`;
   }).join('');
 }
@@ -3481,7 +3486,7 @@ function bbSlideHTML(a){
     <div class="hero-body">
       <div class="hero-kicker">${kicker}</div>
       <div class="hero-title">${schEsc(a.title)}</div>
-      <div class="hero-meta">${[a.eps,a.time,(a.genre||'').split(',')[0]].filter(Boolean).join(' · ')}</div>
+      <div class="hero-meta">${schEsc([a.eps,a.time,(a.genre||'').split(',')[0]].filter(Boolean).join(' · '))}</div>
       ${a.epTotal?`<div class="hero-prog"><div class="pbar"><div class="pfill" style="width:${Math.round(p*100)}%"></div></div><span>${a.ep||0} / ${a.epTotal}</span></div>`:''}
       ${airHTML}
       <div class="hero-cta">${icon('play')} &nbsp;Open</div>
@@ -3548,6 +3553,11 @@ function bbSnap(){
   bbP=np;
   track.style.transition='none';track.style.transform='translateX('+(-bbP*w)+'px)';void track.offsetWidth;track.style.transition='';
 }
+// The search box fires on every keystroke; rebuilding the whole list DOM each time
+// makes typing feel sticky on a big list. Coalesce to one render ~110ms after the
+// last key — imperceptible, but it stops the per-character thrash.
+let _searchT=0;
+function onSearchInput(){clearTimeout(_searchT);_searchT=setTimeout(renderHome,110);}
 function renderHome(){
   const el=document.getElementById('pageEl');
   clearInterval(bbTimer);bbTimer=0;   // stop any rotation; the main path re-arms it
@@ -3562,7 +3572,7 @@ function renderHome(){
     if(hits.length){el.innerHTML=`<div class="grid">${hits.map(posterCard).join('')}</div>`;return;}
     const stLbl=filterStatus==='watching'?(isRead?'Reading':'Watching'):(STATUS_META[filterStatus]?STATUS_META[filterStatus].label:filterStatus);
     const msg=q
-      ?`No matches for “${q}”${filterStatus!=='all'?` in ${stLbl}`:` in your ${isRead?'reading':'watch'} list`}`
+      ?`No matches for “${schEsc(q)}”${filterStatus!=='all'?` in ${stLbl}`:` in your ${isRead?'reading':'watch'} list`}`
       :`Nothing in ${stLbl} yet`;
     el.innerHTML=`<div class="empty"><div class="empty-icon">${q?icon('search'):(STATUS_META[filterStatus]?STATUS_META[filterStatus].icon:(isRead?icon('book'):icon('inbox')))}</div><p>${msg}</p></div>`;
     return;
@@ -4408,7 +4418,7 @@ function renderPreview(){
     return`<div class="preview-item${item.selected&&!dup?' sel':''}" onclick="toggleImport(${item.id})">
       <div class="prev-check">${item.selected&&!dup?icon('check'):''}</div>
       <div class="prev-main">
-        <div class="prev-name">${item.title}${item.ep?` <span style="color:var(--t3);font-size:10px">· ep ${item.ep}</span>`:''}${dup?' <span style="color:var(--t3);font-size:10px">(already added)</span>':''}</div>
+        <div class="prev-name">${schEsc(item.title)}${item.ep?` <span style="color:var(--t3);font-size:10px">· ep ${schEsc(String(item.ep))}</span>`:''}${dup?' <span style="color:var(--t3);font-size:10px">(already added)</span>':''}</div>
         ${dup?'':`<div class="prev-seg">${seg(item,'plan',icon('clipboard')+' Plan')}${seg(item,'watching',icon('play')+' Watch')}${seg(item,'finished',icon('check')+' Done')}${seg(item,'dropped',icon('x')+' Drop')}</div>`}
       </div>
     </div>`;
@@ -4996,10 +5006,28 @@ function stopShare(){
   renderParty();
 }
 function pcClose(uid){const pc=pcs[uid];if(pc){try{pc.close();}catch{}delete pcs[uid];}}
+// Cap what the encoder sends. Without this it chases the source bitrate (screen video
+// can spike past 4–5 Mbps), and on a limited uplink that just piles into a buffer —
+// which is felt as growing lag, not better quality. 2 Mbps is plenty for 720p video;
+// degradationPreference:'balanced' means it eases off resolution/framerate under
+// pressure instead of stalling.
+async function tuneSender(pc){
+  try{
+    const sender=pc.getSenders().find(s=>s.track&&s.track.kind==='video');
+    if(!sender)return;
+    const p=sender.getParameters();
+    if(!p.encodings||!p.encodings.length)p.encodings=[{}];
+    p.encodings[0].maxBitrate=2000000;
+    p.encodings[0].maxFramerate=30;
+    try{p.degradationPreference='balanced';}catch(e){}
+    await sender.setParameters(p);
+  }catch(e){}
+}
 async function pcConnectToViewer(vid){                 // HOST → each viewer
   if(pcs[vid]||!localStream)return;
   const pc=new RTCPeerConnection(RTC_CFG);pcs[vid]=pc;
   localStream.getTracks().forEach(tr=>pc.addTrack(tr,localStream));
+  tuneSender(pc);
   pc.onconnectionstatechange=()=>{if(['failed','closed','disconnected'].includes(pc.connectionState))pcClose(vid);};
   try{const offer=await pc.createOffer();await pc.setLocalDescription(offer);await iceComplete(pc);
     wsSend({t:'signal',to:vid,kind:'offer',data:pc.localDescription});}catch{pcClose(vid);}
@@ -5144,7 +5172,7 @@ function renderParty(){
   const _friends=friendsList();
   const inviteBlock=_friends.length?`<div class="dt-label" style="margin-top:14px">${icon('users')} Invite friends</div><div class="pt-invite">${_friends.map(f=>`<button class="pt-invite-btn" onclick="partyInviteFriend('${escH(f.code)}')"><span class="fr-dot" style="background:${friendColor(f.code)}"></span>${escH(f.name)}</button>`).join('')}</div>`:'';
   box.innerHTML=`
-    <div class="pt-code"><div class="pt-code-val">${r.code}</div><button class="pt-code-cta" onclick="sharePartyLink()" aria-label="Share invite link">${icon('send')}</button><button class="pt-code-cta" onclick="partyCopyCode()" aria-label="Copy code">${icon('copy')}</button></div>
+    <div class="pt-code"><div class="pt-code-val">${schEsc(r.code||partyCode)}</div><button class="pt-code-cta" onclick="sharePartyLink()" aria-label="Share invite link">${icon('send')}</button><button class="pt-code-cta" onclick="partyCopyCode()" aria-label="Copy code">${icon('copy')}</button></div>
     <div class="pt-members">${members}</div>
     ${now}${queueBlock}${hostCtl}${inviteBlock}
     <div class="pt-reactbar">${PARTY_EMOJI.map(e=>`<button class="pt-react" onclick="partyReact('${e}')">${e}</button>`).join('')}</div>
@@ -6415,7 +6443,10 @@ async function sendRecommend(){
 // Open a URL outside the app — legal sites can't be framed. In the native shell we
 // hand it to iOS (opens Safari); on the web it opens a new tab.
 function openExternal(url){
-  if(!url)return;
+  url=String(url==null?'':url).trim();
+  // Only ever hand off real web links. Anything else — javascript:, data:, blob:,
+  // custom schemes — could run in-page or exfiltrate, so it never leaves here.
+  if(!/^https?:\/\//i.test(url)){toast('That link can’t be opened');return;}
   if(typeof IS_NATIVE!=='undefined'&&IS_NATIVE){try{window.webkit.messageHandlers.wl.postMessage({type:'openurl',url});return;}catch(e){}}
   try{window.open(url,'_blank','noopener');}catch(e){location.href=url;}
 }

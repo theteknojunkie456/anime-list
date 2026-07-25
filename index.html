@@ -1267,6 +1267,18 @@ body.recsel .pcard{position:relative;}
 .fy-plan:hover{background:color-mix(in srgb,var(--bg4),#fff 6%);border-color:var(--b3);}
 .fy-plan:active{transform:scale(.96);}
 .fy-plan .ico{width:15px;height:15px;}
+/* ── DESKTOP KEYBOARD LAYER — focus ring + shortcuts overlay (only ever visible
+   once a key is pressed, so touch/phone use is completely unaffected) ── */
+.pcard.kbfocus{outline:2.5px solid var(--a);outline-offset:3px;border-radius:15px;}
+.pcard.kbfocus .pcard-wrap{box-shadow:0 0 0 1px var(--a),0 12px 30px -8px var(--glow);}
+.kbhelp{position:fixed;inset:0;z-index:400;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.55);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);}
+.kbhelp.on{display:flex;animation:fadeUp .2s ease both;}
+.kbhelp-card{width:min(420px,92vw);background:var(--bg2);border:1px solid var(--b3);border-radius:20px;padding:22px 24px;box-shadow:0 24px 70px rgba(0,0,0,.6);}
+.kbhelp-h{font-family:var(--fd);font-size:17px;font-weight:800;letter-spacing:-.3px;margin-bottom:14px;color:var(--t1);}
+.kbhelp-row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:9px 0;border-bottom:1px solid var(--b2);font-size:13.5px;color:var(--t1);}
+.kbhelp-row:last-child{border-bottom:0;}
+.kbhelp-row .keys{display:flex;gap:5px;flex-shrink:0;}
+.kbkey{min-width:22px;height:23px;padding:0 7px;border-radius:7px;background:var(--bg4);border:1px solid var(--b2);font-size:12px;font-weight:700;color:var(--t2);display:inline-flex;align-items:center;justify-content:center;font-family:ui-monospace,SFMono-Regular,monospace;}
 </style>
 </head>
 <body>
@@ -7759,7 +7771,55 @@ try{
 }catch(e){}
 
 // ─── KEYBOARD ───────────────────────────────────────────────────────────────
-document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeAll();closeConfirm();closeYT();}});
+// ── DESKTOP KEYBOARD LAYER ──────────────────────────────────────────────────
+// Power-user nav for a real keyboard: / search · a add · h/l/←/→ move card ·
+// j/k/↑/↓ move a row · Enter open · Esc close · ? help. Completely inert on touch
+// (no physical keyboard) and whenever you're typing, locked, or a sheet/overlay
+// owns the screen — so phone/portrait use is untouched.
+let _kbIdx=-1;
+function _kbTyping(){const el=document.activeElement;if(!el)return false;const t=(el.tagName||'').toLowerCase();return t==='input'||t==='textarea'||t==='select'||el.isContentEditable;}
+function _kbBlocked(){
+  if(typeof appLocked!=='undefined'&&appLocked)return true;
+  return !!document.querySelector('.sheet.on,.onb.on,.lockscreen.on,#playerView.on,#shareView.on');
+}
+function _kbCards(){return Array.prototype.slice.call(document.querySelectorAll('#pageEl .pcard'));}
+function _kbCols(cards){if(cards.length<2)return 1;const top=cards[0].offsetTop;let n=0;for(let i=0;i<cards.length;i++){if(cards[i].offsetTop===top)n++;else break;}return n||1;}
+function _kbFocus(i){
+  const cards=_kbCards();if(!cards.length){_kbIdx=-1;return;}
+  _kbIdx=Math.max(0,Math.min(i,cards.length-1));
+  cards.forEach((c,j)=>c.classList.toggle('kbfocus',j===_kbIdx));
+  try{cards[_kbIdx].scrollIntoView({block:'nearest',behavior:'smooth'});}catch(e){}
+}
+function _kbClear(){document.querySelectorAll('.pcard.kbfocus').forEach(c=>c.classList.remove('kbfocus'));_kbIdx=-1;}
+function _kbMove(d){const cards=_kbCards();if(!cards.length)return;_kbFocus(_kbIdx<0?0:_kbIdx+d);}
+function _kbMoveRow(dir){const cards=_kbCards();if(!cards.length)return;_kbFocus(_kbIdx<0?0:_kbIdx+dir*_kbCols(cards));}
+const KB_HELP=[['/','Search'],['a','Add a title'],['h l ← →','Move between cards'],['j k ↑ ↓','Move a whole row'],['Enter','Open the focused card'],['Esc','Close / clear'],['?','This help']];
+function toggleKbHelp(){
+  let el=document.getElementById('kbHelp');
+  if(!el){
+    el=document.createElement('div');el.id='kbHelp';el.className='kbhelp';el.onclick=ev=>{if(ev.target===el)closeKbHelp();};
+    el.innerHTML='<div class="kbhelp-card"><div class="kbhelp-h">Keyboard shortcuts</div>'+
+      KB_HELP.map(r=>'<div class="kbhelp-row"><span>'+schEsc(r[1])+'</span><span class="keys">'+r[0].split(' ').map(k=>'<span class="kbkey">'+schEsc(k)+'</span>').join('')+'</span></div>').join('')+'</div>';
+    document.body.appendChild(el);
+  }
+  el.classList.toggle('on');
+}
+function closeKbHelp(){const el=document.getElementById('kbHelp');if(el)el.classList.remove('on');}
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){closeKbHelp();closeAll();closeConfirm();closeYT();if(_kbTyping()&&document.activeElement.blur)document.activeElement.blur();_kbClear();return;}
+  if(e.metaKey||e.ctrlKey||e.altKey)return;   // leave OS/browser combos (Cmd+L, Ctrl+A…) alone
+  if(e.key==='/'&&!_kbTyping()){e.preventDefault();const s=document.getElementById('searchIn');if(s){_kbClear();s.focus();try{s.select();}catch(_){}}return;}
+  if((e.key==='?'||(e.key==='/'&&e.shiftKey))&&!_kbTyping()){e.preventDefault();if(!_kbBlocked())toggleKbHelp();return;}
+  if(_kbTyping()||_kbBlocked())return;
+  switch(e.key){
+    case 'a':e.preventDefault();try{openSheet_add();}catch(_){}break;
+    case 'ArrowRight':case 'l':e.preventDefault();_kbMove(1);break;
+    case 'ArrowLeft':case 'h':e.preventDefault();_kbMove(-1);break;
+    case 'ArrowDown':case 'j':e.preventDefault();_kbMoveRow(1);break;
+    case 'ArrowUp':case 'k':e.preventDefault();_kbMoveRow(-1);break;
+    case 'Enter':{const cards=_kbCards();if(_kbIdx>=0&&cards[_kbIdx]){e.preventDefault();cards[_kbIdx].click();}break;}
+  }
+});
 
 // ─── SUMMON THE AI — two-finger hold anywhere ───────────────────────────────
 // The AI moved off the nav bar (Sources took its place), so it's reached by a

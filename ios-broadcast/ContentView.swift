@@ -53,6 +53,7 @@ struct WatchListShell: UIViewRepresentable {
         wv.scrollView.bouncesZoom = false
         wv.allowsBackForwardNavigationGestures = true
         wv.navigationDelegate = context.coordinator
+        wv.uiDelegate = context.coordinator   // grants mic access to the web app (voice/Jitsi)
         context.coordinator.web = wv
         context.coordinator.observeLinks()
 
@@ -66,7 +67,13 @@ struct WatchListShell: UIViewRepresentable {
 
     func updateUIView(_ uiView: WKWebView, context: Context) {}
 
-    final class Coordinator: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
+    final class Coordinator: NSObject, WKScriptMessageHandler, WKNavigationDelegate, WKUIDelegate {
+        // Let the web app use the mic (voice chat + the embedded Jitsi call). Without a
+        // WKUIDelegate granting this, iOS 15+ denies getUserMedia inside the web view and
+        // voice silently fails. The mic prompt itself is gated by NSMicrophoneUsageDescription.
+        func webView(_ webView: WKWebView, requestMediaCapturePermissionFor origin: WKSecurityOrigin, initiatedByFrame frame: WKFrameInfo, type: WKMediaCaptureType, decisionHandler: @escaping (WKPermissionDecision) -> Void) {
+            decisionHandler(.grant)
+        }
         let broadcaster: BroadcastController
         weak var web: WKWebView?
         init(broadcaster: BroadcastController) { self.broadcaster = broadcaster }

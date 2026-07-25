@@ -5266,7 +5266,7 @@ async function pcHandleOffer(from,offer){              // VIEWER answers the hos
   pc.oniceconnectionstatechange=()=>{const st=pc.iceConnectionState;console.log('[party] ICE '+st);
     if(st==='checking')setShareStatus('Connecting to the host’s screen…');
     else if(st==='connected'||st==='completed')setShareStatus('Connected — starting the video…');
-    else if(st==='failed')setShareStatus('Couldn’t reach the host. The network relay may be blocked — leave and rejoin, or check the host is still broadcasting.',true);
+    else if(st==='failed')setShareStatus('Couldn’t connect to the host’s screen. This usually means you or the host is on cellular data or a strict Wi-Fi. Best fix: both get on regular Wi-Fi, then tap Retry. (Voice and chat still work.)',true);
     else if(st==='disconnected')setShareStatus('Connection dropped — trying to recover…',true);};
   pc.onconnectionstatechange=()=>{console.log('[party] PC '+pc.connectionState);
     if(['failed','closed'].includes(pc.connectionState)){pcClose(from);}};   // keep the view up with its status; rtcTick tears down when the host actually stops

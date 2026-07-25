@@ -880,6 +880,11 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 @keyframes pcPop{0%{transform:scale(.4);opacity:0;}30%{transform:scale(1.1);opacity:1;}100%{transform:scale(1);opacity:1;}}
 .shareview{position:fixed;inset:0;z-index:130;background:#000;display:none;transform:translateY(100%);transition:transform .38s cubic-bezier(.2,1,.28,1);}
 .shareview.on{display:block;transform:translateY(0);}
+.jitsiview{position:fixed;inset:0;z-index:135;background:#0a0a0c;display:none;flex-direction:column;transform:translateY(100%);transition:transform .38s cubic-bezier(.2,1,.28,1);}
+.jitsiview.on{display:flex;transform:translateY(0);}
+.jitsiview .pv-top{position:relative;flex-shrink:0;display:flex;align-items:center;gap:10px;padding:calc(var(--safe-t,0px) + 10px) 14px 10px;background:var(--bg);}
+.jitsi-frame{flex:1;min-height:0;position:relative;background:#0a0a0c;}
+.jitsi-frame iframe{position:absolute!important;inset:0;width:100%!important;height:100%!important;border:0;}
 /* In-app player — mirrors .shareview so the transition feels identical */
 .ytview{position:fixed;inset:0;z-index:130;background:#000;display:none;transform:translateY(100%);transition:transform .38s cubic-bezier(.2,1,.28,1);}
 .ytview.on{display:block;transform:translateY(0);}
@@ -1007,6 +1012,12 @@ body.recsel .pcard{position:relative;}
 .pt-mact .ico{width:13px;height:13px;}
 .pt-mact-x{color:var(--a2);}
 /* voice chat controls */
+.pt-jitsi{width:100%;margin-top:12px;display:flex;align-items:center;justify-content:center;gap:9px;height:48px;border-radius:13px;background:linear-gradient(135deg,var(--a1),var(--a2));border:0;color:#fff;font-family:var(--fd);font-weight:800;font-size:14px;cursor:pointer;transition:transform .1s;}
+.pt-jitsi:active{transform:scale(.98);}
+.pt-jitsi.on{background:var(--ag);color:var(--a2);border:1px solid var(--a);}
+.pt-jitsi .ico{width:17px;height:17px;}
+.pt-jitsi-tag{font-size:10px;font-weight:800;padding:2px 7px;border-radius:8px;background:rgba(255,255,255,.22);}
+.pt-jitsi.on .pt-jitsi-tag{background:var(--a);color:#fff;}
 .pt-voice{display:flex;gap:8px;margin-top:12px;}
 .pt-voicebtn{flex:1;display:flex;align-items:center;justify-content:center;gap:8px;height:46px;border-radius:13px;background:var(--bg3);border:1px solid var(--b2);color:var(--t1);font-family:var(--fd);font-weight:800;font-size:14px;cursor:pointer;transition:transform .1s;}
 .pt-voicebtn:active{transform:scale(.98);}
@@ -1757,6 +1768,16 @@ body.recsel .pcard{position:relative;}
     <div class="sh-wait" id="shareWait"><div class="sh-spin"></div><div id="shStatus">Connecting to the host…</div><button class="sh-retry" id="shRetry" onclick="partyRetryShare()" style="display:none">Retry connection</button></div>
     <div class="sh-fit-hint" id="shFitHint">Tap the video to fill the screen</div>
   </div>
+</div>
+
+<!-- Reliable A/V via embedded Jitsi (their relay servers → cross-network works, free) -->
+<div class="jitsiview" id="jitsiView">
+  <div class="pv-top">
+    <button class="sv-back" onclick="hideJitsi()" aria-label="Back to party"><i data-ic="chevron-left"></i></button>
+    <div class="pv-title">Voice &amp; screen</div>
+    <button class="pv-ext" onclick="leaveJitsi()" aria-label="Leave call"><i data-ic="x"></i></button>
+  </div>
+  <div class="jitsi-frame" id="jitsiFrame"></div>
 </div>
 
 <!-- floating pill while a party is live -->
@@ -5062,6 +5083,7 @@ function partyEnd(silent){
   const ws=partyWS;partyWS=null;   // null first so onclose won't reconnect
   if(localStream){localStream.getTracks().forEach(t=>t.stop());localStream=null;}
   voiceOn=false;voiceMuted=false;Object.keys(vpcs).forEach(vpcClose);if(voiceStream){voiceStream.getTracks().forEach(t=>t.stop());voiceStream=null;}
+  try{leaveJitsi();}catch(e){}   // drop the reliable-A/V call too
   Object.keys(pcs).forEach(pcClose);hideShareView();partySeenSig=new Set();partyPrevSharing='';
   try{localStorage.removeItem('party_active');}catch{}
   if(ws){try{ws.close();}catch{}}   // DO removes us + tells the others
@@ -5381,6 +5403,51 @@ function vrtcTick(room){
   if(voiceOn)voice.forEach(uid=>{if(uid!==me&&!vpcs[uid]&&me<uid)vpcConnect(uid);});
   Object.keys(vpcs).forEach(uid=>{if(!voiceOn||!voice.has(uid))vpcClose(uid);});
 }
+// ── Reliable A/V via embedded Jitsi Meet ─────────────────────────────────────
+// Jitsi runs its own relay + forwarding servers, so cross-network voice and
+// screen-share connect reliably for free — the piece our own P2P mesh can't do
+// without a paid TURN. Stripped to mic + screen-share (no camera for now; add
+// 'camera' to TOOLBAR_BUTTONS when it's time). Everyone in a WatchList party
+// derives the same Jitsi room from the party code, so they land together.
+let _jitsiApi=null,_jitsiLoading=false;
+function jitsiRoom(){return 'WatchListParty-'+(partyCode||'lobby')+'-hz7k9x';}
+function loadJitsiScript(cb){
+  if(window.JitsiMeetExternalAPI){cb();return;}
+  if(_jitsiLoading){const t=setInterval(()=>{if(window.JitsiMeetExternalAPI){clearInterval(t);cb();}},120);setTimeout(()=>clearInterval(t),9000);return;}
+  _jitsiLoading=true;
+  const s=document.createElement('script');s.src='https://meet.jit.si/external_api.js';
+  s.onload=()=>{if(window.JitsiMeetExternalAPI)cb();else toast('Couldn’t load the call');};
+  s.onerror=()=>{_jitsiLoading=false;toast('Couldn’t load the call — check your connection');};
+  document.head.appendChild(s);
+}
+function openJitsi(){
+  if(!partyActive()){toast('Start or join a party first');return;}
+  const view=document.getElementById('jitsiView');if(!view)return;
+  closeAll();view.classList.add('on');
+  if(_jitsiApi)return;   // already connected → just re-show the panel
+  loadJitsiScript(()=>{
+    if(_jitsiApi)return;
+    const frame=document.getElementById('jitsiFrame');if(frame)frame.innerHTML='';
+    try{
+      _jitsiApi=new JitsiMeetExternalAPI('meet.jit.si',{
+        roomName:jitsiRoom(),parentNode:frame,width:'100%',height:'100%',
+        userInfo:{displayName:partyName()||'Guest'},
+        configOverwrite:{startWithVideoMuted:true,prejoinPageEnabled:false,disableDeepLinking:true,disableInviteFunctions:true},
+        interfaceConfigOverwrite:{
+          TOOLBAR_BUTTONS:['microphone','desktop','tileview','settings','raisehand','participants-pane','fullscreen','hangup'],
+          MOBILE_APP_PROMO:false,SHOW_JITSI_WATERMARK:false,SHOW_CHROME_EXTENSION_BANNER:false
+        }
+      });
+      _jitsiApi.addEventListener('readyToClose',leaveJitsi);
+    }catch(e){toast('Call failed to start');leaveJitsi();}
+  });
+}
+function hideJitsi(){const v=document.getElementById('jitsiView');if(v)v.classList.remove('on');}   // back to party; call keeps running
+function leaveJitsi(){
+  const v=document.getElementById('jitsiView');if(v)v.classList.remove('on');
+  if(_jitsiApi){try{_jitsiApi.dispose();}catch(e){}_jitsiApi=null;}
+  const frame=document.getElementById('jitsiFrame');if(frame)frame.innerHTML='';
+}
 function renderParty(){
   const box=document.getElementById('partyBody');if(!box)return;
   if(!partyActive()){
@@ -5406,6 +5473,9 @@ function renderParty(){
     <button class="pt-voicebtn${voiceOn?' on':''}" onclick="toggleVoice()">${icon('mic')}<span>${voiceOn?'Leave voice':'Join voice chat'}</span>${vset.size?`<span class="pt-voice-n">${vset.size}</span>`:''}</button>
     ${voiceOn?`<button class="pt-mutebtn${voiceMuted?' muted':''}" onclick="toggleMute()">${icon(voiceMuted?'mic-off':'mic')}<span>${voiceMuted?'Muted':'Mute'}</span></button>`:''}
   </div>`;
+  // Reliable cross-network A/V (Jitsi): the recommended path — talk + share your
+  // screen with audio, connects anywhere. The custom voice above is the P2P fallback.
+  const jitsiBtn=`<button class="pt-jitsi${_jitsiApi?' on':''}" onclick="openJitsi()">${icon('users')}<span>${_jitsiApi?'Back to voice &amp; screen':'Voice &amp; screen share'}</span><span class="pt-jitsi-tag">${_jitsiApi?'live':'works anywhere'}</span></button>`;
   const now=r.title?`<div class="pt-now">${r.img?`<img src="${safeImg(r.img)}" alt="">`:''}<div><div class="pt-now-t">${schEsc(r.title)}</div><div class="pt-now-s">${r.ep?`Episode ${r.ep}`:'Ready'} · ${r.members.length} watching</div></div></div>`:'';
   let hostCtl='';
   const sharing=!!r.sharing, iShare=r.sharing===meUid;
@@ -5475,7 +5545,7 @@ function renderParty(){
   box.innerHTML=`
     <div class="pt-code"><div class="pt-code-val">${schEsc(r.code||partyCode)}</div><button class="pt-code-cta" onclick="sharePartyLink()" aria-label="Share invite link">${icon('send')}</button><button class="pt-code-cta" onclick="partyCopyCode()" aria-label="Copy code">${icon('copy')}</button></div>
     <div class="pt-members">${members}</div>
-    ${now}${queueBlock}${hostCtl}${voiceUI}${inviteBlock}
+    ${now}${queueBlock}${hostCtl}${jitsiBtn}${voiceUI}${inviteBlock}
     <div class="pt-reactbar">${PARTY_EMOJI.map(e=>`<button class="pt-react" onclick="partyReact('${e}')">${e}</button>`).join('')}</div>
     <div class="pt-chat" id="ptChat">${chat||'<div class="pt-sys">Say hi</div>'}</div>
     <div class="pt-typing" id="ptTyping" style="display:none"></div>

@@ -2032,6 +2032,11 @@ const STATUS_META={
 
 // ─── STORAGE ───────────────────────────────────────────────────────────────
 const LSKEY='animelist_v4';
+// Respect the OS "reduce motion" setting for JS-driven scrolling too. CSS animations
+// are already neutralized globally (see the prefers-reduced-motion block), but a
+// scrollTo/scrollIntoView({behavior:'smooth'}) is JS and ignores that — so resolve the
+// behavior at call time and fall back to an instant jump when the user asked for less motion.
+const _scrollBehavior=()=>{try{return matchMedia('(prefers-reduced-motion:reduce)').matches?'auto':'smooth';}catch(e){return 'smooth';}};
 const SYNC_URL='https://watchlist-sync.muhammad-dac.workers.dev';
 const SYNC_CAP=20000000; // keep in step with the worker's push cap (cloud/sync-worker.js)
 // Companion Web Push worker (see enableNotify/disableNotify/notifyUpdate below).
@@ -3401,7 +3406,7 @@ function setViewKind(k){
   if(viewKind===k)return;
   viewKind=k;filterStatus='all';
   const s=document.getElementById('searchIn');if(s)s.value='';
-  render();document.getElementById('pageEl').scrollTo({top:0,behavior:'smooth'});
+  render();document.getElementById('pageEl').scrollTo({top:0,behavior:_scrollBehavior()});
 }
 // ─── AIRING (AniList nextAiringEpisode, display-only) ───────────────────────
 function airingInfo(a){
@@ -3460,8 +3465,8 @@ function openSortMenu(e){
   if(open)setTimeout(()=>{const close=(ev)=>{if(!menu.contains(ev.target)&&!btn.contains(ev.target)){menu.classList.remove('on');btn.classList.remove('on');document.removeEventListener('click',close);}};document.addEventListener('click',close);},0);
 }
 function pickSort(m){sortMode=m;const menu=document.getElementById('sortMenu'),btn=document.getElementById('sortBtn');if(menu)menu.classList.remove('on');if(btn)btn.classList.remove('on');render();}
-function setFilter(f){filterStatus=f;renderFiltRow();renderSortRow();renderHome();document.getElementById('pageEl').scrollTo({top:0,behavior:'smooth'});}
-function goHome(){document.getElementById('searchIn').value='';filterStatus='all';render();document.getElementById('pageEl').scrollTo({top:0,behavior:'smooth'});}
+function setFilter(f){filterStatus=f;renderFiltRow();renderSortRow();renderHome();document.getElementById('pageEl').scrollTo({top:0,behavior:_scrollBehavior()});}
+function goHome(){document.getElementById('searchIn').value='';filterStatus='all';render();document.getElementById('pageEl').scrollTo({top:0,behavior:_scrollBehavior()});}
 
 // nSeas>1 → this card stands in for a whole series (multiple seasons collapsed
 // into one tile, Netflix-style); show a seasons pill and the series' base title.
@@ -5368,7 +5373,7 @@ function onbScroll(){
 function onbNext(){
   const track=document.getElementById('onbTrack'); if(!track)return;
   if(onbIdx>=ONB.length-1){finishOnb();return;}
-  onbIdx++; track.scrollTo({left:onbIdx*track.clientWidth,behavior:'smooth'}); updOnbDots();
+  onbIdx++; track.scrollTo({left:onbIdx*track.clientWidth,behavior:_scrollBehavior()}); updOnbDots();
 }
 function onbCTA(sheet){ if(sheet==='notifySheet')openNotifySheet(); else openSheet(sheet); }   // opens on top of onboarding
 function showOnb(){
@@ -7802,7 +7807,7 @@ function _kbFocus(i){
   const cards=_kbCards();if(!cards.length){_kbIdx=-1;return;}
   _kbIdx=Math.max(0,Math.min(i,cards.length-1));
   cards.forEach((c,j)=>c.classList.toggle('kbfocus',j===_kbIdx));
-  try{cards[_kbIdx].scrollIntoView({block:'nearest',behavior:'smooth'});}catch(e){}
+  try{cards[_kbIdx].scrollIntoView({block:'nearest',behavior:_scrollBehavior()});}catch(e){}
 }
 function _kbClear(){document.querySelectorAll('.pcard.kbfocus').forEach(c=>c.classList.remove('kbfocus'));_kbIdx=-1;}
 function _kbMove(d){const cards=_kbCards();if(!cards.length)return;_kbFocus(_kbIdx<0?0:_kbIdx+d);}

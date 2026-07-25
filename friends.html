@@ -5449,6 +5449,7 @@ function openJitsi(){
         interfaceConfigOverwrite:{TOOLBAR_BUTTONS:['microphone','desktop','tileview','fullscreen','hangup'],MOBILE_APP_PROMO:false,SHOW_JITSI_WATERMARK:false,SHOW_CHROME_EXTENSION_BANNER:false}
       });
       _jitsiApi.addEventListener('readyToClose',leaveJitsi);
+      try{if(document.getElementById('partySheet').classList.contains('on'))renderParty();}catch(e){}   // float chat under the call
     }catch(e){toast('Call failed to start');leaveJitsi();}
   });
 }
@@ -5457,6 +5458,7 @@ function leaveJitsi(){
   const mount=document.getElementById('partyCallMount');if(mount)mount.style.display='none';
   if(_jitsiApi){try{_jitsiApi.dispose();}catch(e){}_jitsiApi=null;}
   const frame=document.getElementById('jitsiFrame');if(frame)frame.innerHTML='';
+  try{if(document.getElementById('partySheet').classList.contains('on'))renderParty();}catch(e){}   // restore normal chat position
 }
 function renderParty(){
   const box=document.getElementById('partyBody');if(!box)return;
@@ -5552,14 +5554,15 @@ function renderParty(){
   const chat=r.chat.map(m=>m.sys?`<div class="pt-sys">${schEsc(m.msg)}</div>`:`<div class="pt-msg${m.uid===meUid?' me':''}"><span class="who">${schEsc(m.name)}</span>${schEsc(m.msg)}<span class="pt-time">${partyTime(m.t)}</span></div>`).join('');
   const _friends=friendsList();
   const inviteBlock=_friends.length?`<div class="dt-label" style="margin-top:14px">${icon('users')} Invite friends</div><div class="pt-invite">${_friends.map(f=>`<button class="pt-invite-btn" onclick="partyInviteFriend('${escH(f.code)}')"><span class="fr-dot" style="background:${friendColor(f.code)}"></span>${escH(f.name)}</button>`).join('')}</div>`:'';
+  const _reactbar=`<div class="pt-reactbar">${PARTY_EMOJI.map(e=>`<button class="pt-react" onclick="partyReact('${e}')">${e}</button>`).join('')}</div>`;
+  const _chatBlock=_reactbar+`<div class="pt-chat" id="ptChat">${chat||'<div class="pt-sys">Say hi</div>'}</div><div class="pt-typing" id="ptTyping" style="display:none"></div><div class="pt-chatbar"><input id="ptMsg" placeholder="Message…" maxlength="300" oninput="partyTypingPing()" onkeydown="if(event.key==='Enter')partySend()"><button class="pt-send" onclick="partySend()">${icon('send')}</button></div>`;
+  const _controls=`${queueBlock}${hostCtl}${jitsiBtn}${voiceUI}${inviteBlock}`;
+  // In a call: float the chat right under the call panel (no scrolling past the queue).
+  // Otherwise: normal order with controls first, chat at the bottom.
   box.innerHTML=`
     <div class="pt-code"><div class="pt-code-val">${schEsc(r.code||partyCode)}</div><button class="pt-code-cta" onclick="sharePartyLink()" aria-label="Share invite link">${icon('send')}</button><button class="pt-code-cta" onclick="partyCopyCode()" aria-label="Copy code">${icon('copy')}</button></div>
     <div class="pt-members">${members}</div>
-    ${now}${queueBlock}${hostCtl}${jitsiBtn}${voiceUI}${inviteBlock}
-    <div class="pt-reactbar">${PARTY_EMOJI.map(e=>`<button class="pt-react" onclick="partyReact('${e}')">${e}</button>`).join('')}</div>
-    <div class="pt-chat" id="ptChat">${chat||'<div class="pt-sys">Say hi</div>'}</div>
-    <div class="pt-typing" id="ptTyping" style="display:none"></div>
-    <div class="pt-chatbar"><input id="ptMsg" placeholder="Message…" maxlength="300" oninput="partyTypingPing()" onkeydown="if(event.key==='Enter')partySend()"><button class="pt-send" onclick="partySend()">${icon('send')}</button></div>
+    ${now}${_jitsiApi?_chatBlock+_controls:_controls+_chatBlock}
     <button class="src-opt" style="margin-top:14px" onclick="partyEnd()"><div class="src-name" style="color:var(--t2)">${partyIsHost?'End the party':'Leave the party'}</div></button>`;
   const cc=document.getElementById('ptChat');if(cc)cc.scrollTop=cc.scrollHeight;
   _chatUnread=0;_lastChatLen=((partyRoom&&partyRoom.chat)||[]).length;updatePartyPill();   // viewing the sheet clears the unread badge

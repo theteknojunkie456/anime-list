@@ -5183,6 +5183,20 @@ const RTC_CFG={iceServers:[
   {urls:'turn:openrelay.metered.ca:443',username:'openrelayproject',credential:'openrelayproject'},
   {urls:'turn:openrelay.metered.ca:443?transport=tcp',username:'openrelayproject',credential:'openrelayproject'}
 ]};
+// Pull live relay credentials from the worker (Cloudflare TURN) — far more reliable
+// across networks than the built-in free relay. Cached ~30 min; falls back to RTC_CFG
+// if the endpoint or the TURN key isn't available, so media still tries to connect.
+let _rtcCfg=null,_rtcCfgAt=0;
+async function getRtcConfig(){
+  const now=Date.now();
+  if(_rtcCfg&&now-_rtcCfgAt<1800000)return _rtcCfg;
+  try{
+    const r=await fetch((window.SYNC_URL||SYNC_URL)+'/turn');
+    const d=await r.json();
+    if(d&&d.iceServers&&d.iceServers.length){_rtcCfg={iceServers:d.iceServers};_rtcCfgAt=now;return _rtcCfg;}
+  }catch(e){}
+  return RTC_CFG;
+}
 function canScreenShare(){return !!(navigator.mediaDevices&&navigator.mediaDevices.getDisplayMedia);}
 function iceComplete(pc){return new Promise(res=>{if(pc.iceGatheringState==='complete')return res();const c=()=>{if(pc.iceGatheringState==='complete'){pc.removeEventListener('icegatheringstatechange',c);res();}};pc.addEventListener('icegatheringstatechange',c);setTimeout(res,2800);});}
 async function startShare(){
@@ -5225,7 +5239,7 @@ async function tuneSender(pc){
 function partyConnectedCount(){try{return Object.values(pcs).filter(p=>p&&p.connectionState==='connected').length;}catch(e){return 0;}}
 async function pcConnectToViewer(vid){                 // HOST → each viewer
   if(pcs[vid]||!localStream)return;
-  const pc=new RTCPeerConnection(RTC_CFG);pcs[vid]=pc;
+  const pc=new RTCPeerConnection(await getRtcConfig());pcs[vid]=pc;
   localStream.getTracks().forEach(tr=>pc.addTrack(tr,localStream));
   tuneSender(pc);
   pc.onconnectionstatechange=()=>{const st=pc.connectionState;if(['failed','closed','disconnected'].includes(st))pcClose(vid);
@@ -5247,7 +5261,7 @@ async function pcHandleOffer(from,offer){              // VIEWER answers the hos
   pcClose(from);
   console.log('[party] offer received from '+from);
   showConnectingShare();setShareStatus('Connecting to the host’s screen…');
-  const pc=new RTCPeerConnection(RTC_CFG);pcs[from]=pc;
+  const pc=new RTCPeerConnection(await getRtcConfig());pcs[from]=pc;
   pc.ontrack=e=>{console.log('[party] video track received');showShareView(e.streams[0]);};
   pc.oniceconnectionstatechange=()=>{const st=pc.iceConnectionState;console.log('[party] ICE '+st);
     if(st==='checking')setShareStatus('Connecting to the host’s screen…');
@@ -5341,7 +5355,7 @@ function vpcAttach(pc,stream){try{
 async function vpcConnect(uid){                          // I offer (I hold the smaller uid)
   if(vpcs[uid]||!voiceStream)return;
   console.log('[voice] offering to '+uid);
-  const pc=new RTCPeerConnection(RTC_CFG);vpcs[uid]=pc;
+  const pc=new RTCPeerConnection(await getRtcConfig());vpcs[uid]=pc;
   voiceStream.getTracks().forEach(t=>pc.addTrack(t,voiceStream));
   pc.ontrack=e=>vpcAttach(pc,e.streams[0]);
   pc.onconnectionstatechange=()=>{if(['failed','closed','disconnected'].includes(pc.connectionState))vpcClose(uid);};
@@ -5352,7 +5366,7 @@ async function vpcHandleOffer(from,offer){               // they offered; I answ
   console.log('[voice] offer received from '+from+(voiceStream?'':' (ignored — not in voice)'));
   if(!voiceStream)return;
   vpcClose(from);
-  const pc=new RTCPeerConnection(RTC_CFG);vpcs[from]=pc;
+  const pc=new RTCPeerConnection(await getRtcConfig());vpcs[from]=pc;
   voiceStream.getTracks().forEach(t=>pc.addTrack(t,voiceStream));
   pc.ontrack=e=>vpcAttach(pc,e.streams[0]);
   pc.onconnectionstatechange=()=>{if(['failed','closed','disconnected'].includes(pc.connectionState))vpcClose(from);};

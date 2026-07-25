@@ -1,0 +1,35 @@
+name: Deploy Cloudflare Workers
+
+# Auto-deploys the party/sync worker and the notify/admin worker whenever their
+# code changes on main — so worker changes ship like web changes (on push, no
+# manual `wrangler deploy`). Runs on GitHub's infra using a Cloudflare API token
+# stored as the repo secret CLOUDFLARE_API_TOKEN (account_id lives in the .toml).
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'cloud/**'
+  workflow_dispatch:   # also runnable by hand from the Actions tab
+
+concurrency:
+  group: deploy-workers
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Deploy sync worker (watch party + voice + chat)
+        working-directory: cloud
+        run: npx --yes wrangler@4 deploy -c sync-wrangler.toml
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      - name: Deploy notify worker (admin cards + push)
+        working-directory: cloud
+        run: npx --yes wrangler@4 deploy -c wrangler.toml
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

@@ -2830,7 +2830,15 @@ async function syncOnOpen(){
         try{arr=JSON.parse(await decList(inner,cryptoKey));}catch{return;} // wrong master / corrupt → leave local intact
         envWraps={pw:inner.pw||(envWraps&&envWraps.pw),rec:inner.rec||(envWraps&&envWraps.rec),pfk:inner.pfk||(envWraps&&envWraps.pfk)};
       }else if(Array.isArray(inner)){arr=inner;}
-      if(arr){anime=migrate(arr);writeLocal();setSyncAt(res.updatedAt);render();renderSyncUI();toast('Synced from cloud');return;}
+      if(arr){
+        // Data-safety guard: never let auto-sync silently replace a non-empty local
+        // list with an empty cloud copy. A fresh or half-initialized device can push
+        // [] (before its real list loads) and win on timestamp — that would wipe a
+        // full list here. If the cloud is empty but we still hold data, local is the
+        // real copy: push it back up instead of destroying it. (Manual syncRestore
+        // already refuses empty; this brings auto-sync in line.)
+        if(!arr.length && anime.length){syncPush();return;}
+        anime=migrate(arr);writeLocal();setSyncAt(res.updatedAt);render();renderSyncUI();toast('Synced from cloud');return;}
     }
     syncPush(); // local is current or newer — make sure the cloud has it
   }catch{}

@@ -2726,14 +2726,20 @@ async function renderFaceIDUI(){
 // So this is real encryption, not a key parked in localStorage behind a check.
 const PRF_SALT=new TextEncoder().encode('watchlist-prf-v1');
 function passkeyAPI(){return !!(window.PublicKeyCredential&&navigator.credentials&&navigator.credentials.create);}
+// Desktop Mac = password-only (no Touch ID), by request. iPhone/iPad (Face ID) and
+// Windows Hello are unaffected; the native iOS app uses LAContext, also separate.
+function _isDesktopMac(){try{const ua=navigator.userAgent||'',plat=navigator.platform||'',mt=navigator.maxTouchPoints||0;
+  if(/iPhone|iPod|iPad/.test(ua)||(plat==='MacIntel'&&mt>1))return false;   // iPhone/iPad, not a desktop Mac
+  return /Mac/i.test(plat)||/Macintosh/.test(ua);}catch(e){return false;}}
 async function faceIDPossible(){
+  if(_isDesktopMac())return false;   // no biometric setup on desktop Mac
   if(!passkeyAPI())return false;
   try{return await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();}catch{return false;}
 }
 function faceIDOn(){try{const e=JSON.parse(store().getItem(LSKEY));return !!(e&&e.pfk);}catch{return false;}}
 // Native app: Face ID goes through iOS (LAContext) via the native bridge — independent
 // of the web passkey (pfk). So it's "available" whenever native, or when a passkey exists.
-function faceAvail(){return (typeof IS_NATIVE!=='undefined'&&IS_NATIVE)||faceIDOn();}
+function faceAvail(){return (typeof IS_NATIVE!=='undefined'&&IS_NATIVE)||(!_isDesktopMac()&&faceIDOn());}
 function doFaceUnlock(){
   if(typeof IS_NATIVE!=='undefined'&&IS_NATIVE){try{window.webkit.messageHandlers.wl.postMessage({type:'faceid'});}catch(e){}return;}
   tryUnlockFaceID();

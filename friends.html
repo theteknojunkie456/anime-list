@@ -880,11 +880,15 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 @keyframes pcPop{0%{transform:scale(.4);opacity:0;}30%{transform:scale(1.1);opacity:1;}100%{transform:scale(1);opacity:1;}}
 .shareview{position:fixed;inset:0;z-index:130;background:#000;display:none;transform:translateY(100%);transition:transform .38s cubic-bezier(.2,1,.28,1);}
 .shareview.on{display:block;transform:translateY(0);}
-.jitsiview{position:fixed;inset:0;z-index:135;background:#0a0a0c;display:none;flex-direction:column;transform:translateY(100%);transition:transform .38s cubic-bezier(.2,1,.28,1);}
-.jitsiview.on{display:flex;transform:translateY(0);}
-.jitsiview .pv-top{position:relative;flex-shrink:0;display:flex;align-items:center;gap:10px;padding:calc(var(--safe-t,0px) + 10px) 14px 10px;background:var(--bg);}
-.jitsi-frame{flex:1;min-height:0;position:relative;background:#0a0a0c;}
-.jitsi-frame iframe{position:absolute!important;inset:0;width:100%!important;height:100%!important;border:0;}
+/* Voice/screen call embedded at the top of the party sheet (not a takeover). */
+.party-call{margin:2px 0 10px;border-radius:16px;overflow:hidden;border:1px solid var(--b3);background:#000;box-shadow:0 8px 24px -8px var(--glow);}
+.party-call-bar{display:flex;align-items:center;gap:8px;padding:9px 12px;background:var(--bg2);font-family:var(--fd);font-weight:800;font-size:13px;color:var(--t1);}
+.party-call-bar>.ico{width:15px;height:15px;color:var(--a2);}
+.party-call-bar span{flex:1;}
+.party-call-x{width:28px;height:28px;flex-shrink:0;border-radius:8px;background:var(--bg4);color:var(--t2);display:flex;align-items:center;justify-content:center;}
+.party-call-x .ico{width:15px;height:15px;}
+.party-call-frame{height:44vh;min-height:300px;position:relative;background:#000;}
+.party-call-frame iframe{position:absolute!important;inset:0;width:100%!important;height:100%!important;border:0;}
 /* In-app player — mirrors .shareview so the transition feels identical */
 .ytview{position:fixed;inset:0;z-index:130;background:#000;display:none;transform:translateY(100%);transition:transform .38s cubic-bezier(.2,1,.28,1);}
 .ytview.on{display:block;transform:translateY(0);}
@@ -1672,6 +1676,12 @@ body.recsel .pcard{position:relative;}
     <div class="sheet-title"><i data-ic="users"></i> Watch party</div>
     <button class="sheet-cancel" onclick="closeAll()">Close</button>
   </div>
+  <!-- Voice/screen call mounts here, ABOVE the body so it survives party re-renders
+       and sits right alongside the chat + controls (no full-screen takeover). -->
+  <div id="partyCallMount" class="party-call" style="display:none">
+    <div class="party-call-bar"><i data-ic="users"></i><span>Voice &amp; screen</span><button class="party-call-x" onclick="leaveJitsi()" aria-label="Leave call"><i data-ic="x"></i></button></div>
+    <div id="jitsiFrame" class="party-call-frame"></div>
+  </div>
   <div id="partyBody"></div>
 </div>
 
@@ -1770,15 +1780,6 @@ body.recsel .pcard{position:relative;}
   </div>
 </div>
 
-<!-- Reliable A/V via embedded Jitsi (their relay servers → cross-network works, free) -->
-<div class="jitsiview" id="jitsiView">
-  <div class="pv-top">
-    <button class="sv-back" onclick="hideJitsi()" aria-label="Back to party"><i data-ic="chevron-left"></i></button>
-    <div class="pv-title">Voice &amp; screen</div>
-    <button class="pv-ext" onclick="leaveJitsi()" aria-label="Leave call"><i data-ic="x"></i></button>
-  </div>
-  <div class="jitsi-frame" id="jitsiFrame"></div>
-</div>
 
 <!-- floating pill while a party is live -->
 <button class="party-pill" id="partyPill" onclick="openSheet('partySheet')"><span class="pp-dot"></span><span id="ppText">Party</span></button>
@@ -5432,9 +5433,11 @@ function loadJitsiScript(cb){
 }
 function openJitsi(){
   if(!partyActive()){toast('Start or join a party first');return;}
-  const view=document.getElementById('jitsiView');if(!view)return;
-  closeAll();view.classList.add('on');
-  if(_jitsiApi)return;   // already connected → just re-show the panel
+  try{if(!document.getElementById('partySheet').classList.contains('on'))openSheet('partySheet');}catch(e){}
+  const mount=document.getElementById('partyCallMount');if(!mount)return;
+  mount.style.display='';
+  try{mount.scrollIntoView({block:'start',behavior:_scrollBehavior()});}catch(e){}
+  if(_jitsiApi)return;   // already in the call → just make sure it's shown
   loadJitsiScript(()=>{
     if(_jitsiApi)return;
     const frame=document.getElementById('jitsiFrame');if(frame)frame.innerHTML='';
@@ -5443,15 +5446,15 @@ function openJitsi(){
         roomName:jitsiRoom(),parentNode:frame,width:'100%',height:'100%',
         userInfo:{displayName:partyName()||'Guest'},
         configOverwrite:{startWithVideoMuted:true,prejoinPageEnabled:false,disableDeepLinking:true,disableInviteFunctions:true},
-        interfaceConfigOverwrite:{TOOLBAR_BUTTONS:['microphone','desktop','tileview','settings','raisehand','participants-pane','fullscreen','hangup'],MOBILE_APP_PROMO:false,SHOW_JITSI_WATERMARK:false,SHOW_CHROME_EXTENSION_BANNER:false}
+        interfaceConfigOverwrite:{TOOLBAR_BUTTONS:['microphone','desktop','tileview','fullscreen','hangup'],MOBILE_APP_PROMO:false,SHOW_JITSI_WATERMARK:false,SHOW_CHROME_EXTENSION_BANNER:false}
       });
       _jitsiApi.addEventListener('readyToClose',leaveJitsi);
     }catch(e){toast('Call failed to start');leaveJitsi();}
   });
 }
-function hideJitsi(){const v=document.getElementById('jitsiView');if(v)v.classList.remove('on');}   // back to party; call keeps running
+function hideJitsi(){}   // no separate view now — the call lives in the party sheet
 function leaveJitsi(){
-  const v=document.getElementById('jitsiView');if(v)v.classList.remove('on');
+  const mount=document.getElementById('partyCallMount');if(mount)mount.style.display='none';
   if(_jitsiApi){try{_jitsiApi.dispose();}catch(e){}_jitsiApi=null;}
   const frame=document.getElementById('jitsiFrame');if(frame)frame.innerHTML='';
 }

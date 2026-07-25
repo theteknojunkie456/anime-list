@@ -4889,14 +4889,14 @@ function partyUid(){try{let u=localStorage.getItem('party_uid');if(!u){u='u'+Mat
 function partyName(){try{return localStorage.getItem('party_name')||'';}catch{return'';}}
 function setPartyName(n){try{localStorage.setItem('party_name',n);}catch{}}
 // ── real-time connection (WebSocket → the room's Durable Object) ─────────────
-let partyWS=null,partyReconn=0;
+let partyWS=null,partyReconn=0,partyReconnecting=false,_partyPrevMembers=null;
 function wsUrl(code,create){const base=(window.SYNC_URL||SYNC_URL).replace(/^http/,'ws');return `${base}/party/${code}?uid=${encodeURIComponent(partyUid())}&name=${encodeURIComponent(partyName()||'Guest')}${create?'&create=1':''}`;}
 function wsSend(obj){if(partyWS&&partyWS.readyState===1){partyWS.send(JSON.stringify(obj));return true;}return false;}
 function partyConnect(code,create){
   partyCode=code;partySeenPlay=0;partySeenReact=new Set();nativeNotifyCode();
   let ws;try{ws=new WebSocket(wsUrl(code,create));}catch{toast('Couldn’t connect to the party');return;}
   partyWS=ws;
-  ws.onopen=()=>{partyReconn=0;updatePartyPill();};
+  ws.onopen=()=>{partyReconn=0;if(partyReconnecting){partyReconnecting=false;toast('Back in the party');}updatePartyPill();};
   ws.onmessage=e=>{let m;try{m=JSON.parse(e.data);}catch{return;}
     if(m.t==='state')applyRoom(m.room);
     else if(m.t==='react')processReacts(m.r?[m.r]:m.reacts);   // lightweight: float the emoji, no full-state churn
@@ -4904,12 +4904,18 @@ function partyConnect(code,create){
     else if(m.t==='error'){toast(m.msg||'Party error');partyEnd(true);}
   };
   ws.onclose=()=>{ if(partyWS!==ws)return;   // a newer socket superseded this one
-    if(partyCode&&partyReconn<6){partyReconn++;setTimeout(()=>{if(partyCode)partyConnect(partyCode,false);},700*partyReconn);}   // resilient reconnect
+    if(partyCode&&partyReconn<6){
+      // resilient reconnect — surface it so a dropped party doesn't just look frozen
+      if(!partyReconnecting){partyReconnecting=true;toast('Connection lost — reconnecting…');updatePartyPill();}
+      partyReconn++;setTimeout(()=>{if(partyCode)partyConnect(partyCode,false);},700*partyReconn);
+    }else if(partyCode){                       // gave up after several tries
+      partyReconnecting=false;updatePartyPill();toast('Couldn’t reconnect — leave and rejoin the party');
+    }
   };
   ws.onerror=()=>{};
 }
 function partyActive(){return !!partyCode;}
-function updatePartyPill(){const el=document.getElementById('partyPill');if(!el)return;const sheetOpen=document.getElementById('partySheet').classList.contains('on');el.classList.toggle('on',partyActive()&&!sheetOpen);const t=document.getElementById('ppText');if(t)t.textContent=partyRoom?`Party · ${partyRoom.members.length}`:'Party';}
+function updatePartyPill(){const el=document.getElementById('partyPill');if(!el)return;const sheetOpen=document.getElementById('partySheet').classList.contains('on');el.classList.toggle('on',partyActive()&&!sheetOpen);const t=document.getElementById('ppText');if(t)t.textContent=partyReconnecting?'Reconnecting…':(partyRoom?`Party · ${partyRoom.members.length}`:'Party');}
 // A signature of only the fields renderParty actually draws (reactions excluded —
 // they float via processReacts). If it's unchanged, a re-render would be identical, so
 // we skip it: that alone kills the reaction/presence re-render storm that made the
@@ -4925,6 +4931,19 @@ function _schedulePartyRender(){
 }
 function applyRoom(room){
   if(!room)return;
+  // Presence: quietly announce who joins and leaves so the party feels live. Skip the
+  // first snapshot (you just arrived — everyone already here isn't "joining") and skip
+  // yourself. Survives reconnects: _partyPrevMembers persists, so a dropped-and-restored
+  // socket doesn't re-toast the whole room.
+  try{
+    const me=partyUid();
+    const now=new Map((room.members||[]).map(m=>[m.uid,m.name||'Someone']));
+    if(_partyPrevMembers){
+      for(const [uid,name] of now){if(uid!==me&&!_partyPrevMembers.has(uid))toast(`${name} joined`);}
+      for(const [uid,name] of _partyPrevMembers){if(uid!==me&&!now.has(uid))toast(`${name} left`);}
+    }
+    _partyPrevMembers=now;
+  }catch(e){}
   partyRoom=room; partyIsHost=(room.host===partyUid());
   updatePartyPill();
   if(document.getElementById('partySheet').classList.contains('on')){
@@ -4991,7 +5010,7 @@ function partyEnd(silent){
   Object.keys(pcs).forEach(pcClose);hideShareView();partySeenSig=new Set();partyPrevSharing='';
   try{localStorage.removeItem('party_active');}catch{}
   if(ws){try{ws.close();}catch{}}   // DO removes us + tells the others
-  partyCode='';partyIsHost=false;partyRoom=null;partyInSession=false;updatePartyPill();nativeNotifyCode();
+  partyCode='';partyIsHost=false;partyRoom=null;partyInSession=false;partyReconnecting=false;_partyPrevMembers=null;updatePartyPill();nativeNotifyCode();
   if(document.getElementById('partySheet').classList.contains('on'))renderParty();
   if(silent)toast('The party ended');
 }
@@ -5127,12 +5146,15 @@ async function tuneSender(pc){
     await sender.setParameters(p);
   }catch(e){}
 }
+// How many viewers are actually WebRTC-connected right now (host side).
+function partyConnectedCount(){try{return Object.values(pcs).filter(p=>p&&p.connectionState==='connected').length;}catch(e){return 0;}}
 async function pcConnectToViewer(vid){                 // HOST → each viewer
   if(pcs[vid]||!localStream)return;
   const pc=new RTCPeerConnection(RTC_CFG);pcs[vid]=pc;
   localStream.getTracks().forEach(tr=>pc.addTrack(tr,localStream));
   tuneSender(pc);
-  pc.onconnectionstatechange=()=>{if(['failed','closed','disconnected'].includes(pc.connectionState))pcClose(vid);};
+  pc.onconnectionstatechange=()=>{const st=pc.connectionState;if(['failed','closed','disconnected'].includes(st))pcClose(vid);
+    try{_schedulePartyRender();}catch(e){}};   // refresh the host's "N of M connected" as links come and go
   try{const offer=await pc.createOffer();await pc.setLocalDescription(offer);await iceComplete(pc);
     wsSend({t:'signal',to:vid,kind:'offer',data:pc.localDescription});}catch{pcClose(vid);}
 }
@@ -5233,8 +5255,14 @@ function renderParty(){
       <div class="pt-pick-info"><div class="pt-pick-t">${schEsc(q.title)}</div><div class="pt-pick-s">${q.ep?`Episode ${q.ep} · `:''}added by ${schEsc(q.by||'?')}</div></div>
       ${partyIsHost?`<button class="pt-qx" onclick="partyQueueRemoveAt(${i})" aria-label="Remove from queue">${icon('x')}</button>`:''}</div>`).join('')}</div>`:'';
   if(partyIsHost&&iShare){
+    // Real WebRTC connection count, not just who's in the room — a viewer can be present
+    // but still negotiating (or blocked by their network), and the host should see that.
+    const viewers=Math.max(0,r.members.length-1), conn=partyConnectedCount();
+    const status=viewers===0?'Waiting for friends to join…'
+      :conn>=viewers?`Friends are watching your screen — perfectly in sync. ${conn} connected.`
+      :`${conn} of ${viewers} connected — the rest are still linking up…`;
     hostCtl=`<button class="pt-share live" onclick="stopShare()">${icon('x')} Stop screen share</button>
-      <div class="pt-hint">Friends are watching your screen — perfectly in sync. ${Math.max(0,r.members.length-1)} connected.</div>`;
+      <div class="pt-hint">${status}</div>`;
   }else if(partyIsHost){
     // Watching first (most likely pick), then the rest; a scannable vertical list.
     const watchable=anime.filter(a=>kindOf(a)==='watch'&&a.aniId)

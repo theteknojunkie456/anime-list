@@ -6086,7 +6086,10 @@ function renderWatch(){
   // service so tokens/search paths fill in the same way. Skipped if the admin's
   // pick is a service the member already added by hand (no duplicate row).
   const mineKeys=new Set(customServices().map(s=>srcKey(s.name)));
-  const reco=adminSources().filter(s=>!mineKeys.has(srcKey(s.name))).map(s=>({label:s.name,url:customServiceURL(s,a),site:s.name.toLowerCase(),kind:'reco',exact:false}));
+  // Admin-recommended (network-wide) sources are a WEB-only surface. The native app
+  // must not present unofficial third-party sources (App Store policy), so on iOS this
+  // stays empty and the "Recommended" section never renders — the two-version split.
+  const reco=IS_NATIVE?[]:adminSources().filter(s=>!mineKeys.has(srcKey(s.name))).map(s=>({label:s.name,url:customServiceURL(s,a),site:s.name.toLowerCase(),kind:'reco',exact:false}));
   const cat=WATCH_PRESETS.map(p=>({label:p.name,url:fillURL(p.url,a),site:p.name.toLowerCase(),kind:'search',exact:false}));
   // Hidden sources are gone from every show; renames apply everywhere at once.
   const dress=list=>list.filter(o=>!isHiddenSrc(o.label)).map(o=>({...o,label:srcLabel(o.label)}));

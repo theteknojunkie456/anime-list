@@ -46,22 +46,22 @@ export default {
     if (url.pathname === '/turn') {
       const tcors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' };
       if (request.method === 'OPTIONS') return new Response(null, { headers: tcors });
-      const stun = { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] };
-      const dbg = url.searchParams.get('debug') === '1';   // temporary diagnostic; never exposes the key
-      if (!env.METERED_APP || !env.METERED_API_KEY) {
-        return json(dbg ? { configured: false, hasApp: !!env.METERED_APP, hasKey: !!env.METERED_API_KEY, iceServers: [stun] } : { iceServers: [stun] }, 200, tcors);
-      }
+      // No-card default: Google STUN + the public openrelay TURN. Best-effort and
+      // sometimes flaky (that's the nature of a free relay), but needs no billing.
+      // If Metered credentials are configured, prepend those (reliable) first.
+      const base = [
+        { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] },
+        { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+        { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+        { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
+      ];
+      if (!env.METERED_APP || !env.METERED_API_KEY) return json({ iceServers: base }, 200, tcors);
       try {
         const r = await fetch(`https://${env.METERED_APP}.metered.live/api/v1/turn/credentials?apiKey=${env.METERED_API_KEY}`);
-        const txt = await r.text();
-        let arr = null; try { arr = JSON.parse(txt); } catch (e) {}
+        const arr = await r.json();
         const ice = Array.isArray(arr) ? arr : [];
-        if (dbg) return json({ configured: true, app: env.METERED_APP, meteredStatus: r.status, count: ice.length, body: ice.length ? '[creds ok, hidden]' : txt.slice(0, 300), iceServers: ice.length ? [stun, ...ice] : [stun] }, 200, tcors);
-        return json({ iceServers: ice.length ? [stun, ...ice] : [stun] }, 200, tcors);
-      } catch (e) {
-        if (dbg) return json({ configured: true, app: env.METERED_APP, error: String((e && e.message) || e), iceServers: [stun] }, 200, tcors);
-        return json({ iceServers: [stun] }, 200, tcors);
-      }
+        return json({ iceServers: ice.length ? [...ice, ...base] : base }, 200, tcors);
+      } catch (e) { return json({ iceServers: base }, 200, tcors); }
     }
 
     // ── list sync (KV, unchanged) ──────────────────────────────────────────

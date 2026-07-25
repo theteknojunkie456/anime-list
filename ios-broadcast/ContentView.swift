@@ -147,11 +147,16 @@ struct WatchListShell: UIViewRepresentable {
                     // fall back to percent-encoding if the raw string won't parse
                     let url = URL(string: s)
                         ?? s.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed).flatMap { URL(string: $0) }
-                    if let url = url {
+                    // Independent trust boundary: only ever hand http(s) links to iOS.
+                    // The web app's openExternal already blocks other schemes, but this
+                    // handler must enforce the same policy itself — a custom/tel/mailto
+                    // scheme reaching UIApplication.open could trigger unintended actions.
+                    let scheme = url?.scheme?.lowercased()
+                    if let url = url, scheme == "http" || scheme == "https" {
                         NSLog("WatchList: openurl → %@", url.absoluteString)
                         DispatchQueue.main.async { UIApplication.shared.open(url, options: [:], completionHandler: nil) }
                     } else {
-                        NSLog("WatchList: openurl FAILED to parse %@", s)
+                        NSLog("WatchList: openurl REFUSED (non-http scheme or unparseable): %@", s)
                     }
                 }
             default: break

@@ -425,7 +425,7 @@ async function handleFetch(request, env) {
     case "/cap":
       return handleSetCap(body, env);
     case "/message":
-      return handleMessageGet(env);
+      return handleMessageGet(body, env);
     case "/message-set":
       return handleMessageSet(body, env);
     case "/sources":
@@ -722,27 +722,36 @@ async function handleSetCap(body, env) {
 // Clients skip a card whose id they've already dismissed, so it shows once.
 
 // Public: clients poll this to get the current card (no auth).
-async function handleMessageGet(env) {
-  const raw = await env.SUBS.get("cfg:message");
+// Cards are stored per platform so web and iOS are independent: the admin can put a
+// card on one, clear it on one, or manage both together. The client asks for its own
+// platform's card (body.p). "cfg:message" is the pre-split legacy key, still honored
+// as a fallback so a card set before this change keeps showing until replaced.
+async function handleMessageGet(body, env) {
+  const p = (body && (body.p === "ios" || body.p === "web")) ? body.p : "web";
+  let raw = await env.SUBS.get("cfg:msg:" + p);
+  if (!raw) raw = await env.SUBS.get("cfg:message");   // legacy single-slot fallback
   return json({ ok: true, message: raw ? JSON.parse(raw) : null });
 }
-// Admin: set (or clear) the current card.
+// Admin: set (or clear) the card, scoped to the chosen platform(s).
 async function handleMessageSet(body, env) {
   if (!adminOK(body, env)) return json({ ok: false, error: "unauthorized" }, 401);
-  if (body.clear) { await env.SUBS.delete("cfg:message"); return json({ ok: true, cleared: true }); }
+  const targets = (body.target === "web" || body.target === "ios") ? [body.target] : ["web", "ios"];
+  if (body.clear) {
+    await Promise.all([...targets.map(p => env.SUBS.delete("cfg:msg:" + p)), env.SUBS.delete("cfg:message")]);
+    return json({ ok: true, cleared: true, target: body.target || "both" });
+  }
   const msg = {
     id: "m" + Date.now(),
     title: String(body.title || "").slice(0, 80),
     body: String(body.body || "").slice(0, 280),
     ctaLabel: String(body.ctaLabel || "").slice(0, 40),
     ctaUrl: String(body.ctaUrl || "").slice(0, 400),
-    // Which platform the card shows on: 'web' (GitHub Pages), 'ios' (native app), or
-    // 'both'. Clients gate on this; an absent value is treated as 'both' for old cards.
     target: (body.target === "web" || body.target === "ios") ? body.target : "both",
     at: Date.now(),
   };
   if (!msg.title && !msg.body) return json({ ok: false, error: "title or body required" }, 400);
-  await env.SUBS.put("cfg:message", JSON.stringify(msg));
+  await Promise.all(targets.map(p => env.SUBS.put("cfg:msg:" + p, JSON.stringify(msg))));
+  await env.SUBS.delete("cfg:message");   // supersede any legacy single-slot card
   return json({ ok: true, message: msg });
 }
 

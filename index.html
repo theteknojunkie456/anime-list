@@ -2140,13 +2140,11 @@ function seenMsg(){try{return localStorage.getItem('seen_msg')||'';}catch{return
 function dismissAdminCard(){const c=document.getElementById('adminCard');if(c)c.style.display='none';try{if(_curMsgId)localStorage.setItem('seen_msg',_curMsgId);}catch{}}
 async function fetchAdminCard(){
   try{
-    const r=await netCall('/message'); const m=r&&r.message;
+    // Ask for THIS platform's card ('ios' in the native app, else 'web'); the worker
+    // keeps them independent, so a web-only card never reaches the iOS app and vice-versa.
+    const r=await netCall('/message',{p:(typeof IS_NATIVE!=='undefined'&&IS_NATIVE)?'ios':'web'}); const m=r&&r.message;
     const c=document.getElementById('adminCard'); if(!c)return;
     if(!m||m.id===seenMsg()){c.style.display='none';return;}
-    // Respect the card's platform target: 'web' shows only on the GitHub Pages build,
-    // 'ios' only in the native app, 'both'/absent everywhere (older cards had no target).
-    const plat=IS_NATIVE?'ios':'web';
-    if(m.target&&m.target!=='both'&&m.target!==plat){c.style.display='none';return;}
     _curMsgId=m.id;
     c.innerHTML=`<button class="admin-card-x" onclick="dismissAdminCard()">${icon('x')}</button>`
       +(m.title?`<div class="admin-card-t">${escH(m.title)}</div>`:'')
@@ -2243,7 +2241,7 @@ function renderAdmin(){
       <input class="ai-prompt-in" id="msgBody" placeholder="Message" style="margin-bottom:8px">
       <input class="ai-prompt-in" id="msgCta" placeholder="Button text (optional)" style="margin-bottom:8px">
       <input class="ai-prompt-in" id="msgUrl" placeholder="Button link (optional)" inputmode="url">
-      <div class="ai-desc" style="margin:10px 0 6px">Show it on</div>
+      <div class="ai-desc" style="margin:10px 0 6px">Target — applies to both Show and Clear</div>
       <div class="msg-tgt-seg" id="msgTargetSeg">
         <button type="button" class="msg-tgt on" onclick="pickMsgTarget('both',this)">Both</button>
         <button type="button" class="msg-tgt" onclick="pickMsgTarget('web',this)">Web only</button>
@@ -2333,7 +2331,8 @@ async function adminSetMessage(){
   try{const r=await adminCall('/message-set',{title,body,ctaLabel,ctaUrl,target:_msgTarget});toast(r&&r.ok?`Card is now live for ${where}`:(r&&r.error||'Failed'));}catch{toast('Failed');}
 }
 async function adminClearMessage(){
-  try{const r=await adminCall('/message-set',{clear:true});toast(r&&r.ok?'Card cleared':(r&&r.error||'Failed'));
+  const where=_msgTarget==='web'?'the web app':_msgTarget==='ios'?'the iOS app':'everyone';
+  try{const r=await adminCall('/message-set',{clear:true,target:_msgTarget});toast(r&&r.ok?`Card removed from ${where}`:(r&&r.error||'Failed'));
     ['msgTitle','msgBody','msgCta','msgUrl'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
   }catch{toast('Failed');}
 }

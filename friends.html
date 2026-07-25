@@ -993,6 +993,17 @@ body.recsel .pcard{position:relative;}
 .pt-qitem:active{transform:none;}
 .pt-qx{width:32px;height:32px;flex-shrink:0;border-radius:50%;background:var(--bg4);color:var(--t3);display:flex;align-items:center;justify-content:center;}
 .pt-qx .ico{width:14px;height:14px;}
+/* queue item actions: vote (everyone) + reorder/remove (host) */
+.pt-qacts{display:flex;align-items:center;gap:5px;flex-shrink:0;}
+.pt-qvote{display:flex;align-items:center;gap:4px;height:32px;padding:0 10px;border-radius:999px;background:var(--bg4);border:1px solid var(--b1);color:var(--t2);font-weight:800;font-size:12px;font-variant-numeric:tabular-nums;}
+.pt-qvote .ico{width:14px;height:14px;}
+.pt-qvote.on{background:var(--ag);border-color:var(--a);color:var(--a2);}
+.pt-qmove{width:30px;height:32px;flex-shrink:0;border-radius:9px;background:var(--bg4);color:var(--t2);display:flex;align-items:center;justify-content:center;}
+.pt-qmove .ico{width:15px;height:15px;}
+.pt-qmove:disabled{opacity:.32;}
+.pt-mact{width:24px;height:24px;flex-shrink:0;border-radius:7px;background:var(--bg4);color:var(--t2);display:inline-flex;align-items:center;justify-content:center;margin-left:3px;}
+.pt-mact .ico{width:13px;height:13px;}
+.pt-mact-x{color:var(--a2);}
 #sourceBody code{background:var(--bg4);border:1px solid var(--b1);border-radius:5px;padding:1px 5px;font-size:11px;font-family:ui-monospace,Menlo,monospace;color:var(--t2);}
 .dots span{animation:blink 1.2s infinite;}
 .dots span:nth-child(2){animation-delay:.2s;}
@@ -5099,6 +5110,10 @@ function partyQueueAdd(id){
 }
 function partyQueueRemoveAt(i){const q=partyRoom&&partyRoom.queue&&partyRoom.queue[i];if(q)wsSend({t:'queue-remove',qid:q.id});}
 function partyQueueNext(){if(!partyIsHost||!partyRoom||!(partyRoom.queue||[]).length)return;wsSend({t:'queue-next'});}
+function partyQueueMove(qid,dir){if(!partyIsHost)return;wsSend({t:'queue-move',qid,dir});}
+function partyQueueVote(qid){wsSend({t:'queue-vote',qid});}   // anyone can vote; host reorders using the counts
+function partyMakeHost(uid,name){if(!partyIsHost)return;askConfirm({title:'Make host?',msg:`Hand the party over to ${name||'this member'}? They’ll control what everyone watches.`,yes:'Make host',onYes:()=>wsSend({t:'host-set',to:uid})});}
+function partyKick(uid,name){if(!partyIsHost)return;askConfirm({title:'Remove member?',msg:`Remove ${name||'this member'} from the party?`,yes:'Remove',onYes:()=>wsSend({t:'kick',uid})});}
 function partyCopyCode(){try{navigator.clipboard.writeText(partyCode);toast('Code copied');}catch{toast(partyCode);}}
 // A tapped invite link — watchlist://party/CODE opened via the app, or ?party=CODE — lands here.
 window.wlJoinParty=function(code){
@@ -5284,17 +5299,25 @@ function renderParty(){
   }
   const r=partyRoom||{members:[],chat:[]};
   const meUid=partyUid();
-  const members=r.members.map(m=>`<span class="pt-chip${m.uid===r.host?' host':''}"><span class="dot"></span>${schEsc(m.name)}${m.uid===r.host?`<span class="pt-host">${icon('star')}</span>`:''}</span>`).join('');
+  const mAct=m=>(partyIsHost&&m.uid!==meUid&&m.uid!==r.host)?`<button class="pt-mact" onclick="partyMakeHost('${safeId(m.uid)}',this.dataset.n)" data-n="${escH(m.name)}" aria-label="Make host" title="Make host">${icon('star')}</button><button class="pt-mact pt-mact-x" onclick="partyKick('${safeId(m.uid)}',this.dataset.n)" data-n="${escH(m.name)}" aria-label="Remove" title="Remove">${icon('x')}</button>`:'';
+  const members=r.members.map(m=>`<span class="pt-chip${m.uid===r.host?' host':''}"><span class="dot"></span>${schEsc(m.name)}${m.uid===r.host?`<span class="pt-host">${icon('star')}</span>`:''}${mAct(m)}</span>`).join('');
   const now=r.title?`<div class="pt-now">${r.img?`<img src="${safeImg(r.img)}" alt="">`:''}<div><div class="pt-now-t">${schEsc(r.title)}</div><div class="pt-now-s">${r.ep?`Episode ${r.ep}`:'Ready'} · ${r.members.length} watching</div></div></div>`:'';
   let hostCtl='';
   const sharing=!!r.sharing, iShare=r.sharing===meUid;
   // Shared "Up next" queue — visible to everyone; the host can remove items and pull the head.
   const qlist=r.queue||[];
-  const queueBlock=qlist.length?`<div class="dt-label" style="margin-top:14px">Up next · ${qlist.length}</div>
+  const qActs=(q,i)=>{
+    const votes=(q.votes||[]).length, mine=(q.votes||[]).includes(meUid);
+    const vote=`<button class="pt-qvote${mine?' on':''}" onclick="partyQueueVote('${safeId(q.id)}')" aria-label="Vote for this">${mine?icon('heart','fill'):icon('heart')}${votes?`<span>${votes}</span>`:''}</button>`;
+    const move=partyIsHost?`<button class="pt-qmove" onclick="partyQueueMove('${safeId(q.id)}','up')" aria-label="Move up"${i===0?' disabled':''}>${icon('chevron-up')}</button><button class="pt-qmove" onclick="partyQueueMove('${safeId(q.id)}','down')" aria-label="Move down"${i===qlist.length-1?' disabled':''}>${icon('chevron-down')}</button>`:'';
+    const rm=partyIsHost?`<button class="pt-qx" onclick="partyQueueRemoveAt(${i})" aria-label="Remove from queue">${icon('x')}</button>`:'';
+    return `<div class="pt-qacts">${vote}${move}${rm}</div>`;
+  };
+  const queueBlock=qlist.length?`<div class="dt-label" style="margin-top:14px">Up next · ${qlist.length}${partyIsHost?'':' · vote for what’s next'}</div>
     <div class="pt-picklist">${qlist.map((q,i)=>`<div class="pt-pick pt-qitem">
       ${q.img?`<img src="${safeImg(q.img)}" alt="">`:`<div class="ph">${((q.title||'?')[0]||'?').toUpperCase()}</div>`}
       <div class="pt-pick-info"><div class="pt-pick-t">${schEsc(q.title)}</div><div class="pt-pick-s">${q.ep?`Episode ${q.ep} · `:''}added by ${schEsc(q.by||'?')}</div></div>
-      ${partyIsHost?`<button class="pt-qx" onclick="partyQueueRemoveAt(${i})" aria-label="Remove from queue">${icon('x')}</button>`:''}</div>`).join('')}</div>`:'';
+      ${qActs(q,i)}</div>`).join('')}</div>`:'';
   if(partyIsHost&&iShare){
     // Real WebRTC connection count, not just who's in the room — a viewer can be present
     // but still negotiating (or blocked by their network), and the host should see that.

@@ -287,6 +287,39 @@ export class PartyRoom {
         if (!isHost && !qid.startsWith(uid + '-')) return;   // host removes anything; others only their own
         q.splice(i, 1); room.rev++; await this.save(); this.broadcast(); return;
       }
+      case 'queue-move': {   // host reorders the up-next list
+        if (!isHost) return;
+        const q = room.queue = room.queue || [];
+        const i = q.findIndex(x => x.id === String(msg.qid || ''));
+        const j = i + (msg.dir === 'up' ? -1 : 1);
+        if (i < 0 || j < 0 || j >= q.length) return;
+        const t = q[i]; q[i] = q[j]; q[j] = t;
+        room.rev++; await this.save(); this.broadcast(); return;
+      }
+      case 'queue-vote': {   // anyone toggles a vote on a queued item (host decides using the counts)
+        const q = room.queue = room.queue || [];
+        const it = q.find(x => x.id === String(msg.qid || '')); if (!it) return;
+        it.votes = it.votes || [];
+        const k = it.votes.indexOf(uid);
+        if (k >= 0) it.votes.splice(k, 1); else it.votes.push(uid);
+        room.rev++; await this.save(); this.broadcast(); return;
+      }
+      case 'host-set': {   // hand host to another member
+        if (!isHost) return;
+        const to = String(msg.to || ''); if (!to || !room.members[to]) return;
+        room.host = to; this.sys(room, `${room.members[to].name} is now host`);
+        room.rev++; await this.save(); this.broadcast(); return;
+      }
+      case 'kick': {   // host removes a member and disconnects them
+        if (!isHost) return;
+        const target = String(msg.uid || ''); if (!target || target === uid || !room.members[target]) return;
+        const nm = room.members[target].name; delete room.members[target];
+        if (room.sharing === target) room.sharing = '';
+        this.sys(room, `${nm} was removed`);
+        this.sendTo(target, { t: 'error', msg: 'The host removed you from the party.' });
+        for (const w of this.state.getWebSockets(target)) { try { w.close(1000, 'removed'); } catch {} }
+        room.rev++; await this.save(); this.broadcast(); return;
+      }
       case 'queue-next': {   // host advances the party to the first queued item + fires the 3·2·1
         if (!isHost) return;
         const next = (room.queue = room.queue || []).shift(); if (!next) return;

@@ -227,7 +227,7 @@ export class PartyRoom {
     let room = await this.getRoom();
     if (!room) {
       if (!create) { server.send(JSON.stringify({ t: 'error', msg: 'no such party' })); server.close(4404, 'no room'); return new Response(null, { status: 101, webSocket: client }); }
-      room = this.room = { code, host: uid, title: '', animeId: '', ep: 0, img: '', playAt: 0, paused: false, sharing: '', members: {}, chat: [], reacts: [], queue: [], rev: 1 };
+      room = this.room = { code, host: uid, title: '', animeId: '', ep: 0, img: '', playAt: 0, paused: false, sharing: '', members: {}, chat: [], reacts: [], queue: [], voice: {}, rev: 1 };
       this.sys(room, `${name} started the party`);
     }
     const fresh = !room.members[uid];
@@ -330,6 +330,12 @@ export class PartyRoom {
         room.rev++; await this.save(); this.broadcast(); return;
       }
       case 'share': { room.sharing = msg.on ? uid : (room.sharing === uid ? '' : room.sharing); this.sys(room, msg.on ? `${name} started screen sharing` : `${name} stopped sharing`); room.rev++; await this.save(); this.broadcast(); return; }   // the broadcaster flags itself as the sharer — on iOS the ReplayKit extension joins under its own uid (not the room host), so a host-only gate would silently drop its "share" and viewers would never see the broadcast start
+      case 'voice': {   // join/leave the voice channel; the audio itself is P2P (mesh), this just tracks presence
+        room.voice = room.voice || {};
+        if (msg.on) { if (!room.voice[uid]) { room.voice[uid] = 1; this.sys(room, `${name} joined voice chat`); } }
+        else { if (room.voice[uid]) { delete room.voice[uid]; this.sys(room, `${name} left voice chat`); } }
+        room.rev++; await this.save(); this.broadcast(); return;
+      }
       case 'signal': {
         const to = String(msg.to || ''); if (!to) return;
         this.sendTo(to, { t: 'signal', from: uid, kind: msg.kind, data: msg.data });
@@ -355,6 +361,7 @@ export class PartyRoom {
     if (stillOpen) return;
     if (room.members[uid]) { this.sys(room, `${room.members[uid].name} left`); delete room.members[uid]; }
     if (room.sharing === uid) room.sharing = '';
+    if (room.voice) delete room.voice[uid];
     if (room.host === uid) { const rest = Object.keys(room.members); if (rest.length) { room.host = rest[0]; this.sys(room, `${room.members[rest[0]].name} is now host`); } }
     room.rev++;
     if (Object.keys(room.members).length) { await this.save(); this.broadcast(); }
@@ -371,7 +378,7 @@ export class PartyRoom {
   sys(room, msg) { room.chat.push({ id: 's-' + Date.now() + '-' + ((Math.random() * 1e6) | 0), sys: true, msg, t: Date.now() }); this.cap(room); }
   view() {
     const r = this.room;
-    return { code: r.code, host: r.host, title: r.title, animeId: r.animeId, ep: r.ep, img: r.img, playAt: r.playAt, paused: !!r.paused, sharing: r.sharing || '', queue: r.queue || [],
+    return { code: r.code, host: r.host, title: r.title, animeId: r.animeId, ep: r.ep, img: r.img, playAt: r.playAt, paused: !!r.paused, sharing: r.sharing || '', queue: r.queue || [], voice: Object.keys(r.voice || {}),
       members: Object.entries(r.members).map(([uid, m]) => ({ uid, name: m.name })), chat: r.chat, reacts: (r.reacts || []).filter(x => Date.now() - x.t < 8000), rev: r.rev };
   }
   broadcast() { const s = JSON.stringify({ t: 'state', room: this.view() }); for (const ws of this.state.getWebSockets()) { try { ws.send(s); } catch {} } }

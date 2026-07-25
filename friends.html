@@ -1004,6 +1004,18 @@ body.recsel .pcard{position:relative;}
 .pt-mact{width:24px;height:24px;flex-shrink:0;border-radius:7px;background:var(--bg4);color:var(--t2);display:inline-flex;align-items:center;justify-content:center;margin-left:3px;}
 .pt-mact .ico{width:13px;height:13px;}
 .pt-mact-x{color:var(--a2);}
+/* voice chat controls */
+.pt-voice{display:flex;gap:8px;margin-top:12px;}
+.pt-voicebtn{flex:1;display:flex;align-items:center;justify-content:center;gap:8px;height:46px;border-radius:13px;background:var(--bg3);border:1px solid var(--b2);color:var(--t1);font-family:var(--fd);font-weight:800;font-size:14px;cursor:pointer;transition:transform .1s;}
+.pt-voicebtn:active{transform:scale(.98);}
+.pt-voicebtn.on{background:var(--ag);border-color:var(--a);color:var(--a2);}
+.pt-voicebtn .ico{width:17px;height:17px;}
+.pt-voice-n{min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:var(--a);color:#fff;font-size:11px;display:inline-flex;align-items:center;justify-content:center;}
+.pt-mutebtn{display:flex;align-items:center;gap:7px;height:46px;padding:0 16px;border-radius:13px;background:var(--bg3);border:1px solid var(--b2);color:var(--t2);font-family:var(--fd);font-weight:800;font-size:13px;cursor:pointer;}
+.pt-mutebtn.muted{background:var(--a);border-color:transparent;color:#fff;}
+.pt-mutebtn .ico{width:16px;height:16px;}
+.pt-vmic{display:inline-flex;margin-left:3px;color:var(--fin,#2fbf6b);}
+.pt-vmic .ico{width:12px;height:12px;}
 #sourceBody code{background:var(--bg4);border:1px solid var(--b1);border-radius:5px;padding:1px 5px;font-size:11px;font-family:ui-monospace,Menlo,monospace;color:var(--t2);}
 .dots span{animation:blink 1.2s infinite;}
 .dots span:nth-child(2){animation-delay:.2s;}
@@ -2040,7 +2052,8 @@ layers:'<path d="M12 2 2 7l10 5 10-5z"/><path d="m2 17 10 5 10-5"/><path d="m2 1
   key:'<path d="M12.6 11.4a5.5 5.5 0 1 0-7.8 7.8 5.5 5.5 0 0 0 7.8-7.8zM12.6 11.4 22 2"/><path d="m17 7 3 3"/>',
   settings:'<line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>',
   external:'<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/>',
-  'chevron-down':'<path d="m6 9 6 6 6-6"/>',
+  'chevron-down':'<path d="m6 9 6 6 6-6"/>','chevron-up':'<path d="m18 15-6-6-6 6"/>',
+'mic-off':'<line x1="1" y1="1" x2="23" y2="23"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/><path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/><path d="M12 19v4M8 23h8"/>',
   sort:'<path d="M11 5h10M11 9h6M11 13h3M3 17l3 3 3-3M6 4v16"/>'
 };
 function icon(name,cls){const p=ICONS[name];if(!p)return'';return `<svg class="ico${cls?' '+cls:''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`;}
@@ -4974,6 +4987,7 @@ function applyRoom(room){
     if(sig!==_prSig){_prSig=sig;_schedulePartyRender();}   // only when something visible actually changed
   }
   try{rtcTick(room);}catch(e){}          // drive the screen-share mesh
+  try{vrtcTick(room);}catch(e){}         // drive the voice mesh
   try{processReacts(room.reacts);}catch(e){}   // float everyone's emoji (from a full-state sync)
   try{renderPvHostBar();}catch(e){}      // keep the host's in-player remote current
 }
@@ -4981,6 +4995,8 @@ function handleSignalMsg(m){try{
   if(m.kind==='offer')pcHandleOffer(m.from,m.data);
   else if(m.kind==='answer')pcHandleAnswer(m.from,m.data);
   else if(m.kind==='reoffer'){pcClose(m.from);pcConnectToViewer(m.from);}   // a viewer asked us to re-establish (Retry) — only the sharer has localStream, so others ignore
+  else if(m.kind==='voffer')vpcHandleOffer(m.from,m.data);   // voice mesh
+  else if(m.kind==='vanswer')vpcHandleAnswer(m.from,m.data);
 }catch(e){}}
 // Viewer-side "Retry connection": drop the dead peer and ask the sharer to re-offer.
 function partyRetryShare(){
@@ -5043,6 +5059,7 @@ function partyJoin(codeArg){
 function partyEnd(silent){
   const ws=partyWS;partyWS=null;   // null first so onclose won't reconnect
   if(localStream){localStream.getTracks().forEach(t=>t.stop());localStream=null;}
+  voiceOn=false;voiceMuted=false;Object.keys(vpcs).forEach(vpcClose);if(voiceStream){voiceStream.getTracks().forEach(t=>t.stop());voiceStream=null;}
   Object.keys(pcs).forEach(pcClose);hideShareView();partySeenSig=new Set();partyPrevSharing='';
   try{localStorage.removeItem('party_active');}catch{}
   if(ws){try{ws.close();}catch{}}   // DO removes us + tells the others
@@ -5281,6 +5298,63 @@ function rtcTick(room){
   }
   partyPrevSharing=sharing;
 }
+// ── VOICE CHAT (WebRTC mesh audio — everyone hears everyone) ─────────────────
+// A separate mesh from the screen-share: its own peer map (vpcs) and its own signal
+// kinds (voffer/vanswer), so voice and screen never collide on the shared relay. To
+// avoid glare, only the peer with the smaller uid offers; the other waits. Presence
+// rides on room.voice (a list of uids currently in the voice channel).
+let voiceOn=false,voiceStream=null,vpcs={},voiceMuted=false;
+async function toggleVoice(){
+  if(voiceOn){leaveVoice();return;}
+  if(!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia)){toast('Voice chat isn’t supported here');return;}
+  let s;try{s=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true},video:false});}
+  catch{toast('Mic access denied — allow the mic to talk');return;}
+  voiceStream=s;voiceOn=true;voiceMuted=false;
+  wsSend({t:'voice',on:true});
+  try{if(partyRoom)vrtcTick(partyRoom);}catch(e){}
+  try{renderParty();}catch(e){}toast('Voice chat on');
+}
+function leaveVoice(){
+  voiceOn=false;
+  Object.keys(vpcs).forEach(vpcClose);
+  if(voiceStream){voiceStream.getTracks().forEach(t=>t.stop());voiceStream=null;}
+  if(partyActive())wsSend({t:'voice',on:false});
+  try{renderParty();}catch(e){}
+}
+function toggleMute(){
+  if(!voiceStream)return;
+  voiceMuted=!voiceMuted;
+  voiceStream.getAudioTracks().forEach(t=>t.enabled=!voiceMuted);
+  try{renderParty();}catch(e){}
+}
+function vpcClose(uid){const pc=vpcs[uid];if(pc){try{if(pc._audio){pc._audio.srcObject=null;pc._audio=null;}}catch(e){}try{pc.close();}catch(e){}delete vpcs[uid];}}
+function vpcAttach(pc,stream){try{const a=new Audio();a.autoplay=true;a.srcObject=stream;const p=a.play&&a.play();if(p&&p.catch)p.catch(()=>{});pc._audio=a;}catch(e){}}
+async function vpcConnect(uid){                          // I offer (I hold the smaller uid)
+  if(vpcs[uid]||!voiceStream)return;
+  const pc=new RTCPeerConnection(RTC_CFG);vpcs[uid]=pc;
+  voiceStream.getTracks().forEach(t=>pc.addTrack(t,voiceStream));
+  pc.ontrack=e=>vpcAttach(pc,e.streams[0]);
+  pc.onconnectionstatechange=()=>{if(['failed','closed','disconnected'].includes(pc.connectionState))vpcClose(uid);};
+  try{const offer=await pc.createOffer();await pc.setLocalDescription(offer);await iceComplete(pc);
+    wsSend({t:'signal',to:uid,kind:'voffer',data:pc.localDescription});}catch{vpcClose(uid);}
+}
+async function vpcHandleOffer(from,offer){               // they offered; I answer (only if I'm on voice)
+  if(!voiceStream)return;
+  vpcClose(from);
+  const pc=new RTCPeerConnection(RTC_CFG);vpcs[from]=pc;
+  voiceStream.getTracks().forEach(t=>pc.addTrack(t,voiceStream));
+  pc.ontrack=e=>vpcAttach(pc,e.streams[0]);
+  pc.onconnectionstatechange=()=>{if(['failed','closed','disconnected'].includes(pc.connectionState))vpcClose(from);};
+  try{await pc.setRemoteDescription(offer);const ans=await pc.createAnswer();await pc.setLocalDescription(ans);await iceComplete(pc);
+    wsSend({t:'signal',to:from,kind:'vanswer',data:pc.localDescription});}catch{vpcClose(from);}
+}
+async function vpcHandleAnswer(from,answer){const pc=vpcs[from];if(pc&&!pc.currentRemoteDescription)try{await pc.setRemoteDescription(answer);}catch{}}
+// On each room state: offer to the voice peers I should (smaller uid), drop those who left.
+function vrtcTick(room){
+  const me=partyUid(),voice=new Set(room.voice||[]);
+  if(voiceOn)voice.forEach(uid=>{if(uid!==me&&!vpcs[uid]&&me<uid)vpcConnect(uid);});
+  Object.keys(vpcs).forEach(uid=>{if(!voiceOn||!voice.has(uid))vpcClose(uid);});
+}
 function renderParty(){
   const box=document.getElementById('partyBody');if(!box)return;
   if(!partyActive()){
@@ -5300,7 +5374,12 @@ function renderParty(){
   const r=partyRoom||{members:[],chat:[]};
   const meUid=partyUid();
   const mAct=m=>(partyIsHost&&m.uid!==meUid&&m.uid!==r.host)?`<button class="pt-mact" onclick="partyMakeHost('${safeId(m.uid)}',this.dataset.n)" data-n="${escH(m.name)}" aria-label="Make host" title="Make host">${icon('star')}</button><button class="pt-mact pt-mact-x" onclick="partyKick('${safeId(m.uid)}',this.dataset.n)" data-n="${escH(m.name)}" aria-label="Remove" title="Remove">${icon('x')}</button>`:'';
-  const members=r.members.map(m=>`<span class="pt-chip${m.uid===r.host?' host':''}"><span class="dot"></span>${schEsc(m.name)}${m.uid===r.host?`<span class="pt-host">${icon('star')}</span>`:''}${mAct(m)}</span>`).join('');
+  const vset=new Set(r.voice||[]);
+  const members=r.members.map(m=>`<span class="pt-chip${m.uid===r.host?' host':''}"><span class="dot"></span>${schEsc(m.name)}${m.uid===r.host?`<span class="pt-host">${icon('star')}</span>`:''}${vset.has(m.uid)?`<span class="pt-vmic" title="In voice chat">${icon('mic')}</span>`:''}${mAct(m)}</span>`).join('');
+  const voiceUI=`<div class="pt-voice">
+    <button class="pt-voicebtn${voiceOn?' on':''}" onclick="toggleVoice()">${icon('mic')}<span>${voiceOn?'Leave voice':'Join voice chat'}</span>${vset.size?`<span class="pt-voice-n">${vset.size}</span>`:''}</button>
+    ${voiceOn?`<button class="pt-mutebtn${voiceMuted?' muted':''}" onclick="toggleMute()">${icon(voiceMuted?'mic-off':'mic')}<span>${voiceMuted?'Muted':'Mute'}</span></button>`:''}
+  </div>`;
   const now=r.title?`<div class="pt-now">${r.img?`<img src="${safeImg(r.img)}" alt="">`:''}<div><div class="pt-now-t">${schEsc(r.title)}</div><div class="pt-now-s">${r.ep?`Episode ${r.ep}`:'Ready'} · ${r.members.length} watching</div></div></div>`:'';
   let hostCtl='';
   const sharing=!!r.sharing, iShare=r.sharing===meUid;
@@ -5370,7 +5449,7 @@ function renderParty(){
   box.innerHTML=`
     <div class="pt-code"><div class="pt-code-val">${schEsc(r.code||partyCode)}</div><button class="pt-code-cta" onclick="sharePartyLink()" aria-label="Share invite link">${icon('send')}</button><button class="pt-code-cta" onclick="partyCopyCode()" aria-label="Copy code">${icon('copy')}</button></div>
     <div class="pt-members">${members}</div>
-    ${now}${queueBlock}${hostCtl}${inviteBlock}
+    ${now}${queueBlock}${hostCtl}${voiceUI}${inviteBlock}
     <div class="pt-reactbar">${PARTY_EMOJI.map(e=>`<button class="pt-react" onclick="partyReact('${e}')">${e}</button>`).join('')}</div>
     <div class="pt-chat" id="ptChat">${chat||'<div class="pt-sys">Say hi</div>'}</div>
     <div class="pt-typing" id="ptTyping" style="display:none"></div>

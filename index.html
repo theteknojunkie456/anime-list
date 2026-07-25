@@ -906,10 +906,12 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 .pt-share .ico{width:17px;height:17px;}
 .pt-hint{font-size:11.5px;color:var(--t3);text-align:center;margin:-2px 0 12px;}
 .party-pill{position:fixed;right:16px;bottom:calc(var(--safe-b) + 96px);z-index:90;display:none;align-items:center;gap:8px;background:var(--a);color:var(--aFg,#fff);border:0;border-radius:999px;padding:11px 16px;font-family:var(--fd);font-size:13.5px;font-weight:800;box-shadow:0 8px 24px -6px var(--glow);}
-/* Public web build (no native app) = no parties. Hide every entry point; the
-   floating pill is force-hidden even when updatePartyPill() tries to show it. */
+/* Public web build (no native app) = no parties. Hide every entry point — but if
+   you're actually IN a party (joined via an invite), the floating pill must still
+   show so you can hop back in after closing the sheet. So hide it only when idle
+   (no .on); an active pill (updatePartyPill added .on) overrides and shows. */
 body.no-party .party-only{display:none!important;}
-body.no-party #partyPill{display:none!important;}
+body.no-party #partyPill:not(.on){display:none!important;}
 /* Friends button: shows only on the public web build (where parties are hidden). */
 .friend-only{display:none;}
 body.no-party .friend-only{display:flex;}
@@ -5327,10 +5329,18 @@ function toggleMute(){
   voiceStream.getAudioTracks().forEach(t=>t.enabled=!voiceMuted);
   try{renderParty();}catch(e){}
 }
-function vpcClose(uid){const pc=vpcs[uid];if(pc){try{if(pc._audio){pc._audio.srcObject=null;pc._audio=null;}}catch(e){}try{pc.close();}catch(e){}delete vpcs[uid];}}
-function vpcAttach(pc,stream){try{const a=new Audio();a.autoplay=true;a.srcObject=stream;const p=a.play&&a.play();if(p&&p.catch)p.catch(()=>{});pc._audio=a;}catch(e){}}
+function vpcClose(uid){const pc=vpcs[uid];if(pc){try{if(pc._audio){pc._audio.srcObject=null;pc._audio.remove();pc._audio=null;}}catch(e){}try{pc.close();}catch(e){}delete vpcs[uid];}}
+// Attach the remote mic to a real (hidden) <audio> in the DOM — a detached new Audio()
+// often stays silent, especially on iOS Safari.
+function vpcAttach(pc,stream){try{
+  const a=document.createElement('audio');a.autoplay=true;a.setAttribute('playsinline','');a.style.display='none';
+  a.srcObject=stream;document.body.appendChild(a);
+  const p=a.play&&a.play();if(p&&p.catch)p.catch(err=>console.log('[voice] play() blocked: '+(err&&err.message)));
+  pc._audio=a;console.log('[voice] remote audio attached');
+}catch(e){console.log('[voice] attach error '+(e&&e.message));}}
 async function vpcConnect(uid){                          // I offer (I hold the smaller uid)
   if(vpcs[uid]||!voiceStream)return;
+  console.log('[voice] offering to '+uid);
   const pc=new RTCPeerConnection(RTC_CFG);vpcs[uid]=pc;
   voiceStream.getTracks().forEach(t=>pc.addTrack(t,voiceStream));
   pc.ontrack=e=>vpcAttach(pc,e.streams[0]);
@@ -5339,6 +5349,7 @@ async function vpcConnect(uid){                          // I offer (I hold the 
     wsSend({t:'signal',to:uid,kind:'voffer',data:pc.localDescription});}catch{vpcClose(uid);}
 }
 async function vpcHandleOffer(from,offer){               // they offered; I answer (only if I'm on voice)
+  console.log('[voice] offer received from '+from+(voiceStream?'':' (ignored — not in voice)'));
   if(!voiceStream)return;
   vpcClose(from);
   const pc=new RTCPeerConnection(RTC_CFG);vpcs[from]=pc;
@@ -5352,6 +5363,7 @@ async function vpcHandleAnswer(from,answer){const pc=vpcs[from];if(pc&&!pc.curre
 // On each room state: offer to the voice peers I should (smaller uid), drop those who left.
 function vrtcTick(room){
   const me=partyUid(),voice=new Set(room.voice||[]);
+  if(voiceOn)console.log('[voice] tick — on voice: ['+[...voice].join(',')+'] me='+me);
   if(voiceOn)voice.forEach(uid=>{if(uid!==me&&!vpcs[uid]&&me<uid)vpcConnect(uid);});
   Object.keys(vpcs).forEach(uid=>{if(!voiceOn||!voice.has(uid))vpcClose(uid);});
 }

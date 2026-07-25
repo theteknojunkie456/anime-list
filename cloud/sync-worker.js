@@ -1,5 +1,6 @@
 // ── WatchList cloud sync + watch parties — Cloudflare Worker ────────────────
 // Free, private, and completely separate from any other app.
+// (deploys automatically on push via .github/workflows/deploy-workers.yml)
 //
 //  • Sync — one list per long random "sync code", stored in KV (bound as LISTS).
 //    POST {op:'pull'|'push', code, data}. Keys: list:<code>

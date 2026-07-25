@@ -20,7 +20,12 @@ final class WebRTCBroadcaster {
     // called to hand a completed offer/answer back to the party signaling layer
     var onOffer: ((_ toUid: String, _ sdp: String) -> Void)?
 
-    private let stunURLs = ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"]
+    // Match the web app's STUN set (see the worker's /turn) — more options means more
+    // direct connections succeed with no relay, the only free way to help cross-network.
+    private let stunURLs = ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302",
+                            "stun:stun2.l.google.com:19302", "stun:stun3.l.google.com:19302",
+                            "stun:stun4.l.google.com:19302", "stun:stun.cloudflare.com:3478",
+                            "stun:global.stun.twilio.com:3478"]
 
     init() {
         RTCInitializeSSL()

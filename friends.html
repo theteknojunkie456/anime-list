@@ -4447,9 +4447,17 @@ async function loadPopularShelf(){
   const box=document.getElementById('popularShelf'); if(!box)return;
   try{
     if(!_popCache){
-      const q=`query{Page(perPage:14){media(type:ANIME,sort:POPULARITY_DESC,isAdult:false){id title{romaji english} coverImage{large} episodes}}}`;
+      // Beginner shelf = entry points only, so a new user starts a series at the
+      // beginning and watches in order. Pull a wider popular set and drop anything
+      // that has a PREQUEL (i.e. a season/part comes before it): keeps Naruto, drops
+      // Naruto Shippuden; keeps Attack on Titan, drops its later seasons; keeps Bleach,
+      // drops Thousand-Year Blood War. Then take the first 14 that survive.
+      const q=`query{Page(perPage:50){media(type:ANIME,sort:POPULARITY_DESC,isAdult:false){id title{romaji english} coverImage{large} episodes relations{edges{relationType node{id}}}}}}`;
       const r=await fetch('https://graphql.anilist.co',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query:q})});
-      const d=await r.json(); _popCache=(((d.data||{}).Page||{}).media||[]);
+      const d=await r.json();
+      const all=(((d.data||{}).Page||{}).media||[]);
+      const isEntryPoint=m=>!(((m.relations||{}).edges)||[]).some(e=>e&&e.relationType==='PREQUEL');
+      _popCache=all.filter(isEntryPoint).slice(0,14);
     }
     if(!_popCache.length){box.innerHTML='';return;}
     box.innerHTML=_popCache.map(m=>{

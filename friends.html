@@ -3612,13 +3612,18 @@ function renderHome(){
     if(!isRead)loadPopularShelf();
     return;
   }
-  const watching=sorted(pool.filter(a=>a.status==='watching'));
+  // Sort the whole pool ONCE. Every section below is a subset of it under the
+  // same sort, and Array.filter preserves order — so filtering this pre-sorted
+  // list yields the same order a per-section sorted() would, at ~1/10th the work
+  // (one O(n log n) instead of one per section: spotlight ×4, rows ×4, favs, genres).
+  const S=sorted(pool);
+  const watching=S.filter(a=>a.status==='watching');
   // spotlight billboard: watching-with-art, then favorites-with-art, then any watching, then any-with-art (max 5)
   const seen=new Set(),spot=[];const addSpot=a=>{if(a&&!seen.has(a.id)){seen.add(a.id);spot.push(a);}};
-  sorted(pool.filter(a=>a.status==='watching'&&titleBg(a))).forEach(addSpot);
-  sorted(pool.filter(a=>a.fav&&titleBg(a))).forEach(addSpot);
+  S.filter(a=>a.status==='watching'&&titleBg(a)).forEach(addSpot);
+  S.filter(a=>a.fav&&titleBg(a)).forEach(addSpot);
   watching.forEach(addSpot);
-  sorted(pool.filter(a=>titleBg(a))).forEach(addSpot);
+  S.filter(a=>titleBg(a)).forEach(addSpot);
   const spotlight=spot.slice(0,5),spotSet=new Set(spotlight.map(a=>a.id));
   heroAmb=spotlight[0]?titleAccent(spotlight[0]):'';setAmbient(heroAmb);
   // Continue-watching rail: the ONE watching surface on home — every watching
@@ -3636,7 +3641,7 @@ function renderHome(){
     :[['plan',icon('clipboard')+' Plan to Watch'],['finished',icon('check')+' Finished'],['dropped',icon('x')+' Dropped']];
   for(const[st,label]of rows){
     const rc=(STATUS_META[st]||{}).color||'var(--t2)';
-    let items=sorted(pool.filter(a=>a.status===st));
+    let items=S.filter(a=>a.status===st);
     // Reading row (read kind only) drops anything already up in the billboard.
     if(st==='watching')items=items.filter(a=>!spotSet.has(a.id));
     if(!items.length)continue;
@@ -3644,16 +3649,17 @@ function renderHome(){
     html+=`<div class="row-sec" data-amb="${items[0]?titleAccent(items[0]):''}"><div class="row-head"><div class="row-title" style="--rc:${rc}">${label}</div><div class="row-count">${cells.length}</div></div>
       <div class="row-scroll">${cells.map(s=>posterCard(s.a,s.n)).join('')}</div></div>`;
   }
-  const favs=sorted(pool.filter(a=>a.fav));
+  const favs=S.filter(a=>a.fav);
   if(favs.length){const fc=collapseSeries(favs);html+=`<div class="row-sec" data-amb="${favs[0]?titleAccent(favs[0]):''}"><div class="row-head"><div class="row-title" style="--rc:var(--a2)">${icon('heart','fill')} Favorites</div><div class="row-count">${fc.length}</div></div>
     <div class="row-scroll">${fc.map(s=>posterCard(s.a,s.n)).join('')}</div></div>`;}
   // genre collections — browse your list by its most-common genres (Netflix-style lens)
-  const gmap={};pool.forEach(a=>(a.genre||'').split(',').map(g=>g.trim()).filter(Boolean).forEach(g=>{(gmap[g]=gmap[g]||[]).push(a);}));
+  // Build from S (already sorted) so each genre bucket is in sort order — no re-sort.
+  const gmap={};S.forEach(a=>(a.genre||'').split(',').map(g=>g.trim()).filter(Boolean).forEach(g=>{(gmap[g]=gmap[g]||[]).push(a);}));
   const topGenres=Object.keys(gmap).filter(g=>gmap[g].length>=2).sort((x,y)=>gmap[y].length-gmap[x].length).slice(0,4);
   if(topGenres.length){
     html+=`<div class="row-div">Browse by genre</div>`;
     for(const g of topGenres){
-      const items=sorted(gmap[g]),gc=collapseSeries(items);
+      const items=gmap[g],gc=collapseSeries(items);
       html+=`<div class="row-sec" data-amb="${items[0]?titleAccent(items[0]):''}"><div class="row-head"><div class="row-title">${g}</div><div class="row-count">${gc.length}</div></div>
         <div class="row-scroll">${gc.map(s=>posterCard(s.a,s.n)).join('')}</div></div>`;
     }

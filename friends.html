@@ -8169,7 +8169,12 @@ function closeKbHelp(){const el=document.getElementById('kbHelp');if(el)el.class
 document.addEventListener('keydown',e=>{
   if(e.key==='Escape'){closeKbHelp();closeAll();closeConfirm();closeYT();if(_kbTyping()&&document.activeElement.blur)document.activeElement.blur();_kbClear();return;}
   if(e.metaKey||e.ctrlKey||e.altKey)return;   // leave OS/browser combos (Cmd+L, Ctrl+A…) alone
-  if(e.key==='/'&&!_kbTyping()){e.preventDefault();const s=document.getElementById('searchIn');if(s){_kbClear();s.focus();try{s.select();}catch(_){}}return;}
+  if(e.key==='/'&&!_kbTyping()){e.preventDefault();
+    // In an open party, "/" jumps to the chat so you can talk; otherwise it focuses search.
+    const partyOpen=(()=>{try{return document.getElementById('partySheet').classList.contains('on');}catch(_){return false;}})();
+    const chat=partyOpen&&document.getElementById('ptMsg');
+    if(chat){chat.focus();return;}
+    const s=document.getElementById('searchIn');if(s){_kbClear();s.focus();try{s.select();}catch(_){}}return;}
   if((e.key==='?'||(e.key==='/'&&e.shiftKey))&&!_kbTyping()){e.preventDefault();if(!_kbBlocked())toggleKbHelp();return;}
   if(_kbTyping()||_kbBlocked())return;
   switch(e.key){

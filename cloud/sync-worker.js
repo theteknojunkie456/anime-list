@@ -261,6 +261,11 @@ export class PartyRoom {
         if (emoji) { const rc = { id: uid + '-' + Date.now() + '-' + ((Math.random() * 1e4) | 0), emoji, uid, t: Date.now() }; room.reacts = (room.reacts || []).filter(r => Date.now() - r.t < 8000); room.reacts.push(rc); if (room.reacts.length > 24) room.reacts = room.reacts.slice(-24); this.broadcastReact(rc); }
         return;
       }
+      case 'typing': {   // transient "X is typing…" — relay to everyone else, never persisted
+        const s = JSON.stringify({ t: 'typing', uid, name });
+        for (const w of this.state.getWebSockets()) { if (w !== ws) { try { w.send(s); } catch {} } }
+        return;
+      }
       case 'set': {
         if (!isHost) return;
         room.title = String(msg.title || '').slice(0, 160); room.animeId = String(msg.animeId || '').slice(0, 40);

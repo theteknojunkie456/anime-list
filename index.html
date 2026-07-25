@@ -865,6 +865,8 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 .pt-msg{font-size:13px;line-height:1.4;color:var(--t1);}
 .pt-msg .who{font-weight:800;color:var(--a2);margin-right:5px;}
 .pt-msg.me .who{color:var(--t2);}
+.pt-time{font-size:10px;color:var(--t3);margin-left:6px;opacity:.65;font-variant-numeric:tabular-nums;}
+.pt-typing{font-size:12px;color:var(--t3);font-style:italic;padding:3px 4px 0;min-height:15px;}
 .pt-sys{font-size:11.5px;color:var(--t3);text-align:center;font-style:italic;}
 .pt-chatbar{display:flex;gap:8px;margin-top:10px;}
 .pt-chatbar input{flex:1;height:44px;border-radius:12px;background:var(--bg3);border:1px solid var(--b1);color:var(--t1);padding:0 14px;font-size:14px;}
@@ -4891,7 +4893,7 @@ function partyUid(){try{let u=localStorage.getItem('party_uid');if(!u){u='u'+Mat
 function partyName(){try{return localStorage.getItem('party_name')||'';}catch{return'';}}
 function setPartyName(n){try{localStorage.setItem('party_name',n);}catch{}}
 // ── real-time connection (WebSocket → the room's Durable Object) ─────────────
-let partyWS=null,partyReconn=0,partyReconnecting=false,_partyPrevMembers=null;
+let partyWS=null,partyReconn=0,partyReconnecting=false,_partyPrevMembers=null,_chatUnread=0,_lastChatLen=0;
 function wsUrl(code,create){const base=(window.SYNC_URL||SYNC_URL).replace(/^http/,'ws');return `${base}/party/${code}?uid=${encodeURIComponent(partyUid())}&name=${encodeURIComponent(partyName()||'Guest')}${create?'&create=1':''}`;}
 function wsSend(obj){if(partyWS&&partyWS.readyState===1){partyWS.send(JSON.stringify(obj));return true;}return false;}
 function partyConnect(code,create){
@@ -4902,6 +4904,7 @@ function partyConnect(code,create){
   ws.onmessage=e=>{let m;try{m=JSON.parse(e.data);}catch{return;}
     if(m.t==='state')applyRoom(m.room);
     else if(m.t==='react')processReacts(m.r?[m.r]:m.reacts);   // lightweight: float the emoji, no full-state churn
+    else if(m.t==='typing')partyShowTyping(m.name,m.uid);
     else if(m.t==='signal')handleSignalMsg(m);
     else if(m.t==='error'){toast(m.msg||'Party error');partyEnd(true);}
   };
@@ -4917,7 +4920,7 @@ function partyConnect(code,create){
   ws.onerror=()=>{};
 }
 function partyActive(){return !!partyCode;}
-function updatePartyPill(){const el=document.getElementById('partyPill');if(!el)return;const sheetOpen=document.getElementById('partySheet').classList.contains('on');el.classList.toggle('on',partyActive()&&!sheetOpen);const t=document.getElementById('ppText');if(t)t.textContent=partyReconnecting?'Reconnecting…':(partyRoom?`Party · ${partyRoom.members.length}`:'Party');}
+function updatePartyPill(){const el=document.getElementById('partyPill');if(!el)return;const sheetOpen=document.getElementById('partySheet').classList.contains('on');el.classList.toggle('on',partyActive()&&!sheetOpen);const t=document.getElementById('ppText');if(t)t.textContent=partyReconnecting?'Reconnecting…':(partyRoom?`Party · ${partyRoom.members.length}${_chatUnread?` · ${_chatUnread} new`:''}`:'Party');}
 // A signature of only the fields renderParty actually draws (reactions excluded —
 // they float via processReacts). If it's unchanged, a re-render would be identical, so
 // we skip it: that alone kills the reaction/presence re-render storm that made the
@@ -4945,6 +4948,13 @@ function applyRoom(room){
       for(const [uid,name] of _partyPrevMembers){if(uid!==me&&!now.has(uid))toast(`${name} left`);}
     }
     _partyPrevMembers=now;
+  }catch(e){}
+  // Unread chat badge on the pill while the party sheet is closed.
+  try{
+    const chatLen=(room.chat||[]).length, sheetOpen=document.getElementById('partySheet').classList.contains('on');
+    if(sheetOpen)_chatUnread=0;
+    else if(chatLen>_lastChatLen){const me=partyUid();_chatUnread+=(room.chat||[]).slice(_lastChatLen).filter(m=>!m.sys&&m.uid!==me).length;}
+    _lastChatLen=chatLen;
   }catch(e){}
   partyRoom=room; partyIsHost=(room.host===partyUid());
   updatePartyPill();
@@ -5025,13 +5035,29 @@ function partyEnd(silent){
   Object.keys(pcs).forEach(pcClose);hideShareView();partySeenSig=new Set();partyPrevSharing='';
   try{localStorage.removeItem('party_active');}catch{}
   if(ws){try{ws.close();}catch{}}   // DO removes us + tells the others
-  partyCode='';partyIsHost=false;partyRoom=null;partyInSession=false;partyReconnecting=false;_partyPrevMembers=null;updatePartyPill();nativeNotifyCode();
+  partyCode='';partyIsHost=false;partyRoom=null;partyInSession=false;partyReconnecting=false;_partyPrevMembers=null;_chatUnread=0;_lastChatLen=0;_typers={};updatePartyPill();nativeNotifyCode();
   if(document.getElementById('partySheet').classList.contains('on'))renderParty();
   if(silent)toast('The party ended');
 }
 function partySend(){
   const inp=document.getElementById('ptMsg');if(!inp)return;const msg=inp.value.trim();if(!msg)return;
   inp.value='';wsSend({t:'chat',msg});
+}
+// Short local time shown beside each chat message.
+function partyTime(t){try{return t?new Date(t).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}):'';}catch(e){return '';}}
+// "typing…" — a throttled ping while you type; peers show it and it self-expires.
+let _typingSentAt=0,_typers={},_typingTimer=0;
+function partyTypingPing(){const now=Date.now();if(now-_typingSentAt>1800){_typingSentAt=now;try{wsSend({t:'typing'});}catch(e){}}}
+function partyShowTyping(name,uid){if(uid===partyUid())return;_typers[uid]={name:name||'Someone',until:Date.now()+3500};renderTyping();}
+function renderTyping(){
+  const el=document.getElementById('ptTyping');if(!el)return;
+  const now=Date.now();
+  Object.keys(_typers).forEach(u=>{if(_typers[u].until<=now)delete _typers[u];});
+  const names=Object.values(_typers).map(x=>x.name);
+  if(!names.length){el.style.display='none';el.textContent='';clearTimeout(_typingTimer);return;}
+  el.style.display='';
+  el.textContent=names.length===1?`${names[0]} is typing…`:names.length===2?`${names[0]} and ${names[1]} are typing…`:'Several people are typing…';
+  clearTimeout(_typingTimer);_typingTimer=setTimeout(renderTyping,1000);
 }
 function partyPlay(){if(!partyIsHost)return;if(!partyRoom||!partyRoom.title){toast('Pick what to watch first');return;}wsSend({t:'play'});}
 function partyPause(){if(!partyIsHost)return;wsSend({t:'pause'});}
@@ -5315,7 +5341,7 @@ function renderParty(){
         <div class="pt-pick-info"><div class="pt-pick-t">${schEsc(a.title)}</div><div class="pt-pick-s">Episode ${ep}${a.epTotal?` · ${a.epTotal} eps`:''}</div></div>
         <span class="pt-pick-q">+ Queue</span></button>`;}).join('')}</div>`;
   }
-  const chat=r.chat.map(m=>m.sys?`<div class="pt-sys">${schEsc(m.msg)}</div>`:`<div class="pt-msg${m.uid===meUid?' me':''}"><span class="who">${schEsc(m.name)}</span>${schEsc(m.msg)}</div>`).join('');
+  const chat=r.chat.map(m=>m.sys?`<div class="pt-sys">${schEsc(m.msg)}</div>`:`<div class="pt-msg${m.uid===meUid?' me':''}"><span class="who">${schEsc(m.name)}</span>${schEsc(m.msg)}<span class="pt-time">${partyTime(m.t)}</span></div>`).join('');
   const _friends=friendsList();
   const inviteBlock=_friends.length?`<div class="dt-label" style="margin-top:14px">${icon('users')} Invite friends</div><div class="pt-invite">${_friends.map(f=>`<button class="pt-invite-btn" onclick="partyInviteFriend('${escH(f.code)}')"><span class="fr-dot" style="background:${friendColor(f.code)}"></span>${escH(f.name)}</button>`).join('')}</div>`:'';
   box.innerHTML=`
@@ -5324,9 +5350,12 @@ function renderParty(){
     ${now}${queueBlock}${hostCtl}${inviteBlock}
     <div class="pt-reactbar">${PARTY_EMOJI.map(e=>`<button class="pt-react" onclick="partyReact('${e}')">${e}</button>`).join('')}</div>
     <div class="pt-chat" id="ptChat">${chat||'<div class="pt-sys">Say hi</div>'}</div>
-    <div class="pt-chatbar"><input id="ptMsg" placeholder="Message…" maxlength="300" onkeydown="if(event.key==='Enter')partySend()"><button class="pt-send" onclick="partySend()">${icon('send')}</button></div>
+    <div class="pt-typing" id="ptTyping" style="display:none"></div>
+    <div class="pt-chatbar"><input id="ptMsg" placeholder="Message…" maxlength="300" oninput="partyTypingPing()" onkeydown="if(event.key==='Enter')partySend()"><button class="pt-send" onclick="partySend()">${icon('send')}</button></div>
     <button class="src-opt" style="margin-top:14px" onclick="partyEnd()"><div class="src-name" style="color:var(--t2)">${partyIsHost?'End the party':'Leave the party'}</div></button>`;
   const cc=document.getElementById('ptChat');if(cc)cc.scrollTop=cc.scrollHeight;
+  _chatUnread=0;_lastChatLen=((partyRoom&&partyRoom.chat)||[]).length;updatePartyPill();   // viewing the sheet clears the unread badge
+  renderTyping();
 }
 
 function doImport(){

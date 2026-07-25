@@ -1250,6 +1250,11 @@ body.recsel .pcard{position:relative;}
 .pop-card.added .pop-name{color:var(--fin,#2fbf6b);}
 .pop-name{font-size:12px;color:var(--t2);line-height:1.3;max-width:112px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
 .pop-loading{color:var(--t3);font-size:13px;display:flex;align-items:center;gap:8px;padding:20px 2px;}
+.beg-shelf{margin-top:20px;}
+.beg-shelf .ai-desc svg{width:14px;height:14px;vertical-align:-2px;opacity:.8;}
+.beg-dismiss{margin-top:13px;display:inline-flex;align-items:center;gap:7px;padding:9px 15px;border:1px solid var(--b2);border-radius:12px;background:var(--bg3);color:var(--t2);font-family:var(--fd);font-weight:700;font-size:13px;cursor:pointer;transition:transform .1s;}
+.beg-dismiss:active{transform:scale(.97);}
+.beg-dismiss svg{width:15px;height:15px;}
 .pop-loading svg{width:16px;height:16px;animation:spin 1s linear infinite;}
 .sched-spin .ico{width:1em;height:1em;}
 .sched-bell .ico{width:1em;height:1em;vertical-align:-0.12em;}
@@ -3639,14 +3644,12 @@ function renderHome(){
     return;
   }
   if(!pool.length){
-    el.innerHTML=isRead
+    const beg=beginnerShelfActive(isRead);
+    const emptyBox=isRead
       ?`<div class="empty"><div class="empty-icon">${icon('book')}</div><p>Your reading list is empty.<br>Add a manhwa, webtoon, manga or light novel — tap ＋ and choose Read.</p><button class="hero-cta" onclick="openSheet_add()">＋ Add something to read</button></div>`
-      :`<div class="empty"><div class="empty-icon">${icon('inbox')}</div><p>Your list is empty.<br>Add a title or import your whole list from Notes in one paste.</p><button class="hero-cta" onclick="openSheet('importSheet')">${icon('clipboard')} Import a list</button></div>
-         <div class="dt-label" style="margin:26px 0 2px">${icon('trophy')} Popular right now — tap to add</div>
-         <p class="ai-desc" style="margin-bottom:12px">New here? Tap a few you like — they stack up in your list. Tap Done when you’re set.</p>
-         <div class="pop-shelf" id="popularShelf"><div class="pop-loading">${icon('loader')} Loading…</div></div>
-         <button class="hero-cta" id="popDone" style="display:none;margin-top:16px" onclick="finishPopularPick()">${icon('check')} <span id="popDoneLbl">Done — view my list</span></button>`;
-    if(!isRead)loadPopularShelf();
+      :`<div class="empty"><div class="empty-icon">${icon('inbox')}</div><p>Your list is empty.<br>Add a title or import your whole list from Notes in one paste.</p><button class="hero-cta" onclick="openSheet('importSheet')">${icon('clipboard')} Import a list</button></div>`;
+    el.innerHTML=emptyBox+(beg?beginnerShelfHTML():'');
+    if(beg)loadPopularShelf();
     return;
   }
   // Sort the whole pool ONCE. Every section below is a subset of it under the
@@ -3668,7 +3671,10 @@ function renderHome(){
   const railItems=isRead?[]:resumeItems(pool).filter(a=>!spotSet.has(a.id));
   // one banner at most: backup warning (critical) wins; otherwise the behind nudge
   const topBanner=shouldNudge()?nudgeHTML():(isRead?'':behindHTML());
-  let html=topBanner+(spotlight.length?billboardHTML(spotlight):'')+resumeRailHTML(railItems,isRead)+quickPickStripHTML(pool,isRead)+friendRecRowHTML();
+  // A brand-new user who's started adding still sees the beginner shelf (up top) so
+  // they can keep stacking titles — it rides above their small list until dismissed.
+  const beg=beginnerShelfActive(isRead);
+  let html=topBanner+(beg?beginnerShelfHTML():'')+(spotlight.length?billboardHTML(spotlight):'')+resumeRailHTML(railItems,isRead)+quickPickStripHTML(pool,isRead)+friendRecRowHTML();
   // each section wears its own status colour (STATUS_META) rather than the one
   // theme accent — the palette already exists, it was just unused outside chips
   // Watch list: no "Watching" row — it's merged into the Continue-watching rail
@@ -3701,7 +3707,7 @@ function renderHome(){
         <div class="row-scroll">${gc.map(s=>posterCard(s.a,s.n)).join('')}</div></div>`;
     }
   }
-  el.innerHTML=html;bbSetup(spotlight);try{rzLoop();}catch{}
+  el.innerHTML=html;bbSetup(spotlight);try{rzLoop();}catch{}if(beg)loadPopularShelf();
 }
 
 // ─── DETAIL ─────────────────────────────────────────────────────────────────
@@ -4450,37 +4456,42 @@ async function loadPopularShelf(){
     box.innerHTML=_popCache.map(m=>{
       const t=(m.title.english||m.title.romaji||'').replace(/'/g,'&#39;');
       const img=safeImg((m.coverImage||{}).large||'');   // sanitized: lands in url('…') and a JS-string onclick arg
-      return `<button class="pop-card" onclick="addPopular(${m.id},'${t.replace(/"/g,'&quot;')}','${img}',${m.episodes||0},this)">
+      const have=anime.some(a=>a.aniId===m.id);   // already on the list → show it checked, not tappable
+      return `<button class="pop-card${have?' added':''}"${have?' disabled':''} onclick="addPopular(${m.id},'${t.replace(/"/g,'&quot;')}','${img}',${m.episodes||0},this)">
         <div class="pop-cover" style="background-image:url('${img}')"></div>
         <div class="pop-name">${escH(m.title.english||m.title.romaji||'')}</div></button>`;
     }).join('');
   }catch(e){box.innerHTML='';}
 }
-// The beginner shelf is a multi-pick: tapping a title adds it but keeps the shelf
-// up (a full render would replace the empty state and blow the shelf away after the
-// first pick). We mark the tapped card "added", bump the Done button's count, and
-// only leave the picker when the user taps Done — so a new user can stack several
-// in one go instead of the grid vanishing under them.
-let _popPicked=0;
+// Beginner discovery shelf. A brand-new user (empty list at load) gets a "Popular
+// right now" bar and can tap several titles straight in. The bar is gated on a
+// load-time "new user" snapshot + a saved dismiss flag — NOT on the empty state —
+// so a background cover-fetch re-render (which flips the home to populated) can't
+// wipe it mid-add. It shows until the user dismisses it for good; after that the
+// compass (For You) up top is everyone's ongoing way to find more.
+let _hadItemsAtLoad=false;   // snapshot at boot: true = returning user (never show the beginner shelf)
+function popDismissed(){try{return localStorage.getItem('pop_dismiss_'+LSKEY)==='1';}catch(e){return false;}}
+function beginnerShelfActive(isRead){return !isRead && !_hadItemsAtLoad && !popDismissed();}
+function dismissPopShelf(){try{localStorage.setItem('pop_dismiss_'+LSKEY,'1');}catch(e){}render();document.getElementById('pageEl').scrollTo({top:0,behavior:_scrollBehavior()});}
+function beginnerShelfHTML(){
+  return `<div class="beg-shelf">
+    <div class="dt-label" style="margin:2px 0 2px">${icon('trophy')} Popular right now — tap to add</div>
+    <p class="ai-desc" style="margin-bottom:10px">Tap a few you like — they stack up in your list. Dismiss when you’re set; the ${icon('compass')} compass up top always has more.</p>
+    <div class="pop-shelf" id="popularShelf"><div class="pop-loading">${icon('loader')} Loading…</div></div>
+    <button class="beg-dismiss" onclick="dismissPopShelf()">${icon('check')} Done — hide this</button>
+  </div>`;
+}
 function addPopular(aniId,title,img,eps,btn){
   const t=String(title||'').trim(); if(!t)return;
   if(anime.some(a=>a.aniId===aniId||normTitle(a.title)===normTitle(t))){toast(`“${t}” is already on your list`);return;}
   anime.unshift({id:uid(),title:t,status:'plan',kind:'watch',ep:0,epTotal:eps||0,rating:0,fav:false,eps:'',time:'',genre:'',order:[],notes:'',img:img||'',aniId,upd:Date.now()});
   dedupeAnime();save();setTimeout(fetchCovers,300);
-  // In the beginner shelf (btn passed): stay put, mark the card, reveal/refresh Done.
-  if(btn&&btn.classList){
-    btn.classList.add('added'); btn.disabled=true;
-    _popPicked++;
-    const done=document.getElementById('popDone'),lbl=document.getElementById('popDoneLbl');
-    if(done)done.style.display='';
-    if(lbl)lbl.textContent=`Done — view my list (${_popPicked} added)`;
-    toast(`Added “${t}”`);
-    return;
-  }
+  // Mark the tapped card in place and keep the shelf up — no full render, so the grid
+  // doesn't jump. If a background render does fire, loadPopularShelf re-marks added
+  // titles from list membership, so the checks survive either way.
+  if(btn&&btn.classList){btn.classList.add('added');btn.disabled=true;toast(`Added “${t}”`);return;}
   render();toast(`Added “${t}” to Plan`);
 }
-// Leave the beginner picker and drop into the now-populated home.
-function finishPopularPick(){_popPicked=0;render();document.getElementById('pageEl').scrollTo({top:0,behavior:_scrollBehavior()});}
 function parseMessyList(raw){
   const out=[],seen=new Set();let ctx='plan';
   for(const rawLine of raw.split(/\r?\n/)){
@@ -7964,7 +7975,7 @@ try{if(_SR&&window.isSecureContext){const m=document.getElementById('chatMic');i
 
 // ─── INIT ───────────────────────────────────────────────────────────────────
 try{hydrateIcons();}catch{}
-load();try{purgeAdult();}catch{}try{if(!appLocked&&dedupeAnime())writeLocal();}catch{}loadTheme();try{seedHiddenDefaults();}catch{}try{_restoreUpd();}catch{}render();try{nativeScheduleNotifs();}catch{}
+load();try{_hadItemsAtLoad=anime.length>0;}catch{}try{purgeAdult();}catch{}try{if(!appLocked&&dedupeAnime())writeLocal();}catch{}loadTheme();try{seedHiddenDefaults();}catch{}try{_restoreUpd();}catch{}render();try{nativeScheduleNotifs();}catch{}
 // After the list is up — and after the tutorial has had its chance to claim a
 // new install — tell returning users what changed in the update they just got.
 try{setTimeout(maybeShowWhatsNew,900);}catch{}

@@ -5444,7 +5444,7 @@ function renderParty(){
     hostCtl=`<button class="pt-play" onclick="reopenShareView()">${icon('play')} Watch the shared screen</button>
       <p class="ai-desc" style="text-align:center">The host is sharing their screen — you're watching in sync.</p>`;
   }else{
-    hostCtl=`<p class="ai-desc" style="text-align:center">${r.title?'Waiting for the host to start…':'Waiting for the host to pick something…'}</p>`;
+    hostCtl=`<p class="ai-desc" style="text-align:center">${r.title?'Waiting for the host to start…':'Waiting for the host to pick something…'}<br><span style="opacity:.7;font-size:12px">You’re watching along — the host picks and controls playback. To host, start a party from a computer or the WatchList app.</span></p>`;
   }
   if(!partyIsHost){   // viewers can't pick, but they can suggest — tap to add to the queue
     const mine=anime.filter(a=>kindOf(a)==='watch'&&a.aniId)

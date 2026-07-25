@@ -736,6 +736,9 @@ async function handleMessageSet(body, env) {
     body: String(body.body || "").slice(0, 280),
     ctaLabel: String(body.ctaLabel || "").slice(0, 40),
     ctaUrl: String(body.ctaUrl || "").slice(0, 400),
+    // Which platform the card shows on: 'web' (GitHub Pages), 'ios' (native app), or
+    // 'both'. Clients gate on this; an absent value is treated as 'both' for old cards.
+    target: (body.target === "web" || body.target === "ios") ? body.target : "both",
     at: Date.now(),
   };
   if (!msg.title && !msg.body) return json({ ok: false, error: "title or body required" }, 400);

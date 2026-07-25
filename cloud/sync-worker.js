@@ -39,24 +39,20 @@ export default {
     }
 
     // ── TURN relay credentials — reliable cross-network media (screen-share + voice).
-    // The client fetches short-lived ICE credentials from Cloudflare's TURN service;
-    // without a real relay ~a third of connections (cellular / strict NAT) fail with
-    // "couldn't reach the host". Degrades to STUN-only if the TURN key isn't configured
-    // yet, so nothing breaks before the secrets are added.
+    // The client fetches live ICE credentials from Metered.ca's free TURN service (no
+    // credit card, 50GB/mo). Without a real relay ~a third of connections (cellular /
+    // strict NAT) fail with "couldn't reach the host". Degrades to STUN-only if the
+    // Metered secrets aren't configured yet, so nothing breaks before they're added.
     if (url.pathname === '/turn') {
       const tcors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' };
       if (request.method === 'OPTIONS') return new Response(null, { headers: tcors });
       const stun = { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] };
-      if (!env.TURN_KEY_ID || !env.TURN_API_TOKEN) return json({ iceServers: [stun] }, 200, tcors);
+      if (!env.METERED_APP || !env.METERED_API_KEY) return json({ iceServers: [stun] }, 200, tcors);
       try {
-        const r = await fetch(`https://rtc.live.cloudflare.com/v1/turn/keys/${env.TURN_KEY_ID}/credentials/generate`, {
-          method: 'POST',
-          headers: { 'Authorization': 'Bearer ' + env.TURN_API_TOKEN, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ttl: 86400 }),
-        });
-        const d = await r.json();
-        const ice = d && d.iceServers ? (Array.isArray(d.iceServers) ? d.iceServers : [d.iceServers]) : [];
-        return json({ iceServers: [stun, ...ice] }, 200, tcors);
+        const r = await fetch(`https://${env.METERED_APP}.metered.live/api/v1/turn/credentials?apiKey=${env.METERED_API_KEY}`);
+        const arr = await r.json();
+        const ice = Array.isArray(arr) ? arr : [];
+        return json({ iceServers: ice.length ? [stun, ...ice] : [stun] }, 200, tcors);
       } catch (e) { return json({ iceServers: [stun] }, 200, tcors); }
     }
 

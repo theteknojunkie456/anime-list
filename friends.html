@@ -888,6 +888,8 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 .sh-stage{position:absolute;inset:0;background:#000;display:flex;align-items:center;justify-content:center;}
 .sh-video{width:100%;height:100%;object-fit:contain;background:#000;}
 .sh-video.fill{object-fit:cover;}   /* tap to go edge-to-edge (crops a little) */
+.sh-retry{margin-top:15px;padding:11px 22px;border:none;border-radius:12px;background:var(--a);color:#fff;font-family:var(--fd);font-weight:800;font-size:14px;cursor:pointer;transition:transform .1s;}
+.sh-retry:active{transform:scale(.96);}
 .shareview .pv-top{position:absolute;top:0;left:0;right:0;z-index:3;background:linear-gradient(to bottom,rgba(0,0,0,.6),rgba(0,0,0,0));padding-bottom:26px;}
 .sh-fit-hint{position:absolute;bottom:calc(var(--safe-b) + 14px);left:50%;transform:translateX(-50%);z-index:3;font-size:11.5px;color:rgba(255,255,255,.55);background:rgba(0,0,0,.4);padding:5px 12px;border-radius:99px;pointer-events:none;transition:opacity .4s;}
 .sh-wait{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;color:rgba(255,255,255,.7);font-size:14px;font-weight:600;}
@@ -1725,7 +1727,7 @@ body.recsel .pcard{position:relative;}
   </div>
   <div class="sh-stage">
     <video id="shareVideo" class="sh-video" autoplay playsinline onclick="this.classList.toggle('fill')"></video>
-    <div class="sh-wait" id="shareWait"><div class="sh-spin"></div><div id="shStatus">Connecting to the host…</div></div>
+    <div class="sh-wait" id="shareWait"><div class="sh-spin"></div><div id="shStatus">Connecting to the host…</div><button class="sh-retry" id="shRetry" onclick="partyRetryShare()" style="display:none">Retry connection</button></div>
     <div class="sh-fit-hint" id="shFitHint">Tap the video to fill the screen</div>
   </div>
 </div>
@@ -4954,7 +4956,20 @@ function applyRoom(room){
   try{processReacts(room.reacts);}catch(e){}   // float everyone's emoji (from a full-state sync)
   try{renderPvHostBar();}catch(e){}      // keep the host's in-player remote current
 }
-function handleSignalMsg(m){try{if(m.kind==='offer')pcHandleOffer(m.from,m.data);else if(m.kind==='answer')pcHandleAnswer(m.from,m.data);}catch(e){}}
+function handleSignalMsg(m){try{
+  if(m.kind==='offer')pcHandleOffer(m.from,m.data);
+  else if(m.kind==='answer')pcHandleAnswer(m.from,m.data);
+  else if(m.kind==='reoffer'){pcClose(m.from);pcConnectToViewer(m.from);}   // a viewer asked us to re-establish (Retry) — only the sharer has localStream, so others ignore
+}catch(e){}}
+// Viewer-side "Retry connection": drop the dead peer and ask the sharer to re-offer.
+function partyRetryShare(){
+  const to=(partyRoom&&partyRoom.sharing)||(partyRoom&&partyRoom.host);
+  if(!to){setShareStatus('No one is sharing right now.',true);return;}
+  const rb=document.getElementById('shRetry');if(rb)rb.style.display='none';
+  setShareStatus('Retrying…');
+  try{Object.keys(pcs).forEach(pcClose);}catch(e){}
+  wsSend({t:'signal',to,kind:'reoffer'});
+}
 function partyCue(room){
   const ov=document.getElementById('partyCount'),num=document.getElementById('pcNum'),lbl=document.getElementById('pcLbl');
   if(!ov)return;
@@ -5160,7 +5175,7 @@ async function pcConnectToViewer(vid){                 // HOST → each viewer
 }
 // Live status under the spinner — turns a mystery black screen into an explained one,
 // and logs each WebRTC step to the console so a stuck connection is diagnosable.
-function setShareStatus(txt,err){try{const el=document.getElementById('shStatus');if(el){el.textContent=txt;el.className=err?'sh-err':'';}console.log('[party] '+txt);}catch(e){}}
+function setShareStatus(txt,err){try{const el=document.getElementById('shStatus');if(el){el.textContent=txt;el.className=err?'sh-err':'';}const rb=document.getElementById('shRetry');if(rb)rb.style.display=err?'':'none';console.log('[party] '+txt);}catch(e){}}
 // Open the share viewer in a "connecting" state (spinner + status), before any frame.
 function showConnectingShare(){
   const sv=document.getElementById('shareView');if(!sv)return;

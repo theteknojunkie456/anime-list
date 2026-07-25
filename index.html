@@ -5822,13 +5822,15 @@ function effectiveSource(a){return (a&&a.srcUrl&&String(a.srcUrl).trim())||strea
 // presets, then any custom services you added. Web build stays free/legal only.
 function watchServices(){
   var out=[];
+  // A hidden source must not appear ANYWHERE — including this per-title picker, which
+  // previously ignored the hidden list and leaked them back in.
   if(typeof IS_NATIVE!=='undefined'&&IS_NATIVE){
     var mine=myServices();
-    PAID_SERVICES.forEach(function(x){if(mine.indexOf(x.id)>=0)out.push({name:x.name,url:x.url});});
-    PAID_SERVICES.forEach(function(x){if(mine.indexOf(x.id)<0)out.push({name:x.name,url:x.url});});
+    PAID_SERVICES.forEach(function(x){if(mine.indexOf(x.id)>=0&&!isHiddenSrc(x.name))out.push({name:x.name,url:x.url});});
+    PAID_SERVICES.forEach(function(x){if(mine.indexOf(x.id)<0&&!isHiddenSrc(x.name))out.push({name:x.name,url:x.url});});
   }
-  WATCH_PRESETS.forEach(function(x){out.push({name:x.name,url:x.url});});
-  customServices().forEach(function(x){out.push({name:x.name,url:x.url});});
+  WATCH_PRESETS.forEach(function(x){if(!isHiddenSrc(x.name))out.push({name:x.name,url:x.url});});
+  customServices().forEach(function(x){if(!isHiddenSrc(x.name))out.push({name:x.name,url:x.url});});
   return out;
 }
 // Friendly per-title picker — tap a service and Watch opens there for THIS show only.

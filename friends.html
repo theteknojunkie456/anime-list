@@ -5356,6 +5356,7 @@ function rtcTick(room){
 let voiceOn=false,voiceStream=null,vpcs={},voiceMuted=false;
 async function toggleVoice(){
   if(voiceOn){leaveVoice();return;}
+  try{if(_jitsiApi)leaveJitsi();}catch(e){}   // don't stack the two voice systems (echo)
   if(!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia)){toast('Voice chat isn’t supported here');return;}
   let s;try{s=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true},video:false});}
   catch{toast('Mic access denied — allow the mic to talk');return;}
@@ -5438,6 +5439,7 @@ function loadJitsiScript(cb){
 }
 function openJitsi(){
   if(!partyActive()){toast('Start or join a party first');return;}
+  try{if(voiceOn)leaveVoice();}catch(e){}   // never run both voice systems at once → that's the echo
   try{if(!document.getElementById('partySheet').classList.contains('on'))openSheet('partySheet');}catch(e){}
   const mount=document.getElementById('partyCallMount');if(!mount)return;
   mount.style.display='';

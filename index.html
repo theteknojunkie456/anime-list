@@ -5416,12 +5416,15 @@ function vrtcTick(room){
 // 'camera' to TOOLBAR_BUTTONS when it's time). Everyone in a WatchList party
 // derives the same Jitsi room from the party code, so they land together.
 let _jitsiApi=null,_jitsiLoading=false;
-function jitsiRoom(){return 'WatchListParty-'+(partyCode||'lobby')+'-hz7k9x';}
+// Community Jitsi that allows anonymous rooms — meet.jit.si now forces the first
+// person to log in with Google to start a room, which kills the "just works" flow.
+const JITSI_HOST='meet.ffmuc.net';
+function jitsiRoom(){return 'WatchListParty'+(partyCode||'lobby')+'hz7k9x';}
 function loadJitsiScript(cb){
   if(window.JitsiMeetExternalAPI){cb();return;}
   if(_jitsiLoading){const t=setInterval(()=>{if(window.JitsiMeetExternalAPI){clearInterval(t);cb();}},120);setTimeout(()=>clearInterval(t),9000);return;}
   _jitsiLoading=true;
-  const s=document.createElement('script');s.src='https://meet.jit.si/external_api.js';
+  const s=document.createElement('script');s.src='https://'+JITSI_HOST+'/external_api.js';
   s.onload=()=>{if(window.JitsiMeetExternalAPI)cb();else toast('Couldn’t load the call');};
   s.onerror=()=>{_jitsiLoading=false;toast('Couldn’t load the call — check your connection');};
   document.head.appendChild(s);
@@ -5435,7 +5438,7 @@ function openJitsi(){
     if(_jitsiApi)return;
     const frame=document.getElementById('jitsiFrame');if(frame)frame.innerHTML='';
     try{
-      _jitsiApi=new JitsiMeetExternalAPI('meet.jit.si',{
+      _jitsiApi=new JitsiMeetExternalAPI(JITSI_HOST,{
         roomName:jitsiRoom(),parentNode:frame,width:'100%',height:'100%',
         userInfo:{displayName:partyName()||'Guest'},
         configOverwrite:{startWithVideoMuted:true,prejoinPageEnabled:false,disableDeepLinking:true,disableInviteFunctions:true},

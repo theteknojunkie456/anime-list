@@ -594,6 +594,26 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
    textbook AI callout. A plain panel with a hairline says the same thing without
    the tell. */
 .dt-note{font-size:13.5px;line-height:1.55;color:var(--t1);background:var(--bg3);border:1px solid var(--b1);border-radius:12px;padding:12px 14px;}
+/* Rich detail (synopsis / meta / trailer / characters / more-like-this) */
+.dt-rich-load{color:var(--t3);font-size:13px;display:flex;align-items:center;gap:8px;padding:14px 0;}
+.dt-rich-meta{display:flex;flex-wrap:wrap;gap:7px;margin-top:14px;}
+.dt-rich-meta span{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:700;color:var(--t2);background:var(--bg3);border:1px solid var(--b1);border-radius:8px;padding:4px 9px;}
+.dt-rich-meta .ico{width:12px;height:12px;color:var(--a2);}
+.dt-synopsis{font-size:13.5px;line-height:1.6;color:var(--t2);margin-top:6px;white-space:pre-line;display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical;overflow:hidden;cursor:pointer;}
+.dt-synopsis.open{-webkit-line-clamp:unset;}
+.dt-trailer{display:inline-flex;align-items:center;gap:8px;margin-top:14px;height:42px;padding:0 18px;border-radius:12px;background:var(--ag);border:1px solid var(--a);color:var(--a2);font-family:var(--fd);font-weight:800;font-size:13.5px;cursor:pointer;}
+.dt-trailer .ico{width:16px;height:16px;}
+.dt-chars,.dt-recs{display:flex;gap:12px;overflow-x:auto;padding:8px 2px;margin:0 -2px;scrollbar-width:none;}
+.dt-chars::-webkit-scrollbar,.dt-recs::-webkit-scrollbar{display:none;}
+.dt-char{flex-shrink:0;width:74px;text-align:center;}
+.dt-char-img{width:74px;height:74px;border-radius:50%;background:var(--bg4) center/cover no-repeat;border:1px solid var(--b2);}
+.dt-char-n{font-size:11px;font-weight:700;color:var(--t1);margin-top:6px;line-height:1.2;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.dt-char-r{font-size:9.5px;color:var(--t3);text-transform:capitalize;margin-top:1px;}
+.dt-rec{flex-shrink:0;width:104px;background:none;border:none;padding:0;text-align:left;cursor:pointer;}
+.dt-rec-img{width:104px;height:148px;border-radius:12px;background:var(--bg4) center/cover no-repeat;border:1px solid var(--b2);box-shadow:0 6px 16px rgba(0,0,0,.3);position:relative;transition:transform .15s;}
+.dt-rec:active .dt-rec-img{transform:scale(.95);}
+.dt-rec-img::after{content:'＋';position:absolute;right:5px;bottom:5px;width:24px;height:24px;border-radius:50%;background:linear-gradient(135deg,var(--a),var(--a2));color:#fff;font-size:16px;font-weight:700;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 8px rgba(0,0,0,.35);}
+.dt-rec-t{font-size:11.5px;color:var(--t2);line-height:1.3;margin-top:6px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
 .dt-seasons{display:flex;flex-direction:column;gap:8px;}
 .dt-season{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:var(--bg3);border:1px solid var(--b1);border-radius:13px;padding:9px 12px;transition:border-color .15s,background .15s;}
 .dt-season.cur{border-color:var(--a);background:var(--ag);}
@@ -3869,6 +3889,7 @@ function renderDetail(){
       </div>
     </div>
     ${friendRecBadge(a)}
+    <div id="dtRich" class="dt-rich"></div>
     <div class="dt-label">Status</div>
     <div class="dt-status">${statusBtns}</div>
     ${progHTML}
@@ -3914,6 +3935,49 @@ function renderDetail(){
     if(curFranchiseFor===a.id&&curFranchise.length)paintFranchise();
     else loadFranchise(a.id,a.aniId);
   }
+  if(kindOf(a)==='watch'&&a.aniId)loadRichDetail(a.aniId,a.id);
+}
+// ─── RICH DETAIL — synopsis, meta, trailer, characters, "more like this" ─────
+// Loads AniList's full metadata on open (cached per id) and renders it into #dtRich,
+// so clicking an anime shows everything about it, in the WatchList theme.
+let _richCache={};
+function _stripHtml(s){return String(s||'').replace(/<br\s*\/?>(\s*)/gi,'\n').replace(/<[^>]+>/g,'').replace(/\n{3,}/g,'\n\n').trim();}
+async function loadRichDetail(aniId,forId){
+  const mount=document.getElementById('dtRich');if(!mount)return;
+  const paint=d=>{if(detailId!==forId)return;const el=document.getElementById('dtRich');if(el)el.innerHTML=richDetailHTML(d);};
+  if(_richCache[aniId]){paint(_richCache[aniId]);return;}
+  mount.innerHTML=`<div class="dt-rich-load">${icon('loader')} Loading details…</div>`;
+  try{
+    const q=`query($id:Int){Media(id:$id,type:ANIME){description(asHtml:false) averageScore episodes duration format status season seasonYear source genres studios(isMain:true){nodes{name}} trailer{id site} characters(sort:ROLE,perPage:12){edges{role node{name{full} image{medium}}}} recommendations(sort:RATING_DESC,perPage:12){nodes{mediaRecommendation{id title{romaji english} coverImage{large} episodes}}}}}`;
+    const r=await fetch('https://graphql.anilist.co',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({query:q,variables:{id:aniId}})});
+    if(!r.ok)throw 0;
+    const d=((await r.json()).data||{}).Media;if(!d)throw 0;
+    _richCache[aniId]=d;paint(d);
+  }catch(e){const el=document.getElementById('dtRich');if(el&&detailId===forId)el.innerHTML='';}
+}
+function richDetailHTML(d){
+  const cap=s=>String(s||'').replace(/_/g,' ').toLowerCase().replace(/\b\w/g,c=>c.toUpperCase());
+  const meta=[];
+  if(d.averageScore)meta.push(`${icon('star')}${d.averageScore}%`);
+  if(d.format)meta.push(cap(d.format));
+  if(d.status)meta.push(cap(d.status));
+  if(d.episodes)meta.push(`${d.episodes} eps`);
+  if(d.duration)meta.push(`${d.duration}m`);
+  if(d.seasonYear)meta.push(`${d.season?cap(d.season)+' ':''}${d.seasonYear}`);
+  const studio=(((d.studios||{}).nodes||[])[0]||{}).name||'';if(studio)meta.push(studio);
+  const metaHTML=meta.length?`<div class="dt-rich-meta">${meta.map(m=>`<span>${m.indexOf('<')>=0?m:schEsc(m)}</span>`).join('')}</div>`:'';
+  const desc=_stripHtml(d.description);
+  const synHTML=desc?`<div class="dt-label" style="margin-top:16px">Synopsis</div><p class="dt-synopsis" onclick="this.classList.toggle('open')">${schEsc(desc)}</p>`:'';
+  let trailerHTML='';
+  if(d.trailer&&d.trailer.site==='youtube'&&d.trailer.id){
+    const url='https://www.youtube.com/watch?v='+encodeURIComponent(String(d.trailer.id));
+    trailerHTML=`<button class="dt-trailer" onclick="openExternal('${escH(url)}')">${icon('play')} Watch trailer</button>`;
+  }
+  const chars=((d.characters||{}).edges)||[];
+  const charsHTML=chars.length?`<div class="dt-label" style="margin-top:18px">Characters</div><div class="dt-chars">${chars.map(e=>{const n=e.node||{};const img=safeImg(((n.image||{}).medium)||'');const nm=((n.name||{}).full)||'';return `<div class="dt-char"><div class="dt-char-img"${img?` style="background-image:url('${img}')"`:''}></div><div class="dt-char-n">${schEsc(nm)}</div><div class="dt-char-r">${schEsc((e.role||'').toLowerCase())}</div></div>`;}).join('')}</div>`:'';
+  const recs=(((d.recommendations||{}).nodes)||[]).map(n=>n&&n.mediaRecommendation).filter(Boolean);
+  const recsHTML=recs.length?`<div class="dt-label" style="margin-top:18px">More like this</div><div class="dt-recs">${recs.map(m=>{const t=(m.title.english||m.title.romaji||'').replace(/'/g,'&#39;');const img=safeImg(((m.coverImage||{}).large)||'');return `<button class="dt-rec" onclick="addPopular(${m.id},'${t.replace(/"/g,'&quot;')}','${img}',${m.episodes||0})"><div class="dt-rec-img"${img?` style="background-image:url('${img}')"`:''}></div><div class="dt-rec-t">${schEsc(m.title.english||m.title.romaji||'')}</div></button>`;}).join('')}</div>`:'';
+  return metaHTML+synHTML+trailerHTML+charsHTML+recsHTML;
 }
 // ─── FRANCHISE (every season of a title, on-list or not) ────────────────────
 // Seasons come from TWO independent sources so a gap in one can't hide a season:

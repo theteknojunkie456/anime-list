@@ -24,10 +24,13 @@ class SampleHandler: RPBroadcastSampleHandler, PartySignalingDelegate {
         signaling.sendShare(true)
     }
 
+    private var loggedAudioApp = false
     override func processSampleBuffer(_ sampleBuffer: CMSampleBuffer, with sampleBufferType: RPSampleBufferType) {
         switch sampleBufferType {
         case .video:    broadcaster.push(sampleBuffer: sampleBuffer)
-        case .audioApp: broadcaster.pushAudio(sampleBuffer: sampleBuffer)   // the media the host is playing
+        case .audioApp:
+            if !loggedAudioApp { loggedAudioApp = true; NSLog("WatchList/audio: first .audioApp buffer from ReplayKit — the app IS capturing audio") }
+            broadcaster.pushAudio(sampleBuffer: sampleBuffer)   // the media the host is playing
         case .audioMic: break                                              // ignore the room mic — app audio only
         @unknown default: break
         }

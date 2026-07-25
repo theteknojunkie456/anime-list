@@ -31,6 +31,7 @@ final class BroadcastAudioDevice: NSObject, RTCAudioDevice {
     private var srcRate: Double = 0
     private var srcChannels: UInt32 = 0
     private var runningSampleTime: Float64 = 0
+    private var _delivered = 0   // diagnostic: how many audio buffers we've fed into WebRTC
 
     // Flags the native ADM reads/drives between initialize and terminate.
     private var _isInitialized = false
@@ -101,6 +102,12 @@ final class BroadcastAudioDevice: NSObject, RTCAudioDevice {
         runningSampleTime += Float64(dstBuffer.frameLength)
         _ = delegate.deliverRecordedData(&flags, &ts, 0, dstBuffer.frameLength,
                                          dstBuffer.audioBufferList, nil, nil)
+        // Diagnostic: prove app-audio is actually reaching WebRTC. First buffer + every
+        // ~500 (~a few seconds) so a silent party is debuggable from Console.app.
+        _delivered += 1
+        if _delivered == 1 || _delivered % 500 == 0 {
+            NSLog("WatchList/audio: delivered %d app-audio buffers to WebRTC (src %.0fHz/%dch)", _delivered, srcRate, srcChannels)
+        }
     }
 
     // MARK: RTCAudioDevice — reported parameters
@@ -146,6 +153,6 @@ final class BroadcastAudioDevice: NSObject, RTCAudioDevice {
     var isRecordingInitialized: Bool { _isRecordingInitialized }
     func initializeRecording() -> Bool { _isRecordingInitialized = true; return true }
     var isRecording: Bool { _isRecording }
-    func startRecording() -> Bool { _isRecording = true; return true }
+    func startRecording() -> Bool { _isRecording = true; _delivered = 0; NSLog("WatchList/audio: WebRTC started recording — app-audio forwarding armed"); return true }
     func stopRecording() -> Bool { _isRecording = false; return true }
 }

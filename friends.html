@@ -3917,7 +3917,7 @@ function renderDetail(){
     <div class="dt-label">Status</div>
     <div class="dt-status">${statusBtns}</div>
         ${(()=>{const id=a.aniId||a.id;return kindOf(a)==="watch"?`<button class="dt-play" onclick="playOrFallback('${id}')">${icon('play')} Play Episode 1</button>`:"";})()}
-    ${kindOf(a)==='watch'?`<button class="dt-play" onclick="openPlayer('${a.aniId || a.id}')">${icon('play')} Play Episode 1</button>`:''}
+    ${kindOf(a)==='watch'?`<button class="dt-play" onclick="tryPlayOrFallback('${a.aniId || a.id}')">${icon('play')} Play Episode 1</button>`:''}
     ${progHTML}
     ${stars}
     ${seasonsHTML}
@@ -3992,7 +3992,7 @@ function richDetailHTML(d){
   if(d.seasonYear)meta.push(`${d.season?cap(d.season)+' ':''}${d.seasonYear}`);
   const studio=(((d.studios||{}).nodes||[])[0]||{}).name||'';if(studio)meta.push(studio);
   const metaHTML=meta.length?`<div class="dt-rich-meta">${meta.map(m=>`<span>${m.indexOf('<')>=0?m:schEsc(m)}</span>`).join('')}</div>`:'';
-  const links=((d.externalLinks)||[]).filter(l=>l&&l.type==='STREAMING'&&l.url);
+  const _seenSite=new Set();const links=((d.externalLinks)||[]).filter(l=>{if(!(l&&l.type==='STREAMING'&&l.url))return false;const k=(l.site||'').trim().toLowerCase();if(!k||_seenSite.has(k))return false;_seenSite.add(k);return true;});
   const linksHTML=links.length?`<div class="dt-label" style="margin-top:16px">${icon('play')} Watch on</div><div class="dt-watchlinks">${links.map(l=>`<button class="dt-watchlink" onclick="openExternal('${escH(l.url).replace(/'/g,"\\'")}')">${schEsc(l.site)} ${icon('external')}</button>`).join('')}</div>`:'';
   const desc=_stripHtml(d.description);
   const synHTML=desc?`<div class="dt-label" style="margin-top:16px">Synopsis</div><p class="dt-synopsis" onclick="this.classList.toggle('open')">${schEsc(desc)}</p>`:'';
@@ -8591,6 +8591,24 @@ function playOrFallback(aniListId) {
       }
     })
     .catch(() => {
+      window.open('https://anilist.co/anime/' + aniListId + '/watch', '_blank');
+    });
+}
+
+function tryPlayOrFallback(aniListId) {
+  // Try the Anikoto API first
+  fetch('https://api.anikoto.net/api/episodes/' + aniListId)
+    .then(r => r.json())
+    .then(data => {
+      if (Array.isArray(data) && data.length > 0) {
+        openPlayer(aniListId, 0);
+      } else {
+        // No episodes found, open AniList watch page
+        window.open('https://anilist.co/anime/' + aniListId + '/watch', '_blank');
+      }
+    })
+    .catch(() => {
+      // API down, open AniList watch page
       window.open('https://anilist.co/anime/' + aniListId + '/watch', '_blank');
     });
 }

@@ -1,20 +1,17 @@
 # Aider config for the WatchList repo (theteknojunkie456/anime-list).
 # The whole app is ONE file (index.html); a single JS syntax error blanks it,
-# so Aider lints after every edit and won't commit broken code.
+# so lint after every edit.
+#
+# NOTE: auto-lint and auto-commits are already ON by default in Aider — don't
+# set them here (writing `auto-commits: true` trips a config-parser bug in 0.82.3).
+# Aider commits locally after a clean, linted edit; it does NOT push. You push
+# manually after loading the page and confirming it renders.
 
 # After editing an .html file, run the single-file syntax checker.
 # A non-zero exit feeds the error back to the model so it fixes it before commit.
 lint-cmd:
   - "html: node scripts/check-syntax.mjs"
-auto-lint: true
-
-# Aider commits locally after a clean, linted edit. It does NOT push — you push
-# manually after loading the page and confirming it renders.
-auto-commit: true
 
 # Load the house rules into every session so edits stay on-brand and on-spec.
 read:
   - CONVENTIONS.md
-
-# Model: set your key in the environment, e.g. export ANTHROPIC_API_KEY=...
-# then Aider defaults to a Claude model. Override per-run with `aider --model ...`.

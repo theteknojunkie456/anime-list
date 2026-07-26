@@ -4048,7 +4048,7 @@ function richDetailHTML(d){
   if(d.seasonYear)meta.push(`${d.season?cap(d.season)+' ':''}${d.seasonYear}`);
   const studio=(((d.studios||{}).nodes||[])[0]||{}).name||'';if(studio)meta.push(studio);
   const metaHTML=meta.length?`<div class="dt-rich-meta">${meta.map(m=>`<span>${m.indexOf('<')>=0?m:schEsc(m)}</span>`).join('')}</div>`:'';
-  const _seenSite=new Set();const links=((d.externalLinks)||[]).filter(l=>{if(!(l&&l.type==='STREAMING'&&l.url))return false;const k=(l.site||'').trim().toLowerCase();if(!k||_seenSite.has(k))return false;_seenSite.add(k);return true;});
+  const _seenSite=new Set();const links=((d.externalLinks)||[]).filter(l=>{if(!(l&&l.type==='STREAMING'&&l.url))return false;const k=(l.site||'').trim().toLowerCase();if(!k||k==='crunchyroll'||_seenSite.has(k))return false;_seenSite.add(k);return true;});
   const linksHTML=links.length?`<div class="dt-label" style="margin-top:16px">${icon('play')} Watch on</div><div class="dt-watchlinks">${links.map(l=>`<button class="dt-watchlink" onclick="openExternal('${escH(l.url).replace(/'/g,"\\'")}')">${schEsc(l.site)} ${icon('external')}</button>`).join('')}</div>`:'';
   // Official per-episode links AniList carries (Crunchyroll/etc. publish them) — legal, opens the source.
   const eps=((d.streamingEpisodes)||[]).filter(e=>e&&e.url&&e.title);

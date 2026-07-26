@@ -17,6 +17,7 @@
 <title>WatchList</title>
 <!-- friends.html is auto-generated from index.html by the pre-commit hook — do not edit it by hand -->
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Manrope:wght@400..800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 <style>
 :root{
   --bg:#0a0a0c;--bg2:#111114;--bg3:#18181c;--bg4:#202025;--bg5:#28282e;
@@ -8565,14 +8566,14 @@ async function fetchEpisodesAndPlay(animelistId, episodeIndex) {
     const animeObj = anime.find(a => a.id === animelistId || a.aniId === animelistId);
     if (!animeObj) {
       toast("Anime not found in list.");
-      closePlayer();
+      closeVideoPlayer();
       return;
     }
     
     const malId = animeObj.malId;
     if (!malId) {
       toast("MAL ID not found for this anime.");
-      closePlayer();
+      closeVideoPlayer();
       return;
     }
 
@@ -8588,12 +8589,12 @@ async function fetchEpisodesAndPlay(animelistId, episodeIndex) {
       playEpisode({video: source.url});
     } else {
       toast(`No stream sources found for Ep ${episodeIndex + 1}`);
-      closePlayer();
+      closeVideoPlayer();
     }
   } catch (error) {
     console.error("Error fetching episodes:", error);
     toast("Error loading episode stream: " + error.message);
-    closePlayer();
+    closeVideoPlayer();
   }
 }
 
@@ -8601,14 +8602,28 @@ function playEpisode(episode) {
   if (!episode) return;
   const videoUrl = episode.video || episode.url;
   if (videoUrl) {
-    videoElement.src = videoUrl;
-    videoElement.load();
-    videoElement.play().catch(e => console.log("Autoplay blocked:", e));
+    if (videoUrl.includes('.m3u8') && typeof Hls !== 'undefined' && Hls.isSupported()) {
+      if (window.hlsPlayer) { window.hlsPlayer.destroy(); }
+      window.hlsPlayer = new Hls();
+      window.hlsPlayer.loadSource(videoUrl);
+      window.hlsPlayer.attachMedia(videoElement);
+      window.hlsPlayer.on(Hls.Events.MANIFEST_PARSED, () => {
+        videoElement.play().catch(e => console.log("Autoplay blocked:", e));
+      });
+    } else {
+      videoElement.src = videoUrl;
+      videoElement.load();
+      videoElement.play().catch(e => console.log("Autoplay blocked:", e));
+    }
     btnPlayPause.textContent = "⏸";
   }
 }
 
-function closePlayer() {
+function closeVideoPlayer() {
+  if (window.hlsPlayer) {
+    window.hlsPlayer.destroy();
+    window.hlsPlayer = null;
+  }
   videoElement.pause();
   videoElement.src = "";
   videoPlayerOverlay.classList.remove("active");
@@ -8666,8 +8681,13 @@ function formatTime(seconds) {
   return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
 }
 
+const btnClosePlayer = document.getElementById("btn-close-player");
+if (btnClosePlayer) {
+  btnClosePlayer.addEventListener("click", closeVideoPlayer);
+}
+
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape" && videoPlayerOverlay.classList.contains("active")) { closePlayer(); }
+  if (e.key === "Escape" && videoPlayerOverlay.classList.contains("active")) { closeVideoPlayer(); }
 });
 
 
@@ -8696,6 +8716,7 @@ async function startAnimePlayback(aniListId) {
         <button id="btn-next-ep">⏭</button>
       </div>
       <div id="time-display">00:00 / 00:00</div>
+      <button id="btn-close-player">✕</button>
     </div>
   </div>
 </div>

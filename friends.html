@@ -649,6 +649,9 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 /* Watch button — the primary action on an anime, so it gets the accent and full width */
 .dt-watch{width:100%;margin-top:18px;padding:15px;border-radius:15px;border:none;background:var(--a);color:var(--aFg);font-family:var(--fd);font-size:15px;font-weight:800;letter-spacing:-.2px;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 8px 22px -6px var(--glow);transition:transform .12s;}
 .dt-watch:active{transform:scale(.97);}
+.dt-play{width:100%;margin-top:14px;padding:15px;border-radius:15px;border:none;background:var(--a);color:var(--aFg);font-family:var(--fd);font-size:15px;font-weight:800;letter-spacing:-.2px;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 8px 22px -6px var(--glow);cursor:pointer;transition:transform .12s;}
+.dt-play:active{transform:scale(.97);}
+.dt-play .ico{width:19px;height:19px;fill:currentColor;}
 .dt-pin-toggle{width:100%;margin-top:9px;padding:8px;background:none;border:none;color:var(--t2);font-family:inherit;font-size:12.5px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;transition:color .15s;}
 .dt-pin-toggle:active{color:var(--t1);}
 .dt-pin-toggle svg{width:14px;height:14px;}
@@ -1383,21 +1386,6 @@ video { width: 100%; height: 100%; object-fit: contain; }
 #time-display { font-family: var(--fb, sans-serif); font-size: 12px; }
 
 
-
-.dt-play {
-  background: var(--a, #6C63FF);
-  color: white;
-  border: none;
-  padding: 8px 16px;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  margin-top: 8px;
-}
-.dt-play:hover {
-  opacity: 0.9;
-}
 </style>
 </head>
 <body>
@@ -3922,15 +3910,13 @@ function renderDetail(){
         ${(()=>{if(kindOf(a)!=='watch')return '';const tw=totalWatchMins(a),fm=filmMins(a);if(!tw)return '';return `<div class="dt-runtime">${icon('clock')} <b>${fmtWatch(tw)}</b> to watch${a.epTotal?` all ${a.epTotal} episodes`:''}${fm?`<span class="dt-runtime-films"> + ${fmtWatch(fm)} of films</span>`:''}</div>`;})()}
         ${(()=>{const air=airingInfo(a);return air?`<div class="dt-air">${icon('calendar')} Ep ${air.ep} · airs ${air.when}</div>`:'';})()}
         <button class="dt-fav${a.fav?' on':''}" onclick="toggleFav()">${a.fav?icon('heart','fill')+' Favorited':icon('heart')+' Favorite'}</button>
-        ${kindOf(a)==="watch" ? `<button class="dt-play" onclick="openPlayer('${a.id}')">▶ Play</button>` : ""}
-        ${(()=>{if(kindOf(a)!=='watch')return '';return `<button class="dt-play-btn" onclick="openPlayer('${a.id}')">▶ Play Episode 1</button>`;})()}
       </div>
     </div>
     ${friendRecBadge(a)}
     <div id="dtRich" class="dt-rich"></div>
     <div class="dt-label">Status</div>
     <div class="dt-status">${statusBtns}</div>
-    ${kindOf(a)==='watch'?`<button class="dt-play" onclick="openPlayer('${a.id}')">▶ Play Episode 1</button>`:''}
+    ${kindOf(a)==='watch'?`<button class="dt-play" onclick="openPlayer('${a.id}')">${icon('play')} Play Episode 1</button>`:''}
     ${progHTML}
     ${stars}
     ${seasonsHTML}

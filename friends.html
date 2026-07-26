@@ -3730,28 +3730,6 @@ function bbSnap(){
 // last key — imperceptible, but it stops the per-character thrash.
 let _searchT=0;
 function onSearchInput(){clearTimeout(_searchT);_searchT=setTimeout(renderHome,110);}
-// Airing this week: tracked watching/plan titles whose next episode drops in the
-// next 7 days, soonest first. Self-hides when nothing qualifies — no clutter.
-function airingThisWeek(){
-  const now=Date.now(),wk=now+7*86400000;
-  return anime.filter(a=>kindOf(a)==='watch'&&(a.status==='watching'||a.status==='plan')&&a.airAt&&a.airAt*1000>now&&a.airAt*1000<=wk)
-    .sort((x,y)=>x.airAt-y.airAt);
-}
-function airingRailHTML(items){
-  if(!items||!items.length)return '';
-  const card=a=>{
-    const inf=airingInfo(a),art=titleBg(a)||a.img;
-    const ch=((a.title||'?').trim()[0]||'?').toUpperCase().replace(/['"<&]/g,'?');
-    const bg=art?`<img class="rz-img" src="${escH(art)}" loading="lazy" alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'rz-ph',textContent:'${ch}'}))">`:`<div class="rz-ph">${ch}</div>`;
-    const when=inf?(inf.ep?`Ep ${inf.ep} · ${inf.when}`:inf.when):'';
-    return `<button class="rz-card" onclick="openDetail('${a.id}')">
-      ${bg}<div class="rz-scrim"></div>
-      <div class="rz-meta"><div class="rz-title">${schEsc(a.title)}</div>${when?`<div class="rz-sub">${schEsc(when)}</div>`:''}</div>
-    </button>`;
-  };
-  return `<div class="rz-sec"><div class="rz-head">${icon('calendar')} Airing this week</div>
-    <div class="rz-scroll">${items.map(card).join('')}</div></div>`;
-}
 function renderHome(){
   const el=document.getElementById('pageEl');
   clearInterval(bbTimer);bbTimer=0;   // stop any rotation; the main path re-arms it
@@ -3802,7 +3780,7 @@ function renderHome(){
   // A brand-new user who's started adding still sees the beginner shelf (up top) so
   // they can keep stacking titles — it rides above their small list until dismissed.
   const beg=beginnerShelfActive(isRead);
-  let html=topBanner+(beg?beginnerShelfHTML():'')+(spotlight.length?billboardHTML(spotlight):'')+resumeRailHTML(railItems,isRead)+(isRead?'':airingRailHTML(airingThisWeek()))+quickPickStripHTML(pool,isRead)+friendRecRowHTML();
+  let html=topBanner+(beg?beginnerShelfHTML():'')+(spotlight.length?billboardHTML(spotlight):'')+resumeRailHTML(railItems,isRead)+quickPickStripHTML(pool,isRead)+friendRecRowHTML();
   // each section wears its own status colour (STATUS_META) rather than the one
   // theme accent — the palette already exists, it was just unused outside chips
   // Watch list: no "Watching" row — it's merged into the Continue-watching rail
@@ -3938,8 +3916,7 @@ function renderDetail(){
     <div id="dtRich" class="dt-rich"></div>
     <div class="dt-label">Status</div>
     <div class="dt-status">${statusBtns}</div>
-        ${(()=>{const id=a.aniId||a.id;return kindOf(a)==="watch"?`<button class="dt-play" onclick="playOrFallback('${id}')">${icon('play')} Play Episode 1</button>`:"";})()}
-    ${kindOf(a)==='watch'?`<button class="dt-play" onclick="playAnimeFromAniList('${a.aniId || a.id}', '${a.title}')>${icon('play')} Play Episode 1</button>`:''}
+    ${kindOf(a)==='watch'?`<button class="dt-play" onclick="openPlayer('${a.id}')">${icon('play')} Play Episode 1</button>`:''}
     ${progHTML}
     ${stars}
     ${seasonsHTML}
@@ -4014,7 +3991,7 @@ function richDetailHTML(d){
   if(d.seasonYear)meta.push(`${d.season?cap(d.season)+' ':''}${d.seasonYear}`);
   const studio=(((d.studios||{}).nodes||[])[0]||{}).name||'';if(studio)meta.push(studio);
   const metaHTML=meta.length?`<div class="dt-rich-meta">${meta.map(m=>`<span>${m.indexOf('<')>=0?m:schEsc(m)}</span>`).join('')}</div>`:'';
-  const _seenSite=new Set();const links=((d.externalLinks)||[]).filter(l=>{if(!(l&&l.type==='STREAMING'&&l.url))return false;const k=(l.site||'').trim().toLowerCase();if(!k||_seenSite.has(k))return false;_seenSite.add(k);return true;});
+  const links=((d.externalLinks)||[]).filter(l=>l&&l.type==='STREAMING'&&l.url);
   const linksHTML=links.length?`<div class="dt-label" style="margin-top:16px">${icon('play')} Watch on</div><div class="dt-watchlinks">${links.map(l=>`<button class="dt-watchlink" onclick="openExternal('${escH(l.url).replace(/'/g,"\\'")}')">${schEsc(l.site)} ${icon('external')}</button>`).join('')}</div>`:'';
   const desc=_stripHtml(d.description);
   const synHTML=desc?`<div class="dt-label" style="margin-top:16px">Synopsis</div><p class="dt-synopsis" onclick="this.classList.toggle('open')">${schEsc(desc)}</p>`:'';
@@ -8602,31 +8579,19 @@ document.addEventListener("keydown", (e) => {
 });
 
 
-function playOrFallback(aniListId) {
-  fetch('https://api.anikoto.net/api/episodes/' + aniListId)
-    .then(r => r.json())
-    .then(data => {
-      if (Array.isArray(data) && data.length > 0) {
-        openPlayer(aniListId, 0);
-      } else {
-        window.open('https://anilist.co/anime/' + aniListId + '/watch', '_blank');
-      }
-    })
-    .catch(() => {
-      window.open('https://anilist.co/anime/' + aniListId + '/watch', '_blank');
-    });
-}
-
-// Map AniList ID to Gogoanime and play
-async function playAnimeFromAniList(aniListId, title) {
+async function startAnimePlayback(aniListId) {
+  const overlay = document.getElementById('video-player-overlay');
   const videoEl = document.getElementById('anime-video');
   const statusEl = document.getElementById('player-status');
   
-  if (statusEl) statusEl.textContent = 'Loading...';
+  if (overlay) overlay.classList.add('active');
+  if (statusEl) statusEl.textContent = 'Fetching stream...';
   
   try {
-    // Step 1: Get Gogoanime ID from AniList ID using a free API
-    const res = await fetch(`https://api.consumet.org/meta/anilist/anime/${aniListId}`);
+    const apiUrl = 'https://api.consumet.org/meta/anilist/anime/' + aniListId;
+    const proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(apiUrl);
+    
+    const res = await fetch(proxyUrl);
     const data = await res.json();
     
     if (!data.episodes || data.episodes.length === 0) {
@@ -8634,25 +8599,30 @@ async function playAnimeFromAniList(aniListId, title) {
       return;
     }
     
-    // Step 2: Get the first episode's stream URL
-    const ep = data.episodes[0];
-    const streamRes = await fetch(`https://api.consumet.org/anime/gogoanime/${ep.id}`);
+    const gogoId = data.episodes[0].id;
+    const streamApiUrl = 'https://api.consumet.org/anime/gogoanime/' + gogoId;
+    const streamProxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(streamApiUrl);
+    
+    const streamRes = await fetch(streamProxyUrl);
     const streamData = await streamRes.json();
     
-    const videoUrl = streamData.sources[0]?.url || streamData.sources[0]?.iframe;
+    let videoUrl = '';
+    if (streamData.sources && streamData.sources.length > 0) {
+      const source = streamData.sources.find(s => s.quality === 'default' || s.quality === '720p') || streamData.sources[0];
+      videoUrl = source.url || source.iframe;
+    }
     
     if (videoUrl) {
-      // Open the player overlay
-      openPlayer(aniListId, 0);
       videoEl.src = videoUrl;
-      videoEl.play();
+      videoEl.play().catch(e => console.log('Autoplay blocked:', e));
       if (statusEl) statusEl.textContent = '';
     } else {
-      if (statusEl) statusEl.textContent = 'Stream not found';
+      if (statusEl) statusEl.textContent = 'Stream URL not found';
     }
+    
   } catch (err) {
-    console.error('Play error:', err);
-    if (statusEl) statusEl.textContent = 'Click to try again';
+    console.error('Playback error:', err);
+    if (statusEl) statusEl.textContent = 'Error: ' + err.message;
   }
 }
 </script>

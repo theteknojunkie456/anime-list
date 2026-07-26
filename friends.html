@@ -3930,7 +3930,7 @@ function renderDetail(){
     <div id="dtRich" class="dt-rich"></div>
     <div class="dt-label">Status</div>
     <div class="dt-status">${statusBtns}</div>
-    ${(()=>{if(kindOf(a)!=='watch'||!a.aniId)return '';return `<button class="dt-play" onclick="openPlayer('${a.aniId}')">${icon('play')} Play Episode 1</button>`;})()}
+    ${kindOf(a)==='watch'?`<button class="dt-play" onclick="openPlayer('${a.id}')">▶ Play Episode 1</button>`:''}
     ${progHTML}
     ${stars}
     ${seasonsHTML}

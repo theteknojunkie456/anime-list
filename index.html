@@ -1366,6 +1366,38 @@ body.recsel .pcard{position:relative;}
 .kbhelp-row:last-child{border-bottom:0;}
 .kbhelp-row .keys{display:flex;gap:5px;flex-shrink:0;}
 .kbkey{min-width:22px;height:23px;padding:0 7px;border-radius:7px;background:var(--bg4);border:1px solid var(--b2);font-size:12px;font-weight:700;color:var(--t2);display:inline-flex;align-items:center;justify-content:center;font-family:ui-monospace,SFMono-Regular,monospace;}
+
+/* Video Player Overlay */
+#video-player-overlay {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: #000; z-index: 1000; display: none; flex-direction: column;
+}
+#video-player-overlay.active { display: flex; }
+#video-container { flex: 1; display: flex; align-items: center; justify-content: center; background: #111; }
+video { width: 100%; height: 100%; object-fit: contain; }
+#player-controls { background: linear-gradient(transparent, rgba(0,0,0,0.8)); padding: 16px; color: white; display: flex; flex-direction: column; gap: 8px; }
+#progress-bar-container { width: 100%; height: 4px; background: rgba(255,255,255,0.3); cursor: pointer; }
+#progress-bar { height: 100%; background: var(--a, #6C63FF); width: 0%; }
+#controls-buttons { display: flex; justify-content: space-between; align-items: center; }
+#controls-buttons button { background: none; border: none; color: white; font-size: 24px; cursor: pointer; padding: 8px; }
+#time-display { font-family: var(--fb, sans-serif); font-size: 12px; }
+
+
+
+.dt-play {
+  background: var(--a, #6C63FF);
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 8px;
+}
+.dt-play:hover {
+  opacity: 0.9;
+}
 </style>
 </head>
 <body>
@@ -3890,12 +3922,15 @@ function renderDetail(){
         ${(()=>{if(kindOf(a)!=='watch')return '';const tw=totalWatchMins(a),fm=filmMins(a);if(!tw)return '';return `<div class="dt-runtime">${icon('clock')} <b>${fmtWatch(tw)}</b> to watch${a.epTotal?` all ${a.epTotal} episodes`:''}${fm?`<span class="dt-runtime-films"> + ${fmtWatch(fm)} of films</span>`:''}</div>`;})()}
         ${(()=>{const air=airingInfo(a);return air?`<div class="dt-air">${icon('calendar')} Ep ${air.ep} · airs ${air.when}</div>`:'';})()}
         <button class="dt-fav${a.fav?' on':''}" onclick="toggleFav()">${a.fav?icon('heart','fill')+' Favorited':icon('heart')+' Favorite'}</button>
+        ${kindOf(a)==="watch" ? `<button class="dt-play" onclick="openPlayer('${a.id}')">▶ Play</button>` : ""}
+        ${(()=>{if(kindOf(a)!=='watch')return '';return `<button class="dt-play-btn" onclick="openPlayer('${a.id}')">▶ Play Episode 1</button>`;}())}
       </div>
     </div>
     ${friendRecBadge(a)}
     <div id="dtRich" class="dt-rich"></div>
     <div class="dt-label">Status</div>
     <div class="dt-status">${statusBtns}</div>
+    ${(()=>{if(kindOf(a)!=='watch'||!a.aniId)return '';return `<button class="dt-play" onclick="openPlayer('${a.aniId}')">${icon('play')} Play Episode 1</button>`;})()}
     ${progHTML}
     ${stars}
     ${seasonsHTML}
@@ -5137,7 +5172,30 @@ function watchParty(title,ep){
   document.getElementById('pvTitle').textContent=title+(ep?` · Ep ${ep}`:'')+' · Party';
   const ext=document.getElementById('pvExt');ext.onclick=()=>{const u=findUrl({title});if(u&&u!=='about:blank')document.getElementById('pvFrame').src=u;};
   const purl=partyStreamURL(title,ep);
-  document.getElementById('pvFrame').src=purl||"data:text/html,<body style='margin:0;background:%230b0b0f;color:%23aaa;font:15px -apple-system,system-ui;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px;height:100vh'>Set your own streaming source in Settings, or use <b style='color:%23fff'>&nbsp;Broadcast your screen&nbsp;</b> to watch together.</body>";
+  document.getElementById('pvFrame').src=purl||"data:text/html,<body style='margin:0;background:%230b0b0f;color:%23aaa;font:15px -apple-system,system-ui;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px;height:100vh'>Set your own streaming source in Settings, or use <b style='color:%23fff'>&nbsp;Broadcast your screen&nbsp;</b> to watch together.
+<!-- Video Player Overlay -->
+<div id="video-player-overlay">
+  <div id="video-container">
+    <video id="anime-video" playsinline>
+      Your browser does not support the video tag.
+    </video>
+  </div>
+  <div id="player-controls">
+    <div id="progress-bar-container">
+      <div id="progress-bar"></div>
+    </div>
+    <div id="controls-buttons">
+      <div>
+        <button id="btn-play-pause">▶</button>
+        <button id="btn-prev-ep">⏮</button>
+        <button id="btn-next-ep">⏭</button>
+      </div>
+      <div id="time-display">00:00 / 00:00</div>
+    </div>
+  </div>
+</div>
+
+</body>";
   document.getElementById('playerView').classList.add('on');
   renderPvNav(null);
   partyInSession=true;partyCurEp=ep;hidePauseOverlay();renderPvHostBar();
@@ -8463,6 +8521,123 @@ setTimeout(syncOnOpen,300);
 setTimeout(()=>{try{if(notifyOn())notifyUpdate();}catch{}},1600);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)syncOnOpen();});
 try{window.addEventListener('online',()=>syncOnOpen());}catch(e){}   // cloud sync recovers the moment the network is back
+
+/* === Video Player Logic === */
+const videoPlayerOverlay = document.getElementById("video-player-overlay");
+const videoElement = document.getElementById("anime-video");
+const progressBar = document.getElementById("progress-bar");
+const progressContainer = document.getElementById("progress-bar-container");
+const btnPlayPause = document.getElementById("btn-play-pause");
+const btnPrevEp = document.getElementById("btn-prev-ep");
+const btnNextEp = document.getElementById("btn-next-ep");
+const timeDisplay = document.getElementById("time-display");
+
+let currentAnimeId = null;
+let currentEpisodeIndex = 0;
+let episodesList = [];
+
+function openPlayer(animelistId, episodeIndex = 0) {
+  currentAnimeId = animelistId;
+  currentEpisodeIndex = episodeIndex;
+  videoPlayerOverlay.classList.add("active");
+  fetchEpisodesAndPlay(animelistId, episodeIndex);
+}
+
+async function fetchEpisodesAndPlay(animelistId, episodeIndex) {
+  btnPlayPause.textContent = "⏳";
+  try {
+    const res = await fetch(`https://api.anikoto.net/api/episodes/${animelistId}`);
+    const data = await res.json();
+    if (!data || data.length === 0) {
+      alert("No episodes found for this anime.");
+      closePlayer();
+      return;
+    }
+    episodesList = data;
+    playEpisode(episodesList[episodeIndex]);
+  } catch (error) {
+    console.error("Error fetching episodes:", error);
+    alert("Error loading episodes.");
+    closePlayer();
+  }
+}
+
+function playEpisode(episode) {
+  if (!episode) return;
+  const videoUrl = episode.video || episode.url;
+  if (videoUrl) {
+    videoElement.src = videoUrl;
+    videoElement.load();
+    videoElement.play().catch(e => console.log("Autoplay blocked:", e));
+    btnPlayPause.textContent = "⏸";
+  }
+}
+
+function closePlayer() {
+  videoElement.pause();
+  videoElement.src = "";
+  videoPlayerOverlay.classList.remove("active");
+}
+
+btnPlayPause.addEventListener("click", () => {
+  if (videoElement.paused) { videoElement.play(); btnPlayPause.textContent = "⏸"; }
+  else { videoElement.pause(); btnPlayPause.textContent = "▶"; }
+});
+
+btnPrevEp.addEventListener("click", () => {
+  if (currentEpisodeIndex > 0) { currentEpisodeIndex--; playEpisode(episodesList[currentEpisodeIndex]); }
+});
+
+btnNextEp.addEventListener("click", () => {
+  if (currentEpisodeIndex < episodesList.length - 1) { currentEpisodeIndex++; playEpisode(episodesList[currentEpisodeIndex]); }
+});
+
+videoElement.addEventListener("timeupdate", () => {
+  const percent = (videoElement.currentTime / videoElement.duration) * 100;
+  progressBar.style.width = percent + "%";
+  timeDisplay.textContent = `${formatTime(videoElement.currentTime)} / ${formatTime(videoElement.duration)}`;
+});
+
+progressContainer.addEventListener("click", (e) => {
+  const rect = progressContainer.getBoundingClientRect();
+  const pos = (e.clientX - rect.left) / rect.width;
+  videoElement.currentTime = pos * videoElement.duration;
+});
+
+function formatTime(seconds) {
+  if (isNaN(seconds)) return "00:00";
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+}
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && videoPlayerOverlay.classList.contains("active")) { closePlayer(); }
+});
+
 </script>
+
+<!-- Video Player Overlay -->
+<div id="video-player-overlay">
+  <div id="video-container">
+    <video id="anime-video" playsinline>
+      Your browser does not support the video tag.
+    </video>
+  </div>
+  <div id="player-controls">
+    <div id="progress-bar-container">
+      <div id="progress-bar"></div>
+    </div>
+    <div id="controls-buttons">
+      <div>
+        <button id="btn-play-pause">▶</button>
+        <button id="btn-prev-ep">⏮</button>
+        <button id="btn-next-ep">⏭</button>
+      </div>
+      <div id="time-display">00:00 / 00:00</div>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>

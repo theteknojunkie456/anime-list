@@ -3730,6 +3730,28 @@ function bbSnap(){
 // last key — imperceptible, but it stops the per-character thrash.
 let _searchT=0;
 function onSearchInput(){clearTimeout(_searchT);_searchT=setTimeout(renderHome,110);}
+// Airing this week: tracked watching/plan titles whose next episode drops in the
+// next 7 days, soonest first. Self-hides when nothing qualifies — no clutter.
+function airingThisWeek(){
+  const now=Date.now(),wk=now+7*86400000;
+  return anime.filter(a=>kindOf(a)==='watch'&&(a.status==='watching'||a.status==='plan')&&a.airAt&&a.airAt*1000>now&&a.airAt*1000<=wk)
+    .sort((x,y)=>x.airAt-y.airAt);
+}
+function airingRailHTML(items){
+  if(!items||!items.length)return '';
+  const card=a=>{
+    const inf=airingInfo(a),art=titleBg(a)||a.img;
+    const ch=((a.title||'?').trim()[0]||'?').toUpperCase().replace(/['"<&]/g,'?');
+    const bg=art?`<img class="rz-img" src="${escH(art)}" loading="lazy" alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'rz-ph',textContent:'${ch}'}))">`:`<div class="rz-ph">${ch}</div>`;
+    const when=inf?(inf.ep?`Ep ${inf.ep} · ${inf.when}`:inf.when):'';
+    return `<button class="rz-card" onclick="openDetail('${a.id}')">
+      ${bg}<div class="rz-scrim"></div>
+      <div class="rz-meta"><div class="rz-title">${schEsc(a.title)}</div>${when?`<div class="rz-sub">${schEsc(when)}</div>`:''}</div>
+    </button>`;
+  };
+  return `<div class="rz-sec"><div class="rz-head">${icon('calendar')} Airing this week</div>
+    <div class="rz-scroll">${items.map(card).join('')}</div></div>`;
+}
 function renderHome(){
   const el=document.getElementById('pageEl');
   clearInterval(bbTimer);bbTimer=0;   // stop any rotation; the main path re-arms it
@@ -3780,7 +3802,7 @@ function renderHome(){
   // A brand-new user who's started adding still sees the beginner shelf (up top) so
   // they can keep stacking titles — it rides above their small list until dismissed.
   const beg=beginnerShelfActive(isRead);
-  let html=topBanner+(beg?beginnerShelfHTML():'')+(spotlight.length?billboardHTML(spotlight):'')+resumeRailHTML(railItems,isRead)+quickPickStripHTML(pool,isRead)+friendRecRowHTML();
+  let html=topBanner+(beg?beginnerShelfHTML():'')+(spotlight.length?billboardHTML(spotlight):'')+resumeRailHTML(railItems,isRead)+(isRead?'':airingRailHTML(airingThisWeek()))+quickPickStripHTML(pool,isRead)+friendRecRowHTML();
   // each section wears its own status colour (STATUS_META) rather than the one
   // theme accent — the palette already exists, it was just unused outside chips
   // Watch list: no "Watching" row — it's merged into the Continue-watching rail

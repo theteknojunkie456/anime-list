@@ -6050,11 +6050,11 @@ function watchEpisode(a){
 //     the main title until fetchCovers fills them in)
 // Search sites are less fragile than deep title URLs (slugs/domains churn), so a
 // {query}/{title} search template is the recommended shape.
-const SRC_TOKEN_RE=/\{(title|query|slug|ep|episode|titleenglish|titleromaji|titlenative|anilistid|malid)\}/i;
+const SRC_TOKEN_RE=/\{(title|query|slug|ep|ep2|ep3|episode|titleenglish|titleromaji|titlenative|anilistid|malid)\}/i;
 const SRC_SEARCH_RE=/\{(title|query|slug|titleenglish|titleromaji|titlenative|anilistid|malid)\}/i; // any non-episode token
 function fillSourceTokens(template,a,ep){
   const t=a.title||'', enc=encodeURIComponent;
-  const raw={ep:(ep||1),episode:(ep||1),anilistid:a.aniId||'',malid:a.malId||''};                    // inserted verbatim
+  const raw={ep:(ep||1),episode:(ep||1),ep2:String(ep||1).padStart(2,'0'),ep3:String(ep||1).padStart(3,'0'),anilistid:a.aniId||'',malid:a.malId||''};  // inserted verbatim ({ep2}=01, {ep3}=001)
   const txt={title:t,query:t,slug:streamSlug(slugTitle(a)),titleenglish:a.titleEn||t,titleromaji:a.titleRo||t,titlenative:a.titleNa||t}; // url-encoded
   return String(template||'').replace(/\{(\w+)\}/g,(m,k)=>{
     const key=k.toLowerCase();

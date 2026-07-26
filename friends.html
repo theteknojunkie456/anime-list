@@ -3916,7 +3916,8 @@ function renderDetail(){
     <div id="dtRich" class="dt-rich"></div>
     <div class="dt-label">Status</div>
     <div class="dt-status">${statusBtns}</div>
-    ${kindOf(a)==='watch'?`<button class="dt-play" onclick="openPlayer('${a.id}')">${icon('play')} Play Episode 1</button>`:''}
+        ${(()=>{const id=a.aniId||a.id;return kindOf(a)==="watch"?`<button class="dt-play" onclick="playOrFallback('${id}')">${icon('play')} Play Episode 1</button>`:"";})()}
+    ${kindOf(a)==='watch'?`<button class="dt-play" onclick="openPlayer('${a.aniId || a.id}')">${icon('play')} Play Episode 1</button>`:''}
     ${progHTML}
     ${stars}
     ${seasonsHTML}
@@ -8578,6 +8579,21 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && videoPlayerOverlay.classList.contains("active")) { closePlayer(); }
 });
 
+
+function playOrFallback(aniListId) {
+  fetch('https://api.anikoto.net/api/episodes/' + aniListId)
+    .then(r => r.json())
+    .then(data => {
+      if (Array.isArray(data) && data.length > 0) {
+        openPlayer(aniListId, 0);
+      } else {
+        window.open('https://anilist.co/anime/' + aniListId + '/watch', '_blank');
+      }
+    })
+    .catch(() => {
+      window.open('https://anilist.co/anime/' + aniListId + '/watch', '_blank');
+    });
+}
 </script>
 
 <!-- Video Player Overlay -->

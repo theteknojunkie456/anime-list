@@ -3923,7 +3923,7 @@ function renderDetail(){
         ${(()=>{const air=airingInfo(a);return air?`<div class="dt-air">${icon('calendar')} Ep ${air.ep} · airs ${air.when}</div>`:'';})()}
         <button class="dt-fav${a.fav?' on':''}" onclick="toggleFav()">${a.fav?icon('heart','fill')+' Favorited':icon('heart')+' Favorite'}</button>
         ${kindOf(a)==="watch" ? `<button class="dt-play" onclick="openPlayer('${a.id}')">▶ Play</button>` : ""}
-        ${(()=>{if(kindOf(a)!=='watch')return '';return `<button class="dt-play-btn" onclick="openPlayer('${a.id}')">▶ Play Episode 1</button>`;}())}
+        ${(()=>{if(kindOf(a)!=='watch')return '';return `<button class="dt-play-btn" onclick="openPlayer('${a.id}')">▶ Play Episode 1</button>`;})()}
       </div>
     </div>
     ${friendRecBadge(a)}
@@ -5172,30 +5172,7 @@ function watchParty(title,ep){
   document.getElementById('pvTitle').textContent=title+(ep?` · Ep ${ep}`:'')+' · Party';
   const ext=document.getElementById('pvExt');ext.onclick=()=>{const u=findUrl({title});if(u&&u!=='about:blank')document.getElementById('pvFrame').src=u;};
   const purl=partyStreamURL(title,ep);
-  document.getElementById('pvFrame').src=purl||"data:text/html,<body style='margin:0;background:%230b0b0f;color:%23aaa;font:15px -apple-system,system-ui;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px;height:100vh'>Set your own streaming source in Settings, or use <b style='color:%23fff'>&nbsp;Broadcast your screen&nbsp;</b> to watch together.
-<!-- Video Player Overlay -->
-<div id="video-player-overlay">
-  <div id="video-container">
-    <video id="anime-video" playsinline>
-      Your browser does not support the video tag.
-    </video>
-  </div>
-  <div id="player-controls">
-    <div id="progress-bar-container">
-      <div id="progress-bar"></div>
-    </div>
-    <div id="controls-buttons">
-      <div>
-        <button id="btn-play-pause">▶</button>
-        <button id="btn-prev-ep">⏮</button>
-        <button id="btn-next-ep">⏭</button>
-      </div>
-      <div id="time-display">00:00 / 00:00</div>
-    </div>
-  </div>
-</div>
-
-</body>";
+  document.getElementById('pvFrame').src=purl||"data:text/html,<body style='margin:0;background:%230b0b0f;color:%23aaa;font:15px -apple-system,system-ui;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px;height:100vh'>Set your own streaming source in Settings, or use <b style='color:%23fff'>&nbsp;Broadcast your screen&nbsp;</b> to watch together.</body>";
   document.getElementById('playerView').classList.add('on');
   renderPvNav(null);
   partyInSession=true;partyCurEp=ep;hidePauseOverlay();renderPvHostBar();

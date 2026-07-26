@@ -17,6 +17,7 @@
 <title>WatchList</title>
 <!-- friends.html is auto-generated from index.html by the pre-commit hook — do not edit it by hand -->
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Manrope:wght@400..800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 <style>
 :root{
   --bg:#0a0a0c;--bg2:#111114;--bg3:#18181c;--bg4:#202025;--bg5:#28282e;
@@ -2087,8 +2088,30 @@ video { width: 100%; height: 100%; object-fit: contain; }
 <!-- TOAST -->
 <div class="toast" id="toast"></div>
 
+<!-- Video Player Overlay — kept before the script tag so its element refs exist when the script runs -->
+<div id="video-player-overlay">
+  <div id="video-container">
+    <video id="anime-video" playsinline>
+      Your browser does not support the video tag.
+    </video>
+  </div>
+  <div id="player-controls">
+    <div id="progress-bar-container">
+      <div id="progress-bar"></div>
+    </div>
+    <div id="controls-buttons">
+      <div>
+        <button id="btn-play-pause">▶</button>
+        <button id="btn-prev-ep">⏮</button>
+        <button id="btn-next-ep">⏭</button>
+      </div>
+      <div id="time-display">00:00 / 00:00</div>
+      <button id="btn-close-player">✕</button>
+    </div>
+  </div>
+</div>
+
 <script>
-document.addEventListener('DOMContentLoaded', function() {
 // ─── ICONS — inline monochrome line icons (Feather/Lucide style, currentColor) ──
 const ICONS={
 mic:'<path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v4M8 23h8"/>',
@@ -3946,7 +3969,11 @@ function renderDetail(){
     <div id="dtRich" class="dt-rich"></div>
     <div class="dt-label">Status</div>
     <div class="dt-status">${statusBtns}</div>
-    ${kindOf(a)==='watch'?`<button class="dt-play" onclick="openPlayer('${a.id}')">${icon('play')} Play Episode 1</button>`:''}
+    ${(()=>{
+      if(kindOf(a)!=='watch') return '';
+      const nextEp = watchEpisode(a) || 1;
+      return `<button class="dt-play" onclick="openPlayer('${a.id}', ${nextEp - 1})">${icon('play')} Play Episode ${nextEp}</button>`;
+    })()}
     ${progHTML}
     ${stars}
     ${seasonsHTML}
@@ -8558,22 +8585,23 @@ function openPlayer(animelistId, episodeIndex = 0) {
 async function fetchEpisodesAndPlay(animelistId, episodeIndex) {
   btnPlayPause.textContent = "⏳";
   try {
-    // Find the anime object to get MAL ID
     const animeObj = anime.find(a => a.id === animelistId || a.aniId === animelistId);
     if (!animeObj) {
-      alert("Anime not found.");
-      closePlayer();
+      toast("Anime not found in list.");
+      closeVideoPlayer();
       return;
     }
     
     const malId = animeObj.malId;
     if (!malId) {
-      alert("MAL ID not found for this anime.");
-      closePlayer();
+      toast("MAL ID not found for this anime.");
+      closeVideoPlayer();
       return;
     }
+
+    toast(`Loading Episode ${episodeIndex + 1} for ${animeObj.title}…`);
     
-    // Use MegaPlay.buzz API to get the stream
+    // Use MegaPlay API proxy stream endpoint
     const streamUrl = `https://mega-playback.vercel.app/api/get?videoId=${malId}&episode=${episodeIndex + 1}`;
     const res = await fetch(streamUrl);
     const data = await res.json();
@@ -8582,13 +8610,13 @@ async function fetchEpisodesAndPlay(animelistId, episodeIndex) {
       const source = data.sources.find(s => s.quality === 'default' || s.quality === '1080p') || data.sources[0];
       playEpisode({video: source.url});
     } else {
-      alert("No video sources found.");
-      closePlayer();
+      toast(`No stream sources found for Ep ${episodeIndex + 1}`);
+      closeVideoPlayer();
     }
   } catch (error) {
     console.error("Error fetching episodes:", error);
-    alert("Error loading episodes: " + error.message);
-    closePlayer();
+    toast("Error loading episode stream: " + error.message);
+    closeVideoPlayer();
   }
 }
 
@@ -8596,14 +8624,28 @@ function playEpisode(episode) {
   if (!episode) return;
   const videoUrl = episode.video || episode.url;
   if (videoUrl) {
-    videoElement.src = videoUrl;
-    videoElement.load();
-    videoElement.play().catch(e => console.log("Autoplay blocked:", e));
+    if (videoUrl.includes('.m3u8') && typeof Hls !== 'undefined' && Hls.isSupported()) {
+      if (window.hlsPlayer) { window.hlsPlayer.destroy(); }
+      window.hlsPlayer = new Hls();
+      window.hlsPlayer.loadSource(videoUrl);
+      window.hlsPlayer.attachMedia(videoElement);
+      window.hlsPlayer.on(Hls.Events.MANIFEST_PARSED, () => {
+        videoElement.play().catch(e => console.log("Autoplay blocked:", e));
+      });
+    } else {
+      videoElement.src = videoUrl;
+      videoElement.load();
+      videoElement.play().catch(e => console.log("Autoplay blocked:", e));
+    }
     btnPlayPause.textContent = "⏸";
   }
 }
 
-function closePlayer() {
+function closeVideoPlayer() {
+  if (window.hlsPlayer) {
+    window.hlsPlayer.destroy();
+    window.hlsPlayer = null;
+  }
   videoElement.pause();
   videoElement.src = "";
   videoPlayerOverlay.classList.remove("active");
@@ -8615,11 +8657,31 @@ btnPlayPause.addEventListener("click", () => {
 });
 
 btnPrevEp.addEventListener("click", () => {
-  if (currentEpisodeIndex > 0) { currentEpisodeIndex--; playEpisode(episodesList[currentEpisodeIndex]); }
+  if (currentEpisodeIndex > 0) {
+    currentEpisodeIndex--;
+    fetchEpisodesAndPlay(currentAnimeId, currentEpisodeIndex);
+  }
 });
 
 btnNextEp.addEventListener("click", () => {
-  if (currentEpisodeIndex < episodesList.length - 1) { currentEpisodeIndex++; playEpisode(episodesList[currentEpisodeIndex]); }
+  const animeObj = anime.find(a => a.id === currentAnimeId || a.aniId === currentAnimeId);
+  const total = (animeObj && animeObj.epTotal) || 999;
+  if (currentEpisodeIndex < total - 1) {
+    currentEpisodeIndex++;
+    fetchEpisodesAndPlay(currentAnimeId, currentEpisodeIndex);
+  }
+});
+
+videoElement.addEventListener("ended", () => {
+  if (currentAnimeId) {
+    applyWatched(currentAnimeId, currentEpisodeIndex + 1);
+    const animeObj = anime.find(a => a.id === currentAnimeId || a.aniId === currentAnimeId);
+    const total = (animeObj && animeObj.epTotal) || 0;
+    if (!total || currentEpisodeIndex < total - 1) {
+      currentEpisodeIndex++;
+      fetchEpisodesAndPlay(currentAnimeId, currentEpisodeIndex);
+    }
+  }
 });
 
 videoElement.addEventListener("timeupdate", () => {
@@ -8641,8 +8703,13 @@ function formatTime(seconds) {
   return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
 }
 
+const btnClosePlayer = document.getElementById("btn-close-player");
+if (btnClosePlayer) {
+  btnClosePlayer.addEventListener("click", closeVideoPlayer);
+}
+
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape" && videoPlayerOverlay.classList.contains("active")) { closePlayer(); }
+  if (e.key === "Escape" && videoPlayerOverlay.classList.contains("active")) { closeVideoPlayer(); }
 });
 
 
@@ -8650,30 +8717,7 @@ async function startAnimePlayback(aniListId) {
   openPlayer(aniListId, 0);
 }
 
-});
 </script>
-
-<!-- Video Player Overlay -->
-<div id="video-player-overlay">
-  <div id="video-container">
-    <video id="anime-video" playsinline>
-      Your browser does not support the video tag.
-    </video>
-  </div>
-  <div id="player-controls">
-    <div id="progress-bar-container">
-      <div id="progress-bar"></div>
-    </div>
-    <div id="controls-buttons">
-      <div>
-        <button id="btn-play-pause">▶</button>
-        <button id="btn-prev-ep">⏮</button>
-        <button id="btn-next-ep">⏭</button>
-      </div>
-      <div id="time-display">00:00 / 00:00</div>
-    </div>
-  </div>
-</div>
 
 </body>
 </html>

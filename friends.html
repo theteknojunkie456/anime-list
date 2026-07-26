@@ -2587,6 +2587,40 @@ function load(){
 }
 let saveWarned=false;let _writeChain=Promise.resolve();
 function backupLocal(s,val){try{s.setItem(LSKEY+'_bak',val);}catch{}}   // best-effort last-known-good mirror
+// ── Big-image offload to IndexedDB ──────────────────────────────────────────
+// localStorage is a hard ~5MB browser cap; base64 covers/backgrounds blow past
+// it. When a save can't fit, we move those images into IndexedDB (hundreds of
+// MB) and keep only a tiny key in localStorage. In-memory images are never
+// touched, and the saved copy is blanked ONLY after the image is confirmed in
+// IDB — so a failed offload falls back to today's behaviour and loses nothing.
+let _mediaDB=null;
+function mediaDB(){
+  if(_mediaDB)return _mediaDB;
+  _mediaDB=new Promise((res,rej)=>{try{const r=indexedDB.open('wl_media',1);r.onupgradeneeded=()=>{try{r.result.createObjectStore('img');}catch(e){}};r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error||new Error('idb'));}catch(e){rej(e);}}).catch(e=>{_mediaDB=null;throw e;});
+  return _mediaDB;
+}
+function idbSet(k,v){return mediaDB().then(db=>new Promise((res,rej)=>{const t=db.transaction('img','readwrite');t.objectStore('img').put(v,k);t.oncomplete=()=>res(1);t.onerror=()=>rej(t.error);t.onabort=()=>rej(t.error||new Error('abort'));}));}
+function idbGet(k){return mediaDB().then(db=>new Promise(res=>{const t=db.transaction('img','readonly');const q=t.objectStore('img').get(k);q.onsuccess=()=>res(q.result||'');q.onerror=()=>res('');})).catch(()=>'');}
+const _IMG_FIELDS=[['bgImage','bgKey'],['img','imgKey']];
+async function offloadImages(){
+  for(const a of anime){if(!a)continue;
+    for(const pair of _IMG_FIELDS){const f=pair[0],kf=pair[1],v=a[f];
+      if(typeof v==='string'&&v.slice(0,5)==='data:'){try{const key=safeId(a.id)+':'+f;await idbSet(key,v);a[kf]=key;}catch(e){}}
+    }
+  }
+}
+function _hasOffloaded(){return anime.some(a=>a&&(a.bgKey||a.imgKey));}
+function _persistList(){
+  if(!_hasOffloaded())return anime;   // no offload yet → identical to before (zero change for normal users)
+  return anime.map(a=>{const c={...a};for(const pair of _IMG_FIELDS){const f=pair[0],kf=pair[1];if(a[kf]&&typeof c[f]==='string'&&c[f].slice(0,5)==='data:')c[f]='';}return c;});
+}
+async function hydrateImages(){
+  let changed=false;
+  for(const a of anime){if(!a)continue;
+    for(const pair of _IMG_FIELDS){const f=pair[0],kf=pair[1];if(a[kf]&&!a[f]){const d=await idbGet(a[kf]);if(d){a[f]=d;changed=true;}}}
+  }
+  if(changed){try{render();}catch(e){}try{if(typeof detailId!=='undefined'&&detailId)renderDetail();}catch(e){}}
+}
 function writeLocal(){
   const s=store();if(!s)return;
   if(appLocked)return;      // locked: `anime` is an empty placeholder — never persist it over the ciphertext
@@ -2598,7 +2632,8 @@ function writeLocal(){
     });
     return _writeChain;
   }
-  try{const raw=JSON.stringify(anime);s.setItem(LSKEY,raw);backupLocal(s,raw);saveWarned=false;}catch{if(!saveWarned){saveWarned=true;toast('Storage full — remove some uploaded covers');}}
+  try{const raw=JSON.stringify(_persistList());s.setItem(LSKEY,raw);backupLocal(s,raw);saveWarned=false;}
+  catch{offloadImages().then(()=>{try{const raw=JSON.stringify(_persistList());s.setItem(LSKEY,raw);backupLocal(s,raw);saveWarned=false;}catch{if(!saveWarned){saveWarned=true;toast('Storage full — remove an uploaded cover to free space');}}});}
 }
 function save(){writeLocal();schedulePush();scheduleNotifyUpdate();}
 
@@ -8460,7 +8495,7 @@ try{if(_SR&&window.isSecureContext){const m=document.getElementById('chatMic');i
 
 // ─── INIT ───────────────────────────────────────────────────────────────────
 try{hydrateIcons();}catch{}
-load();try{_hadItemsAtLoad=anime.length>0;}catch{}try{purgeAdult();}catch{}try{if(!appLocked&&dedupeAnime())writeLocal();}catch{}loadTheme();try{seedHiddenDefaults();}catch{}try{_restoreUpd();}catch{}render();try{nativeScheduleNotifs();}catch{}
+load();try{_hadItemsAtLoad=anime.length>0;}catch{}try{purgeAdult();}catch{}try{if(!appLocked&&dedupeAnime())writeLocal();}catch{}loadTheme();try{seedHiddenDefaults();}catch{}try{_restoreUpd();}catch{}render();try{nativeScheduleNotifs();}catch{}try{hydrateImages();}catch{}
 // After the list is up — and after the tutorial has had its chance to claim a
 // new install — tell returning users what changed in the update they just got.
 try{setTimeout(maybeShowWhatsNew,900);}catch{}

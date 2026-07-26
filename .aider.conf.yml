@@ -7,6 +7,13 @@
 # Aider commits locally after a clean, linted edit; it does NOT push. You push
 # manually after loading the page and confirming it renders.
 
+# Model: Gemini 2.5 Flash, routed THROUGH OpenRouter (huge context — good for
+# this big single file — and OpenRouter bypasses Google's direct-API regional block).
+# Set your key first:  export OPENROUTER_API_KEY=your-key   (from openrouter.ai/keys)
+# No credits / want free? swap the line below for:
+#   model: openrouter/deepseek/deepseek-chat-v3-0324:free   (free, rate-limited)
+model: openrouter/google/gemini-2.5-flash
+
 # After editing an .html file, run the single-file syntax checker.
 # A non-zero exit feeds the error back to the model so it fixes it before commit.
 lint-cmd:

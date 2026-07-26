@@ -611,7 +611,21 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 .dt-eps{display:flex;gap:10px;overflow-x:auto;padding:2px 2px 6px;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;}
 .dt-eps::-webkit-scrollbar{display:none;}
 .dt-ep{flex:0 0 auto;width:150px;background:none;border:none;padding:0;cursor:pointer;text-align:left;scroll-snap-align:start;}
-.dt-ep-img{width:150px;height:84px;border-radius:11px;background:var(--bg3) center/cover no-repeat;border:1px solid var(--b2);}
+.dt-ep-img{position:relative;width:150px;height:84px;border-radius:11px;background:var(--bg3) center/cover no-repeat;border:1px solid var(--b2);}
+.dt-ep-yt{position:absolute;left:8px;top:8px;width:26px;height:26px;border-radius:8px;background:var(--a);color:var(--aFg,#fff);display:flex;align-items:center;justify-content:center;box-shadow:0 2px 10px rgba(0,0,0,.45);}
+.dt-ep-yt .ico{width:13px;height:13px;fill:currentColor;}
+.yt-overlay{position:fixed;inset:0;z-index:400;background:rgba(6,6,10,.92);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;padding:16px;animation:ytin .18s ease-out;}
+@keyframes ytin{from{opacity:0}to{opacity:1}}
+.yt-box{width:100%;max-width:min(94vw,980px);}
+.yt-bar{display:flex;align-items:center;gap:12px;margin-bottom:12px;}
+.yt-lbl{flex:1;display:flex;align-items:center;gap:8px;font-family:var(--fd);font-weight:800;font-size:15px;color:var(--t1);}
+.yt-lbl .ico{width:16px;height:16px;color:var(--a);}
+.yt-x{width:38px;height:38px;flex:0 0 auto;border:none;border-radius:12px;background:var(--bg3);color:var(--t1);display:flex;align-items:center;justify-content:center;cursor:pointer;}
+.yt-x:active{transform:scale(.94);}
+.yt-x .ico{width:18px;height:18px;}
+.yt-frame{position:relative;width:100%;aspect-ratio:16/9;border-radius:16px;overflow:hidden;background:#000;box-shadow:0 26px 70px -14px rgba(0,0,0,.75);}
+.yt-frame iframe{position:absolute;inset:0;width:100%;height:100%;border:0;}
+@media(prefers-reduced-motion:reduce){.yt-overlay{animation:none;}}
 .dt-ep-t{margin-top:6px;font:600 12px/1.35 var(--fb,system-ui);color:var(--t2);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
 .dt-ep:active{transform:scale(.97);}
 .dt-eps-tag{margin-left:8px;font-size:10px;font-weight:700;letter-spacing:.3px;color:var(--t3);border:1px solid var(--b2);border-radius:99px;padding:2px 7px;vertical-align:middle;text-transform:uppercase;}
@@ -4037,6 +4051,19 @@ async function loadRichDetail(aniId,forId){
     _richCache[aniId]=d;paint(d);
   }catch(e){const el=document.getElementById('dtRich');if(el&&detailId===forId)el.innerHTML='';}
 }
+// In-app playback for episodes that are LEGALLY on YouTube (rights-holder
+// channels — Muse Asia, Ani-One, etc.). Uses YouTube's official iframe embed,
+// permitted by their terms. No scraping: we only embed a real YouTube video id.
+function ytId(u){const m=String(u||'').match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/|v\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/);return m?m[1]:'';}
+function playYouTube(videoId){
+  if(!videoId)return;closeYouTube();
+  const ov=document.createElement('div');ov.id='ytOverlay';ov.className='yt-overlay';
+  ov.onclick=function(e){if(e.target===ov)closeYouTube();};
+  ov.innerHTML='<div class="yt-box"><div class="yt-bar"><span class="yt-lbl">'+icon('play')+' Playing on YouTube</span><button class="yt-x" onclick="closeYouTube()" aria-label="Close">'+icon('x')+'</button></div><div class="yt-frame"><iframe src="https://www.youtube.com/embed/'+encodeURIComponent(videoId)+'?autoplay=1&rel=0&modestbranding=1&playsinline=1" title="YouTube player" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe></div></div>';
+  document.body.appendChild(ov);document.body.classList.add('yt-open');
+  ov._esc=function(e){if(e.key==='Escape')closeYouTube();};document.addEventListener('keydown',ov._esc);
+}
+function closeYouTube(){const ov=document.getElementById('ytOverlay');if(!ov)return;if(ov._esc)document.removeEventListener('keydown',ov._esc);ov.remove();document.body.classList.remove('yt-open');}
 function richDetailHTML(d){
   const cap=s=>String(s||'').replace(/_/g,' ').toLowerCase().replace(/\b\w/g,c=>c.toUpperCase());
   const meta=[];
@@ -4052,7 +4079,7 @@ function richDetailHTML(d){
   const linksHTML=links.length?`<div class="dt-label" style="margin-top:16px">${icon('play')} Watch on</div><div class="dt-watchlinks">${links.map(l=>`<button class="dt-watchlink" onclick="openExternal('${escH(l.url).replace(/'/g,"\\'")}')">${schEsc(l.site)} ${icon('external')}</button>`).join('')}</div>`:'';
   // Official per-episode links AniList carries (Crunchyroll/etc. publish them) — legal, opens the source.
   const eps=((d.streamingEpisodes)||[]).filter(e=>e&&e.url&&e.title);
-  const epsHTML=eps.length?`<div class="dt-label" style="margin-top:16px">${icon('play')} Episodes<span class="dt-eps-tag">official</span></div><div class="dt-eps">${eps.slice(0,60).map(e=>{const th=safeImg(e.thumbnail||'');return `<button class="dt-ep" onclick="openExternal('${escH(e.url).replace(/'/g,"\\'")}')"><div class="dt-ep-img"${th?` style="background-image:url('${th}')"`:''}></div><div class="dt-ep-t">${schEsc(e.title)}</div></button>`;}).join('')}</div>`:'';
+  const epsHTML=eps.length?`<div class="dt-label" style="margin-top:16px">${icon('play')} Episodes<span class="dt-eps-tag">official</span></div><div class="dt-eps">${eps.slice(0,60).map(e=>{const th=safeImg(e.thumbnail||'');const yid=ytId(e.url);const act=yid?`playYouTube('${yid}')`:`openExternal('${escH(e.url).replace(/'/g,"\\'")}')`;return `<button class="dt-ep${yid?' yt':''}" onclick="${act}"><div class="dt-ep-img"${th?` style="background-image:url('${th}')"`:''}>${yid?`<span class="dt-ep-yt">${icon('play')}</span>`:''}</div><div class="dt-ep-t">${schEsc(e.title)}</div></button>`;}).join('')}</div>`:'';
   const desc=_stripHtml(d.description);
   const synHTML=desc?`<div class="dt-label" style="margin-top:16px">Synopsis</div><p class="dt-synopsis" onclick="this.classList.toggle('open')">${schEsc(desc)}</p>`:'';
   let trailerHTML='';

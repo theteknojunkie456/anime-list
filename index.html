@@ -3939,7 +3939,7 @@ function renderDetail(){
     <div class="dt-label">Status</div>
     <div class="dt-status">${statusBtns}</div>
         ${(()=>{const id=a.aniId||a.id;return kindOf(a)==="watch"?`<button class="dt-play" onclick="playOrFallback('${id}')">${icon('play')} Play Episode 1</button>`:"";})()}
-    ${kindOf(a)==='watch'?`<button class="dt-play" onclick="tryPlayOrFallback('${a.aniId || a.id}')">${icon('play')} Play Episode 1</button>`:''}
+    ${kindOf(a)==='watch'?`<button class="dt-play" onclick="playAnimeFromAniList('${a.aniId || a.id}', '${a.title}')>${icon('play')} Play Episode 1</button>`:''}
     ${progHTML}
     ${stars}
     ${seasonsHTML}
@@ -8617,22 +8617,43 @@ function playOrFallback(aniListId) {
     });
 }
 
-function tryPlayOrFallback(aniListId) {
-  // Try the Anikoto API first
-  fetch('https://api.anikoto.net/api/episodes/' + aniListId)
-    .then(r => r.json())
-    .then(data => {
-      if (Array.isArray(data) && data.length > 0) {
-        openPlayer(aniListId, 0);
-      } else {
-        // No episodes found, open AniList watch page
-        window.open('https://anilist.co/anime/' + aniListId + '/watch', '_blank');
-      }
-    })
-    .catch(() => {
-      // API down, open AniList watch page
-      window.open('https://anilist.co/anime/' + aniListId + '/watch', '_blank');
-    });
+// Map AniList ID to Gogoanime and play
+async function playAnimeFromAniList(aniListId, title) {
+  const videoEl = document.getElementById('anime-video');
+  const statusEl = document.getElementById('player-status');
+  
+  if (statusEl) statusEl.textContent = 'Loading...';
+  
+  try {
+    // Step 1: Get Gogoanime ID from AniList ID using a free API
+    const res = await fetch(`https://api.consumet.org/meta/anilist/anime/${aniListId}`);
+    const data = await res.json();
+    
+    if (!data.episodes || data.episodes.length === 0) {
+      if (statusEl) statusEl.textContent = 'No episodes found';
+      return;
+    }
+    
+    // Step 2: Get the first episode's stream URL
+    const ep = data.episodes[0];
+    const streamRes = await fetch(`https://api.consumet.org/anime/gogoanime/${ep.id}`);
+    const streamData = await streamRes.json();
+    
+    const videoUrl = streamData.sources[0]?.url || streamData.sources[0]?.iframe;
+    
+    if (videoUrl) {
+      // Open the player overlay
+      openPlayer(aniListId, 0);
+      videoEl.src = videoUrl;
+      videoEl.play();
+      if (statusEl) statusEl.textContent = '';
+    } else {
+      if (statusEl) statusEl.textContent = 'Stream not found';
+    }
+  } catch (err) {
+    console.error('Play error:', err);
+    if (statusEl) statusEl.textContent = 'Click to try again';
+  }
 }
 </script>
 

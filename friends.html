@@ -614,6 +614,15 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 .dt-rec:active .dt-rec-img{transform:scale(.95);}
 .dt-rec-img::after{content:'＋';position:absolute;right:5px;bottom:5px;width:24px;height:24px;border-radius:50%;background:linear-gradient(135deg,var(--a),var(--a2));color:#fff;font-size:16px;font-weight:700;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 8px rgba(0,0,0,.35);}
 .dt-rec-t{font-size:11.5px;color:var(--t2);line-height:1.3;margin-top:6px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.dt-eps{display:flex;flex-direction:column;gap:8px;margin-top:8px;}
+.dt-ep{display:flex;align-items:center;gap:12px;background:var(--bg3);border:1px solid var(--b1);border-radius:12px;padding:8px;text-align:left;cursor:pointer;transition:background .15s;}
+.dt-ep:active{background:var(--bg4);}
+.dt-ep-th{width:88px;height:50px;flex-shrink:0;border-radius:8px;background:var(--bg4) center/cover no-repeat;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.9);}
+.dt-ep-th .ico{width:20px;height:20px;filter:drop-shadow(0 1px 3px rgba(0,0,0,.6));}
+.dt-ep-b{flex:1;min-width:0;}
+.dt-ep-t{font-size:13px;font-weight:700;color:var(--t1);line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.dt-ep-s{font-size:11px;color:var(--t3);margin-top:3px;display:flex;align-items:center;gap:4px;}
+.dt-ep-s .ico{width:11px;height:11px;}
 .dt-seasons{display:flex;flex-direction:column;gap:8px;}
 .dt-season{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:var(--bg3);border:1px solid var(--b1);border-radius:13px;padding:9px 12px;transition:border-color .15s,background .15s;}
 .dt-season.cur{border-color:var(--a);background:var(--ag);}
@@ -3948,7 +3957,7 @@ async function loadRichDetail(aniId,forId){
   if(_richCache[aniId]){paint(_richCache[aniId]);return;}
   mount.innerHTML=`<div class="dt-rich-load">${icon('loader')} Loading details…</div>`;
   try{
-    const q=`query($id:Int){Media(id:$id,type:ANIME){description(asHtml:false) averageScore episodes duration format status season seasonYear source genres studios(isMain:true){nodes{name}} trailer{id site} characters(sort:ROLE,perPage:12){edges{role node{name{full} image{medium}}}} recommendations(sort:RATING_DESC,perPage:12){nodes{mediaRecommendation{id title{romaji english} coverImage{large} episodes}}}}}`;
+    const q=`query($id:Int){Media(id:$id,type:ANIME){description(asHtml:false) averageScore episodes duration format status season seasonYear source genres studios(isMain:true){nodes{name}} trailer{id site} streamingEpisodes{title thumbnail url site} characters(sort:ROLE,perPage:12){edges{role node{name{full} image{medium}}}} recommendations(sort:RATING_DESC,perPage:12){nodes{mediaRecommendation{id title{romaji english} coverImage{large} episodes}}}}}`;
     const r=await fetch('https://graphql.anilist.co',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({query:q,variables:{id:aniId}})});
     if(!r.ok)throw 0;
     const d=((await r.json()).data||{}).Media;if(!d)throw 0;
@@ -3977,7 +3986,9 @@ function richDetailHTML(d){
   const charsHTML=chars.length?`<div class="dt-label" style="margin-top:18px">Characters</div><div class="dt-chars">${chars.map(e=>{const n=e.node||{};const img=safeImg(((n.image||{}).medium)||'');const nm=((n.name||{}).full)||'';return `<div class="dt-char"><div class="dt-char-img"${img?` style="background-image:url('${img}')"`:''}></div><div class="dt-char-n">${schEsc(nm)}</div><div class="dt-char-r">${schEsc((e.role||'').toLowerCase())}</div></div>`;}).join('')}</div>`:'';
   const recs=(((d.recommendations||{}).nodes)||[]).map(n=>n&&n.mediaRecommendation).filter(Boolean);
   const recsHTML=recs.length?`<div class="dt-label" style="margin-top:18px">More like this</div><div class="dt-recs">${recs.map(m=>{const t=(m.title.english||m.title.romaji||'').replace(/'/g,'&#39;');const img=safeImg(((m.coverImage||{}).large)||'');return `<button class="dt-rec" onclick="addPopular(${m.id},'${t.replace(/"/g,'&quot;')}','${img}',${m.episodes||0})"><div class="dt-rec-img"${img?` style="background-image:url('${img}')"`:''}></div><div class="dt-rec-t">${schEsc(m.title.english||m.title.romaji||'')}</div></button>`;}).join('')}</div>`:'';
-  return metaHTML+synHTML+trailerHTML+charsHTML+recsHTML;
+  const seps=((d.streamingEpisodes)||[]).filter(e=>e&&e.url);
+  const epsHTML=seps.length?`<div class="dt-label" style="margin-top:18px">Episodes · ${seps.length}</div><div class="dt-eps">${seps.map(e=>{const th=safeImg(e.thumbnail||'');return `<button class="dt-ep" onclick="openExternal('${escH(e.url).replace(/'/g,"\\'")}')"><div class="dt-ep-th"${th?` style="background-image:url('${th}')"`:''}>${icon('play')}</div><div class="dt-ep-b"><div class="dt-ep-t">${schEsc(e.title||'Episode')}</div><div class="dt-ep-s">${schEsc(e.site||'Watch')} ${icon('external')}</div></div></button>`;}).join('')}</div>`:'';
+  return metaHTML+synHTML+trailerHTML+epsHTML+charsHTML+recsHTML;
 }
 // ─── FRANCHISE (every season of a title, on-list or not) ────────────────────
 // Seasons come from TWO independent sources so a gap in one can't hide a season:

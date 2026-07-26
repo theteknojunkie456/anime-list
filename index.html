@@ -8580,12 +8580,7 @@ document.addEventListener("keydown", (e) => {
 
 
 async function startAnimePlayback(aniListId) {
-  const overlay = document.getElementById('video-player-overlay');
-  const videoEl = document.getElementById('anime-video');
-  const statusEl = document.getElementById('player-status');
-  
-  if (overlay) overlay.classList.add('active');
-  if (statusEl) statusEl.textContent = 'Fetching stream...';
+  openPlayer(aniListId, 0);
   
   try {
     const apiUrl = 'https://api.consumet.org/meta/anilist/anime/' + aniListId;
@@ -8595,7 +8590,7 @@ async function startAnimePlayback(aniListId) {
     const data = await res.json();
     
     if (!data.episodes || data.episodes.length === 0) {
-      if (statusEl) statusEl.textContent = 'No episodes found';
+      playerStatus.textContent = 'No episodes found';
       return;
     }
     
@@ -8613,16 +8608,16 @@ async function startAnimePlayback(aniListId) {
     }
     
     if (videoUrl) {
-      videoEl.src = videoUrl;
-      videoEl.play().catch(e => console.log('Autoplay blocked:', e));
-      if (statusEl) statusEl.textContent = '';
+      playerVideo.src = videoUrl;
+      playerVideo.play().catch(e => console.log('Autoplay blocked:', e));
+      playerStatus.textContent = '';
     } else {
-      if (statusEl) statusEl.textContent = 'Stream URL not found';
+      playerStatus.textContent = 'Stream URL not found';
     }
     
   } catch (err) {
     console.error('Playback error:', err);
-    if (statusEl) statusEl.textContent = 'Error: ' + err.message;
+    playerStatus.textContent = 'Error: ' + err.message;
   }
 }
 </script>

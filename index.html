@@ -6644,35 +6644,56 @@ function addCustomServiceFromForm(){
     n.value='';u.value='';renderSource();
   }
 }
-// Describe-it-in-plain-English → your own AI writes the URL template. It only
-// ever produces a LINK for the browser to open on the site you name — never a
-// scraper or downloader.
+// Teach-by-example link learning. Paste a REAL working link for one show (say,
+// One Piece ep 199) and it generalizes into a token template that adapts to
+// every show. Taught links are remembered, so the pattern keeps improving.
+// Output is only ever a LINK for the browser to open, never a scraper.
+const SRC_EX_KEY='src_examples';
+function srcExamples(){try{const v=JSON.parse(localStorage.getItem(SRC_EX_KEY)||'[]');return Array.isArray(v)?v.filter(e=>e&&e.url):[];}catch{return[];}}
+function addSrcExample(url,note){
+  url=normSrc(String(url||'').trim());
+  if(!url||SRC_TOKEN_RE.test(url)||!/^https?:\/\//i.test(url))return;   // only concrete links, never a template
+  const list=srcExamples().filter(e=>e.url!==url);
+  list.unshift({url,note:String(note||'').slice(0,80)});
+  try{localStorage.setItem(SRC_EX_KEY,JSON.stringify(list.slice(0,8)));}catch{}
+}
+function clearSrcExamples(){try{localStorage.removeItem(SRC_EX_KEY);}catch{}refreshSrcExNote();toast('Taught links cleared');}
+function srcExNoteHTML(){const n=srcExamples().length;return n?`Learned from ${n} link${n>1?'s':''}, and adapting. <button type="button" onclick="clearSrcExamples()" style="background:none;border:0;color:var(--a2);text-decoration:underline;padding:0;font:inherit;cursor:pointer">reset</button>`:'';}
+function refreshSrcExNote(){const n=document.getElementById('srcExNote');if(n)n.innerHTML=srcExNoteHTML();}
+
 async function aiBuildSource(){
   const site=document.getElementById('srcCustom'), want=document.getElementById('srcAiWant');
   if(!site) return;
+  const raw=(site.value||'').trim(), note=(want&&want.value||'').trim();
+  // 1) Instant, free pass — our own recognizer already handles the common shapes
+  //    (/watch/one-piece/ep-199 becomes /watch/{slug}/ep-{ep};  ?q=naruto becomes ?q={query}).
+  if(raw&&!SRC_TOKEN_RE.test(raw)){
+    const mech=templatizeSearchURL(normSrc(raw));
+    if(SRC_TOKEN_RE.test(mech)){site.value=mech;addSrcExample(raw,note);refreshSrcExNote();try{csHintName();testSource();}catch(e){}toast('Pattern learned — check it, then Add site');return;}
+  }
+  // 2) Trickier links, or a plain-English wish — hand it to the user's own AI.
   if(!getKey()){toast('Add your AI key first');try{openKeySheet();}catch(e){}return;}
-  const s=(site.value||'').trim(), w=(want&&want.value||'').trim();
-  if(!s&&!w){toast('Type your site, or say what you want');return;}
-  const btn=document.getElementById('srcAiBtn'), old=btn?btn.innerHTML:'';
-  if(btn){btn.disabled=true;btn.textContent='Building…';}
+  if(!raw&&!note){toast('Paste a real link from your site, or say what you want');return;}
+  const btn=document.getElementById('srcAiBtn'), old=btn?btn.innerHTML:'', ex=srcExamples();
+  if(btn){btn.disabled=true;btn.textContent='Learning…';}
   try{
-    const prompt=`You build ONE link template that opens an anime or manga on a website. It is only a URL for the browser to open — never a scraper or downloader.
-Website: ${s||'(the user did not name one — use a well-known legal site, or a generic search template)'}
-What the link should do: ${w||'open the search results for the show'}
-Reply with ONLY the template on a single line — no quotes, no code fences, no explanation. It must start with http:// or https://.
-Drop these placeholders where a show's details belong:
-{query}=title as a search term, {queryplus}=title with + between words, {slug}=title-as-hyphens, {slug_}=title_with_underscores, {ep}=episode number, {ep2}/{ep3}=episode padded to 2 or 3 digits, {titleRomaji} {titleEnglish} {titleNative}=the exact title, {malId} {anilistId}=the show's id.
-When unsure, prefer a search URL with {query}.
+    const prompt=`You learn a website's link pattern and write ONE reusable link template. It is only a URL for a browser to open, never a scraper or downloader.
+${ex.length?`Working links the user already taught you (same site):\n${ex.map(e=>`- ${e.url}${e.note?`  (${e.note})`:''}`).join('\n')}\n`:''}New from the user: ${raw||'(no link given, use the description)'}
+What it is / what they want: ${note||'open the show, or a specific episode'}
+Generalize into ONE template: put a title or slug placeholder where the show name is, and {ep} where the episode number is. Reply with ONLY the template on one line, no quotes or fences or explanation, starting with http:// or https://.
+Placeholders: {query}=title as search text, {queryplus}=title+with+plus, {slug}=title-with-hyphens, {slug_}=title_with_underscores, {ep}=episode number, {ep2}/{ep3}=episode padded to 2 or 3 digits, {titleRomaji} {titleEnglish} {titleNative}=exact title, {malId} {anilistId}=id.
 Examples:
 https://example.com/search?q={query}
 https://example.com/watch/{slug}/episode-{ep}`;
     const out=String(await callAI(prompt)||'').trim();
     const m=out.match(/https?:\/\/\S+/);
-    if(!m){toast('The AI didn’t return a link — try wording it differently');return;}
+    if(!m){toast('The AI didn’t return a link, try wording it differently');return;}
     site.value=m[0].replace(/[\s"'`)\].,]+$/,'').replace(/\\/g,'');
+    if(raw)addSrcExample(raw,note);
+    refreshSrcExNote();
     try{csHintName();}catch(e){}
     try{testSource();}catch(e){}
-    toast('Link built — check it below, then Add site');
+    toast('Pattern learned — check it, then Add site');
   }catch(e){
     toast(e===NO_KEY?'Add your AI key first':'AI error — check your key and try again');
   }finally{
@@ -7209,7 +7230,7 @@ function renderSource(){
       <div class="src-picks">${REGIONAL_SERVICES
         .filter(s=>!customServices().some(c=>c.name.toLowerCase()===s.name.toLowerCase()))
         .map(s=>`<button class="src-chip" onclick="addRegional('${escH(s.name)}')">${escH(s.name)} <span style="opacity:.55">${escH(s.region)}</span></button>`).join('')}</div>
-      <input class="ai-prompt-in" id="srcCustom" placeholder="paste your site’s search page" value="${custom&&!WATCH_PRESETS.some(p=>p.url===custom)&&!customServices().some(s=>s.url===custom)?custom.replace(/"/g,'&quot;'):''}" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url" style="margin-top:10px" oninput="csHintName()">
+      <input class="ai-prompt-in" id="srcCustom" placeholder="paste a search page, or a real link to any episode" value="${custom&&!WATCH_PRESETS.some(p=>p.url===custom)&&!customServices().some(s=>s.url===custom)?custom.replace(/"/g,'&quot;'):''}" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url" style="margin-top:10px" oninput="csHintName()">
       <input class="ai-prompt-in" id="csName" placeholder="name (auto-filled)" value="" autocomplete="off" spellcheck="false" style="margin-top:8px">
       <div style="display:flex;gap:8px;margin-top:8px">
         <button class="parse-btn" style="flex:1" onclick="addCustomServiceFromForm()">Add site</button>
@@ -7218,10 +7239,11 @@ function renderSource(){
       <div id="srcTest" style="display:none;margin-top:8px;padding:9px 11px;border-radius:9px;background:var(--bg2);color:var(--t2);font:12px/1.45 ui-monospace,Menlo,monospace;word-break:break-all;white-space:pre-wrap"></div>
 
       <div class="src-ai">
-        <div class="src-ai-t">${icon('sparkles')} Not sure of the link? Just describe it.</div>
-        <input class="ai-prompt-in" id="srcAiWant" placeholder="e.g. open the search results for the show" autocomplete="off" style="margin-top:8px;background:var(--bg2)">
-        <button class="parse-btn" id="srcAiBtn" style="margin-top:8px" onclick="aiBuildSource()">${icon('sparkles')} Build the link with AI</button>
-        <p class="ai-desc" style="margin-top:7px;margin-bottom:0;font-size:11px">Put your site above, say what you want, and your own AI writes the address${getKey()?'':' (add your AI key first)'}. Check it, then Add site.</p>
+        <div class="src-ai-t">${icon('sparkles')} Teach it your site’s links</div>
+        <p class="ai-desc" style="margin-top:6px;margin-bottom:0;font-size:11.5px">Paste a real link that works above (say, One Piece episode 199) and it learns a pattern that opens <b>any</b> show. Or just describe what you want. Teach a few and it keeps adapting.</p>
+        <input class="ai-prompt-in" id="srcAiWant" placeholder="which show/episode is that link? or what you want" autocomplete="off" style="margin-top:8px;background:var(--bg2)">
+        <button class="parse-btn" id="srcAiBtn" style="margin-top:8px" onclick="aiBuildSource()">${icon('sparkles')} Learn the pattern</button>
+        <p class="ai-desc" id="srcExNote" style="margin-top:7px;margin-bottom:0;font-size:11px">${srcExNoteHTML()}</p>
       </div>
 
       <details class="src-fold nested" data-fold="adv"${O('adv')} style="margin-top:10px">

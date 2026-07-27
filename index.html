@@ -852,6 +852,13 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 .wn-dots{display:flex;justify-content:center;align-items:center;gap:7px;margin:14px 0 2px;}
 .wn-dot{width:7px;height:7px;border-radius:99px;background:var(--b2);transition:width .2s ease,background .2s ease;}
 .wn-dot.on{width:21px;background:var(--a);}
+/* Admin → Updates: the app's whole history, grouped by the day it shipped. */
+.upd-day{display:flex;align-items:center;gap:8px;margin:16px 0 7px;font-size:11px;font-weight:800;letter-spacing:.13em;text-transform:uppercase;color:var(--t3);}
+.upd-day::after{content:"";flex:1;height:1px;background:var(--b1);}
+.upd-day-n{order:3;font-size:10px;letter-spacing:.06em;color:var(--t3);opacity:.7;}
+.upd-row{display:flex;align-items:flex-start;gap:9px;padding:6px 0;}
+.upd-kind{flex:0 0 auto;margin-top:1px;padding:2px 7px;border-radius:99px;border:1px solid;font-size:9.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap;}
+.upd-txt{font-size:13px;line-height:1.5;color:var(--t2);}
 /* Watch-sheet options (official app: where to watch, tagged by source type) */
 .wt-nudge{display:flex;align-items:center;gap:10px;width:100%;text-align:left;margin:4px 0 2px;padding:12px 13px;border-radius:13px;background:var(--ag);border:1px solid color-mix(in srgb,var(--a) 30%,transparent);color:var(--t1);font-size:12.5px;font-weight:600;line-height:1.35;transition:transform .12s;}
 .wt-nudge:active{transform:scale(.98);}
@@ -2443,6 +2450,12 @@ function renderAdmin(){
       </div>
     </details>
 
+    <details class="src-fold" ontoggle="if(this.open)loadUpdates()">
+      <summary>${icon('clock')} Updates <span class="src-tag" id="updCount"></span></summary>
+      <p class="ai-desc" style="margin-top:8px">Every change since day one — features, fixes, iOS work, the lot. Straight from the repo.</p>
+      <div id="updList"><p class="ai-desc">Open to load…</p></div>
+    </details>
+
     <details class="src-fold">
       <summary>${icon('external')} Invite links</summary>
       <p class="ai-desc" style="margin-top:8px"><b>Request</b> = you approve each; <b>Auto</b> = approved on use.</p>
@@ -2460,6 +2473,75 @@ function renderAdmin(){
   try{getPushSub().then(sub=>{if(sub)adminCall('/admin-register',{subscription:sub});});}catch{}
 }
 function adminSaveToken(){const v=(document.getElementById('adminTkIn')||{}).value||'';if(!v.trim())return;setAdminToken(v.trim());renderAdmin();injectAdminNav();}
+
+// ─── UPDATES ────────────────────────────────────────────────────────────────
+// The app's whole history, read live from the public repo. Nothing is stored in
+// this file, so the log can never drift out of date — and 300+ entries cost the
+// download nothing. 100 commits a page, oldest kept until you ask for more.
+const UPD_REPO='theteknojunkie456/anime-list';
+let _updPage=0,_updRows=[],_updEnd=false,_updLoading=false;
+// What kind of change it was, read off how the commit describes itself. First
+// match wins, so the specific patterns sit above the catch-alls.
+const UPD_KINDS=[
+  [/^(fix|hotfix)\b|un-?break|crash|blank screen|no longer|stop(s|ped)? |revert/i,'Fix'],
+  [/\bios\b|iphone|testflight|app ?store|xcode|swift|native app|official app|broadcast ext/i,'iOS'],
+  [/security|harden|xss|escape|face ?id|touch ?id|lock\b|admin gate/i,'Security'],
+  [/party|watch ?together|turn\b|stun|webrtc|jitsi|voice|screen-?share/i,'Party'],
+  [/perf|speed|lag|faster|storage|cache|hydrat/i,'Speed'],
+  [/theme|polish|spacing|layout|brand|icon|glow|vignette|declutter|sheet|nav\b/i,'Polish'],
+  [/^(ci|chore|aider)|deploy|workflow|ignore|pipeline/i,'Build'],
+];
+function updKind(msg){for(const[re,name]of UPD_KINDS)if(re.test(msg))return name;return 'Feature';}
+const UPD_COL={Fix:'#ff6b6b','iOS':'#8b7cff',Security:'#ffc857',Party:'#4ecdc4',Speed:'#5bc8af',Polish:'#b3a8ff',Build:'var(--t3)',Feature:'var(--a)'};
+async function loadUpdates(){
+  const box=document.getElementById('updList');
+  if(!box||_updLoading||_updEnd&&_updRows.length)return;
+  if(_updRows.length){renderUpdates();return;}                 // already loaded once
+  _updLoading=true; box.innerHTML='<p class="ai-desc">Loading the history…</p>';
+  try{ await updFetchPage(); }
+  catch(e){ box.innerHTML='<p class="ai-desc">Couldn’t reach GitHub just now.</p>'; _updLoading=false; return; }
+  _updLoading=false; renderUpdates();
+}
+async function updFetchPage(){
+  const r=await fetch(`https://api.github.com/repos/${UPD_REPO}/commits?per_page=100&page=${_updPage+1}`,{headers:{Accept:'application/vnd.github+json'}});
+  if(!r.ok)throw new Error('http '+r.status);
+  const list=await r.json();
+  if(!Array.isArray(list)||!list.length){_updEnd=true;return;}
+  _updPage++;
+  if(list.length<100)_updEnd=true;
+  for(const c of list){
+    const full=((c.commit||{}).message||'').trim();
+    const title=full.split('\n')[0];
+    if(/^Merge (pull request|branch)/i.test(title))continue;    // plumbing, not progress
+    _updRows.push({t:title,d:((c.commit||{}).author||{}).date||'',k:updKind(full)});
+  }
+}
+async function updMore(){
+  if(_updLoading||_updEnd)return;
+  const btn=document.getElementById('updMoreBtn');
+  if(btn){btn.disabled=true;btn.textContent='Loading…';}
+  _updLoading=true;
+  try{ await updFetchPage(); }catch(e){}
+  _updLoading=false; renderUpdates();
+}
+// Grouped by day, newest first — the shape you actually read a changelog in.
+function renderUpdates(){
+  const box=document.getElementById('updList');if(!box)return;
+  const cnt=document.getElementById('updCount');
+  if(cnt)cnt.textContent=_updRows.length+(_updEnd?'':'+');
+  const days=[];
+  for(const row of _updRows){
+    const day=(row.d||'').slice(0,10);
+    if(!days.length||days[days.length-1].day!==day)days.push({day,rows:[]});
+    days[days.length-1].rows.push(row);
+  }
+  const fmt=d=>{try{return new Date(d+'T12:00:00').toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'});}catch{return d;}};
+  box.innerHTML=days.map(g=>`<div class="upd-day">${escH(fmt(g.day))}<span class="upd-day-n">${g.rows.length}</span></div>`
+      +g.rows.map(r=>`<div class="upd-row"><span class="upd-kind" style="color:${UPD_COL[r.k]||'var(--a)'};border-color:${UPD_COL[r.k]||'var(--a)'}33">${escH(r.k)}</span><span class="upd-txt">${escH(r.t)}</span></div>`).join('')
+    ).join('')
+    +(_updEnd?`<p class="ai-desc" style="text-align:center;margin:14px 0 2px">That’s day one — ${_updRows.length} changes in all.</p>`
+             :`<button class="parse-btn" id="updMoreBtn" style="margin-top:12px" onclick="updMore()">Load older</button>`);
+}
 async function loadMembers(){
   const box=document.getElementById('adminMembers');if(!box)return;
   let r;try{r=await adminCall('/members');}catch{box.innerHTML='<p class="ai-desc">Couldn’t reach the network.</p>';return;}

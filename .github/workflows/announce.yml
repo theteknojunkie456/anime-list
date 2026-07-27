@@ -1,15 +1,24 @@
 # Push a "what's new" notification to every subscriber when a release ships.
 #
-# Fires when index.html lands on main AND its RELEASE version changed since the
-# previous commit — so ordinary edits don't notify anyone, only a real version
-# bump does. Requires one repo secret: NOTIFY_ADMIN_TOKEN (must match the notify
+# Fires when index.html lands on main AND its RELEASE version changed over the
+# whole push — so ordinary edits don't notify anyone, only a real version bump
+# does. Requires one repo secret: NOTIFY_ADMIN_TOKEN (must match the notify
 # worker's ADMIN_TOKEN). Without it the job no-ops rather than failing loudly.
+#
+# Can also be run by hand (Actions → Announce release → Run workflow) with
+# `force` ticked, for when a release needs announcing after the fact.
 name: Announce release
 
 on:
   push:
     branches: [main]
     paths: ["index.html"]
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Announce the current RELEASE even if the version didn't change"
+        type: boolean
+        default: false
 
 jobs:
   announce:
@@ -22,15 +31,39 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 2   # need the previous commit to compare RELEASE versions
+          fetch-depth: 0   # need the whole push range to compare RELEASE versions
 
       - name: Skip if RELEASE version is unchanged
         id: check
+        env:
+          BEFORE: ${{ github.event.before }}
+          FORCE: ${{ inputs.force }}
         run: |
+          release_v() {  # RELEASE version at a given ref, empty if unreadable
+            git show "$1:index.html" 2>/dev/null | grep -A3 'const RELEASE=' | grep -m1 -oE "v:'[^']+'" || true
+          }
           # Anchor to the RELEASE block — there are other v:'…' fields in the file.
           cur=$(grep -A3 'const RELEASE=' index.html | grep -m1 -oE "v:'[^']+'" || true)
-          prev=$(git show HEAD~1:index.html 2>/dev/null | grep -A3 'const RELEASE=' | grep -m1 -oE "v:'[^']+'" || true)
-          echo "current=$cur previous=$prev"
+
+          if [ "$FORCE" = "true" ]; then
+            echo "forced — announcing $cur"
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Compare against the commit the push STARTED from, not HEAD~1. A push
+          # carrying several commits (bump the version, then keep working) left
+          # HEAD~1 already holding the new version, so the release announced to
+          # nobody. Falls back to HEAD~1 for a first push / unknown base.
+          base=""
+          case "$BEFORE" in
+            ""|0000000000000000000000000000000000000000) ;;
+            *) git cat-file -e "$BEFORE^{commit}" 2>/dev/null && base="$BEFORE" ;;
+          esac
+          [ -n "$base" ] || base="HEAD~1"
+
+          prev=$(release_v "$base")
+          echo "current=$cur previous=$prev (base=$base)"
           if [ "$cur" = "$prev" ]; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else

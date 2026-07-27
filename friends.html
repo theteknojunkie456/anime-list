@@ -849,6 +849,17 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 .wn-dots{display:flex;justify-content:center;align-items:center;gap:7px;margin:14px 0 2px;}
 .wn-dot{width:7px;height:7px;border-radius:99px;background:var(--b2);transition:width .2s ease,background .2s ease;}
 .wn-dot.on{width:21px;background:var(--a);}
+/* Episode cells that fall back to the show's cover — dimmed so the number reads. */
+.dt-ep.generic .dt-ep-img{position:relative;background-size:cover;background-position:center;}
+.dt-ep.generic .dt-ep-img::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.35),rgba(0,0,0,.72));border-radius:inherit;}
+.dt-ep-n{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:1;font-family:var(--fd);font-weight:800;font-size:19px;color:#fff;text-shadow:0 2px 10px rgba(0,0,0,.6);}
+.dt-ep.seen{opacity:.55;}
+.dt-ep.next .dt-ep-img{box-shadow:0 0 0 2px var(--a);}
+/* Shown only when a framed site never paints — see pvWatchBlocked(). */
+.pv-blocked{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:none;text-align:center;padding:18px 20px;border-radius:16px;background:var(--bg2);border:1px solid var(--b2);max-width:280px;z-index:3;}
+.pv-blocked.on{display:block;}
+.pv-blocked-t{font-family:var(--fd);font-weight:800;font-size:15px;color:var(--t1);}
+.pv-blocked-s{font-size:12.5px;line-height:1.5;color:var(--t2);margin-top:6px;}
 /* Sources → one-paste setup: the front door for "use my own site". */
 .src-quick{margin:12px 0 4px;padding:14px 15px;border-radius:16px;background:var(--bg3);border:1px solid var(--b2);}
 .src-quick-t{font-family:var(--fd);font-weight:800;font-size:13.5px;color:var(--t1);display:flex;align-items:center;gap:7px;}
@@ -2025,6 +2036,14 @@ body.recsel .pcard{position:relative;}
        whole app away — the two things streaming-ad networks do. -->
   <div class="pv-frame-wrap"><iframe id="pvFrame" class="pv-frame" sandbox="allow-scripts allow-same-origin allow-forms allow-presentation allow-orientation-lock" allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowfullscreen referrerpolicy="no-referrer"></iframe>
     <div class="pv-pause" id="pvPause"><div class="pv-pause-ico" aria-hidden="true"></div><div class="pv-pause-t">Host paused</div><div class="pv-pause-s">Pause your video too — you'll all resume together</div></div>
+    <!-- Some sites forbid being shown inside another page (X-Frame-Options). The
+         browser refuses before we get a say, and it looks identical to a slow
+         load — so this surfaces after a grace period rather than guessing. -->
+    <div class="pv-blocked" id="pvBlocked">
+      <div class="pv-blocked-t">Still blank?</div>
+      <div class="pv-blocked-s">Some sites don't allow being opened inside another app.</div>
+      <button class="parse-btn" style="margin-top:10px;width:auto;padding:0 18px" onclick="pvOpenExternal()">Open in browser</button>
+    </div>
   </div>
   <!-- binge controls: only shown when a custom source can target a specific episode
        (an {ep} token) — hidden for search/plain sources and for reading, where
@@ -4222,6 +4241,33 @@ function renderHome(){
 }
 
 // ─── DETAIL ─────────────────────────────────────────────────────────────────
+// ─── "EPISODE IS OUT" DEEP LINK ─────────────────────────────────────────────
+// The airing push carries /?show=<anilistId>. Opening it should land ON that
+// show, not the home screen. Works both ways in: a cold start reads the query,
+// and a tab that was already open gets a message from the service worker.
+function openShowByAni(aniId){
+  const n=parseInt(aniId,10); if(!n)return false;
+  const it=anime.find(a=>+a.aniId===n); if(!it)return false;
+  try{closeAll();}catch(e){}
+  openDetail(it.id);
+  return true;
+}
+function consumeShowParam(url){
+  let q=''; try{q=new URL(url||location.href,location.href).searchParams.get('show')||'';}catch(e){}
+  if(!q)return;
+  // Retry briefly: the list may still be decrypting/loading on a cold start.
+  let tries=0;
+  const go=()=>{ if(openShowByAni(q)||++tries>20)return; setTimeout(go,300); };
+  go();
+  // Drop it from the address bar so a refresh doesn't reopen the sheet forever.
+  try{const u=new URL(location.href);u.searchParams.delete('show');history.replaceState(null,'',u.pathname+u.search+u.hash);}catch(e){}
+}
+try{
+  if(navigator.serviceWorker)navigator.serviceWorker.addEventListener('message',e=>{
+    if(e&&e.data&&e.data.type==='wl-open'&&e.data.url)consumeShowParam(e.data.url);
+  });
+}catch(e){}
+setTimeout(()=>{try{consumeShowParam();}catch(e){}},700);
 function openDetail(id){
   if(recSel){if(recSel.has(id))recSel.delete(id);else recSel.add(id);updateRecSelBar();render();return;}   // selection mode: tap toggles
   detailId=id;
@@ -4330,7 +4376,7 @@ function renderDetail(){
     ${notesHTML}
     <div class="dt-label" style="margin-top:18px"></div>
     <div id="ai-box-detail"></div>
-    ${(kindOf(a)==='watch'&&a.aniId)?`<button class="dt-watch" onclick="watchAnime('${a.id}')">${icon('play')} ${watchEpisode(a)?`Watch Episode ${watchEpisode(a)}`:'Watch now'}</button>
+    ${(kindOf(a)==='watch'&&a.aniId)?`<button class="dt-watch" onclick="watchAnime('${a.id}')">${icon('play')} ${(a.ep||0)>0?'Continue Watching':'Start Watching'}</button>
     ${titleWatchPickerHTML(a)}
     <button class="dt-pin-toggle" onclick="togglePin()">${icon('external')} ${a.srcUrl?'Advanced: edit the direct link':'Advanced: paste a direct episode link'}</button>
     <div id="dtPin" style="display:none">
@@ -4343,7 +4389,7 @@ function renderDetail(){
       <div id="dtPinOut" style="display:none;margin-top:8px;padding:9px 11px;border-radius:9px;background:var(--bg2);color:var(--t2);font:12px/1.45 ui-monospace,Menlo,monospace;word-break:break-all;white-space:pre-wrap"></div>
       <p class="ai-desc" style="margin-top:8px;font-size:11px">Set once for this show — Watch goes straight here. Put <code>{ep}</code> where the episode number goes; Next/Prev then auto-advance.</p>
     </div>`:''}
-    ${kindOf(a)==='read'?`<button class="dt-watch" onclick="readManga('${a.id}')">${icon('book')} Read now</button>
+    ${kindOf(a)==='read'?`<button class="dt-watch" onclick="readManga('${a.id}')">${icon('book')} ${(a.ep||0)>0?'Continue Reading':'Start Reading'}</button>
     <button class="dt-pin-toggle" onclick="togglePin()">${icon('external')} ${a.srcUrl?'Direct link pinned — edit':'Pin a direct link for this title'}</button>
     <div id="dtPin" style="display:none">
       <input class="ai-prompt-in" id="dtPinIn" placeholder="https://reader.com/manga/{slug}" value="${escH(a.srcUrl||'')}" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url">
@@ -4416,22 +4462,31 @@ function richDetailHTML(d,forId){
   const eps=((d.streamingEpisodes)||[]).filter(e=>e&&e.url&&e.title);
   const epTotalN=(d.episodes||(_it&&_it.epTotal)||0);
   let epsHTML='';
-  if(_hasSrc&&epTotalN>0){
-    // Custom source + known count → EVERY episode is tappable and opens your source
-    // at that exact number (not just the few AniList lists). Watched ones dim; next is lit.
-    const cur=(_it&&_it.ep)||0,N=Math.min(epTotalN,600),cells=[];
-    for(let n=1;n<=N;n++)cells.push(`<button class="dt-epn${n<=cur?' seen':(n===cur+1?' next':'')}" onclick="watchEpAt('${forId}',${n})">${n}</button>`);
-    epsHTML=`<div class="dt-label" style="margin-top:16px">${icon('play')} Episodes<span class="dt-eps-tag">your source</span></div><div class="dt-epgrid">${cells.join('')}</div>`;
-  }else if(!eps.length&&epTotalN>0&&forId){
-    // No source set and AniList lists no episodes — still show every episode.
-    // A show's episode list is the thing you came to the page for; it shouldn't
-    // depend on whether a third party happened to publish per-episode links.
-    // Tapping goes through watchAnime, so it obeys Sources like everything else.
-    const cur=(_it&&_it.ep)||0,N=Math.min(epTotalN,600),cells=[];
-    for(let n=1;n<=N;n++)cells.push(`<button class="dt-epn${n<=cur?' seen':(n===cur+1?' next':'')}" onclick="watchAnime('${forId}',${n})">${n}</button>`);
-    epsHTML=`<div class="dt-label" style="margin-top:16px">${icon('play')} Episodes<span class="dt-eps-tag">${epTotalN} total</span></div><div class="dt-epgrid">${cells.join('')}</div>`;
-  }else if(eps.length){
-    epsHTML=`<div class="dt-label" style="margin-top:16px">${icon('play')} Episodes<span class="dt-eps-tag">${_hasSrc?'your source':'official'}</span></div><div class="dt-eps">${eps.slice(0,60).map((e,i)=>{const th=safeImg(e.thumbnail||'');const yid=ytId(e.url);const en=(String(e.title).match(/\d+/)||[])[0];const epN=en?+en:(i+1);const act=(_hasSrc||(forId&&noSourceMode()))?`watchAnime('${forId}',${epN})`:(yid?`playYouTube('${yid}')`:`openExternal('${escH(e.url).replace(/'/g,"\\'")}')`);return `<button class="dt-ep${yid&&!_hasSrc?' yt':''}" onclick="${act}"><div class="dt-ep-img"${th?` style="background-image:url('${th}')"`:''}>${yid&&!_hasSrc?`<span class="dt-ep-yt">${icon('play')}</span>`:''}</div><div class="dt-ep-t">${schEsc(e.title)}</div></button>`;}).join('')}</div>`;
+  // EVERY show gets its episodes listed. The count comes from whatever knows it:
+  // AniList's total, your own tracked total, how far it has aired, or — for a
+  // show still running with none of those — the episodes AniList does list.
+  // Only a show with no episode information anywhere shows nothing.
+  const epCount=Math.max(epTotalN|0,(_it&&_it.airEp)|0,eps.length|0);
+  if(epCount>0&&forId){
+    // Thumbnails where AniList published them, plain numbers everywhere else, in
+    // one continuous list — so ep 12 looks like ep 11 even when only the first
+    // few carry art. Watched ones dim, the next one is lit. Every tap goes
+    // through watchAnime, so it obeys Sources exactly like Watch does.
+    const cur=(_it&&_it.ep)||0,N=Math.min(epCount,600);
+    const art={};
+    eps.forEach((e,i)=>{const en=(String(e.title).match(/\d+/)||[])[0];const n=en?+en:(i+1);if(!art[n])art[n]={img:safeImg(e.thumbnail||''),title:e.title};});
+    // Every cell carries art: AniList's own episode still where it published one,
+    // otherwise the show's cover, dimmed with the number over it — so the strip
+    // reads as one list instead of photos trailing off into bare boxes.
+    const fallbackImg=safeImg((_it&&(_it.img||_it.banner))||'');
+    const cells=[];
+    for(let n=1;n<=N;n++){
+      const cls=n<=cur?' seen':(n===cur+1?' next':'');
+      const a2=art[n], img=(a2&&a2.img)||fallbackImg;
+      cells.push(`<button class="dt-ep${cls}${a2&&a2.img?'':' generic'}" onclick="watchAnime('${forId}',${n})"><div class="dt-ep-img"${img?` style="background-image:url('${img}')"`:''}>${a2&&a2.img?'':`<span class="dt-ep-n">${n}</span>`}</div><div class="dt-ep-t">${a2?schEsc(a2.title):('Episode '+n)}</div></button>`);
+    }
+    const tag=_hasSrc?'your source':(epTotalN?`${epTotalN} total`:`${N} so far`);
+    epsHTML=`<div class="dt-label" style="margin-top:16px">${icon('play')} Episodes<span class="dt-eps-tag">${tag}</span></div><div class="dt-eps">${cells.join('')}</div>`;
   }
   const desc=_stripHtml(d.description);
   const synHTML=desc?`<div class="dt-label" style="margin-top:16px">Synopsis</div><p class="dt-synopsis" onclick="this.classList.toggle('open')">${schEsc(desc)}</p>`:'';
@@ -6511,7 +6566,13 @@ async function watchAnime(id,epArg){
   // and a custom source that blocked framing (TVING, Prime, Wavve…) just showed
   // a black rectangle with no way back to the show.
   const ep0=reqEp||watchEpisode(a);
-  if(!embedTarget(streamURL(a,ep0).url||src)){
+  // Stay in WatchList wherever the web allows it. A site that sends
+  // X-Frame-Options / frame-ancestors genuinely cannot be rendered inside another
+  // page — that's the browser refusing, not something we can code around — so the
+  // player watches for a frame that never paints and offers the browser then.
+  // Only the built-in legal presets (which we know refuse) go straight out.
+  const _own=!!(a.srcUrl&&String(a.srcUrl).trim())||!!streamSource();
+  if(!_own&&!embedTarget(streamURL(a,ep0).url||src)){
     armExternalWatch(a,ep0||1);
     openExternal(launchURL(a,ep0));
     toast(`Opening ${sourceName()} for “${a.title}”`);
@@ -6536,7 +6597,19 @@ async function watchAnime(id,epArg){
   // Only custom {ep} sources reach here (default Watch opened a legal site externally
   // above), so this is always the user's own embeddable player URL.
   f.src=streamURL(a,ep).url;
+  pvWatchBlocked(f);
   savePvSession(id,ep,'watch');   // survive an iOS background/reload mid-stream
+}
+// A frame the site refused to render looks exactly like one that's still loading,
+// and cross-origin rules mean we can't inspect it to tell them apart. So: hide the
+// escape hatch, and reveal it only if nothing has painted after a fair wait.
+let _pvBlockT=0;
+function pvWatchBlocked(f){
+  const box=document.getElementById('pvBlocked'); if(!box)return;
+  box.classList.remove('on'); clearTimeout(_pvBlockT);
+  let painted=false;
+  try{f.addEventListener('load',()=>{painted=true;},{once:true});}catch(e){}
+  _pvBlockT=setTimeout(()=>{ if(!painted)box.classList.add('on'); },5000);
 }
 // Reading source (AsuraScans by default). AsuraScans series live at
 // /comics/<slug>-<suffix>, where the suffix is a CONSTANT site-wide token (not a
@@ -8784,13 +8857,13 @@ function _updBusy(){
 // you'd explain it to a friend — what they can now do, not what the code does.
 // No version numbers or jargon in the notes; the date IS the version.
 const RELEASE={
-  v:'2026-07-27.5',
-  title:'Every episode, one button',
-  push:'Every show now lists all its episodes — and Watch is one button, not two.',
+  v:'2026-07-27.6',
+  title:'Every episode, with art',
+  push:'Every show now lists every episode with artwork, and new-episode alerts open the show itself.',
   notes:[
-    'Open any show and you get <b>every episode</b>, numbered. Watched ones dim, the next one is lit — tap any of them to jump there.',
-    'The two buttons that did the same thing are now one: <b>Watch Episode 5</b> tells you exactly where you are picking up.',
-    'Watching somewhere we do not list? <b>Sources</b> now sets your own site up from a single pasted link.',
+    'Open any show and you get <b>every episode</b> with artwork — official stills where they exist, the show\u2019s own art everywhere else. Watched ones dim, the next is lit.',
+    'One button instead of two: <b>Start Watching</b> until you begin, <b>Continue Watching</b> after that.',
+    'When a new episode drops, tapping the alert now takes you <b>straight to that show</b>. And your own site opens inside WatchList instead of throwing you out — where the site allows it.',
   ],
 };
 const SEEN_REL='seen_release';

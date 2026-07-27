@@ -36,7 +36,15 @@ self.addEventListener('notificationclick', e => {
   const url = (e.notification.data && e.notification.data.url) || './';
   e.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
-      for (const c of list) { if ('focus' in c) return c.focus(); }
+      for (const c of list) {
+        if (!('focus' in c)) continue;
+        // Focusing alone left them on whatever screen they were already on, so the
+        // notification's deep link did nothing. Tell the page where to go — and
+        // navigate as a fallback for clients that ignore the message.
+        try { c.postMessage({ type: 'wl-open', url: url }); } catch (e) {}
+        if (c.navigate && !c.url.endsWith(url)) { try { c.navigate(url); } catch (e) {} }
+        return c.focus();
+      }
       if (self.clients.openWindow) return self.clients.openWindow(url);
     })
   );

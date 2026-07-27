@@ -935,7 +935,9 @@ async function handleScheduled(env) {
       const payload = {
         title: airing.title,
         body: `Episode ${airing.episode} is out!`,
-        url: "/",
+        // Deep-link straight at the show in their list, rather than the home
+        // screen — the whole point of the alert is "go watch this one".
+        url: `/?show=${mediaId}`,
         tag: `aired-${mediaId}-${airing.episode}`,
       };
 

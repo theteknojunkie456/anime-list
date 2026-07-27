@@ -150,6 +150,25 @@ export default {
           .map(x => ({ name: str(x && x.name, 60), url: str(x && x.url, 400) }))
           .filter(x => x.name && /^https?:\/\//i.test(x.url)),
         hidden: (Array.isArray(p.hidden) ? p.hidden : []).slice(0, 60).map(x => str(x, 60)).filter(Boolean),
+        // The learned material: links they taught it, and what this site calls
+        // each show (keyed by AniList id). Bounded so a mailbox entry stays small.
+        examples: (Array.isArray(p.examples) ? p.examples : []).slice(0, 8)
+          .map(x => ({ url: str(x && x.url, 400), note: str(x && x.note, 80) }))
+          .filter(x => /^https?:\/\//i.test(x.url)),
+        host: str(p.host, 120).toLowerCase(),
+        slugs: (() => {
+          const src = (p.slugs && typeof p.slugs === 'object') ? p.slugs : {};
+          const out = {};
+          let n = 0;
+          for (const k of Object.keys(src)) {
+            if (n >= 400) break;
+            if (!/^\d{1,9}$/.test(k)) continue;
+            const v = str(src[k], 120);
+            if (!v) continue;
+            out[k] = v; n++;
+          }
+          return out;
+        })(),
       };
       if (!pack.src && !pack.services.length) return json({ error: 'empty pack' }, 400, cors);
       const key = 'src:' + to;

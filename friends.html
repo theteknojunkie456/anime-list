@@ -6561,7 +6561,7 @@ function fillSourceTokens(template,a,ep){
   // user set (see pvSetFromURL). It beats anything we can derive, because the
   // site's own spelling is the only one that's authoritative — "Initial D" is
   // "initial-d-first-stage" on one site and "initial_d" on the next.
-  const _slug=(a&&a.srcSlug&&String(a.srcSlug).trim())||streamSlug(slugTitle(a));
+  const _slug=(a&&a.srcSlug&&String(a.srcSlug).trim())||learnedSlugFor(a)||streamSlug(slugTitle(a));
   const txt={title:t,query:t,slug:_slug,slug_:_slug.replace(/-/g,'_'),titleenglish:a.titleEn||t,titleromaji:a.titleRo||t,titlenative:a.titleNa||t}; // url-encoded ({slug_}=attack_on_titan)
   return String(template||'').replace(/\{(\w+)\}/g,(m,k)=>{
     const key=k.toLowerCase();
@@ -6731,6 +6731,7 @@ function pvSetFromURL(){
   }
   if(!learnedSlug){toast('Couldn’t read a show name from that address');return;}
   a.srcSlug=learnedSlug.replace(/[_-]?(ep|episode)[-_]?\d+$/i,'');
+  setLearnedSlug(a,a.srcSlug,tplNow);        // keyed by site, so it can be synced and shared
   // If the page's shape differs from the current template, adopt the new shape
   // too — that's the same recognizer the one-paste setup uses.
   const reshaped=templatizeSearchURL(url);
@@ -7160,17 +7161,48 @@ function clearSrcExamples(){try{localStorage.removeItem(SRC_EX_KEY);}catch{}refr
 function srcExNoteHTML(){const n=srcExamples().length;return n?`Learned from ${n} link${n>1?'s':''}, and adapting. <button type="button" onclick="clearSrcExamples()" style="background:none;border:0;color:var(--a2);text-decoration:underline;padding:0;font:inherit;cursor:pointer">reset</button>`:'';}
 function refreshSrcExNote(){const n=document.getElementById('srcExNote');if(n)n.innerHTML=srcExNoteHTML();}
 
+// ─── WHAT EACH SITE CALLS EACH SHOW ─────────────────────────────────────────
+// The corrections learned from "Set the right one" are the most valuable thing
+// in the app and the most tedious to rebuild, so they're kept in one place that
+// can be synced and handed to someone else — rather than only on the list item.
+//
+// Keyed by SITE, because a slug is only true for the site it was learned on:
+// anineko may call it initial-d-first-stage where another site says initial_d.
+// Applying one site's names to a different site would break working links.
+const SLUG_MAP_KEY='site_slugs';
+function srcHost(tpl){try{return new URL(String(tpl||'').replace(/\{[^}]+\}/g,'x')).hostname.replace(/^www\./,'').toLowerCase();}catch{return '';}}
+function slugMap(){try{const v=JSON.parse(localStorage.getItem(SLUG_MAP_KEY)||'{}');return (v&&typeof v==='object')?v:{};}catch{return{};}}
+function saveSlugMap(m){try{localStorage.setItem(SLUG_MAP_KEY,JSON.stringify(m));}catch{}}
+function setLearnedSlug(a,slug,tpl){
+  const host=srcHost(tpl||effectiveSource(a)); if(!host||!a||!a.aniId||!slug)return;
+  const m=slugMap(); (m[host]=m[host]||{})[String(a.aniId)]=String(slug).slice(0,120); saveSlugMap(m);
+}
+// Works for shows that aren't even on their list yet — the name is a fact about
+// the site, not about whether you happen to be tracking the show.
+function learnedSlugFor(a){
+  if(!a||!a.aniId)return '';
+  const host=srcHost(effectiveSource(a)); if(!host)return '';
+  return (slugMap()[host]||{})[String(a.aniId)]||'';
+}
 // ─── SHARE YOUR SETUP ───────────────────────────────────────────────────────
 // Getting a streaming site working is the hardest part of the app, and it only
 // has to be solved once per site — so someone who has it working can hand the
 // whole thing to a friend. Nothing is applied silently: it arrives as an offer,
 // they see exactly what they're getting, and they choose.
 function mySourcePack(){
+  const tpl=streamSource()||'';
+  const host=srcHost(tpl);
+  // Only the names learned for THIS site travel with it — another site's slugs
+  // would resolve to pages that don't exist.
+  const slugs=host?(slugMap()[host]||{}):{};
   return {
-    src:streamSource()||'',
+    src:tpl,
     slugPref:(typeof slugPref==='function'&&slugPref())||'',
     services:customServices().map(s=>({name:s.name,url:s.url})),
     hidden:hiddenSrc(),
+    examples:srcExamples(),      // the links you taught it — what it adapts from
+    host,
+    slugs,                       // aniId → what this site calls that show
   };
 }
 // Plain-language description of a pack — the same words for the sender's preview
@@ -7181,6 +7213,9 @@ function packSummary(p){
     bits.push(h?`Watch opens <b>${escH(h)}</b>`:'their Watch setting');
     if(/\{ep\d?\}/i.test(p.src))bits.push('straight to the right episode');}
   if(p.services&&p.services.length)bits.push(`${p.services.length} site${p.services.length>1?'s':''} they added`);
+  const nSlugs=p.slugs?Object.keys(p.slugs).length:0;
+  if(nSlugs)bits.push(`<b>${nSlugs} show${nSlugs>1?'s':''}</b> they already fixed by hand`);
+  if(p.examples&&p.examples.length)bits.push(`what it learned from ${p.examples.length} link${p.examples.length>1?'s':''}`);
   if(p.hidden&&p.hidden.length)bits.push(`${p.hidden.length} hidden from the list`);
   return bits.length?bits.join(' · '):'their source settings';
 }
@@ -7249,6 +7284,13 @@ async function acceptSrcPack(id){
   (p.hidden||[]).forEach(h=>{try{const cur=hiddenSrc();if(!cur.includes(h)){cur.push(h);localStorage.setItem(HIDE_KEY,JSON.stringify(cur));}}catch(_){}});
   if(p.slugPref){try{setSlugPref(p.slugPref);}catch(_){}}
   if(p.src){try{setSource(p.src);}catch(_){}}
+  // The learned names land under the site they belong to, so they apply to shows
+  // this person hasn't even added yet — and never to a different site.
+  if(p.slugs&&p.host){try{
+    const m=slugMap(); m[p.host]=Object.assign({},m[p.host]||{},p.slugs); saveSlugMap(m);
+  }catch(_){}}
+  if(Array.isArray(p.examples))p.examples.forEach(e=>{try{addSrcExample(e.url,e.note);}catch(_){}});
+  try{refreshSrcExNote();}catch(_){}
   await clearSrcPack(id);
   closeAll();
   toast(`You’re set up like ${escH((e.from&&e.from.name)||'your friend')}`);
@@ -9121,13 +9163,13 @@ function _updBusy(){
 // you'd explain it to a friend — what they can now do, not what the code does.
 // No version numbers or jargon in the notes; the date IS the version.
 const RELEASE={
-  v:'2026-07-27.9',
-  title:'Share how you watch',
-  push:'You can now hand your whole streaming setup to a friend — they tap Accept and they\u2019re done.',
+  v:'2026-07-28',
+  title:'Hand someone your whole setup',
+  push:'Share your streaming setup with anyone you pick — including every show you fixed by hand.',
   notes:[
-    'Got your site working? Open <b>Sources</b> and tap <b>Share my setup with a friend</b>.',
-    'They get a plain-English summary of what you\u2019re sending — nothing is applied unless they tap <b>Accept</b>, and it never touches your own settings.',
-    'Accepting copies your site, the ones you added, and your preferences straight over. No pasting, no setup.',
+    'Open <b>Sources</b> \u2192 <b>Share my setup with a friend</b>, pick who, send.',
+    'They get everything: your site, the sites you added, the links you taught it, and <b>every show you corrected by hand</b> \u2014 so shows that never worked for them just work.',
+    'They see in plain words what they are getting and choose <b>Accept</b>. It never changes your settings, and it adds to theirs instead of replacing.',
   ],
 };
 const SEEN_REL='seen_release';

@@ -3467,8 +3467,11 @@ function resumeItems(pool){
   // series collapsed to one card, most-recently-touched first. (The old separate
   // "Watching" row was merged in here — see renderHome. The "Watching" tab up top
   // is unaffected and still lists every title.)
+  // Shows with new episodes waiting (you're "behind") float to the front — the
+  // most-pressing thing to watch — then fall back to most-recently-touched.
+  const behindMap={};try{behindItems().forEach(x=>{if(x&&x.a)behindMap[x.a.id]=x.behind||0;});}catch(e){}
   const list=pool.filter(a=>a.status==='watching' && kindOf(a)==='watch')
-    .sort((a,b)=>(b.upd||0)-(a.upd||0));
+    .sort((a,b)=>{const ba=behindMap[a.id]||0,bb=behindMap[b.id]||0;return ba!==bb?bb-ba:(b.upd||0)-(a.upd||0);});
   return collapseSeries(list).map(c=>c.a);
 }
 function resumeRailHTML(items,isRead){

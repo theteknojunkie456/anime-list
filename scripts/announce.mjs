@@ -43,8 +43,10 @@ async function main() {
   const html = await readFile(INDEX, "utf8");
   const rel = extractRelease(html);
   const title = stripTags(rel.title || "WatchList update");
-  // Notes → one compact line. Keep it short; push bodies get truncated by the OS.
-  let body = (rel.notes || []).map(stripTags).join(" • ");
+  // A lock screen shows roughly one line and hides the rest behind a long-press,
+  // so RELEASE.push (one punchy headline) wins when it's there. Falling back to
+  // the joined notes keeps older releases working, just far less glanceable.
+  let body = stripTags(rel.push || "").trim() || (rel.notes || []).map(stripTags).join(" • ");
   if (body.length > 350) body = body.slice(0, 347) + "…";
 
   const res = await fetch(NOTIFY_URL + "/broadcast", {

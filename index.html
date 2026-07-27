@@ -4103,7 +4103,7 @@ let _richCache={};
 function _stripHtml(s){return String(s||'').replace(/<br\s*\/?>(\s*)/gi,'\n').replace(/<[^>]+>/g,'').replace(/\n{3,}/g,'\n\n').trim();}
 async function loadRichDetail(aniId,forId){
   const mount=document.getElementById('dtRich');if(!mount)return;
-  const paint=d=>{if(detailId!==forId)return;const el=document.getElementById('dtRich');if(el)el.innerHTML=richDetailHTML(d);};
+  const paint=d=>{if(detailId!==forId)return;const el=document.getElementById('dtRich');if(el)el.innerHTML=richDetailHTML(d,forId);};
   if(_richCache[aniId]){paint(_richCache[aniId]);return;}
   mount.innerHTML=`<div class="dt-rich-load">${icon('loader')} Loading details…</div>`;
   try{
@@ -4127,7 +4127,8 @@ function playYouTube(videoId){
   ov._esc=function(e){if(e.key==='Escape')closeYouTube();};document.addEventListener('keydown',ov._esc);
 }
 function closeYouTube(){const ov=document.getElementById('ytOverlay');if(!ov)return;if(ov._esc)document.removeEventListener('keydown',ov._esc);ov.remove();document.body.classList.remove('yt-open');}
-function richDetailHTML(d){
+function richDetailHTML(d,forId){
+  const _it=forId?anime.find(x=>x.id===forId):null;const _hasSrc=!!(_it&&effectiveSource(_it));   // user set their own source → episodes route to it
   const cap=s=>String(s||'').replace(/_/g,' ').toLowerCase().replace(/\b\w/g,c=>c.toUpperCase());
   const meta=[];
   if(d.averageScore)meta.push(`${icon('star')}${d.averageScore}%`);
@@ -4142,7 +4143,7 @@ function richDetailHTML(d){
   const linksHTML=links.length?`<div class="dt-label" style="margin-top:16px">${icon('play')} Watch on</div><div class="dt-watchlinks">${links.map(l=>`<button class="dt-watchlink" onclick="openExternal('${escH(l.url).replace(/'/g,"\\'")}')">${schEsc(l.site)} ${icon('external')}</button>`).join('')}</div>`:'';
   // Official per-episode links AniList carries (Crunchyroll/etc. publish them) — legal, opens the source.
   const eps=((d.streamingEpisodes)||[]).filter(e=>e&&e.url&&e.title);
-  const epsHTML=eps.length?`<div class="dt-label" style="margin-top:16px">${icon('play')} Episodes<span class="dt-eps-tag">official</span></div><div class="dt-eps">${eps.slice(0,60).map(e=>{const th=safeImg(e.thumbnail||'');const yid=ytId(e.url);const act=yid?`playYouTube('${yid}')`:`openExternal('${escH(e.url).replace(/'/g,"\\'")}')`;return `<button class="dt-ep${yid?' yt':''}" onclick="${act}"><div class="dt-ep-img"${th?` style="background-image:url('${th}')"`:''}>${yid?`<span class="dt-ep-yt">${icon('play')}</span>`:''}</div><div class="dt-ep-t">${schEsc(e.title)}</div></button>`;}).join('')}</div>`:'';
+  const epsHTML=eps.length?`<div class="dt-label" style="margin-top:16px">${icon('play')} Episodes<span class="dt-eps-tag">${_hasSrc?'your source':'official'}</span></div><div class="dt-eps">${eps.slice(0,60).map((e,i)=>{const th=safeImg(e.thumbnail||'');const yid=ytId(e.url);const en=(String(e.title).match(/\d+/)||[])[0];const epN=en?+en:(i+1);const act=_hasSrc?`watchAnime('${forId}',${epN})`:(yid?`playYouTube('${yid}')`:`openExternal('${escH(e.url).replace(/'/g,"\\'")}')`);return `<button class="dt-ep${yid&&!_hasSrc?' yt':''}" onclick="${act}"><div class="dt-ep-img"${th?` style="background-image:url('${th}')"`:''}>${yid&&!_hasSrc?`<span class="dt-ep-yt">${icon('play')}</span>`:''}</div><div class="dt-ep-t">${schEsc(e.title)}</div></button>`;}).join('')}</div>`:'';
   const desc=_stripHtml(d.description);
   const synHTML=desc?`<div class="dt-label" style="margin-top:16px">Synopsis</div><p class="dt-synopsis" onclick="this.classList.toggle('open')">${schEsc(desc)}</p>`:'';
   let trailerHTML='';
@@ -6156,8 +6157,8 @@ function fillSourceTokens(template,a,ep){
 // Build the in-frame URL for a custom source. With no token we open it as-is and let
 // them navigate/search. No custom source → empty (default Watch opens legal sites
 // externally, never frames).
-function streamURL(a){
-  const ep=watchEpisode(a), src=effectiveSource(a);
+function streamURL(a,epOverride){
+  const ep=(epOverride>0?epOverride:watchEpisode(a)), src=effectiveSource(a);
   if(!src) return {url:'', ep};
   if(SRC_TOKEN_RE.test(src)) return {url:fillSourceTokens(src,a,ep), ep};
   return {url:src, ep:null}; // plain custom URL — open it as-is
@@ -6188,9 +6189,10 @@ function pvOpenExternal(){
   const u=(streamURL(a).url)||findUrl(a);
   if(u&&u!=='about:blank')openExternal(u);
 }
-async function watchAnime(id){
+async function watchAnime(id,epArg){
   const a=anime.find(x=>x.id===id); if(!a) return;
   if(kindOf(a)!=='watch'||!a.aniId){toast('Watch is for anime only');return;}
+  const reqEp=(epArg>0?epArg:0);   // a specific episode (from the episode list) or 0 = "next up"
   // Source resolution: a per-title pinned link (a.srcUrl) wins; else the global
   // custom source; else the default legal route. A pin/custom source with {ep} plays
   // in-frame; a bare preset opens in the browser.
@@ -6206,16 +6208,16 @@ async function watchAnime(id){
   // behaved differently depending on which settings field had been filled in —
   // and a custom source that blocked framing (TVING, Prime, Wavve…) just showed
   // a black rectangle with no way back to the show.
-  const ep0=watchEpisode(a);
-  if(!embedTarget(streamURL(a).url||src)){
+  const ep0=reqEp||watchEpisode(a);
+  if(!embedTarget(streamURL(a,ep0).url||src)){
     armExternalWatch(a,ep0||1);
-    openExternal(launchURL(a));
+    openExternal(launchURL(a,ep0));
     toast(`Opening ${sourceName()} for “${a.title}”`);
     return;
   }
   // EMBEDDABLE source → immersive in-app player (WatchList chrome, in-frame search)
   pvReturnId=id;
-  const ep=watchEpisode(a);
+  const ep=ep0;
   pvWatchEp=ep;   // the episode we opened, so we can save progress on the way out
   pvOpenTime=Date.now();   // how long they stay is our only signal that they watched
   document.getElementById('pvTitle').innerHTML=escH(a.title)+(ep?` <span class="pv-ep">Ep ${ep}</span>`:'');
@@ -6231,7 +6233,7 @@ async function watchAnime(id){
   renderPvNav(a);
   // Only custom {ep} sources reach here (default Watch opened a legal site externally
   // above), so this is always the user's own embeddable player URL.
-  f.src=streamURL(a).url;
+  f.src=streamURL(a,ep).url;
   savePvSession(id,ep,'watch');   // survive an iOS background/reload mid-stream
 }
 // Reading source (AsuraScans by default). AsuraScans series live at
@@ -7090,9 +7092,9 @@ function openExternal(url){
   if(typeof IS_NATIVE!=='undefined'&&IS_NATIVE){try{window.webkit.messageHandlers.wl.postMessage({type:'openurl',url});return;}catch(e){}}
   try{window.open(url,'_blank','noopener');}catch(e){location.href=url;}
 }
-function launchURL(a){
+function launchURL(a,epOverride){
   const src=streamSource()||LEGAL_DEFAULT, slug=streamSlug(a.title);
-  return src.replace(/\{title\}/g,encodeURIComponent(a.title)).replace(/\{slug\}/g,slug).replace(/\{ep\}/g,String(watchEpisode(a)||1));
+  return src.replace(/\{title\}/g,encodeURIComponent(a.title)).replace(/\{slug\}/g,slug).replace(/\{ep\}/g,String((epOverride>0?epOverride:watchEpisode(a))||1));
 }
 function sourceName(){
   const s=streamSource(); if(!s)return WATCH_PRESETS[0].name;

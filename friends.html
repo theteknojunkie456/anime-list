@@ -7129,7 +7129,8 @@ function renderSource(){
   const O=k=>openFolds[k]?' open':'';
   const custom=streamSource(), rcustom=readSource();
   const host=u=>{try{return new URL(u.replace(/\{[^}]+\}/g,'x')).hostname;}catch{return u.slice(0,32);}};
-  const chips=WATCH_PRESETS.map(p=>`<button class="src-chip${custom===p.url?' on':''}" onclick="setSource('${p.url}')">${p.name}</button>`).join('');
+  const chips=WATCH_PRESETS.filter(p=>!isHiddenSrc(p.name)).map(p=>`<button class="src-chip${custom===p.url?' on':''}" onclick="setSource('${p.url}')">${escH(p.name)}</button>`).join('')
+    +customServices().filter(s=>!isHiddenSrc(s.name)).map(s=>`<button class="src-chip yours${custom===s.url?' on':''}" onclick="setSourceById('${s.id}')">${escH(s.name)}</button>`).join('');
   const myCount=customServices().length, hiddenCount=hiddenSrc().length;
   box.innerHTML=`
     <p class="ai-desc" style="margin-top:2px">Tap <b>Watch</b> on any show and it opens where to watch. This is where you set that up — the basics are here, the rest is tucked away below.</p>
@@ -7237,6 +7238,8 @@ function setSource(v){
   renderSource();
   toast(v?'Source set':'Back to default (legal, free)');
 }
+// Select one of the user's own custom services (by id) as the active source.
+function setSourceById(id){const s=customServices().find(x=>x.id===id);if(s&&s.url)setSource(s.url);}
 // Tap-to-insert token builder for the custom source URL — drop a token at the cursor.
 function insertSrcToken(tok){
   const el=document.getElementById('srcCustom');if(!el)return;

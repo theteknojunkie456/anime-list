@@ -892,6 +892,10 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 .src-chip{font-family:var(--fd);font-size:12.5px;font-weight:700;color:var(--t2);background:var(--bg3);border:1px solid var(--b1);border-radius:999px;padding:9px 15px;transition:border-color .15s,background .15s,color .15s;}
 .src-chip.on{border-color:var(--a);background:var(--ag);color:var(--a2);}
 .src-chip:active{transform:scale(.96);}
+.src-ai{margin-top:12px;padding:12px 13px;border-radius:12px;background:var(--ag);border:1px solid var(--b2);}
+.src-ai-t{font-family:var(--fd);font-size:12.5px;font-weight:800;color:var(--a2);display:flex;align-items:center;gap:7px;line-height:1.3;}
+.src-ai-t .ico{width:15px;height:15px;flex:0 0 auto;}
+.src-fold .src-fold{background:var(--bg3);}
 .al-acct{display:flex;align-items:center;gap:12px;padding:14px 15px;border-radius:14px;background:var(--ag);border:1px solid var(--b2);margin-bottom:6px;}
 .al-acct .ico{width:22px;height:22px;color:var(--a2);flex-shrink:0;}
 .al-name{font-family:var(--fd);font-size:15px;font-weight:800;color:var(--t1);}
@@ -6627,15 +6631,53 @@ function templatizeSearchURL(raw){
 }
 // Live hint: as they paste a URL, fill the name field for them if it's empty.
 function csHintName(){
-  const u=document.getElementById('csURL'),n=document.getElementById('csName');
+  const u=document.getElementById('srcCustom'),n=document.getElementById('csName');
   if(!u||!n||n.value.trim())return;
   n.value=serviceNameFromURL(u.value.trim())||'';
 }
 function addCustomServiceFromForm(){
-  const n=document.getElementById('csName'),u=document.getElementById('csURL');
+  const n=document.getElementById('csName'),u=document.getElementById('srcCustom');
   if(!n||!u)return;
   const url=templatizeSearchURL(normSrc(u.value.trim()));
-  if(addCustomService(n.value,url)){n.value='';u.value='';renderSource();}
+  if(addCustomService(n.value,url)){
+    const s=customServices().find(x=>x.url===url); if(s)setSource(s.url);   // added AND selected — one tap
+    n.value='';u.value='';renderSource();
+  }
+}
+// Describe-it-in-plain-English → your own AI writes the URL template. It only
+// ever produces a LINK for the browser to open on the site you name — never a
+// scraper or downloader.
+async function aiBuildSource(){
+  const site=document.getElementById('srcCustom'), want=document.getElementById('srcAiWant');
+  if(!site) return;
+  if(!getKey()){toast('Add your AI key first');try{openKeySheet();}catch(e){}return;}
+  const s=(site.value||'').trim(), w=(want&&want.value||'').trim();
+  if(!s&&!w){toast('Type your site, or say what you want');return;}
+  const btn=document.getElementById('srcAiBtn'), old=btn?btn.innerHTML:'';
+  if(btn){btn.disabled=true;btn.textContent='Building…';}
+  try{
+    const prompt=`You build ONE link template that opens an anime or manga on a website. It is only a URL for the browser to open — never a scraper or downloader.
+Website: ${s||'(the user did not name one — use a well-known legal site, or a generic search template)'}
+What the link should do: ${w||'open the search results for the show'}
+Reply with ONLY the template on a single line — no quotes, no code fences, no explanation. It must start with http:// or https://.
+Drop these placeholders where a show's details belong:
+{query}=title as a search term, {queryplus}=title with + between words, {slug}=title-as-hyphens, {slug_}=title_with_underscores, {ep}=episode number, {ep2}/{ep3}=episode padded to 2 or 3 digits, {titleRomaji} {titleEnglish} {titleNative}=the exact title, {malId} {anilistId}=the show's id.
+When unsure, prefer a search URL with {query}.
+Examples:
+https://example.com/search?q={query}
+https://example.com/watch/{slug}/episode-{ep}`;
+    const out=String(await callAI(prompt)||'').trim();
+    const m=out.match(/https?:\/\/\S+/);
+    if(!m){toast('The AI didn’t return a link — try wording it differently');return;}
+    site.value=m[0].replace(/[\s"'`)\].,]+$/,'').replace(/\\/g,'');
+    try{csHintName();}catch(e){}
+    try{testSource();}catch(e){}
+    toast('Link built — check it below, then Add site');
+  }catch(e){
+    toast(e===NO_KEY?'Add your AI key first':'AI error — check your key and try again');
+  }finally{
+    if(btn){btn.disabled=false;btn.innerHTML=old;}
+  }
 }
 // Build this title's URL for a custom service. A template with tokens gets them
 // filled; a bare domain falls back to the app's own search-URL builder.
@@ -7148,38 +7190,65 @@ function renderSource(){
     +customServices().filter(s=>!isHiddenSrc(s.name)).map(s=>`<button class="src-chip yours${custom===s.url?' on':''}" onclick="setSourceById('${s.id}')">${escH(s.name)}</button>`).join('');
   const myCount=customServices().length, hiddenCount=hiddenSrc().length;
   box.innerHTML=`
-    <p class="ai-desc" style="margin-top:2px">Tap <b>Watch</b> on any show and it opens where to watch. This is where you set that up — the basics are here, the rest is tucked away below.</p>
+    <p class="ai-desc" style="margin-top:2px">Tapping <b>Watch</b> on a show opens it wherever you pick here.</p>
 
-    <div class="dt-label">${icon('play')} Where Watch takes you</div>
-    <p class="ai-desc">Free and legal. Opens the site's search for your exact title.</p>
+    <div class="dt-label">${icon('play')} Where Watch opens</div>
     <button class="src-opt${!custom&&!noSourceMode()?' on':''}" onclick="setSource('')">
       <div class="src-name">${escH(WATCH_PRESETS[0].name)} <span class="src-tag">Default · Free</span></div>
-      <div class="src-sub">No account needed</div>
+      <div class="src-sub">Legal search — no account needed</div>
     </button>
     <div class="src-picks">${chips}</div>
     <button class="src-opt${noSourceMode()?' on':''}" onclick="setNoSource()" style="margin-top:9px">
-      <div class="src-name">${icon('x')} No source <span class="src-tag">Ask me each time</span></div>
-      <div class="src-sub">Watch won't auto-open — it brings you here to set one</div>
+      <div class="src-name">${icon('x')} Ask me each time <span class="src-tag">No source</span></div>
+      <div class="src-sub">Watch stays put and brings you here instead</div>
     </button>
-    ${myCount?`
-    <div class="dt-label" style="margin-top:16px">${icon('film')} Your services</div>
-    <p class="ai-desc">These show first when you tap Watch. Tap one to remove it.</p>
-    ${customServices().map(s=>`<button class="src-opt" onclick="removeCustomService('${s.id}')"><div class="src-name">${escH(s.name)} <span class="src-tag">Tap to remove</span></div><div class="src-sub">${escH(host(s.url))}</div></button>`).join('')}`:''}
 
     <details class="src-fold" data-fold="add"${O('add')} style="margin-top:16px">
-      <summary>${icon('external')} Add your own service</summary>
-      <p class="ai-desc" style="margin-top:8px">Subscribe to something we don’t list? Tap a region to add it in one go, or paste your service’s search page.</p>
+      <summary>${icon('external')} Add your own site</summary>
+      <p class="ai-desc" style="margin-top:8px">Subscribe somewhere we don’t list? Tap it below — or paste a search page and we’ll wire it up for you.</p>
       <div class="src-picks">${REGIONAL_SERVICES
         .filter(s=>!customServices().some(c=>c.name.toLowerCase()===s.name.toLowerCase()))
         .map(s=>`<button class="src-chip" onclick="addRegional('${escH(s.name)}')">${escH(s.name)} <span style="opacity:.55">${escH(s.region)}</span></button>`).join('')}</div>
-      <input class="ai-prompt-in" id="csURL" placeholder="paste a search page from your service" value="" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url" style="margin-top:10px" oninput="csHintName()">
-      <input class="ai-prompt-in" id="csName" placeholder="name" value="" autocomplete="off" spellcheck="false" style="margin-top:8px">
-      <button class="parse-btn" style="margin-top:8px" onclick="addCustomServiceFromForm()">Add service</button>
+      <input class="ai-prompt-in" id="srcCustom" placeholder="paste your site’s search page" value="${custom&&!WATCH_PRESETS.some(p=>p.url===custom)&&!customServices().some(s=>s.url===custom)?custom.replace(/"/g,'&quot;'):''}" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url" style="margin-top:10px" oninput="csHintName()">
+      <input class="ai-prompt-in" id="csName" placeholder="name (auto-filled)" value="" autocomplete="off" spellcheck="false" style="margin-top:8px">
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="parse-btn" style="flex:1" onclick="addCustomServiceFromForm()">Add site</button>
+        <button class="parse-btn" style="flex:0 0 auto;width:auto;padding:0 16px" onclick="testSource()">${icon('search')} Test</button>
+      </div>
+      <div id="srcTest" style="display:none;margin-top:8px;padding:9px 11px;border-radius:9px;background:var(--bg2);color:var(--t2);font:12px/1.45 ui-monospace,Menlo,monospace;word-break:break-all;white-space:pre-wrap"></div>
+
+      <div class="src-ai">
+        <div class="src-ai-t">${icon('sparkles')} Not sure of the link? Just describe it.</div>
+        <input class="ai-prompt-in" id="srcAiWant" placeholder="e.g. open the search results for the show" autocomplete="off" style="margin-top:8px;background:var(--bg2)">
+        <button class="parse-btn" id="srcAiBtn" style="margin-top:8px" onclick="aiBuildSource()">${icon('sparkles')} Build the link with AI</button>
+        <p class="ai-desc" style="margin-top:7px;margin-bottom:0;font-size:11px">Put your site above, say what you want, and your own AI writes the address${getKey()?'':' (add your AI key first)'}. Check it, then Add site.</p>
+      </div>
+
+      <details class="src-fold nested" data-fold="adv"${O('adv')} style="margin-top:10px">
+        <summary>${icon('sort')} Fine-tune with tokens</summary>
+        <p class="ai-desc" style="margin-top:8px;font-size:11.5px">Tap a token to drop it into the address at the cursor.</p>
+        <div class="src-toks">
+          ${['{query}','{queryplus}','{slug}','{slug_}','{ep}','{ep2}','{ep3}','{titleRomaji}','{titleEnglish}','{titleNative}','{malId}','{anilistId}'].map(t=>`<button type="button" class="src-tok" onclick="insertSrcToken('${t}')">${t}</button>`).join('')}
+        </div>
+        <div class="ai-desc" style="margin-top:10px;font-size:11.5px"><b><code>{slug}</code> spelling</b> — some sites index by romaji, some English:</div>
+        <div class="src-picks">
+          <button class="src-chip${!slugPref()?' on':''}" onclick="setSlugPref('')">Auto</button>
+          <button class="src-chip${slugPref()==='romaji'?' on':''}" onclick="setSlugPref('romaji')">Romaji</button>
+          <button class="src-chip${slugPref()==='english'?' on':''}" onclick="setSlugPref('english')">English</button>
+        </div>
+      </details>
     </details>
 
+    ${myCount?`
+    <details class="src-fold" data-fold="mine"${O('mine')}>
+      <summary>${icon('film')} Your sites <span class="src-tag">${myCount}</span></summary>
+      <p class="ai-desc" style="margin-top:8px">These show first when you tap Watch. Tap one to remove it.</p>
+      ${customServices().map(s=>`<button class="src-opt" onclick="removeCustomService('${s.id}')"><div class="src-name">${escH(s.name)} <span class="src-tag">Tap to remove</span></div><div class="src-sub">${escH(host(s.url))}</div></button>`).join('')}
+    </details>`:''}
+
     <details class="src-fold" data-fold="manage"${O('manage')}>
-      <summary>${icon('sort')} Manage every source${hiddenCount?` <span class="src-tag">${hiddenCount} hidden</span>`:''}</summary>
-      <p class="ai-desc" style="margin-top:8px">Tap a row to rename it, or Hide the ones you never use. Applies to every show.</p>
+      <summary>${icon('sort')} Manage sources${hiddenCount?` <span class="src-tag">${hiddenCount} hidden</span>`:''}</summary>
+      <p class="ai-desc" style="margin-top:8px">Tap a row to rename it, or hide the ones you never use.</p>
       ${allKnownSources().map(s=>{const off=isHiddenSrc(s.name),q=escH(s.name).replace(/'/g,"\\'");
         const sub=[s.kind,s.unverified?'unverified — tap Test':'',off?'hidden':''].filter(Boolean).join(' · ');
         return `<div class="src-opt" style="display:flex;align-items:center;gap:10px${off?';opacity:.45':''}" onclick="renameSrcPrompt('${q}')">
@@ -7189,27 +7258,6 @@ function renderSource(){
         </div>
         <button class="src-chip${off?' on':''}" onclick="event.stopPropagation();toggleHiddenSrc('${q}')">${off?'Unhide':'Hide'}</button>
       </div>`;}).join('')}
-    </details>
-
-    <details class="src-fold" data-fold="adv"${O('adv')}>
-      <summary>${icon('sort')} Advanced — custom link &amp; tokens</summary>
-      <p class="ai-desc" style="margin-top:8px">Point Watch at your own site. A <b>search</b> link is sturdiest.</p>
-      <input class="ai-prompt-in" id="srcCustom" placeholder="https://site.com/search?keyword={query}" value="${custom&&!WATCH_PRESETS.some(p=>p.url===custom)?custom.replace(/"/g,'&quot;'):''}" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url">
-      <div style="display:flex;gap:8px;margin-top:8px">
-        <button class="parse-btn" style="flex:1" onclick="saveSource()">Use this site</button>
-        <button class="parse-btn" style="flex:0 0 auto;width:auto;padding-left:16px;padding-right:16px" onclick="testSource()">${icon('search')} Test</button>
-      </div>
-      <div id="srcTest" style="display:none;margin-top:8px;padding:9px 11px;border-radius:9px;background:var(--bg2);color:var(--t2);font:12px/1.45 ui-monospace,Menlo,monospace;word-break:break-all;white-space:pre-wrap"></div>
-      <div class="ai-desc" style="margin-top:10px;font-size:11.5px">Build it — type your site, then <b>tap a token</b> to drop it in where the cursor is:</div>
-      <div class="src-toks">
-        ${['{query}','{queryplus}','{slug}','{slug_}','{ep}','{ep2}','{ep3}','{titleRomaji}','{titleEnglish}','{titleNative}','{malId}','{anilistId}'].map(t=>`<button type="button" class="src-tok" onclick="insertSrcToken('${t}')">${t}</button>`).join('')}
-      </div>
-      <div class="ai-desc" style="margin-top:10px"><b><code>{slug}</code> spelling</b> — some sites index by romaji, some by English.</div>
-      <div class="src-picks">
-        <button class="src-chip${!slugPref()?' on':''}" onclick="setSlugPref('')">Auto</button>
-        <button class="src-chip${slugPref()==='romaji'?' on':''}" onclick="setSlugPref('romaji')">Romaji</button>
-        <button class="src-chip${slugPref()==='english'?' on':''}" onclick="setSlugPref('english')">English</button>
-      </div>
     </details>
     ${IS_NATIVE?`
     <div class="dt-label" style="margin-top:22px">${icon('film')} Your streaming accounts</div>

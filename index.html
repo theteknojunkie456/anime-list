@@ -686,9 +686,6 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 /* Watch button — the primary action on an anime, so it gets the accent and full width */
 .dt-watch{width:100%;margin-top:18px;padding:15px;border-radius:15px;border:none;background:var(--a);color:var(--aFg);font-family:var(--fd);font-size:15px;font-weight:800;letter-spacing:-.2px;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 8px 22px -6px var(--glow);transition:transform .12s;}
 .dt-watch:active{transform:scale(.97);}
-.dt-play{width:100%;margin-top:14px;padding:15px;border-radius:15px;border:none;background:var(--a);color:var(--aFg);font-family:var(--fd);font-size:15px;font-weight:800;letter-spacing:-.2px;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 8px 22px -6px var(--glow);cursor:pointer;transition:transform .12s;}
-.dt-play:active{transform:scale(.97);}
-.dt-play .ico{width:19px;height:19px;fill:currentColor;}
 .dt-pin-toggle{width:100%;margin-top:9px;padding:8px;background:none;border:none;color:var(--t2);font-family:inherit;font-size:12.5px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;transition:color .15s;}
 .dt-pin-toggle:active{color:var(--t1);}
 .dt-pin-toggle svg{width:14px;height:14px;}
@@ -4325,14 +4322,6 @@ function renderDetail(){
     <div id="dtRich" class="dt-rich"></div>
     <div class="dt-label">Status</div>
     <div class="dt-status">${statusBtns}</div>
-    ${(()=>{
-      if(kindOf(a)!=='watch') return '';
-      const nextEp = watchEpisode(a) || 1;
-      // Straight through watchAnime, like every other watch action: your pinned
-      // link wins, else your source at THIS episode, else the no-source prompt.
-      // It used to call a scraper player that ignored Sources entirely.
-      return `<button class="dt-play" onclick="watchAnime('${a.id}', ${nextEp})">${icon('play')} Play Episode ${nextEp}</button>`;
-    })()}
     ${progHTML}
     ${stars}
     ${seasonsHTML}
@@ -4341,7 +4330,7 @@ function renderDetail(){
     ${notesHTML}
     <div class="dt-label" style="margin-top:18px"></div>
     <div id="ai-box-detail"></div>
-    ${(kindOf(a)==='watch'&&a.aniId)?`<button class="dt-watch" onclick="watchAnime('${a.id}')">${icon('play')} Watch now</button>
+    ${(kindOf(a)==='watch'&&a.aniId)?`<button class="dt-watch" onclick="watchAnime('${a.id}')">${icon('play')} ${watchEpisode(a)?`Watch Episode ${watchEpisode(a)}`:'Watch now'}</button>
     ${titleWatchPickerHTML(a)}
     <button class="dt-pin-toggle" onclick="togglePin()">${icon('external')} ${a.srcUrl?'Advanced: edit the direct link':'Advanced: paste a direct episode link'}</button>
     <div id="dtPin" style="display:none">
@@ -4433,6 +4422,14 @@ function richDetailHTML(d,forId){
     const cur=(_it&&_it.ep)||0,N=Math.min(epTotalN,600),cells=[];
     for(let n=1;n<=N;n++)cells.push(`<button class="dt-epn${n<=cur?' seen':(n===cur+1?' next':'')}" onclick="watchEpAt('${forId}',${n})">${n}</button>`);
     epsHTML=`<div class="dt-label" style="margin-top:16px">${icon('play')} Episodes<span class="dt-eps-tag">your source</span></div><div class="dt-epgrid">${cells.join('')}</div>`;
+  }else if(!eps.length&&epTotalN>0&&forId){
+    // No source set and AniList lists no episodes — still show every episode.
+    // A show's episode list is the thing you came to the page for; it shouldn't
+    // depend on whether a third party happened to publish per-episode links.
+    // Tapping goes through watchAnime, so it obeys Sources like everything else.
+    const cur=(_it&&_it.ep)||0,N=Math.min(epTotalN,600),cells=[];
+    for(let n=1;n<=N;n++)cells.push(`<button class="dt-epn${n<=cur?' seen':(n===cur+1?' next':'')}" onclick="watchAnime('${forId}',${n})">${n}</button>`);
+    epsHTML=`<div class="dt-label" style="margin-top:16px">${icon('play')} Episodes<span class="dt-eps-tag">${epTotalN} total</span></div><div class="dt-epgrid">${cells.join('')}</div>`;
   }else if(eps.length){
     epsHTML=`<div class="dt-label" style="margin-top:16px">${icon('play')} Episodes<span class="dt-eps-tag">${_hasSrc?'your source':'official'}</span></div><div class="dt-eps">${eps.slice(0,60).map((e,i)=>{const th=safeImg(e.thumbnail||'');const yid=ytId(e.url);const en=(String(e.title).match(/\d+/)||[])[0];const epN=en?+en:(i+1);const act=(_hasSrc||(forId&&noSourceMode()))?`watchAnime('${forId}',${epN})`:(yid?`playYouTube('${yid}')`:`openExternal('${escH(e.url).replace(/'/g,"\\'")}')`);return `<button class="dt-ep${yid&&!_hasSrc?' yt':''}" onclick="${act}"><div class="dt-ep-img"${th?` style="background-image:url('${th}')"`:''}>${yid&&!_hasSrc?`<span class="dt-ep-yt">${icon('play')}</span>`:''}</div><div class="dt-ep-t">${schEsc(e.title)}</div></button>`;}).join('')}</div>`;
   }
@@ -8787,13 +8784,13 @@ function _updBusy(){
 // you'd explain it to a friend — what they can now do, not what the code does.
 // No version numbers or jargon in the notes; the date IS the version.
 const RELEASE={
-  v:'2026-07-27.4',
-  title:'Set up your site in one paste',
-  push:'Use your own site in one step: play any episode, copy the address, paste it in Sources.',
+  v:'2026-07-27.5',
+  title:'Every episode, one button',
+  push:'Every show now lists all its episodes — and Watch is one button, not two.',
   notes:[
-    'Watching somewhere we do not list? Open <b>Sources</b> and you will see it right at the top.',
-    'Start <b>any</b> episode of <b>any</b> show on your site, copy that address, and paste it in. Nothing else to fill in.',
-    'It tells you which show and episode it read, shows you where another show would open, and one button sets it for everything.',
+    'Open any show and you get <b>every episode</b>, numbered. Watched ones dim, the next one is lit — tap any of them to jump there.',
+    'The two buttons that did the same thing are now one: <b>Watch Episode 5</b> tells you exactly where you are picking up.',
+    'Watching somewhere we do not list? <b>Sources</b> now sets your own site up from a single pasted link.',
   ],
 };
 const SEEN_REL='seen_release';

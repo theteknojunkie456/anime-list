@@ -852,6 +852,15 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 .wn-dots{display:flex;justify-content:center;align-items:center;gap:7px;margin:14px 0 2px;}
 .wn-dot{width:7px;height:7px;border-radius:99px;background:var(--b2);transition:width .2s ease,background .2s ease;}
 .wn-dot.on{width:21px;background:var(--a);}
+/* Player recovery bar — shown a few seconds after a deep link opens. */
+.pv-wrong{position:absolute;left:50%;transform:translateX(-50%);bottom:14px;z-index:4;display:none;align-items:center;gap:8px;
+  padding:8px 10px 8px 14px;border-radius:99px;background:var(--bg2);border:1px solid var(--b3);box-shadow:0 10px 30px rgba(0,0,0,.5);max-width:94%;}
+.pv-wrong.on{display:flex;}
+.pv-wrong-t{font-size:12.5px;font-weight:700;color:var(--t1);white-space:nowrap;}
+.pv-wrong-b{font-size:12px;font-weight:700;padding:7px 12px;border-radius:99px;background:var(--bg4);border:1px solid var(--b2);color:var(--t1);white-space:nowrap;cursor:pointer;}
+.pv-wrong-b:active{transform:scale(.97);}
+.pv-wrong-x{width:26px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:99px;background:transparent;border:none;color:var(--t3);cursor:pointer;}
+.pv-wrong-x svg{width:14px;height:14px;}
 /* Episode cells that fall back to the show's cover — dimmed so the number reads. */
 .dt-ep.generic .dt-ep-img{position:relative;background-size:cover;background-position:center;}
 .dt-ep.generic .dt-ep-img::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.35),rgba(0,0,0,.72));border-radius:inherit;}
@@ -2042,6 +2051,16 @@ body.recsel .pcard{position:relative;}
     <!-- Some sites forbid being shown inside another page (X-Frame-Options). The
          browser refuses before we get a say, and it looks identical to a slow
          load — so this surfaces after a grace period rather than guessing. -->
+    <!-- A deep link lands on the site's 404 whenever our slug isn't the one that
+         site uses (Initial D vs initial-d-first-stage). An iframe can't expose
+         its HTTP status cross-origin, so the app cannot detect that itself —
+         this puts the two recoveries one tap away instead of behind an icon. -->
+    <div class="pv-wrong" id="pvWrong">
+      <span class="pv-wrong-t">Wrong page?</span>
+      <button class="pv-wrong-b" onclick="pvTrySpelling()">Try another spelling</button>
+      <button class="pv-wrong-b" onclick="pvSearchHere()">Search this title</button>
+      <button class="pv-wrong-x" onclick="document.getElementById('pvWrong').classList.remove('on')" aria-label="Dismiss"><i data-ic="x"></i></button>
+    </div>
     <div class="pv-blocked" id="pvBlocked">
       <div class="pv-blocked-t">Still blank?</div>
       <div class="pv-blocked-s">Some sites don't allow being opened inside another app.</div>
@@ -6600,12 +6619,49 @@ async function watchAnime(id,epArg){
   // Only custom {ep} sources reach here (default Watch opened a legal site externally
   // above), so this is always the user's own embeddable player URL.
   f.src=streamURL(a,ep).url;
+  _pvSpell=0; pvOfferFix();
   pvWatchBlocked(f);
   savePvSession(id,ep,'watch');   // survive an iOS background/reload mid-stream
 }
 // A frame the site refused to render looks exactly like one that's still loading,
 // and cross-origin rules mean we can't inspect it to tell them apart. So: hide the
 // escape hatch, and reveal it only if nothing has painted after a fair wait.
+// Sites disagree about what a show is called: AniList's romaji, its English
+// title, and the site's own slug are often three different strings. Rather than
+// guess once and dead-end on a 404, this cycles the title variants through the
+// same template — one tap per attempt, no typing, no leaving the player.
+let _pvSpell=0;
+function pvTrySpelling(){
+  const a=anime.find(x=>x.id===pvReturnId); if(!a){toast('Nothing open');return;}
+  const variants=[['auto',a.title],['romaji',a.titleRo],['english',a.titleEn],['native',a.titleNa]]
+    .filter(v=>v[1]&&String(v[1]).trim());
+  if(variants.length<2){pvSearchHere();return;}      // nothing else to try
+  _pvSpell=(_pvSpell+1)%variants.length;
+  const [label,title]=variants[_pvSpell];
+  // Swap the title this ONE lookup uses, build the URL, then put it back.
+  const real=a.title; a.title=title;
+  let url=''; try{url=streamURL(a,pvWatchEp||1).url;}finally{a.title=real;}
+  if(!url){pvSearchHere();return;}
+  document.getElementById('pvFrame').src=url;
+  toast(`Trying “${title}”`);
+}
+// The site's own search for this exact title, in-frame.
+function pvSearchHere(){
+  const a=anime.find(x=>x.id===pvReturnId); if(!a)return;
+  const u=findUrl(a);
+  if(!u||u==='about:blank'){toast('No source to search');return;}
+  document.getElementById('pvFrame').src=u;
+  pvCanNav=false; renderPvNav(null);
+  toast('Searching the site for this title');
+}
+// Offer the recovery a moment after a deep link opens — long enough not to nag
+// when the page is simply loading, soon enough to be there when it 404s.
+let _pvWrongT=0;
+function pvOfferFix(){
+  const b=document.getElementById('pvWrong'); if(!b)return;
+  b.classList.remove('on'); clearTimeout(_pvWrongT);
+  _pvWrongT=setTimeout(()=>b.classList.add('on'),3500);
+}
 let _pvBlockT=0;
 function pvWatchBlocked(f){
   const box=document.getElementById('pvBlocked'); if(!box)return;
@@ -6670,6 +6726,7 @@ function pvGoTo(a,ep){
   const url=episodeURL(a,ep); if(!url) return;
   pvWatchEp=ep;
   document.getElementById('pvFrame').src=url;
+  pvOfferFix();
   document.getElementById('pvTitle').innerHTML=escH(a.title)+' <span class="pv-ep">Ep '+ep+'</span>';
   pvOpenTime=Date.now();                 // fresh clock — each episode earns its own auto-mark
   savePvSession(pvReturnId,ep,'watch');
@@ -8860,13 +8917,13 @@ function _updBusy(){
 // you'd explain it to a friend — what they can now do, not what the code does.
 // No version numbers or jargon in the notes; the date IS the version.
 const RELEASE={
-  v:'2026-07-27.6',
-  title:'Every episode, with art',
-  push:'Every show now lists every episode with artwork, and new-episode alerts open the show itself.',
+  v:'2026-07-27.7',
+  title:'Landed on the wrong page?',
+  push:'If a site opens the wrong page, one tap tries another spelling or searches it — without leaving.',
   notes:[
-    'Open any show and you get <b>every episode</b> with artwork — official stills where they exist, the show\u2019s own art everywhere else. Watched ones dim, the next is lit.',
-    'One button instead of two: <b>Start Watching</b> until you begin, <b>Continue Watching</b> after that.',
-    'When a new episode drops, tapping the alert now takes you <b>straight to that show</b>. And your own site opens inside WatchList instead of throwing you out — where the site allows it.',
+    'Sites disagree about what a show is called — <b>Initial D</b> on one site is <b>initial-d-first-stage</b> on another, so a link can land on that site\u2019s 404.',
+    'When that happens, a bar now appears in the player: <b>Try another spelling</b> cycles the show\u2019s other names, <b>Search this title</b> searches the site itself.',
+    'Both stay inside WatchList, and your episode stays tracked either way.',
   ],
 };
 const SEEN_REL='seen_release';

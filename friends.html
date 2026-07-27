@@ -6210,6 +6210,7 @@ function pvOpenExternal(){
 async function watchAnime(id,epArg){
   const a=anime.find(x=>x.id===id); if(!a) return;
   if(kindOf(a)!=='watch'||!a.aniId){toast('Watch is for anime only');return;}
+  if(noSourceMode()&&!(a.srcUrl&&String(a.srcUrl).trim())){showNoSourcePrompt();return;}   // no source chosen (and no per-title pin) → prompt
   const reqEp=(epArg>0?epArg:0);   // a specific episode (from the episode list) or 0 = "next up"
   // Source resolution: a per-title pinned link (a.srcUrl) wins; else the global
   // custom source; else the default legal route. A pin/custom source with {ep} plays
@@ -7137,11 +7138,15 @@ function renderSource(){
 
     <div class="dt-label">${icon('play')} Where Watch takes you</div>
     <p class="ai-desc">Free and legal. Opens the site's search for your exact title.</p>
-    <button class="src-opt${!custom?' on':''}" onclick="setSource('')">
+    <button class="src-opt${!custom&&!noSourceMode()?' on':''}" onclick="setSource('')">
       <div class="src-name">${escH(WATCH_PRESETS[0].name)} <span class="src-tag">Default · Free</span></div>
       <div class="src-sub">No account needed</div>
     </button>
     <div class="src-picks">${chips}</div>
+    <button class="src-opt${noSourceMode()?' on':''}" onclick="setNoSource()" style="margin-top:9px">
+      <div class="src-name">${icon('x')} No source <span class="src-tag">Ask me each time</span></div>
+      <div class="src-sub">Watch won't auto-open — it brings you here to set one</div>
+    </button>
     ${myCount?`
     <div class="dt-label" style="margin-top:16px">${icon('film')} Your services</div>
     <p class="ai-desc">These show first when you tap Watch. Tap one to remove it.</p>
@@ -7234,10 +7239,15 @@ function saveReadSource(){
 }
 function setSource(v){
   if(v&&streamSource()===v)v='';   // tap the selected chip again → deselect, back to default
+  try{localStorage.removeItem('no_source');}catch{}   // choosing any source exits "no source" mode
   try{if(v)localStorage.setItem('stream_src',v);else localStorage.removeItem('stream_src');}catch{}
   renderSource();
   toast(v?'Source set':'Back to default (legal, free)');
 }
+// "No source" mode — user wants nothing auto-opened; Watch prompts them to set one.
+function noSourceMode(){try{return localStorage.getItem('no_source')==='1';}catch{return false;}}
+function setNoSource(){try{localStorage.setItem('no_source','1');localStorage.removeItem('stream_src');}catch{}renderSource();toast('No source — Watch will ask you to set one');}
+function showNoSourcePrompt(){toast('Set a source first');try{openSheet('sourceSheet');}catch(e){}}
 // Select one of the user's own custom services (by id) as the active source.
 function setSourceById(id){const s=customServices().find(x=>x.id===id);if(s&&s.url)setSource(s.url);}
 // Tap-to-insert token builder for the custom source URL — drop a token at the cursor.

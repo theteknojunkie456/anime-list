@@ -130,6 +130,63 @@ export default {
       ctx.waitUntil(notifyChan(env, to, 'rec', envelope));
       return json({ ok: true }, 200, cors);
     }
+    // ── shared source setups ─────────────────────────────────────────────────
+    // Someone who has their streaming site working can hand that setup to a
+    // friend instead of talking them through it. Same mailbox shape as rec_send:
+    // it lands as a pending offer, and nothing is applied until they accept.
+    if (op === 'src_send') {
+      const to = String(body.to || '');
+      if (!/^[A-Za-z0-9]{10,64}$/.test(to)) return json({ error: 'bad to' }, 400, cors);
+      const from = (body.from && typeof body.from === 'object') ? body.from : {};
+      const fromCode = String(from.code || '');
+      const fromName = String(from.name || 'A friend').slice(0, 40);
+      if (!/^[A-Za-z0-9]{10,64}$/.test(fromCode)) return json({ error: 'bad from' }, 400, cors);
+      const p = (body.pack && typeof body.pack === 'object') ? body.pack : {};
+      const str = (v, n) => String(v == null ? '' : v).slice(0, n);
+      const pack = {
+        src: str(p.src, 400),
+        slugPref: ['romaji', 'english'].includes(String(p.slugPref)) ? String(p.slugPref) : '',
+        services: (Array.isArray(p.services) ? p.services : []).slice(0, 30)
+          .map(x => ({ name: str(x && x.name, 60), url: str(x && x.url, 400) }))
+          .filter(x => x.name && /^https?:\/\//i.test(x.url)),
+        hidden: (Array.isArray(p.hidden) ? p.hidden : []).slice(0, 60).map(x => str(x, 60)).filter(Boolean),
+      };
+      if (!pack.src && !pack.services.length) return json({ error: 'empty pack' }, 400, cors);
+      const key = 'src:' + to;
+      let list = [];
+      try { const s2 = await env.LISTS.get(key); if (s2) list = JSON.parse(s2); } catch {}
+      if (!Array.isArray(list)) list = [];
+      list = list.filter(e => !(e && e.from && e.from.code === fromCode));   // one pending offer per sender
+      const envelope = { id: fromCode.slice(0, 8) + Date.now().toString(36), from: { code: fromCode, name: fromName }, pack, at: Date.now() };
+      list.push(envelope);
+      if (list.length > 40) list = list.slice(list.length - 40);
+      await env.LISTS.put(key, JSON.stringify(list));
+      ctx.waitUntil(notifyChan(env, to, 'src', envelope));
+      return json({ ok: true }, 200, cors);
+    }
+
+    if (op === 'src_pull') {
+      const code = String(body.code || '');
+      if (!/^[A-Za-z0-9]{10,64}$/.test(code)) return json({ error: 'bad code' }, 400, cors);
+      let list = [];
+      try { const s2 = await env.LISTS.get('src:' + code); if (s2) list = JSON.parse(s2); } catch {}
+      if (!Array.isArray(list)) list = [];
+      return json({ packs: list }, 200, cors);
+    }
+
+    // Accepting or dismissing clears the offer, so it doesn't ask again.
+    if (op === 'src_clear') {
+      const code = String(body.code || '');
+      if (!/^[A-Za-z0-9]{10,64}$/.test(code)) return json({ error: 'bad code' }, 400, cors);
+      const id = String(body.id || '');
+      let list = [];
+      try { const s2 = await env.LISTS.get('src:' + code); if (s2) list = JSON.parse(s2); } catch {}
+      if (!Array.isArray(list)) list = [];
+      list = id ? list.filter(e => e && e.id !== id) : [];
+      await env.LISTS.put('src:' + code, JSON.stringify(list));
+      return json({ ok: true }, 200, cors);
+    }
+
     if (op === 'rec_pull') {
       const code = String(body.code || '');
       if (!/^[A-Za-z0-9]{10,64}$/.test(code)) return json({ error: 'bad code' }, 400, cors);

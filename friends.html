@@ -869,6 +869,12 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 .pv-set-t{font-family:var(--fd);font-weight:800;font-size:15px;color:var(--t1);}
 .pv-set-s{font-size:12.5px;line-height:1.55;color:var(--t2);margin:7px 0 11px;}
 .pv-set-row{display:flex;gap:8px;margin-top:9px;}
+/* Share-a-setup: preview chip + friend picker. */
+.shr-preview{margin-top:10px;padding:11px 13px;border-radius:12px;background:var(--bg3);border:1px solid var(--b1);color:var(--t2);font-size:12.5px;line-height:1.55;}
+.shr-preview b{color:var(--t1);}
+.shr-list{display:flex;flex-wrap:wrap;gap:8px;}
+.shr-f{padding:9px 14px;border-radius:99px;background:var(--bg3);border:1px solid var(--b1);color:var(--t2);font-size:12.5px;font-weight:700;cursor:pointer;}
+.shr-f.on{background:var(--ag);border-color:var(--a);color:var(--t1);}
 /* Episode cells that fall back to the show's cover — dimmed so the number reads. */
 .dt-ep.generic .dt-ep-img{position:relative;background-size:cover;background-position:center;}
 .dt-ep.generic .dt-ep-img::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.35),rgba(0,0,0,.72));border-radius:inherit;}
@@ -1883,6 +1889,24 @@ body.recsel .pcard{position:relative;}
     <button class="sheet-cancel" onclick="closeAll()">Done</button>
   </div>
   <div id="adminBody"></div>
+</div>
+
+<div class="sheet" id="shareSrcSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <div class="sheet-title"><i data-ic="send"></i> Share my setup</div>
+    <button class="sheet-cancel" onclick="closeAll()">Close</button>
+  </div>
+  <div id="shareSrcBody"></div>
+</div>
+
+<div class="sheet" id="srcOfferSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <div class="sheet-title"><i data-ic="inbox"></i> A friend shared their setup</div>
+    <button class="sheet-cancel" onclick="closeAll()">Close</button>
+  </div>
+  <div id="srcOfferBody"></div>
 </div>
 
 <div class="sheet" id="newsSheet">
@@ -7136,6 +7160,104 @@ function clearSrcExamples(){try{localStorage.removeItem(SRC_EX_KEY);}catch{}refr
 function srcExNoteHTML(){const n=srcExamples().length;return n?`Learned from ${n} link${n>1?'s':''}, and adapting. <button type="button" onclick="clearSrcExamples()" style="background:none;border:0;color:var(--a2);text-decoration:underline;padding:0;font:inherit;cursor:pointer">reset</button>`:'';}
 function refreshSrcExNote(){const n=document.getElementById('srcExNote');if(n)n.innerHTML=srcExNoteHTML();}
 
+// ─── SHARE YOUR SETUP ───────────────────────────────────────────────────────
+// Getting a streaming site working is the hardest part of the app, and it only
+// has to be solved once per site — so someone who has it working can hand the
+// whole thing to a friend. Nothing is applied silently: it arrives as an offer,
+// they see exactly what they're getting, and they choose.
+function mySourcePack(){
+  return {
+    src:streamSource()||'',
+    slugPref:(typeof slugPref==='function'&&slugPref())||'',
+    services:customServices().map(s=>({name:s.name,url:s.url})),
+    hidden:hiddenSrc(),
+  };
+}
+// Plain-language description of a pack — the same words for the sender's preview
+// and the receiver's offer, so nobody has to decode a URL template.
+function packSummary(p){
+  const bits=[];
+  if(p.src){let h=''; try{h=new URL(String(p.src).replace(/\{[^}]+\}/g,'x')).hostname.replace(/^www\./,'');}catch{}
+    bits.push(h?`Watch opens <b>${escH(h)}</b>`:'their Watch setting');
+    if(/\{ep\d?\}/i.test(p.src))bits.push('straight to the right episode');}
+  if(p.services&&p.services.length)bits.push(`${p.services.length} site${p.services.length>1?'s':''} they added`);
+  if(p.hidden&&p.hidden.length)bits.push(`${p.hidden.length} hidden from the list`);
+  return bits.length?bits.join(' · '):'their source settings';
+}
+async function shareSources(){
+  const fr=friendsList();
+  if(!fr.length){toast('Add a friend first');closeAll();setTimeout(openFriends,240);return;}
+  const pack=mySourcePack();
+  if(!pack.src&&!pack.services.length){toast('Set up a source first');return;}
+  const picked=[...document.querySelectorAll('.shr-f.on')].map(el=>el.dataset.code).filter(Boolean);
+  if(!picked.length){toast('Pick who to send it to');return;}
+  const from={code:myFriendCode(),name:myFriendName()||'A friend'};
+  const res=await Promise.all(picked.map(async code=>{
+    try{const r=await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({op:'src_send',to:code,from,pack})});
+      const j=r.ok?await r.json():{};return !!(j&&j.ok);}catch(e){return false;}
+  }));
+  const ok=res.filter(Boolean).length;
+  closeAll();
+  toast(ok?`Sent your setup to ${ok} friend${ok>1?'s':''}`:'Couldn’t send — try again');
+}
+function renderShareSources(){
+  const box=document.getElementById('shareSrcBody'); if(!box)return;
+  const fr=friendsList(), pack=mySourcePack();
+  box.innerHTML=`<p class="ai-desc" style="margin-top:2px">They get a copy of your setup — <b>only if they accept</b>. It never changes your own.</p>
+    <div class="shr-preview">${packSummary(pack)}</div>
+    <div class="dt-label" style="margin-top:14px">Send to</div>
+    ${fr.length?`<div class="shr-list">${fr.map(f=>`<button class="shr-f" data-code="${escH(f.code)}" onclick="this.classList.toggle('on')">${escH(friendLabel(f))}</button>`).join('')}</div>`
+      :`<p class="ai-desc">You have no friends added yet. Add someone in <b>Friends</b> first.</p>`}
+    <button class="parse-btn" style="margin-top:14px" onclick="shareSources()">${icon('send')} Send my setup</button>`;
+}
+function openShareSources(){renderShareSources();openSheet('shareSrcSheet');}
+
+// ── incoming offers ──
+let srcPacksIn=[];
+async function pullSrcPacks(){
+  const code=myFriendCode(); if(!code)return;
+  try{
+    const r=await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({op:'src_pull',code})});
+    if(!r.ok)return;
+    const j=await r.json();
+    srcPacksIn=Array.isArray(j.packs)?j.packs:[];
+    if(srcPacksIn.length)showSrcOffer();
+  }catch(e){}
+}
+function showSrcOffer(){
+  const e=srcPacksIn[0]; if(!e||appLocked)return;
+  const box=document.getElementById('srcOfferBody'); if(!box)return;
+  box.innerHTML=`<p class="ai-desc" style="margin-top:2px"><b>${escH((e.from&&e.from.name)||'A friend')}</b> shared how they watch.</p>
+    <div class="shr-preview">${packSummary(e.pack||{})}</div>
+    <p class="ai-desc" style="margin-top:12px">Accepting copies it to your app. You can change or undo it any time in <b>Sources</b>.</p>
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button class="parse-btn" style="flex:1" onclick="acceptSrcPack('${escH(e.id)}')">Accept</button>
+      <button class="parse-btn" style="flex:0 0 auto;width:auto;padding:0 18px" onclick="dismissSrcPack('${escH(e.id)}')">No thanks</button>
+    </div>`;
+  openSheet('srcOfferSheet');
+}
+async function clearSrcPack(id){
+  try{await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({op:'src_clear',code:myFriendCode(),id})});}catch(e){}
+  srcPacksIn=srcPacksIn.filter(p=>p.id!==id);
+}
+function dismissSrcPack(id){clearSrcPack(id);closeAll();}
+async function acceptSrcPack(id){
+  const e=srcPacksIn.find(p=>p.id===id); if(!e){closeAll();return;}
+  const p=e.pack||{};
+  // Merge, don't wipe: their sites get added alongside anything you already had.
+  (p.services||[]).forEach(s=>{try{addCustomService(s.name,s.url);}catch(_){}});
+  (p.hidden||[]).forEach(h=>{try{const cur=hiddenSrc();if(!cur.includes(h)){cur.push(h);localStorage.setItem(HIDE_KEY,JSON.stringify(cur));}}catch(_){}});
+  if(p.slugPref){try{setSlugPref(p.slugPref);}catch(_){}}
+  if(p.src){try{setSource(p.src);}catch(_){}}
+  await clearSrcPack(id);
+  closeAll();
+  toast(`You’re set up like ${escH((e.from&&e.from.name)||'your friend')}`);
+  try{renderSource();}catch(_){}
+  // The setup works on its own; a key is only needed for the app to WRITE new
+  // link patterns for them later. Offer it once, here, rather than letting them
+  // hit the wall the first time they try it.
+  if(!getKey())setTimeout(()=>{try{openSheet('keySheet');toast('Optional: add a free key so WatchList can learn new sites for you');}catch(_){}},900);
+}
 // ─── ONE-PASTE SETUP ────────────────────────────────────────────────────────
 // The old path worked but only if you already understood it: open a fold, paste,
 // then say WHICH show and episode the link was, then "learn the pattern", then
@@ -7759,6 +7881,7 @@ function renderSource(){
       <input class="ai-prompt-in" id="srcQuickIn" placeholder="paste that episode's address" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url" oninput="quickSetup()">
       <div id="srcQuickOut" class="src-quick-out" style="display:none"></div>
     </div>
+    <button class="src-chip" style="width:100%;justify-content:center;margin:8px 0 2px" onclick="openShareSources()"><i data-ic="send"></i> Share my setup with a friend</button>
 
     <div class="dt-label">${icon('play')} Where Watch opens</div>
     <button class="src-opt${!custom&&!noSourceMode()?' on':''}" onclick="setSource('')">
@@ -8998,13 +9121,13 @@ function _updBusy(){
 // you'd explain it to a friend — what they can now do, not what the code does.
 // No version numbers or jargon in the notes; the date IS the version.
 const RELEASE={
-  v:'2026-07-27.8',
-  title:'Teach it the right page',
-  push:'Wrong page? Paste the right one once and WatchList remembers that show forever.',
+  v:'2026-07-27.9',
+  title:'Share how you watch',
+  push:'You can now hand your whole streaming setup to a friend — they tap Accept and they\u2019re done.',
   notes:[
-    'If a show opens on the site\u2019s 404, the player now offers <b>Set the right one</b>.',
-    'Find the show on that site, paste that page\u2019s address, and WatchList learns what <b>that site</b> calls it — so every episode of it works from then on.',
-    'If the address is a different shape entirely, it fixes your link pattern too. One paste, once per show.',
+    'Got your site working? Open <b>Sources</b> and tap <b>Share my setup with a friend</b>.',
+    'They get a plain-English summary of what you\u2019re sending — nothing is applied unless they tap <b>Accept</b>, and it never touches your own settings.',
+    'Accepting copies your site, the ones you added, and your preferences straight over. No pasting, no setup.',
   ],
 };
 const SEEN_REL='seen_release';
@@ -9353,10 +9476,11 @@ try{loadRecsCache();}catch(e){}
   // keepalive so Cloudflare doesn't drop the idle socket
   setInterval(()=>{try{if(friendWS&&friendWS.readyState===1)friendWS.send('p');}catch(e){}},25000);
   try{document.addEventListener('visibilitychange',()=>{if(!document.hidden){connectFriendWS();pullRecs();pullFriendReqs();}});}catch(e){}
-  try{window.addEventListener('online',()=>{connectFriendWS();pullRecs();pullFriendReqs();});}catch(e){}
+  try{window.addEventListener('online',()=>{connectFriendWS();pullRecs();pullFriendReqs();pullSrcPacks();});}catch(e){}
 }
 setTimeout(fetchCovers,1200);
 setTimeout(syncOnOpen,300);
+setTimeout(()=>{try{pullSrcPacks();}catch(e){}},2400);   // a shared setup waiting for you
 // If notifications are on, re-sync the tracked show list with the worker on load (fire-and-forget).
 setTimeout(()=>{try{if(notifyOn())notifyUpdate();}catch{}},1600);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)syncOnOpen();});

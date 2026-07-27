@@ -2513,7 +2513,9 @@ async function updFetchPage(){
     const full=((c.commit||{}).message||'').trim();
     const title=full.split('\n')[0];
     if(/^Merge (pull request|branch)/i.test(title))continue;    // plumbing, not progress
-    _updRows.push({t:title,d:((c.commit||{}).author||{}).date||'',k:updKind(full)});
+    // Tag off the subject line only. Reading the body mislabels things — a
+    // commit that merely *mentions* iOS or the lock screen isn't iOS work.
+    _updRows.push({t:title,d:((c.commit||{}).author||{}).date||'',k:updKind(title)});
   }
 }
 async function updMore(){

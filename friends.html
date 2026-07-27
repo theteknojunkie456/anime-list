@@ -7085,8 +7085,12 @@ function quickSetup(){
   const epM=/\{ep\d?\}/.test(tpl)&&url.match(/(?:ep|episode|e)[-_]?(\d+)(?!.*\d)/i);
   const ep=epM?epM[1]:'';
   const slugSeg=(()=>{try{
-    const a=new URL(url).pathname.split('/').filter(Boolean),b=new URL(tpl).pathname.split('/').filter(Boolean);
-    for(let i=0;i<b.length;i++)if(/\{(slug|slug_|query|queryplus|title\w*)\}/i.test(b[i]))return a[i]||'';
+    const a=new URL(url).pathname.split('/').filter(Boolean);
+    // Split the TEMPLATE as text, not through URL(): the constructor
+    // percent-encodes the braces, so {slug} came back as %7Bslug%7D and never
+    // matched — which is why this always said "that show".
+    const b=String(tpl).replace(/^https?:\/\/[^/]+/i,'').split('?')[0].split('/').filter(Boolean);
+    for(let i=0;i<b.length;i++)if(/\{(slug|slug_|query|queryplus|title\w*)\}/i.test(decodeURIComponent(b[i])))return a[i]||'';
     return '';
   }catch{return '';}})();
   const norm=s=>String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,'');

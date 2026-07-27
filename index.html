@@ -875,6 +875,11 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 .shr-list{display:flex;flex-wrap:wrap;gap:8px;}
 .shr-f{padding:9px 14px;border-radius:99px;background:var(--bg3);border:1px solid var(--b1);color:var(--t2);font-size:12.5px;font-weight:700;cursor:pointer;}
 .shr-f.on{background:var(--ag);border-color:var(--a);color:var(--t1);}
+/* One quiet row at the end of Sources — sharing is worth offering, not shouting. */
+.src-share-row{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin-top:18px;padding:13px 0;
+  border-radius:13px;background:transparent;border:1px dashed var(--b2);color:var(--t2);font-size:12.5px;font-weight:700;cursor:pointer;}
+.src-share-row:active{transform:scale(.99);}
+.src-share-row svg{width:15px;height:15px;}
 /* Episode cells that fall back to the show's cover — dimmed so the number reads. */
 .dt-ep.generic .dt-ep-img{position:relative;background-size:cover;background-position:center;}
 .dt-ep.generic .dt-ep-img::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.35),rgba(0,0,0,.72));border-radius:inherit;}
@@ -2817,6 +2822,22 @@ async function hydrateOne(a){
   for(const pair of _IMG_FIELDS){const f=pair[0],kf=pair[1];if(a[kf]&&!a[f]){const d=await idbGet(a[kf]);if(d){a[f]=d;changed=true;}}}
   if(changed){try{if(typeof detailId!=='undefined'&&detailId===a.id)renderDetail();}catch(e){}}
 }
+// Only a genuine quota error means "full". Everything else — a crypto failure,
+// a serialisation problem, Safari refusing to write in a private window — used to
+// be reported as "Storage full", which sent people deleting titles to fix a
+// problem that had nothing to do with space. Name the right thing instead.
+function isQuotaErr(e){
+  if(!e)return false;
+  const n=String(e.name||''), c=Number(e.code);
+  return n==='QuotaExceededError'||n==='NS_ERROR_DOM_QUOTA_REACHED'||c===22||c===1014;
+}
+function _saveFailed(e){
+  if(saveWarned)return;
+  saveWarned=true;
+  if(isQuotaErr(e))toast('Storage full — remove an uploaded cover to free space');
+  else{try{console.error('[WatchList] save failed',e);}catch(_){}
+    toast('Couldn’t save just now — your list is safe, try again');}
+}
 function writeLocal(){
   const s=store();if(!s)return;
   if(appLocked)return;      // locked: `anime` is an empty placeholder — never persist it over the ciphertext
@@ -2824,12 +2845,16 @@ function writeLocal(){
     const snap=JSON.stringify(anime);
     _writeChain=_writeChain.then(async()=>{
       try{const {iv,ct}=await encList(snap,cryptoKey);const env=JSON.stringify({v:2,enc:1,iv,ct,pw:envWraps.pw,rec:envWraps.rec,pfk:envWraps.pfk});s.setItem(LSKEY,env);backupLocal(s,env);saveWarned=false;}
-      catch{if(!saveWarned){saveWarned=true;toast('Storage full — remove some uploaded covers');}}
+      catch(e){_saveFailed(e);}
     });
     return _writeChain;
   }
   try{const raw=JSON.stringify(_persistList());s.setItem(LSKEY,raw);backupLocal(s,raw);saveWarned=false;}
-  catch{offloadImages().then(()=>{try{const raw=JSON.stringify(_persistList());s.setItem(LSKEY,raw);backupLocal(s,raw);saveWarned=false;}catch{if(!saveWarned){saveWarned=true;toast('Storage full — remove an uploaded cover to free space');}}});}
+  catch(e){
+    // Only worth offloading images when space is actually the problem.
+    if(!isQuotaErr(e)){_saveFailed(e);return;}
+    offloadImages().then(()=>{try{const raw=JSON.stringify(_persistList());s.setItem(LSKEY,raw);backupLocal(s,raw);saveWarned=false;}catch(e2){_saveFailed(e2);}});
+  }
 }
 function save(){writeLocal();schedulePush();scheduleNotifyUpdate();}
 
@@ -7923,7 +7948,7 @@ function renderSource(){
       <input class="ai-prompt-in" id="srcQuickIn" placeholder="paste that episode's address" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url" oninput="quickSetup()">
       <div id="srcQuickOut" class="src-quick-out" style="display:none"></div>
     </div>
-    <button class="src-chip" style="width:100%;justify-content:center;margin:8px 0 2px" onclick="openShareSources()"><i data-ic="send"></i> Share my setup with a friend</button>
+
 
     <div class="dt-label">${icon('play')} Where Watch opens</div>
     <button class="src-opt${!custom&&!noSourceMode()?' on':''}" onclick="setSource('')">
@@ -7937,8 +7962,8 @@ function renderSource(){
     </button>
 
     <details class="src-fold" data-fold="add"${O('add')} style="margin-top:16px">
-      <summary>${icon('external')} Add your own site</summary>
-      <p class="ai-desc" style="margin-top:8px">Subscribe somewhere we don’t list? Tap it below — or paste a search page and we’ll wire it up for you.</p>
+      <summary>${icon('external')} Add a site by hand</summary>
+      <p class="ai-desc" style="margin-top:8px">Only needed if the paste box above didn’t suit — a service you subscribe to, or a site whose address you want to write yourself.</p>
       <div class="src-picks">${REGIONAL_SERVICES
         .filter(s=>!customServices().some(c=>c.name.toLowerCase()===s.name.toLowerCase()))
         .map(s=>`<button class="src-chip" onclick="addRegional('${escH(s.name)}')">${escH(s.name)} <span style="opacity:.55">${escH(s.region)}</span></button>`).join('')}</div>
@@ -7994,14 +8019,17 @@ function renderSource(){
       </div>`;}).join('')}
     </details>
     ${IS_NATIVE?`
-    <div class="dt-label" style="margin-top:22px">${icon('film')} Your streaming accounts</div>
-    <p class="ai-desc">Tick the services you subscribe to. On a show, <b>Watch</b> then offers <b>“Open in …”</b> for each — opening that app on your phone where you're already signed in. We never see your password, and nothing is ever pirated.</p>
+    <details class="src-fold" data-fold="subs"${O('subs')}>
+      <summary>${icon('film')} Your streaming accounts${myServices().length?` <span class="src-tag">${myServices().length}</span>`:''}</summary>
+    <p class="ai-desc" style="margin-top:8px">Tick the services you subscribe to. On a show, <b>Watch</b> then offers <b>“Open in …”</b> for each — opening that app on your phone where you're already signed in. We never see your password, and nothing is ever pirated.</p>
     <div class="src-picks">${PAID_SERVICES.map(s=>`<button class="src-chip${myServices().includes(s.id)?' on':''}" onclick="toggleService('${s.id}')">${s.name}</button>`).join('')}</div>
     <p class="ai-desc" style="margin-top:10px;font-size:11.5px">Watch lists your services first, then the free options — so a title is never a dead end.</p>
+    </details>
     `:''}
 
-    <div class="dt-label" style="margin-top:22px">${icon('book')} Reading source</div>
-    <p class="ai-desc">Where <b>Read now</b> opens a manga / manhwa / webtoon.</p>
+    <details class="src-fold" data-fold="read"${O('read')}>
+      <summary>${icon('book')} Reading source${rcustom?` <span class="src-tag">${escH(host(rcustom))}</span>`:''}</summary>
+      <p class="ai-desc" style="margin-top:8px">Where <b>Read now</b> opens a manga, manhwa or webtoon.</p>
     <button class="src-opt${!rcustom?' on':''}" onclick="setReadSource('')">
       <div class="src-name">AsuraScans <span class="src-tag">Built-in</span></div>
       <div class="src-sub">Jumps straight to the series</div>
@@ -8011,7 +8039,10 @@ function renderSource(){
       <div class="src-sub">${rcustom?'Using '+host(rcustom):'Paste any reading site below'}</div>
     </button>
     <input class="ai-prompt-in" id="rsrcCustom" placeholder="comick.io — or a full URL" value="${rcustom?rcustom.replace(/"/g,'&quot;'):''}" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url" style="margin-top:10px">
-    <button class="parse-btn" onclick="saveReadSource()">Use this site</button>`;
+    <button class="parse-btn" onclick="saveReadSource()">Use this site</button>
+    </details>
+
+    <button class="src-share-row" onclick="openShareSources()">${icon('send')} Share this setup with a friend</button>`;
   // Put the fold you were using back where it was — same scroll, still open.
   try{if(scroller)scroller.scrollTop=prevScroll;}catch{}
 }

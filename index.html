@@ -860,6 +860,9 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 .wt-t-sub{background:var(--watbg);color:var(--wat);}
 .wt-t-search{background:var(--bg4);color:var(--t3);}
 .src-picks{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px;}
+.src-toks{display:flex;flex-wrap:wrap;gap:7px;margin-top:8px;}
+.src-tok{font-family:var(--fm,ui-monospace);font-size:12px;color:var(--a2);background:var(--bg3);border:1px solid var(--b2);border-radius:8px;padding:6px 10px;cursor:pointer;transition:transform .1s,background .15s;}
+.src-tok:active{transform:scale(.94);background:var(--ag);}
 /* AI summon glow — a flowing multi-hue light that hugs the rounded screen edges,
    in the spirit of iOS's Siri. It's a border-only aurora: a rotating conic
    gradient, heavily blurred, masked so only the rim glows and the centre stays
@@ -6156,12 +6159,12 @@ function watchEpisode(a){
 //     the main title until fetchCovers fills them in)
 // Search sites are less fragile than deep title URLs (slugs/domains churn), so a
 // {query}/{title} search template is the recommended shape.
-const SRC_TOKEN_RE=/\{(title|query|slug|ep|ep2|ep3|episode|titleenglish|titleromaji|titlenative|anilistid|malid)\}/i;
+const SRC_TOKEN_RE=/\{(title|query|queryplus|slug|slug_|ep|ep2|ep3|episode|titleenglish|titleromaji|titlenative|anilistid|malid)\}/i;
 const SRC_SEARCH_RE=/\{(title|query|slug|titleenglish|titleromaji|titlenative|anilistid|malid)\}/i; // any non-episode token
 function fillSourceTokens(template,a,ep){
   const t=a.title||'', enc=encodeURIComponent;
-  const raw={ep:(ep||1),episode:(ep||1),ep2:String(ep||1).padStart(2,'0'),ep3:String(ep||1).padStart(3,'0'),anilistid:a.aniId||'',malid:a.malId||''};  // inserted verbatim ({ep2}=01, {ep3}=001)
-  const txt={title:t,query:t,slug:streamSlug(slugTitle(a)),titleenglish:a.titleEn||t,titleromaji:a.titleRo||t,titlenative:a.titleNa||t}; // url-encoded
+  const raw={ep:(ep||1),episode:(ep||1),ep2:String(ep||1).padStart(2,'0'),ep3:String(ep||1).padStart(3,'0'),queryplus:streamSlug(slugTitle(a)).replace(/-/g,'+'),anilistid:a.aniId||'',malid:a.malId||''};  // verbatim ({ep2}=01, {ep3}=001, {queryplus}=attack+on+titan)
+  const txt={title:t,query:t,slug:streamSlug(slugTitle(a)),slug_:streamSlug(slugTitle(a)).replace(/-/g,'_'),titleenglish:a.titleEn||t,titleromaji:a.titleRo||t,titlenative:a.titleNa||t}; // url-encoded ({slug_}=attack_on_titan)
   return String(template||'').replace(/\{(\w+)\}/g,(m,k)=>{
     const key=k.toLowerCase();
     if(key in raw)return String(raw[key]);
@@ -7177,7 +7180,10 @@ function renderSource(){
         <button class="parse-btn" style="flex:0 0 auto;width:auto;padding-left:16px;padding-right:16px" onclick="testSource()">${icon('search')} Test</button>
       </div>
       <div id="srcTest" style="display:none;margin-top:8px;padding:9px 11px;border-radius:9px;background:var(--bg2);color:var(--t2);font:12px/1.45 ui-monospace,Menlo,monospace;word-break:break-all;white-space:pre-wrap"></div>
-      <p class="ai-desc" style="margin-top:10px;font-size:11.5px">Tokens: <code>{query}</code>, <code>{slug}</code>, <code>{ep}</code>, <code>{titleRomaji}</code>, <code>{titleEnglish}</code>, <code>{titleNative}</code>, <code>{anilistId}</code>, <code>{malId}</code>.</p>
+      <div class="ai-desc" style="margin-top:10px;font-size:11.5px">Build it — type your site, then <b>tap a token</b> to drop it in where the cursor is:</div>
+      <div class="src-toks">
+        ${['{query}','{queryplus}','{slug}','{slug_}','{ep}','{ep2}','{ep3}','{titleRomaji}','{titleEnglish}','{titleNative}','{malId}','{anilistId}'].map(t=>`<button type="button" class="src-tok" onclick="insertSrcToken('${t}')">${t}</button>`).join('')}
+      </div>
       <div class="ai-desc" style="margin-top:10px"><b><code>{slug}</code> spelling</b> — some sites index by romaji, some by English.</div>
       <div class="src-picks">
         <button class="src-chip${!slugPref()?' on':''}" onclick="setSlugPref('')">Auto</button>
@@ -7230,6 +7236,13 @@ function setSource(v){
   try{if(v)localStorage.setItem('stream_src',v);else localStorage.removeItem('stream_src');}catch{}
   renderSource();
   toast(v?'Source set':'Back to default (legal, free)');
+}
+// Tap-to-insert token builder for the custom source URL — drop a token at the cursor.
+function insertSrcToken(tok){
+  const el=document.getElementById('srcCustom');if(!el)return;
+  const v=el.value||'',s=(el.selectionStart==null?v.length:el.selectionStart),e=(el.selectionEnd==null?v.length:el.selectionEnd);
+  el.value=v.slice(0,s)+tok+v.slice(e);
+  const p=s+tok.length;try{el.focus();el.setSelectionRange(p,p);}catch(_){}
 }
 function saveSource(){
   const v=normSrc(document.getElementById('srcCustom').value);

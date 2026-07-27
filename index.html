@@ -861,6 +861,14 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 .pv-wrong-b:active{transform:scale(.97);}
 .pv-wrong-x{width:26px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:99px;background:transparent;border:none;color:var(--t3);cursor:pointer;}
 .pv-wrong-x svg{width:14px;height:14px;}
+.pv-wrong-b.prim{background:var(--a);border-color:var(--a);color:var(--aFg);}
+/* Paste-the-right-address panel. */
+.pv-set{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:5;display:none;width:min(420px,92%);
+  padding:18px;border-radius:18px;background:var(--bg2);border:1px solid var(--b3);box-shadow:0 18px 50px rgba(0,0,0,.6);}
+.pv-set.on{display:block;}
+.pv-set-t{font-family:var(--fd);font-weight:800;font-size:15px;color:var(--t1);}
+.pv-set-s{font-size:12.5px;line-height:1.55;color:var(--t2);margin:7px 0 11px;}
+.pv-set-row{display:flex;gap:8px;margin-top:9px;}
 /* Episode cells that fall back to the show's cover — dimmed so the number reads. */
 .dt-ep.generic .dt-ep-img{position:relative;background-size:cover;background-position:center;}
 .dt-ep.generic .dt-ep-img::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.35),rgba(0,0,0,.72));border-radius:inherit;}
@@ -2059,7 +2067,19 @@ body.recsel .pcard{position:relative;}
       <span class="pv-wrong-t">Wrong page?</span>
       <button class="pv-wrong-b" onclick="pvTrySpelling()">Try another spelling</button>
       <button class="pv-wrong-b" onclick="pvSearchHere()">Search this title</button>
+      <button class="pv-wrong-b prim" onclick="pvSetPrompt()">Set the right one</button>
       <button class="pv-wrong-x" onclick="document.getElementById('pvWrong').classList.remove('on')" aria-label="Dismiss"><i data-ic="x"></i></button>
+    </div>
+    <!-- Learn the site's own name for this show, from one working address. -->
+    <div class="pv-set" id="pvSet">
+      <div class="pv-set-t" id="pvSetTitle"></div>
+      <div class="pv-set-s">Find the show on this site, then paste that page's address. WatchList remembers what this site calls it, so every episode works from now on.</div>
+      <input class="ai-prompt-in" id="pvSetIn" placeholder="paste the address of the right page" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url">
+      <div class="pv-set-row">
+        <button class="parse-btn" style="flex:1" onclick="pvSetFromURL()">Set</button>
+        <button class="parse-btn" style="flex:0 0 auto;width:auto;padding:0 16px" onclick="pvOpenExternal()">Open in browser</button>
+        <button class="parse-btn" style="flex:0 0 auto;width:auto;padding:0 16px" onclick="document.getElementById('pvSet').classList.remove('on')">Cancel</button>
+      </div>
     </div>
     <div class="pv-blocked" id="pvBlocked">
       <div class="pv-blocked-t">Still blank?</div>
@@ -6513,7 +6533,12 @@ const SRC_SEARCH_RE=/\{(title|query|slug|titleenglish|titleromaji|titlenative|an
 function fillSourceTokens(template,a,ep){
   const t=a.title||'', enc=encodeURIComponent;
   const raw={ep:(ep||1),episode:(ep||1),ep2:String(ep||1).padStart(2,'0'),ep3:String(ep||1).padStart(3,'0'),queryplus:streamSlug(slugTitle(a)).replace(/-/g,'+'),anilistid:a.aniId||'',malid:a.malId||''};  // verbatim ({ep2}=01, {ep3}=001, {queryplus}=attack+on+titan)
-  const txt={title:t,query:t,slug:streamSlug(slugTitle(a)),slug_:streamSlug(slugTitle(a)).replace(/-/g,'_'),titleenglish:a.titleEn||t,titleromaji:a.titleRo||t,titlenative:a.titleNa||t}; // url-encoded ({slug_}=attack_on_titan)
+  // a.srcSlug is what the SITE calls this show, learned from a working link the
+  // user set (see pvSetFromURL). It beats anything we can derive, because the
+  // site's own spelling is the only one that's authoritative — "Initial D" is
+  // "initial-d-first-stage" on one site and "initial_d" on the next.
+  const _slug=(a&&a.srcSlug&&String(a.srcSlug).trim())||streamSlug(slugTitle(a));
+  const txt={title:t,query:t,slug:_slug,slug_:_slug.replace(/-/g,'_'),titleenglish:a.titleEn||t,titleromaji:a.titleRo||t,titlenative:a.titleNa||t}; // url-encoded ({slug_}=attack_on_titan)
   return String(template||'').replace(/\{(\w+)\}/g,(m,k)=>{
     const key=k.toLowerCase();
     if(key in raw)return String(raw[key]);
@@ -6644,6 +6669,58 @@ function pvTrySpelling(){
   if(!url){pvSearchHere();return;}
   document.getElementById('pvFrame').src=url;
   toast(`Trying “${title}”`);
+}
+// ─── "THIS IS THE RIGHT PAGE" ───────────────────────────────────────────────
+// When the deep link misses, the fix is one fact we can't obtain ourselves: what
+// the SITE calls this show. A cross-origin frame won't tell us its address — the
+// browser forbids it — so the user hands it over once, and it sticks forever.
+//
+// Two things get learned from that one paste:
+//   • the show's slug on this site  → every future episode of it resolves
+//   • the URL's shape, if it differs → the template itself is corrected
+function pvSetPrompt(){
+  const a=anime.find(x=>x.id===pvReturnId); if(!a){toast('Nothing open');return;}
+  const box=document.getElementById('pvSet'); if(!box)return;
+  document.getElementById('pvWrong').classList.remove('on');
+  document.getElementById('pvSetTitle').textContent=`Where is “${a.title}” on this site?`;
+  const inp=document.getElementById('pvSetIn'); inp.value='';
+  box.classList.add('on'); try{inp.focus();}catch(e){}
+}
+function pvSetFromURL(){
+  const a=anime.find(x=>x.id===pvReturnId); if(!a)return;
+  const raw=((document.getElementById('pvSetIn')||{}).value||'').trim();
+  if(!raw){toast('Paste the address of the page you’re on');return;}
+  const url=normSrc(raw);
+  let path=[]; try{path=new URL(url).pathname.split('/').filter(Boolean);}catch{toast('That doesn’t look like a web address');return;}
+  const tplNow=effectiveSource(a)||'';
+  // Where does {slug} sit in the template we're using? Split as TEXT — URL()
+  // would percent-encode the braces and never match.
+  const tSegs=String(tplNow).replace(/^https?:\/\/[^/]+/i,'').split('?')[0].split('/').filter(Boolean);
+  let idx=-1;
+  for(let i=0;i<tSegs.length;i++)if(/\{(slug|slug_)\}/i.test(decodeURIComponent(tSegs[i]))){idx=i;break;}
+  let learnedSlug='';
+  if(idx>=0&&path[idx])learnedSlug=path[idx];
+  else{
+    // Shape doesn't line up — take the segment that isn't structural or an episode.
+    const STRUCT=/^(watch|anime|series|video|tv|show|title|play|stream|v|w|en|sub|dub)$/i;
+    for(const seg of path){ if(STRUCT.test(seg)||/^(ep|episode|e)[-_]?\d+$/i.test(seg)||/^\d+$/.test(seg))continue; learnedSlug=seg; }
+  }
+  if(!learnedSlug){toast('Couldn’t read a show name from that address');return;}
+  a.srcSlug=learnedSlug.replace(/[_-]?(ep|episode)[-_]?\d+$/i,'');
+  // If the page's shape differs from the current template, adopt the new shape
+  // too — that's the same recognizer the one-paste setup uses.
+  const reshaped=templatizeSearchURL(url);
+  if(SRC_TOKEN_RE.test(reshaped)&&reshaped!==tplNow){
+    setSource(reshaped);
+    try{addSrcExample(url,a.title);refreshSrcExNote();}catch(e){}
+  }
+  try{save();}catch(e){}
+  document.getElementById('pvSet').classList.remove('on');
+  toast(`Got it — “${a.title}” is “${a.srcSlug}” here`);
+  // Reload at the episode they were on, now using the learned name.
+  const ep=pvWatchEp||1;
+  const fixed=streamURL(a,ep).url;
+  if(fixed)document.getElementById('pvFrame').src=fixed;
 }
 // The site's own search for this exact title, in-frame.
 function pvSearchHere(){
@@ -8921,13 +8998,13 @@ function _updBusy(){
 // you'd explain it to a friend — what they can now do, not what the code does.
 // No version numbers or jargon in the notes; the date IS the version.
 const RELEASE={
-  v:'2026-07-27.7',
-  title:'Landed on the wrong page?',
-  push:'If a site opens the wrong page, one tap tries another spelling or searches it — without leaving.',
+  v:'2026-07-27.8',
+  title:'Teach it the right page',
+  push:'Wrong page? Paste the right one once and WatchList remembers that show forever.',
   notes:[
-    'Sites disagree about what a show is called — <b>Initial D</b> on one site is <b>initial-d-first-stage</b> on another, so a link can land on that site\u2019s 404.',
-    'When that happens, a bar now appears in the player: <b>Try another spelling</b> cycles the show\u2019s other names, <b>Search this title</b> searches the site itself.',
-    'Both stay inside WatchList, and your episode stays tracked either way.',
+    'If a show opens on the site\u2019s 404, the player now offers <b>Set the right one</b>.',
+    'Find the show on that site, paste that page\u2019s address, and WatchList learns what <b>that site</b> calls it — so every episode of it works from then on.',
+    'If the address is a different shape entirely, it fixes your link pattern too. One paste, once per show.',
   ],
 };
 const SEEN_REL='seen_release';

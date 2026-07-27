@@ -184,6 +184,35 @@ export default {
       return json({ ok: true }, 200, cors);
     }
 
+    // ── a shareable setup link ───────────────────────────────────────────────
+    // Publishing to a short code means a setup can be handed to ANYONE — a text
+    // message, a Discord line — with no friend request first. Read-only and
+    // opaque: the code reveals nothing about who made it.
+    if (op === 'src_pub') {
+      const p2 = (body.pack && typeof body.pack === 'object') ? body.pack : {};
+      const from = (body.from && typeof body.from === 'object') ? body.from : {};
+      if (!p2.src && !(Array.isArray(p2.services) && p2.services.length)) return json({ error: 'empty pack' }, 400, cors);
+      const A = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';                 // no look-alikes
+      const bytes = crypto.getRandomValues(new Uint8Array(8));
+      let code = '';
+      for (const b of bytes) code += A[b % A.length];
+      await env.LISTS.put('pub:' + code, JSON.stringify({
+        pack: p2,
+        from: { name: String(from.name || 'A friend').slice(0, 40) },
+        at: Date.now(),
+      }), { expirationTtl: 60 * 60 * 24 * 180 });                  // 6 months
+      return json({ ok: true, code }, 200, cors);
+    }
+
+    if (op === 'src_get') {
+      const code = String(body.code || '').toUpperCase();
+      if (!/^[A-Z0-9]{6,16}$/.test(code)) return json({ error: 'bad code' }, 400, cors);
+      let rec = null;
+      try { const s2 = await env.LISTS.get('pub:' + code); if (s2) rec = JSON.parse(s2); } catch {}
+      if (!rec) return json({ error: 'not found' }, 404, cors);
+      return json({ ok: true, pack: rec.pack, from: rec.from, at: rec.at }, 200, cors);
+    }
+
     if (op === 'src_pull') {
       const code = String(body.code || '');
       if (!/^[A-Za-z0-9]{10,64}$/.test(code)) return json({ error: 'bad code' }, 400, cors);

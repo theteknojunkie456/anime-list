@@ -876,10 +876,13 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 .shr-f{padding:9px 14px;border-radius:99px;background:var(--bg3);border:1px solid var(--b1);color:var(--t2);font-size:12.5px;font-weight:700;cursor:pointer;}
 .shr-f.on{background:var(--ag);border-color:var(--a);color:var(--t1);}
 /* One quiet row at the end of Sources — sharing is worth offering, not shouting. */
-.src-share-row{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin-top:18px;padding:13px 0;
-  border-radius:13px;background:transparent;border:1px dashed var(--b2);color:var(--t2);font-size:12.5px;font-weight:700;cursor:pointer;}
-.src-share-row:active{transform:scale(.99);}
-.src-share-row svg{width:15px;height:15px;}
+/* "Share mine" — sits with the box where you set your link, because that's the
+   moment you'd want to pass it on. */
+.src-quick-share{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin-top:10px;padding:11px 0;
+  border-radius:12px;background:var(--bg4);border:1px solid var(--b2);color:var(--t1);font-size:12.5px;font-weight:800;cursor:pointer;}
+.src-quick-share span{font-weight:600;color:var(--t3);font-size:11.5px;}
+.src-quick-share:active{transform:scale(.99);}
+.src-quick-share svg{width:15px;height:15px;}
 /* Episode cells that fall back to the show's cover — dimmed so the number reads. */
 .dt-ep.generic .dt-ep-img{position:relative;background-size:cover;background-position:center;}
 .dt-ep.generic .dt-ep-img::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.35),rgba(0,0,0,.72));border-radius:inherit;}
@@ -1894,15 +1897,6 @@ body.recsel .pcard{position:relative;}
     <button class="sheet-cancel" onclick="closeAll()">Done</button>
   </div>
   <div id="adminBody"></div>
-</div>
-
-<div class="sheet" id="shareSrcSheet">
-  <div class="sheet-handle"></div>
-  <div class="sheet-header">
-    <div class="sheet-title"><i data-ic="send"></i> Share my setup</div>
-    <button class="sheet-cancel" onclick="closeAll()">Close</button>
-  </div>
-  <div id="shareSrcBody"></div>
 </div>
 
 <div class="sheet" id="srcOfferSheet">
@@ -4456,17 +4450,6 @@ function renderDetail(){
       </div>
     </div>
     ${friendRecBadge(a)}
-    <div id="dtRich" class="dt-rich"></div>
-    <div class="dt-label">Status</div>
-    <div class="dt-status">${statusBtns}</div>
-    ${progHTML}
-    ${stars}
-    ${seasonsHTML}
-    ${chips?`<div class="dt-label">Genres</div><div class="chips">${chips}</div>`:''}
-    ${orderHTML}
-    ${notesHTML}
-    <div class="dt-label" style="margin-top:18px"></div>
-    <div id="ai-box-detail"></div>
     ${(kindOf(a)==='watch'&&a.aniId)?`<button class="dt-watch" onclick="watchAnime('${a.id}')">${icon('play')} ${(a.ep||0)>0?'Continue Watching':'Start Watching'}</button>
     ${titleWatchPickerHTML(a)}
     <button class="dt-pin-toggle" onclick="togglePin()">${icon('external')} ${a.srcUrl?'Advanced: edit the direct link':'Advanced: paste a direct episode link'}</button>
@@ -4480,6 +4463,17 @@ function renderDetail(){
       <div id="dtPinOut" style="display:none;margin-top:8px;padding:9px 11px;border-radius:9px;background:var(--bg2);color:var(--t2);font:12px/1.45 ui-monospace,Menlo,monospace;word-break:break-all;white-space:pre-wrap"></div>
       <p class="ai-desc" style="margin-top:8px;font-size:11px">Set once for this show — Watch goes straight here. Put <code>{ep}</code> where the episode number goes; Next/Prev then auto-advance.</p>
     </div>`:''}
+    ${progHTML}
+    <div class="dt-label">Status</div>
+    <div class="dt-status">${statusBtns}</div>
+    <div id="dtRich" class="dt-rich"></div>
+    ${stars}
+    ${seasonsHTML}
+    ${chips?`<div class="dt-label">Genres</div><div class="chips">${chips}</div>`:''}
+    ${orderHTML}
+    ${notesHTML}
+    <div class="dt-label" style="margin-top:18px"></div>
+    <div id="ai-box-detail"></div>
     ${kindOf(a)==='read'?`<button class="dt-watch" onclick="readManga('${a.id}')">${icon('book')} ${(a.ep||0)>0?'Continue Reading':'Start Reading'}</button>
     <button class="dt-pin-toggle" onclick="togglePin()">${icon('external')} ${a.srcUrl?'Direct link pinned — edit':'Pin a direct link for this title'}</button>
     <div id="dtPin" style="display:none">
@@ -7244,33 +7238,65 @@ function packSummary(p){
   if(p.hidden&&p.hidden.length)bits.push(`${p.hidden.length} hidden from the list`);
   return bits.length?bits.join(' · '):'their source settings';
 }
-async function shareSources(){
-  const fr=friendsList();
-  if(!fr.length){toast('Add a friend first');closeAll();setTimeout(openFriends,240);return;}
+// One button, one link. The old flow needed an accepted friend and its own
+// screen to pick them — three steps before anything was shared, and no help at
+// all for handing your setup to someone who isn't in the app yet. A link works
+// for anyone: text it, paste it in Discord. It carries how you watch, never
+// anything from your list.
+let _shareBusy=false;
+async function shareMine(){
+  if(_shareBusy)return;
   const pack=mySourcePack();
-  if(!pack.src&&!pack.services.length){toast('Set up a source first');return;}
-  const picked=[...document.querySelectorAll('.shr-f.on')].map(el=>el.dataset.code).filter(Boolean);
-  if(!picked.length){toast('Pick who to send it to');return;}
-  const from={code:myFriendCode(),name:myFriendName()||'A friend'};
-  const res=await Promise.all(picked.map(async code=>{
-    try{const r=await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({op:'src_send',to:code,from,pack})});
-      const j=r.ok?await r.json():{};return !!(j&&j.ok);}catch(e){return false;}
-  }));
-  const ok=res.filter(Boolean).length;
-  closeAll();
-  toast(ok?`Sent your setup to ${ok} friend${ok>1?'s':''}`:'Couldn’t send — try again');
+  if(!pack.src&&!pack.services.length){toast('Set your site first');return;}
+  const btn=document.getElementById('shareMineBtn'), old=btn?btn.innerHTML:'';
+  _shareBusy=true; if(btn){btn.disabled=true;btn.textContent='Making your link…';}
+  try{
+    const r=await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({op:'src_pub',pack,from:{name:myFriendName()||'A friend'}})});
+    const j=r.ok?await r.json():{};
+    if(!j.ok||!j.code)throw new Error('no code');
+    showShareLink(location.origin+location.pathname+'?setup='+j.code,pack);
+  }catch(e){toast('Couldn’t make a link — try again');}
+  finally{_shareBusy=false; if(btn){btn.disabled=false;btn.innerHTML=old;}}
 }
-function renderShareSources(){
-  const box=document.getElementById('shareSrcBody'); if(!box)return;
-  const fr=friendsList(), pack=mySourcePack();
-  box.innerHTML=`<p class="ai-desc" style="margin-top:2px">They get a copy of your setup — <b>only if they accept</b>. It never changes your own.</p>
-    <div class="shr-preview">${packSummary(pack)}</div>
-    <div class="dt-label" style="margin-top:14px">Send to</div>
-    ${fr.length?`<div class="shr-list">${fr.map(f=>`<button class="shr-f" data-code="${escH(f.code)}" onclick="this.classList.toggle('on')">${escH(friendLabel(f))}</button>`).join('')}</div>`
-      :`<p class="ai-desc">You have no friends added yet. Add someone in <b>Friends</b> first.</p>`}
-    <button class="parse-btn" style="margin-top:14px" onclick="shareSources()">${icon('send')} Send my setup</button>`;
+function showShareLink(link,pack){
+  const box=document.getElementById('srcQuickOut');   // reuse the panel they're already looking at
+  if(box){
+    box.style.display='block';
+    box.innerHTML=`<div class="src-quick-ok">
+      <div class="src-quick-got">${icon('check')} Your setup link is ready.</div>
+      <div class="src-quick-sub">Whoever opens it gets ${packSummary(pack)} — once they tap Accept.</div>
+      <div class="src-quick-url">${escH(link)}</div>
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button class="parse-btn" style="flex:1" onclick="copyShareLink('${escH(link)}')">Copy link</button>
+        ${navigator.share?`<button class="parse-btn" style="flex:0 0 auto;width:auto;padding:0 16px" onclick="sendShareLink('${escH(link)}')">Send…</button>`:''}
+      </div>
+    </div>`;
+  }
+  toast('Link ready — send it to anyone');
 }
-function openShareSources(){renderShareSources();openSheet('shareSrcSheet');}
+function copyShareLink(link){
+  try{navigator.clipboard.writeText(link).then(()=>toast('Link copied'),()=>toast('Copy it from the box above'));}
+  catch(e){toast('Copy it from the box above');}
+}
+function sendShareLink(link){
+  try{navigator.share({title:'My WatchList setup',text:'Use my streaming setup in WatchList',url:link});}catch(e){copyShareLink(link);}
+}
+// Opening ?setup=CODE fetches that published setup and offers it — the same
+// Accept screen either way, so there's only one thing to understand.
+async function consumeSetupParam(){
+  let code=''; try{code=(new URL(location.href).searchParams.get('setup')||'').toUpperCase();}catch(e){}
+  if(!code)return;
+  try{const u=new URL(location.href);u.searchParams.delete('setup');history.replaceState(null,'',u.pathname+u.search+u.hash);}catch(e){}
+  try{
+    const r=await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({op:'src_get',code})});
+    const j=r.ok?await r.json():{};
+    if(!j.ok||!j.pack){toast('That setup link has expired');return;}
+    srcPacksIn=[{id:'link:'+code,from:j.from||{name:'A friend'},pack:j.pack,at:j.at||Date.now()}];
+    showSrcOffer();
+  }catch(e){toast('Couldn’t open that link');}
+}
+setTimeout(()=>{try{consumeSetupParam();}catch(e){}},1200);
 
 // ── incoming offers ──
 let srcPacksIn=[];
@@ -7297,6 +7323,7 @@ function showSrcOffer(){
   openSheet('srcOfferSheet');
 }
 async function clearSrcPack(id){
+  if(String(id||'').indexOf('link:')===0){srcPacksIn=srcPacksIn.filter(p=>p.id!==id);return;}
   try{await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({op:'src_clear',code:myFriendCode(),id})});}catch(e){}
   srcPacksIn=srcPacksIn.filter(p=>p.id!==id);
 }
@@ -7947,6 +7974,7 @@ function renderSource(){
       </ol>
       <input class="ai-prompt-in" id="srcQuickIn" placeholder="paste that episode's address" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url" oninput="quickSetup()">
       <div id="srcQuickOut" class="src-quick-out" style="display:none"></div>
+      <button class="src-quick-share" id="shareMineBtn" onclick="shareMine()">${icon('send')} Share mine<span>${custom?escH(host(custom)):'anyone can use your setup'}</span></button>
     </div>
 
 
@@ -8041,8 +8069,7 @@ function renderSource(){
     <input class="ai-prompt-in" id="rsrcCustom" placeholder="comick.io — or a full URL" value="${rcustom?rcustom.replace(/"/g,'&quot;'):''}" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url" style="margin-top:10px">
     <button class="parse-btn" onclick="saveReadSource()">Use this site</button>
     </details>
-
-    <button class="src-share-row" onclick="openShareSources()">${icon('send')} Share this setup with a friend</button>`;
+`;
   // Put the fold you were using back where it was — same scroll, still open.
   try{if(scroller)scroller.scrollTop=prevScroll;}catch{}
 }
@@ -9194,13 +9221,13 @@ function _updBusy(){
 // you'd explain it to a friend — what they can now do, not what the code does.
 // No version numbers or jargon in the notes; the date IS the version.
 const RELEASE={
-  v:'2026-07-28.1',
-  title:'A calmer Sources screen',
-  push:'Sources is tidied down to the one thing that matters, and a wrong \u201cstorage full\u201d warning is fixed.',
+  v:'2026-07-28.2',
+  title:'Share your setup with a link',
+  push:'Sharing your setup is now one button and a link \u2014 send it to anyone, no friend request needed.',
   notes:[
-    '<b>Sources</b> now shows just what you need: paste your site, and where Watch opens. Everything else is tucked into sections you can open when you want them.',
-    'Reading source and streaming accounts are their own sections now, so they stay out of the way until you need them.',
-    'Fixed: the app could say <b>storage full</b> and tell you to delete titles when your storage was nearly empty \u2014 any save hiccup was being blamed on space. It now says what actually went wrong.',
+    'Under the paste box in <b>Sources</b> there is now <b>Share mine</b>. Tap it, get a link, send it to anyone \u2014 text, Discord, wherever.',
+    'Whoever opens it sees what they are getting and taps <b>Accept</b>. They do not need to be your friend in the app, or even have a setup yet.',
+    'Opening a show now puts <b>Watch</b> and your progress at the top, where they belong, instead of below the ratings and genres.',
   ],
 };
 const SEEN_REL='seen_release';

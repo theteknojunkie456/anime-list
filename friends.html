@@ -1431,19 +1431,7 @@ body.recsel .pcard{position:relative;}
 .kbkey{min-width:22px;height:23px;padding:0 7px;border-radius:7px;background:var(--bg4);border:1px solid var(--b2);font-size:12px;font-weight:700;color:var(--t2);display:inline-flex;align-items:center;justify-content:center;font-family:ui-monospace,SFMono-Regular,monospace;}
 
 /* Video Player Overlay */
-#video-player-overlay {
-  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-  background: #000; z-index: 1000; display: none; flex-direction: column;
-}
-#video-player-overlay.active { display: flex; }
-#video-container { flex: 1; display: flex; align-items: center; justify-content: center; background: #111; }
-video { width: 100%; height: 100%; object-fit: contain; }
-#player-controls { background: linear-gradient(transparent, rgba(0,0,0,0.8)); padding: 16px; color: white; display: flex; flex-direction: column; gap: 8px; }
-#progress-bar-container { width: 100%; height: 4px; background: rgba(255,255,255,0.3); cursor: pointer; }
-#progress-bar { height: 100%; background: var(--a, #6C63FF); width: 0%; }
-#controls-buttons { display: flex; justify-content: space-between; align-items: center; }
-#controls-buttons button { background: none; border: none; color: white; font-size: 24px; cursor: pointer; padding: 8px; }
-#time-display { font-family: var(--fb, sans-serif); font-size: 12px; }
+
 
 
 </style>
@@ -2142,28 +2130,6 @@ video { width: 100%; height: 100%; object-fit: contain; }
 <div class="toast" id="toast"></div>
 
 <!-- Video Player Overlay — kept before the script tag so its element refs exist when the script runs -->
-<div id="video-player-overlay">
-  <div id="video-container">
-    <video id="anime-video" playsinline>
-      Your browser does not support the video tag.
-    </video>
-  </div>
-  <div id="player-controls">
-    <div id="progress-bar-container">
-      <div id="progress-bar"></div>
-    </div>
-    <div id="controls-buttons">
-      <div>
-        <button id="btn-play-pause">▶</button>
-        <button id="btn-prev-ep">⏮</button>
-        <button id="btn-next-ep">⏭</button>
-      </div>
-      <div id="time-display">00:00 / 00:00</div>
-      <button id="btn-close-player">✕</button>
-    </div>
-  </div>
-</div>
-
 <script>
 // ─── ICONS — inline monochrome line icons (Feather/Lucide style, currentColor) ──
 const ICONS={
@@ -4347,7 +4313,10 @@ function renderDetail(){
     ${(()=>{
       if(kindOf(a)!=='watch') return '';
       const nextEp = watchEpisode(a) || 1;
-      return `<button class="dt-play" onclick="openPlayer('${a.id}', ${nextEp - 1})">${icon('play')} Play Episode ${nextEp}</button>`;
+      // Straight through watchAnime, like every other watch action: your pinned
+      // link wins, else your source at THIS episode, else the no-source prompt.
+      // It used to call a scraper player that ignored Sources entirely.
+      return `<button class="dt-play" onclick="watchAnime('${a.id}', ${nextEp})">${icon('play')} Play Episode ${nextEp}</button>`;
     })()}
     ${progHTML}
     ${stars}
@@ -4450,14 +4419,15 @@ function richDetailHTML(d,forId){
     for(let n=1;n<=N;n++)cells.push(`<button class="dt-epn${n<=cur?' seen':(n===cur+1?' next':'')}" onclick="watchEpAt('${forId}',${n})">${n}</button>`);
     epsHTML=`<div class="dt-label" style="margin-top:16px">${icon('play')} Episodes<span class="dt-eps-tag">your source</span></div><div class="dt-epgrid">${cells.join('')}</div>`;
   }else if(eps.length){
-    epsHTML=`<div class="dt-label" style="margin-top:16px">${icon('play')} Episodes<span class="dt-eps-tag">${_hasSrc?'your source':'official'}</span></div><div class="dt-eps">${eps.slice(0,60).map((e,i)=>{const th=safeImg(e.thumbnail||'');const yid=ytId(e.url);const en=(String(e.title).match(/\d+/)||[])[0];const epN=en?+en:(i+1);const act=_hasSrc?`watchAnime('${forId}',${epN})`:(yid?`playYouTube('${yid}')`:`openExternal('${escH(e.url).replace(/'/g,"\\'")}')`);return `<button class="dt-ep${yid&&!_hasSrc?' yt':''}" onclick="${act}"><div class="dt-ep-img"${th?` style="background-image:url('${th}')"`:''}>${yid&&!_hasSrc?`<span class="dt-ep-yt">${icon('play')}</span>`:''}</div><div class="dt-ep-t">${schEsc(e.title)}</div></button>`;}).join('')}</div>`;
+    epsHTML=`<div class="dt-label" style="margin-top:16px">${icon('play')} Episodes<span class="dt-eps-tag">${_hasSrc?'your source':'official'}</span></div><div class="dt-eps">${eps.slice(0,60).map((e,i)=>{const th=safeImg(e.thumbnail||'');const yid=ytId(e.url);const en=(String(e.title).match(/\d+/)||[])[0];const epN=en?+en:(i+1);const act=(_hasSrc||(forId&&noSourceMode()))?`watchAnime('${forId}',${epN})`:(yid?`playYouTube('${yid}')`:`openExternal('${escH(e.url).replace(/'/g,"\\'")}')`);return `<button class="dt-ep${yid&&!_hasSrc?' yt':''}" onclick="${act}"><div class="dt-ep-img"${th?` style="background-image:url('${th}')"`:''}>${yid&&!_hasSrc?`<span class="dt-ep-yt">${icon('play')}</span>`:''}</div><div class="dt-ep-t">${schEsc(e.title)}</div></button>`;}).join('')}</div>`;
   }
   const desc=_stripHtml(d.description);
   const synHTML=desc?`<div class="dt-label" style="margin-top:16px">Synopsis</div><p class="dt-synopsis" onclick="this.classList.toggle('open')">${schEsc(desc)}</p>`:'';
   let trailerHTML='';
   if(d.trailer&&d.trailer.site==='youtube'&&d.trailer.id){
-    const url='https://www.youtube.com/watch?v='+encodeURIComponent(String(d.trailer.id));
-    trailerHTML=`<button class="dt-trailer" onclick="openExternal('${escH(url)}')">${icon('play')} Watch trailer</button>`;
+    // Plays in WatchList's own YouTube overlay — the trailer is an official
+    // upload, so there's no reason to throw anyone out of the app to watch it.
+    trailerHTML=`<button class="dt-trailer" onclick="playYouTube('${escH(String(d.trailer.id)).replace(/'/g,"\\'")}')">${icon('play')} Watch trailer</button>`;
   }
   const chars=((d.characters||{}).edges)||[];
   const charsHTML=chars.length?`<div class="dt-label" style="margin-top:18px">Characters</div><div class="dt-chars">${chars.map(e=>{const n=e.node||{};const img=safeImg(((n.image||{}).medium)||'');const nm=((n.name||{}).full)||'';return `<div class="dt-char"><div class="dt-char-img"${img?` style="background-image:url('${img}')"`:''}></div><div class="dt-char-n">${schEsc(nm)}</div><div class="dt-char-r">${schEsc((e.role||'').toLowerCase())}</div></div>`;}).join('')}</div>`:'';
@@ -9101,20 +9071,6 @@ setTimeout(()=>{try{if(notifyOn())notifyUpdate();}catch{}},1600);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)syncOnOpen();});
 try{window.addEventListener('online',()=>syncOnOpen());}catch(e){}   // cloud sync recovers the moment the network is back
 
-/* === Video Player Logic === */
-const videoPlayerOverlay = document.getElementById("video-player-overlay");
-const videoElement = document.getElementById("anime-video");
-const progressBar = document.getElementById("progress-bar");
-const progressContainer = document.getElementById("progress-bar-container");
-const btnPlayPause = document.getElementById("btn-play-pause");
-const btnPrevEp = document.getElementById("btn-prev-ep");
-const btnNextEp = document.getElementById("btn-next-ep");
-const timeDisplay = document.getElementById("time-display");
-
-let currentAnimeId = null;
-let currentEpisodeIndex = 0;
-let episodesList = [];
-
 /* ═══════════════════════════════════════════════════════════════════════════
    NOTE FOR THE OTHER AI EDITING THIS FILE — read before you touch anything:
    • This is ONE single-file app. A single JS syntax error blanks the WHOLE app
@@ -9128,150 +9084,10 @@ let episodesList = [];
      of those broke the file (dangling strings, duplicate IDs, HTML-in-strings).
    • IIFE syntax is (()=>{ … })() — call parens OUTSIDE the arrow. `await` only
      works inside an `async` function.
-   • The scraper streaming below can't work in a browser (dead endpoints + CORS /
-     Referer blocks) — that's your department, but don't let it crash the app.
+   • Do NOT add scraper/streaming players. Every watch action goes through
+     watchAnime(id, ep) so it honours the user's Sources setting.
    ═══════════════════════════════════════════════════════════════════════════ */
-function openPlayer(animelistId, episodeIndex = 0) {
-  currentAnimeId = animelistId;
-  currentEpisodeIndex = episodeIndex;
-  videoPlayerOverlay.classList.add("active");
-  fetchEpisodesAndPlay(animelistId, episodeIndex);
-}
 
-async function fetchEpisodesAndPlay(animelistId, episodeIndex) {
-  btnPlayPause.textContent = "⏳";
-  try {
-    const animeObj = anime.find(a => a.id === animelistId || a.aniId === animelistId);
-    if (!animeObj) {
-      toast("Anime not found in list.");
-      closeVideoPlayer();
-      return;
-    }
-    
-    const malId = animeObj.malId;
-    if (!malId) {
-      toast("MAL ID not found for this anime.");
-      closeVideoPlayer();
-      return;
-    }
-
-    toast(`Loading Episode ${episodeIndex + 1} for ${animeObj.title}…`);
-    
-    // Use MegaPlay API proxy stream endpoint
-    const streamUrl = `https://mega-playback.vercel.app/api/get?videoId=${malId}&episode=${episodeIndex + 1}`;
-    const res = await fetch(streamUrl);
-    const data = await res.json();
-    
-    if (data.sources && data.sources.length > 0) {
-      const source = data.sources.find(s => s.quality === 'default' || s.quality === '1080p') || data.sources[0];
-      playEpisode({video: source.url});
-    } else {
-      toast(`No stream sources found for Ep ${episodeIndex + 1}`);
-      closeVideoPlayer();
-    }
-  } catch (error) {
-    console.error("Error fetching episodes:", error);
-    toast("Error loading episode stream: " + error.message);
-    closeVideoPlayer();
-  }
-}
-
-function playEpisode(episode) {
-  if (!episode) return;
-  const videoUrl = episode.video || episode.url;
-  if (videoUrl) {
-    if (videoUrl.includes('.m3u8') && typeof Hls !== 'undefined' && Hls.isSupported()) {
-      if (window.hlsPlayer) { window.hlsPlayer.destroy(); }
-      window.hlsPlayer = new Hls();
-      window.hlsPlayer.loadSource(videoUrl);
-      window.hlsPlayer.attachMedia(videoElement);
-      window.hlsPlayer.on(Hls.Events.MANIFEST_PARSED, () => {
-        videoElement.play().catch(e => console.log("Autoplay blocked:", e));
-      });
-    } else {
-      videoElement.src = videoUrl;
-      videoElement.load();
-      videoElement.play().catch(e => console.log("Autoplay blocked:", e));
-    }
-    btnPlayPause.textContent = "⏸";
-  }
-}
-
-function closeVideoPlayer() {
-  if (window.hlsPlayer) {
-    window.hlsPlayer.destroy();
-    window.hlsPlayer = null;
-  }
-  videoElement.pause();
-  videoElement.src = "";
-  videoPlayerOverlay.classList.remove("active");
-}
-
-btnPlayPause.addEventListener("click", () => {
-  if (videoElement.paused) { videoElement.play(); btnPlayPause.textContent = "⏸"; }
-  else { videoElement.pause(); btnPlayPause.textContent = "▶"; }
-});
-
-btnPrevEp.addEventListener("click", () => {
-  if (currentEpisodeIndex > 0) {
-    currentEpisodeIndex--;
-    fetchEpisodesAndPlay(currentAnimeId, currentEpisodeIndex);
-  }
-});
-
-btnNextEp.addEventListener("click", () => {
-  const animeObj = anime.find(a => a.id === currentAnimeId || a.aniId === currentAnimeId);
-  const total = (animeObj && animeObj.epTotal) || 999;
-  if (currentEpisodeIndex < total - 1) {
-    currentEpisodeIndex++;
-    fetchEpisodesAndPlay(currentAnimeId, currentEpisodeIndex);
-  }
-});
-
-videoElement.addEventListener("ended", () => {
-  if (currentAnimeId) {
-    applyWatched(currentAnimeId, currentEpisodeIndex + 1);
-    const animeObj = anime.find(a => a.id === currentAnimeId || a.aniId === currentAnimeId);
-    const total = (animeObj && animeObj.epTotal) || 0;
-    if (!total || currentEpisodeIndex < total - 1) {
-      currentEpisodeIndex++;
-      fetchEpisodesAndPlay(currentAnimeId, currentEpisodeIndex);
-    }
-  }
-});
-
-videoElement.addEventListener("timeupdate", () => {
-  const percent = (videoElement.currentTime / videoElement.duration) * 100;
-  progressBar.style.width = percent + "%";
-  timeDisplay.textContent = `${formatTime(videoElement.currentTime)} / ${formatTime(videoElement.duration)}`;
-});
-
-progressContainer.addEventListener("click", (e) => {
-  const rect = progressContainer.getBoundingClientRect();
-  const pos = (e.clientX - rect.left) / rect.width;
-  videoElement.currentTime = pos * videoElement.duration;
-});
-
-function formatTime(seconds) {
-  if (isNaN(seconds)) return "00:00";
-  const mins = Math.floor(seconds / 60);
-  const secs = Math.floor(seconds % 60);
-  return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
-}
-
-const btnClosePlayer = document.getElementById("btn-close-player");
-if (btnClosePlayer) {
-  btnClosePlayer.addEventListener("click", closeVideoPlayer);
-}
-
-document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape" && videoPlayerOverlay.classList.contains("active")) { closeVideoPlayer(); }
-});
-
-
-async function startAnimePlayback(aniListId) {
-  openPlayer(aniListId, 0);
-}
 
 </script>
 

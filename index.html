@@ -2614,12 +2614,29 @@ function _persistList(){
   if(!_hasOffloaded())return anime;   // no offload yet → identical to before (zero change for normal users)
   return anime.map(a=>{const c={...a};for(const pair of _IMG_FIELDS){const f=pair[0],kf=pair[1];if(a[kf]&&typeof c[f]==='string'&&c[f].slice(0,5)==='data:')c[f]='';}return c;});
 }
+// Lazy: this only does anything when images were offloaded (i.e. storage hit
+// capacity). Otherwise there are no keys and it's an instant no-op. When there
+// ARE offloaded images, we don't block startup — the app renders immediately
+// (offloaded art momentarily blank), then we pull the images from IndexedDB in
+// PARALLEL in the background and repaint once, so a big library never janks the
+// open. A title's own image is also resolved on demand when its detail opens.
 async function hydrateImages(){
-  let changed=false;
+  const jobs=[];
   for(const a of anime){if(!a)continue;
-    for(const pair of _IMG_FIELDS){const f=pair[0],kf=pair[1];if(a[kf]&&!a[f]){const d=await idbGet(a[kf]);if(d){a[f]=d;changed=true;}}}
+    for(const pair of _IMG_FIELDS){const f=pair[0],kf=pair[1];
+      if(a[kf]&&!a[f])jobs.push(idbGet(a[kf]).then(d=>{if(d)a[f]=d;}));
+    }
   }
-  if(changed){try{render();}catch(e){}try{if(typeof detailId!=='undefined'&&detailId)renderDetail();}catch(e){}}
+  if(!jobs.length)return;                       // nothing offloaded → no work at all
+  try{await Promise.all(jobs);}catch(e){}
+  try{render();}catch(e){}try{if(typeof detailId!=='undefined'&&detailId)renderDetail();}catch(e){}
+}
+// Resolve one title's offloaded images immediately (used when its detail opens,
+// so the sheet always has its art even before the background pass reaches it).
+async function hydrateOne(a){
+  if(!a)return;let changed=false;
+  for(const pair of _IMG_FIELDS){const f=pair[0],kf=pair[1];if(a[kf]&&!a[f]){const d=await idbGet(a[kf]);if(d){a[f]=d;changed=true;}}}
+  if(changed){try{if(typeof detailId!=='undefined'&&detailId===a.id)renderDetail();}catch(e){}}
 }
 function writeLocal(){
   const s=store();if(!s)return;
@@ -3923,6 +3940,7 @@ function openDetail(id){
   if(recSel){if(recSel.has(id))recSel.delete(id);else recSel.add(id);updateRecSelBar();render();return;}   // selection mode: tap toggles
   detailId=id;
   const it=anime.find(a=>a.id===id);setAmbient(it?titleAccent(it):'');
+  try{hydrateOne(it);}catch(e){}   // pull this title's offloaded art on demand
   renderDetail();
   const sh=document.getElementById('detailSheet');if(sh)sh.scrollTop=0;
   openSheet('detailSheet');

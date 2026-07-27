@@ -639,6 +639,11 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 .dt-ep-t{margin-top:6px;font:600 12px/1.35 var(--fb,system-ui);color:var(--t2);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
 .dt-ep:active{transform:scale(.97);}
 .dt-eps-tag{margin-left:8px;font-size:10px;font-weight:700;letter-spacing:.3px;color:var(--t3);border:1px solid var(--b2);border-radius:99px;padding:2px 7px;vertical-align:middle;text-transform:uppercase;}
+.dt-epgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(46px,1fr));gap:8px;margin-top:6px;}
+.dt-epn{height:42px;border-radius:11px;border:1px solid var(--b2);background:var(--bg3);color:var(--t2);font-family:var(--fd);font-weight:800;font-size:14px;cursor:pointer;transition:transform .1s;}
+.dt-epn:active{transform:scale(.94);}
+.dt-epn.seen{color:var(--t3);background:var(--bg2);opacity:.65;}
+.dt-epn.next{background:var(--a);color:var(--aFg,#fff);border-color:transparent;box-shadow:0 4px 16px -4px var(--glow);}
 .dt-chars,.dt-recs{display:flex;gap:12px;overflow-x:auto;padding:8px 2px;margin:0 -2px;scrollbar-width:none;}
 .dt-chars::-webkit-scrollbar,.dt-recs::-webkit-scrollbar{display:none;}
 .dt-char{flex-shrink:0;width:74px;text-align:center;}
@@ -4143,7 +4148,17 @@ function richDetailHTML(d,forId){
   const linksHTML=links.length?`<div class="dt-label" style="margin-top:16px">${icon('play')} Watch on</div><div class="dt-watchlinks">${links.map(l=>`<button class="dt-watchlink" onclick="openExternal('${escH(l.url).replace(/'/g,"\\'")}')">${schEsc(l.site)} ${icon('external')}</button>`).join('')}</div>`:'';
   // Official per-episode links AniList carries (Crunchyroll/etc. publish them) — legal, opens the source.
   const eps=((d.streamingEpisodes)||[]).filter(e=>e&&e.url&&e.title);
-  const epsHTML=eps.length?`<div class="dt-label" style="margin-top:16px">${icon('play')} Episodes<span class="dt-eps-tag">${_hasSrc?'your source':'official'}</span></div><div class="dt-eps">${eps.slice(0,60).map((e,i)=>{const th=safeImg(e.thumbnail||'');const yid=ytId(e.url);const en=(String(e.title).match(/\d+/)||[])[0];const epN=en?+en:(i+1);const act=_hasSrc?`watchAnime('${forId}',${epN})`:(yid?`playYouTube('${yid}')`:`openExternal('${escH(e.url).replace(/'/g,"\\'")}')`);return `<button class="dt-ep${yid&&!_hasSrc?' yt':''}" onclick="${act}"><div class="dt-ep-img"${th?` style="background-image:url('${th}')"`:''}>${yid&&!_hasSrc?`<span class="dt-ep-yt">${icon('play')}</span>`:''}</div><div class="dt-ep-t">${schEsc(e.title)}</div></button>`;}).join('')}</div>`:'';
+  const epTotalN=(d.episodes||(_it&&_it.epTotal)||0);
+  let epsHTML='';
+  if(_hasSrc&&epTotalN>0){
+    // Custom source + known count → EVERY episode is tappable and opens your source
+    // at that exact number (not just the few AniList lists). Watched ones dim; next is lit.
+    const cur=(_it&&_it.ep)||0,N=Math.min(epTotalN,600),cells=[];
+    for(let n=1;n<=N;n++)cells.push(`<button class="dt-epn${n<=cur?' seen':(n===cur+1?' next':'')}" onclick="watchAnime('${forId}',${n})">${n}</button>`);
+    epsHTML=`<div class="dt-label" style="margin-top:16px">${icon('play')} Episodes<span class="dt-eps-tag">your source</span></div><div class="dt-epgrid">${cells.join('')}</div>`;
+  }else if(eps.length){
+    epsHTML=`<div class="dt-label" style="margin-top:16px">${icon('play')} Episodes<span class="dt-eps-tag">${_hasSrc?'your source':'official'}</span></div><div class="dt-eps">${eps.slice(0,60).map((e,i)=>{const th=safeImg(e.thumbnail||'');const yid=ytId(e.url);const en=(String(e.title).match(/\d+/)||[])[0];const epN=en?+en:(i+1);const act=_hasSrc?`watchAnime('${forId}',${epN})`:(yid?`playYouTube('${yid}')`:`openExternal('${escH(e.url).replace(/'/g,"\\'")}')`);return `<button class="dt-ep${yid&&!_hasSrc?' yt':''}" onclick="${act}"><div class="dt-ep-img"${th?` style="background-image:url('${th}')"`:''}>${yid&&!_hasSrc?`<span class="dt-ep-yt">${icon('play')}</span>`:''}</div><div class="dt-ep-t">${schEsc(e.title)}</div></button>`;}).join('')}</div>`;
+  }
   const desc=_stripHtml(d.description);
   const synHTML=desc?`<div class="dt-label" style="margin-top:16px">Synopsis</div><p class="dt-synopsis" onclick="this.classList.toggle('open')">${schEsc(desc)}</p>`:'';
   let trailerHTML='';

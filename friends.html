@@ -4157,7 +4157,7 @@ function richDetailHTML(d,forId){
     // Custom source + known count → EVERY episode is tappable and opens your source
     // at that exact number (not just the few AniList lists). Watched ones dim; next is lit.
     const cur=(_it&&_it.ep)||0,N=Math.min(epTotalN,600),cells=[];
-    for(let n=1;n<=N;n++)cells.push(`<button class="dt-epn${n<=cur?' seen':(n===cur+1?' next':'')}" onclick="watchAnime('${forId}',${n})">${n}</button>`);
+    for(let n=1;n<=N;n++)cells.push(`<button class="dt-epn${n<=cur?' seen':(n===cur+1?' next':'')}" onclick="watchEpAt('${forId}',${n})">${n}</button>`);
     epsHTML=`<div class="dt-label" style="margin-top:16px">${icon('play')} Episodes<span class="dt-eps-tag">your source</span></div><div class="dt-epgrid">${cells.join('')}</div>`;
   }else if(eps.length){
     epsHTML=`<div class="dt-label" style="margin-top:16px">${icon('play')} Episodes<span class="dt-eps-tag">${_hasSrc?'your source':'official'}</span></div><div class="dt-eps">${eps.slice(0,60).map((e,i)=>{const th=safeImg(e.thumbnail||'');const yid=ytId(e.url);const en=(String(e.title).match(/\d+/)||[])[0];const epN=en?+en:(i+1);const act=_hasSrc?`watchAnime('${forId}',${epN})`:(yid?`playYouTube('${yid}')`:`openExternal('${escH(e.url).replace(/'/g,"\\'")}')`);return `<button class="dt-ep${yid&&!_hasSrc?' yt':''}" onclick="${act}"><div class="dt-ep-img"${th?` style="background-image:url('${th}')"`:''}>${yid&&!_hasSrc?`<span class="dt-ep-yt">${icon('play')}</span>`:''}</div><div class="dt-ep-t">${schEsc(e.title)}</div></button>`;}).join('')}</div>`;
@@ -6206,6 +6206,17 @@ function pvOpenExternal(){
   const a=anime.find(x=>x.id===pvReturnId); if(!a){toast('Nothing to open');return;}
   const u=(streamURL(a).url)||findUrl(a);
   if(u&&u!=='about:blank')openExternal(u);
+}
+// Episode-grid tap: open the episode on your source AND move your progress to it —
+// advance-only, so tapping an earlier one to rewatch never rewinds your place.
+function watchEpAt(id,ep){
+  const a=anime.find(x=>x.id===id); if(!a) return;
+  const blocked=noSourceMode()&&!(a.srcUrl&&String(a.srcUrl).trim());   // can't actually watch → leave progress alone
+  if(!blocked&&ep>0){
+    const pos=Math.max(0,ep-1);                                          // so tapped ep N reads as your next/current
+    if(pos>(a.ep||0)){a.ep=a.epTotal?Math.min(pos,a.epTotal):pos;if(a.status==='plan')a.status='watching';touch(a);save();}
+  }
+  watchAnime(id,ep);
 }
 async function watchAnime(id,epArg){
   const a=anime.find(x=>x.id===id); if(!a) return;

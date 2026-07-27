@@ -2078,7 +2078,7 @@ video { width: 100%; height: 100%; object-fit: contain; }
       <label class="cpick-lbl">Background<input type="color" class="cpick" id="ctBg" value="#111114"></label>
       <button class="ai-run-btn" style="flex:1" onclick="saveCustomTheme()">Save theme</button>
     </div>
-    <button class="src-chip" id="polishBtn" style="width:100%;margin-top:10px;justify-content:center" onclick="polishTheme()"><i data-ic="sparkles"></i> Glow</button>
+    <button class="src-chip" id="harmonizeBtn" style="width:100%;margin-top:10px;justify-content:center" onclick="harmonizeTheme()"><i data-ic="sparkles"></i> Harmonize</button>
   </div>
   <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--b1);">
     <div class="flabel" style="margin-bottom:10px">Background brightness</div>
@@ -3519,111 +3519,193 @@ function applyTheme(id,persist=true){
   try{applyAmbient();}catch(e){}
   renderThemeGrid();
 }
-// ─── POLISH IT ──────────────────────────────────────────────────────────────
-// A hand-picked accent and background rarely land where they need to be: the
-// accent comes out muddy or neon, and the two colors don't look related. This
-// keeps BOTH hues — their vision — and only fixes what makes it look unfinished:
-// depth, saturation, and the relationship between the two. Then it names it.
-function hex2hsl(h){
-  const [r,g,b]=hex2rgb(h).map(v=>v/255);
-  const mx=Math.max(r,g,b),mn=Math.min(r,g,b),d=mx-mn,l=(mx+mn)/2;
-  let hu=0,s=0;
-  if(d){
-    s=d/(1-Math.abs(2*l-1));
-    hu=mx===r?((g-b)/d+(g<b?6:0)):mx===g?((b-r)/d+2):((r-g)/d+4);
-    hu*=60;
+// ─── HARMONIZE ──────────────────────────────────────────────────────────────
+// A hand-picked accent and background almost never land: the accent is muddy or
+// neon, the background is a flat half-dark, and the two look unrelated. This
+// keeps the hues they chose — their vision — and fixes everything underneath,
+// in the spaces the eye actually works in rather than in HSL.
+//
+// HSL is the wrong tool and it is worth saying why: at the same HSL lightness a
+// yellow is roughly three times as bright as a blue, so any rule written in HSL
+// treats half the colour wheel unfairly. Everything below runs in Oklab/OKLCH
+// (perceptually uniform lightness, hue-independent chroma), contrast is measured
+// with APCA rather than the WCAG ratio (which badly misjudges light-on-dark —
+// exactly this app), out-of-gamut colours are mapped the way CSS Color 4 says
+// to, and the final pair is checked under simulated colour blindness.
+//
+//   Oklab matrices           — Björn Ottosson
+//   APCA SA98G constants     — Myndex / apca-w3
+//   Gamut mapping            — CSS Color 4, binary search on chroma in OKLCH
+//   CVD matrices             — Machado, Oliveira & Fernandes 2009, severity 1.0
+//   Harmony findings         — Ou & Luo, two-colour harmony model
+
+// sRGB ↔ linear light. Everything perceptual has to happen in linear light.
+const srgb2lin=v=>{v/=255;return v<=0.04045?v/12.92:Math.pow((v+0.055)/1.055,2.4);};
+const lin2srgb=v=>{v=Math.max(0,Math.min(1,v));v=v<=0.0031308?v*12.92:1.055*Math.pow(v,1/2.4)-0.055;return Math.round(v*255);};
+function hex2oklab(hex){
+  const [r,g,b]=hex2rgb(hex).map(srgb2lin);
+  const l=Math.cbrt(0.4122214708*r+0.5363325363*g+0.0514459929*b);
+  const m=Math.cbrt(0.2119034982*r+0.6806995451*g+0.1073969566*b);
+  const s=Math.cbrt(0.0883024619*r+0.2817188376*g+0.6299787005*b);
+  return [0.2104542553*l+0.7936177850*m-0.0040720468*s,
+          1.9779984951*l-2.4285922050*m+0.4505937099*s,
+          0.0259040371*l+0.7827717662*m-0.8086757660*s];
+}
+function oklab2lin(L,a,b){
+  const l_=L+0.3963377774*a+0.2158037573*b, m_=L-0.1055613458*a-0.0638541728*b, s_=L-0.0894841775*a-1.2914855480*b;
+  const l=l_*l_*l_, m=m_*m_*m_, s=s_*s_*s_;
+  return [ 4.0767416621*l-3.3077115913*m+0.2309699292*s,
+          -1.2684380046*l+2.6097574011*m-0.3413193965*s,
+          -0.0041960863*l-0.7034186147*m+1.7076147010*s];
+}
+function hex2oklch(hex){const [L,a,b]=hex2oklab(hex);return [L,Math.hypot(a,b),((Math.atan2(b,a)*180/Math.PI)%360+360)%360];}
+const linInGamut=c=>c.every(v=>v>=-0.0002&&v<=1.0002);
+// CSS Color 4 gamut mapping: hold lightness and hue, binary-search the chroma
+// down until the colour is displayable. Clipping RGB instead (the naive fix)
+// shifts hue — a "too saturated" blue clips toward purple.
+function oklch2hex(L,C,h){
+  const rad=h*Math.PI/180, at=c=>oklab2lin(L,c*Math.cos(rad),c*Math.sin(rad));
+  let c=Math.max(0,C);
+  if(!linInGamut(at(c))){
+    let lo=0,hi=c;
+    for(let i=0;i<22;i++){const mid=(lo+hi)/2;if(linInGamut(at(mid)))lo=mid;else hi=mid;}
+    c=lo;
   }
-  return [hu,s*100,l*100];
+  return '#'+at(c).map(v=>lin2srgb(v).toString(16).padStart(2,'0')).join('');
 }
-function hsl2hex(h,s,l){
-  h=((h%360)+360)%360; s=Math.max(0,Math.min(100,s))/100; l=Math.max(0,Math.min(100,l))/100;
-  const c=(1-Math.abs(2*l-1))*s, x=c*(1-Math.abs((h/60)%2-1)), m=l-c/2;
-  const seg=[[c,x,0],[x,c,0],[0,c,x],[0,x,c],[x,0,c],[c,0,x]][Math.floor(h/60)%6];
-  return '#'+seg.map(v=>Math.round((v+m)*255).toString(16).padStart(2,'0')).join('');
+// The most chroma this hue can hold at this lightness. Yellow can carry far more
+// than blue; asking every hue for the same number is what makes palettes patchy.
+function maxChroma(L,h){
+  const rad=h*Math.PI/180;
+  let lo=0,hi=0.42;
+  for(let i=0;i<22;i++){const mid=(lo+hi)/2;if(linInGamut(oklab2lin(L,mid*Math.cos(rad),mid*Math.sin(rad))))lo=mid;else hi=mid;}
+  return lo;
 }
+// APCA (SA98G). Signed Lc: positive = dark text on light, negative = light on
+// dark. |Lc| 60 is body-text grade, 75+ is emphatic. Used instead of the WCAG
+// ratio because WCAG 2 systematically overstates contrast on dark backgrounds.
+function apcaY(hex){
+  const [r,g,b]=hex2rgb(hex).map(v=>Math.pow(v/255,2.4));
+  const Y=0.2126729*r+0.7151522*g+0.0721750*b;
+  return Y>0.022?Y:Y+Math.pow(0.022-Y,1.414);          // black soft clamp
+}
+function apcaLc(txt,bg){
+  const Yt=apcaY(txt),Yb=apcaY(bg);
+  if(Yb>Yt){const S=(Math.pow(Yb,0.56)-Math.pow(Yt,0.57))*1.14;return S<0.1?0:(S-0.027)*100;}
+  const S=(Math.pow(Yb,0.65)-Math.pow(Yt,0.62))*1.14;return S>-0.1?0:(S+0.027)*100;
+}
+// Machado 2009, severity 1.0 — how these colours land for a red-green colour
+// blind viewer, which is roughly one man in twelve.
+const CVD_M={
+  protan:[0.152286,1.052583,-0.204868, 0.114503,0.786281,0.099216, -0.003882,-0.048116,1.051998],
+  deutan:[0.367322,0.860646,-0.227968, 0.280085,0.672501,0.047413, -0.011820,0.042940,0.968881],
+};
+function cvdHex(hex,m){
+  const [r,g,b]=hex2rgb(hex).map(srgb2lin);
+  return '#'+[m[0]*r+m[1]*g+m[2]*b, m[3]*r+m[4]*g+m[5]*b, m[6]*r+m[7]*g+m[8]*b]
+    .map(v=>lin2srgb(v).toString(16).padStart(2,'0')).join('');
+}
+// Perceptual distance in Oklab — the CSS Color 4 ΔEOK.
+function dEok(h1,h2){const a=hex2oklab(h1),b=hex2oklab(h2);return Math.hypot(a[0]-b[0],a[1]-b[1],a[2]-b[2]);}
 // Nudge one hue toward another the short way round the wheel.
-function hueToward(from,to,w){
-  let d=((to-from+540)%360)-180;
-  return ((from+d*w)%360+360)%360;
-}
-const TONE_HUES=[[12,'Ember'],[26,'Rust'],[44,'Amber'],[64,'Gold'],[96,'Lime'],[152,'Jade'],[180,'Teal'],[202,'Aqua'],[230,'Cobalt'],[258,'Indigo'],[286,'Iris'],[316,'Orchid'],[340,'Rose'],[361,'Ember']];
-const TONE_EMOJI=[[12,'🔥'],[44,'🌅'],[64,'⭐'],[160,'🍀'],[205,'🌊'],[262,'💎'],[300,'🔮'],[345,'🌸'],[361,'🔥']];
-const pickBand=(bands,h)=>{for(const[max,val]of bands)if(h<max)return val;return bands[bands.length-1][1];};
-// Shortest way round the wheel between two hues, 0–180.
+function hueToward(from,to,w){const d=((to-from+540)%360)-180;return ((from+d*w)%360+360)%360;}
 const hueGap=(a,b)=>{const d=Math.abs(((a-b)%360+360)%360);return d>180?360-d:d;};
-// The classical schemes, as offsets from the accent. `partner` is the hue that
-// carries the ambient glow — the second voice in the palette; `support` is the
-// quieter third. Picked by how far apart the user's OWN two colours already sit,
-// so the result is the scheme they were reaching for, snapped onto real geometry
-// instead of landing between two of them (which is what reads as "off").
+
+// The classical schemes as OKLCH hue offsets from the accent. `partner` carries
+// the ambient glow — the palette's second voice; `support` tints the background.
+// Chosen by how far apart the user's OWN two colours already sit, so the result
+// is the scheme they were reaching for, snapped onto exact geometry rather than
+// left between two of them, which is precisely what reads as "off".
 const TONE_SCHEMES=[
-  [22 ,'Analogous',        30,  -30],   // neighbours — calm, single-mood
-  [55 ,'Wide analogous',   40,  -40],
-  [110,'Triadic',         120, -120],   // three evenly spaced — lively, balanced
-  [150,'Split complement',150, -150],   // the complement's two neighbours — contrast without the clash
-  [181,'Tetradic',        180,   30],   // two opposite pairs 30° apart — his rectangle
+  [22 ,'Analogous',        32,  -32],
+  [55 ,'Wide analogous',   44,  -44],
+  [110,'Triadic',         120, -120],
+  [150,'Split complement',150, -150],
+  [181,'Tetradic',        180,   32],   // two opposite pairs, ~30° apart
 ];
-// Yellow-greens read far lighter than blues at the same HSL lightness, so a flat
-// L target makes half the wheel look washed and the other half muddy. Correcting
-// by the hue's own luminance weight is what keeps every accent equally present.
-function toneL(h,base){
-  const w=0.2126*Math.max(0,Math.cos((h-30)*Math.PI/180))+0.7152*Math.max(0,Math.cos((h-120)*Math.PI/180))+0.0722*Math.max(0,Math.cos((h-240)*Math.PI/180));
-  return base-(w-0.34)*14;              // bright hues sit lower, deep hues higher
-}
-// Walk a hue's lightness until it actually clears the background by `target`.
-function toneContrast(h,s,l,bg,target,up){
-  const ratio=(a,b)=>{const l1=Math.max(relLum(a),relLum(b)),l2=Math.min(relLum(a),relLum(b));return (l1+0.05)/(l2+0.05);};
-  for(let i=0;i<40&&ratio(hsl2hex(h,s,l),bg)<target;i++)l+=up?1.5:-1.5;
-  return Math.max(4,Math.min(96,l));
-}
-function polishTheme(){
+// Hue names in OKLCH degrees — these are NOT the HSL angles (OKLCH red is ~29°,
+// yellow ~110°, blue ~264°), so the bands are placed by where the eye puts them.
+const TONE_HUES=[[20,'Rose'],[42,'Ember'],[62,'Rust'],[85,'Amber'],[105,'Gold'],[130,'Lime'],[152,'Jade'],[180,'Fern'],[205,'Teal'],[232,'Aqua'],[258,'Cobalt'],[285,'Indigo'],[310,'Iris'],[335,'Orchid'],[361,'Rose']];
+const TONE_EMOJI=[[42,'🌸'],[62,'🔥'],[105,'🌅'],[130,'⭐'],[180,'🍀'],[232,'🌊'],[285,'💎'],[335,'🔮'],[361,'🌸']];
+const pickBand=(bands,h)=>{for(const[max,val]of bands)if(h<max)return val;return bands[bands.length-1][1];};
+
+function harmonizeTheme(){
   const aIn=document.getElementById('ctAccent'),bIn=document.getElementById('ctBg');
   if(!aIn||!bIn)return;
-  let [ah,as,al]=hex2hsl(aIn.value);
-  const [bh0,bs0,bl0]=hex2hsl(bIn.value);
-  const light=bl0>62;                        // they're after a light theme — respect it
-  // A colourless pick is a CHOICE — greyscale, monochrome. Forcing a scheme onto
-  // it would hand back a red theme nobody asked for; it only gets depth fixed.
-  const mono=as<8;
-  // Which scheme were they reaching for? Read it off the gap they already chose.
-  const gap=hueGap(ah,bh0);
+  const [,aC,aH]=hex2oklch(aIn.value);
+  const [bL0,bC0,bH0]=hex2oklch(bIn.value);
+  const light=bL0>0.62;                       // they're after a light theme — respect it
+  // A colourless pick is a CHOICE — monochrome. Forcing a scheme onto it would
+  // hand back a red theme nobody asked for; it only gets its depth fixed.
+  const mono=aC<0.03;
+  const gap=hueGap(aH,bH0);
   const [,schemeName,partnerOff,supportOff]=TONE_SCHEMES.find(s=>gap<s[0])||TONE_SCHEMES[TONE_SCHEMES.length-1];
-  const partner=((ah+partnerOff)%360+360)%360;
-  const support=((ah+supportOff)%360+360)%360;
+  const support=((aH+supportOff)%360+360)%360;
+  let partner=((aH+partnerOff)%360+360)%360;
 
-  // 60 — the background carries the most surface, so it takes the quietest
-  // colour: the support hue at a whisper of saturation. A tint, never dead grey.
-  const bh=mono?bh0:hueToward(bh0,support,0.6);
-  const bs=mono?Math.min(bs0,5):(light?Math.min(10,Math.max(4,bs0)):Math.min(20,Math.max(10,bs0)));
-  const bl=light?Math.min(97,Math.max(93,bl0)):Math.min(9,Math.max(5,bl0));
-  const bg=hsl2hex(bh,bs,bl);
+  // 60 — the background covers the most surface, so it takes the quietest
+  // colour: the support hue at a whisper of chroma. Ou & Luo found near-neutrals
+  // sharing the palette's hue read as harmonious where flat grey reads as dead,
+  // and that SLIGHT lightness differences are the disharmonious ones — so the
+  // background commits to a depth instead of sitting halfway.
+  const bH=mono?bH0:hueToward(bH0,support,0.7);
+  const bC=mono?Math.min(bC0,0.006):Math.min(0.030,Math.max(0.012,bC0));
+  const bL=light?Math.min(0.97,Math.max(0.94,bL0)):Math.min(0.24,Math.max(0.16,bL0));
+  const bg=oklch2hex(bL,bC,bH);
 
-  // 10 — the accent is the smallest area, so it earns the most intensity, held
-  // to a contrast floor against the page it sits on (4.5:1, AA).
-  as=mono?Math.min(as,6):Math.min(88,Math.max(62,as));
-  al=toneL(ah,light?44:58);
-  al=toneContrast(ah,as,al,bg,4.5,!light);
-  const accent=hsl2hex(ah,as,al);
+  // 10 — the accent is the smallest area, so it earns the most intensity. Every
+  // hue holds its most chroma at its OWN lightness (yellow peaks bright near
+  // 0.9, blue deep near 0.5), so rather than fixing a lightness and taking what
+  // chroma is left — which is what turns accents pastel — this searches the
+  // whole range and keeps the most saturated colour that still clears the
+  // contrast floor. Vivid first, legible always.
+  // A hard contrast floor is the obvious move and it is wrong: deep hues cannot
+  // meet it without being bleached. Blue at its most saturated scores APCA 19 on
+  // near-black, and this app's own accent — the one that looks right — scores
+  // only 33. Forcing every theme to 58 would pastel-ise half the wheel.
+  // So: maximise chroma, scaled by a penalty that bites below Lc 45. Vivid hues
+  // keep their punch, dim ones get lifted just far enough to be seen.
+  let accent='',best=-1;
+  for(let L=0.30;L<=0.94;L+=0.01){
+    const hex=oklch2hex(L,mono?Math.min(aC,0.012):Math.min(0.34,maxChroma(L,aH)*0.94),aH);
+    const lc=Math.abs(apcaLc(hex,bg));
+    const score=mono
+      ? -Math.abs(lc-62)                     // a monochrome accent just wants to read
+      : hex2oklch(hex)[1]*Math.pow(Math.min(1,lc/45),0.6);
+    if(score>best){best=score;accent=hex;}
+  }
 
-  // 30 — the ambient glow is the palette's second voice. Giving it the PARTNER
+  // 30 — the ambient glow is the palette's second voice. Handing it the PARTNER
   // hue is what stops a custom theme reading as one colour smeared over a page.
-  const glow=mono?hsl2hex(bh,8,light?62:56):hsl2hex(partner,light?58:66,light?56:60);
+  const glowOf=h=>oklch2hex(light?0.68:0.74,Math.min(0.20,maxChroma(light?0.68:0.74,h)*0.82),h);
+  let glow=mono?oklch2hex(light?0.68:0.74,0.012,bH):glowOf(partner);
+  // Two hues can be a textbook complement and still collapse into one colour for
+  // a red-green colour blind viewer. If they do, rotate the partner until the
+  // pair survives both protanopia and deuteranopia.
+  if(!mono){
+    for(let i=0;i<7;i++){
+      const gap2=Math.min(dEok(cvdHex(accent,CVD_M.protan),cvdHex(glow,CVD_M.protan)),
+                          dEok(cvdHex(accent,CVD_M.deutan),cvdHex(glow,CVD_M.deutan)));
+      if(gap2>=0.13)break;
+      partner=(partner+34)%360; glow=glowOf(partner);
+    }
+  }
 
   aIn.value=accent; bIn.value=bg;
   // Saves + applies the glow without setGlow's own toast — one button, one message.
   glowColorLive(glow); try{renderGlowRow();}catch(e){}
   // Brightness rides with the theme: a light theme wants the backdrop lifted, a
   // dark one only as much lift as their own pick was already asking for.
-  setBgBright(light?78:Math.max(0,Math.min(14,Math.round((bl0-5)*2))));
+  setBgBright(light?78:Math.max(0,Math.min(14,Math.round((bL0-0.16)*140))));
   const sl=document.getElementById('brightSlider'); if(sl)sl.value=bgBright();
 
   // A name that goes with it: the accent says which colour, the background says
   // which mood. Deterministic, so the same palette always earns the same name.
   const moods=light?['Dawn','Frost','Linen']:['Night','Dusk','Noir','Ink'];
-  const tone=mono?(light?'Linen':'Slate'):pickBand(TONE_HUES,ah);
-  const name=`${tone} ${moods[Math.round(bh/90)%moods.length]}`.slice(0,14);
+  const tone=mono?(light?'Linen':'Slate'):pickBand(TONE_HUES,aH);
+  const name=`${tone} ${moods[Math.round(bH/90)%moods.length]}`.slice(0,14);
   const nIn=document.getElementById('ctName'); if(nIn)nIn.value=name;
-  const eIn=document.getElementById('ctEmoji'); if(eIn&&!eIn.value.trim())eIn.value=mono?'🌙':pickBand(TONE_EMOJI,ah);
+  const eIn=document.getElementById('ctEmoji'); if(eIn&&!eIn.value.trim())eIn.value=mono?'🌙':pickBand(TONE_EMOJI,aH);
   toast(`${name} · ${mono?'Monochrome':schemeName}`);
 }
 function saveCustomTheme(){

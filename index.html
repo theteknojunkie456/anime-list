@@ -852,6 +852,21 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 .wn-dots{display:flex;justify-content:center;align-items:center;gap:7px;margin:14px 0 2px;}
 .wn-dot{width:7px;height:7px;border-radius:99px;background:var(--b2);transition:width .2s ease,background .2s ease;}
 .wn-dot.on{width:21px;background:var(--a);}
+/* Sources → one-paste setup: the front door for "use my own site". */
+.src-quick{margin:12px 0 4px;padding:14px 15px;border-radius:16px;background:var(--bg3);border:1px solid var(--b2);}
+.src-quick-t{font-family:var(--fd);font-weight:800;font-size:13.5px;color:var(--t1);display:flex;align-items:center;gap:7px;}
+.src-quick-t svg{width:15px;height:15px;}
+.src-quick-steps{margin:9px 0 11px;padding-left:19px;color:var(--t2);font-size:12.5px;line-height:1.62;}
+.src-quick-steps li{margin:1px 0;}
+.src-quick-steps b{color:var(--t1);}
+.src-quick-out{margin-top:10px;}
+.src-quick-ok,.src-quick-bad{border-radius:12px;padding:11px 12px;font-size:12.5px;line-height:1.55;}
+.src-quick-ok{background:var(--ag);border:1px solid var(--b2);}
+.src-quick-bad{background:var(--bg2);border:1px solid var(--b1);color:var(--t2);}
+.src-quick-got{color:var(--t1);font-size:13px;display:flex;align-items:flex-start;gap:7px;}
+.src-quick-got svg{width:15px;height:15px;flex:0 0 auto;margin-top:2px;color:var(--a);}
+.src-quick-sub{color:var(--t3);margin-top:6px;font-size:11.5px;}
+.src-quick-url{margin-top:6px;padding:8px 10px;border-radius:9px;background:var(--bg2);color:var(--t2);font:11.5px/1.45 ui-monospace,Menlo,monospace;word-break:break-all;}
 /* Admin → Updates: the app's whole history, grouped by the day it shipped. */
 .upd-day{display:flex;align-items:center;gap:8px;margin:16px 0 7px;font-size:11px;font-weight:800;letter-spacing:.13em;text-transform:uppercase;color:var(--t3);}
 .upd-day::after{content:"";flex:1;height:1px;background:var(--b1);}
@@ -6914,6 +6929,63 @@ function clearSrcExamples(){try{localStorage.removeItem(SRC_EX_KEY);}catch{}refr
 function srcExNoteHTML(){const n=srcExamples().length;return n?`Learned from ${n} link${n>1?'s':''}, and adapting. <button type="button" onclick="clearSrcExamples()" style="background:none;border:0;color:var(--a2);text-decoration:underline;padding:0;font:inherit;cursor:pointer">reset</button>`:'';}
 function refreshSrcExNote(){const n=document.getElementById('srcExNote');if(n)n.innerHTML=srcExNoteHTML();}
 
+// ─── ONE-PASTE SETUP ────────────────────────────────────────────────────────
+// The old path worked but only if you already understood it: open a fold, paste,
+// then say WHICH show and episode the link was, then "learn the pattern", then
+// check it, then Add site, then select it. Six moves and three bits of jargon.
+// Everything after the paste is inferable from the link itself, so this asks for
+// the paste and nothing else, says in plain words what it worked out, and offers
+// one button. Same recognizer underneath — this is the front door, not a rewrite.
+function quickSetup(){
+  const inp=document.getElementById('srcQuickIn'),out=document.getElementById('srcQuickOut');
+  if(!inp||!out)return;
+  const raw=(inp.value||'').trim();
+  if(raw.length<12){out.style.display='none';return;}
+  const url=normSrc(raw);
+  const tpl=templatizeSearchURL(url);
+  out.style.display='block';
+  if(!SRC_TOKEN_RE.test(tpl)){
+    // Couldn't see a show/episode in it — usually a homepage or a player page
+    // with the show hidden behind a query string.
+    out.innerHTML=`<div class="src-quick-bad">${icon('search')} That looks like a page address, but I can't see which show or episode it points at.<br>Open <b>one episode</b> of any show and copy that address — the one with the show's name in it.</div>`;
+    return;
+  }
+  // Name the show and episode back to them, so they can see it understood the
+  // link rather than having to trust it. Both are read out of the address.
+  const epM=/\{ep\d?\}/.test(tpl)&&url.match(/(?:ep|episode|e)[-_]?(\d+)(?!.*\d)/i);
+  const ep=epM?epM[1]:'';
+  const slugSeg=(()=>{try{
+    const a=new URL(url).pathname.split('/').filter(Boolean),b=new URL(tpl).pathname.split('/').filter(Boolean);
+    for(let i=0;i<b.length;i++)if(/\{(slug|slug_|query|queryplus|title\w*)\}/i.test(b[i]))return a[i]||'';
+    return '';
+  }catch{return '';}})();
+  const norm=s=>String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,'');
+  const known=slugSeg?anime.find(a=>norm(slugTitle(a))===norm(slugSeg))
+    ||anime.find(a=>norm(slugTitle(a)).startsWith(norm(slugSeg).slice(0,10))&&norm(slugSeg).length>5):null;
+  const showName=known?known.title:(slugSeg?slugSeg.replace(/[-_]+/g,' ').replace(/\b\w/g,c=>c.toUpperCase()):'that show');
+  let site=''; try{site=new URL(tpl.replace(/\{[^}]+\}/g,'x')).hostname.replace(/^www\./,'');}catch{}
+  // Prove it generalises: resolve the SAME template for a different show they own.
+  const other=anime.find(a=>kindOf(a)==='watch'&&a!==known)||anime.find(a=>a!==known);
+  const proof=other?fillSourceTokens(tpl,other,3):'';
+  out.innerHTML=`<div class="src-quick-ok">
+      <div class="src-quick-got">${icon('check')} That's <b>${escH(showName)}</b>${ep?` episode ${escH(ep)}`:''} on <b>${escH(site||'your site')}</b>.</div>
+      <div class="src-quick-sub">Watch will open every show the same way${other?` — ${escH(other.title)} episode 3 would go to:`:'.'}</div>
+      ${proof?`<div class="src-quick-url">${escH(proof)}</div>`:''}
+      <button class="parse-btn" style="margin-top:10px" onclick="quickSetupUse()">Use this for everything</button>
+    </div>`;
+  out.dataset.tpl=tpl; out.dataset.site=site;
+}
+// One button: save the site, make it the active source, and get out of the way.
+function quickSetupUse(){
+  const out=document.getElementById('srcQuickOut'); if(!out||!out.dataset.tpl)return;
+  const tpl=out.dataset.tpl, site=out.dataset.site||'Your site';
+  const name=site.replace(/\.(tv|to|com|net|org|io|me|cc|se|gg|xyz)$/i,'').replace(/^\w/,c=>c.toUpperCase());
+  try{addCustomService(name,tpl);}catch(e){}
+  try{addSrcExample((document.getElementById('srcQuickIn')||{}).value||'','');refreshSrcExNote();}catch(e){}
+  setSource(tpl);                       // clears No-source mode and selects it
+  closeAll();
+  toast(`Watch now opens ${name}`);
+}
 async function aiBuildSource(){
   const site=document.getElementById('srcCustom'), want=document.getElementById('srcAiWant');
   if(!site) return;
@@ -7465,6 +7537,17 @@ function renderSource(){
   const myCount=customServices().length, hiddenCount=hiddenSrc().length;
   box.innerHTML=`
     <p class="ai-desc" style="margin-top:2px">Tapping <b>Watch</b> on a show opens it wherever you pick here.</p>
+
+    <div class="src-quick">
+      <div class="src-quick-t">${icon('sparkles')} Use the site you already watch on</div>
+      <ol class="src-quick-steps">
+        <li>Open your site and start <b>any</b> episode of <b>any</b> show.</li>
+        <li>Copy the address of that episode.</li>
+        <li>Paste it here — that's it.</li>
+      </ol>
+      <input class="ai-prompt-in" id="srcQuickIn" placeholder="paste that episode's address" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url" oninput="quickSetup()">
+      <div id="srcQuickOut" class="src-quick-out" style="display:none"></div>
+    </div>
 
     <div class="dt-label">${icon('play')} Where Watch opens</div>
     <button class="src-opt${!custom&&!noSourceMode()?' on':''}" onclick="setSource('')">
@@ -8704,16 +8787,13 @@ function _updBusy(){
 // you'd explain it to a friend — what they can now do, not what the code does.
 // No version numbers or jargon in the notes; the date IS the version.
 const RELEASE={
-  v:'2026-07-27.3',
-  title:'Play goes where you told it',
-  // One glanceable line for the push notification. The lock screen shows ~1 line
-  // and hides the rest behind a long-press, so the notes below (which can be as
-  // long as they need to be in the sheet) never become the push body.
-  push:'Play now opens YOUR source at the right episode — and trailers play inside the app.',
+  v:'2026-07-27.4',
+  title:'Set up your site in one paste',
+  push:'Use your own site in one step: play any episode, copy the address, paste it in Sources.',
   notes:[
-    '<b>Play</b> and every episode now open the source you set, at that exact episode. If you have not set one, it asks instead of picking for you.',
-    '<b>Watch trailer</b> plays right inside WatchList — no more being thrown out to another app.',
-    'Made your own theme and it did not land? Tap <b>Harmonize</b> under <b>Make your own</b>. It keeps your colours, turns them into a palette that works, sets the glow and brightness to match, and names it.',
+    'Watching somewhere we do not list? Open <b>Sources</b> and you will see it right at the top.',
+    'Start <b>any</b> episode of <b>any</b> show on your site, copy that address, and paste it in. Nothing else to fill in.',
+    'It tells you which show and episode it read, shows you where another show would open, and one button sets it for everything.',
   ],
 };
 const SEEN_REL='seen_release';

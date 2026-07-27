@@ -2078,7 +2078,7 @@ video { width: 100%; height: 100%; object-fit: contain; }
       <label class="cpick-lbl">Background<input type="color" class="cpick" id="ctBg" value="#111114"></label>
       <button class="ai-run-btn" style="flex:1" onclick="saveCustomTheme()">Save theme</button>
     </div>
-    <button class="src-chip" id="polishBtn" style="width:100%;margin-top:10px;justify-content:center" onclick="polishTheme()"><i data-ic="sparkles"></i> Polish it</button>
+    <button class="src-chip" id="polishBtn" style="width:100%;margin-top:10px;justify-content:center" onclick="polishTheme()"><i data-ic="sparkles"></i> Globe</button>
   </div>
   <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--b1);">
     <div class="flabel" style="margin-bottom:10px">Background brightness</div>
@@ -3549,29 +3549,74 @@ function hueToward(from,to,w){
 const TONE_HUES=[[12,'Ember'],[26,'Rust'],[44,'Amber'],[64,'Gold'],[96,'Lime'],[152,'Jade'],[180,'Teal'],[202,'Aqua'],[230,'Cobalt'],[258,'Indigo'],[286,'Iris'],[316,'Orchid'],[340,'Rose'],[361,'Ember']];
 const TONE_EMOJI=[[12,'🔥'],[44,'🌅'],[64,'⭐'],[160,'🍀'],[205,'🌊'],[262,'💎'],[300,'🔮'],[345,'🌸'],[361,'🔥']];
 const pickBand=(bands,h)=>{for(const[max,val]of bands)if(h<max)return val;return bands[bands.length-1][1];};
+// Shortest way round the wheel between two hues, 0–180.
+const hueGap=(a,b)=>{const d=Math.abs(((a-b)%360+360)%360);return d>180?360-d:d;};
+// The classical schemes, as offsets from the accent. `partner` is the hue that
+// carries the ambient glow — the second voice in the palette; `support` is the
+// quieter third. Picked by how far apart the user's OWN two colours already sit,
+// so the result is the scheme they were reaching for, snapped onto real geometry
+// instead of landing between two of them (which is what reads as "off").
+const TONE_SCHEMES=[
+  [22 ,'Analogous',        30,  -30],   // neighbours — calm, single-mood
+  [55 ,'Wide analogous',   40,  -40],
+  [110,'Triadic',         120, -120],   // three evenly spaced — lively, balanced
+  [150,'Split complement',150, -150],   // the complement's two neighbours — contrast without the clash
+  [181,'Tetradic',        180,   30],   // two opposite pairs 30° apart — his rectangle
+];
+// Yellow-greens read far lighter than blues at the same HSL lightness, so a flat
+// L target makes half the wheel look washed and the other half muddy. Correcting
+// by the hue's own luminance weight is what keeps every accent equally present.
+function toneL(h,base){
+  const w=0.2126*Math.max(0,Math.cos((h-30)*Math.PI/180))+0.7152*Math.max(0,Math.cos((h-120)*Math.PI/180))+0.0722*Math.max(0,Math.cos((h-240)*Math.PI/180));
+  return base-(w-0.34)*14;              // bright hues sit lower, deep hues higher
+}
+// Walk a hue's lightness until it actually clears the background by `target`.
+function toneContrast(h,s,l,bg,target,up){
+  const ratio=(a,b)=>{const l1=Math.max(relLum(a),relLum(b)),l2=Math.min(relLum(a),relLum(b));return (l1+0.05)/(l2+0.05);};
+  for(let i=0;i<40&&ratio(hsl2hex(h,s,l),bg)<target;i++)l+=up?1.5:-1.5;
+  return Math.max(4,Math.min(96,l));
+}
 function polishTheme(){
   const aIn=document.getElementById('ctAccent'),bIn=document.getElementById('ctBg');
   if(!aIn||!bIn)return;
   let [ah,as,al]=hex2hsl(aIn.value);
-  let [bh,bs,bl]=hex2hsl(bIn.value);
-  const light=bl>62;                         // they're after a light theme — respect it
-  // A colourless pick is a CHOICE — greyscale, monochrome. Forcing saturation on
-  // it would hand back a red theme nobody asked for. Only its depth gets fixed.
+  const [bh0,bs0,bl0]=hex2hsl(bIn.value);
+  const light=bl0>62;                        // they're after a light theme — respect it
+  // A colourless pick is a CHOICE — greyscale, monochrome. Forcing a scheme onto
+  // it would hand back a red theme nobody asked for; it only gets depth fixed.
   const mono=as<8;
-  // Accent: their hue, held at the saturation and lightness that actually carry
-  // on this backdrop. Washed-out picks come up, neon picks come down.
-  as=mono?Math.min(as,6):Math.min(88,Math.max(58,as));
-  al=light?Math.min(mono?46:50,Math.max(34,al)):Math.min(mono?76:64,Math.max(mono?62:52,al));
-  // Background: their hue pulled a quarter of the way toward the accent, so the
-  // two read as one palette instead of two unrelated choices, then set to a
-  // proper depth — the flat, half-dark greys are what make a theme look cheap.
-  bh=hueToward(bh,ah,0.25);
-  bs=light?Math.min(12,Math.max(3,bs)):Math.min(22,Math.max(9,bs));
-  bl=light?Math.min(97,Math.max(93,bl)):Math.min(9,Math.max(5,bl));
-  // Guarantee the accent still separates from the page it sits on.
-  if(Math.abs(al-bl)<34)al=light?Math.max(30,bl-38):Math.min(70,bl+38);
-  const accent=hsl2hex(ah,as,al),bg=hsl2hex(bh,bs,bl);
+  // Which scheme were they reaching for? Read it off the gap they already chose.
+  const gap=hueGap(ah,bh0);
+  const [,schemeName,partnerOff,supportOff]=TONE_SCHEMES.find(s=>gap<s[0])||TONE_SCHEMES[TONE_SCHEMES.length-1];
+  const partner=((ah+partnerOff)%360+360)%360;
+  const support=((ah+supportOff)%360+360)%360;
+
+  // 60 — the background carries the most surface, so it takes the quietest
+  // colour: the support hue at a whisper of saturation. A tint, never dead grey.
+  const bh=mono?bh0:hueToward(bh0,support,0.6);
+  const bs=mono?Math.min(bs0,5):(light?Math.min(10,Math.max(4,bs0)):Math.min(20,Math.max(10,bs0)));
+  const bl=light?Math.min(97,Math.max(93,bl0)):Math.min(9,Math.max(5,bl0));
+  const bg=hsl2hex(bh,bs,bl);
+
+  // 10 — the accent is the smallest area, so it earns the most intensity, held
+  // to a contrast floor against the page it sits on (4.5:1, AA).
+  as=mono?Math.min(as,6):Math.min(88,Math.max(62,as));
+  al=toneL(ah,light?44:58);
+  al=toneContrast(ah,as,al,bg,4.5,!light);
+  const accent=hsl2hex(ah,as,al);
+
+  // 30 — the ambient glow is the palette's second voice. Giving it the PARTNER
+  // hue is what stops a custom theme reading as one colour smeared over a page.
+  const glow=mono?hsl2hex(bh,8,light?62:56):hsl2hex(partner,light?58:66,light?56:60);
+
   aIn.value=accent; bIn.value=bg;
+  // Saves + applies the glow without setGlow's own toast — one button, one message.
+  glowColorLive(glow); try{renderGlowRow();}catch(e){}
+  // Brightness rides with the theme: a light theme wants the backdrop lifted, a
+  // dark one only as much lift as their own pick was already asking for.
+  setBgBright(light?78:Math.max(0,Math.min(14,Math.round((bl0-5)*2))));
+  const sl=document.getElementById('brightSlider'); if(sl)sl.value=bgBright();
+
   // A name that goes with it: the accent says which colour, the background says
   // which mood. Deterministic, so the same palette always earns the same name.
   const moods=light?['Dawn','Frost','Linen']:['Night','Dusk','Noir','Ink'];
@@ -3579,7 +3624,7 @@ function polishTheme(){
   const name=`${tone} ${moods[Math.round(bh/90)%moods.length]}`.slice(0,14);
   const nIn=document.getElementById('ctName'); if(nIn)nIn.value=name;
   const eIn=document.getElementById('ctEmoji'); if(eIn&&!eIn.value.trim())eIn.value=mono?'🌙':pickBand(TONE_EMOJI,ah);
-  toast(`Polished — ${name}`);
+  toast(`${name} · ${mono?'Monochrome':schemeName}`);
 }
 function saveCustomTheme(){
   const name=(document.getElementById('ctName').value.trim()||'Custom').replace(/[<>"'&]/g,'').slice(0,14);

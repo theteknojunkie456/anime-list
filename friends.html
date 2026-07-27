@@ -308,6 +308,16 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 .sv-heronum .v .ico{width:19px;height:19px;fill:currentColor;}
 .sv-heronum .l{font-size:10.5px;font-weight:700;color:var(--t2);margin-top:5px;}
 .sv-sec{margin:20px 18px 0;}
+.sv-store{margin:14px 18px 0;background:var(--bg2);border:1px solid var(--b2);border-radius:14px;padding:13px 15px;}
+.sv-store-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;}
+.sv-store-lbl{display:flex;align-items:center;gap:7px;font-family:var(--fd);font-weight:800;font-size:13px;color:var(--t2);}
+.sv-store-lbl .ico{width:15px;height:15px;color:var(--t3);}
+.sv-store-val{font-family:var(--fm,ui-monospace);font-size:12px;color:var(--t2);}
+.sv-store-val.warn{color:var(--drp,#ff6b6b);}
+.sv-store-track{height:8px;border-radius:99px;background:var(--bg4);overflow:hidden;}
+.sv-store-fill{height:100%;border-radius:99px;background:linear-gradient(90deg,var(--a),var(--a2));transition:width .5s cubic-bezier(.2,.8,.2,1);}
+.sv-store-fill.warn{background:linear-gradient(90deg,#ff8b3d,var(--drp,#ff5f6b));}
+.sv-store-note{margin-top:8px;font-size:11px;color:var(--t3);line-height:1.4;}
 .sv-h{font-size:12px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--t3);margin-bottom:8px;}
 .sv-bar{display:flex;align-items:center;gap:10px;padding:11px 0;cursor:pointer;border-top:1px solid var(--bn2);min-height:44px;}
 .sv-bar:first-child{border-top:none;}
@@ -7326,6 +7336,19 @@ function svCountUp(el,to){if(!el)return;const dur=850,t0=performance.now();const
 function svChips(list){return list.length?list.map(a=>'<span class="sv-chip">'+schEsc(a.title)+(a.rating?' '+icon('star','fill')+a.rating:'')+'</span>').join(''):'<span class="sv-chip">None yet</span>';}
 function svBar(id,label,color,val,max,drill){return '<div class="sv-bar" onclick="svDrill(\''+id+'\',this)"><div class="lbl">'+label+'</div><div class="track"><div class="fill" style="width:'+Math.round(val/Math.max(1,max)*100)+'%;background:'+color+'"></div></div><div class="n">'+val+'</div><span class="chev">'+icon('chevron-right')+'</span></div><div class="sv-drill" id="drill-'+id+'">'+drill+'</div>';}
 function svDrill(id,el){const d=document.getElementById('drill-'+id);if(!d)return;el.classList.toggle('open',d.classList.toggle('on'));}
+// Storage meter — shows how full the ~5MB on-device localStorage is (the real
+// cap), so the image-offload to IndexedDB is visible rather than a mystery.
+function _lsBytes(){let n=0;try{for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);n+=k.length+(localStorage.getItem(k)||'').length;}}catch(e){}return n*2;}
+function _fmtMB(b){return (b/1048576).toFixed(b<1048576?2:1)+' MB';}
+function storageBarHTML(){
+  const ls=_lsBytes(),cap=5*1048576,pct=Math.min(100,Math.round(ls/cap*100)),near=pct>=80;
+  return '<div class="sv-store"><div class="sv-store-top"><span class="sv-store-lbl">'+icon('inbox')+' Device storage</span><span class="sv-store-val'+(near?' warn':'')+'">'+_fmtMB(ls)+' / ~5 MB</span></div>'+
+    '<div class="sv-store-track"><div class="sv-store-fill'+(near?' warn':'')+'" style="width:'+pct+'%"></div></div>'+
+    '<div class="sv-store-note" id="svStoreNote">Uploaded images move to extra storage automatically when this fills.</div></div>';
+}
+function _fillStoreNote(){
+  try{if(navigator.storage&&navigator.storage.estimate){navigator.storage.estimate().then(e=>{const extra=Math.max(0,(e&&e.usage||0)-_lsBytes());const el=document.getElementById('svStoreNote');if(el&&extra>102400)el.textContent='+ '+_fmtMB(extra)+' of images kept in extra storage (IndexedDB).';}).catch(()=>{});}}catch(e){}
+}
 function renderStats(){
   const body=document.getElementById('statsViewBody');if(!body)return;
   const counts={watching:0,plan:0,finished:0,dropped:0};
@@ -7343,6 +7366,7 @@ function renderStats(){
   const ratingBars=rated.length?rd.map(x=>svBar('r-'+x.r,x.r+' '+icon('star','fill'),'var(--a)',x.items.length,maxR,svChips(x.items))).join(''):'<p class="ai-desc">Rate some titles to see this.</p>';
   const topRated=[...rated].sort((a,b)=>b.rating-a.rating).slice(0,8);
   body.innerHTML=
+    storageBarHTML()+
     '<div class="sv-hero"><div class="sv-heronum"><div class="v" data-to="'+hrs+'">0</div><div class="l">Hours watched</div></div>'+
       '<div class="sv-heronum"><div class="v" data-to="'+anime.length+'">0</div><div class="l">Titles</div></div>'+
       '<div class="sv-heronum"><div class="v" data-to="'+eps+'">0</div><div class="l">Episodes</div></div></div>'+
@@ -7353,6 +7377,7 @@ function renderStats(){
     '<div class="sv-sec"><div class="sv-h">Top genres — tap to reveal</div>'+genreBars+'</div>'+
     '<div class="sv-sec"><div class="sv-h">Ratings — tap to reveal</div>'+ratingBars+'</div>'+
     (topRated.length?'<div class="sv-sec"><div class="sv-h">Your top rated</div><div class="sv-drill on">'+topRated.map(a=>'<span class="sv-chip">'+schEsc(a.title)+' '+icon('star','fill')+a.rating+'</span>').join('')+'</div></div>':'');
+  try{_fillStoreNote();}catch(e){}
   body.querySelectorAll('.sv-heronum .v[data-to]').forEach(el=>svCountUp(el,+el.getAttribute('data-to')));
 }
 function renderStatsSheet(){

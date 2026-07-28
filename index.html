@@ -4566,7 +4566,7 @@ async function loadRichDetail(aniId,forId){
   if(_richCache[aniId]){paint(_richCache[aniId]);return;}
   mount.innerHTML=`<div class="dt-rich-load">${icon('loader')} Loading details…</div>`;
   try{
-    const q=`query($id:Int){Media(id:$id,type:ANIME){description(asHtml:false) averageScore episodes duration format status season seasonYear source genres externalLinks{site url type} studios(isMain:true){nodes{name}} trailer{id site} streamingEpisodes{title thumbnail url site} characters(sort:ROLE,perPage:12){edges{role node{name{full} image{medium}}}} recommendations(sort:RATING_DESC,perPage:12){nodes{mediaRecommendation{id title{romaji english} coverImage{large} episodes}}}}}`;
+    const q=`query($id:Int){Media(id:$id,type:ANIME){description(asHtml:false) averageScore episodes duration format status season seasonYear source genres externalLinks{site url type} studios(isMain:true){nodes{name}} trailer{id site} streamingEpisodes{title thumbnail url site} characters(sort:ROLE,perPage:12){edges{role node{name{full} image{medium}}}} recommendations(sort:RATING_DESC,perPage:12){nodes{mediaRecommendation{id isAdult genres title{romaji english} coverImage{large} episodes}}}}}`;
     const r=await fetch('https://graphql.anilist.co',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({query:q,variables:{id:aniId}})});
     if(!r.ok)throw 0;
     const d=((await r.json()).data||{}).Media;if(!d)throw 0;
@@ -4644,7 +4644,7 @@ function richDetailHTML(d,forId){
   }
   const chars=((d.characters||{}).edges)||[];
   const charsHTML=chars.length?`<div class="dt-label" style="margin-top:18px">Characters</div><div class="dt-chars">${chars.map(e=>{const n=e.node||{};const img=safeImg(((n.image||{}).medium)||'');const nm=((n.name||{}).full)||'';return `<div class="dt-char"><div class="dt-char-img"${img?` style="background-image:url('${img}')"`:''}></div><div class="dt-char-n">${schEsc(nm)}</div><div class="dt-char-r">${schEsc((e.role||'').toLowerCase())}</div></div>`;}).join('')}</div>`:'';
-  const recs=(((d.recommendations||{}).nodes)||[]).map(n=>n&&n.mediaRecommendation).filter(Boolean);
+  const recs=(((d.recommendations||{}).nodes)||[]).map(n=>n&&n.mediaRecommendation).filter(x=>x&&!isAdultMedia(x));
   const recsHTML=recs.length?`<div class="dt-label" style="margin-top:18px">More like this</div><div class="dt-recs">${recs.map(m=>{const t=(m.title.english||m.title.romaji||'').replace(/'/g,'&#39;');const img=safeImg(((m.coverImage||{}).large)||'');return `<button class="dt-rec" onclick="addPopular(${m.id},'${t.replace(/"/g,'&quot;')}','${img}',${m.episodes||0})"><div class="dt-rec-img"${img?` style="background-image:url('${img}')"`:''}></div><div class="dt-rec-t">${schEsc(m.title.english||m.title.romaji||'')}</div></button>`;}).join('')}</div>`:'';
   return metaHTML+linksHTML+epsHTML+synHTML+trailerHTML+charsHTML+recsHTML;
 }
@@ -4678,12 +4678,18 @@ async function aniGraph(seedId){
   const nodes={},want=[seedId],seen=new Set([seedId]);let hops=0;
   while(want.length&&hops<26){
     hops++;const id=want.shift();
-    const q=`query($id:Int){Media(id:$id){id idMal format status episodes seasonYear startDate{year month} title{romaji english} coverImage{large} nextAiringEpisode{airingAt episode} relations{edges{relationType node{id type}}}}}`;
+    const q=`query($id:Int){Media(id:$id){id idMal isAdult genres format status episodes seasonYear startDate{year month} title{romaji english} coverImage{large} nextAiringEpisode{airingAt episode} relations{edges{relationType node{id type isAdult genres}}}}}`;
     let m;try{const r=await fetch('https://graphql.anilist.co',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({query:q,variables:{id}})});if(r.status===429){await pause(1400);want.unshift(id);hops--;continue;}if(!r.ok)continue;m=((await r.json()).data||{}).Media;}catch{continue;}
-    if(!m)continue;nodes[m.id]=m;
+    if(!m)continue;
+    if(isAdultMedia(m))continue;                 // never surfaces, and never walked through
+    nodes[m.id]=m;
     ((m.relations&&m.relations.edges)||[]).forEach(e=>{
       if(!e||!e.node||e.node.type!=='ANIME'||seen.has(e.node.id))return;
       if(!FRANCHISE_RELS.has(e.relationType))return;
+      // Adult spin-offs hang off perfectly ordinary series. Widening this walk to
+      // side stories and spin-offs is what let them in; the flag travels on the
+      // edge, so they're dropped before they're ever fetched or shown.
+      if(isAdultMedia(e.node)){seen.add(e.node.id);return;}
       seen.add(e.node.id);
       // Walk the main line first — a franchise with a dozen side stories should
       // still find season 3 before it runs out of hops.
@@ -4700,7 +4706,9 @@ async function malGraph(seedMal){
   while(want.length&&hops<12){
     hops++;const id=want.shift();
     let d;try{const r=await fetch(`https://api.jikan.moe/v4/anime/${id}/full`);if(r.status===429){await pause(1400);want.unshift(id);hops--;continue;}if(!r.ok)continue;d=(await r.json()).data;}catch{continue;}
-    if(!d)continue;nodes[d.mal_id]=d;
+    if(!d)continue;
+    if(isAdultMedia({rating:d.rating,genres:d.genres,explicit_genres:d.explicit_genres}))continue;   // drop it AND its branches
+    nodes[d.mal_id]=d;
     ((d.relations)||[]).forEach(rel=>{if(/Sequel|Prequel|Side story|Parent story|Alternative|Spin-?off|Summary|Full story/i.test(rel.relation||'')){((rel.entry)||[]).forEach(e=>{if(e.type==='anime'&&!seen.has(e.mal_id)){seen.add(e.mal_id);want.push(e.mal_id);}});}});
     if(want.length)await pause(400);
   }
@@ -4802,12 +4810,12 @@ function declineNext(aniId){try{const l=nextDeclined();if(!l.includes(aniId)){l.
 // One small query — the direct sequel only. The full franchise walk is many
 // requests, and finishing a show shouldn't kick one off.
 async function fetchSequel(aniId){
-  const q=`query($id:Int){Media(id:$id){relations{edges{relationType node{id type format status episodes seasonYear title{romaji english} coverImage{large}}}}}}`;
+  const q=`query($id:Int){Media(id:$id){relations{edges{relationType node{id type isAdult genres format status episodes seasonYear title{romaji english} coverImage{large}}}}}}`;
   try{
     const r=await fetch('https://graphql.anilist.co',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({query:q,variables:{id:aniId}})});
     if(!r.ok)return null;
     const edges=((((await r.json()).data||{}).Media||{}).relations||{}).edges||[];
-    const e=edges.find(x=>x&&x.relationType==='SEQUEL'&&x.node&&x.node.type==='ANIME');
+    const e=edges.find(x=>x&&x.relationType==='SEQUEL'&&x.node&&x.node.type==='ANIME'&&!isAdultMedia(x.node));
     return e?e.node:null;
   }catch(e){return null;}
 }
@@ -9475,12 +9483,12 @@ function _updBusy(){
 // you'd explain it to a friend — what they can now do, not what the code does.
 // No version numbers or jargon in the notes; the date IS the version.
 const RELEASE={
-  v:'2026-07-28.13',
-  title:'Take back a recommendation',
-  push:'Recommended something by mistake? You can take it back now.',
+  v:'2026-07-28.14',
+  title:'Adult titles stay out',
+  push:'Adult titles can no longer reach the seasons list, the next-season offer, or More like this.',
   notes:[
-    'Open <b>Friends</b> and you will see what you have recommended, and to whom. <b>Take back</b> removes it from their app.',
-    'It disappears next time they open WatchList. If they already saw it, they already saw it \u2014 nothing can undo that part.',
+    'Adult titles were still able to appear in three places: a show\u2019s <b>Seasons</b> list, the <b>next season</b> offer, and <b>More like this</b>. They are filtered out of all of them now.',
+    'The seasons list was the worst of it \u2014 it follows side stories and spin-offs, which is exactly where adult versions of ordinary series hang off. Those are dropped before they are even fetched.',
   ],
 };
 const SEEN_REL='seen_release';

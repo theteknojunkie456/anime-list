@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>WatchList for Android</title>
+<meta name="description" content="Install WatchList on Android — from Chrome in two taps, or download the app file.">
+<meta name="theme-color" content="#0d0d0f">
+<link rel="icon" href="icons/icon-192.png">
+<style>
+  :root{
+    --bg:#0d0d0f; --bg2:#141419; --bg3:#1b1b22; --b1:rgba(255,255,255,.08); --b2:rgba(255,255,255,.16);
+    --t1:#f2f2f5; --t2:#a9a9b6; --t3:#6d6d7b; --a:#e03d55; --a2:#ff6b84;
+    --fd:"Bricolage Grotesque",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+    --fb:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--t1);font-family:var(--fb);line-height:1.6;-webkit-font-smoothing:antialiased;
+    background-image:radial-gradient(900px 520px at 80% -10%,rgba(224,61,85,.13),transparent 60%);}
+  .wrap{max-width:640px;margin:0 auto;padding:clamp(28px,7vw,64px) 20px 80px;}
+  h1{font-family:var(--fd);font-weight:800;letter-spacing:-.03em;font-size:clamp(30px,7vw,44px);line-height:1.08;margin:14px 0 10px;}
+  h2{font-family:var(--fd);font-weight:800;letter-spacing:-.02em;font-size:19px;margin:0 0 4px;}
+  p{color:var(--t2);margin:0 0 14px;}
+  .kick{font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:var(--t3);font-weight:700;}
+  .logo{display:flex;align-items:center;gap:11px;}
+  .logo img{width:42px;height:42px;border-radius:11px;}
+  .logo span{font-family:var(--fd);font-weight:800;font-size:19px;}
+  .card{background:linear-gradient(180deg,var(--bg2),var(--bg));border:1px solid var(--b1);border-radius:18px;padding:22px;margin:16px 0;}
+  .card.lead{border-color:rgba(224,61,85,.34);box-shadow:0 14px 40px -22px rgba(224,61,85,.75);}
+  .tag{display:inline-block;font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;
+    padding:4px 10px;border-radius:99px;border:1px solid var(--b2);color:var(--t2);margin-bottom:10px;}
+  .tag.best{color:var(--a2);border-color:rgba(224,61,85,.45);}
+  ol{margin:12px 0 0;padding-left:20px;color:var(--t2);}
+  ol li{margin:7px 0;}
+  b{color:var(--t1);}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:9px;width:100%;margin-top:16px;padding:15px 20px;
+    border-radius:14px;background:var(--a);color:#fff;font-family:var(--fd);font-weight:800;font-size:15px;text-decoration:none;border:none;cursor:pointer;}
+  .btn.ghost{background:transparent;border:1px solid var(--b2);color:var(--t1);}
+  .note{font-size:12.5px;color:var(--t3);margin-top:12px;}
+  .foot{margin-top:36px;padding-top:20px;border-top:1px solid var(--b1);font-size:13px;color:var(--t3);}
+  .foot a{color:var(--a2);text-decoration:none;}
+  @media (prefers-color-scheme: light){
+    :root{--bg:#faf9f7;--bg2:#fff;--bg3:#f2f1ef;--b1:rgba(0,0,0,.10);--b2:rgba(0,0,0,.18);--t1:#15151a;--t2:#4a4a55;--t3:#77778a;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="logo"><img src="icons/icon-192.png" alt=""><span>WatchList</span></div>
+  <div class="kick" style="margin-top:26px">For Android</div>
+  <h1>Two ways to get it.</h1>
+  <p>Both give you the same app with its own icon, full screen, working offline. The first takes about ten seconds.</p>
+
+  <div class="card lead">
+    <span class="tag best">Recommended</span>
+    <h2>Install from Chrome</h2>
+    <p>Nothing to download, and it updates itself every time we ship something.</p>
+    <ol>
+      <li>Open <b>WatchList</b> in Chrome.</li>
+      <li>Tap <b>Install app</b> when Chrome offers it — or ⋮ menu → <b>Add to Home screen</b>.</li>
+      <li>Open it from your home screen like any other app.</li>
+    </ol>
+    <a class="btn" href="./index.html">Open WatchList in Chrome</a>
+    <p class="note">Notifications work on Android, so you'll get told when a new episode of anything you track drops.</p>
+  </div>
+
+  <div class="card">
+    <span class="tag">App file</span>
+    <h2>Download the APK</h2>
+    <p>A normal installable app file, if you'd rather have one — to sideload, or to pass to someone directly.</p>
+    <ol>
+      <li>Download the latest <b>watchlist.apk</b> from Releases.</li>
+      <li>Open it. Android will ask you to allow installing from your browser — that's normal for an app that isn't from the Play Store.</li>
+      <li>Install, and it appears in your app drawer.</li>
+    </ol>
+    <a class="btn ghost" href="https://github.com/theteknojunkie456/anime-list/releases/latest">Get the latest release</a>
+    <p class="note">Same app, wrapped. It still updates its contents automatically, so you won't need to reinstall for new features.</p>
+  </div>
+
+  <div class="foot">
+    On an iPhone? Open the site in Safari and tap <b>Share → Add to Home Screen</b>.
+    <br>Questions or something broken — <a href="https://github.com/theteknojunkie456/anime-list/issues">open an issue</a>.
+  </div>
+
+</div>
+</body>
+</html>

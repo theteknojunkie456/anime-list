@@ -7011,7 +7011,11 @@ const WATCH_PRESETS=[
   {name:'Ani-One Asia',  url:'https://www.youtube.com/@AniOneAsia/search?query={title}'},
   {name:'Muse Asia',     url:'https://www.youtube.com/@MuseAsia/search?query={title}'},
 ];
-const LEGAL_DEFAULT=WATCH_PRESETS[0].url;   // first preset — free, no account, no paid tier
+// The free fallback Watch uses when you haven't set a source. It has to respect
+// the hidden list: hiding a site and then watching the app send you there anyway
+// is the app overruling you. Falls through to the next unhidden preset, and only
+// back to the first if somehow everything is hidden.
+function legalDefault(){const p=WATCH_PRESETS.find(x=>!isHiddenSrc(x.name))||WATCH_PRESETS[0];return p;}
 // ── Official-app only: "Open in [Service]" ──────────────────────────────────
 // The public web build uses ONLY the free-legal sources above. The official app
 // adds this: the user ticks the paid services they personally subscribe to, and
@@ -8072,11 +8076,11 @@ function openExternal(url){
   try{window.open(url,'_blank','noopener');}catch(e){location.href=url;}
 }
 function launchURL(a,epOverride){
-  const src=streamSource()||LEGAL_DEFAULT, slug=streamSlug(a.title);
+  const src=streamSource()||legalDefault().url, slug=streamSlug(a.title);
   return src.replace(/\{title\}/g,encodeURIComponent(a.title)).replace(/\{slug\}/g,slug).replace(/\{ep\}/g,String((epOverride>0?epOverride:watchEpisode(a))||1));
 }
 function sourceName(){
-  const s=streamSource(); if(!s)return WATCH_PRESETS[0].name;
+  const s=streamSource(); if(!s)return legalDefault().name;
   const p=WATCH_PRESETS.find(x=>x.url===s); if(p)return p.name;
   try{return new URL(s.replace(/\{[^}]+\}/g,'x')).hostname.replace(/^www\./,'');}catch{return 'the site';}
 }
@@ -8108,7 +8112,7 @@ function renderSource(){
     <div class="dt-label">${icon('play')} Where Watch opens</div>
     <button class="src-opt${!custom&&!noSourceMode()?' on':''}" onclick="setSource('')">
       <div class="src-name">Free legal search <span class="src-tag">Default</span></div>
-      <div class="src-sub">Looks it up on ${escH(WATCH_PRESETS[0].name)} — no account needed</div>
+      <div class="src-sub">Looks it up on ${escH(legalDefault().name)} — no account needed</div>
     </button>
     ${chips?`<div class="src-picks" style="margin-top:9px">${chips}</div>`:''}
     <button class="src-opt${noSourceMode()?' on':''}" onclick="setNoSource()" style="margin-top:9px">
@@ -9344,12 +9348,12 @@ function _updBusy(){
 // you'd explain it to a friend — what they can now do, not what the code does.
 // No version numbers or jargon in the notes; the date IS the version.
 const RELEASE={
-  v:'2026-07-28.5',
-  title:'Sources, finally tidy',
-  push:'Sources is down to two things: paste your site, and where Watch opens. The rest is out of the way.',
+  v:'2026-07-28.6',
+  title:'Hidden means hidden',
+  push:'A source you hide is now really gone \u2014 including the one Watch falls back to.',
   notes:[
-    'Four stacked menus became one. <b>Sources</b> now shows the paste box and where Watch opens \u2014 everything else lives under <b>Everything else</b>.',
-    'The default option said <b>Roku Channel \u00b7 Default</b>, which was just whichever site sorted first. It now says <b>Free legal search</b> and names the site underneath, where it belongs.',
+    'Hiding a site removed it from the lists, but Watch still used it as the free fallback and the Sources screen still named it as the default. Hidden now means hidden everywhere.',
+    'If you have hidden the default, Watch moves to the next free site you have not hidden.',
   ],
 };
 const SEEN_REL='seen_release';

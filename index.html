@@ -7511,10 +7511,20 @@ async function acceptSrcPack(id){
 // Everything after the paste is inferable from the link itself, so this asks for
 // the paste and nothing else, says in plain words what it worked out, and offers
 // one button. Same recognizer underneath — this is the front door, not a rewrite.
+// Restore a link they pasted before going off to fetch a key. Losing it meant
+// finding the episode page a second time — the exact loop that made this painful.
+function restoreSrcDraft(){
+  const inp=document.getElementById('srcQuickIn'); if(!inp||inp.value)return;
+  let d=''; try{d=localStorage.getItem('src_draft')||'';}catch(e){}
+  if(!d)return;
+  inp.value=d;
+  try{quickSetup();}catch(e){}
+}
 function quickSetup(){
   const inp=document.getElementById('srcQuickIn'),out=document.getElementById('srcQuickOut');
   if(!inp||!out)return;
   const raw=(inp.value||'').trim();
+  try{raw?localStorage.setItem('src_draft',raw):localStorage.removeItem('src_draft');}catch(e){}
   if(raw.length<12){out.style.display='none';return;}
   const url=normSrc(raw);
   const tpl=templatizeSearchURL(url);
@@ -7525,8 +7535,11 @@ function quickSetup(){
     // the AI as a way out rather than a prerequisite.
     out.innerHTML=`<div class="src-quick-bad">${icon('search')} I can't tell which show or episode that address points at.<br>
       The one to copy is a <b>single episode's</b> page — its address usually has the show's name in it.
+      ${getKey()?`
       <input class="ai-prompt-in" id="srcQuickWant" placeholder="or tell me: which show and episode is it?" autocomplete="off" style="margin-top:9px;background:var(--bg2)">
-      <button class="parse-btn" id="srcAiBtn" style="margin-top:8px" onclick="aiBuildSource()">${icon('sparkles')} Work it out for me</button>
+      <button class="parse-btn" id="srcAiBtn" style="margin-top:8px" onclick="aiBuildSource()">${icon('sparkles')} Work it out for me</button>`
+      :`<p class="ai-desc" style="margin:9px 0 0">Or let AI work it out — that needs a free key first (about two minutes, no card). <b>Your link is saved</b>, so it'll still be here when you get back.</p>
+      <button class="parse-btn" style="margin-top:8px" onclick="openKeySheet()">${icon('key')} Get a free key first</button>`}
       </div>`;
     return;
   }
@@ -7573,6 +7586,7 @@ function quickSetupUse(){
   try{addCustomService(name,tpl);}catch(e){}
   try{addSrcExample((document.getElementById('srcQuickIn')||{}).value||'','');refreshSrcExNote();}catch(e){}
   setSource(tpl);                       // clears No-source mode and selects it
+  try{localStorage.removeItem('src_draft');}catch(e){}
   closeAll();
   toast(`Watch now opens ${name}`);
 }
@@ -8164,85 +8178,55 @@ function renderSource(){
 
     <details class="src-fold" data-fold="settings"${O('settings')} style="margin-top:16px">
       <summary>${icon('settings')} Everything else</summary>
-      <p class="ai-desc" style="margin-top:8px">Adding a site yourself, the ones you've saved, hiding what you never use, and where manga opens.</p>
-    <details class="src-fold nested" data-fold="add"${O('add')}>
-      <summary>${icon('sort')} More options</summary>
-      <p class="ai-desc" style="margin-top:8px">Only needed if the paste box above didn’t suit — a service you subscribe to, or a site whose address you want to write yourself.</p>
-      <div class="src-picks">${(onlyMine()?[]:REGIONAL_SERVICES)
+
+      <div class="dt-label" style="margin-top:14px">Your sources</div>
+      <label class="ct-dk">Only the sites I added<span class="ct-tgl"><input type="checkbox" id="onlyMineTgl" ${onlyMine()?'checked':''} onchange="setOnlyMine(this.checked)"><span class="ct-tgl-track"></span></span></label>
+      <p class="ai-desc" style="margin-top:7px">Tap a name to rename it, or Hide the ones you never want to see${hiddenCount?` — <b>${hiddenCount}</b> hidden right now`:''}.</p>
+      ${allKnownSources().map(s=>{const off=isHiddenSrc(s.name),q=escH(s.name).replace(/'/g,"\\'");
+        return `<div class="src-opt" style="display:flex;align-items:center;gap:10px${off?';opacity:.45':''}" onclick="renameSrcPrompt('${q}')">
+          <div style="flex:1;min-width:0"><div class="src-name">${escH(srcLabel(s.name))}</div><div class="src-sub">${escH(host(s.url||''))}</div></div>
+          <button class="src-chip${off?' on':''}" onclick="event.stopPropagation();toggleHiddenSrc('${q}')">${off?'Unhide':'Hide'}</button>
+        </div>`;}).join('')}
+
+      <div class="dt-label" style="margin-top:20px">Add one yourself</div>
+      <p class="ai-desc">Only if the paste box above didn't suit — a service you subscribe to, or an address you want to write out.</p>
+      ${onlyMine()?'':`<div class="src-picks">${REGIONAL_SERVICES
         .filter(s=>!customServices().some(c=>c.name.toLowerCase()===s.name.toLowerCase()))
-        .map(s=>`<button class="src-chip" onclick="addRegional('${escH(s.name)}')">${escH(s.name)} <span style="opacity:.55">${escH(s.region)}</span></button>`).join('')}</div>
-      <input class="ai-prompt-in" id="srcCustom" placeholder="paste a search page, or a real link to any episode" value="${custom&&!WATCH_PRESETS.some(p=>p.url===custom)&&!customServices().some(s=>s.url===custom)?custom.replace(/"/g,'&quot;'):''}" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url" style="margin-top:10px" oninput="csHintName()">
+        .map(s=>`<button class="src-chip" onclick="addRegional('${escH(s.name)}')">${escH(s.name)} <span style="opacity:.55">${escH(s.region)}</span></button>`).join('')}</div>`}
+      <input class="ai-prompt-in" id="srcCustom" placeholder="https://site.com/watch/{slug}/ep-{ep}" value="${custom&&!WATCH_PRESETS.some(p=>p.url===custom)&&!customServices().some(s=>s.url===custom)?custom.replace(/"/g,'&quot;'):''}" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url" style="margin-top:10px" oninput="csHintName()">
       <input class="ai-prompt-in" id="csName" placeholder="name (auto-filled)" value="" autocomplete="off" spellcheck="false" style="margin-top:8px">
       <div style="display:flex;gap:8px;margin-top:8px">
         <button class="parse-btn" style="flex:1" onclick="addCustomServiceFromForm()">Save and use it</button>
         <button class="parse-btn" style="flex:0 0 auto;width:auto;padding:0 16px" onclick="testSource()">${icon('search')} Test</button>
       </div>
       <div id="srcTest" style="display:none;margin-top:8px;padding:9px 11px;border-radius:9px;background:var(--bg2);color:var(--t2);font:12px/1.45 ui-monospace,Menlo,monospace;word-break:break-all;white-space:pre-wrap"></div>
+      <div class="src-toks" style="margin-top:10px">
+        ${['{query}','{slug}','{ep}','{ep2}','{ep3}','{titleRomaji}','{titleEnglish}'].map(t=>`<button type="button" class="src-tok" onclick="insertSrcToken('${t}')">${t}</button>`).join('')}
+      </div>
+      <div class="src-picks" style="margin-top:8px">
+        <button class="src-chip${!slugPref()?' on':''}" onclick="setSlugPref('')">Auto spelling</button>
+        <button class="src-chip${slugPref()==='romaji'?' on':''}" onclick="setSlugPref('romaji')">Romaji</button>
+        <button class="src-chip${slugPref()==='english'?' on':''}" onclick="setSlugPref('english')">English</button>
+      </div>
+      <p class="ai-desc" id="srcExNote" style="margin-top:8px;font-size:11px">${srcExNoteHTML()}</p>
 
-<details class="src-fold nested" data-fold="adv"${O('adv')} style="margin-top:10px">
-        <summary>${icon('sort')} Fine-tune with tokens</summary>
-        <p class="ai-desc" style="margin-top:8px;font-size:11.5px">Tap a token to drop it into the address at the cursor.</p>
-        <div class="src-toks">
-          ${['{query}','{queryplus}','{slug}','{slug_}','{ep}','{ep2}','{ep3}','{titleRomaji}','{titleEnglish}','{titleNative}','{malId}','{anilistId}'].map(t=>`<button type="button" class="src-tok" onclick="insertSrcToken('${t}')">${t}</button>`).join('')}
-        </div>
-        <div class="ai-desc" style="margin-top:10px;font-size:11.5px"><b><code>{slug}</code> spelling</b> — some sites index by romaji, some English:</div>
-        <div class="src-picks">
-          <button class="src-chip${!slugPref()?' on':''}" onclick="setSlugPref('')">Auto</button>
-          <button class="src-chip${slugPref()==='romaji'?' on':''}" onclick="setSlugPref('romaji')">Romaji</button>
-          <button class="src-chip${slugPref()==='english'?' on':''}" onclick="setSlugPref('english')">English</button>
-        </div>
-      </details>
-    </details>
+      ${IS_NATIVE?`
+      <div class="dt-label" style="margin-top:20px">${icon('film')} Services you pay for</div>
+      <p class="ai-desc">Tick what you subscribe to and Watch offers "Open in …" for each.</p>
+      <div class="src-picks">${PAID_SERVICES.map(s=>`<button class="src-chip${myServices().includes(s.id)?' on':''}" onclick="toggleService('${s.id}')">${s.name}</button>`).join('')}</div>`:''}
 
-    ${myCount?`
-    <details class="src-fold nested" data-fold="mine"${O('mine')}>
-      <summary>${icon('film')} Your sites <span class="src-tag">${myCount}</span></summary>
-      <p class="ai-desc" style="margin-top:8px">These show first when you tap Watch. Tap one to remove it.</p>
-      ${customServices().map(s=>`<button class="src-opt" onclick="removeCustomService('${s.id}')"><div class="src-name">${escH(s.name)} <span class="src-tag">Tap to remove</span></div><div class="src-sub">${escH(host(s.url))}</div></button>`).join('')}
-    </details>`:''}
-
-    <details class="src-fold nested" data-fold="manage"${O('manage')}>
-      <summary>${icon('sort')} Manage sources${hiddenCount?` <span class="src-tag">${hiddenCount} hidden</span>`:''}</summary>
-      <label class="ct-dk" style="margin-top:10px">Only the sites I added<span class="ct-tgl"><input type="checkbox" id="onlyMineTgl" ${onlyMine()?'checked':''} onchange="setOnlyMine(this.checked)"><span class="ct-tgl-track"></span></span></label>
-      <p class="ai-desc" style="margin-top:8px">Hides every built-in suggestion, including ones added in future updates. Your own sites are unaffected.</p>
-      <p class="ai-desc">Or tap a row to rename it, and hide them one at a time.</p>
-      ${allKnownSources().map(s=>{const off=isHiddenSrc(s.name),q=escH(s.name).replace(/'/g,"\\'");
-        const sub=[s.kind,s.unverified?'unverified — tap Test':'',off?'hidden':''].filter(Boolean).join(' · ');
-        return `<div class="src-opt" style="display:flex;align-items:center;gap:10px${off?';opacity:.45':''}" onclick="renameSrcPrompt('${q}')">
-        <div style="flex:1;min-width:0">
-          <div class="src-name">${escH(srcLabel(s.name))}${srcLabel(s.name)!==s.name?` <span class="src-tag">${escH(s.name)}</span>`:''}</div>
-          <div class="src-sub">${escH(sub)}</div>
-        </div>
-        <button class="src-chip${off?' on':''}" onclick="event.stopPropagation();toggleHiddenSrc('${q}')">${off?'Unhide':'Hide'}</button>
-      </div>`;}).join('')}
-    </details>
-    ${IS_NATIVE?`
-    <details class="src-fold nested" data-fold="subs"${O('subs')}>
-      <summary>${icon('film')} Your streaming accounts${myServices().length?` <span class="src-tag">${myServices().length}</span>`:''}</summary>
-    <p class="ai-desc" style="margin-top:8px">Tick the services you subscribe to. On a show, <b>Watch</b> then offers <b>“Open in …”</b> for each — opening that app on your phone where you're already signed in. We never see your password, and nothing is ever pirated.</p>
-    <div class="src-picks">${PAID_SERVICES.map(s=>`<button class="src-chip${myServices().includes(s.id)?' on':''}" onclick="toggleService('${s.id}')">${s.name}</button>`).join('')}</div>
-    <p class="ai-desc" style="margin-top:10px;font-size:11.5px">Watch lists your services first, then the free options — so a title is never a dead end.</p>
-    </details>
-    `:''}
-
-    <details class="src-fold nested" data-fold="read"${O('read')}>
-      <summary>${icon('book')} Reading source${rcustom?` <span class="src-tag">${escH(host(rcustom))}</span>`:''}</summary>
-      <p class="ai-desc" style="margin-top:8px">Where <b>Read now</b> opens a manga, manhwa or webtoon.</p>
-    <button class="src-opt${!rcustom?' on':''}" onclick="setReadSource('')">
-      <div class="src-name">AsuraScans <span class="src-tag">Built-in</span></div>
-      <div class="src-sub">Jumps straight to the series</div>
-    </button>
-    <button class="src-opt${rcustom?' on':''}" onclick="document.getElementById('rsrcCustom').focus()">
-      <div class="src-name">Your own site</div>
-      <div class="src-sub">${rcustom?'Using '+host(rcustom):'Paste any reading site below'}</div>
-    </button>
-    <input class="ai-prompt-in" id="rsrcCustom" placeholder="comick.io — or a full URL" value="${rcustom?rcustom.replace(/"/g,'&quot;'):''}" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url" style="margin-top:10px">
-    <button class="parse-btn" onclick="saveReadSource()">Use this site</button>
-    </details>
+      <div class="dt-label" style="margin-top:20px">${icon('book')} Where manga opens</div>
+      <button class="src-opt${!rcustom?' on':''}" onclick="setReadSource('')">
+        <div class="src-name">AsuraScans <span class="src-tag">Built-in</span></div>
+        <div class="src-sub">Jumps straight to the series</div>
+      </button>
+      <input class="ai-prompt-in" id="rsrcCustom" placeholder="comick.io — or a full URL" value="${rcustom?rcustom.replace(/"/g,'&quot;'):''}" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url" style="margin-top:9px">
+      <button class="parse-btn" onclick="saveReadSource()">Use this site instead</button>
     </details>
 `;
   // Put the fold you were using back where it was — same scroll, still open.
   try{if(scroller)scroller.scrollTop=prevScroll;}catch{}
+  try{restoreSrcDraft();}catch(e){}
 }
 function setReadSource(v){
   try{if(v)localStorage.setItem('read_src',v);else localStorage.removeItem('read_src');}catch{}
@@ -9392,13 +9376,13 @@ function _updBusy(){
 // you'd explain it to a friend — what they can now do, not what the code does.
 // No version numbers or jargon in the notes; the date IS the version.
 const RELEASE={
-  v:'2026-07-28.8',
-  title:'Next episode stops 404ing',
-  push:'Next episode now uses the link you actually set \u2014 and a show gets renamed to what your site calls it.',
+  v:'2026-07-28.9',
+  title:'Fewer menus, and your link is kept',
+  push:'Sources has no menus-inside-menus any more, and a link you paste survives going off to get a key.',
   notes:[
-    '<b>Mark watched &amp; next</b> and the next/previous arrows built their own address from the show\u2019s title, ignoring the link you pinned and the name you had already corrected \u2014 so they could 404 on a show you had just fixed. They now use the same link as everything else.',
-    'When you correct a show with <b>Set the right one</b>, WatchList takes the spelling from that address. A show stored as <i>Hero With No Class</i> becomes <i>Hero without a Class</i> if that is what the site calls it, so nothing searches the wrong name again.',
-    '<b>Only the sites I added</b> now also hides the suggested services, not just the source lists.',
+    '<b>Everything else</b> no longer opens into four more menus. It is one page: your sources with hide and rename, adding one yourself, and where manga opens.',
+    'Your sites and the built-in ones are one list now, instead of two places doing the same job.',
+    'If a link needs AI and you have no key, it says so <b>before</b> you start \u2014 and remembers the link you pasted, so you do not have to go and find that episode page again.',
   ],
 };
 const SEEN_REL='seen_release';

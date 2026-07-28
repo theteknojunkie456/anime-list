@@ -2888,7 +2888,16 @@ function save(){writeLocal();schedulePush();scheduleNotifyUpdate();}
 const ENCFLAG='enc_'+LSKEY;
 let cryptoKey=null, envWraps=null, appLocked=false;  // cryptoKey = the master key (unwrapped); envWraps = {pw,rec} wrapped copies
 function encEnabled(){try{return localStorage.getItem(ENCFLAG)==='1';}catch{return false;}}
-const _b64=b=>btoa(String.fromCharCode(...new Uint8Array(b)));
+// Spreading the array into fromCharCode passes one argument PER BYTE, so a large
+// enough list blows the engine's argument limit and throws RangeError. With a
+// password set, every save then failed — silently at first, and later reported as
+// "storage full", which sent people deleting titles to fix an encoder bug. Chunked.
+const _b64=b=>{
+  const u=new Uint8Array(b), CH=0x8000;
+  let out='';
+  for(let i=0;i<u.length;i+=CH)out+=String.fromCharCode.apply(null,u.subarray(i,i+CH));
+  return btoa(out);
+};
 const _unb64=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
 function isEnvelope(x){return !!(x&&typeof x==='object'&&x.enc===1&&x.ct&&x.iv);}
 async function deriveKey(secret,salt){               // PBKDF2 → a wrapping key (from a password OR a recovery key)
@@ -9401,13 +9410,13 @@ function _updBusy(){
 // you'd explain it to a friend — what they can now do, not what the code does.
 // No version numbers or jargon in the notes; the date IS the version.
 const RELEASE={
-  v:'2026-07-28.10',
-  title:'It stops interrupting your episode',
-  push:'The app no longer reloads mid-episode \u2014 and if it ever does, it puts you back where you were.',
+  v:'2026-07-28.11',
+  title:'Fixed: saving with a password on',
+  push:'If you use a password and have a big list, your changes were not saving. Fixed \u2014 nothing was lost.',
   notes:[
-    'WatchList updates itself quietly in the background, but it was allowed to do that while you were watching \u2014 which reloaded the app and, if you have a password set, dropped you on the lock screen mid-episode.',
-    'It now waits until you are finished. That covers the in-app player, YouTube playback, watch parties, and a site you opened in your browser.',
-    'If it does get interrupted \u2014 a phone reclaiming memory, say \u2014 unlocking puts you straight back into what you were watching.',
+    'A real bug, now fixed: with a <b>password lock</b> switched on and a large list, saving failed every time. The app kept working, so you would not notice until a reload put things back.',
+    'It had nothing to do with space \u2014 it was a limit in how the encrypted list was encoded. Earlier versions blamed <b>storage full</b>, which sent people deleting titles for no reason.',
+    'Your list was never lost, and nothing needs redoing. Open the app once and the fix applies.',
   ],
 };
 const SEEN_REL='seen_release';

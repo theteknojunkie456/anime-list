@@ -8107,16 +8107,19 @@ function renderSource(){
 
     <div class="dt-label">${icon('play')} Where Watch opens</div>
     <button class="src-opt${!custom&&!noSourceMode()?' on':''}" onclick="setSource('')">
-      <div class="src-name">${escH(WATCH_PRESETS[0].name)} <span class="src-tag">Default · Free</span></div>
-      <div class="src-sub">Legal search — no account needed</div>
+      <div class="src-name">Free legal search <span class="src-tag">Default</span></div>
+      <div class="src-sub">Looks it up on ${escH(WATCH_PRESETS[0].name)} — no account needed</div>
     </button>
-    <div class="src-picks">${chips}</div>
+    ${chips?`<div class="src-picks" style="margin-top:9px">${chips}</div>`:''}
     <button class="src-opt${noSourceMode()?' on':''}" onclick="setNoSource()" style="margin-top:9px">
       <div class="src-name">${icon('x')} Ask me each time <span class="src-tag">No source</span></div>
       <div class="src-sub">Watch stays put and brings you here instead</div>
     </button>
 
-    <details class="src-fold" data-fold="add"${O('add')} style="margin-top:16px">
+    <details class="src-fold" data-fold="settings"${O('settings')} style="margin-top:16px">
+      <summary>${icon('settings')} Everything else</summary>
+      <p class="ai-desc" style="margin-top:8px">Adding a site yourself, the ones you've saved, hiding what you never use, and where manga opens.</p>
+    <details class="src-fold nested" data-fold="add"${O('add')}>
       <summary>${icon('sort')} More options</summary>
       <p class="ai-desc" style="margin-top:8px">Only needed if the paste box above didn’t suit — a service you subscribe to, or a site whose address you want to write yourself.</p>
       <div class="src-picks">${REGIONAL_SERVICES
@@ -8146,13 +8149,13 @@ function renderSource(){
     </details>
 
     ${myCount?`
-    <details class="src-fold" data-fold="mine"${O('mine')}>
+    <details class="src-fold nested" data-fold="mine"${O('mine')}>
       <summary>${icon('film')} Your sites <span class="src-tag">${myCount}</span></summary>
       <p class="ai-desc" style="margin-top:8px">These show first when you tap Watch. Tap one to remove it.</p>
       ${customServices().map(s=>`<button class="src-opt" onclick="removeCustomService('${s.id}')"><div class="src-name">${escH(s.name)} <span class="src-tag">Tap to remove</span></div><div class="src-sub">${escH(host(s.url))}</div></button>`).join('')}
     </details>`:''}
 
-    <details class="src-fold" data-fold="manage"${O('manage')}>
+    <details class="src-fold nested" data-fold="manage"${O('manage')}>
       <summary>${icon('sort')} Manage sources${hiddenCount?` <span class="src-tag">${hiddenCount} hidden</span>`:''}</summary>
       <p class="ai-desc" style="margin-top:8px">Tap a row to rename it, or hide the ones you never use.</p>
       ${allKnownSources().map(s=>{const off=isHiddenSrc(s.name),q=escH(s.name).replace(/'/g,"\\'");
@@ -8166,7 +8169,7 @@ function renderSource(){
       </div>`;}).join('')}
     </details>
     ${IS_NATIVE?`
-    <details class="src-fold" data-fold="subs"${O('subs')}>
+    <details class="src-fold nested" data-fold="subs"${O('subs')}>
       <summary>${icon('film')} Your streaming accounts${myServices().length?` <span class="src-tag">${myServices().length}</span>`:''}</summary>
     <p class="ai-desc" style="margin-top:8px">Tick the services you subscribe to. On a show, <b>Watch</b> then offers <b>“Open in …”</b> for each — opening that app on your phone where you're already signed in. We never see your password, and nothing is ever pirated.</p>
     <div class="src-picks">${PAID_SERVICES.map(s=>`<button class="src-chip${myServices().includes(s.id)?' on':''}" onclick="toggleService('${s.id}')">${s.name}</button>`).join('')}</div>
@@ -8174,7 +8177,7 @@ function renderSource(){
     </details>
     `:''}
 
-    <details class="src-fold" data-fold="read"${O('read')}>
+    <details class="src-fold nested" data-fold="read"${O('read')}>
       <summary>${icon('book')} Reading source${rcustom?` <span class="src-tag">${escH(host(rcustom))}</span>`:''}</summary>
       <p class="ai-desc" style="margin-top:8px">Where <b>Read now</b> opens a manga, manhwa or webtoon.</p>
     <button class="src-opt${!rcustom?' on':''}" onclick="setReadSource('')">
@@ -8187,6 +8190,7 @@ function renderSource(){
     </button>
     <input class="ai-prompt-in" id="rsrcCustom" placeholder="comick.io — or a full URL" value="${rcustom?rcustom.replace(/"/g,'&quot;'):''}" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url" style="margin-top:10px">
     <button class="parse-btn" onclick="saveReadSource()">Use this site</button>
+    </details>
     </details>
 `;
   // Put the fold you were using back where it was — same scroll, still open.
@@ -9340,13 +9344,12 @@ function _updBusy(){
 // you'd explain it to a friend — what they can now do, not what the code does.
 // No version numbers or jargon in the notes; the date IS the version.
 const RELEASE={
-  v:'2026-07-28.4',
-  title:'One link. That is the whole setup.',
-  push:'Setting your own site is now one paste \u2014 no AI key, no second step, no hunting through menus.',
+  v:'2026-07-28.5',
+  title:'Sources, finally tidy',
+  push:'Sources is down to two things: paste your site, and where Watch opens. The rest is out of the way.',
   notes:[
-    'Setting up your site was three boxes for the same link, in two different places, with an AI key demanded halfway through. Now it is <b>one paste</b>, at the top of <b>Sources</b>.',
-    'Paste any episode\u2019s address. WatchList reads which show and episode it is, shows you where a different show would open, and one button sets it for everything.',
-    'No key needed \u2014 it only asks for one if it genuinely cannot read the link, and even then only as a way out.',
+    'Four stacked menus became one. <b>Sources</b> now shows the paste box and where Watch opens \u2014 everything else lives under <b>Everything else</b>.',
+    'The default option said <b>Roku Channel \u00b7 Default</b>, which was just whichever site sorted first. It now says <b>Free legal search</b> and names the site underneath, where it belongs.',
   ],
 };
 const SEEN_REL='seen_release';

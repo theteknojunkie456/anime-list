@@ -2829,8 +2829,14 @@ function _saveFailed(e){
   if(saveWarned)return;
   saveWarned=true;
   if(isQuotaErr(e))toast('Storage full — remove an uploaded cover to free space');
-  else{try{console.error('[WatchList] save failed',e);}catch(_){}
-    toast('Couldn’t save just now — your list is safe, try again');}
+  else{
+    try{console.error('[WatchList] save failed',e);}catch(_){}
+    // Name the failure in the message itself. "Something went wrong" is
+    // unreportable — on a phone there's no console to open, so the one person
+    // who can diagnose it never learns what it was.
+    const why=(e&&(e.name||e.constructor&&e.constructor.name))||'unknown';
+    toast(`Couldn’t save (${String(why).slice(0,24)}) — your list is safe, try again`);
+  }
 }
 function writeLocal(){
   const s=store();if(!s)return;
@@ -3400,8 +3406,14 @@ async function sendTestNotify(){
 }
 function scheduleNotifyUpdate(){if(!notifyOn())return;clearTimeout(notifyUpdT);notifyUpdT=setTimeout(notifyUpdate,2500);}
 // Keep the worker's tracked list current (fire-and-forget).
+// A live push subscription IS the consent — it only exists because they granted
+// permission on this device. Gating on the local notifyOn() flag as well meant a
+// device whose flag drifted (cleared storage, restored backup, a build that
+// never set it) kept its subscription on the server with an EMPTY show list: the
+// broadcasts arrived, but the every-15-minutes airing check had nothing to look
+// at, so "new episode" alerts could never fire. Now the subscription decides.
 async function notifyUpdate(){
-  if(!notifyOn()||!pushSupported())return;
+  if(!pushSupported())return;
   try{
     const sub=await getPushSub();if(!sub)return;
     await fetch(NOTIFY_URL+'/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({endpoint:sub.endpoint,animeIds:notifyAnimeIds()})});
@@ -4607,14 +4619,28 @@ function malSeason(d){return{aniId:0,malId:d.mal_id,title:d.title_english||d.tit
   format:(d.type||'').toUpperCase().replace(/\s+/g,'_'),status:'',episodes:d.episodes||0,
   img:(d.images&&d.images.jpg&&(d.images.jpg.large_image_url||d.images.jpg.image_url))||'',airingAt:0,airEp:0,src:'mal'};}
 // Walk AniList sequel/prequel edges from a seed id, returning every reached node.
+// Everything that belongs to the same franchise. SEQUEL/PREQUEL alone missed
+// specials, OVAs, movies and side stories entirely — which is most of what a
+// long-running series actually consists of. ADAPTATION/SOURCE/CHARACTER are
+// deliberately absent: those cross into the manga and other media, not more of
+// the show. Node type is filtered to ANIME regardless.
+const FRANCHISE_RELS=new Set(['SEQUEL','PREQUEL','SIDE_STORY','PARENT','ALTERNATIVE','SPIN_OFF','SUMMARY','COMPILATION','CONTAINS']);
 async function aniGraph(seedId){
   const nodes={},want=[seedId],seen=new Set([seedId]);let hops=0;
-  while(want.length&&hops<12){
+  while(want.length&&hops<26){
     hops++;const id=want.shift();
     const q=`query($id:Int){Media(id:$id){id idMal format status episodes seasonYear startDate{year month} title{romaji english} coverImage{large} nextAiringEpisode{airingAt episode} relations{edges{relationType node{id type}}}}}`;
     let m;try{const r=await fetch('https://graphql.anilist.co',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({query:q,variables:{id}})});if(r.status===429){await pause(1400);want.unshift(id);hops--;continue;}if(!r.ok)continue;m=((await r.json()).data||{}).Media;}catch{continue;}
     if(!m)continue;nodes[m.id]=m;
-    ((m.relations&&m.relations.edges)||[]).forEach(e=>{if((e.relationType==='SEQUEL'||e.relationType==='PREQUEL')&&e.node&&e.node.type==='ANIME'&&!seen.has(e.node.id)){seen.add(e.node.id);want.push(e.node.id);}});
+    ((m.relations&&m.relations.edges)||[]).forEach(e=>{
+      if(!e||!e.node||e.node.type!=='ANIME'||seen.has(e.node.id))return;
+      if(!FRANCHISE_RELS.has(e.relationType))return;
+      seen.add(e.node.id);
+      // Walk the main line first — a franchise with a dozen side stories should
+      // still find season 3 before it runs out of hops.
+      if(e.relationType==='SEQUEL'||e.relationType==='PREQUEL')want.unshift(e.node.id);
+      else want.push(e.node.id);
+    });
     if(want.length)await pause(320);
   }
   return Object.values(nodes);
@@ -4626,7 +4652,7 @@ async function malGraph(seedMal){
     hops++;const id=want.shift();
     let d;try{const r=await fetch(`https://api.jikan.moe/v4/anime/${id}/full`);if(r.status===429){await pause(1400);want.unshift(id);hops--;continue;}if(!r.ok)continue;d=(await r.json()).data;}catch{continue;}
     if(!d)continue;nodes[d.mal_id]=d;
-    ((d.relations)||[]).forEach(rel=>{if(/Sequel|Prequel/i.test(rel.relation||'')){((rel.entry)||[]).forEach(e=>{if(e.type==='anime'&&!seen.has(e.mal_id)){seen.add(e.mal_id);want.push(e.mal_id);}});}});
+    ((d.relations)||[]).forEach(rel=>{if(/Sequel|Prequel|Side story|Parent story|Alternative|Spin-?off|Summary|Full story/i.test(rel.relation||'')){((rel.entry)||[]).forEach(e=>{if(e.type==='anime'&&!seen.has(e.mal_id)){seen.add(e.mal_id);want.push(e.mal_id);}});}});
     if(want.length)await pause(400);
   }
   return Object.values(nodes);
@@ -9002,7 +9028,7 @@ async function scanUpcomingRelated(){
     try{localStorage.setItem('upcoming_related',JSON.stringify([...found.values()]));}catch(e){}
     try{localStorage.setItem('rel_scan_at',String(Date.now()));}catch(e){}
     try{nativeScheduleNotifs();}catch(e){}
-    try{if(!(typeof IS_NATIVE!=='undefined'&&IS_NATIVE)&&notifyOn())notifyUpdate();}catch(e){}
+    try{if(!(typeof IS_NATIVE!=='undefined'&&IS_NATIVE))notifyUpdate();}catch(e){}
   }catch(e){}
 }
 // Tap an upcoming-related row in the schedule -> add it to Plan so it's fully tracked.
@@ -9582,7 +9608,7 @@ setTimeout(fetchCovers,1200);
 setTimeout(syncOnOpen,300);
 setTimeout(()=>{try{pullSrcPacks();}catch(e){}},2400);   // a shared setup waiting for you
 // If notifications are on, re-sync the tracked show list with the worker on load (fire-and-forget).
-setTimeout(()=>{try{if(notifyOn())notifyUpdate();}catch{}},1600);
+setTimeout(()=>{try{notifyUpdate();}catch{}},1600);   // repairs a subscription tracking nothing
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)syncOnOpen();});
 try{window.addEventListener('online',()=>syncOnOpen());}catch(e){}   // cloud sync recovers the moment the network is back
 

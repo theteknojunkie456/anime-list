@@ -875,6 +875,11 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 .shr-list{display:flex;flex-wrap:wrap;gap:8px;}
 .shr-f{padding:9px 14px;border-radius:99px;background:var(--bg3);border:1px solid var(--b1);color:var(--t2);font-size:12.5px;font-weight:700;cursor:pointer;}
 .shr-f.on{background:var(--ag);border-color:var(--a);color:var(--t1);}
+/* The next-season offer. */
+.next-card{display:flex;gap:13px;align-items:center;margin-top:12px;padding:12px;border-radius:15px;background:var(--bg3);border:1px solid var(--b1);}
+.next-card img,.next-ph{width:58px;height:82px;border-radius:9px;object-fit:cover;flex:0 0 auto;background:var(--bg4);}
+.next-t{font-family:var(--fd);font-weight:800;font-size:15px;color:var(--t1);line-height:1.25;}
+.next-s{font-size:12.5px;color:var(--t3);margin-top:4px;}
 /* One quiet row at the end of Sources — sharing is worth offering, not shouting. */
 /* "Share mine" — sits with the box where you set your link, because that's the
    moment you'd want to pass it on. */
@@ -1897,6 +1902,15 @@ body.recsel .pcard{position:relative;}
     <button class="sheet-cancel" onclick="closeAll()">Done</button>
   </div>
   <div id="adminBody"></div>
+</div>
+
+<div class="sheet" id="nextSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <div class="sheet-title"><i data-ic="sparkles"></i> What&rsquo;s next</div>
+    <button class="sheet-cancel" onclick="dismissNextSeason()">Close</button>
+  </div>
+  <div id="nextBody"></div>
 </div>
 
 <div class="sheet" id="srcOfferSheet">
@@ -4742,6 +4756,68 @@ function paintFranchise(){
     <button class="dt-seenall" onclick="markFranchiseSeen()">${icon(allSeen?'check':'layers')} ${allSeen?'All seen':'Seen all'}</button></div>
     <div class="dt-seasons">${rows}</div>`;
 }
+// ─── WHAT'S NEXT ────────────────────────────────────────────────────────────
+// Finishing a season is the exact moment you'd want the next one, and it's also
+// the moment the app knows something you might not: whether one exists. Asked
+// once, never nagged — a "no" is remembered per show, and a sequel already on
+// your list is never offered.
+const NEXT_SKIP_KEY='next_declined';
+function nextDeclined(){try{const v=JSON.parse(localStorage.getItem(NEXT_SKIP_KEY)||'[]');return Array.isArray(v)?v:[];}catch{return[];}}
+function declineNext(aniId){try{const l=nextDeclined();if(!l.includes(aniId)){l.push(aniId);localStorage.setItem(NEXT_SKIP_KEY,JSON.stringify(l.slice(-300)));}}catch{}}
+// One small query — the direct sequel only. The full franchise walk is many
+// requests, and finishing a show shouldn't kick one off.
+async function fetchSequel(aniId){
+  const q=`query($id:Int){Media(id:$id){relations{edges{relationType node{id type format status episodes seasonYear title{romaji english} coverImage{large}}}}}}`;
+  try{
+    const r=await fetch('https://graphql.anilist.co',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({query:q,variables:{id:aniId}})});
+    if(!r.ok)return null;
+    const edges=((((await r.json()).data||{}).Media||{}).relations||{}).edges||[];
+    const e=edges.find(x=>x&&x.relationType==='SEQUEL'&&x.node&&x.node.type==='ANIME');
+    return e?e.node:null;
+  }catch(e){return null;}
+}
+async function offerNextSeason(a){
+  if(!a||kindOf(a)!=='watch'||!a.aniId)return;
+  const nxt=await fetchSequel(a.aniId);
+  if(!nxt||!nxt.id)return;
+  if(nextDeclined().includes(nxt.id))return;                 // they already said no
+  if(anime.some(x=>x.aniId===nxt.id))return;                 // already on their list
+  const title=(nxt.title&&(nxt.title.english||nxt.title.romaji))||'The next season';
+  const soon=nxt.status==='NOT_YET_RELEASED';
+  const box=document.getElementById('nextBody'); if(!box)return;
+  box.innerHTML=`<p class="ai-desc" style="margin-top:2px">You just finished <b>${escH(a.title)}</b>. There's more.</p>
+    <div class="next-card">
+      ${nxt.coverImage&&nxt.coverImage.large?`<img src="${escH(nxt.coverImage.large)}" alt="">`:'<div class="next-ph"></div>'}
+      <div class="next-info">
+        <div class="next-t">${escH(title)}</div>
+        <div class="next-s">${soon?'Not out yet':(nxt.episodes?`${nxt.episodes} episodes`:'Sequel')}${nxt.seasonYear?` · ${nxt.seasonYear}`:''}</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:14px">
+      <button class="parse-btn" style="flex:1" onclick="addNextSeason()">${soon?'Add to Plan':'Add and start watching'}</button>
+      <button class="parse-btn" style="flex:0 0 auto;width:auto;padding:0 18px" onclick="dismissNextSeason()">Not now</button>
+    </div>`;
+  _nextOffer={node:nxt,soon};
+  openSheet('nextSheet');
+}
+let _nextOffer=null;
+function addNextSeason(){
+  if(!_nextOffer){closeAll();return;}
+  const n=_nextOffer.node;
+  const item=seasonToItem({
+    aniId:n.id,malId:0,title:(n.title&&(n.title.english||n.title.romaji))||'Untitled',
+    img:(n.coverImage&&n.coverImage.large)||'',episodes:n.episodes||0,year:n.seasonYear||0,
+  },_nextOffer.soon?'plan':'watching');
+  anime.unshift(item);
+  _nextOffer=null;
+  save();render();closeAll();
+  toast(`${item.title} added`);
+  try{fetchCovers();}catch(e){}
+}
+function dismissNextSeason(){
+  if(_nextOffer&&_nextOffer.node)declineNext(_nextOffer.node.id);
+  _nextOffer=null;closeAll();
+}
 function seasonToItem(s,status){
   return {id:uid(),kind:'watch',status,title:s.title||'Untitled',aniId:s.aniId||0,malId:s.malId||0,
     img:s.img||'',eps:s.episodes?s.episodes+' eps':'',epTotal:s.episodes||0,
@@ -4772,17 +4848,21 @@ function markFranchiseSeen(){
 }
 function setDetailStatus(s){
   const a=anime.find(x=>x.id===detailId);if(!a)return;
+  const was=a.status;
   a.status=s;
   if(s==='finished'&&a.epTotal)a.ep=a.epTotal;
   touch(a);save();renderDetail();render();alPushItem(a);
+  if(s==='finished'&&was!=='finished')offerNextSeason(a);
 }
 function bumpEp(d){
   const a=anime.find(x=>x.id===detailId);if(!a)return;
   a.ep=Math.max(0,(a.ep||0)+d);
   if(a.epTotal)a.ep=Math.min(a.ep,a.epTotal);
-  if(a.epTotal&&a.ep===a.epTotal&&a.status!=='finished'){a.status='finished';toast('Marked as finished!');}
+  let _justFinished=false;
+  if(a.epTotal&&a.ep===a.epTotal&&a.status!=='finished'){a.status='finished';toast('Marked as finished!');_justFinished=true;}
   else if(a.ep>0&&a.status==='plan'){a.status='watching';}
   touch(a);save();renderDetail();render();alPushItem(a);
+  if(_justFinished)offerNextSeason(a);
 }
 function setRating(n){
   const a=anime.find(x=>x.id===detailId);if(!a)return;
@@ -9247,13 +9327,13 @@ function _updBusy(){
 // you'd explain it to a friend — what they can now do, not what the code does.
 // No version numbers or jargon in the notes; the date IS the version.
 const RELEASE={
-  v:'2026-07-28.2',
-  title:'Share your setup with a link',
-  push:'Sharing your setup is now one button and a link \u2014 send it to anyone, no friend request needed.',
+  v:'2026-07-28.3',
+  title:'Finish a season, get the next one',
+  push:'Finish a season and WatchList offers you the next one \u2014 plus every special, OVA and movie now shows up.',
   notes:[
-    'Under the paste box in <b>Sources</b> there is now <b>Share mine</b>. Tap it, get a link, send it to anyone \u2014 text, Discord, wherever.',
-    'Whoever opens it sees what they are getting and taps <b>Accept</b>. They do not need to be your friend in the app, or even have a setup yet.',
-    'Opening a show now puts <b>Watch</b> and your progress at the top, where they belong, instead of below the ratings and genres.',
+    'Mark a season <b>Done</b> and if there is a next one, WatchList offers it \u2014 one tap to add it and carry on. Say no once and it will not ask again for that show.',
+    'The <b>Seasons</b> list now includes everything in a franchise: specials, OVAs, movies and side stories, not just the numbered seasons.',
+    'Fixed: some people had notifications switched on but were never registered for episode alerts, so nothing ever arrived. That repairs itself next time you open the app.',
   ],
 };
 const SEEN_REL='seen_release';

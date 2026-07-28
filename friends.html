@@ -6857,6 +6857,20 @@ function pvSetFromURL(){
   if(!learnedSlug){toast('Couldn’t read a show name from that address');return;}
   a.srcSlug=learnedSlug.replace(/[_-]?(ep|episode)[-_]?\d+$/i,'');
   setLearnedSlug(a,a.srcSlug,tplNow);        // keyed by site, so it can be synced and shared
+  // If the address spells the show differently from the title we hold, the
+  // address is the one that's demonstrably right — it's the page that loaded.
+  // "Hero With No Class" vs hero-without-a-class isn't a spelling nicety: every
+  // link we build from the wrong title 404s. Adopt it, and say so.
+  const asWords=a.srcSlug.replace(/[-_]+/g,' ').trim();
+  const flat=x=>String(x||'').toLowerCase().replace(/[^a-z0-9]/g,'');
+  if(asWords.length>2&&flat(asWords)!==flat(a.title)&&!flat(a.title).startsWith(flat(asWords))){
+    const nice=asWords.replace(/\b\w/g,c=>c.toUpperCase())
+      .replace(/\b(A|An|The|Of|With|Without|And|Or|No|In|On|To)\b/g,w=>w.toLowerCase())
+      .replace(/^./,c=>c.toUpperCase());
+    a.titleAlt=a.title;                      // keep what it was, so it can be put back
+    a.title=nice;
+    toast(`Renamed to “${nice}” — that's what the site calls it`);
+  }
   // If the page's shape differs from the current template, adopt the new shape
   // too — that's the same recognizer the one-paste setup uses.
   const reshaped=templatizeSearchURL(url);
@@ -6933,11 +6947,16 @@ function readManga(id){
 // Step episodes or bank-and-advance without leaving the player. Only wired up
 // when a custom source can address a specific episode (an {ep} token) — otherwise
 // the nav bar stays hidden.
+// Next/Prev episode used to build its own URL from the title, which meant it
+// ignored everything that makes a link correct: a per-title pinned link, the
+// slug learned from "Set the right one", and every token except {slug}/{ep}.
+// So a show whose site spells it differently 404'd on Next even after being
+// corrected — the fix didn't survive the one button most likely to need it.
+// One builder for every episode link now.
 function episodeURL(a,ep){
-  const slug=streamSlug(a.title), src=streamSource();
-  if(!src) return null;   // no custom source → can't address an episode in-frame
-  if(/\{ep\}/.test(src)) return src.replace(/\{title\}/g,encodeURIComponent(a.title)).replace(/\{slug\}/g,slug).replace(/\{ep\}/g,ep);
-  return null;   // search / plain source — no way to target an episode
+  const src=effectiveSource(a);
+  if(!src||!/\{ep\d?\}/i.test(src))return null;   // no way to address an episode
+  return fillSourceTokens(src,a,ep);
 }
 function renderPvNav(a){
   const nav=document.getElementById('pvNav'); if(!nav) return;
@@ -8149,7 +8168,7 @@ function renderSource(){
     <details class="src-fold nested" data-fold="add"${O('add')}>
       <summary>${icon('sort')} More options</summary>
       <p class="ai-desc" style="margin-top:8px">Only needed if the paste box above didn’t suit — a service you subscribe to, or a site whose address you want to write yourself.</p>
-      <div class="src-picks">${REGIONAL_SERVICES
+      <div class="src-picks">${(onlyMine()?[]:REGIONAL_SERVICES)
         .filter(s=>!customServices().some(c=>c.name.toLowerCase()===s.name.toLowerCase()))
         .map(s=>`<button class="src-chip" onclick="addRegional('${escH(s.name)}')">${escH(s.name)} <span style="opacity:.55">${escH(s.region)}</span></button>`).join('')}</div>
       <input class="ai-prompt-in" id="srcCustom" placeholder="paste a search page, or a real link to any episode" value="${custom&&!WATCH_PRESETS.some(p=>p.url===custom)&&!customServices().some(s=>s.url===custom)?custom.replace(/"/g,'&quot;'):''}" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url" style="margin-top:10px" oninput="csHintName()">
@@ -9373,12 +9392,13 @@ function _updBusy(){
 // you'd explain it to a friend — what they can now do, not what the code does.
 // No version numbers or jargon in the notes; the date IS the version.
 const RELEASE={
-  v:'2026-07-28.7',
-  title:'Only the sites you added',
-  push:'One switch hides every built-in source and keeps only the sites you added yourself.',
+  v:'2026-07-28.8',
+  title:'Next episode stops 404ing',
+  push:'Next episode now uses the link you actually set \u2014 and a show gets renamed to what your site calls it.',
   notes:[
-    'In <b>Sources \u2192 Everything else \u2192 Manage sources</b> there is now <b>Only the sites I added</b>. One switch, instead of hiding fifty things by hand.',
-    'It covers sources we add in future updates too, so the list stays yours. Your individual hides are remembered underneath, so switching it off puts everything back the way it was.',
+    '<b>Mark watched &amp; next</b> and the next/previous arrows built their own address from the show\u2019s title, ignoring the link you pinned and the name you had already corrected \u2014 so they could 404 on a show you had just fixed. They now use the same link as everything else.',
+    'When you correct a show with <b>Set the right one</b>, WatchList takes the spelling from that address. A show stored as <i>Hero With No Class</i> becomes <i>Hero without a Class</i> if that is what the site calls it, so nothing searches the wrong name again.',
+    '<b>Only the sites I added</b> now also hides the suggested services, not just the source lists.',
   ],
 };
 const SEEN_REL='seen_release';

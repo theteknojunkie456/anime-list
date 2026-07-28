@@ -2403,7 +2403,7 @@ async function fetchAdminCard(){
   try{
     // Ask for THIS platform's card ('ios' in the native app, else 'web'); the worker
     // keeps them independent, so a web-only card never reaches the iOS app and vice-versa.
-    const r=await netCall('/message',{p:(typeof IS_NATIVE!=='undefined'&&IS_NATIVE)?'ios':'web'}); const m=r&&r.message;
+    const r=await netCall('/message',{p:wlPlatform()}); const m=r&&r.message;
     const c=document.getElementById('adminCard'); if(!c)return;
     if(!m||m.id===seenMsg()){c.style.display='none';return;}
     _curMsgId=m.id;
@@ -2453,7 +2453,18 @@ const ADMIN_CK='wl_admin_ck';
 function isAdminDevice(){try{return !!adminToken()||(!!syncCode()&&syncCode()===localStorage.getItem(ADMIN_CK));}catch{return !!adminToken();}}
 function bindAdminKey(){try{if(adminToken()){const c=syncCode();if(c)localStorage.setItem(ADMIN_CK,c);}}catch{}}
 function setAdminToken(t){try{t?localStorage.setItem(ADMIN_TK,t):localStorage.removeItem(ADMIN_TK);}catch{}}
-function openAdmin(){_msgTarget='both';renderAdmin();openSheet('adminSheet');}   // segment re-renders with Both active
+// Which build this is. The Android APK is a Trusted Web Activity around the same
+// site, and it announces itself in the user-agent — so it can be targeted (and
+// counted) separately instead of being lumped in with desktop browsers.
+function wlPlatform(){
+  try{
+    if(typeof IS_NATIVE!=='undefined'&&IS_NATIVE)return 'ios';
+    const ua=navigator.userAgent||'';
+    if(/Android/i.test(ua))return 'android';
+  }catch(e){}
+  return 'web';
+}
+function openAdmin(){_msgTarget='all';renderAdmin();openSheet('adminSheet');}   // segment re-renders with All active
 // Secret unlock: tap the WatchList logo 5× fast to bring up admin the first time
 // (to enter your token). After that, a nav button appears — see injectAdminNav.
 let _adminTaps=0,_adminTapT=null;
@@ -2504,9 +2515,10 @@ function renderAdmin(){
       <input class="ai-prompt-in" id="msgUrl" placeholder="Button link (optional)" inputmode="url">
       <div class="ai-desc" style="margin:10px 0 6px">Target — applies to both Show and Clear</div>
       <div class="msg-tgt-seg" id="msgTargetSeg">
-        <button type="button" class="msg-tgt on" onclick="pickMsgTarget('both',this)">Both</button>
-        <button type="button" class="msg-tgt" onclick="pickMsgTarget('web',this)">Web only</button>
-        <button type="button" class="msg-tgt" onclick="pickMsgTarget('ios',this)">iOS only</button>
+        <button type="button" class="msg-tgt on" onclick="pickMsgTarget('all',this)">All</button>
+        <button type="button" class="msg-tgt" onclick="pickMsgTarget('web',this)">Web</button>
+        <button type="button" class="msg-tgt" onclick="pickMsgTarget('ios',this)">iOS</button>
+        <button type="button" class="msg-tgt" onclick="pickMsgTarget('android',this)">Android</button>
       </div>
       <div style="display:flex;gap:8px;margin-top:10px">
         <button class="parse-btn" style="flex:1" onclick="adminSetMessage()">Show card</button>
@@ -4546,15 +4558,19 @@ async function loadRichDetail(aniId,forId){
 // channels — Muse Asia, Ani-One, etc.). Uses YouTube's official iframe embed,
 // permitted by their terms. No scraping: we only embed a real YouTube video id.
 function ytId(u){const m=String(u||'').match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/|v\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/);return m?m[1]:'';}
-function playYouTube(videoId){
+function playYouTube(videoId,forId,ep){
   if(!videoId)return;closeYouTube();
+  // Same session record the in-app player writes, so a reload (or a lock) can
+  // put you back rather than dropping you on the home screen.
+  try{if(forId)savePvSession(forId,ep||0,'yt:'+videoId);}catch(e){}
   const ov=document.createElement('div');ov.id='ytOverlay';ov.className='yt-overlay';
   ov.onclick=function(e){if(e.target===ov)closeYouTube();};
   ov.innerHTML='<div class="yt-box"><div class="yt-bar"><span class="yt-lbl">'+icon('play')+' Playing on YouTube</span><button class="yt-x" onclick="closeYouTube()" aria-label="Close">'+icon('x')+'</button></div><div class="yt-frame"><iframe src="https://www.youtube.com/embed/'+encodeURIComponent(videoId)+'?autoplay=1&rel=0&modestbranding=1&playsinline=1" title="YouTube player" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe></div></div>';
   document.body.appendChild(ov);document.body.classList.add('yt-open');
   ov._esc=function(e){if(e.key==='Escape')closeYouTube();};document.addEventListener('keydown',ov._esc);
 }
-function closeYouTube(){const ov=document.getElementById('ytOverlay');if(!ov)return;if(ov._esc)document.removeEventListener('keydown',ov._esc);ov.remove();document.body.classList.remove('yt-open');}
+function closeYouTube(){try{const p=JSON.parse(localStorage.getItem(PV_ACTIVE)||'null');if(p&&String(p.kind||'').indexOf('yt:')===0)clearPvSession();}catch(e){}
+const ov=document.getElementById('ytOverlay');if(!ov)return;if(ov._esc)document.removeEventListener('keydown',ov._esc);ov.remove();document.body.classList.remove('yt-open');}
 function richDetailHTML(d,forId){
   const _it=forId?anime.find(x=>x.id===forId):null;const _hasSrc=!!(_it&&effectiveSource(_it));   // user set their own source → episodes route to it
   const cap=s=>String(s||'').replace(/_/g,' ').toLowerCase().replace(/\b\w/g,c=>c.toUpperCase());
@@ -7012,6 +7028,7 @@ function restorePlayer(){
   if(!s.t||Date.now()-s.t>PV_FRESH_MS){clearPvSession();return;}   // too old to spring on them
   const a=anime.find(x=>x.id===s.id);
   if(!a){clearPvSession();return;}
+  if(String(s.kind||'').indexOf('yt:')===0){ playYouTube(String(s.kind).slice(3),s.id,s.ep); return; }
   if(s.kind==='read'){ if(kindOf(a)==='read')readManga(s.id); else clearPvSession(); return; }
   if(kindOf(a)!=='watch'||!a.aniId){clearPvSession();return;}
   watchAnime(s.id);
@@ -9360,8 +9377,16 @@ async function _liveVer(){
     return v;
   }catch(e){return '';}
 }
+// A silent reload mid-episode reads as the app randomly locking itself, because
+// a locked list gates the app on every boot. The guard knew about the in-app
+// player but not the other three ways you can be watching — the YouTube overlay,
+// a watch party's screen share, or a site opened in the browser that you're
+// about to come back from.
 function _updBusy(){
-  const pv=document.getElementById('playerView'); if(pv&&pv.classList.contains('on'))return true;   // watching
+  const on=id=>{const e=document.getElementById(id);return !!(e&&e.classList.contains('on'));};
+  if(on('playerView')||on('shareView')||on('ytView'))return true;
+  if(document.getElementById('ytOverlay'))return true;                 // licensed YouTube playback
+  if(typeof extId!=='undefined'&&extId)return true;                    // away watching, will return
   const el=document.activeElement; if(el&&/^(INPUT|TEXTAREA)$/.test(el.tagName)&&(el.value||'').length)return true;   // mid-typing
   return false;
 }
@@ -9376,13 +9401,13 @@ function _updBusy(){
 // you'd explain it to a friend — what they can now do, not what the code does.
 // No version numbers or jargon in the notes; the date IS the version.
 const RELEASE={
-  v:'2026-07-28.9',
-  title:'Fewer menus, and your link is kept',
-  push:'Sources has no menus-inside-menus any more, and a link you paste survives going off to get a key.',
+  v:'2026-07-28.10',
+  title:'It stops interrupting your episode',
+  push:'The app no longer reloads mid-episode \u2014 and if it ever does, it puts you back where you were.',
   notes:[
-    '<b>Everything else</b> no longer opens into four more menus. It is one page: your sources with hide and rename, adding one yourself, and where manga opens.',
-    'Your sites and the built-in ones are one list now, instead of two places doing the same job.',
-    'If a link needs AI and you have no key, it says so <b>before</b> you start \u2014 and remembers the link you pasted, so you do not have to go and find that episode page again.',
+    'WatchList updates itself quietly in the background, but it was allowed to do that while you were watching \u2014 which reloaded the app and, if you have a password set, dropped you on the lock screen mid-episode.',
+    'It now waits until you are finished. That covers the in-app player, YouTube playback, watch parties, and a site you opened in your browser.',
+    'If it does get interrupted \u2014 a phone reclaiming memory, say \u2014 unlocking puts you straight back into what you were watching.',
   ],
 };
 const SEEN_REL='seen_release';

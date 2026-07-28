@@ -735,10 +735,14 @@ async function handleMessageGet(body, env) {
 // Admin: set (or clear) the card, scoped to the chosen platform(s).
 async function handleMessageSet(body, env) {
   if (!adminOK(body, env)) return json({ ok: false, error: "unauthorized" }, 401);
-  const targets = (body.target === "web" || body.target === "ios") ? [body.target] : ["web", "ios"];
+  // Android is its own target now. The APK is a wrapper around the same site, so
+  // it reports as its own platform rather than hiding inside "web" — otherwise a
+  // card meant for phone users lands on desktops too.
+  const PLATFORMS = ["web", "ios", "android"];
+  const targets = PLATFORMS.includes(body.target) ? [body.target] : PLATFORMS;
   if (body.clear) {
     await Promise.all([...targets.map(p => env.SUBS.delete("cfg:msg:" + p)), env.SUBS.delete("cfg:message")]);
-    return json({ ok: true, cleared: true, target: body.target || "both" });
+    return json({ ok: true, cleared: true, target: body.target || "all" });
   }
   const msg = {
     id: "m" + Date.now(),
@@ -746,7 +750,7 @@ async function handleMessageSet(body, env) {
     body: String(body.body || "").slice(0, 280),
     ctaLabel: String(body.ctaLabel || "").slice(0, 40),
     ctaUrl: String(body.ctaUrl || "").slice(0, 400),
-    target: (body.target === "web" || body.target === "ios") ? body.target : "both",
+    target: PLATFORMS.includes(body.target) ? body.target : "all",
     at: Date.now(),
   };
   if (!msg.title && !msg.body) return json({ ok: false, error: "title or body required" }, 400);

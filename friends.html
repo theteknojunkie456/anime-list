@@ -1034,14 +1034,22 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 .shareview{position:fixed;inset:0;z-index:130;background:#000;display:none;transform:translateY(100%);transition:transform .38s cubic-bezier(.2,1,.28,1);}
 .shareview.on{display:block;transform:translateY(0);}
 /* Voice/screen call embedded at the top of the party sheet (not a takeover). */
-.party-call{margin:2px 0 10px;border-radius:16px;overflow:hidden;border:1px solid var(--b3);background:#000;box-shadow:0 8px 24px -8px var(--glow);}
-.party-call-bar{display:flex;align-items:center;gap:8px;padding:9px 12px;background:var(--bg2);font-family:var(--fd);font-weight:800;font-size:13px;color:var(--t1);}
+.party-call{margin:2px 0 12px;border-radius:16px;overflow:hidden;border:1px solid var(--b2);background:var(--bg2);box-shadow:0 10px 30px -14px var(--glow);transition:border-color .18s;}
+/* The call used to be a black rectangle dropped into a themed sheet — hard edges,
+   its own colour, nothing in common with the app around it. It now uses the same
+   surface, border and radius as every other card, and the video is inset so the
+   panel reads as part of the sheet rather than a window cut into it. */
+.party-call.full{position:fixed;inset:0;z-index:120;margin:0;border-radius:0;border:0;display:flex;flex-direction:column;background:var(--bg);}
+.party-call.full .party-call-frame{flex:1;height:auto;min-height:0;border-radius:0;margin:0;}
+.party-call.full .party-call-bar{padding-top:calc(9px + var(--safe-t,0px));}
+body.call-full{overflow:hidden;}
+.party-call-bar{display:flex;align-items:center;gap:8px;padding:10px 10px 9px 13px;background:transparent;font-family:var(--fd);font-weight:800;font-size:13px;color:var(--t1);}
 .party-call-bar .live-dot{width:8px;height:8px;flex-shrink:0;border-radius:50%;background:#3ecf7e;box-shadow:0 0 8px #3ecf7e;animation:livePulse 2s ease-in-out infinite;}
 @keyframes livePulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.45;transform:scale(.72);}}
 .party-call-bar span{flex:1;letter-spacing:.01em;}
 .party-call-x{width:28px;height:28px;flex-shrink:0;border-radius:8px;background:var(--bg4);color:var(--t2);display:flex;align-items:center;justify-content:center;}
 .party-call-x .ico{width:15px;height:15px;}
-.party-call-frame{height:44vh;min-height:300px;position:relative;background:#000;}
+.party-call-frame{height:44vh;min-height:300px;position:relative;background:#000;border-radius:12px;margin:0 8px 8px;overflow:hidden;}
 .party-call-frame iframe{position:absolute!important;inset:0;width:100%!important;height:100%!important;border:0;}
 /* In-app player — mirrors .shareview so the transition feels identical */
 .ytview{position:fixed;inset:0;z-index:130;background:#000;display:none;transform:translateY(100%);transition:transform .38s cubic-bezier(.2,1,.28,1);}
@@ -1838,7 +1846,9 @@ body.recsel .pcard{position:relative;}
   <!-- Voice/screen call mounts here, ABOVE the body so it survives party re-renders
        and sits right alongside the chat + controls (no full-screen takeover). -->
   <div id="partyCallMount" class="party-call" style="display:none">
-    <div class="party-call-bar"><span class="live-dot"></span><span>Live · voice &amp; screen</span><button class="party-call-x" onclick="leaveJitsi()" aria-label="Leave call"><i data-ic="x"></i></button></div>
+    <div class="party-call-bar"><span class="live-dot"></span><span>Live · voice &amp; screen</span>
+      <button class="party-call-x" id="callFsBtn" onclick="toggleCallFull()" aria-label="Full screen" title="Full screen"><i data-ic="external"></i></button>
+      <button class="party-call-x" onclick="leaveJitsi()" aria-label="Leave call"><i data-ic="x"></i></button></div>
     <div id="jitsiFrame" class="party-call-frame"></div>
   </div>
   <div id="partyBody"></div>
@@ -6264,8 +6274,22 @@ function openJitsi(){
   });
 }
 function hideJitsi(){}   // no separate view now — the call lives in the party sheet
+// The call sits inside the party sheet, which is right for talking THROUGH a
+// show — but that panel is small on a phone, and useless when the call is the
+// thing you're actually looking at. This lets it take the screen and hand it
+// back, without tearing down and rejoining (which would drop you from the call).
+function toggleCallFull(){
+  const mount=document.getElementById('partyCallMount'); if(!mount)return;
+  const on=mount.classList.toggle('full');
+  const b=document.getElementById('callFsBtn');
+  if(b){b.innerHTML=icon(on?'x':'external');b.setAttribute('aria-label',on?'Exit full screen':'Full screen');b.title=b.getAttribute('aria-label');}
+  try{document.body.classList.toggle('call-full',on);}catch(e){}
+  try{if(_jitsiApi&&_jitsiApi.resize)_jitsiApi.resize();}catch(e){}   // nudge Jitsi to re-lay out
+}
 function leaveJitsi(){
-  const mount=document.getElementById('partyCallMount');if(mount)mount.style.display='none';
+  const mount=document.getElementById('partyCallMount');
+  if(mount){mount.style.display='none';mount.classList.remove('full');}
+  try{document.body.classList.remove('call-full');}catch(e){}
   if(_jitsiApi){try{_jitsiApi.dispose();}catch(e){}_jitsiApi=null;}
   const frame=document.getElementById('jitsiFrame');if(frame)frame.innerHTML='';
   try{if(document.getElementById('partySheet').classList.contains('on'))renderParty();}catch(e){}   // restore normal chat position
@@ -9410,13 +9434,12 @@ function _updBusy(){
 // you'd explain it to a friend — what they can now do, not what the code does.
 // No version numbers or jargon in the notes; the date IS the version.
 const RELEASE={
-  v:'2026-07-28.11',
-  title:'Fixed: saving with a password on',
-  push:'If you use a password and have a big list, your changes were not saving. Fixed \u2014 nothing was lost.',
+  v:'2026-07-28.12',
+  title:'The call fits in now',
+  push:'The watch-party call looks like part of the app, and can go full screen.',
   notes:[
-    'A real bug, now fixed: with a <b>password lock</b> switched on and a large list, saving failed every time. The app kept working, so you would not notice until a reload put things back.',
-    'It had nothing to do with space \u2014 it was a limit in how the encrypted list was encoded. Earlier versions blamed <b>storage full</b>, which sent people deleting titles for no reason.',
-    'Your list was never lost, and nothing needs redoing. Open the app once and the fix applies.',
+    'The voice and screen-share panel was a black box dropped into the party sheet. It now uses the same surface, border and rounding as everything else around it.',
+    'New <b>full screen</b> button in the call bar \u2014 useful when the panel is too small to see. Tap it again to put the call back beside the chat. You stay in the call either way.',
   ],
 };
 const SEEN_REL='seen_release';

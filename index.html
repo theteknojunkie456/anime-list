@@ -6744,7 +6744,7 @@ function watchEpAt(id,ep){
 async function watchAnime(id,epArg){
   const a=anime.find(x=>x.id===id); if(!a) return;
   if(kindOf(a)!=='watch'||!a.aniId){toast('Watch is for anime only');return;}
-  if(noSourceMode()&&!(a.srcUrl&&String(a.srcUrl).trim())){showNoSourcePrompt();return;}   // no source chosen (and no per-title pin) → prompt
+  if((noSourceMode()||!effectiveSource(a)&&!legalDefault())&&!(a.srcUrl&&String(a.srcUrl).trim())){showNoSourcePrompt();return;}   // no source chosen (and no per-title pin) → prompt
   const reqEp=(epArg>0?epArg:0);   // a specific episode (from the episode list) or 0 = "next up"
   // Source resolution: a per-title pinned link (a.srcUrl) wins; else the global
   // custom source; else the default legal route. A pin/custom source with {ep} plays
@@ -7015,7 +7015,15 @@ const WATCH_PRESETS=[
 // the hidden list: hiding a site and then watching the app send you there anyway
 // is the app overruling you. Falls through to the next unhidden preset, and only
 // back to the first if somehow everything is hidden.
-function legalDefault(){const p=WATCH_PRESETS.find(x=>!isHiddenSrc(x.name))||WATCH_PRESETS[0];return p;}
+function legalDefault(){
+  const p=WATCH_PRESETS.find(x=>!isHiddenSrc(x.name));
+  if(p)return p;
+  // Everything built-in is hidden. Fall to a site they added; if there's none,
+  // return nothing rather than quietly reinstating a preset they rejected —
+  // Watch then asks them to pick, which is the honest outcome.
+  const mine=customServices().filter(x=>!hiddenSrc().includes(srcKey(x.name)))[0];
+  return mine?{name:mine.name,url:mine.url}:null;
+}
 // ── Official-app only: "Open in [Service]" ──────────────────────────────────
 // The public web build uses ONLY the free-legal sources above. The official app
 // adds this: the user ticks the paid services they personally subscribe to, and
@@ -7131,7 +7139,22 @@ function addRegional(name){
 const HIDE_KEY='hidden_sources', ALIAS_KEY='source_aliases';
 function srcKey(name){return String(name||'').toLowerCase().replace(/[^a-z0-9]/g,'');}
 function hiddenSrc(){try{const v=JSON.parse(localStorage.getItem(HIDE_KEY)||'[]');return Array.isArray(v)?v:[];}catch{return[];}}
-function isHiddenSrc(name){return hiddenSrc().includes(srcKey(name));}
+// "Only my sites": rather than hiding fifty built-ins one at a time — and having
+// to hide each new one we ship — this inverts the rule. Anything you didn't add
+// yourself is hidden, permanently and by default. Your individual hides still
+// apply on top, so turning it back off restores exactly what you had.
+const ONLY_MINE_KEY='only_my_sources';
+function onlyMine(){try{return localStorage.getItem(ONLY_MINE_KEY)==='1';}catch{return false;}}
+function setOnlyMine(v){
+  try{v?localStorage.setItem(ONLY_MINE_KEY,'1'):localStorage.removeItem(ONLY_MINE_KEY);}catch{}
+  try{renderSource();}catch(e){}
+  toast(v?'Only the sites you added':'Showing every source again');
+}
+function isMySrc(name){const k=srcKey(name);return customServices().some(x=>srcKey(x.name)===k);}
+function isHiddenSrc(name){
+  if(hiddenSrc().includes(srcKey(name)))return true;
+  return onlyMine()&&!isMySrc(name);
+}
 function toggleHiddenSrc(name){
   const k=srcKey(name),list=hiddenSrc(),i=list.indexOf(k);
   if(i>=0)list.splice(i,1);else list.push(k);
@@ -8076,11 +8099,11 @@ function openExternal(url){
   try{window.open(url,'_blank','noopener');}catch(e){location.href=url;}
 }
 function launchURL(a,epOverride){
-  const src=streamSource()||legalDefault().url, slug=streamSlug(a.title);
+  const src=streamSource()||(legalDefault()||{}).url||'', slug=streamSlug(a.title);
   return src.replace(/\{title\}/g,encodeURIComponent(a.title)).replace(/\{slug\}/g,slug).replace(/\{ep\}/g,String((epOverride>0?epOverride:watchEpisode(a))||1));
 }
 function sourceName(){
-  const s=streamSource(); if(!s)return legalDefault().name;
+  const s=streamSource(); if(!s)return (legalDefault()||{}).name||'your own site';
   const p=WATCH_PRESETS.find(x=>x.url===s); if(p)return p.name;
   try{return new URL(s.replace(/\{[^}]+\}/g,'x')).hostname.replace(/^www\./,'');}catch{return 'the site';}
 }
@@ -8112,7 +8135,7 @@ function renderSource(){
     <div class="dt-label">${icon('play')} Where Watch opens</div>
     <button class="src-opt${!custom&&!noSourceMode()?' on':''}" onclick="setSource('')">
       <div class="src-name">Free legal search <span class="src-tag">Default</span></div>
-      <div class="src-sub">Looks it up on ${escH(legalDefault().name)} — no account needed</div>
+      <div class="src-sub">${legalDefault()?`Looks it up on ${escH(legalDefault().name)} — no account needed`:'Nothing to fall back on — set a site above'}</div>
     </button>
     ${chips?`<div class="src-picks" style="margin-top:9px">${chips}</div>`:''}
     <button class="src-opt${noSourceMode()?' on':''}" onclick="setNoSource()" style="margin-top:9px">
@@ -8161,7 +8184,9 @@ function renderSource(){
 
     <details class="src-fold nested" data-fold="manage"${O('manage')}>
       <summary>${icon('sort')} Manage sources${hiddenCount?` <span class="src-tag">${hiddenCount} hidden</span>`:''}</summary>
-      <p class="ai-desc" style="margin-top:8px">Tap a row to rename it, or hide the ones you never use.</p>
+      <label class="ct-dk" style="margin-top:10px">Only the sites I added<span class="ct-tgl"><input type="checkbox" id="onlyMineTgl" ${onlyMine()?'checked':''} onchange="setOnlyMine(this.checked)"><span class="ct-tgl-track"></span></span></label>
+      <p class="ai-desc" style="margin-top:8px">Hides every built-in suggestion, including ones added in future updates. Your own sites are unaffected.</p>
+      <p class="ai-desc">Or tap a row to rename it, and hide them one at a time.</p>
       ${allKnownSources().map(s=>{const off=isHiddenSrc(s.name),q=escH(s.name).replace(/'/g,"\\'");
         const sub=[s.kind,s.unverified?'unverified — tap Test':'',off?'hidden':''].filter(Boolean).join(' · ');
         return `<div class="src-opt" style="display:flex;align-items:center;gap:10px${off?';opacity:.45':''}" onclick="renameSrcPrompt('${q}')">
@@ -9348,12 +9373,12 @@ function _updBusy(){
 // you'd explain it to a friend — what they can now do, not what the code does.
 // No version numbers or jargon in the notes; the date IS the version.
 const RELEASE={
-  v:'2026-07-28.6',
-  title:'Hidden means hidden',
-  push:'A source you hide is now really gone \u2014 including the one Watch falls back to.',
+  v:'2026-07-28.7',
+  title:'Only the sites you added',
+  push:'One switch hides every built-in source and keeps only the sites you added yourself.',
   notes:[
-    'Hiding a site removed it from the lists, but Watch still used it as the free fallback and the Sources screen still named it as the default. Hidden now means hidden everywhere.',
-    'If you have hidden the default, Watch moves to the next free site you have not hidden.',
+    'In <b>Sources \u2192 Everything else \u2192 Manage sources</b> there is now <b>Only the sites I added</b>. One switch, instead of hiding fifty things by hand.',
+    'It covers sources we add in future updates too, so the list stays yours. Your individual hides are remembered underneath, so switching it off puts everything back the way it was.',
   ],
 };
 const SEEN_REL='seen_release';

@@ -1054,6 +1054,18 @@ body.call-full{overflow:hidden;}
 .party-call-x{width:28px;height:28px;flex-shrink:0;border-radius:8px;background:var(--bg4);color:var(--t2);display:flex;align-items:center;justify-content:center;}
 .party-call-x .ico{width:15px;height:15px;}
 .party-call-x.danger{color:#ff8b8b;background:rgba(255,90,90,.12);}
+/* Call controls: quiet by default, lit when the thing they control is ON, and
+   unmistakably off when muted — a control you have to interpret is a control
+   you'll get wrong in front of other people. */
+.party-call-x.on{background:var(--ag);color:var(--a2);border:1px solid var(--a);}
+.party-call-x.off{background:rgba(255,90,90,.14);color:#ff8b8b;}
+.party-call-bar #callStatus{font-weight:700;color:var(--t2);}
+.party-call-bar #callStatus b{color:var(--t1);}
+@media(max-width:420px){
+  .party-call-bar{gap:5px;padding-left:11px;}
+  .party-call-x{width:26px;height:26px;}
+  .party-call-bar #callStatus{font-size:12px;}
+}
 .party-call-frame{height:44vh;min-height:300px;position:relative;background:#000;border-radius:12px;margin:0 8px 8px;overflow:hidden;}
 .party-call-frame iframe{position:absolute!important;inset:0;width:100%!important;height:100%!important;border:0;}
 /* In-app player — mirrors .shareview so the transition feels identical */
@@ -1851,7 +1863,10 @@ body.recsel .pcard{position:relative;}
   <!-- Voice/screen call mounts here, ABOVE the body so it survives party re-renders
        and sits right alongside the chat + controls (no full-screen takeover). -->
   <div id="partyCallMount" class="party-call" style="display:none">
-    <div class="party-call-bar"><span class="live-dot"></span><span>Live · voice &amp; screen</span>
+    <div class="party-call-bar"><span class="live-dot"></span><span id="callStatus">Connecting…</span>
+      <button class="party-call-x" id="callMicBtn" onclick="callToggleMic()" aria-label="Mute" title="Mute"><i data-ic="mic"></i></button>
+      <button class="party-call-x" id="callCamBtn" onclick="callToggleCam()" aria-label="Camera" title="Camera"><i data-ic="camera"></i></button>
+      <button class="party-call-x" id="callShareBtn" onclick="callToggleShare()" aria-label="Share screen" title="Share your screen"><i data-ic="layers"></i></button>
       <button class="party-call-x" id="callFsBtn" onclick="toggleCallFull()" aria-label="Full screen" title="Full screen"><i data-ic="maximize"></i></button>
       <button class="party-call-x danger" onclick="leaveJitsi()" aria-label="Leave call" title="Leave the call"><i data-ic="x"></i></button></div>
     <div id="jitsiFrame" class="party-call-frame"></div>
@@ -6302,9 +6317,22 @@ function openJitsi(){
         roomName:jitsiRoom(),parentNode:frame,width:'100%',height:'100%',
         userInfo:{displayName:partyName()||'Guest'},
         configOverwrite:{startWithVideoMuted:true,prejoinPageEnabled:false,disableDeepLinking:true,disableInviteFunctions:true},
-        interfaceConfigOverwrite:{TOOLBAR_BUTTONS:['microphone','desktop','tileview','fullscreen','hangup'],MOBILE_APP_PROMO:false,SHOW_JITSI_WATERMARK:false,SHOW_CHROME_EXTENSION_BANNER:false}
+        // Our bar drives the call, so Jitsi's toolbar is redundant chrome in a
+        // panel this small — keep tile view only, and drop the branding.
+        interfaceConfigOverwrite:{TOOLBAR_BUTTONS:['tileview'],MOBILE_APP_PROMO:false,SHOW_JITSI_WATERMARK:false,SHOW_WATERMARK_FOR_GUESTS:false,SHOW_CHROME_EXTENSION_BANNER:false,DISABLE_JOIN_LEAVE_NOTIFICATIONS:true,HIDE_INVITE_MORE_HEADER:true,DEFAULT_BACKGROUND:'#0d0d0f',DISABLE_VIDEO_BACKGROUND:true,TILE_VIEW_MAX_COLUMNS:3}
       });
       _jitsiApi.addEventListener('readyToClose',leaveJitsi);
+      // Presence and speaking state, so our own bar can say something useful.
+      try{
+        _callNames={};_callSpeaker='';renderCallStatus();
+        _jitsiApi.addEventListener('participantJoined',e=>{_callNames[e.id]=e.displayName||'Someone';renderCallStatus();});
+        _jitsiApi.addEventListener('participantLeft',e=>{delete _callNames[e.id];if(_callSpeaker===e.id)_callSpeaker='';renderCallStatus();});
+        _jitsiApi.addEventListener('dominantSpeakerChanged',e=>{_callSpeaker=e.id||'';renderCallStatus();});
+        _jitsiApi.addEventListener('videoConferenceJoined',()=>{_callMic=true;_callCam=false;_callShare=false;renderCallStatus();});
+        _jitsiApi.addEventListener('audioMuteStatusChanged',e=>{_callMic=!e.muted;const b=document.getElementById('callMicBtn');if(b){b.innerHTML=icon(_callMic?'mic':'mic-off');b.classList.toggle('off',!_callMic);}});
+        _jitsiApi.addEventListener('videoMuteStatusChanged',e=>{_callCam=!e.muted;_callBtn('callCamBtn',_callCam);});
+        _jitsiApi.addEventListener('screenSharingStatusChanged',e=>{_callShare=!!e.on;_callBtn('callShareBtn',_callShare);});
+      }catch(e){}
       try{if(document.getElementById('partySheet').classList.contains('on'))renderParty();}catch(e){}   // float chat under the call
     }catch(e){toast('Call failed to start');leaveJitsi();}
   });
@@ -6318,6 +6346,37 @@ function hideJitsi(){}   // no separate view now — the call lives in the party
 // fill the display — the tap-to-fill hint only changes how the video is cropped.
 // Uses the real Fullscreen API where it exists (desktop, Android) and falls back
 // to a CSS takeover on iOS, which doesn't allow it outside a <video> element.
+// Jitsi's own toolbar is buried inside the iframe, in its styling, at its size.
+// Driving it through the external API means the controls live in OUR bar, match
+// the app, and stay reachable when the call is a small panel beside the chat.
+let _callMic=true,_callCam=false,_callShare=false;
+function _callBtn(id,on){const b=document.getElementById(id);if(b)b.classList.toggle('on',!!on);}
+function callToggleMic(){
+  if(!_jitsiApi)return;
+  try{_jitsiApi.executeCommand('toggleAudio');}catch(e){}
+  _callMic=!_callMic;
+  const b=document.getElementById('callMicBtn');
+  if(b){b.innerHTML=icon(_callMic?'mic':'mic-off');b.classList.toggle('off',!_callMic);b.title=_callMic?'Mute':'Unmute';b.setAttribute('aria-label',b.title);}
+}
+function callToggleCam(){
+  if(!_jitsiApi)return;
+  try{_jitsiApi.executeCommand('toggleVideo');}catch(e){}
+  _callCam=!_callCam; _callBtn('callCamBtn',_callCam);
+}
+function callToggleShare(){
+  if(!_jitsiApi)return;
+  try{_jitsiApi.executeCommand('toggleShareScreen');}catch(e){}
+  _callShare=!_callShare; _callBtn('callShareBtn',_callShare);
+}
+// "Live · voice & screen" said nothing you couldn't already see. Who is actually
+// in the call, and who is talking right now, is the part you can't.
+let _callNames={},_callSpeaker='';
+function renderCallStatus(){
+  const el=document.getElementById('callStatus'); if(!el)return;
+  const n=Object.keys(_callNames).length+1;                 // +1 = you
+  const who=_callSpeaker&&_callNames[_callSpeaker];
+  el.innerHTML=who?`<b>${escH(who)}</b> is talking`:`${n} in the call`;
+}
 function toggleShareFull(){
   const stage=document.querySelector('#shareView .sh-stage')||document.getElementById('shareView');
   const btn=document.getElementById('shFsBtn');
@@ -9535,13 +9594,13 @@ function _updBusy(){
 // you'd explain it to a friend — what they can now do, not what the code does.
 // No version numbers or jargon in the notes; the date IS the version.
 const RELEASE={
-  v:'2026-07-28.16',
-  title:'Parties play on your own source',
-  push:'Starting a show in a watch party now opens it on your own site, at the right episode.',
+  v:'2026-07-28.17',
+  title:'The party call grew up',
+  push:'Mic, camera and screen-share now live in WatchList\u2019s own bar \u2014 and the host\u2019s screen can go full screen.',
   notes:[
-    'When a party starts a show, it now opens on <b>your</b> streaming setup \u2014 including a link you pinned for that title and any name you corrected. Before, it built its own address and could land on a 404 for a show you had already fixed.',
-    'The host can now play <b>any</b> item in the queue, not just the top one \u2014 useful when something further down wins the vote.',
-    'Queued shows carry their identity, so everyone\u2019s app can match them to their own copy instead of guessing from the title.',
+    '<b>Mic, camera and share</b> are in the call bar now instead of buried inside the call window, and they light up so you can see at a glance what is on.',
+    'The bar tells you <b>who is in the call</b> and <b>who is talking</b>, rather than just saying \u201cLive\u201d.',
+    'The host\u2019s screen has a proper <b>full screen</b> button. And WatchList will never update itself while you are in a party \u2014 that used to drop you out of the room mid-meeting.',
   ],
 };
 const SEEN_REL='seen_release';

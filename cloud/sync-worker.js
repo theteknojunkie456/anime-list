@@ -128,7 +128,7 @@ export default {
       while (JSON.stringify(list).length > 2_000_000 && list.length > 1) list = list.slice(Math.ceil(list.length / 2));
       await env.LISTS.put(key, JSON.stringify(list));
       ctx.waitUntil(notifyChan(env, to, 'rec', envelope));
-      return json({ ok: true }, 200, cors);
+      return json({ ok: true, id: envelope.id }, 200, cors);
     }
     // ── shared source setups ─────────────────────────────────────────────────
     // Someone who has their streaming site working can hand that setup to a
@@ -233,6 +233,31 @@ export default {
       list = id ? list.filter(e => e && e.id !== id) : [];
       await env.LISTS.put('src:' + code, JSON.stringify(list));
       return json({ ok: true }, 200, cors);
+    }
+
+    // Unsend. A recommendation is a message sitting in someone's mailbox, so it
+    // can be taken back out — but only by whoever put it there: the sender's own
+    // code has to match the envelope's, which is the same trust model rec_send
+    // already uses. Silent about whether anything matched, so this can't be used
+    // to probe another person's mailbox.
+    if (op === 'rec_unsend') {
+      const to = String(body.to || '');
+      const fromCode = String((body.from && body.from.code) || '');
+      if (!/^[A-Za-z0-9]{10,64}$/.test(to)) return json({ error: 'bad to' }, 400, cors);
+      if (!/^[A-Za-z0-9]{10,64}$/.test(fromCode)) return json({ error: 'bad from' }, 400, cors);
+      const id = String(body.id || '');
+      const key = 'rec:' + to;
+      let list = [];
+      try { const s2 = await env.LISTS.get(key); if (s2) list = JSON.parse(s2); } catch {}
+      if (!Array.isArray(list)) list = [];
+      const before = list.length;
+      list = list.filter(e => {
+        if (!e || !e.from || e.from.code !== fromCode) return true;   // never touch anyone else's
+        return id ? e.id !== id : false;                              // no id → withdraw all of mine
+      });
+      if (list.length !== before) await env.LISTS.put(key, JSON.stringify(list));
+      ctx.waitUntil(notifyChan(env, to, 'rec', { removed: true }));   // so their app refreshes
+      return json({ ok: true, removed: before - list.length }, 200, cors);
     }
 
     if (op === 'rec_pull') {

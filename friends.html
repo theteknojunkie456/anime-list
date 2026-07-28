@@ -8099,7 +8099,8 @@ function renderFriends(){
     ${outHTML}
     <div class="dt-label" style="margin-top:20px">${icon('users')} Friends · ${fr.length}</div>
     <div class="fr-list">${flist}</div>
-    <button class="dt-watch" style="margin-top:16px" onclick="startRecommend()">${icon('send')} Recommend shows to friends</button>`;
+    <button class="dt-watch" style="margin-top:16px" onclick="startRecommend()">${icon('send')} Recommend shows to friends</button>
+    ${sentRecsHTML()}`;
 }
 function copyFriendCode(){const c=myFriendCode();try{navigator.clipboard.writeText(c);toast('Code copied');}catch{toast(c);}}
 async function doAddFriend(){
@@ -8157,6 +8158,44 @@ function renderRecSend(){
     <div class="rs-list">${friendHTML}</div>
     <button class="dt-watch rec-cta" onclick="sendRecommend()"${(recToFriends.size&&fr.length)?'':' disabled'}>${icon('send')} Send${recToFriends.size?' to '+recToFriends.size:''}</button>`;
 }
+// ─── UNSEND A RECOMMENDATION ────────────────────────────────────────────────
+// A recommendation is a message left in someone's mailbox, so a mis-send should
+// be retractable — but only if we recorded sending it, which nothing did before.
+const RECS_SENT='recs_sent';
+function recsSent(){try{const a=JSON.parse(localStorage.getItem(RECS_SENT)||'[]');return Array.isArray(a)?a:[];}catch{return[];}}
+function noteRecSent(code,id,items){
+  try{
+    const l=recsSent();
+    l.unshift({code,id,at:Date.now(),titles:(items||[]).map(i=>i.title).filter(Boolean).slice(0,6)});
+    localStorage.setItem(RECS_SENT,JSON.stringify(l.slice(0,60)));
+  }catch(e){}
+}
+async function unsendRec(id,code){
+  const from={code:myFriendCode(),name:myFriendName()||'A friend'};
+  try{
+    const r=await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({op:'rec_unsend',to:code,from,id})});
+    const j=r.ok?await r.json():{};
+    if(!j.ok)throw new Error('failed');
+  }catch(e){toast('Couldn\u2019t reach the network — try again');return;}
+  try{localStorage.setItem(RECS_SENT,JSON.stringify(recsSent().filter(x=>!(x.id===id&&x.code===code))));}catch(e){}
+  renderFriends();
+  toast('Taken back');
+}
+function sentRecsHTML(){
+  const l=recsSent(); if(!l.length)return '';
+  return `<div class="dt-label" style="margin-top:18px">${icon('send')} You recommended</div>
+    <p class="ai-desc">Sent something by mistake? Take it back — it disappears from their app next time they open it.</p>
+    ${l.slice(0,12).map(e=>{
+      const who=friendDisplay(e.code,'A friend');
+      const when=(()=>{const d=Math.round((Date.now()-(e.at||0))/86400000);return d<=0?'today':d===1?'yesterday':d+' days ago';})();
+      return `<div class="src-opt" style="display:flex;align-items:center;gap:10px">
+        <div style="flex:1;min-width:0">
+          <div class="src-name">${escH(e.titles&&e.titles.length?e.titles.join(', '):'A recommendation')}</div>
+          <div class="src-sub">to ${escH(who)} · ${escH(when)}</div>
+        </div>
+        <button class="src-chip" onclick="unsendRec('${escH(e.id)}','${escH(e.code)}')">Take back</button>
+      </div>`;}).join('')}`;
+}
 async function sendRecommend(){
   const fr=friendsList();
   if(!recToFriends.size||!recPickShows.size||!fr.length){toast('Pick shows and a friend');return;}
@@ -8165,7 +8204,9 @@ async function sendRecommend(){
   const from={code:myFriendCode(),name:myFriendName()||'A friend'};
   // fire all sends at once — a 5-friend send is as fast as a 1-friend send
   const results=await Promise.all([...recToFriends].map(async code=>{
-    try{const r=await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({op:'rec_send',to:code,from,items})});const j=r.ok?await r.json():{};return !!(j&&j.ok);}catch(e){return false;}
+    try{const r=await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({op:'rec_send',to:code,from,items})});const j=r.ok?await r.json():{};
+      if(j&&j.ok)noteRecSent(code,j.id||'',items);
+      return !!(j&&j.ok);}catch(e){return false;}
   }));
   const ok=results.filter(Boolean).length,fail=results.length-ok;
   closeAll();
@@ -9434,12 +9475,12 @@ function _updBusy(){
 // you'd explain it to a friend — what they can now do, not what the code does.
 // No version numbers or jargon in the notes; the date IS the version.
 const RELEASE={
-  v:'2026-07-28.12',
-  title:'The call fits in now',
-  push:'The watch-party call looks like part of the app, and can go full screen.',
+  v:'2026-07-28.13',
+  title:'Take back a recommendation',
+  push:'Recommended something by mistake? You can take it back now.',
   notes:[
-    'The voice and screen-share panel was a black box dropped into the party sheet. It now uses the same surface, border and rounding as everything else around it.',
-    'New <b>full screen</b> button in the call bar \u2014 useful when the panel is too small to see. Tap it again to put the call back beside the chat. You stay in the call either way.',
+    'Open <b>Friends</b> and you will see what you have recommended, and to whom. <b>Take back</b> removes it from their app.',
+    'It disappears next time they open WatchList. If they already saw it, they already saw it \u2014 nothing can undo that part.',
   ],
 };
 const SEEN_REL='seen_release';

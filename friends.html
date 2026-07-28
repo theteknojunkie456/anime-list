@@ -7474,11 +7474,22 @@ function quickSetup(){
   const tpl=templatizeSearchURL(url);
   out.style.display='block';
   if(!SRC_TOKEN_RE.test(tpl)){
-    // Couldn't see a show/episode in it — usually a homepage or a player page
-    // with the show hidden behind a query string.
-    out.innerHTML=`<div class="src-quick-bad">${icon('search')} That looks like a page address, but I can't see which show or episode it points at.<br>Open <b>one episode</b> of any show and copy that address — the one with the show's name in it.</div>`;
+    // Couldn't see a show/episode in it — usually a homepage, or a player page
+    // that hides the show behind a query string. Say what would work, and offer
+    // the AI as a way out rather than a prerequisite.
+    out.innerHTML=`<div class="src-quick-bad">${icon('search')} I can't tell which show or episode that address points at.<br>
+      The one to copy is a <b>single episode's</b> page — its address usually has the show's name in it.
+      <input class="ai-prompt-in" id="srcQuickWant" placeholder="or tell me: which show and episode is it?" autocomplete="off" style="margin-top:9px;background:var(--bg2)">
+      <button class="parse-btn" id="srcAiBtn" style="margin-top:8px" onclick="aiBuildSource()">${icon('sparkles')} Work it out for me</button>
+      </div>`;
     return;
   }
+  quickShowTemplate(tpl,url);
+}
+// The one confirmation card: what it read, proof it generalises, one button.
+function quickShowTemplate(tpl,url){
+  const out=document.getElementById('srcQuickOut'); if(!out)return;
+  out.style.display='block';
   // Name the show and episode back to them, so they can see it understood the
   // link rather than having to trust it. Both are read out of the address.
   const epM=/\{ep\d?\}/.test(tpl)&&url.match(/(?:ep|episode|e)[-_]?(\d+)(?!.*\d)/i);
@@ -7519,15 +7530,23 @@ function quickSetupUse(){
   closeAll();
   toast(`Watch now opens ${name}`);
 }
+// The AI path is a FALLBACK, not a parallel route. It only surfaces from the
+// paste box when the free recognizer can't read a link, so nobody is sent off to
+// fetch an API key before they can set a source — the common case never needs one.
 async function aiBuildSource(){
-  const site=document.getElementById('srcCustom'), want=document.getElementById('srcAiWant');
+  const site=document.getElementById('srcQuickIn')||document.getElementById('srcCustom');
+  const want=document.getElementById('srcQuickWant')||document.getElementById('srcAiWant');
   if(!site) return;
   const raw=(site.value||'').trim(), note=(want&&want.value||'').trim();
   // 1) Instant, free pass — our own recognizer already handles the common shapes
   //    (/watch/one-piece/ep-199 becomes /watch/{slug}/ep-{ep};  ?q=naruto becomes ?q={query}).
   if(raw&&!SRC_TOKEN_RE.test(raw)){
     const mech=templatizeSearchURL(normSrc(raw));
-    if(SRC_TOKEN_RE.test(mech)){site.value=mech;addSrcExample(raw,note);refreshSrcExNote();try{csHintName();testSource();}catch(e){}toast('Pattern learned — check it, then Add site');return;}
+    if(SRC_TOKEN_RE.test(mech)){
+      addSrcExample(raw,note);refreshSrcExNote();
+      if(document.getElementById('srcQuickIn')===site){quickShowTemplate(mech,raw);return;}
+      site.value=mech;try{csHintName();testSource();}catch(e){}toast('Pattern learned — check it, then save it');return;
+    }
   }
   // 2) Trickier links, or a plain-English wish — hand it to the user's own AI.
   if(!getKey()){toast('Add your AI key first');try{openKeySheet();}catch(e){}return;}
@@ -7546,12 +7565,18 @@ https://example.com/watch/{slug}/episode-{ep}`;
     const out=String(await callAI(prompt)||'').trim();
     const m=out.match(/https?:\/\/\S+/);
     if(!m){toast('The AI didn’t return a link, try wording it differently');return;}
-    site.value=m[0].replace(/[\s"'`)\].,]+$/,'').replace(/\\/g,'');
+    const learned=m[0].replace(/[\s"'`)\].,]+$/,'').replace(/\\/g,'');
     if(raw)addSrcExample(raw,note);
     refreshSrcExNote();
-    try{csHintName();}catch(e){}
-    try{testSource();}catch(e){}
-    toast('Pattern learned — check it, then Add site');
+    if(document.getElementById('srcQuickIn')===site){
+      // Straight into the same "here's what it does, use it?" card as a paste.
+      quickShowTemplate(learned,raw);
+    }else{
+      site.value=learned;
+      try{csHintName();}catch(e){}
+      try{testSource();}catch(e){}
+      toast('Pattern learned — check it, then save it');
+    }
   }catch(e){
     toast(e===NO_KEY?'Add your AI key first':'AI error — check your key and try again');
   }finally{
@@ -8072,12 +8097,8 @@ function renderSource(){
     <p class="ai-desc" style="margin-top:2px">Tapping <b>Watch</b> on a show opens it wherever you pick here.</p>
 
     <div class="src-quick">
-      <div class="src-quick-t">${icon('sparkles')} Use the site you already watch on</div>
-      <ol class="src-quick-steps">
-        <li>Open your site and start <b>any</b> episode of <b>any</b> show.</li>
-        <li>Copy the address of that episode.</li>
-        <li>Paste it here — that's it.</li>
-      </ol>
+      <div class="src-quick-t">${icon('sparkles')} Watch on your own site</div>
+      <p class="ai-desc" style="margin:7px 0 11px;font-size:12.5px">Open your site, start <b>any</b> episode of <b>any</b> show, and paste that page's address below. That one link is the whole setup — no key, no second step: WatchList works out the pattern and uses it for every show.</p>
       <input class="ai-prompt-in" id="srcQuickIn" placeholder="paste that episode's address" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url" oninput="quickSetup()">
       <div id="srcQuickOut" class="src-quick-out" style="display:none"></div>
       <button class="src-quick-share" id="shareMineBtn" onclick="shareMine()">${icon('send')} Share mine<span>${custom?escH(host(custom)):'anyone can use your setup'}</span></button>
@@ -8104,20 +8125,12 @@ function renderSource(){
       <input class="ai-prompt-in" id="srcCustom" placeholder="paste a search page, or a real link to any episode" value="${custom&&!WATCH_PRESETS.some(p=>p.url===custom)&&!customServices().some(s=>s.url===custom)?custom.replace(/"/g,'&quot;'):''}" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url" style="margin-top:10px" oninput="csHintName()">
       <input class="ai-prompt-in" id="csName" placeholder="name (auto-filled)" value="" autocomplete="off" spellcheck="false" style="margin-top:8px">
       <div style="display:flex;gap:8px;margin-top:8px">
-        <button class="parse-btn" style="flex:1" onclick="addCustomServiceFromForm()">Add site</button>
+        <button class="parse-btn" style="flex:1" onclick="addCustomServiceFromForm()">Save and use it</button>
         <button class="parse-btn" style="flex:0 0 auto;width:auto;padding:0 16px" onclick="testSource()">${icon('search')} Test</button>
       </div>
       <div id="srcTest" style="display:none;margin-top:8px;padding:9px 11px;border-radius:9px;background:var(--bg2);color:var(--t2);font:12px/1.45 ui-monospace,Menlo,monospace;word-break:break-all;white-space:pre-wrap"></div>
 
-      <div class="src-ai">
-        <div class="src-ai-t">${icon('sparkles')} Teach it your site’s links</div>
-        <p class="ai-desc" style="margin-top:6px;margin-bottom:0;font-size:11.5px">Paste a real link that works above (say, One Piece episode 199) and it learns a pattern that opens <b>any</b> show. Or just describe what you want. Teach a few and it keeps adapting.</p>
-        <input class="ai-prompt-in" id="srcAiWant" placeholder="which show/episode is that link? or what you want" autocomplete="off" style="margin-top:8px;background:var(--bg2)">
-        <button class="parse-btn" id="srcAiBtn" style="margin-top:8px" onclick="aiBuildSource()">${icon('sparkles')} Learn the pattern</button>
-        <p class="ai-desc" id="srcExNote" style="margin-top:7px;margin-bottom:0;font-size:11px">${srcExNoteHTML()}</p>
-      </div>
-
-      <details class="src-fold nested" data-fold="adv"${O('adv')} style="margin-top:10px">
+<details class="src-fold nested" data-fold="adv"${O('adv')} style="margin-top:10px">
         <summary>${icon('sort')} Fine-tune with tokens</summary>
         <p class="ai-desc" style="margin-top:8px;font-size:11.5px">Tap a token to drop it into the address at the cursor.</p>
         <div class="src-toks">
@@ -9327,13 +9340,13 @@ function _updBusy(){
 // you'd explain it to a friend — what they can now do, not what the code does.
 // No version numbers or jargon in the notes; the date IS the version.
 const RELEASE={
-  v:'2026-07-28.3',
-  title:'Finish a season, get the next one',
-  push:'Finish a season and WatchList offers you the next one \u2014 plus every special, OVA and movie now shows up.',
+  v:'2026-07-28.4',
+  title:'One link. That is the whole setup.',
+  push:'Setting your own site is now one paste \u2014 no AI key, no second step, no hunting through menus.',
   notes:[
-    'Mark a season <b>Done</b> and if there is a next one, WatchList offers it \u2014 one tap to add it and carry on. Say no once and it will not ask again for that show.',
-    'The <b>Seasons</b> list now includes everything in a franchise: specials, OVAs, movies and side stories, not just the numbered seasons.',
-    'Fixed: some people had notifications switched on but were never registered for episode alerts, so nothing ever arrived. That repairs itself next time you open the app.',
+    'Setting up your site was three boxes for the same link, in two different places, with an AI key demanded halfway through. Now it is <b>one paste</b>, at the top of <b>Sources</b>.',
+    'Paste any episode\u2019s address. WatchList reads which show and episode it is, shows you where a different show would open, and one button sets it for everything.',
+    'No key needed \u2014 it only asks for one if it genuinely cannot read the link, and even then only as a way out.',
   ],
 };
 const SEEN_REL='seen_release';

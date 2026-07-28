@@ -439,7 +439,10 @@ export class PartyRoom {
       case 'queue-add': {   // anyone may queue a pick for later
         const title = String(msg.title || '').slice(0, 160); if (!title) return;
         room.queue = room.queue || []; if (room.queue.length >= QUEUE_CAP) return;
-        room.queue.push({ id: uid + '-' + Date.now(), title, animeId: String(msg.animeId || '').slice(0, 40), ep: Math.max(0, Math.min(9999, parseInt(msg.ep, 10) || 0)), img: String(msg.img || '').slice(0, 400), by: name });
+        // aniId travels with the item: animeId is the queuer's LOCAL list id and
+        // means nothing on anyone else's device, so without it the rest of the
+        // party can't match a queued show to their own copy (and its pinned link).
+        room.queue.push({ id: uid + '-' + Date.now(), title, animeId: String(msg.animeId || '').slice(0, 40), aniId: Math.max(0, parseInt(msg.aniId, 10) || 0), ep: Math.max(0, Math.min(9999, parseInt(msg.ep, 10) || 0)), img: String(msg.img || '').slice(0, 400), by: name });
         this.sys(room, `${name} queued ${title}`); room.rev++; await this.save(); this.broadcast(); return;
       }
       case 'queue-remove': {
@@ -484,7 +487,7 @@ export class PartyRoom {
       case 'queue-next': {   // host advances the party to the first queued item + fires the 3·2·1
         if (!isHost) return;
         const next = (room.queue = room.queue || []).shift(); if (!next) return;
-        room.title = next.title; room.animeId = next.animeId; room.ep = next.ep; room.img = next.img;
+        room.title = next.title; room.animeId = next.animeId; room.aniId = next.aniId || 0; room.ep = next.ep; room.img = next.img;
         room.playAt = 0; room.paused = false;
         this.sys(room, `Now watching ${room.title}${room.ep ? ' · Ep ' + room.ep : ''}`);
         room.playAt = Date.now() + 3600; this.sys(room, '▶ Starting in 3…');

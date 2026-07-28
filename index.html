@@ -5870,24 +5870,35 @@ function partyCue(room){
   const tick=()=>{
     const left=Math.ceil((room.playAt-Date.now())/1000);
     if(left>0){num.textContent=left;num.style.animation='none';void num.offsetWidth;num.style.animation='';setTimeout(tick,Math.min(1000,room.playAt-Date.now()));}
-    else{num.innerHTML=icon('play');lbl.textContent='Playing!';setTimeout(()=>{ov.classList.remove('on');closeAll();if(room.title)watchParty(room.title,room.ep);},450);}
+    else{num.innerHTML=icon('play');lbl.textContent='Playing!';setTimeout(()=>{ov.classList.remove('on');closeAll();if(room.title)watchParty(room.title,room.ep,room.aniId||0);},450);}
   };
   tick();
 }
 // Open the player straight from a title/episode — a party member may not even have
 // the show in their own list, so this doesn't go through watchAnime.
-function partyStreamURL(title,ep){
-  const slug=streamSlug(title),src=streamSource();
-  if(!src)return '';   // no custom source → party uses screen-broadcast, not a built-in player
-  if(/\{ep\}/.test(src))return src.replace(/\{title\}/g,encodeURIComponent(title)).replace(/\{slug\}/g,slug).replace(/\{ep\}/g,ep||1);
-  if(/\{title\}|\{slug\}/.test(src))return src.replace(/\{title\}/g,encodeURIComponent(title)).replace(/\{slug\}/g,slug);
-  return src;
+// A third hand-rolled URL builder used to live here, and it had the same flaw as
+// the next-episode one: global source only, slug derived from the title, and just
+// {title}/{slug}/{ep} understood. So the host pressing Play in a party ignored
+// their pinned link and the name they'd corrected — and 404'd on exactly the
+// shows they'd already fixed. It resolves the title against their own list first,
+// then goes through the same builder as everything else.
+function partyStreamURL(title,ep,aniId){
+  let a=null;
+  if(aniId)a=anime.find(x=>+x.aniId===+aniId)||null;
+  if(!a)a=anime.find(x=>normTitle(x.title)===normTitle(title))||null;
+  const item=a||{title,aniId:aniId||0,ep:0,epTotal:0};      // not on their list → still openable
+  const src=effectiveSource(item);
+  if(!src)return '';   // no source set → party falls back to screen-broadcast
+  return fillSourceTokens(src,item,ep||1);
 }
-function watchParty(title,ep){
+function watchParty(title,ep,aniId){
   pvReturnId=null;pvWatchEp=null;pvOpenTime=0;pvCanNav=false;
   document.getElementById('pvTitle').textContent=title+(ep?` · Ep ${ep}`:'')+' · Party';
-  const ext=document.getElementById('pvExt');ext.onclick=()=>{const u=findUrl({title});if(u&&u!=='about:blank')document.getElementById('pvFrame').src=u;};
-  const purl=partyStreamURL(title,ep);
+  // Search recovery should use their own copy of the show when they have one, so
+  // a corrected name is used here too.
+  const own=aniId?anime.find(x=>+x.aniId===+aniId):null;
+  const ext=document.getElementById('pvExt');ext.onclick=()=>{const u=findUrl(own||{title});if(u&&u!=='about:blank')document.getElementById('pvFrame').src=u;};
+  const purl=partyStreamURL(title,ep,aniId);
   document.getElementById('pvFrame').src=purl||"data:text/html,<body style='margin:0;background:%230b0b0f;color:%23aaa;font:15px -apple-system,system-ui;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px;height:100vh'>Set your own streaming source in Settings, or use <b style='color:%23fff'>&nbsp;Broadcast your screen&nbsp;</b> to watch together.</body>";
   document.getElementById('playerView').classList.add('on');
   renderPvNav(null);
@@ -5980,10 +5991,19 @@ function partyPick(id){
 function partyQueueAdd(id){
   const a=anime.find(x=>x.id===id);if(!a)return;
   const ep=Math.min((a.ep||0)+1,a.epTotal||((a.ep||0)+1));
-  wsSend({t:'queue-add',title:a.title,animeId:a.id,ep,img:titleBg(a)||a.img||''});toast(`Queued ${a.title} · Ep ${ep}`);
+  wsSend({t:'queue-add',title:a.title,animeId:a.id,aniId:a.aniId||0,ep,img:titleBg(a)||a.img||''});toast(`Queued ${a.title} · Ep ${ep}`);
 }
 function partyQueueRemoveAt(i){const q=partyRoom&&partyRoom.queue&&partyRoom.queue[i];if(q)wsSend({t:'queue-remove',qid:q.id});}
 function partyQueueNext(){if(!partyIsHost||!partyRoom||!(partyRoom.queue||[]).length)return;wsSend({t:'queue-next'});}
+// Play something further down the list without removing everything above it —
+// the host could only ever pull the head, so a vote that won from third place
+// meant deleting two items by hand first.
+function partyQueuePlayAt(i){
+  if(!partyIsHost||!partyRoom)return;
+  const q=partyRoom.queue||[],item=q[i]; if(!item)return;
+  for(let n=0;n<i;n++)wsSend({t:'queue-move',qid:item.id,dir:-1});   // walk it to the front
+  setTimeout(()=>wsSend({t:'queue-next'}),260);
+}
 function partyQueueMove(qid,dir){if(!partyIsHost)return;wsSend({t:'queue-move',qid,dir});}
 function partyQueueVote(qid){wsSend({t:'queue-vote',qid});}   // anyone can vote; host reorders using the counts
 function partyMakeHost(uid,name){if(!partyIsHost)return;askConfirm({title:'Make host?',msg:`Hand the party over to ${name||'this member'}? They’ll control what everyone watches.`,yes:'Make host',onYes:()=>wsSend({t:'host-set',to:uid})});}
@@ -6340,7 +6360,8 @@ function renderParty(){
     const vote=`<button class="pt-qvote${mine?' on':''}" onclick="partyQueueVote('${safeId(q.id)}')" aria-label="Vote for this">${mine?icon('heart','fill'):icon('heart')}${votes?`<span>${votes}</span>`:''}</button>`;
     const move=partyIsHost?`<button class="pt-qmove" onclick="partyQueueMove('${safeId(q.id)}','up')" aria-label="Move up"${i===0?' disabled':''}>${icon('chevron-up')}</button><button class="pt-qmove" onclick="partyQueueMove('${safeId(q.id)}','down')" aria-label="Move down"${i===qlist.length-1?' disabled':''}>${icon('chevron-down')}</button>`:'';
     const rm=partyIsHost?`<button class="pt-qx" onclick="partyQueueRemoveAt(${i})" aria-label="Remove from queue">${icon('x')}</button>`:'';
-    return `<div class="pt-qacts">${vote}${move}${rm}</div>`;
+    const jump=(partyIsHost&&i>0)?`<button class="pt-qx" onclick="partyQueuePlayAt(${i})" aria-label="Play this next" title="Play this now">${icon('play')}</button>`:'';
+    return `<div class="pt-qacts">${vote}${move}${jump}${rm}</div>`;
   };
   const queueBlock=qlist.length?`<div class="dt-label" style="margin-top:14px">Up next · ${qlist.length}${partyIsHost?'':' · vote for what’s next'}</div>
     <div class="pt-picklist">${qlist.map((q,i)=>`<div class="pt-pick pt-qitem">
@@ -9483,13 +9504,13 @@ function _updBusy(){
 // you'd explain it to a friend — what they can now do, not what the code does.
 // No version numbers or jargon in the notes; the date IS the version.
 const RELEASE={
-  v:'2026-07-28.15',
-  title:'Advanced Hentai Blocking',
-  push:'Adult titles are now blocked everywhere \u2014 seasons lists, next-season offers and recommendations.',
+  v:'2026-07-28.16',
+  title:'Parties play on your own source',
+  push:'Starting a show in a watch party now opens it on your own site, at the right episode.',
   notes:[
-    'Adult titles could still slip into three places: a show\u2019s <b>Seasons</b> list, the <b>next season</b> offer, and <b>More like this</b>. All three are blocked now.',
-    'The seasons list mattered most \u2014 it follows side stories and spin-offs, which is exactly where adult versions of ordinary series hang off. Those are dropped before they are even loaded.',
-    'Every place WatchList looks up titles now checks first, so this holds across search, your list, recommendations and franchises alike.',
+    'When a party starts a show, it now opens on <b>your</b> streaming setup \u2014 including a link you pinned for that title and any name you corrected. Before, it built its own address and could land on a 404 for a show you had already fixed.',
+    'The host can now play <b>any</b> item in the queue, not just the top one \u2014 useful when something further down wins the vote.',
+    'Queued shows carry their identity, so everyone\u2019s app can match them to their own copy instead of guessing from the title.',
   ],
 };
 const SEEN_REL='seen_release';

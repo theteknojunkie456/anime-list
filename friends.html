@@ -1043,12 +1043,17 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 .party-call.full .party-call-frame{flex:1;height:auto;min-height:0;border-radius:0;margin:0;}
 .party-call.full .party-call-bar{padding-top:calc(9px + var(--safe-t,0px));}
 body.call-full{overflow:hidden;}
+.shareview.sh-max{position:fixed;inset:0;z-index:130;}
+.shareview.sh-max .sh-stage{height:100vh;}
 .party-call-bar{display:flex;align-items:center;gap:8px;padding:10px 10px 9px 13px;background:transparent;font-family:var(--fd);font-weight:800;font-size:13px;color:var(--t1);}
-.party-call-bar .live-dot{width:8px;height:8px;flex-shrink:0;border-radius:50%;background:#3ecf7e;box-shadow:0 0 8px #3ecf7e;animation:livePulse 2s ease-in-out infinite;}
+/* flex:1 on the bar's spans was growing the dot into a long green bar — a fixed
+   basis with no grow keeps it a dot. */
+.party-call-bar .live-dot{flex:0 0 8px;width:8px;height:8px;border-radius:50%;background:#3ecf7e;box-shadow:0 0 8px #3ecf7e;animation:livePulse 2s ease-in-out infinite;}
 @keyframes livePulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.45;transform:scale(.72);}}
 .party-call-bar span{flex:1;letter-spacing:.01em;}
 .party-call-x{width:28px;height:28px;flex-shrink:0;border-radius:8px;background:var(--bg4);color:var(--t2);display:flex;align-items:center;justify-content:center;}
 .party-call-x .ico{width:15px;height:15px;}
+.party-call-x.danger{color:#ff8b8b;background:rgba(255,90,90,.12);}
 .party-call-frame{height:44vh;min-height:300px;position:relative;background:#000;border-radius:12px;margin:0 8px 8px;overflow:hidden;}
 .party-call-frame iframe{position:absolute!important;inset:0;width:100%!important;height:100%!important;border:0;}
 /* In-app player — mirrors .shareview so the transition feels identical */
@@ -1847,8 +1852,8 @@ body.recsel .pcard{position:relative;}
        and sits right alongside the chat + controls (no full-screen takeover). -->
   <div id="partyCallMount" class="party-call" style="display:none">
     <div class="party-call-bar"><span class="live-dot"></span><span>Live · voice &amp; screen</span>
-      <button class="party-call-x" id="callFsBtn" onclick="toggleCallFull()" aria-label="Full screen" title="Full screen"><i data-ic="external"></i></button>
-      <button class="party-call-x" onclick="leaveJitsi()" aria-label="Leave call"><i data-ic="x"></i></button></div>
+      <button class="party-call-x" id="callFsBtn" onclick="toggleCallFull()" aria-label="Full screen" title="Full screen"><i data-ic="maximize"></i></button>
+      <button class="party-call-x danger" onclick="leaveJitsi()" aria-label="Leave call" title="Leave the call"><i data-ic="x"></i></button></div>
     <div id="jitsiFrame" class="party-call-frame"></div>
   </div>
   <div id="partyBody"></div>
@@ -1958,6 +1963,7 @@ body.recsel .pcard{position:relative;}
   <div class="pv-top">
     <button class="sv-back" onclick="leaveShareView()" aria-label="Back"><i data-ic="chevron-left"></i></button>
     <div class="pv-title" id="shareTitle">Watch party</div>
+    <button class="pv-ext" id="shFsBtn" onclick="toggleShareFull()" aria-label="Full screen" title="Full screen"><i data-ic="maximize"></i></button>
     <button class="pv-ext party-only" onclick="openSheet('partySheet')" aria-label="Party chat"><i data-ic="message"></i></button>
   </div>
   <div class="sh-stage">
@@ -2253,6 +2259,8 @@ body.recsel .pcard{position:relative;}
 <script>
 // ─── ICONS — inline monochrome line icons (Feather/Lucide style, currentColor) ──
 const ICONS={
+maximize:'<path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/>',
+minimize:'<path d="M8 3v3a2 2 0 0 1-2 2H3"/><path d="M21 8h-3a2 2 0 0 1-2-2V3"/><path d="M16 21v-3a2 2 0 0 1 2-2h3"/><path d="M3 16h3a2 2 0 0 1 2 2v3"/>',
 mic:'<path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v4M8 23h8"/>',
 calendar:'<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
 bell:'<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>',
@@ -6306,11 +6314,30 @@ function hideJitsi(){}   // no separate view now — the call lives in the party
 // show — but that panel is small on a phone, and useless when the call is the
 // thing you're actually looking at. This lets it take the screen and hand it
 // back, without tearing down and rejoining (which would drop you from the call).
+// The host's screen is the thing you're actually watching, and it had no way to
+// fill the display — the tap-to-fill hint only changes how the video is cropped.
+// Uses the real Fullscreen API where it exists (desktop, Android) and falls back
+// to a CSS takeover on iOS, which doesn't allow it outside a <video> element.
+function toggleShareFull(){
+  const stage=document.querySelector('#shareView .sh-stage')||document.getElementById('shareView');
+  const btn=document.getElementById('shFsBtn');
+  const set=on=>{if(btn)btn.innerHTML=icon(on?'minimize':'maximize');};
+  const fsEl=document.fullscreenElement||document.webkitFullscreenElement;
+  if(fsEl){ (document.exitFullscreen||document.webkitExitFullscreen||function(){}).call(document); set(false); return; }
+  const req=stage.requestFullscreen||stage.webkitRequestFullscreen;
+  if(req){ try{ req.call(stage); set(true); return; }catch(e){} }
+  // iOS Safari: no element fullscreen — take the viewport instead.
+  const v=document.getElementById('shareVideo');
+  if(v&&v.webkitEnterFullscreen){ try{ v.webkitEnterFullscreen(); return; }catch(e){} }
+  const on=document.getElementById('shareView').classList.toggle('sh-max');
+  set(on);
+}
+try{document.addEventListener('fullscreenchange',()=>{const b=document.getElementById('shFsBtn');if(b)b.innerHTML=icon(document.fullscreenElement?'minimize':'maximize');});}catch(e){}
 function toggleCallFull(){
   const mount=document.getElementById('partyCallMount'); if(!mount)return;
   const on=mount.classList.toggle('full');
   const b=document.getElementById('callFsBtn');
-  if(b){b.innerHTML=icon(on?'x':'external');b.setAttribute('aria-label',on?'Exit full screen':'Full screen');b.title=b.getAttribute('aria-label');}
+  if(b){b.innerHTML=icon(on?'minimize':'maximize');b.setAttribute('aria-label',on?'Exit full screen':'Full screen');b.title=b.getAttribute('aria-label');}
   try{document.body.classList.toggle('call-full',on);}catch(e){}
   try{if(_jitsiApi&&_jitsiApi.resize)_jitsiApi.resize();}catch(e){}   // nudge Jitsi to re-lay out
 }
@@ -9490,6 +9517,10 @@ function _updBusy(){
   if(on('playerView')||on('shareView')||on('ytView'))return true;
   if(document.getElementById('ytOverlay'))return true;                 // licensed YouTube playback
   if(typeof extId!=='undefined'&&extId)return true;                    // away watching, will return
+  // In a party, a reload doesn't just interrupt one person — it drops them from
+  // the room and the call while everyone else waits. Never update mid-party.
+  try{if(typeof partyActive==='function'&&partyActive())return true;}catch(e){}
+  try{if(_jitsiApi)return true;}catch(e){}                             // in the voice/video call
   const el=document.activeElement; if(el&&/^(INPUT|TEXTAREA)$/.test(el.tagName)&&(el.value||'').length)return true;   // mid-typing
   return false;
 }

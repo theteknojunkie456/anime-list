@@ -9428,13 +9428,75 @@ async function runRecommend(){
 }
 let chatHistory=[];
 try{chatHistory=JSON.parse(localStorage.getItem('chat_hist')||'[]');if(!Array.isArray(chatHistory))chatHistory=[];}catch{chatHistory=[];}
-function saveChat(){try{localStorage.setItem('chat_hist',JSON.stringify(chatHistory.slice(-40)));}catch{}}
+// 40 messages was ~20 exchanges — long enough to feel continuous, short enough
+// that a long session quietly forgets its own beginning. Doubled.
+function saveChat(){try{localStorage.setItem('chat_hist',JSON.stringify(chatHistory.slice(-80)));}catch{}}
+// What the assistant knows and how it should behave. The old version handed it a
+// flat list of titles and told it to be concise — which is exactly how you get
+// something that answers like a search box. A conversation needs three things it
+// didn't have: specifics worth reacting to, permission to have opinions, and a
+// reason to ask something back.
 function chatContext(){
-  const line=a=>a.title+(a.genre?' ['+a.genre+']':'')+(a.rating?' ('+a.rating+'/5)':'');
-  const g=(kind,st)=>anime.filter(a=>kindOf(a)===kind&&a.status===st).map(line).join('; ')||'none';
-  return "You are a warm, sharp anime & manga companion inside the user's personal WatchList app. Chat naturally and fairly concisely (a few sentences unless they ask for more). Reference their ACTUAL list, read their ratings to gauge taste, keep spoilers out unless asked, and use light markdown (bold, bullet lists) when it helps. When recommending NEW titles, prefer things not already on their list, lean toward what matches their high-rated + genre patterns, and steer clear of what they dropped.\n\n"+
-    "WATCHING: "+g('watch','watching')+"\nPLAN TO WATCH: "+g('watch','plan')+"\nFINISHED (ratings shown): "+g('watch','finished')+"\nDROPPED (disliked): "+g('watch','dropped')+"\n"+
-    "READING: "+g('read','watching')+"\nPLAN TO READ: "+g('read','plan')+"\nFINISHED READING: "+g('read','finished');
+  const line=a=>a.title+(a.genre?' ['+a.genre+']':'')+(a.rating?' — rated '+a.rating+'/5':'');
+  const g=(kind,st)=>anime.filter(a=>kindOf(a)===kind&&a.status===st);
+  const names=l=>l.map(line).join('; ')||'nothing yet';
+
+  // Mid-watch progress is the most conversational fact there is — "you're four
+  // episodes from the end of X" is something a friend would know and a bot wouldn't.
+  const inProgress=g('watch','watching').filter(a=>a.epTotal).map(a=>{
+    const left=Math.max(0,(a.epTotal||0)-(a.ep||0));
+    return `${a.title}: episode ${a.ep||0} of ${a.epTotal}${left?` (${left} left)`:' (finale next)'}`;
+  }).join('; ');
+
+  // Recently touched, so it can pick up where the last conversation left off.
+  const recent=[...anime].filter(a=>a.upd).sort((x,y)=>y.upd-x.upd).slice(0,6)
+    .map(a=>`${a.title} (${(STATUS_META[a.status]||{}).label||a.status})`).join('; ');
+
+  // Taste, derived rather than asked for.
+  const loved=anime.filter(a=>(a.rating||0)>=4).map(a=>a.title);
+  const dropped=g('watch','dropped').map(a=>a.title);
+  const genreCount={};
+  anime.forEach(a=>{if((a.rating||0)>=4)String(a.genre||'').split(/[,/]/).forEach(x=>{x=x.trim();if(x)genreCount[x]=(genreCount[x]||0)+1;});});
+  const favGenres=Object.entries(genreCount).sort((a,b)=>b[1]-a[1]).slice(0,4).map(e=>e[0]).join(', ');
+
+  // Airing this week, so "what's out" needs no lookup.
+  const now=Date.now(),wk=now+7*86400000;
+  const airing=anime.filter(a=>a.airAt&&a.airAt*1000>now&&a.airAt*1000<wk)
+    .sort((x,y)=>x.airAt-y.airAt)
+    .map(a=>`${a.title} ep ${a.airEp||'?'} on ${new Date(a.airAt*1000).toLocaleDateString([],{weekday:'long'})}`).join('; ');
+
+  const hour=new Date().getHours();
+  const partOfDay=hour<5?'the middle of the night':hour<12?'morning':hour<17?'afternoon':hour<22?'evening':'late night';
+  const me=(typeof myFriendName==='function'&&myFriendName())||'';
+
+  return [
+`You are the user's anime and manga companion, living inside their own WatchList app. You are not a search engine and not a customer-service bot — you are the friend who has actually seen this stuff and remembers what they thought of it.`,
+`How to talk:`,
+`• Have opinions. If something they loved is overrated, or something they dropped deserves a second chance, say so and say why. Hedging on everything is what makes an assistant feel hollow.`,
+`• Match their length. A one-line question gets a one-line answer. A real question gets a real answer. Never pad, never bullet-point something that wants a sentence.`,
+`• React to specifics before answering. They are four episodes from a finale; they rated something 2/5. Notice it.`,
+`• Ask something back when you genuinely want to know — not as a habit, and never more than one question at a time.`,
+`• Remember this conversation. Earlier messages are yours to build on; don't reintroduce yourself or restate what they just told you.`,
+`• No spoilers past where they've actually got to, unless they ask.`,
+`• Light markdown only where it earns its place. Prose by default.`,
+`• If they just want to chat about something and not be recommended anything, do that.`,
+me?`You are talking to ${me}.`:'',
+`It is currently ${partOfDay} on ${new Date().toLocaleDateString([],{weekday:'long',month:'long',day:'numeric'})}.`,
+``,
+inProgress?`PART-WAY THROUGH: ${inProgress}`:'',
+recent?`LAST TOUCHED: ${recent}`:'',
+airing?`AIRING THIS WEEK: ${airing}`:'',
+favGenres?`GENRES THEY RATE HIGHEST: ${favGenres}`:'',
+loved.length?`RATED 4+ : ${loved.join('; ')}`:'',
+dropped.length?`DROPPED (do not recommend these): ${dropped.join('; ')}`:'',
+`WATCHING: ${names(g('watch','watching'))}`,
+`PLAN TO WATCH: ${names(g('watch','plan'))}`,
+`FINISHED: ${names(g('watch','finished'))}`,
+`READING: ${names(g('read','watching'))}`,
+`PLAN TO READ: ${names(g('read','plan'))}`,
+`FINISHED READING: ${names(g('read','finished'))}`,
+`When suggesting something new, prefer what they haven't got, lean on the patterns above, and never suggest anything on the dropped list.`,
+  ].filter(Boolean).join('\n');
 }
 function mdToHtml(t){
   let s=schEsc(t);
@@ -9447,10 +9509,24 @@ function mdToHtml(t){
   s=s.replace(/(?:^|\n)((?:\s*\d+\.\s.+(?:\n|$))+)/g,(m,blk)=>'\n<ol class="chat-ul">'+blk.trim().split(/\n/).map(l=>'<li>'+l.replace(/^\s*\d+\.\s/,'').trim()+'</li>').join('')+'</ol>');
   return s.replace(/\n{2,}/g,'<br><br>').replace(/\n/g,'<br>');
 }
+// Openers built from THEIR list. Four generic prompts trained people to treat this
+// like a vending machine — the first thing you see sets what you think it's for.
 function chatChips(){
-  const chips=['What should I watch next?','What should I marathon this weekend?','Something short for tonight','Recommend by mood: cozy'];
-  if(anime.filter(a=>kindOf(a)==='watch'&&a.status==='plan').length>1)chips.push('Best order for my Plan list');
-  return chips;
+  const chips=[];
+  const watching=anime.filter(a=>kindOf(a)==='watch'&&a.status==='watching');
+  const near=watching.filter(a=>a.epTotal&&(a.epTotal-(a.ep||0))<=3&&(a.ep||0)>0)[0];
+  const mid=watching.filter(a=>(a.ep||0)>0)[0];
+  const loved=anime.filter(a=>(a.rating||0)>=4)[0];
+  const dropped=anime.filter(a=>a.status==='dropped')[0];
+  const plan=anime.filter(a=>kindOf(a)==='watch'&&a.status==='plan');
+
+  if(near)chips.push(`Should I finish ${near.title} tonight?`);
+  else if(mid)chips.push(`Remind me what's happening in ${mid.title}`);
+  if(loved)chips.push(`Why do I like ${loved.title} so much?`);
+  if(dropped)chips.push(`Was I wrong to drop ${dropped.title}?`);
+  if(plan.length>1)chips.push('What should I start next, and why that one?');
+  chips.push('Talk me out of starting something new');
+  return chips.slice(0,5);
 }
 function renderChatThread(typing){
   const th=document.getElementById('chatThread');if(!th)return;
@@ -9607,16 +9683,16 @@ async function callAIChatStream(history,onToken){
   const system=chatContext(),model=getModel();
   if(key.startsWith('gsk_')||key.startsWith('sk-or-')){
     const url=key.startsWith('gsk_')?'https://api.groq.com/openai/v1/chat/completions':'https://openrouter.ai/api/v1/chat/completions';
-    const resp=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify({model,messages:[{role:'system',content:system}].concat(history),stream:true,max_tokens:1200})});
+    const resp=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify({model,messages:[{role:'system',content:system}].concat(history),stream:true,max_tokens:2000})});
     if(!resp.ok)throw new Error('API '+resp.status);
     let full='';await readSSE(resp,d=>{d=d.trim();if(d==='[DONE]'||!d)return;try{const j=JSON.parse(d);const t=j.choices?.[0]?.delta?.content;if(t){full+=t;onToken(t);}}catch(e){}});return full;
   }
   if(key.startsWith('AIza')){
-    const resp=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+model+':streamGenerateContent?alt=sse',{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},body:JSON.stringify({systemInstruction:{parts:[{text:system}]},contents:history.map(m=>({role:m.role==='assistant'?'model':'user',parts:[{text:m.content}]})),generationConfig:{maxOutputTokens:1200}})});
+    const resp=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+model+':streamGenerateContent?alt=sse',{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},body:JSON.stringify({systemInstruction:{parts:[{text:system}]},contents:history.map(m=>({role:m.role==='assistant'?'model':'user',parts:[{text:m.content}]})),generationConfig:{maxOutputTokens:2000}})});
     if(!resp.ok)throw new Error('API '+resp.status);
     let full='';await readSSE(resp,d=>{d=d.trim();if(!d)return;try{const j=JSON.parse(d);const t=j.candidates?.[0]?.content?.parts?.[0]?.text;if(t){full+=t;onToken(t);}}catch(e){}});return full;
   }
-  const resp=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model,max_tokens:1200,system,messages:history,stream:true})});
+  const resp=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model,max_tokens:2000,system,messages:history,stream:true})});
   if(!resp.ok)throw new Error('API '+resp.status);
   let full='';await readSSE(resp,d=>{d=d.trim();if(!d)return;try{const j=JSON.parse(d);if(j.type==='content_block_delta'&&j.delta&&j.delta.text){full+=j.delta.text;onToken(j.delta.text);}}catch(e){}});return full;
 }

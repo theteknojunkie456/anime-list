@@ -6542,6 +6542,24 @@ function callToggleMic(){
   const b=document.getElementById('callMicBtn');
   if(b){b.innerHTML=icon(_callMic?'mic':'mic-off');b.classList.toggle('off',!_callMic);b.title=_callMic?'Mute':'Unmute';b.setAttribute('aria-label',b.title);}
 }
+// lib-jitsi-meet's desktop capture runs its own capability checks and its own
+// wrapper, and it can refuse on browsers that CAN capture — it threw a bare
+// "Error" on a phone rather than anything meaningful. So when it refuses, ask the
+// browser directly with getDisplayMedia and wrap whatever we get back. If the
+// platform really can't do it, THAT call is the one that fails, and its error is
+// the truthful one.
+async function natDesktopTrack(){
+  try{
+    const ts=await JitsiMeetJS.createLocalTracks({devices:['desktop']});
+    if(ts&&ts.length)return ts;
+  }catch(e){try{console.warn('[WatchList] jitsi desktop capture refused, trying the browser directly:',e&&(e.name||e.message));}catch(_){}}
+  if(!(navigator.mediaDevices&&navigator.mediaDevices.getDisplayMedia))throw new Error('NotSupported');
+  const stream=await navigator.mediaDevices.getDisplayMedia({video:{frameRate:30},audio:true});
+  const made=JitsiMeetJS.createLocalTracksFromMediaStreams([
+    {stream,sourceType:'screen',mediaType:'video',videoType:'desktop'}
+  ]);
+  return Array.isArray(made)?made:[made];
+}
 async function natToggleTrack(kind){
   const have=(_nat.tracks||[]).find(t=>t.getType()==='video'&&(kind==='desktop'?t.getVideoType()==='desktop':t.getVideoType()!=='desktop'));
   if(have){
@@ -6550,7 +6568,7 @@ async function natToggleTrack(kind){
     _nat.tracks=_nat.tracks.filter(t=>t!==have);
     renderNativeTiles(); return false;
   }
-  const ts=await JitsiMeetJS.createLocalTracks({devices:[kind]});
+  const ts=(kind==='desktop')?await natDesktopTrack():await JitsiMeetJS.createLocalTracks({devices:[kind]});
   ts.forEach(t=>{_nat.tracks.push(t);_nat.room.addTrack(t);if(t.getType()==='video')natAttach(t);});
   return true;
 }
@@ -6596,7 +6614,9 @@ function shareFailMsg(e){
   // getDisplayMedia missing entirely → the browser has no such capability.
   if(/undefined is not a function|not a function|NotSupported|TypeError/i.test(n))
     return (typeof IS_NATIVE!=='undefined'&&IS_NATIVE)?'This app can’t capture the screen — use Broadcast your screen':'This browser can’t share a screen';
-  return 'Screen sharing didn’t start ('+n.slice(0,28)+')';
+  if(/NotSupported/i.test(n))return (typeof IS_NATIVE!=='undefined'&&IS_NATIVE)?'This app can’t capture the screen — use Broadcast your screen':'This browser can’t share a screen';
+  const detail=String((e&&e.message)||'').slice(0,40);
+  return 'Screen sharing didn’t start'+(detail&&detail!=='Error'?' — '+detail:'');
 }
 function callToggleShare(){
   if(nativeCallOn()){

@@ -1065,6 +1065,9 @@ body.call-full{overflow:hidden;}
    cross-origin iframe and cannot be styled from here, so this carries the theme
    and the per-person colour instead — and it doubles as the speaking indicator. */
 .call-people{display:flex;flex-wrap:wrap;gap:6px;padding:0 10px 9px;}
+.call-fallback{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 10px 10px;padding:10px 12px;
+  border-radius:12px;background:var(--bg3);border:1px solid var(--b2);color:var(--t2);font-size:12px;line-height:1.45;}
+.call-fallback span{flex:1 0 100%;}
 /* Our own tiles — the whole point of rendering the call ourselves. Each person
    gets a soft border in their own colour, lifted to a glow while they speak. */
 .call-tiles{display:grid;gap:8px;padding:0 8px 8px;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));}
@@ -6439,7 +6442,8 @@ function renderNativeTiles(){
     }
     t.style.setProperty('--who',natPersonColor(p.name));
     t.classList.toggle('talking',_nat.speaker===p.id);
-    if(p.local){t.classList.toggle('mirrored',_callMirror);_callBtn('callMirrorBtn',_callMirror);}
+    t.classList.toggle('mirrored',p.local?_callMirror:!!_mirrorOf[p.id]);
+    if(p.local)_callBtn('callMirrorBtn',_callMirror);
     t.classList.toggle('novideo',!t.querySelector('video').srcObject);
     const nm=t.querySelector('.call-tile-name'); if(nm)nm.textContent=p.name||'Someone';
   });
@@ -6495,7 +6499,14 @@ async function openNativeCall(){
   room.on(E.conference.USER_LEFT,refresh);
   room.on(E.conference.DISPLAY_NAME_CHANGED,refresh);
   room.on(E.conference.DOMINANT_SPEAKER_CHANGED,id=>{_nat.speaker=id;refresh();});
+  // Someone flipped their own camera — mirror their tile here to match.
+  room.on(E.conference.PARTICIPANT_PROPERTY_CHANGED,(p,key,_old,val)=>{
+    if(key!=='wlMirror')return;
+    try{_mirrorOf[p.getId()]=(val==='1');}catch(e){}
+    applyMirrorClasses();
+  });
   room.setDisplayName(partyName()||'Guest');
+  try{room.setLocalParticipantProperty('wlMirror',_callMirror?'1':'0');}catch(e){}   // so late joiners see it right
   await new Promise((res,rej)=>{
     const t=setTimeout(()=>rej(new Error('join timeout')),9000);
     room.on(E.conference.CONFERENCE_JOINED,()=>{clearTimeout(t);res();});
@@ -6644,19 +6655,53 @@ function callToggleCam(){
 }
 // Grid vs speaker was the one Jitsi button worth keeping, so removing their
 // toolbar entirely means providing it — same command, our bar.
-// Mirroring is a self-view convention: unmirrored, raising your right hand looks
-// like your left and text reads backwards. It flips only YOUR preview — what the
-// others receive is untouched, which is the whole point.
-let _callMirror=true;
+// Flip is shared, not local. Mirroring only your own preview is the usual
+// convention, but it leaves the case that actually matters unsolved: when your
+// camera hands out a mirrored image, everyone else sees your text backwards and
+// you have no way to correct it. Re-encoding a flipped stream would cost battery
+// and bandwidth for something that is purely a display transform — so instead the
+// preference travels as a participant property and every viewer flips your tile
+// on their side. What you see is what they see.
+let _callMirror=false;
+let _mirrorOf={};                 // participant id → flipped?
+function applyMirrorClasses(){
+  document.querySelectorAll('#callTiles .call-tile').forEach(t=>{
+    const pid=t.dataset.pid;
+    t.classList.toggle('mirrored',pid==='local'?_callMirror:!!_mirrorOf[pid]);
+  });
+}
 function callToggleMirror(){
   _callMirror=!_callMirror;
   _callBtn('callMirrorBtn',_callMirror);
-  const t=document.querySelector('#callTiles [data-pid="local"]');
-  if(t)t.classList.toggle('mirrored',_callMirror);
+  applyMirrorClasses();
   try{localStorage.setItem('call_mirror',_callMirror?'1':'0');}catch(e){}
+  // Costs one tiny property broadcast — no media is re-sent.
+  try{if(nativeCallOn())_nat.room.setLocalParticipantProperty('wlMirror',_callMirror?'1':'0');}catch(e){}
+  toast(_callMirror?'Your camera is flipped for everyone':'Camera back to normal');
 }
-try{_callMirror=(localStorage.getItem('call_mirror')||'1')==='1';}catch(e){}
+try{_callMirror=(localStorage.getItem('call_mirror')||'0')==='1';}catch(e){}
 let _callGrid=false;
+// Rebuild this call on the embed, keeping the party intact. Used when our own
+// renderer can't capture the screen but the embedded one can — losing screen
+// sharing is a worse outcome than losing custom tiles.
+function offerEmbedForSharing(why){
+  const box=document.getElementById('callPeople');
+  toast(why);
+  if(!box)return;
+  const bar=document.createElement('div');
+  bar.className='call-fallback';
+  bar.innerHTML=`<span>${escH(why)}. The classic call can share on this device.</span>
+    <button class="src-chip on" onclick="switchToEmbedCall()">Switch and share</button>
+    <button class="src-chip" onclick="this.parentNode.remove()">Not now</button>`;
+  box.parentNode.insertBefore(bar,box.nextSibling);
+}
+function switchToEmbedCall(){
+  document.querySelectorAll('.call-fallback').forEach(el=>el.remove());
+  try{closeNativeCall();}catch(e){}
+  _natTried=true;                     // this call stays on the embed
+  toast('Reconnecting on the classic call…');
+  setTimeout(()=>{try{openEmbedCall();}catch(e){}},250);
+}
 function callToggleGrid(){
   if(nativeCallOn()){_callGrid=!_callGrid;_callBtn('callGridBtn',_callGrid);renderNativeTiles();return;}
   if(!_jitsiApi)return;
@@ -6694,7 +6739,14 @@ function shareFailMsg(e){
 function callToggleShare(){
   if(nativeCallOn()){
     natToggleTrack('desktop').then(on=>{_callShare=on;_callBtn('callShareBtn',on);})
-      .catch(e=>{try{console.error('[WatchList] screen share failed',e);}catch(_){}toast(shareFailMsg(e));});
+      .catch(e=>{
+        try{console.error('[WatchList] screen share failed',e);}catch(_){}
+        // The embedded call CAN share screen and audio on this phone — that was
+        // working before our own renderer existed. So a capture failure here is
+        // never the end of the road: offer the call that is known to manage it,
+        // rather than reporting defeat on a device that has already done it.
+        offerEmbedForSharing(shareFailMsg(e));
+      });
     return;
   }
   if(!_jitsiApi)return;

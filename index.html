@@ -1866,7 +1866,8 @@ body.recsel .pcard{position:relative;}
     <div class="party-call-bar"><span class="live-dot"></span><span id="callStatus">Connecting…</span>
       <button class="party-call-x" id="callMicBtn" onclick="callToggleMic()" aria-label="Mute" title="Mute"><i data-ic="mic"></i></button>
       <button class="party-call-x" id="callCamBtn" onclick="callToggleCam()" aria-label="Camera" title="Camera"><i data-ic="camera"></i></button>
-      <button class="party-call-x" id="callShareBtn" onclick="callToggleShare()" aria-label="Share screen" title="Share your screen"><i data-ic="layers"></i></button>
+      <button class="party-call-x" id="callShareBtn" onclick="callToggleShare()" aria-label="Share screen" title="Share your screen"><i data-ic="upload"></i></button>
+      <button class="party-call-x" id="callGridBtn" onclick="callToggleGrid()" aria-label="Grid or speaker view" title="Grid / speaker view"><i data-ic="layers"></i></button>
       <button class="party-call-x" id="callFsBtn" onclick="toggleCallFull()" aria-label="Full screen" title="Full screen"><i data-ic="maximize"></i></button>
       <button class="party-call-x danger" onclick="leaveJitsi()" aria-label="Leave call" title="Leave the call"><i data-ic="x"></i></button></div>
     <div id="jitsiFrame" class="party-call-frame"></div>
@@ -6319,7 +6320,7 @@ function openJitsi(){
         configOverwrite:{startWithVideoMuted:true,prejoinPageEnabled:false,disableDeepLinking:true,disableInviteFunctions:true},
         // Our bar drives the call, so Jitsi's toolbar is redundant chrome in a
         // panel this small — keep tile view only, and drop the branding.
-        interfaceConfigOverwrite:{TOOLBAR_BUTTONS:['tileview'],MOBILE_APP_PROMO:false,SHOW_JITSI_WATERMARK:false,SHOW_WATERMARK_FOR_GUESTS:false,SHOW_CHROME_EXTENSION_BANNER:false,DISABLE_JOIN_LEAVE_NOTIFICATIONS:true,HIDE_INVITE_MORE_HEADER:true,DEFAULT_BACKGROUND:'#0d0d0f',DISABLE_VIDEO_BACKGROUND:true,TILE_VIEW_MAX_COLUMNS:3}
+        interfaceConfigOverwrite:{TOOLBAR_BUTTONS:[],MOBILE_APP_PROMO:false,SHOW_JITSI_WATERMARK:false,SHOW_WATERMARK_FOR_GUESTS:false,SHOW_CHROME_EXTENSION_BANNER:false,DISABLE_JOIN_LEAVE_NOTIFICATIONS:true,HIDE_INVITE_MORE_HEADER:true,DEFAULT_BACKGROUND:'#0d0d0f',DISABLE_VIDEO_BACKGROUND:true,TILE_VIEW_MAX_COLUMNS:3}
       });
       _jitsiApi.addEventListener('readyToClose',leaveJitsi);
       // Presence and speaking state, so our own bar can say something useful.
@@ -6332,6 +6333,7 @@ function openJitsi(){
         _jitsiApi.addEventListener('audioMuteStatusChanged',e=>{_callMic=!e.muted;const b=document.getElementById('callMicBtn');if(b){b.innerHTML=icon(_callMic?'mic':'mic-off');b.classList.toggle('off',!_callMic);}});
         _jitsiApi.addEventListener('videoMuteStatusChanged',e=>{_callCam=!e.muted;_callBtn('callCamBtn',_callCam);});
         _jitsiApi.addEventListener('screenSharingStatusChanged',e=>{_callShare=!!e.on;_callBtn('callShareBtn',_callShare);});
+        _jitsiApi.addEventListener('tileViewChanged',e=>{_callGrid=!!e.enabled;_callBtn('callGridBtn',_callGrid);});
       }catch(e){}
       try{if(document.getElementById('partySheet').classList.contains('on'))renderParty();}catch(e){}   // float chat under the call
     }catch(e){toast('Call failed to start');leaveJitsi();}
@@ -6362,6 +6364,14 @@ function callToggleCam(){
   if(!_jitsiApi)return;
   try{_jitsiApi.executeCommand('toggleVideo');}catch(e){}
   _callCam=!_callCam; _callBtn('callCamBtn',_callCam);
+}
+// Grid vs speaker was the one Jitsi button worth keeping, so removing their
+// toolbar entirely means providing it — same command, our bar.
+let _callGrid=false;
+function callToggleGrid(){
+  if(!_jitsiApi)return;
+  try{_jitsiApi.executeCommand('toggleTileView');}catch(e){}
+  _callGrid=!_callGrid; _callBtn('callGridBtn',_callGrid);
 }
 function callToggleShare(){
   if(!_jitsiApi)return;

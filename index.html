@@ -5984,6 +5984,7 @@ function partyRetryShare(){
   wsSend({t:'signal',to,kind:'reoffer'});
 }
 function partyCue(room){
+  try{partyFollowHost(room);}catch(e){}
   const ov=document.getElementById('partyCount'),num=document.getElementById('pcNum'),lbl=document.getElementById('pcLbl');
   if(!ov)return;
   lbl.textContent='Get ready…';ov.classList.add('on');
@@ -6109,6 +6110,25 @@ function renderPvHostBar(){
 // party that has drifted apart lines up again — full quality for everyone, no
 // upload, no battery cost, and it works on every device including the ones that
 // can't capture a screen.
+// "Follow the host" — the web-app answer to screen sharing, and the only one
+// that survives a cross-origin player. No pixels move: when the host opens an
+// episode, everyone else's app opens the SAME episode on their OWN source, in
+// their own quality, with their own audio. Better than a shared screen on every
+// axis except one — you can't see their cursor — and it works on every device,
+// including the iPhones that can never capture a screen.
+let _followedKey='';
+function partyFollowHost(room){
+  if(!room||partyIsHost||!partyFollow())return;
+  const key=(room.animeId||'')+':'+(room.aniId||0)+':'+(room.title||'')+':'+(room.ep||0);
+  if(!key||key===_followedKey)return;
+  if(!room.title)return;
+  _followedKey=key;
+  // Only once the host has actually started it — playAt is set by the countdown.
+  if(!room.playAt)return;
+  toast(`Following the host — ${room.title}${room.ep?' · Ep '+room.ep:''}`);
+}
+function partyFollow(){try{return localStorage.getItem('party_follow')!=='0';}catch{return true;}}
+function setPartyFollow(v){try{v?localStorage.removeItem('party_follow'):localStorage.setItem('party_follow','0');}catch{}renderParty();}
 function partyResync(){
   if(!partyIsHost){toast('Only the host can re-sync');return;}
   wsSend({t:'resync'});

@@ -6620,17 +6620,39 @@ function callToggleMic(){
 // browser directly with getDisplayMedia and wrap whatever we get back. If the
 // platform really can't do it, THAT call is the one that fails, and its error is
 // the truthful one.
-async function natDesktopTrack(){
-  try{
-    const ts=await JitsiMeetJS.createLocalTracks({devices:['desktop']});
-    if(ts&&ts.length)return ts;
-  }catch(e){try{console.warn('[WatchList] jitsi desktop capture refused, trying the browser directly:',e&&(e.name||e.message));}catch(_){}}
-  if(!(navigator.mediaDevices&&navigator.mediaDevices.getDisplayMedia))throw new Error('NotSupported');
-  const stream=await navigator.mediaDevices.getDisplayMedia({video:{frameRate:30},audio:true});
-  const made=JitsiMeetJS.createLocalTracksFromMediaStreams([
-    {stream,sourceType:'screen',mediaType:'video',videoType:'desktop'}
-  ]);
-  return Array.isArray(made)?made:[made];
+// THE ORDER MATTERS. Safari only allows getDisplayMedia when it is called
+// directly inside the tap that triggered it — any await beforehand spends the
+// user gesture, and the call is then rejected however capable the device is.
+// Trying Jitsi's own capture first (which awaits) is what made this fail on a
+// phone that had already screen-shared through the embed. So: capture first,
+// synchronously, then hand the stream to the call.
+function grabDisplayStream(){
+  if(!(navigator.mediaDevices&&navigator.mediaDevices.getDisplayMedia)){
+    return Promise.reject(Object.assign(new Error('NotSupported'),{name:'NotSupported'}));
+  }
+  // Audio requested too — he was sharing screen AND sound through the embed.
+  return navigator.mediaDevices.getDisplayMedia({video:{frameRate:30},audio:true});
+}
+async function natAddDisplayStream(stream){
+  const specs=[{stream,sourceType:'screen',mediaType:'video',videoType:'desktop'}];
+  if(stream.getAudioTracks&&stream.getAudioTracks().length)specs.push({stream,sourceType:'screen',mediaType:'audio'});
+  let made=[];
+  try{made=JitsiMeetJS.createLocalTracksFromMediaStreams(specs);}catch(e){
+    made=JitsiMeetJS.createLocalTracksFromMediaStreams([specs[0]]);   // some builds reject the audio spec
+  }
+  made=Array.isArray(made)?made:[made];
+  made.forEach(t=>{_nat.tracks.push(t);_nat.room.addTrack(t);if(t.getType()==='video')natAttach(t);});
+  // Ending the share from the browser's own "Stop sharing" bar must return the
+  // button to its off state, or it lies about what's happening.
+  try{stream.getVideoTracks()[0].addEventListener('ended',()=>{_callShare=false;_callBtn('callShareBtn',false);renderNativeTiles();});}catch(e){}
+  return true;
+}
+async function natStopDisplay(){
+  const gone=(_nat.tracks||[]).filter(t=>t.getType()==='video'?t.getVideoType()==='desktop':t.getOriginalStream&&false);
+  gone.forEach(t=>{try{_nat.room.removeTrack(t);}catch(e){}try{t.dispose();}catch(e){}});
+  _nat.tracks=(_nat.tracks||[]).filter(t=>gone.indexOf(t)<0);
+  renderNativeTiles();
+  return false;
 }
 async function natToggleTrack(kind){
   const have=(_nat.tracks||[]).find(t=>t.getType()==='video'&&(kind==='desktop'?t.getVideoType()==='desktop':t.getVideoType()!=='desktop'));
@@ -6640,7 +6662,7 @@ async function natToggleTrack(kind){
     _nat.tracks=_nat.tracks.filter(t=>t!==have);
     renderNativeTiles(); return false;
   }
-  const ts=(kind==='desktop')?await natDesktopTrack():await JitsiMeetJS.createLocalTracks({devices:[kind]});
+  const ts=await JitsiMeetJS.createLocalTracks({devices:[kind]});
   ts.forEach(t=>{_nat.tracks.push(t);_nat.room.addTrack(t);if(t.getType()==='video')natAttach(t);});
   return true;
 }
@@ -6739,7 +6761,11 @@ function shareFailMsg(e){
 }
 function callToggleShare(){
   if(nativeCallOn()){
-    natToggleTrack('desktop').then(on=>{_callShare=on;_callBtn('callShareBtn',on);})
+    if(_callShare){natStopDisplay().then(()=>{_callShare=false;_callBtn('callShareBtn',false);});return;}
+    // No await before this line — that is the whole point.
+    grabDisplayStream()
+      .then(stream=>natAddDisplayStream(stream))
+      .then(()=>{_callShare=true;_callBtn('callShareBtn',true);})
       .catch(e=>{
         try{console.error('[WatchList] screen share failed',e);}catch(_){}
         // The embedded call CAN share screen and audio on this phone — that was

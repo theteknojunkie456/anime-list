@@ -486,6 +486,15 @@ export class PartyRoom {
       }
       // Re-sync: the host restarts the countdown on whatever is already playing,
       // so a party that has drifted apart lines back up without changing show.
+      // Host's playback position, relayed to everyone else. Tiny and frequent —
+      // it carries a timestamp and a state, never media.
+      case 'ytsync': {
+        if (!isHost) return;
+        const at = Math.max(0, Math.min(86400, Number(msg.at) || 0));
+        const playing = !!msg.playing;
+        this.broadcastRaw({ t: 'ytsync', at, playing, vid: String(msg.vid || '').slice(0, 24), sentAt: Date.now() }, uid);
+        return;
+      }
       case 'resync': {
         if (!isHost) return;
         room.paused = false;
@@ -557,6 +566,15 @@ export class PartyRoom {
   broadcast() { const s = JSON.stringify({ t: 'state', room: this.view() }); for (const ws of this.state.getWebSockets()) { try { ws.send(s); } catch {} } }
   broadcastReact(rc) { const s = JSON.stringify({ t: 'react', r: rc }); for (const ws of this.state.getWebSockets()) { try { ws.send(s); } catch {} } }
   sendTo(uid, obj) { const s = JSON.stringify(obj); for (const ws of this.state.getWebSockets(uid)) { try { ws.send(s); } catch {} } }
+  // Straight to everyone but the sender, with no room-state write. Playback
+  // position arrives several times a minute; persisting it would rewrite the
+  // room object constantly for something nobody needs after the moment passes.
+  broadcastRaw(obj, exceptUid) {
+    const s = JSON.stringify(obj);
+    for (const ws of this.state.getWebSockets()) {
+      try { if (exceptUid && this.state.getTags(ws).includes(exceptUid)) continue; ws.send(s); } catch {}
+    }
+  }
 }
 
 function json(obj, status, cors) {

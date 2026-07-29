@@ -5904,6 +5904,7 @@ function partyConnect(code,create){
   ws.onmessage=e=>{let m;try{m=JSON.parse(e.data);}catch{return;}
     if(m.t==='state')applyRoom(m.room);
     else if(m.t==='react')processReacts(m.r?[m.r]:m.reacts);   // lightweight: float the emoji, no full-state churn
+    else if(m.t==='ytsync')applyYtSync(m);                      // follow the host's player, hands-free
     else if(m.t==='typing')partyShowTyping(m.name,m.uid);
     else if(m.t==='signal')handleSignalMsg(m);
     else if(m.t==='error'){toast(m.msg||'Party error');partyEnd(true);}
@@ -6024,6 +6025,9 @@ function watchParty(title,ep,aniId){
   document.getElementById('playerView').classList.add('on');
   renderPvNav(null);
   partyInSession=true;partyCurEp=ep;hidePauseOverlay();renderPvHostBar();
+  // Only the host is hands-on: they simply watch, and their player's position is
+  // reported for everyone else to follow.
+  try{if(partyIsHost)startYtSync();}catch(e){}
 }
 function partyCreate(){
   const n=(document.getElementById('ptName')?document.getElementById('ptName').value.trim():'')||partyName();
@@ -6109,6 +6113,7 @@ function partyMediaCommand(cmd){
 }
 function showPauseOverlay(){
   const stopped=partyMediaCommand('pause');
+  try{partyBroadcastPlayback(false);}catch(e){}
   const el=document.getElementById('pvPause');
   if(el&&document.getElementById('playerView').classList.contains('on')){
     const sub=el.querySelector('.pv-pause-s');
@@ -6119,6 +6124,7 @@ function showPauseOverlay(){
 function hidePauseOverlay(){
   const el=document.getElementById('pvPause');if(el)el.classList.remove('on');
   partyMediaCommand('play');
+  try{partyBroadcastPlayback(true);}catch(e){}
 }
 // A viewer follows the host's remote: auto-jump on episode change, show the pause
 // veil on pause. (The embed is cross-origin so we can't literally pause its video —
@@ -6164,6 +6170,70 @@ function partyFollowHost(room){
 }
 function partyFollow(){try{return localStorage.getItem('party_follow')!=='0';}catch{return true;}}
 function setPartyFollow(v){try{v?localStorage.removeItem('party_follow'):localStorage.setItem('party_follow','0');}catch{}renderParty();}
+// ─── SYNCED PLAYBACK ────────────────────────────────────────────────────────
+// Watching together without moving a single pixel. For anything WatchList plays
+// itself — the YouTube embeds, our own <video> — the host's player drives
+// everyone else's: pause, play and seek all follow. Each person gets full
+// quality, their own audio and their own subtitles, and it works on devices that
+// can never capture a screen, because these are commands rather than video.
+//
+// The YouTube iframe API talks over postMessage: we ask to be told its state,
+// and command it the same way. No SDK, no extra script.
+let _ytPollT=0,_ytLast=0,_ytApplying=false,_ytState={at:0,playing:false};
+function ytFrames(){
+  return [...document.querySelectorAll('iframe')].filter(f=>{try{return /youtube(-nocookie)?\.com/.test(f.src||'');}catch(e){return false;}});
+}
+function ytCommand(func,args){
+  ytFrames().forEach(f=>{try{f.contentWindow.postMessage(JSON.stringify({event:'command',func,args:args||[]}),'*');}catch(e){}});
+}
+// Ask each player to start reporting; without this it never volunteers state.
+function ytStartListening(){
+  ytFrames().forEach(f=>{try{f.contentWindow.postMessage(JSON.stringify({event:'listening',id:1}),'*');}catch(e){}});
+}
+try{window.addEventListener('message',e=>{
+  if(!/youtube(-nocookie)?\.com/.test(String(e.origin||'')))return;
+  let d; try{d=typeof e.data==='string'?JSON.parse(e.data):e.data;}catch(_){return;}
+  const info=d&&d.info;
+  if(!info)return;
+  if(typeof info.currentTime==='number')_ytState.at=info.currentTime;
+  if(typeof info.playerState==='number')_ytState.playing=(info.playerState===1);
+});}catch(e){}
+// Host: report position on a slow tick. 2.5s is often enough to stay together
+// without turning the channel into a firehose.
+function ytSyncTick(){
+  if(!partyIsHost||!partyActive())return;
+  ytStartListening();
+  const at=_ytState.at||0;
+  if(at&&Math.abs(at-_ytLast)>0.4){
+    _ytLast=at;
+    wsSend({t:'ytsync',at,playing:!!_ytState.playing});
+  }
+}
+function startYtSync(){
+  clearInterval(_ytPollT);
+  _ytPollT=setInterval(ytSyncTick,2500);
+  ytStartListening();
+}
+function stopYtSync(){clearInterval(_ytPollT);_ytPollT=0;}
+// Viewer: match the host, allowing for the hop between us. Only correct on real
+// drift — nudging constantly would stutter the picture for no benefit.
+function applyYtSync(m){
+  if(partyIsHost||_ytApplying)return;
+  const frames=ytFrames(); if(!frames.length)return;
+  const lag=Math.max(0,(Date.now()-(m.sentAt||Date.now()))/1000);
+  const target=(m.at||0)+(m.playing?lag:0);
+  const drift=Math.abs((_ytState.at||0)-target);
+  _ytApplying=true;
+  try{
+    if(drift>1.5)ytCommand('seekTo',[target,true]);
+    if(m.playing)ytCommand('playVideo');else ytCommand('pauseVideo');
+  }catch(e){}
+  setTimeout(()=>{_ytApplying=false;},600);
+}
+function partyBroadcastPlayback(playing){
+  if(!partyIsHost)return;
+  try{wsSend({t:'ytsync',at:_ytState.at||0,playing:!!playing});}catch(e){}
+}
 function partyResync(){
   if(!partyIsHost){toast('Only the host can re-sync');return;}
   wsSend({t:'resync'});
@@ -9086,6 +9156,7 @@ function saveSource(){
 const AUTO_MARK_MS=15*60*1000;   // ~15 min → auto-mark (covers a full ep minus recap/outro)
 const PEEK_MS=2*60*1000;         // under 2 min → don't bother them
 function closePlayer(){
+  try{stopYtSync();}catch(e){}
   clearPvSession();   // an intentional close — don't spring it back on next load
   partyInSession=false;hidePauseOverlay();try{renderPvHostBar();}catch{}
   const v=document.getElementById('playerView'); if(v)v.classList.remove('on');

@@ -6407,7 +6407,10 @@ function natAttach(track){
   }
 }
 async function openNativeCall(){
-  if(_natTried)throw new Error('already tried');
+  // Guards this attempt only. It used to latch for the whole page session, so
+  // leaving a call and starting another silently dropped you onto the embed —
+  // which is why the pre-join screen reappeared after the first call.
+  if(_natTried)throw new Error('attempt already in flight');
   _natTried=true;
   await loadJitsiLib();
   const J=window.JitsiMeetJS;
@@ -6453,9 +6456,11 @@ async function openNativeCall(){
   _callMic=true;_callCam=false;_callShare=false;
   syncShareBtn();
   refresh();
+  _natTried=false;               // joined — free the guard for the next call
   return true;
 }
 function closeNativeCall(){
+  _natTried=false;               // a new call gets a fresh attempt at our renderer
   if(!_nat)return;
   try{(_nat.tracks||[]).forEach(t=>{try{t.dispose();}catch(e){}});}catch(e){}
   try{_nat.room&&_nat.room.leave();}catch(e){}
@@ -6476,6 +6481,7 @@ function openJitsi(){
     try{if(document.getElementById('partySheet').classList.contains('on'))renderParty();}catch(e){}
   }).catch(err=>{
     try{console.warn('[WatchList] native call unavailable, using the embed:',err&&err.message);}catch(e){}
+    _natTried=false;
     closeNativeCall();
     openEmbedCall();
   });
@@ -6491,7 +6497,9 @@ function openEmbedCall(){
       _jitsiApi=new JitsiMeetExternalAPI(JITSI_HOST,{
         roomName:jitsiRoom(),parentNode:frame,width:'100%',height:'100%',
         userInfo:{displayName:partyName()||'Guest'},
-        configOverwrite:{startWithVideoMuted:true,prejoinPageEnabled:false,disableDeepLinking:true,disableInviteFunctions:true},
+        // prejoinPageEnabled was renamed; current builds read prejoinConfig, so the old
+// flag alone left the "Join meeting" screen sitting inside our panel.
+        configOverwrite:{startWithVideoMuted:true,prejoinPageEnabled:false,prejoinConfig:{enabled:false},disableDeepLinking:true,disableInviteFunctions:true,requireDisplayName:false,startWithAudioMuted:false},
         // Our bar drives the call, so Jitsi's toolbar is redundant chrome in a
         // panel this small — keep tile view only, and drop the branding.
         interfaceConfigOverwrite:{TOOLBAR_BUTTONS:[],MOBILE_APP_PROMO:false,SHOW_JITSI_WATERMARK:false,SHOW_WATERMARK_FOR_GUESTS:false,SHOW_CHROME_EXTENSION_BANNER:false,DISABLE_JOIN_LEAVE_NOTIFICATIONS:true,HIDE_INVITE_MORE_HEADER:true,DEFAULT_BACKGROUND:'#0d0d0f',DISABLE_VIDEO_BACKGROUND:true,TILE_VIEW_MAX_COLUMNS:3}

@@ -6734,7 +6734,17 @@ function offerEmbedForSharing(why){
   // the same engine. Offering it would be theatre. The routes that genuinely
   // capture an iPhone screen are the installed app's broadcast, or a computer.
   const canEmbedHelp=f.getDisplayMedia;
-  bar.innerHTML=`<span><b>${escH(why)}</b>${f.getDisplayMedia?'':' — Safari gives web apps no way to record the screen on iPhone. The WatchList app can, using <b>Broadcast your screen</b>; so can any computer.'}</span>
+  // A standalone (home-screen) app and a Safari tab are not the same environment
+  // on iOS, and WebKit withholds capabilities from the former that it grants the
+  // latter. Worth saying, because from the outside they look identical — same
+  // site, same icon — and it is the difference nobody thinks to test.
+  const iosish=/iPhone|iPad|iPod/i.test(navigator.userAgent||'');
+  const hint=f.getDisplayMedia?''
+    :(iosish&&f.standalone
+      ?' — this is the home-screen app, which iOS gives no screen recording. Try opening the same site in <b>Safari</b> instead; if that fails too, the WatchList app’s <b>Broadcast your screen</b> is the way on iPhone.'
+      :' — this browser gives web apps no way to record the screen. On iPhone use the WatchList app’s <b>Broadcast your screen</b>; a computer can share directly.');
+  bar.innerHTML=`<span><b>${escH(why)}</b>${hint}</span>
+    ${(!f.getDisplayMedia&&iosish&&f.standalone)?`<button class="src-chip on" onclick="openExternal(location.origin+location.pathname)">Open in Safari</button>`:''}
     ${canEmbedHelp?`<button class="src-chip on" onclick="switchToEmbedCall()">Use the call that can share</button>`:''}
     <button class="src-chip" onclick="this.closest('.call-fallback').querySelector('.cf-why').style.display='block'">Why?</button>
     <button class="src-chip" onclick="this.closest('.call-fallback').remove()">Dismiss</button>

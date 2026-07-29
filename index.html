@@ -1062,6 +1062,25 @@ body.call-full{overflow:hidden;}
    cross-origin iframe and cannot be styled from here, so this carries the theme
    and the per-person colour instead — and it doubles as the speaking indicator. */
 .call-people{display:flex;flex-wrap:wrap;gap:6px;padding:0 10px 9px;}
+/* Our own tiles — the whole point of rendering the call ourselves. Each person
+   gets a soft border in their own colour, lifted to a glow while they speak. */
+.call-tiles{display:grid;gap:8px;padding:0 8px 8px;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));}
+.call-tiles.speaker{grid-template-columns:1fr;}
+.call-tiles.speaker .call-tile:not(.talking){display:none;}
+.call-tiles.speaker .call-tile:not(.talking):first-child{display:block;}
+.call-tile{position:relative;aspect-ratio:4/3;border-radius:14px;overflow:hidden;background:var(--bg3);
+  border:1px solid color-mix(in oklab,var(--who) 45%,transparent);
+  box-shadow:0 0 0 1px color-mix(in oklab,var(--who) 18%,transparent);
+  transition:box-shadow .22s ease,border-color .22s ease,transform .22s ease;}
+.call-tile.talking{border-color:var(--who);box-shadow:0 0 0 2px var(--who),0 0 22px -6px var(--who);transform:translateY(-1px);}
+.call-tile video{width:100%;height:100%;object-fit:cover;display:block;background:#000;}
+.call-tile.novideo video{opacity:0;}
+.call-tile.novideo::before{content:"";position:absolute;inset:0;
+  background:radial-gradient(120% 90% at 50% 30%,color-mix(in oklab,var(--who) 30%,transparent),transparent 70%),var(--bg3);}
+.call-tile-name{position:absolute;left:8px;bottom:8px;z-index:2;max-width:calc(100% - 16px);
+  padding:3px 9px;border-radius:99px;background:rgba(0,0,0,.55);backdrop-filter:blur(6px);
+  color:#fff;font-size:11px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+@media(prefers-reduced-motion:reduce){.call-tile{transition:none;}.call-tile.talking{transform:none;}}
 .call-person{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:99px;
   background:var(--bg3);border:1px solid var(--b1);color:var(--t2);font-size:11.5px;font-weight:700;
   transition:border-color .2s,color .2s,box-shadow .2s;}
@@ -6315,6 +6334,126 @@ function loadJitsiScript(cb){
   s.onerror=()=>{_jitsiLoading=false;toast('Couldn’t load the call — check your connection');};
   document.head.appendChild(s);
 }
+// ─── NATIVE CALL RENDERER ───────────────────────────────────────────────────
+// The embed hands us one opaque rectangle, so the tiles inside it can't be
+// styled — no borders, no per-person colour, no layout of our own. lib-jitsi-meet
+// is the same service without the UI: we join the room ourselves and create each
+// <video> element, so every tile is a real element in our DOM.
+//
+// It is also a great deal more to go wrong than an iframe, so every failure path
+// — library, connection, join timeout, tracks — falls back to the embed. A visual
+// upgrade must never be the reason a call doesn't happen.
+const JITSI_NATIVE={
+  lib:'https://jitsi.riot.im/libs/lib-jitsi-meet.min.js',
+  domain:'meet.jitsi', muc:'muc.meet.jitsi',
+  ws:'wss://meet.element.io/xmpp-websocket',
+};
+let _nat=null;                  // {conn,room,tracks,people}
+let _natTried=false;
+function nativeCallOn(){return !!(_nat&&_nat.room);}
+function loadJitsiLib(){
+  return new Promise((res,rej)=>{
+    if(window.JitsiMeetJS)return res();
+    const el=document.createElement('script');el.src=JITSI_NATIVE.lib;
+    el.onload=()=>window.JitsiMeetJS?res():rej(new Error('no JitsiMeetJS'));
+    el.onerror=()=>rej(new Error('lib load failed'));
+    document.head.appendChild(el);
+  });
+}
+function natPersonColor(name){return friendColor(name||'?');}
+function renderNativeTiles(){
+  const wrap=document.getElementById('jitsiFrame'); if(!wrap||!_nat)return;
+  let grid=document.getElementById('callTiles');
+  if(!grid){wrap.innerHTML='<div id="callTiles" class="call-tiles"></div>';grid=document.getElementById('callTiles');}
+  const want=new Map();
+  want.set('local',{id:'local',name:(partyName()||'You')+' (you)',local:true});
+  (_nat.people||[]).forEach(p=>want.set(p.id,p));
+  // Reuse tiles rather than rebuilding: re-creating a <video> drops its stream.
+  [...grid.children].forEach(el=>{if(!want.has(el.dataset.pid))el.remove();});
+  want.forEach(p=>{
+    let t=grid.querySelector(`[data-pid="${CSS.escape(p.id)}"]`);
+    if(!t){
+      t=document.createElement('div');t.className='call-tile';t.dataset.pid=p.id;
+      t.innerHTML='<video autoplay playsinline'+(p.local?' muted':'')+'></video><span class="call-tile-name"></span>';
+      grid.appendChild(t);
+    }
+    t.style.setProperty('--who',natPersonColor(p.name));
+    t.classList.toggle('talking',_nat.speaker===p.id);
+    t.classList.toggle('novideo',!t.querySelector('video').srcObject);
+    const nm=t.querySelector('.call-tile-name'); if(nm)nm.textContent=p.name||'Someone';
+  });
+  grid.classList.toggle('speaker',!_callGrid);
+}
+function natAttach(track){
+  if(!_nat)return;
+  const pid=track.isLocal()?'local':track.getParticipantId();
+  renderNativeTiles();
+  const tile=document.querySelector(`#callTiles [data-pid="${CSS.escape(pid)}"]`); if(!tile)return;
+  if(track.getType()==='video'){
+    const v=tile.querySelector('video'); try{track.attach(v);}catch(e){}
+    tile.classList.remove('novideo');
+  }else if(!track.isLocal()){
+    let a=tile.querySelector('audio');
+    if(!a){a=document.createElement('audio');a.autoplay=true;tile.appendChild(a);}
+    try{track.attach(a);}catch(e){}
+  }
+}
+async function openNativeCall(){
+  if(_natTried)throw new Error('already tried');
+  _natTried=true;
+  await loadJitsiLib();
+  const J=window.JitsiMeetJS;
+  try{J.setLogLevel(J.logLevels.ERROR);}catch(e){}
+  J.init({disableAudioLevels:false});
+  const roomName=jitsiRoom().toLowerCase();
+  const conn=new J.JitsiConnection(null,null,{
+    hosts:{domain:JITSI_NATIVE.domain,muc:JITSI_NATIVE.muc},
+    serviceUrl:JITSI_NATIVE.ws+'?room='+encodeURIComponent(roomName),
+    clientNode:'http://jitsi.org/jitsimeet',
+  });
+  const E=J.events;
+  await new Promise((res,rej)=>{
+    const t=setTimeout(()=>rej(new Error('connect timeout')),9000);
+    conn.addEventListener(E.connection.CONNECTION_ESTABLISHED,()=>{clearTimeout(t);res();});
+    conn.addEventListener(E.connection.CONNECTION_FAILED,()=>{clearTimeout(t);rej(new Error('connection failed'));});
+    conn.connect();
+  });
+  const room=conn.initJitsiConference(roomName,{p2p:{enabled:true}});
+  _nat={conn,room,tracks:[],people:[],speaker:''};
+  const refresh=()=>{
+    _nat.people=room.getParticipants().map(p=>({id:p.getId(),name:p.getDisplayName()||'Someone'}));
+    _callNames={}; _nat.people.forEach(p=>{_callNames[p.id]=p.name;});
+    _callSpeaker=_nat.speaker; renderCallStatus(); renderNativeTiles();
+  };
+  room.on(E.conference.TRACK_ADDED,t=>{if(!t.isLocal())natAttach(t);});
+  room.on(E.conference.TRACK_REMOVED,()=>renderNativeTiles());
+  room.on(E.conference.USER_JOINED,refresh);
+  room.on(E.conference.USER_LEFT,refresh);
+  room.on(E.conference.DISPLAY_NAME_CHANGED,refresh);
+  room.on(E.conference.DOMINANT_SPEAKER_CHANGED,id=>{_nat.speaker=id;refresh();});
+  room.setDisplayName(partyName()||'Guest');
+  await new Promise((res,rej)=>{
+    const t=setTimeout(()=>rej(new Error('join timeout')),9000);
+    room.on(E.conference.CONFERENCE_JOINED,()=>{clearTimeout(t);res();});
+    room.join();
+  });
+  // Mic only to start, exactly like the embed did.
+  try{
+    const local=await J.createLocalTracks({devices:['audio']});
+    local.forEach(t=>{_nat.tracks.push(t);room.addTrack(t);});
+  }catch(e){}
+  _callMic=true;_callCam=false;_callShare=false;
+  refresh();
+  return true;
+}
+function closeNativeCall(){
+  if(!_nat)return;
+  try{(_nat.tracks||[]).forEach(t=>{try{t.dispose();}catch(e){}});}catch(e){}
+  try{_nat.room&&_nat.room.leave();}catch(e){}
+  try{_nat.conn&&_nat.conn.disconnect();}catch(e){}
+  _nat=null;
+  const f=document.getElementById('jitsiFrame'); if(f)f.innerHTML='';
+}
 function openJitsi(){
   if(!partyActive()){toast('Start or join a party first');return;}
   try{if(voiceOn)leaveVoice();}catch(e){}   // never both voice systems at once → no echo
@@ -6322,7 +6461,20 @@ function openJitsi(){
   const mount=document.getElementById('partyCallMount');if(!mount)return;
   mount.style.display='';
   try{mount.scrollIntoView({block:'start',behavior:_scrollBehavior()});}catch(e){}
-  if(_jitsiApi)return;   // already in the call → just make sure it's shown
+  if(_jitsiApi||nativeCallOn())return;   // already in the call → just make sure it's shown
+  // Our own renderer first; the embed is the safety net, not the plan.
+  openNativeCall().then(()=>{
+    try{if(document.getElementById('partySheet').classList.contains('on'))renderParty();}catch(e){}
+  }).catch(err=>{
+    try{console.warn('[WatchList] native call unavailable, using the embed:',err&&err.message);}catch(e){}
+    closeNativeCall();
+    openEmbedCall();
+  });
+}
+function openEmbedCall(){
+  const mount=document.getElementById('partyCallMount');if(!mount)return;
+  mount.style.display='';
+  if(_jitsiApi)return;
   loadJitsiScript(()=>{
     if(_jitsiApi)return;
     const frame=document.getElementById('jitsiFrame');if(frame)frame.innerHTML='';
@@ -6367,13 +6519,37 @@ function hideJitsi(){}   // no separate view now — the call lives in the party
 let _callMic=true,_callCam=false,_callShare=false;
 function _callBtn(id,on){const b=document.getElementById(id);if(b)b.classList.toggle('on',!!on);}
 function callToggleMic(){
+  if(nativeCallOn()){
+    const a=(_nat.tracks||[]).find(t=>t.getType()==='audio');
+    if(a){try{_callMic?a.mute():a.unmute();}catch(e){}}
+    _callMic=!_callMic;
+    const b=document.getElementById('callMicBtn');
+    if(b){b.innerHTML=icon(_callMic?'mic':'mic-off');b.classList.toggle('off',!_callMic);}
+    return;
+  }
   if(!_jitsiApi)return;
   try{_jitsiApi.executeCommand('toggleAudio');}catch(e){}
   _callMic=!_callMic;
   const b=document.getElementById('callMicBtn');
   if(b){b.innerHTML=icon(_callMic?'mic':'mic-off');b.classList.toggle('off',!_callMic);b.title=_callMic?'Mute':'Unmute';b.setAttribute('aria-label',b.title);}
 }
+async function natToggleTrack(kind){
+  const have=(_nat.tracks||[]).find(t=>t.getType()==='video'&&(kind==='desktop'?t.getVideoType()==='desktop':t.getVideoType()!=='desktop'));
+  if(have){
+    try{_nat.room.removeTrack(have);}catch(e){}
+    try{have.dispose();}catch(e){}
+    _nat.tracks=_nat.tracks.filter(t=>t!==have);
+    renderNativeTiles(); return false;
+  }
+  const ts=await JitsiMeetJS.createLocalTracks({devices:[kind]});
+  ts.forEach(t=>{_nat.tracks.push(t);_nat.room.addTrack(t);if(t.getType()==='video')natAttach(t);});
+  return true;
+}
 function callToggleCam(){
+  if(nativeCallOn()){
+    natToggleTrack('video').then(on=>{_callCam=on;_callBtn('callCamBtn',on);}).catch(()=>toast('Couldn\u2019t start the camera'));
+    return;
+  }
   if(!_jitsiApi)return;
   try{_jitsiApi.executeCommand('toggleVideo');}catch(e){}
   _callCam=!_callCam; _callBtn('callCamBtn',_callCam);
@@ -6382,11 +6558,16 @@ function callToggleCam(){
 // toolbar entirely means providing it — same command, our bar.
 let _callGrid=false;
 function callToggleGrid(){
+  if(nativeCallOn()){_callGrid=!_callGrid;_callBtn('callGridBtn',_callGrid);renderNativeTiles();return;}
   if(!_jitsiApi)return;
   try{_jitsiApi.executeCommand('toggleTileView');}catch(e){}
   _callGrid=!_callGrid; _callBtn('callGridBtn',_callGrid);
 }
 function callToggleShare(){
+  if(nativeCallOn()){
+    natToggleTrack('desktop').then(on=>{_callShare=on;_callBtn('callShareBtn',on);}).catch(()=>toast('Screen sharing was blocked'));
+    return;
+  }
   if(!_jitsiApi)return;
   try{_jitsiApi.executeCommand('toggleShareScreen');}catch(e){}
   _callShare=!_callShare; _callBtn('callShareBtn',_callShare);
@@ -6439,6 +6620,7 @@ function leaveJitsi(){
   const mount=document.getElementById('partyCallMount');
   if(mount){mount.style.display='none';mount.classList.remove('full');}
   try{document.body.classList.remove('call-full');}catch(e){}
+  try{closeNativeCall();}catch(e){}
   if(_jitsiApi){try{_jitsiApi.dispose();}catch(e){}_jitsiApi=null;}
   const frame=document.getElementById('jitsiFrame');if(frame)frame.innerHTML='';
   try{if(document.getElementById('partySheet').classList.contains('on'))renderParty();}catch(e){}   // restore normal chat position
@@ -9614,7 +9796,7 @@ function _updBusy(){
   // In a party, a reload doesn't just interrupt one person — it drops them from
   // the room and the call while everyone else waits. Never update mid-party.
   try{if(typeof partyActive==='function'&&partyActive())return true;}catch(e){}
-  try{if(_jitsiApi)return true;}catch(e){}                             // in the voice/video call
+  try{if(_jitsiApi||nativeCallOn())return true;}catch(e){}             // in the voice/video call
   const el=document.activeElement; if(el&&/^(INPUT|TEXTAREA)$/.test(el.tagName)&&(el.value||'').length)return true;   // mid-typing
   return false;
 }
@@ -9629,13 +9811,13 @@ function _updBusy(){
 // you'd explain it to a friend — what they can now do, not what the code does.
 // No version numbers or jargon in the notes; the date IS the version.
 const RELEASE={
-  v:'2026-07-28.17',
-  title:'The party call grew up',
-  push:'Mic, camera and screen-share now live in WatchList\u2019s own bar \u2014 and the host\u2019s screen can go full screen.',
+  v:'2026-07-28.18',
+  title:'The call looks like WatchList now',
+  push:'Everyone in a party call gets their own soft-coloured tile that lights up when they talk.',
   notes:[
-    '<b>Mic, camera and share</b> are in the call bar now instead of buried inside the call window, and they light up so you can see at a glance what is on.',
-    'The bar tells you <b>who is in the call</b> and <b>who is talking</b>, rather than just saying \u201cLive\u201d.',
-    'The host\u2019s screen has a proper <b>full screen</b> button. And WatchList will never update itself while you are in a party \u2014 that used to drop you out of the room mid-meeting.',
+    'WatchList now draws the call itself instead of embedding someone else\u2019s. Every person gets their own tile with a soft border in their own colour, which lifts into a glow while they are speaking.',
+    'Grid or speaker view, mic, camera and screen share are all in WatchList\u2019s own bar.',
+    'If any of it cannot start on your device, the call quietly falls back to the old embedded one \u2014 a nicer-looking call is never a reason for no call.',
   ],
 };
 const SEEN_REL='seen_release';

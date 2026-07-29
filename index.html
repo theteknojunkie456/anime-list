@@ -6579,22 +6579,29 @@ function callToggleGrid(){
 function canShareScreen(){
   try{return !!(navigator.mediaDevices&&navigator.mediaDevices.getDisplayMedia);}catch(e){return false;}
 }
+// Deliberately NOT pre-disabled. Support here is genuinely inconsistent — it
+// varies by iOS version, by browser, and between a tab and an installed app —
+// and refusing to try means someone whose device CAN do it never finds out.
+// So: always attempt, and report what actually came back.
 function syncShareBtn(){
   const b=document.getElementById('callShareBtn'); if(!b)return;
-  const ok=canShareScreen();
-  b.classList.toggle('unavailable',!ok);
-  b.title=ok?'Share your screen':'Sharing a screen isn’t possible from a phone browser';
+  b.classList.remove('unavailable');
+  b.title='Share your screen';
   b.setAttribute('aria-label',b.title);
 }
+function shareFailMsg(e){
+  const n=String((e&&(e.name||e.message))||'');
+  if(/NotAllowed|Permission/i.test(n))return 'Screen sharing was declined';
+  if(/NotFound|NotReadable|Abort/i.test(n))return 'Couldn’t capture the screen — try again';
+  // getDisplayMedia missing entirely → the browser has no such capability.
+  if(/undefined is not a function|not a function|NotSupported|TypeError/i.test(n))
+    return (typeof IS_NATIVE!=='undefined'&&IS_NATIVE)?'This app can’t capture the screen — use Broadcast your screen':'This browser can’t share a screen';
+  return 'Screen sharing didn’t start ('+n.slice(0,28)+')';
+}
 function callToggleShare(){
-  if(!canShareScreen()){
-    if(typeof IS_NATIVE!=='undefined'&&IS_NATIVE)toast('Use Broadcast your screen — iPhone can’t share from a web page');
-    else toast('This device can’t share a screen from the browser');
-    return;
-  }
   if(nativeCallOn()){
     natToggleTrack('desktop').then(on=>{_callShare=on;_callBtn('callShareBtn',on);})
-      .catch(e=>toast(/NotAllowed/i.test(String(e&&e.name))?'Screen sharing was declined':'Couldn’t start screen sharing'));
+      .catch(e=>{try{console.error('[WatchList] screen share failed',e);}catch(_){}toast(shareFailMsg(e));});
     return;
   }
   if(!_jitsiApi)return;

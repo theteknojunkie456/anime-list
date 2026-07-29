@@ -6083,8 +6083,43 @@ function partyNext(){
   const ep=(partyRoom.ep||0)+1;
   wsSend({t:'set',title:partyRoom.title,animeId:partyRoom.animeId,ep,img:partyRoom.img});wsSend({t:'play'});
 }
-function showPauseOverlay(){const el=document.getElementById('pvPause');if(el&&document.getElementById('playerView').classList.contains('on'))el.classList.add('on');}
-function hidePauseOverlay(){const el=document.getElementById('pvPause');if(el)el.classList.remove('on');}
+// An overlay saying "paused" while the episode plays on underneath is worse than
+// nothing — you can still hear it. So pause the actual video wherever the browser
+// lets us: any <video> we own, and YouTube embeds through their postMessage API
+// (which is why enablejsapi is set on those URLs).
+//
+// A third-party streaming site in an iframe is the one case we cannot touch —
+// cross-origin means no access to its player, by the same rule that stops it
+// touching us. There, the overlay is the honest fallback, and it now says so
+// rather than implying the video stopped.
+function partyMediaCommand(cmd){
+  let reached=0;
+  document.querySelectorAll('video').forEach(v=>{
+    try{if(cmd==='pause'){if(!v.paused){v.pause();reached++;}}else{v.play&&v.play().catch(()=>{});reached++;}}catch(e){}
+  });
+  document.querySelectorAll('iframe').forEach(f=>{
+    let src=''; try{src=f.src||'';}catch(e){}
+    if(!/youtube(-nocookie)?\.com/.test(src))return;
+    try{
+      f.contentWindow.postMessage(JSON.stringify({event:'command',func:cmd==='pause'?'pauseVideo':'playVideo',args:[]}),'*');
+      reached++;
+    }catch(e){}
+  });
+  return reached;
+}
+function showPauseOverlay(){
+  const stopped=partyMediaCommand('pause');
+  const el=document.getElementById('pvPause');
+  if(el&&document.getElementById('playerView').classList.contains('on')){
+    const sub=el.querySelector('.pv-pause-s');
+    if(sub)sub.textContent=stopped?'Paused for everyone — it resumes together':'This site’s player can’t be paused from here — pause it yourself';
+    el.classList.add('on');
+  }
+}
+function hidePauseOverlay(){
+  const el=document.getElementById('pvPause');if(el)el.classList.remove('on');
+  partyMediaCommand('play');
+}
 // A viewer follows the host's remote: auto-jump on episode change, show the pause
 // veil on pause. (The embed is cross-origin so we can't literally pause its video —
 // the veil covers it and the resume 3·2·1 re-aligns everyone.)
@@ -8450,7 +8485,7 @@ function isPrivateHost(h){
 // absence of a blocking header is not the same as permission.
 function embedTarget(url){
   const id=ytId(url);
-  if(id)return 'https://www.youtube-nocookie.com/embed/'+encodeURIComponent(id)+'?autoplay=1&rel=0&playsinline=1';
+  if(id)return 'https://www.youtube-nocookie.com/embed/'+encodeURIComponent(id)+'?autoplay=1&rel=0&playsinline=1&enablejsapi=1';
   let u; try{u=new URL(url);}catch{return '';}
   if(isPrivateHost(u.hostname))return url;                       // your own server
   if(/(^|\.)archive\.org$/.test(u.hostname))                     // public-domain library

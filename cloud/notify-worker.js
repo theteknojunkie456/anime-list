@@ -414,6 +414,8 @@ async function handleFetch(request, env) {
       return handleStatus(body, env);
     case "/members":
       return handleMembers(body, env);
+    case "/rename":
+      return handleRename(body, env);
     case "/approve":
       return handleDecide(body, env, "approved");
     case "/deny":
@@ -582,15 +584,41 @@ async function countApproved(env) {
 
 // A device announces itself. New devices land 'pending' (or 'approved' if they
 // carried a valid auto-invite), and the admin is pinged once about a new request.
+// Let the admin label a device. Names are optional and often absent — someone
+// grandfathered in never typed one — so the roster needs a way to say "this is
+// Faiz" without waiting on the user. An alias set here wins over any name they
+// send later, so it never gets clobbered.
+async function handleRename(body, env) {
+  if (!adminOK(body, env)) return json({ ok: false, error: "unauthorized" }, 401);
+  const id = String(body.deviceId || "").replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 64);
+  if (!id) return json({ ok: false, error: "deviceId required" }, 400);
+  const key = devKey(id);
+  const raw = await env.SUBS.get(key);
+  if (!raw) return json({ ok: false, error: "not found" }, 404);
+  const rec = JSON.parse(raw);
+  const alias = String(body.alias || "").slice(0, 40).trim();
+  if (alias) rec.alias = alias; else delete rec.alias;
+  await env.SUBS.put(key, JSON.stringify(rec));
+  return json({ ok: true, alias: rec.alias || "" });
+}
 async function handleJoin(body, env) {
   const id = String(body.deviceId || "").replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 64);
   if (!id) return json({ ok: false, error: "deviceId required" }, 400);
   const key = devKey(id);
   const existing = await env.SUBS.get(key);
   if (existing) {
-    // Already known — just report status, don't re-notify.
+    // Already known — report status, don't re-notify. But do fill in a name if we
+    // never got one: grandfathered devices register as "(existing)", which is why
+    // the roster was a list of placeholders. A real name arriving later should
+    // land, while a name the admin set by hand is never overwritten.
     const rec = JSON.parse(existing);
-    return json({ ok: true, status: rec.status, name: rec.name || "" });
+    const incoming = String(body.name || "").slice(0, 40).trim();
+    const placeholder = !rec.name || rec.name === "(existing)";
+    if (incoming && placeholder && !rec.alias) {
+      rec.name = incoming;
+      await env.SUBS.put(key, JSON.stringify(rec));
+    }
+    return json({ ok: true, status: rec.status, name: rec.alias || rec.name || "" });
   }
 
   // Optional invite: an 'auto' code approves on the spot (still counts toward the

@@ -2452,6 +2452,15 @@ async function netCall(path,body){
   const r=await fetch(NOTIFY_URL+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})});
   return r.json();
 }
+// Any name this person has already told the app — their party display name, or the
+// name they use with friends. Asking again for something we already know is how you
+// end up with a roster full of "(unnamed)".
+function knownName(){
+  try{
+    const n=(typeof myFriendName==='function'&&myFriendName())||localStorage.getItem('party_name')||localStorage.getItem('friend_name')||'';
+    return String(n).trim().slice(0,40);
+  }catch(e){return '';}
+}
 // The gate. Returns true if the app should stay HIDDEN behind the join screen.
 async function networkGate(){
   if(typeof IS_NATIVE!=='undefined'&&IS_NATIVE)return false;   // official app: always open, no cap/gate
@@ -2459,10 +2468,15 @@ async function networkGate(){
   const force=gateTestMode()==='force';                   // preview mode ignores the shortcuts below
   if(!force&&netStatus()==='approved')return false;       // cached approval → open, revalidate below
   // Grandfather: anyone already using the app keeps working, no request needed.
-  if(!force&&(hasStoredList()||(Array.isArray(anime)&&anime.length))){setNetStatus('approved');try{netCall('/join',{deviceId:wlDevice(),name:'(existing)'});}catch{}return false;}
+  if(!force&&(hasStoredList()||(Array.isArray(anime)&&anime.length))){setNetStatus('approved');
+    // Send the name they've already given the app (parties, friends) rather than
+    // the "(existing)" placeholder — that placeholder is exactly why the roster
+    // was a column of anonymous rows.
+    try{netCall('/join',{deviceId:wlDevice(),name:knownName()||'(existing)'});}catch{}
+    return false;}
   // New device → ask the network where it stands.
   let st='unknown';
-  try{const inv=localStorage.getItem(NET_INVITE)||'';const j=await netCall('/join',{deviceId:wlDevice(),invite:inv});st=j.status||'unknown';}
+  try{const inv=localStorage.getItem(NET_INVITE)||'';const j=await netCall('/join',{deviceId:wlDevice(),name:knownName(),invite:inv});st=j.status||'unknown';}
   catch{ // can't reach the server: don't trap a brand-new user in a dead wall — let them in as a local-only guest.
     return false; }
   if(st==='approved'){setNetStatus('approved');return false;}
@@ -2738,7 +2752,7 @@ async function loadMembers(){
   const devs=r.devices||[];
   const pending=devs.filter(d=>d.status==='pending'), approved=devs.filter(d=>d.status==='approved'), denied=devs.filter(d=>d.status==='denied');
   const row=(d,actions)=>`<div class="src-opt" style="display:flex;align-items:center;gap:8px">
-    <div style="flex:1;min-width:0"><div class="src-name">${escH(d.name||'(unnamed)')}</div><div class="src-sub">${d.status}${d.joinedAt?' · '+when(d.joinedAt):''}${d.source?' · heard: '+escH(d.source):''}${d.invite?' · invite':''}</div></div>${actions}</div>`;
+    <div style="flex:1;min-width:0" onclick="adminRenameDevice('${escH(d.id)}','${escH(d.alias||d.name||'')}')"><div class="src-name">${escH(d.alias||d.name||'(tap to name)')}${d.alias&&d.name&&d.alias!==d.name?` <span class="src-tag">${escH(d.name)}</span>`:''}</div><div class="src-sub">${d.status}${d.joinedAt?' · '+when(d.joinedAt):''}${d.source?' · heard: '+escH(d.source):''}${d.invite?' · invite':''}</div></div>${actions}</div>`;
   const ap=d=>`<button class="src-chip on" onclick="adminDecide('${d.id}','approve')">Approve</button>`;
   const dn=d=>`<button class="src-chip" onclick="adminDecide('${d.id}','deny')">Deny</button>`;
   // Every group is always shown, with its count — an empty section is
@@ -2752,6 +2766,15 @@ async function loadMembers(){
     +group('Waiting on you',pending,d=>ap(d)+dn(d))
     +group('Members',approved,d=>dn(d))
     +group('Denied',denied,d=>ap(d),true);
+}
+// Name someone yourself. A device may never send a name — grandfathered ones
+// don't have one to send — so waiting for one means a roster you can't read.
+async function adminRenameDevice(id,current){
+  const v=prompt('Name this person',current||'');
+  if(v===null)return;
+  try{const r=await adminCall('/rename',{deviceId:id,alias:v.trim()});if(r&&r.error){toast(r.error);return;}}
+  catch{toast('Couldn’t save that name');return;}
+  loadMembers();
 }
 async function adminDecide(id,action){
   try{const r=await adminCall('/'+action,{deviceId:id});if(r&&r.error)toast(r.error);}catch{toast('Failed');}

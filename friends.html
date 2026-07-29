@@ -6676,8 +6676,9 @@ function callToggleMirror(){
   applyMirrorClasses();
   try{localStorage.setItem('call_mirror',_callMirror?'1':'0');}catch(e){}
   // Costs one tiny property broadcast — no media is re-sent.
+  // Silent on purpose: the button lighting up already says it happened, and the
+  // others' view just flips. Announcing it would be narrating a toggle.
   try{if(nativeCallOn())_nat.room.setLocalParticipantProperty('wlMirror',_callMirror?'1':'0');}catch(e){}
-  toast(_callMirror?'Your camera is flipped for everyone':'Camera back to normal');
 }
 try{_callMirror=(localStorage.getItem('call_mirror')||'0')==='1';}catch(e){}
 let _callGrid=false;

@@ -6540,16 +6540,9 @@ function openJitsi(){
   mount.style.display='';
   try{mount.scrollIntoView({block:'start',behavior:_scrollBehavior()});}catch(e){}
   if(_jitsiApi||nativeCallOn())return;   // already in the call → just make sure it's shown
-  // Where the browser exposes no screen capture to us — his installed PWA, for
-  // one — our renderer would look nicer and be unable to share, and screen
-  // sharing is the point of a watch party. So that device gets the embed from the
-  // start: no failed tap, no switch offered, it simply works. Devices that CAN
-  // capture keep the custom tiles and lose nothing.
-  if(!(navigator.mediaDevices&&navigator.mediaDevices.getDisplayMedia)){
-    try{console.info('[WatchList] no screen capture here — using the embedded call so sharing works');}catch(e){}
-    openEmbedCall();
-    return;
-  }
+  // Deliberately NOT switching to the embed when capture is missing: the embed
+  // runs in the same WebKit, so it cannot capture either. Sending anyone there
+  // would cost them the custom tiles and gain nothing at all.
   openNativeCall().then(()=>{
     try{if(document.getElementById('partySheet').classList.contains('on'))renderParty();}catch(e){}
   }).catch(err=>{
@@ -6737,10 +6730,12 @@ function offerEmbedForSharing(why){
   const f=captureFacts();
   const bar=document.createElement('div');
   bar.className='call-fallback';
-  // The embed is the path he has actually shared from on this device, so it leads
-  // — not as a consolation, but because it is the one known to work here.
-  bar.innerHTML=`<span><b>${escH(why)}</b></span>
-    <button class="src-chip on" onclick="switchToEmbedCall()">Use the call that can share</button>
+  // On a device with no capture API, the embedded call is no better — it runs in
+  // the same engine. Offering it would be theatre. The routes that genuinely
+  // capture an iPhone screen are the installed app's broadcast, or a computer.
+  const canEmbedHelp=f.getDisplayMedia;
+  bar.innerHTML=`<span><b>${escH(why)}</b>${f.getDisplayMedia?'':' — Safari gives web apps no way to record the screen on iPhone. The WatchList app can, using <b>Broadcast your screen</b>; so can any computer.'}</span>
+    ${canEmbedHelp?`<button class="src-chip on" onclick="switchToEmbedCall()">Use the call that can share</button>`:''}
     <button class="src-chip" onclick="this.closest('.call-fallback').querySelector('.cf-why').style.display='block'">Why?</button>
     <button class="src-chip" onclick="this.closest('.call-fallback').remove()">Dismiss</button>
     <div class="cf-why" style="display:none;flex:1 0 100%;margin-top:6px;font:11px/1.5 ui-monospace,Menlo,monospace;color:var(--t3);word-break:break-all">
@@ -6795,7 +6790,7 @@ function callToggleShare(){
     // No capture API at all in this build of the app: our renderer can never
     // share here, so go straight to the offer rather than failing first.
     if(!(navigator.mediaDevices&&navigator.mediaDevices.getDisplayMedia)){
-      offerEmbedForSharing('This view can’t capture the screen');
+      offerEmbedForSharing('An iPhone web app can’t record the screen');
       return;
     }
     // No await before this line — that is the whole point.

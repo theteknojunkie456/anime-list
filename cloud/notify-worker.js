@@ -620,20 +620,21 @@ async function handleJoin(body, env) {
   };
   await env.SUBS.put(key, JSON.stringify(rec));
 
-  // Ping the admin about a genuinely new pending request (best-effort).
-  if (status === "pending") {
-    try {
-      const aep = await env.SUBS.get("admin:endpoint");
-      if (aep) {
-        const asub = JSON.parse(aep);
-        await sendPush(asub, {
-          title: "WatchList — new join request",
-          body: (rec.name || "Someone") + " wants in. Open the admin panel to approve.",
-          url: "/", tag: "wl-join",
-        }, env);
-      }
-    } catch {}
-  }
+  // Tell the admin about EVERY new person. It only fired for pending before, so
+  // anyone arriving through an auto-approve invite joined invisibly — the admin
+  // had no idea their app had gained a user.
+  try {
+    const aep = await env.SUBS.get("admin:endpoint");
+    if (aep) {
+      const asub = JSON.parse(aep);
+      const who = rec.name || "Someone";
+      const heard = rec.source ? " (heard: " + rec.source + ")" : "";
+      const payload = status === "pending"
+        ? { title: "Someone wants in", body: who + " requested access" + heard + ". Approve them in Admin.", url: "/?admin=members", tag: "wl-join-" + id }
+        : { title: "New member", body: who + " joined with an invite" + heard + ".", url: "/?admin=members", tag: "wl-join-" + id };
+      await sendPush(asub, payload, env);
+    }
+  } catch {}
   return json({ ok: true, status });
 }
 

@@ -1077,6 +1077,7 @@ body.call-full{overflow:hidden;}
   transition:box-shadow .22s ease,border-color .22s ease,transform .22s ease;}
 .call-tile.talking{border-color:var(--who);box-shadow:0 0 0 2px var(--who),0 0 22px -6px var(--who);transform:translateY(-1px);}
 .call-tile video{width:100%;height:100%;object-fit:cover;display:block;background:#000;}
+.call-tile.mirrored video{transform:scaleX(-1);}
 .call-tile.novideo video{opacity:0;}
 .call-tile.novideo::before{content:"";position:absolute;inset:0;
   background:radial-gradient(120% 90% at 50% 30%,color-mix(in oklab,var(--who) 30%,transparent),transparent 70%),var(--bg3);}
@@ -1906,6 +1907,7 @@ body.recsel .pcard{position:relative;}
       <button class="party-call-x" id="callMicBtn" onclick="callToggleMic()" aria-label="Mute" title="Mute"><i data-ic="mic"></i></button>
       <button class="party-call-x" id="callCamBtn" onclick="callToggleCam()" aria-label="Camera" title="Camera"><i data-ic="camera"></i></button>
       <button class="party-call-x" id="callShareBtn" onclick="callToggleShare()" aria-label="Share screen" title="Share your screen"><i data-ic="upload"></i></button>
+      <button class="party-call-x" id="callMirrorBtn" onclick="callToggleMirror()" aria-label="Mirror my video" title="Mirror my own video"><i data-ic="refresh"></i></button>
       <button class="party-call-x" id="callGridBtn" onclick="callToggleGrid()" aria-label="Grid or speaker view" title="Grid / speaker view"><i data-ic="layers"></i></button>
       <button class="party-call-x" id="callFsBtn" onclick="toggleCallFull()" aria-label="Full screen" title="Full screen"><i data-ic="maximize"></i></button>
       <button class="party-call-x danger" onclick="leaveJitsi()" aria-label="Leave call" title="Leave the call"><i data-ic="x"></i></button></div>
@@ -2716,13 +2718,20 @@ async function loadMembers(){
   const devs=r.devices||[];
   const pending=devs.filter(d=>d.status==='pending'), approved=devs.filter(d=>d.status==='approved'), denied=devs.filter(d=>d.status==='denied');
   const row=(d,actions)=>`<div class="src-opt" style="display:flex;align-items:center;gap:8px">
-    <div style="flex:1;min-width:0"><div class="src-name">${escH(d.name||'(unnamed)')}</div><div class="src-sub">${d.status}${d.source?' · heard: '+escH(d.source):''}${d.invite?' · invite':''}</div></div>${actions}</div>`;
+    <div style="flex:1;min-width:0"><div class="src-name">${escH(d.name||'(unnamed)')}</div><div class="src-sub">${d.status}${d.joinedAt?' · '+when(d.joinedAt):''}${d.source?' · heard: '+escH(d.source):''}${d.invite?' · invite':''}</div></div>${actions}</div>`;
   const ap=d=>`<button class="src-chip on" onclick="adminDecide('${d.id}','approve')">Approve</button>`;
   const dn=d=>`<button class="src-chip" onclick="adminDecide('${d.id}','deny')">Deny</button>`;
+  // Every group is always shown, with its count — an empty section is
+  // information too ("nobody is waiting on me"), and a section that only appears
+  // when non-empty means you can't tell the difference between none and broken.
+  const when=t=>{if(!t)return '';const d=Math.round((Date.now()-t)/86400000);return d<=0?'today':d===1?'yesterday':d+'d ago';};
+  const group=(label,list,acts,dim)=>`<div class="ai-desc" style="margin:12px 0 6px${dim?';opacity:.7':''}"><b>${label} (${list.length})</b></div>`
+    +(list.length?list.map(d=>row(d,acts(d))).join(''):`<p class="ai-desc" style="opacity:.55;margin:0 0 4px">None.</p>`);
   box.innerHTML=
-    (pending.length?`<div class="ai-desc" style="margin:6px 0"><b>Pending (${pending.length})</b></div>`+pending.map(d=>row(d,ap(d)+dn(d))).join(''):'<p class="ai-desc">No pending requests.</p>')
-    +(approved.length?`<div class="ai-desc" style="margin:10px 0 6px"><b>Approved (${approved.length})</b></div>`+approved.map(d=>row(d,dn(d))).join(''):'')
-    +(denied.length?`<div class="ai-desc" style="margin:10px 0 6px;opacity:.7"><b>Denied (${denied.length})</b></div>`+denied.map(d=>row(d,ap(d))).join(''):'');
+    `<div class="dt-label" style="margin-top:2px">${icon('users')} Everyone · ${devs.length}</div>`
+    +group('Waiting on you',pending,d=>ap(d)+dn(d))
+    +group('Members',approved,d=>dn(d))
+    +group('Denied',denied,d=>ap(d),true);
 }
 async function adminDecide(id,action){
   try{const r=await adminCall('/'+action,{deviceId:id});if(r&&r.error)toast(r.error);}catch{toast('Failed');}
@@ -3057,7 +3066,7 @@ async function upgradeToV2(pw){                        // migrate an older (v1) 
 let lockRecMode=false;
 let _lockTapH=null;
 function showLock(){
-  appLocked=true;lockRecMode=false;
+  appLocked=true;lockRecMode=false;forgetSessionKey();
   const el=document.getElementById('lockScreen');if(!el)return;
   el.classList.add('on');
   const i=document.getElementById('lockPw');if(i)i.value='';
@@ -3118,7 +3127,40 @@ function setLockMode(rec){
 function toggleLockMode(){setLockMode(!lockRecMode);}
 function _unlockErr(i,err,msg){if(err)err.textContent=msg;const card=document.querySelector('.lock-card');if(card){card.classList.remove('shake');void card.offsetWidth;card.classList.add('shake');}if(i){i.value='';i.focus();}}
 var _pendingPartyJoin=null;   // an invite that arrived while the list was locked
-function finishUnlock(){hideLock();render();renderLockUI();setTimeout(syncOnOpen,200);try{setTimeout(fetchCovers,600);}catch{}try{restorePlayer();}catch{}try{alBootSync();}catch{}try{if(_pendingPartyJoin){var _pc=_pendingPartyJoin;_pendingPartyJoin=null;setTimeout(function(){try{window.wlJoinParty(_pc);}catch(e){}},350);}}catch{}}
+// iOS reloads a standalone app on rotation, on memory pressure, on returning from
+// the background — and every reload re-gated a password-locked list, which reads
+// as "it locked me out for no reason". The master key is held in sessionStorage
+// for the life of this app session so those reloads pass straight through.
+//
+// The trade-off, stated plainly: while the app is open, the key sits in
+// sessionStorage. It dies when the app is closed (not merely backgrounded), and
+// anyone who could read it already has the app open in front of them. Locking is
+// still real — closing the app, or Lock now, requires the password again.
+const SESS_KEY='wl_session_key';
+async function rememberSessionKey(){
+  try{
+    if(!cryptoKey)return;
+    const jwk=await crypto.subtle.exportKey('jwk',cryptoKey);
+    sessionStorage.setItem(SESS_KEY,JSON.stringify({k:jwk,w:envWraps}));
+  }catch(e){}
+}
+function forgetSessionKey(){try{sessionStorage.removeItem(SESS_KEY);}catch(e){}}
+async function resumeSession(){
+  let raw=null; try{raw=sessionStorage.getItem(SESS_KEY);}catch(e){}
+  if(!raw)return false;
+  try{
+    const {k,w}=JSON.parse(raw);
+    cryptoKey=await crypto.subtle.importKey('jwk',k,{name:'AES-GCM'},true,['encrypt','decrypt']);
+    envWraps=w||envWraps;
+    const env=JSON.parse(store().getItem(LSKEY));
+    if(!isEnvelope(env))throw 0;
+    anime=migrate(JSON.parse(await decList(env,cryptoKey)));
+    appLocked=false;
+    finishUnlock();
+    return true;
+  }catch(e){cryptoKey=null;forgetSessionKey();return false;}
+}
+function finishUnlock(){try{rememberSessionKey();}catch(e){}hideLock();render();renderLockUI();setTimeout(syncOnOpen,200);try{setTimeout(fetchCovers,600);}catch{}try{restorePlayer();}catch{}try{alBootSync();}catch{}try{if(_pendingPartyJoin){var _pc=_pendingPartyJoin;_pendingPartyJoin=null;setTimeout(function(){try{window.wlJoinParty(_pc);}catch(e){}},350);}}catch{}}
 async function tryUnlock(){                            // unlock with the password
   const i=document.getElementById('lockPw'),err=document.getElementById('lockErr');
   const pw=i?i.value:'';if(!pw)return;if(err)err.textContent='';
@@ -4458,6 +4500,16 @@ function openShowByAni(aniId){
   openDetail(it.id);
   return true;
 }
+// The join alert links to ?admin=members so tapping it lands on the roster.
+function consumeAdminParam(){
+  let q=''; try{q=new URL(location.href).searchParams.get('admin')||'';}catch(e){}
+  if(q!=='members')return;
+  try{const u=new URL(location.href);u.searchParams.delete('admin');history.replaceState(null,'',u.pathname+u.search+u.hash);}catch(e){}
+  let n=0;
+  const go=()=>{ if(!isAdminDevice()||++n>20)return; try{openAdmin();}catch(e){} };
+  setTimeout(go,900);
+}
+setTimeout(()=>{try{consumeAdminParam();}catch(e){}},1000);
 function consumeShowParam(url){
   let q=''; try{q=new URL(url||location.href,location.href).searchParams.get('show')||'';}catch(e){}
   if(!q)return;
@@ -6387,6 +6439,7 @@ function renderNativeTiles(){
     }
     t.style.setProperty('--who',natPersonColor(p.name));
     t.classList.toggle('talking',_nat.speaker===p.id);
+    if(p.local){t.classList.toggle('mirrored',_callMirror);_callBtn('callMirrorBtn',_callMirror);}
     t.classList.toggle('novideo',!t.querySelector('video').srcObject);
     const nm=t.querySelector('.call-tile-name'); if(nm)nm.textContent=p.name||'Someone';
   });
@@ -6591,6 +6644,18 @@ function callToggleCam(){
 }
 // Grid vs speaker was the one Jitsi button worth keeping, so removing their
 // toolbar entirely means providing it — same command, our bar.
+// Mirroring is a self-view convention: unmirrored, raising your right hand looks
+// like your left and text reads backwards. It flips only YOUR preview — what the
+// others receive is untouched, which is the whole point.
+let _callMirror=true;
+function callToggleMirror(){
+  _callMirror=!_callMirror;
+  _callBtn('callMirrorBtn',_callMirror);
+  const t=document.querySelector('#callTiles [data-pid="local"]');
+  if(t)t.classList.toggle('mirrored',_callMirror);
+  try{localStorage.setItem('call_mirror',_callMirror?'1':'0');}catch(e){}
+}
+try{_callMirror=(localStorage.getItem('call_mirror')||'1')==='1';}catch(e){}
 let _callGrid=false;
 function callToggleGrid(){
   if(nativeCallOn()){_callGrid=!_callGrid;_callBtn('callGridBtn',_callGrid);renderNativeTiles();return;}
@@ -10166,7 +10231,11 @@ try{(function(){var code=(new URL(location.href).searchParams.get('party')||'').
   else{setTimeout(function(){try{window.wlJoinParty(code);}catch(e){}},600);}
 })();}catch(e){}
 try{alCatchRedirect().then(()=>{if(!appLocked)alBootSync();}).catch(()=>{});}catch{}   // returning from AniList OAuth
-if(appLocked)showLock();   // stored list is ciphertext → gate the app until unlocked
+if(appLocked){
+  // A forced reload (rotation, memory pressure) shouldn't feel like being locked
+  // out — resume silently if this app session already unlocked once.
+  resumeSession().then(ok=>{if(!ok)showLock();}).catch(()=>showLock());
+}
 else try{restorePlayer();}catch{}   // came back mid-stream after an iOS reload → reopen it
 try{maybeShowTutorial();}catch{}
 try{document.getElementById('pageEl').addEventListener('scroll',onPageScroll,{passive:true});}catch{}

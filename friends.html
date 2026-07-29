@@ -9534,6 +9534,11 @@ function chatChips(){
   if(dropped)chips.push(`Was I wrong to drop ${dropped.title}?`);
   if(plan.length>1)chips.push('What should I start next, and why that one?');
   chips.push('Talk me out of starting something new');
+  // Personalised openers need a list to be personal about. A brand-new user has
+  // none, and would have been left with a single prompt — a worse first
+  // impression than the generic four these replaced. Top up to three.
+  const fallback=['What are you into?','Sell me on something I would never pick','What is worth watching this season?'];
+  for(const f of fallback){if(chips.length>=3)break;if(!chips.includes(f))chips.push(f);}
   return chips.slice(0,5);
 }
 function renderChatThread(typing){

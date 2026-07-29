@@ -6711,6 +6711,26 @@ let _callGrid=false;
 // sharing is a worse outcome than losing custom tiles.
 // What this environment actually exposes. Written out so a screenshot answers the
 // question instead of another round of me guessing at iOS behaviour.
+// window.open does nothing from a home-screen app — iOS keeps it inside the app,
+// which is why the button appeared to do nothing at all. The x-safari- scheme is
+// the documented way to hand a URL to Safari proper; the anchor click is the
+// fallback for anywhere that scheme isn't honoured.
+function openInSafari(){
+  const url=location.origin+location.pathname;
+  try{
+    const t=setTimeout(()=>{
+      try{
+        const a=document.createElement('a');
+        a.href=url;a.target='_blank';a.rel='noopener';
+        document.body.appendChild(a);a.click();a.remove();
+      }catch(e){}
+      toast('If Safari didn’t open, paste the address there yourself');
+    },700);
+    // If this navigates, the timeout never fires because the page is gone.
+    location.href='x-safari-'+url;
+    void t;
+  }catch(e){toast('Open Safari and go to the same address');}
+}
 function captureFacts(){
   const md=navigator.mediaDevices||{};
   const standalone=(window.matchMedia&&matchMedia('(display-mode: standalone)').matches)||navigator.standalone===true;
@@ -6744,7 +6764,7 @@ function offerEmbedForSharing(why){
       ?' — this is the home-screen app, which iOS gives no screen recording. Try opening the same site in <b>Safari</b> instead; if that fails too, the WatchList app’s <b>Broadcast your screen</b> is the way on iPhone.'
       :' — this browser gives web apps no way to record the screen. On iPhone use the WatchList app’s <b>Broadcast your screen</b>; a computer can share directly.');
   bar.innerHTML=`<span><b>${escH(why)}</b>${hint}</span>
-    ${(!f.getDisplayMedia&&iosish&&f.standalone)?`<button class="src-chip on" onclick="openExternal(location.origin+location.pathname)">Open in Safari</button>`:''}
+    ${(!f.getDisplayMedia&&iosish&&f.standalone)?`<button class="src-chip on" onclick="openInSafari()">Open in Safari</button>`:''}
     ${canEmbedHelp?`<button class="src-chip on" onclick="switchToEmbedCall()">Use the call that can share</button>`:''}
     <button class="src-chip" onclick="this.closest('.call-fallback').querySelector('.cf-why').style.display='block'">Why?</button>
     <button class="src-chip" onclick="this.closest('.call-fallback').remove()">Dismiss</button>

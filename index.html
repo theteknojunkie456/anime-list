@@ -1058,6 +1058,18 @@ body.call-full{overflow:hidden;}
    unmistakably off when muted — a control you have to interpret is a control
    you'll get wrong in front of other people. */
 .party-call-x.on{background:var(--ag);color:var(--a2);border:1px solid var(--a);}
+/* Who's in the call, each in their own colour. The tiles themselves are inside a
+   cross-origin iframe and cannot be styled from here, so this carries the theme
+   and the per-person colour instead — and it doubles as the speaking indicator. */
+.call-people{display:flex;flex-wrap:wrap;gap:6px;padding:0 10px 9px;}
+.call-person{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:99px;
+  background:var(--bg3);border:1px solid var(--b1);color:var(--t2);font-size:11.5px;font-weight:700;
+  transition:border-color .2s,color .2s,box-shadow .2s;}
+.call-person-dot{width:7px;height:7px;border-radius:99px;background:var(--who);box-shadow:0 0 7px var(--who);}
+.call-person.talking{color:var(--t1);border-color:var(--who);box-shadow:0 0 0 1px var(--who),0 0 14px -4px var(--who);}
+/* The panel itself carries the app's accent, so the call reads as part of the theme. */
+.party-call{border-color:var(--b2);}
+.party-call:has(.call-person.talking){border-color:var(--b3);}
 .party-call-x.off{background:rgba(255,90,90,.14);color:#ff8b8b;}
 .party-call-bar #callStatus{font-weight:700;color:var(--t2);}
 .party-call-bar #callStatus b{color:var(--t1);}
@@ -1870,6 +1882,7 @@ body.recsel .pcard{position:relative;}
       <button class="party-call-x" id="callGridBtn" onclick="callToggleGrid()" aria-label="Grid or speaker view" title="Grid / speaker view"><i data-ic="layers"></i></button>
       <button class="party-call-x" id="callFsBtn" onclick="toggleCallFull()" aria-label="Full screen" title="Full screen"><i data-ic="maximize"></i></button>
       <button class="party-call-x danger" onclick="leaveJitsi()" aria-label="Leave call" title="Leave the call"><i data-ic="x"></i></button></div>
+    <div id="callPeople" class="call-people"></div>
     <div id="jitsiFrame" class="party-call-frame"></div>
   </div>
   <div id="partyBody"></div>
@@ -6382,10 +6395,22 @@ function callToggleShare(){
 // in the call, and who is talking right now, is the part you can't.
 let _callNames={},_callSpeaker='';
 function renderCallStatus(){
-  const el=document.getElementById('callStatus'); if(!el)return;
+  const el=document.getElementById('callStatus');
   const n=Object.keys(_callNames).length+1;                 // +1 = you
   const who=_callSpeaker&&_callNames[_callSpeaker];
-  el.innerHTML=who?`<b>${escH(who)}</b> is talking`:`${n} in the call`;
+  if(el)el.innerHTML=who?`<b>${escH(who)}</b> is talking`:`${n} in the call`;
+  // The video tiles live in a cross-origin frame, so they can't be styled from
+  // here — no border, no tint, nothing. This is the part we DO own: one chip per
+  // person in their own colour, lit while they're the one speaking. The colour is
+  // derived from the name, so it's the same for everyone in the room.
+  const strip=document.getElementById('callPeople'); if(!strip)return;
+  const me={id:'__me',name:(partyName()||'You')};
+  const all=[me].concat(Object.keys(_callNames).map(id=>({id,name:_callNames[id]})));
+  strip.innerHTML=all.map(p=>{
+    const c=friendColor(p.name||p.id), live=(_callSpeaker&&_callSpeaker===p.id);
+    return `<span class="call-person${live?' talking':''}" style="--who:${c}">
+      <span class="call-person-dot"></span>${escH(p.name||'Someone')}</span>`;
+  }).join('');
 }
 function toggleShareFull(){
   const stage=document.querySelector('#shareView .sh-stage')||document.getElementById('shareView');

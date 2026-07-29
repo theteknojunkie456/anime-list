@@ -6707,15 +6707,36 @@ let _callGrid=false;
 // Rebuild this call on the embed, keeping the party intact. Used when our own
 // renderer can't capture the screen but the embedded one can — losing screen
 // sharing is a worse outcome than losing custom tiles.
+// What this environment actually exposes. Written out so a screenshot answers the
+// question instead of another round of me guessing at iOS behaviour.
+function captureFacts(){
+  const md=navigator.mediaDevices||{};
+  const standalone=(window.matchMedia&&matchMedia('(display-mode: standalone)').matches)||navigator.standalone===true;
+  return {
+    getDisplayMedia:!!md.getDisplayMedia,
+    getUserMedia:!!md.getUserMedia,
+    standalone:!!standalone,
+    native:(typeof IS_NATIVE!=='undefined'&&IS_NATIVE),
+    ua:(navigator.userAgent||'').slice(0,90),
+  };
+}
 function offerEmbedForSharing(why){
   const box=document.getElementById('callPeople');
   toast(why);
   if(!box)return;
+  document.querySelectorAll('.call-fallback').forEach(el=>el.remove());
+  const f=captureFacts();
   const bar=document.createElement('div');
   bar.className='call-fallback';
-  bar.innerHTML=`<span>${escH(why)}. The classic call can share on this device.</span>
-    <button class="src-chip on" onclick="switchToEmbedCall()">Switch and share</button>
-    <button class="src-chip" onclick="this.parentNode.remove()">Not now</button>`;
+  // The embed is the path he has actually shared from on this device, so it leads
+  // — not as a consolation, but because it is the one known to work here.
+  bar.innerHTML=`<span><b>${escH(why)}</b></span>
+    <button class="src-chip on" onclick="switchToEmbedCall()">Use the call that can share</button>
+    <button class="src-chip" onclick="this.closest('.call-fallback').querySelector('.cf-why').style.display='block'">Why?</button>
+    <button class="src-chip" onclick="this.closest('.call-fallback').remove()">Dismiss</button>
+    <div class="cf-why" style="display:none;flex:1 0 100%;margin-top:6px;font:11px/1.5 ui-monospace,Menlo,monospace;color:var(--t3);word-break:break-all">
+      getDisplayMedia: ${f.getDisplayMedia} · installed app: ${f.standalone} · native: ${f.native}<br>${escH(f.ua)}
+    </div>`;
   box.parentNode.insertBefore(bar,box.nextSibling);
 }
 function switchToEmbedCall(){
@@ -6762,6 +6783,12 @@ function shareFailMsg(e){
 function callToggleShare(){
   if(nativeCallOn()){
     if(_callShare){natStopDisplay().then(()=>{_callShare=false;_callBtn('callShareBtn',false);});return;}
+    // No capture API at all in this build of the app: our renderer can never
+    // share here, so go straight to the offer rather than failing first.
+    if(!(navigator.mediaDevices&&navigator.mediaDevices.getDisplayMedia)){
+      offerEmbedForSharing('This view can’t capture the screen');
+      return;
+    }
     // No await before this line — that is the whole point.
     grabDisplayStream()
       .then(stream=>natAddDisplayStream(stream))

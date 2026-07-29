@@ -484,6 +484,15 @@ export class PartyRoom {
         for (const w of this.state.getWebSockets(target)) { try { w.close(1000, 'removed'); } catch {} }
         room.rev++; await this.save(); this.broadcast(); return;
       }
+      // Re-sync: the host restarts the countdown on whatever is already playing,
+      // so a party that has drifted apart lines back up without changing show.
+      case 'resync': {
+        if (!isHost) return;
+        room.paused = false;
+        room.playAt = Date.now() + 3600;
+        this.sys(room, '▶ Re-syncing — pause and get ready');
+        room.rev++; await this.save(); this.broadcast(); return;
+      }
       case 'queue-next': {   // host advances the party to the first queued item + fires the 3·2·1
         if (!isHost) return;
         const next = (room.queue = room.queue || []).shift(); if (!next) return;

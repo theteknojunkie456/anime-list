@@ -2212,6 +2212,7 @@ body.recsel .pcard{position:relative;}
   <!-- host's party remote, right in the player — pause/next everyone without leaving the video -->
   <div class="pv-host" id="pvHostBar" style="display:none">
     <button class="pv-host-main" id="pvHostPause">Pause everyone</button>
+    <button class="pv-host-next" onclick="partyResync()" title="Count everyone back in together">Re-sync</button>
     <button class="pv-host-next" onclick="partyNext()">Next</button>
     <button class="pv-host-chat party-only" onclick="openSheet('partySheet')" aria-label="Party chat"><i data-ic="message"></i></button>
   </div>
@@ -6102,6 +6103,17 @@ function renderPvHostBar(){
   pb.classList.toggle('paused',paused);
   pb.onclick=paused?partyPlay:partyPause;
 }
+// WatchList's own answer to "share my screen" on a device that won't give up its
+// pixels: don't move pixels at all. Everyone already has the episode; what they
+// lack is a common clock. This restarts the 3·2·1 on whatever is playing, so a
+// party that has drifted apart lines up again — full quality for everyone, no
+// upload, no battery cost, and it works on every device including the ones that
+// can't capture a screen.
+function partyResync(){
+  if(!partyIsHost){toast('Only the host can re-sync');return;}
+  wsSend({t:'resync'});
+  toast('Counting everyone back in…');
+}
 function partyPick(id){
   const a=anime.find(x=>x.id===id);if(!a)return;
   const ep=Math.min((a.ep||0)+1,a.epTotal||((a.ep||0)+1));
@@ -6785,7 +6797,8 @@ function offerSyncWatch(){
   const bar=document.createElement('div');
   bar.className='call-fallback';
   bar.innerHTML=`<span><b>This device won’t hand over its screen.</b> You can still watch together — everyone opens the same episode at the same moment, in full quality.</span>
-    ${partyIsHost?`<button class="src-chip on" onclick="document.querySelectorAll('.call-fallback').forEach(e=>e.remove());closeAll();setTimeout(()=>openSheet('partySheet'),200);">Pick what to watch</button>`:''}
+    ${partyIsHost?`<button class="src-chip on" onclick="document.querySelectorAll('.call-fallback').forEach(e=>e.remove());closeAll();setTimeout(()=>openSheet('partySheet'),200);">Pick what to watch</button>
+    <button class="src-chip" onclick="partyResync();this.closest('.call-fallback').remove();">Count us in together</button>`:''}
     ${(f.standalone&&/iPhone|iPad|iPod/i.test(navigator.userAgent||''))?`<button class="src-chip" onclick="openInSafari()">Try in Safari</button>`:''}
     <button class="src-chip" onclick="this.closest('.call-fallback').querySelector('.cf-why').style.display='block'">Why?</button>
     <button class="src-chip" onclick="this.closest('.call-fallback').remove()">Dismiss</button>

@@ -1,16 +1,25 @@
 {
   "manifest_version": 3,
-  "name": "WatchList Party — sync anime with friends",
+  "name": "WatchList Party \u2014 sync anime with friends",
   "version": "0.1.0",
-  "description": "Watch anime in perfect sync — play, pause and seek together on AniNeko. Our own Teleparty, for WatchList.",
-  "permissions": ["storage"],
+  "description": "Watch anime in perfect sync \u2014 play, pause and seek together on AniNeko. Our own Teleparty, for WatchList.",
+  "permissions": [
+    "storage"
+  ],
   "host_permissions": [
     "https://anineko.to/*",
     "https://vivibebe.site/*",
     "https://*.vivibebe.site/*",
     "https://watchlist-sync.muhammad-dac.workers.dev/*"
   ],
-  "action": { "default_popup": "popup.html", "default_title": "WatchList Party" },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "WatchList Party",
+    "default_icon": {
+      "48": "icons/icon-48.png",
+      "128": "icons/icon-128.png"
+    }
+  },
   "content_scripts": [
     {
       "matches": [
@@ -20,7 +29,15 @@
       ],
       "all_frames": true,
       "run_at": "document_idle",
-      "js": ["content.js"]
+      "js": [
+        "content.js"
+      ]
     }
-  ]
+  ],
+  "icons": {
+    "48": "icons/icon-48.png",
+    "96": "icons/icon-96.png",
+    "128": "icons/icon-128.png",
+    "512": "icons/icon-512.png"
+  }
 }

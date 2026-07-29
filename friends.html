@@ -6540,7 +6540,16 @@ function openJitsi(){
   mount.style.display='';
   try{mount.scrollIntoView({block:'start',behavior:_scrollBehavior()});}catch(e){}
   if(_jitsiApi||nativeCallOn())return;   // already in the call → just make sure it's shown
-  // Our own renderer first; the embed is the safety net, not the plan.
+  // Where the browser exposes no screen capture to us — his installed PWA, for
+  // one — our renderer would look nicer and be unable to share, and screen
+  // sharing is the point of a watch party. So that device gets the embed from the
+  // start: no failed tap, no switch offered, it simply works. Devices that CAN
+  // capture keep the custom tiles and lose nothing.
+  if(!(navigator.mediaDevices&&navigator.mediaDevices.getDisplayMedia)){
+    try{console.info('[WatchList] no screen capture here — using the embedded call so sharing works');}catch(e){}
+    openEmbedCall();
+    return;
+  }
   openNativeCall().then(()=>{
     try{if(document.getElementById('partySheet').classList.contains('on'))renderParty();}catch(e){}
   }).catch(err=>{

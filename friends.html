@@ -1051,8 +1051,11 @@ body.call-full{overflow:hidden;}
 .party-call-bar .live-dot{flex:0 0 8px;width:8px;height:8px;border-radius:50%;background:#3ecf7e;box-shadow:0 0 8px #3ecf7e;animation:livePulse 2s ease-in-out infinite;}
 @keyframes livePulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.45;transform:scale(.72);}}
 .party-call-bar span{flex:1;letter-spacing:.01em;}
-.party-call-x{width:28px;height:28px;flex-shrink:0;border-radius:8px;background:var(--bg4);color:var(--t2);display:flex;align-items:center;justify-content:center;}
-.party-call-x .ico{width:15px;height:15px;}
+.party-call-x{width:38px;height:38px;flex-shrink:0;border-radius:11px;background:var(--bg4);color:var(--t2);display:flex;align-items:center;justify-content:center;position:relative;}
+/* The visible chip stays compact, but the tappable area extends past it to a
+   comfortable 44px — these are pressed mid-conversation, often one-handed. */
+.party-call-x::after{content:"";position:absolute;inset:-4px;}
+.party-call-x .ico{width:18px;height:18px;}
 .party-call-x.danger{color:#ff8b8b;background:rgba(255,90,90,.12);}
 /* Call controls: quiet by default, lit when the thing they control is ON, and
    unmistakably off when muted — a control you have to interpret is a control
@@ -1090,14 +1093,19 @@ body.call-full{overflow:hidden;}
 .party-call{border-color:var(--b2);}
 .party-call:has(.call-person.talking){border-color:var(--b3);}
 .party-call-x.off{background:rgba(255,90,90,.14);color:#ff8b8b;}
+.party-call-x.unavailable{opacity:.38;}
 .party-call-bar #callStatus{font-weight:700;color:var(--t2);}
 .party-call-bar #callStatus b{color:var(--t1);}
 @media(max-width:420px){
-  .party-call-bar{gap:5px;padding-left:11px;}
-  .party-call-x{width:26px;height:26px;}
-  .party-call-bar #callStatus{font-size:12px;}
+  .party-call-bar{gap:6px;padding:10px 8px 9px 12px;flex-wrap:wrap;}
+  .party-call-bar #callStatus{font-size:12.5px;flex:1 0 100%;order:-1;margin-bottom:2px;}
+  .party-call-x{width:40px;height:40px;}
 }
-.party-call-frame{height:44vh;min-height:300px;position:relative;background:#000;border-radius:12px;margin:0 8px 8px;overflow:hidden;}
+/* With our own tiles the frame sizes to its content — the fixed height was for
+   the embed, and left a black band under a single tile. */
+.party-call-frame{position:relative;background:transparent;border-radius:12px;margin:0;overflow:hidden;}
+.party-call-frame:has(iframe){height:44vh;min-height:300px;background:#000;margin:0 8px 8px;}
+.party-call.full .party-call-frame:has(iframe){height:auto;}
 .party-call-frame iframe{position:absolute!important;inset:0;width:100%!important;height:100%!important;border:0;}
 /* In-app player — mirrors .shareview so the transition feels identical */
 .ytview{position:fixed;inset:0;z-index:130;background:#000;display:none;transform:translateY(100%);transition:transform .38s cubic-bezier(.2,1,.28,1);}
@@ -6443,6 +6451,7 @@ async function openNativeCall(){
     local.forEach(t=>{_nat.tracks.push(t);room.addTrack(t);});
   }catch(e){}
   _callMic=true;_callCam=false;_callShare=false;
+  syncShareBtn();
   refresh();
   return true;
 }
@@ -6494,7 +6503,7 @@ function openEmbedCall(){
         _jitsiApi.addEventListener('participantJoined',e=>{_callNames[e.id]=e.displayName||'Someone';renderCallStatus();});
         _jitsiApi.addEventListener('participantLeft',e=>{delete _callNames[e.id];if(_callSpeaker===e.id)_callSpeaker='';renderCallStatus();});
         _jitsiApi.addEventListener('dominantSpeakerChanged',e=>{_callSpeaker=e.id||'';renderCallStatus();});
-        _jitsiApi.addEventListener('videoConferenceJoined',()=>{_callMic=true;_callCam=false;_callShare=false;renderCallStatus();});
+        _jitsiApi.addEventListener('videoConferenceJoined',()=>{_callMic=true;_callCam=false;_callShare=false;syncShareBtn();renderCallStatus();});
         _jitsiApi.addEventListener('audioMuteStatusChanged',e=>{_callMic=!e.muted;const b=document.getElementById('callMicBtn');if(b){b.innerHTML=icon(_callMic?'mic':'mic-off');b.classList.toggle('off',!_callMic);}});
         _jitsiApi.addEventListener('videoMuteStatusChanged',e=>{_callCam=!e.muted;_callBtn('callCamBtn',_callCam);});
         _jitsiApi.addEventListener('screenSharingStatusChanged',e=>{_callShare=!!e.on;_callBtn('callShareBtn',_callShare);});
@@ -6563,9 +6572,29 @@ function callToggleGrid(){
   try{_jitsiApi.executeCommand('toggleTileView');}catch(e){}
   _callGrid=!_callGrid; _callBtn('callGridBtn',_callGrid);
 }
+// iOS Safari has no getDisplayMedia at all — a web page on an iPhone simply
+// cannot capture the screen. Failing with "blocked" implied the user had denied
+// something they were never asked. Say what's true, and point at the one thing
+// that does work there: the official app's native broadcast.
+function canShareScreen(){
+  try{return !!(navigator.mediaDevices&&navigator.mediaDevices.getDisplayMedia);}catch(e){return false;}
+}
+function syncShareBtn(){
+  const b=document.getElementById('callShareBtn'); if(!b)return;
+  const ok=canShareScreen();
+  b.classList.toggle('unavailable',!ok);
+  b.title=ok?'Share your screen':'Sharing a screen isn’t possible from a phone browser';
+  b.setAttribute('aria-label',b.title);
+}
 function callToggleShare(){
+  if(!canShareScreen()){
+    if(typeof IS_NATIVE!=='undefined'&&IS_NATIVE)toast('Use Broadcast your screen — iPhone can’t share from a web page');
+    else toast('This device can’t share a screen from the browser');
+    return;
+  }
   if(nativeCallOn()){
-    natToggleTrack('desktop').then(on=>{_callShare=on;_callBtn('callShareBtn',on);}).catch(()=>toast('Screen sharing was blocked'));
+    natToggleTrack('desktop').then(on=>{_callShare=on;_callBtn('callShareBtn',on);})
+      .catch(e=>toast(/NotAllowed/i.test(String(e&&e.name))?'Screen sharing was declined':'Couldn’t start screen sharing'));
     return;
   }
   if(!_jitsiApi)return;

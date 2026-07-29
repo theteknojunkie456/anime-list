@@ -2412,7 +2412,15 @@ const NOTIFY_URL='https://watchlist-notify.muhammad-dac.workers.dev';
 // grandfathered straight through, an approval is cached so the app opens
 // instantly next time, and a network failure NEVER locks out an already-approved
 // device. The public page still opens for anyone; this gates the *experience*.
-const NETWORK_GATE=false;
+// Invite-only. Anyone new lands on the request screen and waits for approval in
+// Admin → Members; the admin gets a push the moment they ask. Off until now, which
+// is why people who opened the link walked straight in and never appeared in the
+// roster at all — the roster could only ever show devices the gate had recorded.
+//
+// Everyone already using the app is grandfathered by networkGate(): a device that
+// holds a list is approved on sight and registered as "(existing)", so switching
+// this on never locks out an existing user.
+const NETWORK_GATE=true;
 const NET_KEY='wl_device', NET_STATUS='wl_net_status', NET_INVITE='wl_invite';
 // Effective switch: the global flag OR a per-device test flag, so you can trial
 // the whole join flow on your own phone (visit with ?gate=1) before turning it

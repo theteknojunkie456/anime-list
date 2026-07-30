@@ -5287,6 +5287,7 @@ function openSheet(id){
   closeAll();
   document.getElementById('overlay').classList.add('on');
   document.getElementById(id).classList.add('on');
+  try{sheetFocusGuard(id,true);}catch(e){}
   if(id==='themeSheet')renderThemeGrid();
   if(id==='statsSheet')renderStatsSheet();
   if(id==='settingsSheet')renderSettings();
@@ -5299,14 +5300,14 @@ function openSheet(id){
   if(id==='anilistSheet')renderAniList();
   if(id==='partySheet')renderParty();
   if(id==='watchSheet')renderWatch();
-  if(id==='friendsSheet'){renderFriends();friendPresenceWatch(true);frFocusGuard(true);}
+  if(id==='friendsSheet'){renderFriends();friendPresenceWatch(true);}
   if(id==='recPickSheet')renderRecPick();
   if(id==='recSendSheet')renderRecSend();
   if(id==='recDetailSheet')renderRecDetail();
   try{updatePartyPill();}catch{}
 }
 function closeAll(){
-  try{frFocusGuard(false);}catch(e){}
+  try{sheetFocusGuard(null,false);}catch(e){}
   document.querySelectorAll('.sheet').forEach(s=>s.classList.remove('on'));
   document.getElementById('overlay').classList.remove('on');
   try{updatePartyPill();}catch{}
@@ -9150,26 +9151,40 @@ function paintPresence(){
 // Only while the sheet is actually open — presence you can't see isn't worth a
 // request every half minute.
 // A sheet that keeps focus behind it isn't a sheet, it's a picture of one: Tab
-// walks into the page underneath and nothing announces the change. Scoped to
-// this sheet on purpose — the rest of the app's sheets are a separate job.
-let _frInert=[], _frReturn=null;
-function frFocusGuard(on){
-  const sh=document.getElementById('friendsSheet'); if(!sh)return;
+// walks into the page underneath, a screen reader is never told the context
+// changed, and the page can be scrolled and operated through the overlay. Every
+// sheet gets this now, not just Friends.
+let _shInert=[], _shReturn=null, _shId=null;
+function sheetFocusGuard(id,on){
+  const sh=id&&document.getElementById(id);
   if(on){
-    if(_frInert.length)return;
-    sh.setAttribute('role','dialog');sh.setAttribute('aria-modal','true');sh.setAttribute('aria-label','Friends');
-    _frReturn=document.activeElement;
-    _frInert=[...document.body.children].filter(el=>el!==sh&&!el.classList.contains('sheet')&&el.id!=='overlay'&&el.id!=='toast'&&!el.hasAttribute('inert'));
-    _frInert.forEach(el=>el.setAttribute('inert',''));
+    if(!sh||_shInert.length)return;
+    _shId=id;
+    sh.setAttribute('role','dialog');sh.setAttribute('aria-modal','true');
+    const t=sh.querySelector('.sheet-title');
+    if(t&&!sh.getAttribute('aria-label'))sh.setAttribute('aria-label',(t.textContent||'').trim()||'Dialog');
+    _shReturn=document.activeElement;
+    // Only the page itself goes inert — #app and the bottom nav. Everything else
+    // at body level is another overlay (the player, the wheel, the tutorial, the
+    // lock screens), and some of those open on top of a sheet without closing it
+    // first. Inerting those would leave a live view that can't be touched.
+    _shInert=[document.getElementById('app'),document.querySelector('.nav')].filter(el=>el&&!el.hasAttribute('inert'));
+    _shInert.forEach(el=>el.setAttribute('inert',''));
+    // Focus the one control every sheet has. A sheet that focuses something of
+    // its own does it after this runs, so it still wins.
     const first=sh.querySelector('.sheet-cancel'); if(first)try{first.focus();}catch(e){}
   }else{
-    if(!_frInert.length)return;
-    _frInert.forEach(el=>el.removeAttribute('inert'));_frInert=[];
-    sh.removeAttribute('aria-modal');
-    if(_frReturn&&_frReturn.isConnected)try{_frReturn.focus();}catch(e){}
-    _frReturn=null;
+    if(!_shInert.length)return;
+    _shInert.forEach(el=>el.removeAttribute('inert'));_shInert=[];
+    const prev=_shId&&document.getElementById(_shId);
+    if(prev)prev.removeAttribute('aria-modal');
+    _shId=null;
+    if(_shReturn&&_shReturn.isConnected&&_shReturn.offsetParent!==null)try{_shReturn.focus();}catch(e){}
+    _shReturn=null;
   }
 }
+// Kept as the old name so the friends sheet's own calls still resolve.
+function frFocusGuard(on){sheetFocusGuard(on?'friendsSheet':_shId,on);}
 // Escape unwinds the row one layer at a time — armed remove, then rename, then
 // the open row itself — before anything else gets to close the whole sheet.
 document.addEventListener('keydown',e=>{

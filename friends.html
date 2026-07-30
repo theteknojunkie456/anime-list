@@ -1071,16 +1071,23 @@ body.call-full{overflow:hidden;}
    purpose, but it answers the question people actually stall on. */
 .wheel-wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100%;padding:28px 20px;gap:14px;}
 .wheel-title{font-family:var(--fd);font-weight:800;font-size:clamp(20px,5vw,28px);letter-spacing:-.02em;color:var(--t1);text-align:center;}
-.wheel-window{position:relative;width:min(300px,78vw);height:min(420px,58vh);border-radius:20px;overflow:hidden;
-  background:var(--bg2);border:1px solid var(--b2);box-shadow:0 20px 60px -24px var(--glow);}
-.wheel-reel{position:absolute;inset:0;display:flex;flex-direction:column;will-change:transform;}
-.wheel-reel img{width:100%;height:min(420px,58vh);object-fit:cover;flex:0 0 auto;background:var(--bg3);}
-.wheel-mark{position:absolute;inset:0;pointer-events:none;
-  background:linear-gradient(180deg,rgba(0,0,0,.55),transparent 22%,transparent 78%,rgba(0,0,0,.55));}
-.wheel-window.done{border-color:var(--a);box-shadow:0 0 0 2px var(--a),0 24px 70px -22px var(--glow);}
-.wheel-name{font-family:var(--fd);font-weight:800;font-size:17px;color:var(--t1);text-align:center;min-height:24px;}
+.pk-moods{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;}
+.pk-mood{padding:8px 14px;border-radius:999px;border:1px solid var(--b1);background:var(--bg2);color:var(--t2);font-family:var(--fd);font-size:12.5px;font-weight:700;cursor:pointer;transition:border-color .15s,color .15s,background .15s;}
+.pk-mood.on{border-color:var(--a);background:var(--ag);color:var(--a2);}
+.pk-card{display:flex;gap:16px;align-items:center;width:min(430px,92vw);padding:16px;border-radius:20px;background:var(--bg2);border:1px solid var(--b2);box-shadow:0 24px 60px -30px rgba(0,0,0,.8);}
+.pk-cover{flex:0 0 auto;width:104px;height:150px;border-radius:14px;object-fit:cover;background:var(--bg3);border:1px solid var(--b2);}
+.pk-body{flex:1;min-width:0;}
+.pk-name{font-family:var(--fd);font-weight:800;font-size:17.5px;line-height:1.25;color:var(--t1);}
+.pk-meta{font-size:12.5px;color:var(--t3);margin-top:5px;}
+.pk-why{font-size:13px;color:var(--t2);line-height:1.45;margin-top:9px;}
+.pk-empty{width:min(430px,92vw);padding:22px 18px;border-radius:20px;background:var(--bg2);border:1px solid var(--b2);color:var(--t2);font-size:13.5px;line-height:1.5;text-align:center;}
 .wheel-btns{display:flex;gap:9px;flex-wrap:wrap;justify-content:center;}
-@media(prefers-reduced-motion:reduce){.wheel-reel{transition:none!important;}}
+/* One button component, one of them primary — the old row mixed a block button
+   with two pills and read as three unrelated controls. */
+.pk-btn{padding:11px 18px;border-radius:999px;border:1px solid var(--b2);background:var(--bg3);color:var(--t1);font-family:var(--fd);font-size:13.5px;font-weight:800;cursor:pointer;transition:transform .12s,background .15s,border-color .15s;}
+.pk-btn:active{transform:scale(.97);}
+.pk-btn.prim{background:var(--a);border-color:var(--a);color:var(--aFg,#fff);}
+.pk-btn:focus-visible{outline:2px solid var(--a2);outline-offset:2px;}
 .call-fallback{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 10px 10px;padding:10px 12px;
   border-radius:12px;background:var(--bg3);border:1px solid var(--b2);color:var(--t2);font-size:12px;line-height:1.45;}
 .call-fallback span{flex:1 0 100%;}
@@ -2193,12 +2200,9 @@ body.recsel .pcard{position:relative;}
 <!-- DECIDE FOR ME — a reel that spins your Plan list and picks one -->
 <div class="statsview" id="wheelView">
   <div class="wheel-wrap">
-    <div class="wheel-title" id="wheelTitle">Deciding&hellip;</div>
-    <div class="wheel-window">
-      <div class="wheel-reel" id="wheelReel"></div>
-      <div class="wheel-mark" aria-hidden="true"></div>
-    </div>
-    <div class="wheel-name" id="wheelName"></div>
+    <div class="wheel-title" id="wheelTitle">Watch this</div>
+    <div class="pk-moods" id="pkMoods"></div>
+    <div class="pk-card" id="pkCard"></div>
     <div class="wheel-btns" id="wheelBtns"></div>
   </div>
 </div>
@@ -4268,28 +4272,11 @@ function qpLeftMins(a){
 function quickPickStripHTML(pool,isRead){
   if(isRead) return '';                            // watch list only for now
   if(pool.filter(a=>a.status==='watching'||a.status==='plan').length<2) return '';
-  const picks=[['sparkles','Surprise me','surprise'],['clock','Short one','short'],['check','Almost done','almost'],['compass','Something new','new']];
-  const chips=picks.map(([ic,label,mood])=>`<button class="qp-chip" onclick="quickPick('${mood}')">${icon(ic)}<span>${label}</span></button>`).join('');
-  return `<div class="qp-sec"><div class="qp-head">${icon('bulb')} Not sure what to watch?</div><div class="qp-chips">${chips}</div></div>`;
+  // One chip, not four. The moods still exist — they live inside the picker now,
+  // where you can change your mind without going back to the home screen.
+  return `<div class="qp-sec"><div class="qp-head">${icon('bulb')} Not sure what to watch?</div>
+    <div class="qp-chips"><button class="qp-chip" onclick="decideForMe()">${icon('sparkles')}<span>Pick one for me</span></button></div></div>`;
 }
-// Pick one title by mood and open it — a decision-maker, not another list to scroll.
-function quickPick(mood){
-  const pool=anime.filter(a=>kindOf(a)==='watch');
-  const watching=pool.filter(a=>a.status==='watching'), plan=pool.filter(a=>a.status==='plan');
-  let cands=[], why='';
-  if(mood==='short'){ cands=[...watching,...plan].filter(a=>a.epTotal).sort((a,b)=>qpLeftMins(a)-qpLeftMins(b)); why='shortest left'; }
-  else if(mood==='almost'){ cands=watching.filter(a=>a.epTotal&&(a.ep||0)<a.epTotal).sort((a,b)=>prog(b)-prog(a)); why='closest to the finish'; }
-  else if(mood==='new'){ cands=plan.slice().sort((a,b)=>(b.rating||0)-(a.rating||0)||(b.upd||0)-(a.upd||0)); why='fresh from your Plan'; }
-  else{ // surprise — a genuinely random one from what you're watching or plan to
-    cands=[...watching,...plan];
-    if(cands.length){const p=cands[Math.floor(Math.random()*cands.length)]; toast('Surprise — '+p.title); openDetail(p.id); return;}
-  }
-  if(!cands.length){ toast('Nothing fits that yet'); return; }
-  const pick=cands[0];
-  toast(pick.title+' — '+why);
-  openDetail(pick.id);
-}
-
 // ─── HOME RENDER ────────────────────────────────────────────────────────────
 function sorted(list){
   const l=[...list];
@@ -4423,7 +4410,7 @@ function renderFiltRow(){
     return`<button class="fchip${cls?' '+cls:''}" onclick="setFilter('${f}')">${l}<span class="fn">${n}</span></button>`;
   }).join('')
   // Sits with the Plan chip because that's the pile you stare at without choosing.
-  +((counts.plan||0)>1&&!isRead?`<button class="fchip" onclick="decideForMe()" title="Pick one for me">${icon('sparkles')} Decide</button>`:'');
+  ;   // "Decide" used to sit here, crowding the filter row it had nothing to do with — it lives under "Not sure what to watch?" now.
 }
 const SORT_MODES=[['recent','clock','Recent'],['az',null,'A–Z'],['rating','star','Rating'],['progress','play','Progress'],['duration','film','Shortest']];
 const MENU_FILTS=[['finished','check','Finished'],['dropped','x','Dropped']];   // extra filters tucked in the menu
@@ -7660,75 +7647,102 @@ function behindHTML(){
 
 // ─── STATS ──────────────────────────────────────────────────────────────────
 function parseHrs(s){const m=/([\d.]+)/.exec(s||'');return m?+m[1]:0;}
-// ─── DECIDE FOR ME ──────────────────────────────────────────────────────────
-// A reel of your Plan covers that spins and slows to a stop on one. It is silly,
-// deliberately — but the thing people actually stall on is choosing, and a list of
-// sixty titles is worse at that than a coin. Weighted a little toward shorter
-// shows, because "I can't start something huge tonight" is the usual reason a
-// choice never gets made.
-let _wheelSpinning=false;
-function planPool(){
-  return anime.filter(a=>kindOf(a)==='watch'&&a.status==='plan');
+// ─── PICK ONE FOR ME ────────────────────────────────────────────────────────
+// This used to be a spinning reel. The spin was the problem: it dressed a
+// decision up as a slot machine, and a slot machine has no opinion — it landed
+// on whatever, from Plan only, and asked you to accept it. Now it picks on
+// reasons it can state out loud, and states them. Same job, no theatre.
+let pkMood='any', pkCurrent=null, pkSeen=[];
+function pkPool(){return anime.filter(a=>kindOf(a)==='watch');}
+function pkHours(a){const m=(a.epTotal||0)*(a.dur||24);return m?(m>=90?Math.round(m/60)+'h':m+' min'):'';}
+// Candidates for the chosen mood. "Anything" deliberately includes what you're
+// already watching — the old version only ever offered Plan, which is why it
+// kept suggesting things you'd never picked up while ignoring the show you were
+// four episodes into.
+function pkCandidates(mood){
+  const pool=pkPool(), watching=pool.filter(a=>a.status==='watching'), plan=pool.filter(a=>a.status==='plan');
+  if(mood==='short')return [...watching,...plan].filter(a=>a.epTotal&&a.epTotal<=26);
+  if(mood==='almost')return watching.filter(a=>a.epTotal&&(a.ep||0)>0&&(a.ep||0)<a.epTotal&&prog(a)>=50);
+  if(mood==='new')return plan;
+  return [...watching,...plan];
 }
-function decideForMe(){
-  const pool=planPool();
-  if(!pool.length){toast('Nothing in Plan to watch yet');return;}
-  if(pool.length===1){wheelLand(pool[0],pool);return;}
-  const reel=document.getElementById('wheelReel'),win=document.querySelector('#wheelView .wheel-window');
-  const t=document.getElementById('wheelTitle'),nm=document.getElementById('wheelName'),btns=document.getElementById('wheelBtns');
-  document.getElementById('wheelView').classList.add('on');
-  win.classList.remove('done');
-  t.textContent='Deciding\u2026'; nm.textContent=''; btns.innerHTML='';
-  if(_wheelSpinning)return;
-  _wheelSpinning=true;
-
-  // Shorter shows get a slightly better chance — a 12-episode pick is likelier to
-  // actually get watched tonight than a 500-episode commitment.
-  const weight=a=>{const n=a.epTotal||24;return n<=13?3:n<=26?2:n<=60?1:0.5;};
-  const bag=[];pool.forEach(a=>{for(let i=0;i<Math.round(weight(a)*2);i++)bag.push(a);});
-  const winner=bag[Math.floor(Math.random()*bag.length)]||pool[0];
-
-  // Build a long strip that ends on the winner, so the stop is the animation
-  // landing rather than a swap at the end.
-  const strip=[];
-  for(let i=0;i<18;i++)strip.push(pool[Math.floor(Math.random()*pool.length)]);
-  strip.push(winner);
-  reel.style.transition='none';
-  reel.style.transform='translateY(0)';
-  reel.innerHTML=strip.map(a=>`<img src="${escH(safeImg(a.img||''))}" alt="">`).join('');
-  const h=document.querySelector('#wheelView .wheel-window').getBoundingClientRect().height;
-  requestAnimationFrame(()=>{
-    const reduce=(()=>{try{return matchMedia('(prefers-reduced-motion:reduce)').matches;}catch(e){return false;}})();
-    const dur=reduce?0:2600;
-    reel.style.transition=`transform ${dur}ms cubic-bezier(.12,.72,.06,1)`;
-    reel.style.transform=`translateY(${-(strip.length-1)*h}px)`;
-    setTimeout(()=>{_wheelSpinning=false;wheelLand(winner,pool);},dur+40);
-  });
+// Score on what the item actually knows about itself. There's no community
+// rating stored, so this doesn't pretend to judge quality — it favours things
+// you can realistically finish and things you've already started.
+function pkScore(a){
+  let sc=0;
+  const eps=a.epTotal||0;
+  if(eps&&eps<=13)sc+=1.1; else if(eps&&eps<=26)sc+=0.7; else if(eps&&eps<=60)sc+=0.15; else if(eps)sc-=0.5;
+  if(a.status==='watching'&&(a.ep||0)>0)sc+=0.9;               // finish what you started
+  if(prog(a)>=60)sc+=0.5;
+  if(a.fav)sc+=0.6;
+  if(a.rating)sc+=a.rating*0.12;                                // your own stars, when you've given them
+  const days=(Date.now()-(a.upd||0))/86400000;
+  if(days<14)sc+=0.35; else if(days>240)sc-=0.3;                // recent intent beats something parked for a year
+  return sc;
 }
-function wheelLand(a,pool){
-  const win=document.querySelector('#wheelView .wheel-window');
+function pkWhy(a){
+  const eps=a.epTotal||0, hrs=pkHours(a);
+  if(a.status==='watching'&&(a.ep||0)>0&&eps)return `You're ${a.ep} of ${eps} in — ${eps-(a.ep||0)} left.`;
+  if(eps&&eps<=13)return `Only ${eps} episodes${hrs?`, about ${hrs}`:''}. Easy to actually finish.`;
+  if(eps&&eps<=26)return `${eps} episodes${hrs?`, about ${hrs}`:''}.`;
+  if(a.fav)return 'One you starred.';
+  if(eps)return `${eps} episodes${hrs?`, about ${hrs}`:''}.`;
+  return 'Been sitting in your list.';
+}
+// Take the best few and choose among them, so "Show another" gives you variety
+// without falling off a cliff into whatever's left.
+function pkChoose(){
+  const cands=pkCandidates(pkMood);
+  if(!cands.length)return null;
+  const ranked=cands.slice().sort((a,b)=>pkScore(b)-pkScore(a));
+  const fresh=ranked.filter(a=>!pkSeen.includes(a.id));
+  const from=(fresh.length?fresh:ranked).slice(0,Math.min(5,Math.max(1,Math.ceil(ranked.length/3))));
+  const pick=from[Math.floor(Math.random()*from.length)];
+  pkSeen.push(pick.id); if(pkSeen.length>8)pkSeen.shift();
+  return pick;
+}
+function decideForMe(mood){
+  if(mood)pkMood=mood; else {pkMood='any';pkSeen=[];}
   document.getElementById('wheelView').classList.add('on');
-  if(win)win.classList.add('done');
-  const t=document.getElementById('wheelTitle'),nm=document.getElementById('wheelName'),btns=document.getElementById('wheelBtns');
-  const eps=a.epTotal?`${a.epTotal} episodes`:'';
-  t.textContent='This one.';
-  nm.innerHTML=`${escH(a.title)}${eps?`<div style="font-family:var(--fb);font-weight:600;font-size:12.5px;color:var(--t3);margin-top:3px">${eps}</div>`:''}`;
-  if(!document.getElementById('wheelReel').children.length&&a.img)
-    document.getElementById('wheelReel').innerHTML=`<img src="${escH(safeImg(a.img))}" alt="">`;
-  btns.innerHTML=`<button class="parse-btn" style="width:auto;padding:0 18px" onclick="wheelAccept('${a.id}')">Fine, I'll watch it</button>
-    ${pool.length>1?`<button class="src-chip" onclick="decideForMe()">Spin again</button>`:''}
-    <button class="src-chip" onclick="closeWheel()">Not now</button>`;
+  renderPick();
+}
+function renderPick(){
+  const moods=[['any','Anything'],['short','Short'],['almost','Almost done'],['new','Not started']];
+  const mb=document.getElementById('pkMoods');
+  if(mb)mb.innerHTML=moods.map(([k,l])=>`<button class="pk-mood${pkMood===k?' on':''}" onclick="decideForMe('${k}')">${escH(l)}</button>`).join('');
+  const card=document.getElementById('pkCard'), btns=document.getElementById('wheelBtns'), t=document.getElementById('wheelTitle');
+  const a=pkChoose(); pkCurrent=a;
+  if(!a){
+    if(t)t.textContent='Nothing fits';
+    card.outerHTML='<div class="pk-empty" id="pkCard">Nothing on your list matches that. Try <b>Anything</b>, or add a show first.</div>';
+    if(btns)btns.innerHTML=`<button class="pk-btn" onclick="closeWheel()">Close</button>`;
+    return;
+  }
+  if(t)t.textContent='Watch this';
+  const eps=a.epTotal?`${a.epTotal} episodes`:'', hrs=pkHours(a);
+  const el=document.getElementById('pkCard');
+  el.outerHTML=`<div class="pk-card" id="pkCard">
+    ${a.img?`<img class="pk-cover" src="${escH(safeImg(a.img))}" alt="">`:'<div class="pk-cover"></div>'}
+    <div class="pk-body">
+      <div class="pk-name">${escH(a.title)}</div>
+      <div class="pk-meta">${escH([eps,hrs&&eps?'· '+hrs:hrs].filter(Boolean).join(' '))}</div>
+      <div class="pk-why">${escH(pkWhy(a))}</div>
+    </div>
+  </div>`;
+  btns.innerHTML=`<button class="pk-btn prim" onclick="wheelAccept('${a.id}')">Start it</button>
+    <button class="pk-btn" onclick="renderPick()">Show another</button>
+    <button class="pk-btn" onclick="closeWheel()">Close</button>`;
 }
 function wheelAccept(id){
   const a=anime.find(x=>x.id===id); if(!a){closeWheel();return;}
-  a.status='watching'; touch(a); save(); render();
+  if(a.status!=='watching'){a.status='watching';touch(a);save();render();}
   closeWheel();
   openDetail(a.id);
 }
 function closeWheel(){
   const v=document.getElementById('wheelView'); if(v)v.classList.remove('on');
-  const r=document.getElementById('wheelReel'); if(r)r.innerHTML='';
-  _wheelSpinning=false;
+  pkCurrent=null;
 }
 function openStats(){renderStats();const v=document.getElementById('statsView');if(v)v.classList.add('on');}
 function closeStats(){const v=document.getElementById('statsView');if(v)v.classList.remove('on');}

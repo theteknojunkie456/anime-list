@@ -8894,6 +8894,34 @@ function renameFriendPrompt(code){
   renderFriends();
 }
 // Pull my mailbox: auto-add anyone who ACCEPTED my request; surface incoming requests.
+// ─── HEAL ONE-SIDED FRIENDSHIPS ─────────────────────────────────────────────
+// While the app couldn't receive, friendships completed on one side only: they have
+// you, you don't have them, or the reverse. Rather than making anyone re-add
+// anybody, each friend you hold gets told once that you hold them — an 'accept',
+// which is the same message a normal acceptance sends, so their app adds you
+// through the path it already trusts.
+//
+// Once per friend, tracked locally. That matters: firing repeatedly would re-add
+// you to the list of anyone who later removes you, which is a different feature
+// and not one anybody asked for.
+const FR_ANNOUNCED='fr_announced';
+function frAnnounced(){try{const v=JSON.parse(localStorage.getItem(FR_ANNOUNCED)||'[]');return Array.isArray(v)?v:[];}catch{return[];}}
+async function healFriendships(){
+  const me=myFriendCode(); if(!me)return;
+  const done=frAnnounced(), mine=friendsList();
+  const todo=mine.filter(f=>f&&f.code&&!done.includes(f.code));
+  if(!todo.length)return;
+  const from={code:me,name:myFriendName()||'A friend'};
+  for(const f of todo){
+    try{
+      await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({op:'fr_accept',to:f.code,from})});
+      done.push(f.code);
+    }catch(e){}
+  }
+  try{localStorage.setItem(FR_ANNOUNCED,JSON.stringify(done.slice(-300)));}catch(e){}
+}
+setTimeout(()=>{try{healFriendships();}catch(e){}},4200);
 async function pullFriendReqs(){
   // Was disabled on the official app while the Friends UI stayed visible, so the
   // app could send a request and never receive the acceptance — the friendship

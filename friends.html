@@ -4937,9 +4937,9 @@ async function loadRichDetail(aniId,forId){
     _richCache[aniId]=d;paint(d);
   }catch(e){const el=document.getElementById('dtRich');if(el&&detailId===forId)el.innerHTML='';}
 }
-// In-app playback for episodes that are LEGALLY on YouTube (rights-holder
-// channels — Muse Asia, Ani-One, etc.). Uses YouTube's official iframe embed,
-// permitted by their terms. No scraping: we only embed a real YouTube video id.
+// In-app playback for episodes the rights-holders publish on YouTube themselves
+// (Muse Asia, Ani-One, and the like). Uses YouTube's own iframe embed, which
+// their terms allow. No scraping: we only ever embed a real YouTube video id.
 function ytId(u){const m=String(u||'').match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/|v\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/);return m?m[1]:'';}
 function playYouTube(videoId,forId,ep){
   if(!videoId)return;closeYouTube();
@@ -4968,7 +4968,7 @@ function richDetailHTML(d,forId){
   const metaHTML=meta.length?`<div class="dt-rich-meta">${meta.map(m=>`<span>${m.indexOf('<')>=0?m:schEsc(m)}</span>`).join('')}</div>`:'';
   const _seenSite=new Set();const links=((d.externalLinks)||[]).filter(l=>{if(!(l&&l.type==='STREAMING'&&l.url))return false;const k=(l.site||'').trim().toLowerCase();if(!k||k==='crunchyroll'||_seenSite.has(k))return false;_seenSite.add(k);return true;});
   const linksHTML=links.length?`<div class="dt-label" style="margin-top:16px">${icon('play')} Watch on</div><div class="dt-watchlinks">${links.map(l=>`<button class="dt-watchlink" onclick="openExternal('${escH(l.url).replace(/'/g,"\\'")}')">${schEsc(l.site)} ${icon('external')}</button>`).join('')}</div>`:'';
-  // Official per-episode links AniList carries (Crunchyroll/etc. publish them) — legal, opens the source.
+  // Per-episode links AniList carries, published by the services themselves — opens the source.
   const eps=((d.streamingEpisodes)||[]).filter(e=>e&&e.url&&e.title);
   const epTotalN=(d.episodes||(_it&&_it.epTotal)||0);
   let epsHTML='';
@@ -7454,12 +7454,12 @@ function doImport(){
 // Normalizes a scraped catalogue row into a library item. The scrape is a
 // DISCOVERY source only — it supplies a title and nothing we trust. Everything
 // that matters (real genres, art, episode counts, aniId, and therefore the
-// official streaming links behind routeLegal) comes from AniList via
+// streaming links behind routeFree) comes from AniList via
 // fetchCovers, exactly like every other add path.
 //
-// The row's watch URL is deliberately dropped rather than stored: it points at
-// an unlicensed host, and §6 keeps every external source keyless and legal.
-// Playback stays on routeLegal — which lands on the exact official page anyway.
+// The row's watch URL is deliberately dropped rather than stored: §6 keeps every
+// external source keyless and coming from the services themselves. Playback stays
+// on routeFree — which lands on the exact official page anyway.
 // Recognizes a scraped catalogue paste: a JSON object or array carrying the
 // scraper's field names. Returns rows, or null so plain-text paste falls through
 // to the normal line parser untouched.
@@ -7735,7 +7735,7 @@ function closeStats(){const v=document.getElementById('statsView');if(v)v.classL
 
 // ─── IN-APP PLAYER (streaming site embed) ───────────────────────────────────
 // No built-in streaming source. The app never ships a default player: Watch opens
-// legal services externally (launchURL / Open-in-service). The in-frame player runs
+// services externally (launchURL / Open-in-service). The in-frame player runs
 // ONLY for a user-provided custom embeddable source that carries {ep}/{slug}.
 function streamSource(){try{return localStorage.getItem('stream_src')||'';}catch{return'';}}
 // Slugify a title for a custom source's {slug} token: lowercase, punctuation dropped,
@@ -7745,12 +7745,12 @@ function streamSlug(title){
 }
 // A per-title pinned link (a.srcUrl) overrides the global source for THAT show — you
 // set the exact URL once and Watch goes straight there. Falls back to the global
-// custom source, then (empty) to the default free-legal route. No scraping: you
+// custom source, then (empty) to the default free route. No scraping: you
 // supply the mapping, the app just remembers it.
 function effectiveSource(a){return (a&&a.srcUrl&&String(a.srcUrl).trim())||streamSource();}
 // Personalized list of streaming services offered as a per-title "Watch on" choice:
-// the paid services you picked as yours first (official app only), then the free/legal
-// presets, then any custom services you added. Web build stays free/legal only.
+// the paid services you picked as yours first (official app only), then the free
+// presets, then any custom services you added. Web build uses the free ones only.
 function watchServices(){
   var out=[];
   // A hidden source must not appear ANYWHERE — including this per-title picker, which
@@ -7847,7 +7847,7 @@ function fillSourceTokens(template,a,ep){
   });
 }
 // Build the in-frame URL for a custom source. With no token we open it as-is and let
-// them navigate/search. No custom source → empty (default Watch opens legal sites
+// them navigate/search. No custom source → empty (default Watch opens those sites
 // externally, never frames).
 function streamURL(a,epOverride){
   const ep=(epOverride>0?epOverride:watchEpisode(a)), src=effectiveSource(a);
@@ -7895,17 +7895,17 @@ function watchEpAt(id,ep){
 async function watchAnime(id,epArg){
   const a=anime.find(x=>x.id===id); if(!a) return;
   if(kindOf(a)!=='watch'||!a.aniId){toast('Watch is for anime only');return;}
-  if((noSourceMode()||!effectiveSource(a)&&!legalDefault())&&!(a.srcUrl&&String(a.srcUrl).trim())){showNoSourcePrompt();return;}   // no source chosen (and no per-title pin) → prompt
+  if((noSourceMode()||!effectiveSource(a)&&!freeDefault())&&!(a.srcUrl&&String(a.srcUrl).trim())){showNoSourcePrompt();return;}   // no source chosen (and no per-title pin) → prompt
   const reqEp=(epArg>0?epArg:0);   // a specific episode (from the episode list) or 0 = "next up"
   // Source resolution: a per-title pinned link (a.srcUrl) wins; else the global
-  // custom source; else the default legal route. A pin/custom source with {ep} plays
+  // custom source; else the default route. A pin/custom source with {ep} plays
   // in-frame; a bare preset opens in the browser.
   const src=effectiveSource(a);
-  // Legal auto-routing now runs on BOTH builds. It used to be official-app only,
+  // Auto-routing now runs on BOTH builds. It used to be official-app only,
   // which left web users with a single hardcoded free-search default — no way to
   // reach their own services, and no inline player. Nothing here is native-only:
   // it's official links, the user's own services, and a licensed YouTube embed.
-  if(!src){ await routeLegal(a); return; }
+  if(!src){ await routeFree(a); return; }
   // ONE RULE, both paths: if the source is embeddable it plays inline; otherwise
   // it opens in the browser and we track progress by time-away. Previously a
   // custom source always framed and a preset always opened, so the same "watch"
@@ -7917,7 +7917,7 @@ async function watchAnime(id,epArg){
   // X-Frame-Options / frame-ancestors genuinely cannot be rendered inside another
   // page — that's the browser refusing, not something we can code around — so the
   // player watches for a frame that never paints and offers the browser then.
-  // Only the built-in legal presets (which we know refuse) go straight out.
+  // Only the built-in presets (which we know refuse framing) go straight out.
   const _own=!!(a.srcUrl&&String(a.srcUrl).trim())||!!streamSource();
   if(!_own&&!embedTarget(streamURL(a,ep0).url||src)){
     armExternalWatch(a,ep0||1);
@@ -7941,7 +7941,7 @@ async function watchAnime(id,epArg){
   // binge controls light up only when the source can address a specific episode
   pvCanNav=!!ep&&/\{ep(isode)?\}/i.test(src);
   renderPvNav(a);
-  // Only custom {ep} sources reach here (default Watch opened a legal site externally
+  // Only custom {ep} sources reach here (default Watch opened the site externally
   // above), so this is always the user's own embeddable player URL.
   f.src=streamURL(a,ep).url;
   _pvSpell=0; pvOfferFix();
@@ -8169,7 +8169,7 @@ function restorePlayer(){
   watchAnime(s.id);
   if(pvReturnId===s.id){pvOpenTime=s.t;savePvSession(s.id,pvWatchEp,'watch');}   // keep the original clock so a long watch still auto-marks
 }
-// Official, legal, and FREE-FOREVER streaming — no paid tiers (Crunchyroll ended its
+// Services that stream free, for good — no paid tiers (Crunchyroll ended its
 // free tier in 2026; HIDIVE is paid — both excluded). WatchList opens the site's
 // search for your exact title in the browser (these services DRM / block framing).
 const WATCH_PRESETS=[
@@ -8186,7 +8186,7 @@ const WATCH_PRESETS=[
 // the hidden list: hiding a site and then watching the app send you there anyway
 // is the app overruling you. Falls through to the next unhidden preset, and only
 // back to the first if somehow everything is hidden.
-function legalDefault(){
+function freeDefault(){
   const p=WATCH_PRESETS.find(x=>!isHiddenSrc(x.name));
   if(p)return p;
   // Everything built-in is hidden. Fall to a site they added; if there's none,
@@ -8196,12 +8196,12 @@ function legalDefault(){
   return mine?{name:mine.name,url:mine.url}:null;
 }
 // ── Official-app only: "Open in [Service]" ──────────────────────────────────
-// The public web build uses ONLY the free-legal sources above. The official app
+// The public web build uses ONLY the free sources above. The official app
 // adds this: the user ticks the paid services they personally subscribe to, and
 // Watch hands off — via the native openurl bridge — into that service's own iPhone
 // app (universal link), where they're already signed in. We never see a password
 // and never host video: no streaming service lets a third party play its content,
-// so the only legal move is to open THEIR app. No piracy, ever, on either build.
+// so the only workable move is to open THEIR app. Neither build hosts video.
 const PAID_SERVICES=[
   {id:'crunchyroll',name:'Crunchyroll', url:'https://www.crunchyroll.com/search?q={title}'},
   {id:'netflix',    name:'Netflix',     url:'https://www.netflix.com/search?q={title}'},
@@ -8223,15 +8223,15 @@ function safeText(s){return String(s==null?'':s).replace(/[<>]/g,'').slice(0,400
 function myServices(){try{return JSON.parse(localStorage.getItem('my_services')||'[]');}catch{return[];}}
 function toggleService(id){let s=myServices();s=s.includes(id)?s.filter(x=>x!==id):s.concat(id);try{localStorage.setItem('my_services',JSON.stringify(s));}catch{}renderSource();}
 function fillURL(url,a){return url.replace(/\{title\}/g,encodeURIComponent(a.title)).replace(/\{slug\}/g,streamSlug(a.title)).replace(/\{ep\}/g,String(watchEpisode(a)||1));}
-// ── LEGAL AUTO-ROUTING ──────────────────────────────────────────────────────
+// ── AUTO-ROUTING ────────────────────────────────────────────────────────────
 // AniList's externalLinks are the OFFICIAL streaming links per title — direct to
 // the exact show (no slug-guessing, no 404s), free + subscription. We fetch them,
 // rank (your subscriptions → free → subscription), open the exact page, and
 // remember your pick so it just opens there next time.
-const LEGAL_FREE_SITES=new Set(['youtube','bilibili tv','bilibili','hoopla','pluto tv','the roku channel','roku','roku channel','retrocrush','plex','ani-one','ani-one asia','muse asia','iq','wetv','amazon freevee','freevee','crunchyroll (free)','pokemon tv']);
+const FREE_SITES=new Set(['youtube','bilibili tv','bilibili','hoopla','pluto tv','the roku channel','roku','roku channel','retrocrush','plex','ani-one','ani-one asia','muse asia','iq','wetv','amazon freevee','freevee','crunchyroll (free)','pokemon tv']);
 // map a My-Services id onto how the site appears in AniList (loose contains match)
 const SUB_MATCH={crunchyroll:'crunchyroll',netflix:'netflix',hidive:'hidive',hulu:'hulu',disney:'disney',max:'max',prime:'amazon',appletv:'apple'};
-async function whereLegal(a){
+async function whereToWatch(a){
   if(a.streams)return a.streams;
   if(!a.aniId)return (a.streams=[]);
   try{
@@ -8243,22 +8243,23 @@ async function whereLegal(a){
     for(const l of links){
       if(l.type!=='STREAMING'||!l.url)continue;
       const key=(l.site||'').toLowerCase(); if(!key||seen.has(key))continue; seen.add(key);
-      out.push({site:l.site,url:String(l.url).replace(/^http:/,'https:'),free:LEGAL_FREE_SITES.has(key)});
+      out.push({site:l.site,url:String(l.url).replace(/^http:/,'https:'),free:FREE_SITES.has(key)});
     }
     a.streams=out; try{save();}catch{}
     return out;
   }catch(e){return (a.streams=[]);}
 }
-function legalPref(){try{return localStorage.getItem('legal_pref')||'';}catch{return '';}}
-function setLegalPref(s){try{localStorage.setItem('legal_pref',s||'');}catch{}}
+// Reads the old key too, so a pick made before this rename still stands.
+function sitePref(){try{return localStorage.getItem('site_pref')||localStorage.getItem('legal_pref')||'';}catch{return '';}}
+function setSitePref(s){try{localStorage.setItem('site_pref',s||'');localStorage.removeItem('legal_pref');}catch{}}
 function subHas(siteLower){return myServices().some(id=>SUB_MATCH[id]&&siteLower.includes(SUB_MATCH[id]));}
-// Entry point: look up where it's legal, auto-open your remembered pick if it's
+// Entry point: look up where it's streaming, auto-open your remembered pick if
 // available, otherwise show the chooser of what actually carries THIS title.
-async function routeLegal(a){
+async function routeFree(a){
   toast(`Finding where to watch “${a.title}”…`);
-  const streams=await whereLegal(a);
+  const streams=await whereToWatch(a);
   watchTarget=a;
-  const pref=legalPref();
+  const pref=sitePref();
   // Check the user's own services first — someone who added one and picked it
   // wants it every time, and it won't be in AniList's list to match against.
   const own=pref&&!isHiddenSrc(pref)&&customServices().find(s=>s.name.toLowerCase()===pref);
@@ -8331,7 +8332,7 @@ function toggleHiddenSrc(name){
   if(i>=0)list.splice(i,1);else list.push(k);
   try{localStorage.setItem(HIDE_KEY,JSON.stringify(list));}catch{}
   // A hidden source can't stay the remembered auto-open pick.
-  if(i<0&&legalPref()===String(name||'').toLowerCase())setLegalPref('');
+  if(i<0&&sitePref()===String(name||'').toLowerCase())setSitePref('');
   toast(i>=0?`${name} is back`:`${name} hidden`);
   renderSource();
 }
@@ -8821,7 +8822,7 @@ function renderWatch(){
   const dress=list=>list.filter(o=>!isHiddenSrc(o.label)).map(o=>({...o,label:srcLabel(o.label)}));
   const myShown=dress(mine), recoShown=dress(reco), availShown=dress(avail), catShown=dress(cat);
   watchOpts=myShown.concat(recoShown,availShown,catShown);
-  const row=(o,i)=>{const[tl,tc]=WT_TAG[o.kind]||WT_TAG.search;return `<button class="wt-opt${legalPref()===o.site?' on':''}" onclick="watchOpen(${i})">
+  const row=(o,i)=>{const[tl,tc]=WT_TAG[o.kind]||WT_TAG.search;return `<button class="wt-opt${sitePref()===o.site?' on':''}" onclick="watchOpen(${i})">
     <div class="wt-main"><div class="wt-name">${escH(o.label)}</div><div class="wt-sub">${o.exact?'straight to the show':'opens a title search'}</div></div>
     <span class="wt-tag ${tc}">${tl}</span></button>`;};
   const sec=(label,items,off)=>items.length?`<div class="dt-label" style="margin-top:14px">${label}</div>`+items.map((o,i)=>row(o,off+i)).join(''):'';
@@ -8839,7 +8840,7 @@ function renderWatch(){
 // ─── IN-APP PLAYER ──────────────────────────────────────────────────────────
 // Plays inline ONLY where the host publishes an embed API and licenses it —
 // which in practice means YouTube (Muse Asia, Ani-One and other rights-holders
-// stream full episodes there; see LEGAL_FREE_SITES). Everything else opens
+// stream full episodes there; see FREE_SITES). Everything else opens
 // externally, and that is not a policy choice we could code around: Crunchyroll,
 // Netflix, Hulu and Max all send X-Frame-Options/frame-ancestors that make an
 // iframe render blank. Embedding is a permission, not a technique.
@@ -8896,7 +8897,7 @@ function closeYT(){
 }
 function watchOpen(i){
   const o=watchOpts[i],a=watchTarget;if(!o||!a)return;
-  setLegalPref(o.site);
+  setSitePref(o.site);
   // Exact-match links only: a search-preset URL isn't a video, so never embed it.
   // Your own server is the exception — its search page IS the app.
   let tgt='';
@@ -9625,7 +9626,7 @@ async function sendRecommend(){
   closeAll();
   toast(ok?`Sent to ${ok} friend${ok>1?'s':''}${fail?` (${fail} failed)`:''}`:'Send failed — try again');
 }
-// Open a URL outside the app — legal sites can't be framed. In the native shell we
+// Open a URL outside the app — these sites refuse framing. In the native shell we
 // hand it to iOS (opens Safari); on the web it opens a new tab.
 function openExternal(url){
   url=String(url==null?'':url).trim();
@@ -9639,11 +9640,11 @@ function launchURL(a,epOverride){
   // a._rt = the real title when an admin has renamed what they see. Links must
   // follow the real one or the show simply doesn't open.
   const real=a._rt||a.title;
-  const src=streamSource()||(legalDefault()||{}).url||'', slug=streamSlug(real);
+  const src=streamSource()||(freeDefault()||{}).url||'', slug=streamSlug(real);
   return src.replace(/\{title\}/g,encodeURIComponent(real)).replace(/\{slug\}/g,slug).replace(/\{ep\}/g,String((epOverride>0?epOverride:watchEpisode(a))||1));
 }
 function sourceName(){
-  const s=streamSource(); if(!s)return (legalDefault()||{}).name||'your own site';
+  const s=streamSource(); if(!s)return (freeDefault()||{}).name||'your own site';
   const p=WATCH_PRESETS.find(x=>x.url===s); if(p)return p.name;
   try{return new URL(s.replace(/\{[^}]+\}/g,'x')).hostname.replace(/^www\./,'');}catch{return 'the site';}
 }
@@ -9677,7 +9678,7 @@ function renderSource(){
     <div class="dt-label">${icon('play')} Where Watch opens</div>
     <button class="src-opt${!custom&&!noSourceMode()?' on':''}" onclick="setSource('')">
       <div class="src-name">Free search <span class="src-tag">Default</span></div>
-      <div class="src-sub">${legalDefault()?`Looks it up on ${escH(legalDefault().name)} — no account needed`:'Nothing to fall back on — set a site above'}</div>
+      <div class="src-sub">${freeDefault()?`Looks it up on ${escH(freeDefault().name)} — no account needed`:'Nothing to fall back on — set a site above'}</div>
     </button>
     ${chips?`<div class="src-picks" style="margin-top:9px">${chips}</div>`:''}
     <button class="src-opt${noSourceMode()?' on':''}" onclick="setNoSource()" style="margin-top:9px">
@@ -9825,7 +9826,7 @@ function autoOpen(a,name,url){
 function offerHideSource(name){
   showMWBar(`Couldn’t watch on <b>${schEsc(srcLabel(name))}</b>?`,'Hide it',()=>{
     if(!isHiddenSrc(name))toggleHiddenSrc(name);
-    if(legalPref()===String(name).toLowerCase())setLegalPref('');
+    if(sitePref()===String(name).toLowerCase())setSitePref('');
   });
 }
 function armExternalWatch(a,ep){

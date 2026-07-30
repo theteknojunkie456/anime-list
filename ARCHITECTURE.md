@@ -15,10 +15,10 @@ from one codebase, split at runtime by the `IS_NATIVE` flag:
 
 | Build | Where | What it has |
 |---|---|---|
-| **Public web** | `theteknojunkie456.github.io/anime-list` (GitHub Pages) | Personal tracker **+ Friends**, legal watch-routing (your own services + inline YouTube). No watch parties. |
+| **Public web** | `theteknojunkie456.github.io/anime-list` (GitHub Pages) | Personal tracker **+ Friends**, watch-routing (your own services + inline YouTube). No watch parties. |
 | **Official app** | TestFlight / native iOS (`ios-broadcast/`) | Everything above **+** watch parties, screen broadcast, "My Services". |
 
-> **Watch-routing moved to both builds.** `routeLegal()` used to be gated behind
+> **Watch-routing moved to both builds.** `routeFree()` used to be gated behind
 > `IS_NATIVE`; web fell back to one hardcoded free-search default, so web users
 > could never reach their own regional services. It now runs on both — nothing in
 > that path is native-only (official AniList links, user-added services, and a
@@ -136,7 +136,7 @@ into one card).
 
 ---
 
-## 6. External data (all keyless, all legal)
+## 6. External data (all keyless)
 
 - **AniList GraphQL** (`https://graphql.anilist.co`) — primary. CORS-enabled, no
   key. Metadata, covers, banners, dominant color, episode counts, per-episode
@@ -226,7 +226,7 @@ own.
 `watchAnime(id)` decides how to play. **One rule on both builds:** if the source
 is embeddable it plays inline, otherwise it opens in the browser.
 
-- **No custom source (either build):** `routeLegal(a)` lists where the title
+- **No custom source (either build):** `routeFree(a)` lists where the title
   actually is — the user's own services first, then AniList's official
   `externalLinks`, then free searches — and remembers the pick.
 - **Embeddable source** → inline player. `embedTarget()` is an allowlist:
@@ -288,8 +288,8 @@ can't.
 - Web changes go live via GitHub Pages; the app auto-updates (§9).
 
 **Hard rules (non-negotiable, both builds)**
-1. **No piracy.** Never embed/host a service's video, never handle streaming
-   credentials, never build a scraper/auto-resolver that locates unlicensed
-   streams. The only legal moves are opening the user's *own* service (official
-   app) or the neutral user-configured custom-source field. See §10.
+1. **Never host video.** Never embed a service's stream, never handle streaming
+   credentials, never build a scraper or auto-resolver that goes looking for one.
+   The two moves available are opening the user's *own* service (official app)
+   and the neutral user-configured custom-source field. See §10.
 2. **No adult content.** Enforced by the gate in §7 — don't weaken it.

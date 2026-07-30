@@ -149,7 +149,7 @@ struct WatchListShell: UIViewRepresentable {
                 if let pw = body["pw"] as? String, !pw.isEmpty { PWStore.save(pw); NSLog("WatchList: password saved to Keychain (Face ID armed for next launch)") }
             case "faceid":
                 DispatchQueue.main.async { self.triggerFaceID() }
-            case "openurl":   // legal streaming sites can't be framed — open in Safari
+            case "openurl":   // these sites refuse framing — open in Safari
                 if let s = body["url"] as? String {
                     // fall back to percent-encoding if the raw string won't parse
                     let url = URL(string: s)

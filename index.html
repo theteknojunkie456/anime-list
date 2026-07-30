@@ -7546,7 +7546,7 @@ function maybeShowTutorial(){
 // ─── ONBOARDING (swipeable welcome + setup) ─────────────────────────────────
 const _iOS=/iP(hone|ad|od)/.test(navigator.userAgent)||(/Macintosh/.test(navigator.userAgent)&&navigator.maxTouchPoints>1);
 const ONB=[
-  {ic:'sparkles',oc:'#c084fc',title:'Welcome to WatchList',body:'Track every anime & manga, see the total time to binge a whole series, watch on free legal sources, and swap recommendations with friends — all in one place.'},
+  {ic:'sparkles',oc:'#c084fc',title:'Welcome to WatchList',body:'Track every anime & manga, see the total time to binge a whole series, watch on free sources, and swap recommendations with friends — all in one place.'},
   {ic:'upload',oc:'#4dabf7',imp:'Recommended',title:'Add to your Home Screen',body:_iOS
     ? 'Tap the <b>Share</b> button in Safari’s toolbar (the box with an ↑), scroll down, and tap <b>Add to Home Screen</b>. WatchList then opens full-screen like a real app — and on iPhone it’s the <b>only</b> way episode alerts can reach you.'
     : 'Open your browser’s menu and tap <b>Install app</b> (or <b>Add to Home screen</b>). WatchList opens full-screen like a real app, and notifications work.'},
@@ -9676,7 +9676,7 @@ function renderSource(){
 
     <div class="dt-label">${icon('play')} Where Watch opens</div>
     <button class="src-opt${!custom&&!noSourceMode()?' on':''}" onclick="setSource('')">
-      <div class="src-name">Free legal search <span class="src-tag">Default</span></div>
+      <div class="src-name">Free search <span class="src-tag">Default</span></div>
       <div class="src-sub">${legalDefault()?`Looks it up on ${escH(legalDefault().name)} — no account needed`:'Nothing to fall back on — set a site above'}</div>
     </button>
     ${chips?`<div class="src-picks" style="margin-top:9px">${chips}</div>`:''}
@@ -9760,7 +9760,7 @@ function setSource(v){
   try{localStorage.removeItem('no_source');}catch{}   // choosing any source exits "no source" mode
   try{if(v)localStorage.setItem('stream_src',v);else localStorage.removeItem('stream_src');}catch{}
   renderSource();
-  toast(v?'Source set':'Back to default (legal, free)');
+  toast(v?'Source set':'Back to the free default');
 }
 // "No source" mode — user wants nothing auto-opened; Watch prompts them to set one.
 function noSourceMode(){try{return localStorage.getItem('no_source')==='1';}catch{return false;}}

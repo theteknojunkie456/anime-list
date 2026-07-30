@@ -4296,6 +4296,7 @@ function sorted(list){
   const l=[...list];
   if(sortMode==='az')l.sort((a,b)=>a.title.localeCompare(b.title));
   else if(sortMode==='rating')l.sort((a,b)=>(b.rating||0)-(a.rating||0));
+  else if(sortMode==='score')l.sort((a,b)=>(b.aniScore||0)-(a.aniScore||0));   // AniList community score, unrated last
   else if(sortMode==='progress')l.sort((a,b)=>prog(b)-prog(a));
   else if(sortMode==='duration')l.sort((a,b)=>(totalWatchMins(a)||Infinity)-(totalWatchMins(b)||Infinity));   // shortest first
   else l.sort((a,b)=>(b.upd||0)-(a.upd||0));
@@ -4426,7 +4427,9 @@ function renderFiltRow(){
   // Sits with the Plan chip because that's the pile you stare at without choosing.
   ;   // "Decide" used to sit here, crowding the filter row it had nothing to do with — it lives under "Not sure what to watch?" now.
 }
-const SORT_MODES=[['recent','clock','Recent'],['az',null,'A–Z'],['rating','star','Rating'],['progress','play','Progress'],['duration','film','Shortest']];
+// Two different ratings, so both say whose: 'Rating' is your own stars, 'Top
+// rated' is AniList's community score, stored per title since the score work.
+const SORT_MODES=[['recent','clock','Recent'],['az',null,'A–Z'],['rating','star','Your rating'],['score','trophy','Top rated'],['progress','play','Progress'],['duration','film','Shortest']];
 const MENU_FILTS=[['finished','check','Finished'],['dropped','x','Dropped']];   // extra filters tucked in the menu
 function renderSortRow(){
   const curSort=SORT_MODES.find(x=>x[0]===sortMode)||SORT_MODES[0];
@@ -7680,12 +7683,15 @@ function pkCandidates(mood){
   if(mood==='new')return plan;
   return [...watching,...plan];
 }
-// Score on what the item actually knows about itself. There's no community
-// rating stored, so this doesn't pretend to judge quality — it favours things
-// you can realistically finish and things you've already started.
+// Score on what the item knows about itself. AniList's community score carries
+// the most weight of any single factor — a 45%-rated show shouldn't be offered
+// ahead of an 85% one just because it's shorter — but length and whether you've
+// already started something still matter, because the pick has to be one you'd
+// realistically watch tonight.
 function pkScore(a){
   let sc=0;
   const eps=a.epTotal||0;
+  if(a.aniScore)sc+=(a.aniScore-65)/12;   // 65% ≈ neutral; 85% ≈ +1.7, 45% ≈ -1.7
   if(eps&&eps<=13)sc+=1.1; else if(eps&&eps<=26)sc+=0.7; else if(eps&&eps<=60)sc+=0.15; else if(eps)sc-=0.5;
   if(a.status==='watching'&&(a.ep||0)>0)sc+=0.9;               // finish what you started
   if(prog(a)>=60)sc+=0.5;
@@ -7698,6 +7704,8 @@ function pkScore(a){
 function pkWhy(a){
   const eps=a.epTotal||0, hrs=pkHours(a);
   if(a.status==='watching'&&(a.ep||0)>0&&eps)return `You're ${a.ep} of ${eps} in — ${eps-(a.ep||0)} left.`;
+  if(a.aniScore>=80&&eps&&eps<=26)return `Rated ${(a.aniScore/10).toFixed(1)} on AniList, and only ${eps} episodes.`;
+  if(a.aniScore>=82)return `One of the best-rated things on your list — ${(a.aniScore/10).toFixed(1)} on AniList.`;
   if(eps&&eps<=13)return `Only ${eps} episodes${hrs?`, about ${hrs}`:''}. Easy to actually finish.`;
   if(eps&&eps<=26)return `${eps} episodes${hrs?`, about ${hrs}`:''}.`;
   if(a.fav)return 'One you starred.';
@@ -7735,12 +7743,13 @@ function renderPick(){
   }
   if(t)t.textContent='Watch this';
   const eps=a.epTotal?`${a.epTotal} episodes`:'', hrs=pkHours(a);
+  const score=a.aniScore?`★ ${(a.aniScore/10).toFixed(1)}`:'';
   const el=document.getElementById('pkCard');
   el.outerHTML=`<div class="pk-card" id="pkCard">
     ${a.img?`<img class="pk-cover" src="${escH(safeImg(a.img))}" alt="">`:'<div class="pk-cover"></div>'}
     <div class="pk-body">
       <div class="pk-name">${escH(a.title)}</div>
-      <div class="pk-meta">${escH([eps,hrs&&eps?'· '+hrs:hrs].filter(Boolean).join(' '))}</div>
+      <div class="pk-meta">${escH([score,eps,hrs].filter(Boolean).join(' · '))}</div>
       <div class="pk-why">${escH(pkWhy(a))}</div>
     </div>
   </div>`;
@@ -10472,7 +10481,7 @@ function airingNeedy(a){
 }
 // !a.adultChk forces a one-time isAdult verification of EVERY title — even ones
 // already fully enriched — so adult content imported before this gate gets swept.
-function coverNeedy(){return anime.filter(a=>!a.adultChk||(!a.img&&!a.imgTried)||(!a.eps&&!a.detTried)||(!a.banner&&!a.bannerTried)||airingNeedy(a));}
+function coverNeedy(){return anime.filter(a=>!a.adultChk||(!a.img&&!a.imgTried)||(!a.eps&&!a.detTried)||(!a.banner&&!a.bannerTried)||(!a.aniScore&&!a.scoreTried)||airingNeedy(a));}
 async function fetchCovers(){
   if(coverRunning)return;coverRunning=true;
   let netFails=0,adultRemoved=0;
@@ -10490,9 +10499,12 @@ async function fetchCovers(){
         const read=kindOf(a)==='read';
         const type=read?'MANGA':'ANIME';
         // bannerImage = wide per-title scene art (may be null); coverImage.color = AniList's precomputed dominant hex
+        // averageScore = AniList's community score out of 100. It was already
+        // being fetched for the detail sheet and thrown away; storing it is what
+        // lets anything in the app rank by "is this actually good".
         const fields=read
-          ?'title{romaji english native} coverImage{large extraLarge color} bannerImage chapters volumes genres isAdult'
-          :'id title{romaji english native} coverImage{large extraLarge color} bannerImage episodes duration genres isAdult nextAiringEpisode{airingAt episode}';
+          ?'title{romaji english native} coverImage{large extraLarge color} bannerImage chapters volumes genres isAdult averageScore'
+          :'id title{romaji english native} coverImage{large extraLarge color} bannerImage episodes duration genres isAdult averageScore nextAiringEpisode{airingAt episode}';
         // Known season? Refresh that EXACT media by id — a title search would drift to
         // whatever AniList ranks first (often a different, currently-airing season),
         // pinning the wrong air date. Only unknown items fall back to a title search.
@@ -10527,6 +10539,7 @@ async function fetchCovers(){
           // per-title theming: wide banner art + AniList's dominant color (kept independent of any user-set bgImage/bgAccent)
           if(m.bannerImage)a.banner=m.bannerImage;
           if(m.coverImage&&m.coverImage.color)a.aniColor=m.coverImage.color;
+          if(m.averageScore)a.aniScore=m.averageScore;
           if(!a.eps){
             if(read){
               if(m.chapters){a.eps=`${m.chapters} chapters`;a.epTotal=m.chapters;}
@@ -10549,6 +10562,7 @@ async function fetchCovers(){
         if(!a.img)a.imgTried=true;
         a.bannerTried=true; // stamp even when bannerImage was null (some titles have none) so we don't refetch forever
         a.detTried=true;
+        a.scoreTried=1; // some titles genuinely have no score — stamp so they aren't refetched forever
         a.adultChk=1;   // verified against AniList's isAdult flag (adult ones already removed above)
       });
       if(adultIds.length){const gone=new Set(adultIds);anime=anime.filter(a=>!gone.has(a.id));adultRemoved+=adultIds.length;

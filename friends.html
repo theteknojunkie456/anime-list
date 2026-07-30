@@ -969,6 +969,8 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 .src-fold>*:last-child{margin-bottom:14px;}
 .src-chip{font-family:var(--fd);font-size:12.5px;font-weight:700;color:var(--t2);background:var(--bg3);border:1px solid var(--b1);border-radius:999px;padding:9px 15px;transition:border-color .15s,background .15s,color .15s;}
 .src-chip.on{border-color:var(--a);background:var(--ag);color:var(--a2);}
+.src-chip.yours{border-color:var(--b3);color:var(--t1);}
+.src-chip.yours.on{border-color:var(--a);color:var(--a2);}
 .src-chip:active{transform:scale(.96);}
 .src-ai{margin-top:12px;padding:12px 13px;border-radius:12px;background:var(--ag);border:1px solid var(--b2);}
 .src-ai-t{font-family:var(--fd);font-size:12.5px;font-weight:800;color:var(--a2);display:flex;align-items:center;gap:7px;line-height:1.3;}
@@ -9655,8 +9657,10 @@ function renderSource(){
   const O=k=>openFolds[k]?' open':'';
   const custom=streamSource(), rcustom=readSource();
   const host=u=>{try{return new URL(u.replace(/\{[^}]+\}/g,'x')).hostname;}catch{return u.slice(0,32);}};
-  const chips=WATCH_PRESETS.filter(p=>!isHiddenSrc(p.name)).map(p=>`<button class="src-chip${custom===p.url?' on':''}" onclick="setSource('${p.url}')">${escH(p.name)}</button>`).join('')
-    +customServices().filter(s=>!isHiddenSrc(s.name)).map(s=>`<button class="src-chip yours${custom===s.url?' on':''}" onclick="setSourceById('${s.id}')">${escH(s.name)}</button>`).join('');
+  // Yours first. The built-in list is fixed and findable; the sites you added are
+  // the ones you actually reach for, and they were sitting after eight presets.
+  const chips=customServices().filter(s=>!isHiddenSrc(s.name)).map(s=>`<button class="src-chip yours${custom===s.url?' on':''}" onclick="setSourceById('${s.id}')">${escH(s.name)}</button>`).join('')
+    +WATCH_PRESETS.filter(p=>!isHiddenSrc(p.name)).map(p=>`<button class="src-chip${custom===p.url?' on':''}" onclick="setSource('${p.url}')">${escH(p.name)}</button>`).join('');
   const myCount=customServices().length, hiddenCount=hiddenSrc().length;
   box.innerHTML=`
     <p class="ai-desc" style="margin-top:2px">Tapping <b>Watch</b> on a show opens it wherever you pick here.</p>

@@ -1089,6 +1089,24 @@ body.call-full{overflow:hidden;}
 .pk-name{font-family:var(--fd);font-weight:800;font-size:17.5px;line-height:1.25;color:var(--t1);}
 .pk-meta{font-size:12.5px;color:var(--t3);margin-top:5px;}
 .pk-why{font-size:13px;color:var(--t2);line-height:1.45;margin-top:9px;}
+/* Riffling: the cover softens and the card leans in, so the swaps read as one
+   moving thing rather than a slideshow. */
+.pk-card.spinning .pk-cover{filter:blur(1.5px) saturate(.85);transform:scale(.97);}
+.pk-card.spinning .pk-name{opacity:.75;}
+.pk-cover,.pk-name{transition:filter .18s ease,transform .18s ease,opacity .18s ease;}
+.pk-card.landed{animation:pkLand .52s cubic-bezier(.16,1,.3,1);}
+@keyframes pkLand{
+  0%{transform:scale(.965);border-color:var(--a);box-shadow:0 0 0 3px var(--ag),0 24px 60px -30px rgba(0,0,0,.8);}
+  60%{transform:scale(1.006);border-color:var(--a);box-shadow:0 0 0 2px var(--ag),0 24px 60px -30px rgba(0,0,0,.8);}
+  100%{transform:scale(1);}
+}
+.pk-card.landed .pk-why{animation:pkWhyIn .4s .06s cubic-bezier(.16,1,.3,1) both;}
+@keyframes pkWhyIn{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:none;}}
+@media(prefers-reduced-motion:reduce){
+  .pk-card.landed,.pk-card.landed .pk-why{animation:none;}
+  .pk-card.spinning .pk-cover{filter:none;transform:none;}
+  .pk-cover,.pk-name{transition:none;}
+}
 .pk-empty{width:min(430px,92vw);padding:22px 18px;border-radius:20px;background:var(--bg2);border:1px solid var(--b2);color:var(--t2);font-size:13.5px;line-height:1.5;text-align:center;}
 .wheel-btns{display:flex;gap:9px;flex-wrap:wrap;justify-content:center;}
 /* One button component, one of them primary — the old row mixed a block button
@@ -7753,7 +7771,36 @@ function decideForMe(mood){
   document.getElementById('wheelView').classList.add('on');
   renderPick();
 }
-function renderPick(){
+// The reel is gone but the moment it was for isn't: a decision feels better when
+// something happens. So the pick riffles through the real candidates and slows
+// onto the winner — the theatre is in the reveal, not in how the choice is made.
+let _pkSpin=0;
+function pkReveal(a,cands){
+  const cover=document.querySelector('#pkCard .pk-cover'), name=document.querySelector('#pkCard .pk-name');
+  if(!cover||!name||cands.length<3)return Promise.resolve();
+  const reduce=(()=>{try{return matchMedia('(prefers-reduced-motion:reduce)').matches;}catch(e){return false;}})();
+  if(reduce)return Promise.resolve();
+  const others=cands.filter(x=>x.id!==a.id);
+  const run=++_pkSpin;
+  const card=document.getElementById('pkCard');
+  if(card)card.classList.add('spinning');
+  return new Promise(done=>{
+    // Nine frames, each a little slower than the last — the deceleration is what
+    // reads as "landing" rather than "stopped".
+    const gaps=[60,60,70,80,95,115,140,175,215];
+    let i=0;
+    const step=()=>{
+      if(run!==_pkSpin){done();return;}                       // a newer spin took over
+      if(i>=gaps.length){if(card)card.classList.remove('spinning');done();return;}
+      const pick=others[Math.floor(Math.random()*others.length)]||a;
+      if(pick.img&&cover.tagName==='IMG')cover.src=safeImg(pick.img);
+      name.textContent=pick.title;
+      setTimeout(step,gaps[i++]);
+    };
+    step();
+  });
+}
+async function renderPick(){
   const moods=[['any','Anything'],['short','Short'],['almost','Almost done'],['new','Not started']];
   const mb=document.getElementById('pkMoods');
   if(mb)mb.innerHTML=moods.map(([k,l])=>`<button class="pk-mood${pkMood===k?' on':''}" onclick="decideForMe('${k}')">${escH(l)}</button>`).join('');
@@ -7765,7 +7812,22 @@ function renderPick(){
     if(btns)btns.innerHTML=`<button class="pk-btn" onclick="closeWheel()">Close</button>`;
     return;
   }
+  if(t)t.textContent='Deciding…';
+  // Paint the winner's own card first so the riffle has something to riffle,
+  // then let it settle and reveal the reason.
+  const cands=pkCandidates(pkMood);
+  paintPickCard(a,true);
+  await pkReveal(a,cands);
   if(t)t.textContent='Watch this';
+  paintPickCard(a,false);
+  const landed=document.getElementById('pkCard');
+  if(landed){landed.classList.remove('landed');void landed.offsetWidth;landed.classList.add('landed');}
+  btns.innerHTML=`<button class="pk-btn prim" onclick="wheelAccept('${a.id}')">Start it</button>
+    <button class="pk-btn" onclick="renderPick()">Show another</button>
+    <button class="pk-btn" onclick="closeWheel()">Close</button>`;
+}
+// quiet=true during the riffle: cover and title only, no reason yet.
+function paintPickCard(a,quiet){
   const eps=a.epTotal?`${a.epTotal} episodes`:'', hrs=pkHours(a);
   const score=a.aniScore?`★ ${(a.aniScore/10).toFixed(1)}`:'';
   const el=document.getElementById('pkCard');
@@ -7774,12 +7836,9 @@ function renderPick(){
     <div class="pk-body">
       <div class="pk-name">${escH(a.title)}</div>
       <div class="pk-meta">${escH([score,eps,hrs].filter(Boolean).join(' · '))}</div>
-      <div class="pk-why">${escH(pkWhy(a))}</div>
+      <div class="pk-why">${quiet?'&nbsp;':escH(pkWhy(a))}</div>
     </div>
   </div>`;
-  btns.innerHTML=`<button class="pk-btn prim" onclick="wheelAccept('${a.id}')">Start it</button>
-    <button class="pk-btn" onclick="renderPick()">Show another</button>
-    <button class="pk-btn" onclick="closeWheel()">Close</button>`;
 }
 function wheelAccept(id){
   const a=anime.find(x=>x.id===id); if(!a){closeWheel();return;}

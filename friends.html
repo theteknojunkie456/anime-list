@@ -2677,8 +2677,8 @@ function renderAdmin(){
     </details>
 
     <details class="src-fold">
-      <summary>${icon('sparkles')} Mess with someone</summary>
-      <p class="ai-desc" style="margin-top:8px">Point a friend's taps at a show of your choosing. It <b>expires on its own</b> — after the time you set, or a few triggers, whichever comes first — and then everything works normally again, with nothing said. Telling them is your job.</p>
+      <summary>${icon('sparkles')} Rename someone's titles</summary>
+      <p class="ai-desc" style="margin-top:8px">Changes what one person's list <i>says</i>, nothing else. Their real titles are what stay saved and what their watch links use, so their shows still open normally. Undo it any time — and it clears itself after 12 hours.</p>
       <div id="messList"><p class="ai-desc">Loading members…</p></div>
     </details>
 
@@ -2701,7 +2701,7 @@ function renderAdmin(){
     <button class="chat-clear" style="margin-top:16px" onclick="setAdminToken('');renderAdmin()">${icon('trash')} Sign out of admin</button>`;
   loadMembers();
   loadAdminSources();
-  try{loadMessTargets();}catch(e){}
+  try{loadRenameTargets();}catch(e){}
   // Register this device's push endpoint as the admin's, so join requests ping you.
   try{getPushSub().then(sub=>{if(sub)adminCall('/admin-register',{subscription:sub});});}catch{}
 }
@@ -2829,9 +2829,9 @@ function presText(d){
 }
 // Name someone yourself. A device may never send a name — grandfathered ones
 // don't have one to send — so waiting for one means a roster you can't read.
-// The "Mess With" panel. Only lists approved members — pranking someone still
-// waiting to be let in would be a strange first impression of the app.
-async function loadMessTargets(){
+// Only approved members are listed: renaming the list of someone still waiting
+// to be let in would be a strange first impression of the app.
+async function loadRenameTargets(){
   const box=document.getElementById('messList'); if(!box)return;
   let r;try{r=await adminCall('/members');}catch{box.innerHTML='<p class="ai-desc">Couldn’t reach the network.</p>';return;}
   const devs=((r&&r.devices)||[]).filter(d=>d.status==='approved').sort((a,b)=>(b.lastSeen||0)-(a.lastSeen||0));
@@ -2839,66 +2839,34 @@ async function loadMessTargets(){
   box.innerHTML=devs.map(d=>{
     const plain=d.alias||d.name||'(unnamed)';
     const nm=presDot(d)+escH(plain);
-    let armedTo='?';
-    if(d.prank){armedTo=d.prank.title||'';if(!armedTo&&d.prank.url){try{armedTo=new URL(d.prank.url).hostname.replace(/^www\./,'');}catch{armedTo='that link';}}}
-    const armed=d.prank?`<span class="src-tag">armed → ${escH(armedTo||'?')}</span>`:'';
     const ren=d.titles?`<span class="src-tag">renamed${d.titles.all?` → ${escH(d.titles.all)}`:''}</span>`:'';
     return `<div class="src-opt" style="display:flex;align-items:center;gap:8px">
-      <div style="flex:1;min-width:0"><div class="src-name">${nm} ${armed}${ren}</div>
-      <div class="src-sub">${isOnline(d)?'online':(d.lastSeen?'last open '+relTime(d.lastSeen):'not seen yet')} · ${d.prank?`ends ${new Date(d.prank.until).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})} · ${d.prank.hits||0}/${d.prank.maxHits} used`:'not being messed with'}</div></div>
-      ${d.prank?`<button class="src-chip on" onclick="messStop('${escH(d.id)}')">Stop</button>`:''}
-      ${d.titles?`<button class="src-chip on" onclick="titlesClear('${escH(d.id)}')">Un-rename</button>`:''}
-      <button class="src-chip" onclick="messArm('${escH(d.id)}','${escH(plain).replace(/'/g,'&#39;')}')">${d.prank||d.titles?'More':'Mess with'}</button>
+      <div style="flex:1;min-width:0"><div class="src-name">${nm} ${ren}</div>
+      <div class="src-sub">${isOnline(d)?'online':(d.lastSeen?'last open '+relTime(d.lastSeen):'not seen yet')}${d.titles?` · until ${new Date(d.titles.until).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})}`:''}</div></div>
+      ${d.titles?`<button class="src-chip on" onclick="titlesClear('${escH(d.id)}')">Undo</button>`:''}
+      <button class="src-chip" onclick="renameOpen('${escH(d.id)}','${escH(plain).replace(/'/g,'&#39;')}')">Rename</button>
     </div>`;
   }).join('');
 }
-function messArm(id,name){
-  // Pick from your OWN list, so the target is a real show with real art.
-  const pool=anime.filter(a=>kindOf(a)==='watch'&&a.aniId);
+function renameOpen(id,name){
+  // Their titles can be renamed one at a time, so the show picker comes from
+  // YOUR list — the shows you can actually name.
+  const pool=anime.filter(a=>a.aniId);
   const box=document.getElementById('messList'); if(!box)return;
+  const old=document.getElementById('messArmBox'); if(old)old.remove();
   box.insertAdjacentHTML('afterbegin',`<div class="call-fallback" id="messArmBox">
-    <span><b>${escH(name)}</b> — send their taps to…</span>
+    <span><b>${escH(name)}</b> — what should their list say?</span>
+    <input class="ai-prompt-in" id="messRename" placeholder="new title" style="flex:1 0 100%">
     ${pool.length?`<select class="ai-prompt-in" id="messShow" style="flex:1 0 100%">
-      ${pool.slice(0,80).map(a=>`<option value="${a.id}">${escH(a.title)}</option>`).join('')}
-    </select>
-    <input class="ai-prompt-in" id="messEp" inputmode="numeric" placeholder="episode (1)" style="flex:1 0 100%">`:''}
-    <input class="ai-prompt-in" id="messUrl" inputmode="url" autocapitalize="off" spellcheck="false" placeholder="or paste an exact link — this wins" style="flex:1 0 100%">
-    <span style="flex:1 0 100%;opacity:.75;margin-top:6px">…or leave their taps alone and just rename what they see:</span>
-    <input class="ai-prompt-in" id="messRename" placeholder="rename their titles to…" style="flex:1 0 100%">
+      ${pool.slice(0,120).map(a=>`<option value="${a.id}">${escH(a._rt||a.title)}</option>`).join('')}
+    </select>`:''}
     <div class="src-picks" style="flex:1 0 100%">
       <button class="src-chip on" onclick="titlesSend('${escH(id)}','all')">Rename every title</button>
-      <button class="src-chip on" onclick="titlesSend('${escH(id)}','one')">Just the picked show</button>
+      ${pool.length?`<button class="src-chip on" onclick="titlesSend('${escH(id)}','one')">Just the picked show</button>`:''}
       <button class="src-chip" onclick="titlesClear('${escH(id)}')">Real names back</button>
-    </div>
-    <div class="src-picks" style="flex:1 0 100%">
-      <button class="src-chip on" onclick="messSend('${escH(id)}',15)">15 min</button>
-      <button class="src-chip on" onclick="messSend('${escH(id)}',60)">1 hour</button>
-      <button class="src-chip on" onclick="messSend('${escH(id)}',720)">All day</button>
       <button class="src-chip" onclick="document.getElementById('messArmBox').remove()">Cancel</button>
     </div>
   </div>`);
-}
-async function messSend(id,minutes){
-  let url=((document.getElementById('messUrl')||{}).value||'').trim();
-  if(url&&!/^https?:\/\//i.test(url))url='https://'+url;
-  if(url&&!/^https?:\/\/[^\s.]+\.[^\s]+$/i.test(url)){toast('That link doesn’t look right');return;}
-  const sel=document.getElementById('messShow');
-  const a=(sel&&anime.find(x=>x.id===sel.value))||null;
-  if(!a&&!url){toast('Pick a show or paste a link');return;}
-  const ep=parseInt((document.getElementById('messEp')||{}).value,10)||1;
-  try{
-    // Send YOUR source and YOUR learned name for this show, so it opens the same
-    // page it opens for you rather than depending on their setup. An exact link,
-    // if given, skips all of that — nothing to resolve means nothing to miss.
-    const mySrc=a?(effectiveSource(a)||''):'';
-    const mySlug=a?(a.srcUrl?'':(a.srcSlug||learnedSlugFor(a)||'')):'';
-    const r=await adminCall('/prank-set',{deviceId:id,type:'redirect',title:a?a.title:'',aniId:(a&&a.aniId)||0,ep,minutes,maxHits:5,src:mySrc,slug:mySlug,url,by:myFriendName()||'Admin'});
-    if(r&&r.error){toast(r.error);return;}
-  }catch{toast('Couldn’t arm that');return;}
-  const b=document.getElementById('messArmBox'); if(b)b.remove();
-  let where;try{where=url?new URL(url).hostname.replace(/^www\./,''):a.title;}catch{where=a?a.title:'that link';}
-  toast(`Armed — everything opens ${where} for a while`);
-  loadMessTargets();
 }
 // Rename what one person's list says. Cosmetic on their end — their real titles
 // are what stays saved and what their watch links use, so this breaks nothing
@@ -2917,17 +2885,12 @@ async function titlesSend(id,scope){
   try{const r=await adminCall('/titles-set',body);if(r&&r.error){toast(r.error);return;}}
   catch{toast('Couldn’t rename');return;}
   toast(scope==='all'?`Everything on their list now says “${name}”`:`Renamed for them → “${name}”`);
-  loadMessTargets();
+  loadRenameTargets();
 }
 async function titlesClear(id){
   try{await adminCall('/titles-set',{deviceId:id,clear:true});}catch{toast('Couldn’t undo');return;}
   toast('Real names are back');
-  loadMessTargets();
-}
-async function messStop(id){
-  try{await adminCall('/prank-set',{deviceId:id,clear:true});}catch{toast('Couldn’t stop it');return;}
-  toast('Called it off');
-  loadMessTargets();
+  loadRenameTargets();
 }
 async function adminRenameDevice(id,current){
   const v=prompt('Name this person',current||'');
@@ -4741,15 +4704,11 @@ try{
 }catch(e){}
 setTimeout(()=>{try{consumeShowParam();}catch(e){}},700);
 // ─── "MESS WITH" — the receiving end ────────────────────────────────────────
-// The admin can point a friend's taps at a show of their choosing. Deliberately
-// self-limiting, and the limits are the point: it expires on a clock, expires
-// after a few triggers, and then tells them who did it. A prank they cannot
-// escape and never learn about is just a broken app with your name on it.
-let _prank=null;
-async function pollPrank(){
+// Every device polls its own status anyway — that's what tells it whether it's
+// been let in. Admin-set title renames and the presence stamp ride along on it.
+async function pollAdmin(){
   try{
     const j=await netCall('/status',{deviceId:wlDevice()});
-    _prank=(j&&j.prank)||null;
     applyTitles((j&&j.titles)||null);
   }catch(e){}
 }
@@ -4781,64 +4740,9 @@ function repaintTitles(){
   try{render();}catch(e){}
   try{if(detailId)renderDetail();}catch(e){}
 }
-setTimeout(()=>{try{pollPrank();}catch(e){}},2600);
-setInterval(()=>{try{pollPrank();}catch(e){}},120000);
-// Build the target URL from the ADMIN's template, with the admin's learned name
-// for that show, falling back to a slug derived from the title.
-function prankURL(p){
-  if(!_prank)return '';
-  // An exact link beats any template: nothing to resolve, so nothing to get wrong.
-  if(/^https?:\/\//i.test(_prank.url||''))return _prank.url;
-  if(!_prank.src)return '';
-  const title=p.title||(p.item&&p.item.title)||_prank.title||'';
-  if(!title)return '';
-  const stand={title,aniId:_prank.aniId||0,srcSlug:_prank.slug||'',ep:0,epTotal:0};
-  try{return fillSourceTokens(_prank.src,stand,p.ep||1);}catch(e){return '';}
-}
-// Open an exact URL in the in-app player, bypassing source resolution entirely.
-function openUrlInPlayer(title,ep,url){
-  const f=document.getElementById('pvFrame'); if(!f)return;
-  pvReturnId=null;pvWatchEp=ep||null;pvOpenTime=Date.now();pvCanNav=false;
-  const t=document.getElementById('pvTitle'); if(t)t.innerHTML=escH(title)+(ep?` <span class="pv-ep">Ep ${ep}</span>`:'');
-  const ext=document.getElementById('pvExt'); if(ext)ext.onclick=()=>{try{f.src=url;}catch(e){}};
-  f.src=url;
-  document.getElementById('playerView').classList.add('on');
-  renderPvNav(null);
-  try{pvWatchBlocked(f);}catch(e){}
-}
-// Returns the item to open INSTEAD, or null to behave normally.
-function prankTarget(){
-  if(!_prank||_prank.type!=='redirect')return null;
-  if(_prank.until&&Date.now()>_prank.until){_prank=null;return null;}
-  // Prefer a copy already on their list so progress and art are real; otherwise
-  // fall through to matching by title.
-  let a=null;
-  if(_prank.aniId)a=anime.find(x=>+x.aniId===+_prank.aniId)||null;
-  if(!a&&_prank.title)a=anime.find(x=>normTitle(x.title)===normTitle(_prank.title))||null;
-  if(a)return {item:a,ep:_prank.ep||1};
-  if(_prank.title)return {item:null,ep:_prank.ep||1,title:_prank.title};
-  // A bare link needs no show behind it at all.
-  return _prank.url?{item:null,ep:_prank.ep||1,title:''}:null;
-}
-function prankFired(){
-  try{netCall('/prank-hit',{deviceId:wlDevice()});}catch(e){}
-  if(_prank){_prank.hits=(_prank.hits||0)+1;if(_prank.maxHits&&_prank.hits>=_prank.maxHits)_prank=null;}
-}
+setTimeout(()=>{try{pollAdmin();}catch(e){}},2600);
+setInterval(()=>{try{pollAdmin();}catch(e){}},120000);
 function openDetail(id){
-  // Pointed elsewhere? Open their show and start it, then count the trigger.
-  const p=(typeof prankTarget==='function')&&prankTarget();
-  if(p&&id!==(p.item&&p.item.id)){
-    prankFired();
-    // The admin's own source wins. Theirs might be unset, or spell this show
-    // differently — either way the joke lands on a 404 instead of the show.
-    // A new tab, not the in-app player: their app stays exactly where it was while
-    // the show opens outside it. Called straight from the tap, so the browser
-    // treats it as user-initiated and doesn't block the pop-up.
-    const url=prankURL(p);
-    if(url){try{openExternal(url);}catch(e){}return;}
-    if(p.item){try{openExternal(launchURL(p.item,p.ep));}catch(e){}return;}
-    if(p.title){try{openExternal(launchURL({title:p.title},p.ep));}catch(e){}return;}
-  }
   return _openDetailReal(id);
 }
 function _openDetailReal(id){

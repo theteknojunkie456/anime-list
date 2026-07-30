@@ -416,10 +416,6 @@ async function handleFetch(request, env) {
       return handleMembers(body, env);
     case "/titles-set":
       return handleTitlesSet(body, env);
-    case "/prank-set":
-      return handlePrankSet(body, env);
-    case "/prank-hit":
-      return handlePrankHit(body, env);
     case "/rename":
       return handleRename(body, env);
     case "/approve":
@@ -688,23 +684,9 @@ async function handleStatus(body, env) {
     rec.lastSeen = Date.now();
     dirty = true;
   }
-  // A prank rides along with the status poll the app already makes, so it needs no
-  // extra request. It is deliberately self-limiting: it expires on a clock AND
-  // after a set number of triggers, then reveals itself. A joke nobody can escape
-  // stops being a joke and becomes a broken app.
-  let prank = null;
-  if (rec.prank) {
-    const p = rec.prank;
-    const dead = (p.until && Date.now() > p.until) || (p.maxHits && (p.hits || 0) >= p.maxHits);
-    if (dead) {
-      // Expires silently. The admin does the telling — the app naming him was a
-      // guess at how he'd want to play it, and it wasn't ours to make.
-      delete rec.prank;
-      dirty = true;
-    } else {
-      prank = p;
-    }
-  }
+  // The old "mess with" redirect is gone. Any record still carrying one is
+  // cleaned up the first time that device checks in, so nothing lingers.
+  if (rec.prank || rec.pranked) { delete rec.prank; delete rec.pranked; dirty = true; }
   // Renamed titles ride along the same poll. Passive, so no trigger count — just
   // a clock, and the admin can put the real names back at any time.
   let titles = null;
@@ -713,18 +695,7 @@ async function handleStatus(body, env) {
     else titles = rec.titles;
   }
   if (dirty) await env.SUBS.put(devKey(body.deviceId), JSON.stringify(rec));
-  return json({ ok: true, status: rec.status, prank, titles });
-}
-
-// Count a trigger. Kept separate from /status so a poll can't burn through the
-// allowance on its own — only an actual firing does.
-async function handlePrankHit(body, env) {
-  const key = devKey(body.deviceId);
-  const raw = await env.SUBS.get(key);
-  if (!raw) return json({ ok: true });
-  const rec = JSON.parse(raw);
-  if (rec.prank) { rec.prank.hits = (rec.prank.hits || 0) + 1; await env.SUBS.put(key, JSON.stringify(rec)); }
-  return json({ ok: true, hits: (rec.prank && rec.prank.hits) || 0 });
+  return json({ ok: true, status: rec.status, titles });
 }
 
 // Admin: rename the titles one device sees. `all` renames every title; `map`
@@ -755,41 +726,6 @@ async function handleTitlesSet(body, env) {
   rec.titles = { all, map: { ...prev, ...map }, until: Date.now() + mins * 60000 };
   await env.SUBS.put(key, JSON.stringify(rec));
   return json({ ok: true, titles: rec.titles });
-}
-
-// Admin: arm or disarm a prank on one device.
-async function handlePrankSet(body, env) {
-  if (!adminOK(body, env)) return json({ ok: false, error: "unauthorized" }, 401);
-  const key = devKey(body.deviceId);
-  const raw = await env.SUBS.get(key);
-  if (!raw) return json({ ok: false, error: "not found" }, 404);
-  const rec = JSON.parse(raw);
-  if (body.clear) {
-    delete rec.prank; delete rec.pranked;
-    await env.SUBS.put(key, JSON.stringify(rec));
-    return json({ ok: true, cleared: true });
-  }
-  const mins = Math.max(1, Math.min(720, parseInt(body.minutes, 10) || 30));   // 12h ceiling, so a forgotten prank dies
-  rec.prank = {
-    type: String(body.type || "redirect").slice(0, 24),
-    title: String(body.title || "").slice(0, 160),
-    aniId: Math.max(0, parseInt(body.aniId, 10) || 0),
-    ep: Math.max(0, Math.min(9999, parseInt(body.ep, 10) || 1)),
-    // The admin's own source travels with the prank. Relying on the target's setup
-    // means it fizzles for anyone who has none, or lands on a 404 for anyone whose
-    // site names that show differently — and a prank that just breaks is no joke.
-    src: String(body.src || "").slice(0, 400),
-    slug: String(body.slug || "").slice(0, 120),
-    // An exact link, when the admin would rather not trust source templates at
-    // all. It wins over src/slug on the client, so the tap can't land on a 404.
-    url: /^https?:\/\//i.test(String(body.url || "")) ? String(body.url).slice(0, 600) : "",
-    by: String(body.by || "Admin").slice(0, 40),
-    until: Date.now() + mins * 60000,
-    maxHits: Math.max(1, Math.min(50, parseInt(body.maxHits, 10) || 5)),
-    hits: 0,
-  };
-  await env.SUBS.put(key, JSON.stringify(rec));
-  return json({ ok: true, prank: rec.prank });
 }
 
 // --- admin-only below (all guarded by ADMIN_TOKEN) ---

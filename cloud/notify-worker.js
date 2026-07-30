@@ -414,6 +414,10 @@ async function handleFetch(request, env) {
       return handleStatus(body, env);
     case "/members":
       return handleMembers(body, env);
+    case "/prank-set":
+      return handlePrankSet(body, env);
+    case "/prank-hit":
+      return handlePrankHit(body, env);
     case "/rename":
       return handleRename(body, env);
     case "/approve":
@@ -671,7 +675,63 @@ async function handleStatus(body, env) {
   const raw = await env.SUBS.get(devKey(body.deviceId));
   if (!raw) return json({ ok: true, status: "unknown" });
   const rec = JSON.parse(raw);
-  return json({ ok: true, status: rec.status });
+  // A prank rides along with the status poll the app already makes, so it needs no
+  // extra request. It is deliberately self-limiting: it expires on a clock AND
+  // after a set number of triggers, then reveals itself. A joke nobody can escape
+  // stops being a joke and becomes a broken app.
+  let prank = null;
+  if (rec.prank) {
+    const p = rec.prank;
+    const dead = (p.until && Date.now() > p.until) || (p.maxHits && (p.hits || 0) >= p.maxHits);
+    if (dead) {
+      delete rec.prank;
+      rec.pranked = { by: p.by || "Admin", at: Date.now() };   // the reveal, shown once
+      await env.SUBS.put(devKey(body.deviceId), JSON.stringify(rec));
+    } else {
+      prank = p;
+    }
+  }
+  let reveal = null;
+  if (rec.pranked) { reveal = rec.pranked; delete rec.pranked; await env.SUBS.put(devKey(body.deviceId), JSON.stringify(rec)); }
+  return json({ ok: true, status: rec.status, prank, reveal });
+}
+
+// Count a trigger. Kept separate from /status so a poll can't burn through the
+// allowance on its own — only an actual firing does.
+async function handlePrankHit(body, env) {
+  const key = devKey(body.deviceId);
+  const raw = await env.SUBS.get(key);
+  if (!raw) return json({ ok: true });
+  const rec = JSON.parse(raw);
+  if (rec.prank) { rec.prank.hits = (rec.prank.hits || 0) + 1; await env.SUBS.put(key, JSON.stringify(rec)); }
+  return json({ ok: true, hits: (rec.prank && rec.prank.hits) || 0 });
+}
+
+// Admin: arm or disarm a prank on one device.
+async function handlePrankSet(body, env) {
+  if (!adminOK(body, env)) return json({ ok: false, error: "unauthorized" }, 401);
+  const key = devKey(body.deviceId);
+  const raw = await env.SUBS.get(key);
+  if (!raw) return json({ ok: false, error: "not found" }, 404);
+  const rec = JSON.parse(raw);
+  if (body.clear) {
+    delete rec.prank; delete rec.pranked;
+    await env.SUBS.put(key, JSON.stringify(rec));
+    return json({ ok: true, cleared: true });
+  }
+  const mins = Math.max(1, Math.min(720, parseInt(body.minutes, 10) || 30));   // 12h ceiling, so a forgotten prank dies
+  rec.prank = {
+    type: String(body.type || "redirect").slice(0, 24),
+    title: String(body.title || "").slice(0, 160),
+    aniId: Math.max(0, parseInt(body.aniId, 10) || 0),
+    ep: Math.max(0, Math.min(9999, parseInt(body.ep, 10) || 1)),
+    by: String(body.by || "Admin").slice(0, 40),
+    until: Date.now() + mins * 60000,
+    maxHits: Math.max(1, Math.min(50, parseInt(body.maxHits, 10) || 5)),
+    hits: 0,
+  };
+  await env.SUBS.put(key, JSON.stringify(rec));
+  return json({ ok: true, prank: rec.prank });
 }
 
 // --- admin-only below (all guarded by ADMIN_TOKEN) ---

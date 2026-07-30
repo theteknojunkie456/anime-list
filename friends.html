@@ -7776,25 +7776,28 @@ function decideForMe(mood){
 // onto the winner — the theatre is in the reveal, not in how the choice is made.
 let _pkSpin=0;
 function pkReveal(a,cands){
-  const cover=document.querySelector('#pkCard .pk-cover'), name=document.querySelector('#pkCard .pk-name');
-  if(!cover||!name||cands.length<3)return Promise.resolve();
+  const run=++_pkSpin;                                   // any older reveal stops here
+  if(cands.length<3)return Promise.resolve();
   const reduce=(()=>{try{return matchMedia('(prefers-reduced-motion:reduce)').matches;}catch(e){return false;}})();
   if(reduce)return Promise.resolve();
   const others=cands.filter(x=>x.id!==a.id);
-  const run=++_pkSpin;
-  const card=document.getElementById('pkCard');
-  if(card)card.classList.add('spinning');
+  const live=()=>document.getElementById('pkCard');
+  const c0=live(); if(!c0)return Promise.resolve();
+  c0.classList.add('spinning');
   return new Promise(done=>{
     // Nine frames, each a little slower than the last — the deceleration is what
     // reads as "landing" rather than "stopped".
     const gaps=[60,60,70,80,95,115,140,175,215];
     let i=0;
+    const stop=()=>{const c=live();if(c)c.classList.remove('spinning');done();};
     const step=()=>{
-      if(run!==_pkSpin){done();return;}                       // a newer spin took over
-      if(i>=gaps.length){if(card)card.classList.remove('spinning');done();return;}
+      const c=live();
+      if(run!==_pkSpin||!c){done();return;}               // superseded, or the sheet closed
+      if(i>=gaps.length){stop();return;}
       const pick=others[Math.floor(Math.random()*others.length)]||a;
-      if(pick.img&&cover.tagName==='IMG')cover.src=safeImg(pick.img);
-      name.textContent=pick.title;
+      const cover=c.querySelector('.pk-cover'), name=c.querySelector('.pk-name');
+      if(cover&&cover.tagName==='IMG'&&pick.img)cover.src=safeImg(pick.img);
+      if(name)name.textContent=pick.title;
       setTimeout(step,gaps[i++]);
     };
     step();
@@ -7808,7 +7811,9 @@ async function renderPick(){
   const a=pkChoose(); pkCurrent=a;
   if(!a){
     if(t)t.textContent='Nothing fits';
-    card.outerHTML='<div class="pk-empty" id="pkCard">Nothing on your list matches that. Try <b>Anything</b>, or add a show first.</div>';
+    _pkSpin++;                       // cancel any reveal in flight
+    card.className='pk-empty';
+    card.innerHTML='Nothing on your list matches that. Try <b>Anything</b>, or add a show first.';
     if(btns)btns.innerHTML=`<button class="pk-btn" onclick="closeWheel()">Close</button>`;
     return;
   }
@@ -7826,19 +7831,22 @@ async function renderPick(){
     <button class="pk-btn" onclick="renderPick()">Show another</button>
     <button class="pk-btn" onclick="closeWheel()">Close</button>`;
 }
-// quiet=true during the riffle: cover and title only, no reason yet.
+// Writes into #pkCard rather than replacing it. Swapping the node out was what
+// stranded the reveal: the frames held references to an element that was no
+// longer in the document, so the class that says "still spinning" never came
+// off the card you were actually looking at.
 function paintPickCard(a,quiet){
   const eps=a.epTotal?`${a.epTotal} episodes`:'', hrs=pkHours(a);
   const score=a.aniScore?`★ ${(a.aniScore/10).toFixed(1)}`:'';
-  const el=document.getElementById('pkCard');
-  el.outerHTML=`<div class="pk-card" id="pkCard">
+  const el=document.getElementById('pkCard'); if(!el)return;
+  el.className='pk-card'+(el.classList.contains('spinning')?' spinning':'');
+  el.innerHTML=`
     ${a.img?`<img class="pk-cover" src="${escH(safeImg(a.img))}" alt="">`:'<div class="pk-cover"></div>'}
     <div class="pk-body">
       <div class="pk-name">${escH(a.title)}</div>
       <div class="pk-meta">${escH([score,eps,hrs].filter(Boolean).join(' · '))}</div>
       <div class="pk-why">${quiet?'&nbsp;':escH(pkWhy(a))}</div>
-    </div>
-  </div>`;
+    </div>`;
 }
 function wheelAccept(id){
   const a=anime.find(x=>x.id===id); if(!a){closeWheel();return;}
@@ -7848,6 +7856,8 @@ function wheelAccept(id){
 }
 function closeWheel(){
   const v=document.getElementById('wheelView'); if(v)v.classList.remove('on');
+  _pkSpin++;                                             // stop a reveal that's still running
+  const c=document.getElementById('pkCard'); if(c)c.classList.remove('spinning','landed');
   pkCurrent=null;
 }
 function openStats(){renderStats();const v=document.getElementById('statsView');if(v)v.classList.add('on');}

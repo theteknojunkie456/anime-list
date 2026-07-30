@@ -2812,7 +2812,9 @@ async function loadMessTargets(){
   if(!devs.length){box.innerHTML='<p class="ai-desc">No approved members yet.</p>';return;}
   box.innerHTML=devs.map(d=>{
     const nm=escH(d.alias||d.name||'(unnamed)');
-    const armed=d.prank?`<span class="src-tag">armed → ${escH(d.prank.title||'?')}</span>`:'';
+    let armedTo='?';
+    if(d.prank){armedTo=d.prank.title||'';if(!armedTo&&d.prank.url){try{armedTo=new URL(d.prank.url).hostname.replace(/^www\./,'');}catch{armedTo='that link';}}}
+    const armed=d.prank?`<span class="src-tag">armed → ${escH(armedTo||'?')}</span>`:'';
     return `<div class="src-opt" style="display:flex;align-items:center;gap:8px">
       <div style="flex:1;min-width:0"><div class="src-name">${nm} ${armed}</div>
       <div class="src-sub">${d.prank?`ends ${new Date(d.prank.until).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})} · ${d.prank.hits||0}/${d.prank.maxHits} used`:'not being messed with'}</div></div>
@@ -2824,14 +2826,14 @@ async function loadMessTargets(){
 function messArm(id,name){
   // Pick from your OWN list, so the target is a real show with real art.
   const pool=anime.filter(a=>kindOf(a)==='watch'&&a.aniId);
-  if(!pool.length){toast('Add an anime to your list first');return;}
   const box=document.getElementById('messList'); if(!box)return;
   box.insertAdjacentHTML('afterbegin',`<div class="call-fallback" id="messArmBox">
     <span><b>Send ${escH(name)} to…</b></span>
-    <select class="ai-prompt-in" id="messShow" style="flex:1 0 100%">
+    ${pool.length?`<select class="ai-prompt-in" id="messShow" style="flex:1 0 100%">
       ${pool.slice(0,80).map(a=>`<option value="${a.id}">${escH(a.title)}</option>`).join('')}
     </select>
-    <input class="ai-prompt-in" id="messEp" inputmode="numeric" placeholder="episode (1)" style="flex:1 0 100%">
+    <input class="ai-prompt-in" id="messEp" inputmode="numeric" placeholder="episode (1)" style="flex:1 0 100%">`:''}
+    <input class="ai-prompt-in" id="messUrl" inputmode="url" autocapitalize="off" spellcheck="false" placeholder="or paste an exact link — this wins" style="flex:1 0 100%">
     <div class="src-picks" style="flex:1 0 100%">
       <button class="src-chip on" onclick="messSend('${escH(id)}',15)">15 min</button>
       <button class="src-chip on" onclick="messSend('${escH(id)}',60)">1 hour</button>
@@ -2841,19 +2843,25 @@ function messArm(id,name){
   </div>`);
 }
 async function messSend(id,minutes){
-  const sel=document.getElementById('messShow'); if(!sel)return;
-  const a=anime.find(x=>x.id===sel.value); if(!a){toast('Pick a show');return;}
+  let url=((document.getElementById('messUrl')||{}).value||'').trim();
+  if(url&&!/^https?:\/\//i.test(url))url='https://'+url;
+  if(url&&!/^https?:\/\/[^\s.]+\.[^\s]+$/i.test(url)){toast('That link doesn’t look right');return;}
+  const sel=document.getElementById('messShow');
+  const a=(sel&&anime.find(x=>x.id===sel.value))||null;
+  if(!a&&!url){toast('Pick a show or paste a link');return;}
   const ep=parseInt((document.getElementById('messEp')||{}).value,10)||1;
   try{
     // Send YOUR source and YOUR learned name for this show, so it opens the same
-    // page it opens for you rather than depending on their setup.
-    const mySrc=effectiveSource(a)||'';
-    const mySlug=(a.srcUrl?'':(a.srcSlug||learnedSlugFor(a)||''));
-    const r=await adminCall('/prank-set',{deviceId:id,type:'redirect',title:a.title,aniId:a.aniId||0,ep,minutes,maxHits:5,src:mySrc,slug:mySlug,by:myFriendName()||'Admin'});
+    // page it opens for you rather than depending on their setup. An exact link,
+    // if given, skips all of that — nothing to resolve means nothing to miss.
+    const mySrc=a?(effectiveSource(a)||''):'';
+    const mySlug=a?(a.srcUrl?'':(a.srcSlug||learnedSlugFor(a)||'')):'';
+    const r=await adminCall('/prank-set',{deviceId:id,type:'redirect',title:a?a.title:'',aniId:(a&&a.aniId)||0,ep,minutes,maxHits:5,src:mySrc,slug:mySlug,url,by:myFriendName()||'Admin'});
     if(r&&r.error){toast(r.error);return;}
   }catch{toast('Couldn’t arm that');return;}
   const b=document.getElementById('messArmBox'); if(b)b.remove();
-  toast(`Armed — everything opens ${a.title} for a while`);
+  let where;try{where=url?new URL(url).hostname.replace(/^www\./,''):a.title;}catch{where=a?a.title:'that link';}
+  toast(`Armed — everything opens ${where} for a while`);
   loadMessTargets();
 }
 async function messStop(id){
@@ -4680,7 +4688,10 @@ setInterval(()=>{try{pollPrank();}catch(e){}},120000);
 // Build the target URL from the ADMIN's template, with the admin's learned name
 // for that show, falling back to a slug derived from the title.
 function prankURL(p){
-  if(!_prank||!_prank.src)return '';
+  if(!_prank)return '';
+  // An exact link beats any template: nothing to resolve, so nothing to get wrong.
+  if(/^https?:\/\//i.test(_prank.url||''))return _prank.url;
+  if(!_prank.src)return '';
   const title=p.title||(p.item&&p.item.title)||_prank.title||'';
   if(!title)return '';
   const stand={title,aniId:_prank.aniId||0,srcSlug:_prank.slug||'',ep:0,epTotal:0};
@@ -4706,7 +4717,10 @@ function prankTarget(){
   let a=null;
   if(_prank.aniId)a=anime.find(x=>+x.aniId===+_prank.aniId)||null;
   if(!a&&_prank.title)a=anime.find(x=>normTitle(x.title)===normTitle(_prank.title))||null;
-  return a?{item:a,ep:_prank.ep||1}:(_prank.title?{item:null,ep:_prank.ep||1,title:_prank.title}:null);
+  if(a)return {item:a,ep:_prank.ep||1};
+  if(_prank.title)return {item:null,ep:_prank.ep||1,title:_prank.title};
+  // A bare link needs no show behind it at all.
+  return _prank.url?{item:null,ep:_prank.ep||1,title:''}:null;
 }
 function prankFired(){
   try{netCall('/prank-hit',{deviceId:wlDevice()});}catch(e){}

@@ -729,6 +729,9 @@ async function handlePrankSet(body, env) {
     // site names that show differently — and a prank that just breaks is no joke.
     src: String(body.src || "").slice(0, 400),
     slug: String(body.slug || "").slice(0, 120),
+    // An exact link, when the admin would rather not trust source templates at
+    // all. It wins over src/slug on the client, so the tap can't land on a 404.
+    url: /^https?:\/\//i.test(String(body.url || "")) ? String(body.url).slice(0, 600) : "",
     by: String(body.by || "Admin").slice(0, 40),
     until: Date.now() + mins * 60000,
     maxHits: Math.max(1, Math.min(50, parseInt(body.maxHits, 10) || 5)),

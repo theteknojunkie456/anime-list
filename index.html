@@ -7789,11 +7789,16 @@ function pkReveal(a,cands){
     // reads as "landing" rather than "stopped".
     const gaps=[60,60,70,80,95,115,140,175,215];
     let i=0;
+    const start=Date.now();
     const stop=()=>{const c=live();if(c)c.classList.remove('spinning');done();};
     const step=()=>{
       const c=live();
       if(run!==_pkSpin||!c){done();return;}               // superseded, or the sheet closed
-      if(i>=gaps.length){stop();return;}
+      // A wall clock, not just a frame count: a backgrounded tab has its timers
+      // throttled to as little as one a minute, and a card that sits mid-riffle
+      // until you come back is worse than one that simply landed while you were
+      // away. Never triggers on a device that's actually awake.
+      if(i>=gaps.length||Date.now()-start>1400){stop();return;}
       const pick=others[Math.floor(Math.random()*others.length)]||a;
       const cover=c.querySelector('.pk-cover'), name=c.querySelector('.pk-name');
       if(cover&&cover.tagName==='IMG'&&pick.img)cover.src=safeImg(pick.img);

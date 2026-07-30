@@ -137,9 +137,7 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
    the CONTENT (a mask, not a painted scrim) means posters dissolve into whatever
    is behind them — which is a per-title ambient gradient, so a solid scrim would
    have been a visible band of the wrong colour. */
-.page{flex:1;overflow-y:auto;overscroll-behavior:none;padding-bottom:calc(var(--safe-b) + 86px);
-  -webkit-mask-image:linear-gradient(180deg,transparent 0,#000 14px);
-  mask-image:linear-gradient(180deg,transparent 0,#000 14px);}
+.page{flex:1;overflow-y:auto;overscroll-behavior:none;padding-top:47px;padding-bottom:calc(var(--safe-b) + 86px);}
 
 /* ── HEADER ── */
 .hdr{padding:calc(var(--safe-t) + 12px) 18px 0;display:flex;align-items:center;justify-content:space-between;}
@@ -164,7 +162,11 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 .search-in:focus{border-color:var(--a);box-shadow:0 0 0 3px var(--ag);background:var(--bg2);}
 .search-in::placeholder{color:var(--t3);}
 /* filters + sort share one scrolling strip, split by a hairline */
-.ctrl-row{display:flex;align-items:center;gap:10px;padding:10px 18px 0;}
+/* The pills float ON the list rather than sitting in a row above it: the scroll
+   area now starts behind them (negative margin) and pays it back as padding, so
+   posters slide underneath instead of being cut off at a container edge. */
+.ctrl-row{display:flex;align-items:center;gap:10px;padding:10px 18px 0;position:relative;z-index:6;pointer-events:none;margin-bottom:-41px;}
+.ctrl-row>*{pointer-events:auto;}
 /* filters scroll on their own; a soft fade at the right edge instead of a hard cut-off */
 .filt-scroll{flex:0 1 auto;min-width:0;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;}
 .filt-scroll::-webkit-scrollbar{display:none;}
@@ -200,11 +202,17 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
   display:inline-flex;align-items:center;gap:6px;transition:background-color .15s,color .15s,box-shadow .15s;
 }
 .fchip .fn{font-size:9.5px;font-weight:800;opacity:0.65;font-variant-numeric:tabular-nums;}
-.fchip.on{background:color-mix(in srgb,var(--a) 20%,var(--bg3));border-color:transparent;color:var(--a2);}
-.fchip.on-watching{background:color-mix(in srgb,var(--wat) 20%,var(--bg3));border-color:transparent;color:var(--wat);}
-.fchip.on-plan{background:color-mix(in srgb,var(--pln) 20%,var(--bg3));border-color:transparent;color:var(--pln);}
-.fchip.on-finished{background:color-mix(in srgb,var(--fin) 20%,var(--bg3));border-color:transparent;color:var(--fin);}
-.fchip.on-dropped{background:color-mix(in srgb,var(--drp) 22%,var(--bg3));border-color:transparent;color:var(--t1);}
+.fchip,.sort-btn{
+  background:color-mix(in srgb,var(--bg3) 62%,transparent);
+  border:1px solid rgba(255,255,255,.13);
+  -webkit-backdrop-filter:blur(14px) saturate(1.25);backdrop-filter:blur(14px) saturate(1.25);
+  box-shadow:0 4px 14px -6px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.07);
+}
+.fchip.on{background:color-mix(in srgb,var(--a) 26%,transparent);border-color:color-mix(in srgb,var(--a) 45%,transparent);color:var(--a2);}
+.fchip.on-watching{background:color-mix(in srgb,var(--wat) 26%,transparent);border-color:color-mix(in srgb,var(--wat) 45%,transparent);color:var(--wat);}
+.fchip.on-plan{background:color-mix(in srgb,var(--pln) 26%,transparent);border-color:color-mix(in srgb,var(--pln) 45%,transparent);color:var(--pln);}
+.fchip.on-finished{background:color-mix(in srgb,var(--fin) 26%,transparent);border-color:color-mix(in srgb,var(--fin) 45%,transparent);color:var(--fin);}
+.fchip.on-dropped{background:color-mix(in srgb,var(--drp) 26%,transparent);border-color:color-mix(in srgb,var(--drp) 45%,transparent);color:var(--t1);}
 .fchip.on .fn,.fchip[class*="on-"] .fn{opacity:0.85;}
 
 /* ── HERO ── */

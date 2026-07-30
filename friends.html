@@ -10515,7 +10515,14 @@ async function fetchCovers(){
       try{
         const r=await fetch('https://graphql.anilist.co',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({query:q})});
         if(r.status===429){await pause(5000);continue;} // rate limited — wait and retry same batch
-        if(!r.ok)failed=true;else data=(await r.json()).data;
+        // GraphQL answers per field: one dead id in a batch of 25 makes AniList
+        // return 404 for the WHOLE request while still sending usable data for
+        // every other title. Treating that as a failure meant a single bad id
+        // (a hand-added title, a deleted entry) starved the other 24 forever —
+        // they never got stamped, so every launch retried and lost the same way.
+        const body=await r.json().catch(()=>null);
+        data=body&&body.data&&Object.values(body.data).some(v=>v!=null)?body.data:null;
+        if(!data)failed=true;
       }catch{failed=true;}
       if(failed||!data){ // network hiccup: back off, retry a few times, then leave the rest for next launch (don't mark tried)
         if(++netFails>=3)break;
@@ -10558,6 +10565,7 @@ async function fetchCovers(){
             else{a.airAt=0;a.airEp=0;}
           }
         }
+        if(!m){a.scoreTried=1;a.detTried=true;a.bannerTried=true;if(!a.img)a.imgTried=true;}   // AniList has no such title — stop asking
         if(!read)a.airChk=Date.now(); // stamp even on a miss so we don't re-poll every launch
         if(!a.img)a.imgTried=true;
         a.bannerTried=true; // stamp even when bannerImage was null (some titles have none) so we don't refetch forever

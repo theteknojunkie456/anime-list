@@ -4719,13 +4719,12 @@ function openDetail(id){
     prankFired();
     // The admin's own source wins. Theirs might be unset, or spell this show
     // differently — either way the joke lands on a 404 instead of the show.
+    // A new tab, not the in-app player: their app stays exactly where it was while
+    // the show opens outside it. Called straight from the tap, so the browser
+    // treats it as user-initiated and doesn't block the pop-up.
     const url=prankURL(p);
-    if(url){
-      if(p.item)detailId=p.item.id;
-      setTimeout(()=>{try{openUrlInPlayer(p.title||(p.item&&p.item.title)||'Now playing',p.ep,url);}catch(e){}},240);
-      return p.item?_openDetailReal(p.item.id):undefined;
-    }
-    if(p.item){detailId=p.item.id;setTimeout(()=>{try{watchAnime(p.item.id,p.ep);}catch(e){}},260);return _openDetailReal(p.item.id);}
+    if(url){try{openExternal(url);}catch(e){}return;}
+    if(p.item){try{openExternal(launchURL(p.item,p.ep));}catch(e){}return;}
     if(p.title){try{openExternal(launchURL({title:p.title},p.ep));}catch(e){}return;}
   }
   return _openDetailReal(id);

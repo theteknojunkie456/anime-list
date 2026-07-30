@@ -10484,7 +10484,7 @@ function airingNeedy(a){
 function coverNeedy(){return anime.filter(a=>!a.adultChk||(!a.img&&!a.imgTried)||(!a.eps&&!a.detTried)||(!a.banner&&!a.bannerTried)||(!a.aniScore&&!a.scoreTried)||airingNeedy(a));}
 async function fetchCovers(){
   if(coverRunning)return;coverRunning=true;
-  let netFails=0,adultRemoved=0;
+  let netFails=0,adultRemoved=0,batchSize=25;
   try{
     while(true){
       const needy=coverNeedy();
@@ -10492,7 +10492,7 @@ async function fetchCovers(){
       // most-visible first so the hero + Watching row fill almost instantly
       const rank={watching:0,plan:1,finished:2,dropped:3};
       needy.sort((a,b)=>(rank[a.status]??9)-(rank[b.status]??9));
-      const batch=needy.slice(0,25);
+      const batch=needy.slice(0,batchSize);
       // query the correct AniList type per item: MANGA for reading (manhwa/webtoon/manga/LN), ANIME otherwise.
       // watch items also pull nextAiringEpisode so the card can show the real next-episode air time.
       const q='{'+batch.map((a,i)=>{
@@ -10511,7 +10511,7 @@ async function fetchCovers(){
         if(!read&&a.aniId)return `a${i}:Media(id:${a.aniId},type:ANIME){${fields}}`;
         return `a${i}:Page(perPage:1){media(search:${JSON.stringify(String(a.title))},type:${type}){${fields}}}`;
       }).join(' ')+'}';
-      let data=null,failed=false;
+      let data=null,failed=false,rejected=false;
       try{
         const r=await fetch('https://graphql.anilist.co',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({query:q})});
         if(r.status===429){await pause(5000);continue;} // rate limited — wait and retry same batch
@@ -10521,14 +10521,29 @@ async function fetchCovers(){
         // (a hand-added title, a deleted entry) starved the other 24 forever —
         // they never got stamped, so every launch retried and lost the same way.
         const body=await r.json().catch(()=>null);
-        data=body&&body.data&&Object.values(body.data).some(v=>v!=null)?body.data:null;
-        if(!data)failed=true;
+        if(!body)failed=true;                                  // no response body at all → treat as network
+        else{
+          data=body.data&&Object.values(body.data).some(v=>v!=null)?body.data:null;
+          if(!data)rejected=true;                              // answered, but the whole batch came back empty
+        }
       }catch{failed=true;}
+      // AniList answers a batch all-or-nothing: ONE id it doesn't recognise —
+      // a hand-added title, a deleted entry — and the entire request 404s with
+      // every alias null. That used to starve the other 24 titles forever,
+      // because nothing got written and nothing got stamped, so the same batch
+      // came back needy on every launch and failed the same way. Halve the batch
+      // and retry until the bad one is alone, then stamp it and move on.
+      if(rejected){
+        if(batchSize>1){batchSize=Math.max(1,Math.floor(batchSize/2));await pause(400);continue;}
+        const bad=batch[0];
+        if(bad){bad.scoreTried=1;bad.detTried=true;bad.bannerTried=true;bad.adultChk=1;if(!bad.img)bad.imgTried=true;if(kindOf(bad)!=='read')bad.airChk=Date.now();}
+        batchSize=25;save();await pause(400);continue;
+      }
       if(failed||!data){ // network hiccup: back off, retry a few times, then leave the rest for next launch (don't mark tried)
         if(++netFails>=3)break;
         await pause(3000);continue;
       }
-      netFails=0;
+      netFails=0;batchSize=25;
       const adultIds=[];
       batch.forEach((a,i)=>{
         const read=kindOf(a)==='read';

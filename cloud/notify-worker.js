@@ -684,16 +684,15 @@ async function handleStatus(body, env) {
     const p = rec.prank;
     const dead = (p.until && Date.now() > p.until) || (p.maxHits && (p.hits || 0) >= p.maxHits);
     if (dead) {
+      // Expires silently. The admin does the telling — the app naming him was a
+      // guess at how he'd want to play it, and it wasn't ours to make.
       delete rec.prank;
-      rec.pranked = { by: p.by || "Admin", at: Date.now() };   // the reveal, shown once
       await env.SUBS.put(devKey(body.deviceId), JSON.stringify(rec));
     } else {
       prank = p;
     }
   }
-  let reveal = null;
-  if (rec.pranked) { reveal = rec.pranked; delete rec.pranked; await env.SUBS.put(devKey(body.deviceId), JSON.stringify(rec)); }
-  return json({ ok: true, status: rec.status, prank, reveal });
+  return json({ ok: true, status: rec.status, prank });
 }
 
 // Count a trigger. Kept separate from /status so a poll can't burn through the

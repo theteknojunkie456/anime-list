@@ -2678,7 +2678,7 @@ function renderAdmin(){
 
     <details class="src-fold">
       <summary>${icon('sparkles')} Mess with someone</summary>
-      <p class="ai-desc" style="margin-top:8px">Point a friend's taps at a show of your choosing. It <b>expires on its own</b> — after the time you set, or a few triggers, whichever comes first — and then tells them it was you. That's what keeps it a joke rather than a broken app.</p>
+      <p class="ai-desc" style="margin-top:8px">Point a friend's taps at a show of your choosing. It <b>expires on its own</b> — after the time you set, or a few triggers, whichever comes first — and then everything works normally again, with nothing said. Telling them is your job.</p>
       <div id="messList"><p class="ai-desc">Loading members…</p></div>
     </details>
 
@@ -4673,15 +4673,10 @@ async function pollPrank(){
   try{
     const j=await netCall('/status',{deviceId:wlDevice()});
     _prank=(j&&j.prank)||null;
-    if(j&&j.reveal)showPrankReveal(j.reveal);
   }catch(e){}
 }
 setTimeout(()=>{try{pollPrank();}catch(e){}},2600);
 setInterval(()=>{try{pollPrank();}catch(e){}},120000);
-function showPrankReveal(r){
-  const who=(r&&r.by)||'Admin';
-  setTimeout(()=>{try{toast(`${who} was messing with you. It's over now.`);}catch(e){}},700);
-}
 // Build the target URL from the ADMIN's template, with the admin's learned name
 // for that show, falling back to a slug derived from the title.
 function prankURL(p){

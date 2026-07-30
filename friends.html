@@ -621,6 +621,15 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 .dt-watchlink{display:inline-flex;align-items:center;gap:6px;height:38px;padding:0 14px;border-radius:11px;background:var(--bg3);border:1px solid var(--b2);color:var(--t1);font-family:var(--fd);font-weight:800;font-size:13px;cursor:pointer;}
 .dt-watchlink:active{transform:scale(.97);}
 .dt-watchlink .ico{width:13px;height:13px;color:var(--t3);}
+.dt-fold{margin-top:14px;border:1px solid var(--b1);border-radius:14px;background:var(--bg2);overflow:hidden;}
+.dt-fold>summary{list-style:none;cursor:pointer;padding:12px 14px;display:flex;align-items:center;gap:8px;font-family:var(--fd);font-size:13px;font-weight:700;color:var(--t2);}
+.dt-fold>summary::-webkit-details-marker{display:none;}
+.dt-fold>summary b{color:var(--t1);font-weight:800;}
+.dt-fold>summary .ico{width:15px;height:15px;color:var(--t3);flex:0 0 auto;}
+.dt-fold-x{margin-left:auto;font-size:12px;font-weight:700;color:var(--a2);}
+.dt-fold[open]>summary{border-bottom:1px solid var(--b1);}
+.dt-fold>*:not(summary){margin-left:14px;margin-right:14px;}
+.dt-fold>*:last-child{margin-bottom:14px;}
 .dt-eps{display:flex;gap:10px;overflow-x:auto;padding:2px 2px 6px;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;}
 .dt-eps::-webkit-scrollbar{display:none;}
 .dt-ep{flex:0 0 auto;width:150px;background:none;border:none;padding:0;cursor:pointer;text-align:left;scroll-snap-align:start;}
@@ -4779,6 +4788,7 @@ function openDetail(id){
   return _openDetailReal(id);
 }
 function _openDetailReal(id){
+  if(detailId!==id)_epsAll=0;   // a new show starts with the windowed strip
   if(recSel){if(recSel.has(id))recSel.delete(id);else recSel.add(id);updateRecSelBar();render();return;}   // selection mode: tap toggles
   detailId=id;
   const it=anime.find(a=>a.id===id);setAmbient(it?titleAccent(it):'');
@@ -4850,7 +4860,7 @@ function renderDetail(){
   const sibs=seriesOf(a);
   let seasonsHTML='';
   if(kindOf(a)==='watch'&&a.aniId){
-    seasonsHTML=`<div id="dt-franchise"><div class="dt-season-load">${icon('loader')} Loading seasons…</div></div>`;
+    seasonsHTML=`<div id="dt-franchise" style="min-height:76px"><div class="dt-season-load">${icon('loader')} Loading seasons…</div></div>`;
   }else if(sibs.length>1){
     seasonsHTML=`<div class="dt-label">${read?'Parts':'Seasons'} · ${sibs.length}</div>
     <div class="dt-seasons">${sibs.map(s=>{const cur=s.id===a.id,st=STATUS_META[s.status];
@@ -4875,7 +4885,8 @@ function renderDetail(){
       </div>
     </div>
     ${friendRecBadge(a)}
-    ${(kindOf(a)==='watch'&&a.aniId)?`<button class="dt-watch" onclick="watchAnime('${a.id}')">${icon('play')} ${(a.ep||0)>0?'Continue Watching':'Start Watching'}</button>
+    ${(kindOf(a)==='watch'&&a.aniId)?`${progHTML}
+    <button class="dt-watch" onclick="watchAnime('${a.id}')">${icon('play')} ${(a.ep||0)>0?'Continue Watching':'Start Watching'}</button>
     ${titleWatchPickerHTML(a)}
     <button class="dt-pin-toggle" onclick="togglePin()">${icon('external')} ${a.srcUrl?'Advanced: edit the direct link':'Advanced: paste a direct episode link'}</button>
     <div id="dtPin" style="display:none">
@@ -4887,8 +4898,7 @@ function renderDetail(){
       </div>
       <div id="dtPinOut" style="display:none;margin-top:8px;padding:9px 11px;border-radius:9px;background:var(--bg2);color:var(--t2);font:12px/1.45 ui-monospace,Menlo,monospace;word-break:break-all;white-space:pre-wrap"></div>
       <p class="ai-desc" style="margin-top:8px;font-size:11px">Set once for this show — Watch goes straight here. Put <code>{ep}</code> where the episode number goes; Next/Prev then auto-advance.</p>
-    </div>`:''}
-    ${progHTML}
+    </div></details>`:progHTML}
     <div class="dt-label">Status</div>
     <div class="dt-status">${statusBtns}</div>
     <div id="dtRich" class="dt-rich"></div>
@@ -4897,8 +4907,7 @@ function renderDetail(){
     ${chips?`<div class="dt-label">Genres</div><div class="chips">${chips}</div>`:''}
     ${orderHTML}
     ${notesHTML}
-    <div class="dt-label" style="margin-top:18px"></div>
-    <div id="ai-box-detail"></div>
+    <div id="ai-box-detail" style="margin-top:18px"></div>
     ${kindOf(a)==='read'?`<button class="dt-watch" onclick="readManga('${a.id}')">${icon('book')} ${(a.ep||0)>0?'Continue Reading':'Start Reading'}</button>
     <button class="dt-pin-toggle" onclick="togglePin()">${icon('external')} ${a.srcUrl?'Direct link pinned — edit':'Pin a direct link for this title'}</button>
     <div id="dtPin" style="display:none">
@@ -4928,9 +4937,18 @@ function renderDetail(){
 // so clicking an anime shows everything about it, in the WatchList theme.
 let _richCache={};
 function _stripHtml(s){return String(s||'').replace(/<br\s*\/?>(\s*)/gi,'\n').replace(/<[^>]+>/g,'').replace(/\n{3,}/g,'\n\n').trim();}
+let _epsAll=0,_richLast=null;
+// Expanding the episode strip is a repaint, not a refetch — the data is already
+// in _richCache, and the network shouldn't be touched to reveal what we have.
+function dtShowAllEps(){
+  _epsAll=1;
+  if(!_richLast)return;
+  const el=document.getElementById('dtRich');
+  if(el)el.innerHTML=richDetailHTML(_richLast.d,_richLast.forId);
+}
 async function loadRichDetail(aniId,forId){
   const mount=document.getElementById('dtRich');if(!mount)return;
-  const paint=d=>{if(detailId!==forId)return;const el=document.getElementById('dtRich');if(el)el.innerHTML=richDetailHTML(d,forId);};
+  const paint=d=>{if(detailId!==forId)return;_richLast={d,forId};const el=document.getElementById('dtRich');if(el)el.innerHTML=richDetailHTML(d,forId);};
   if(_richCache[aniId]){paint(_richCache[aniId]);return;}
   mount.innerHTML=`<div class="dt-rich-load">${icon('loader')} Loading details…</div>`;
   try{
@@ -4971,7 +4989,7 @@ function richDetailHTML(d,forId){
   const studio=(((d.studios||{}).nodes||[])[0]||{}).name||'';if(studio)meta.push(studio);
   const metaHTML=meta.length?`<div class="dt-rich-meta">${meta.map(m=>`<span>${m.indexOf('<')>=0?m:schEsc(m)}</span>`).join('')}</div>`:'';
   const _seenSite=new Set();const links=((d.externalLinks)||[]).filter(l=>{if(!(l&&l.type==='STREAMING'&&l.url))return false;const k=(l.site||'').trim().toLowerCase();if(!k||k==='crunchyroll'||_seenSite.has(k))return false;_seenSite.add(k);return true;});
-  const linksHTML=links.length?`<div class="dt-label" style="margin-top:16px">${icon('play')} Watch on</div><div class="dt-watchlinks">${links.map(l=>`<button class="dt-watchlink" onclick="openExternal('${escH(l.url).replace(/'/g,"\\'")}')">${schEsc(l.site)} ${icon('external')}</button>`).join('')}</div>`:'';
+  const linksHTML=links.length?`<div class="dt-label" style="margin-top:16px">${icon('external')} Also streaming on</div><div class="dt-watchlinks">${links.map(l=>`<button class="dt-watchlink" onclick="openExternal('${escH(l.url).replace(/'/g,"\\'")}')">${schEsc(l.site)} ${icon('external')}</button>`).join('')}</div>`:'';
   // Per-episode links AniList carries, published by the services themselves — opens the source.
   const eps=((d.streamingEpisodes)||[]).filter(e=>e&&e.url&&e.title);
   const epTotalN=(d.episodes||(_it&&_it.epTotal)||0);
@@ -4993,14 +5011,20 @@ function richDetailHTML(d,forId){
     // otherwise the show's cover, dimmed with the number over it — so the strip
     // reads as one list instead of photos trailing off into bare boxes.
     const fallbackImg=safeImg((_it&&(_it.img||_it.banner))||'');
+    // A 100-episode show used to put 100 buttons in the DOM and the tab order.
+    // Show the stretch around where you are; the rest is one tap away.
+    const WIN=8;
+    const lo=_epsAll?1:Math.max(1,cur-2), hi=_epsAll?N:Math.min(N,Math.max(cur+WIN,WIN));
     const cells=[];
-    for(let n=1;n<=N;n++){
+    for(let n=lo;n<=hi;n++){
       const cls=n<=cur?' seen':(n===cur+1?' next':'');
       const a2=art[n], img=(a2&&a2.img)||fallbackImg;
       cells.push(`<button class="dt-ep${cls}${a2&&a2.img?'':' generic'}" onclick="watchAnime('${forId}',${n})"><div class="dt-ep-img"${img?` style="background-image:url('${img}')"`:''}>${a2&&a2.img?'':`<span class="dt-ep-n">${n}</span>`}</div><div class="dt-ep-t">${a2?schEsc(a2.title):('Episode '+n)}</div></button>`);
     }
     const tag=_hasSrc?'your source':(epTotalN?`${epTotalN} total`:`${N} so far`);
-    epsHTML=`<div class="dt-label" style="margin-top:16px">${icon('play')} Episodes<span class="dt-eps-tag">${tag}</span></div><div class="dt-eps">${cells.join('')}</div>`;
+    const hidden=N-cells.length;
+    epsHTML=`<div class="dt-label" style="margin-top:16px">${icon('play')} Episodes<span class="dt-eps-tag">${tag}</span></div><div class="dt-eps">${cells.join('')}</div>`
+      +(hidden>0?`<button class="dt-pin-toggle" onclick="dtShowAllEps()">${icon('layers')} Show all ${N} episodes</button>`:'');
   }
   const desc=_stripHtml(d.description);
   const synHTML=desc?`<div class="dt-label" style="margin-top:16px">Synopsis</div><p class="dt-synopsis" onclick="this.classList.toggle('open')">${schEsc(desc)}</p>`:'';
@@ -7808,8 +7832,14 @@ function titleWatchPickerHTML(a){
   var svcs=watchServices();
   var known=svcs.some(function(x){return x.url===cur;});
   var chips=svcs.map(function(x){return '<button class="src-chip'+(cur===x.url?' on':'')+'" data-u="'+escH(x.url)+'" onclick="setTitleService(\''+a.id+'\',this.dataset.u)">'+escH(x.name)+'</button>';}).join('');
-  return '<div class="dt-label" style="margin-top:14px">'+icon('play')+' Watch this on</div>'
-    +'<p class="ai-desc" style="font-size:11.5px">Pick where <b>Watch now</b> opens for this show \u2014 just this one. Leave it on <b>Default</b> to use your usual source.</p>'
+  // Eleven chips and an advanced form used to sit open on every visit, between
+  // the watch button and the episode counter. It's a setting you touch once per
+  // show, so it states itself in one line and opens when you want it.
+  var curName='Your usual source';
+  if(cur){var hit=svcs.filter(function(x){return x.url===cur;})[0];curName=hit?hit.name:'A link you pinned';}
+  return '<details class="dt-fold">'
+    +'<summary>'+icon('play')+' Opens on <b>'+escH(curName)+'</b><span class="dt-fold-x">Change</span></summary>'
+    +'<p class="ai-desc" style="font-size:11.5px;margin-top:2px">Just for this show. Leave it on <b>Default</b> to follow your usual source.</p>'
     +'<div class="src-picks">'
     +'<button class="src-chip'+(!cur?' on':'')+'" onclick="setTitleService(\''+a.id+'\',\'\')">Default</button>'
     +chips

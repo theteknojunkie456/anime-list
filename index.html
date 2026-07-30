@@ -5272,7 +5272,7 @@ function openSheet(id){
   if(id==='anilistSheet')renderAniList();
   if(id==='partySheet')renderParty();
   if(id==='watchSheet')renderWatch();
-  if(id==='friendsSheet')renderFriends();
+  if(id==='friendsSheet'){renderFriends();friendPresenceWatch(true);}
   if(id==='recPickSheet')renderRecPick();
   if(id==='recSendSheet')renderRecSend();
   if(id==='recDetailSheet')renderRecDetail();
@@ -9061,6 +9061,33 @@ function onPartyInvite(data){
     partyJoin(code);openSheet('partySheet');
   }});
 }
+// ─── Who's around ───────────────────────────────────────────────────────────
+// A friend is "online" when their app is open, because that is when their live
+// channel exists. Nothing is stored and nothing expires — we just ask.
+let frOnline={}, _frPresT=null;
+async function pullFriendPresence(){
+  const codes=friendsList().map(f=>f&&f.code).filter(Boolean);
+  if(!codes.length){frOnline={};return;}
+  try{
+    const r=await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({op:'presence',codes})});
+    const j=r.ok?await r.json():null;
+    if(j&&j.online){frOnline=j.online;try{renderFriends();}catch(e){}}
+  }catch(e){}
+}
+// Only while the sheet is actually open — presence you can't see isn't worth a
+// request every half minute.
+function friendPresenceWatch(on){
+  clearTimeout(_frPresT);
+  if(!on)return;
+  pullFriendPresence();
+  const tick=()=>{
+    const sh=document.getElementById('friendsSheet');
+    if(!sh||!sh.classList.contains('on'))return;
+    pullFriendPresence();
+    _frPresT=setTimeout(tick,25000);
+  };
+  _frPresT=setTimeout(tick,25000);
+}
 function connectFriendWS(){
   // And the live channel, which is what makes any of it arrive without a reload.
   const code=myFriendCode(); if(!code)return;
@@ -9184,7 +9211,11 @@ function renderFriends(){
   const code=myFriendCode(),name=myFriendName(),fr=friendsList(),out=friendsOut(),reqs=friendReqs;
   const reqHTML=reqs.length?`<div class="dt-label" style="margin-top:18px">${icon('inbox')} Friend requests · ${reqs.length}</div>`+reqs.map(r=>`<div class="fr-row"><span class="fr-dot" style="background:${friendColor(r.from.code)}"></span><div class="fr-info"><div class="fr-name">${escH(r.from.name)}</div><div class="fr-code">wants to be friends</div></div><button class="fr-accept" onclick="acceptReq('${escH(r.id)}')">${icon('check')} Accept</button><button class="fr-x" onclick="denyReq('${escH(r.id)}')" aria-label="Deny">${icon('x')}</button></div>`).join(''):'';
   const outHTML=out.length?`<div class="dt-label" style="margin-top:16px">Pending · ${out.length}</div>`+out.map(f=>`<div class="fr-row"><span class="fr-dot" style="background:${friendColor(f.code)};opacity:.4"></span><div class="fr-info"><div class="fr-name">${escH(f.name||f.code)}</div><div class="fr-code">request sent — waiting to accept</div></div><button class="fr-x" onclick="cancelOutgoing('${escH(f.code)}')" aria-label="Cancel">${icon('x')}</button></div>`).join(''):'';
-  const flist=fr.length?fr.map(f=>`<div class="fr-row"><span class="fr-dot" style="background:${friendColor(f.code)}"></span><div class="fr-info"><div class="fr-name">${escH(friendLabel(f))}</div><div class="fr-code">${f.alias&&f.name&&f.alias!==f.name?'aka '+escH(f.name):escH(f.code)}</div></div><button class="fr-x" onclick="renameFriendPrompt('${escH(f.code)}')" aria-label="Rename friend">${icon('edit')}</button><button class="fr-x" onclick="removeFriend('${escH(f.code)}')" aria-label="Remove friend">${icon('x')}</button></div>`).join(''):'<p class="ai-desc">No friends yet — share your code, or send a request below.</p>';
+  // Whoever is in the app right now comes first — they're who you'd actually
+  // send something to, or start a party with.
+  const sorted=fr.slice().sort((a,b)=>(frOnline[b.code]?1:0)-(frOnline[a.code]?1:0)||friendLabel(a).localeCompare(friendLabel(b)));
+  const onCount=fr.filter(f=>frOnline[f.code]).length;
+  const flist=fr.length?sorted.map(f=>friendRow(f)).join(''):'<p class="ai-desc">No friends yet — share your code, or send a request below.</p>';
   box.innerHTML=`
     <div class="dt-label">${icon('star')} Your name</div>
     <input class="ai-prompt-in" id="frName" placeholder="What friends see" value="${escH(name)}" maxlength="40" oninput="setMyFriendName(this.value)">
@@ -9198,10 +9229,40 @@ function renderFriends(){
     <button class="parse-btn" onclick="doAddFriend()">Send friend request</button>
     <div class="fr-err" id="frErr"></div>
     ${outHTML}
-    <div class="dt-label" style="margin-top:20px">${icon('users')} Friends · ${fr.length}</div>
+    <div class="dt-label" style="margin-top:20px">${icon('users')} Friends · ${fr.length}${onCount?` · <span style="color:var(--fin)">${onCount} online</span>`:''}</div>
     <div class="fr-list">${flist}</div>
     <button class="dt-watch" style="margin-top:16px" onclick="startRecommend()">${icon('send')} Recommend shows to friends</button>
     ${sentRecsHTML()}`;
+}
+// One friend, one row, one tap. Rename / remove / recommend / invite used to be
+// scattered across the sheet and the row; they all live here now, opened by the
+// person they apply to.
+let frOpenCode=null;
+function toggleFriendRow(code){frOpenCode=(frOpenCode===code)?null:code;renderFriends();}
+function friendRow(f){
+  const on=!!frOnline[f.code], open=frOpenCode===f.code;
+  const fromThem=recsIn.filter(e=>e&&e.from&&e.from.code===f.code).reduce((n,e)=>n+((e.items||[]).length),0);
+  const sentThem=recsSent().filter(e=>e&&e.code===f.code).length;
+  const bits=[on?'<span style="color:var(--fin)">Online now</span>':'Offline'];
+  if(fromThem)bits.push(`${fromThem} rec${fromThem===1?'':'s'} from them`);
+  if(sentThem)bits.push(`${sentThem} sent`);
+  return `<div class="fr-row" style="${open?'background:var(--bg3);border-radius:12px;':''}flex-wrap:wrap;cursor:pointer" onclick="toggleFriendRow('${escH(f.code)}')">
+    <span class="fr-dot" style="background:${on?'var(--fin)':friendColor(f.code)};${on?'box-shadow:0 0 0 3px var(--finbg)':'opacity:.45'}"></span>
+    <div class="fr-info"><div class="fr-name">${escH(friendLabel(f))}</div><div class="fr-code">${bits.join(' · ')}</div></div>
+    <span style="opacity:.5;transform:rotate(${open?'90':'0'}deg);transition:transform .15s">${icon('chevron-right')}</span>
+    ${open?`<div class="src-picks" style="flex:1 0 100%;margin-top:10px" onclick="event.stopPropagation()">
+      <button class="src-chip on" onclick="recommendTo('${escH(f.code)}')">${icon('send')} Recommend</button>
+      <button class="src-chip" onclick="partyInviteFriend('${escH(f.code)}')">${icon('users')} Invite to party</button>
+      <button class="src-chip" onclick="renameFriendPrompt('${escH(f.code)}')">${icon('edit')} Rename</button>
+      <button class="src-chip" onclick="removeFriend('${escH(f.code)}')">${icon('x')} Remove</button>
+    </div>`:''}
+  </div>`;
+}
+// Straight from their row into the picker, with them already chosen — the old
+// path made you pick shows, then hunt for the person you started from.
+function recommendTo(code){
+  recPickShows=new Set();recItemNotes={};recToFriends=new Set([code]);
+  renderRecPick();openSheet('recPickSheet');
 }
 function copyFriendCode(){const c=myFriendCode();try{navigator.clipboard.writeText(c);toast('Code copied');}catch{toast(c);}}
 async function doAddFriend(){
@@ -9214,6 +9275,7 @@ async function doAddFriend(){
 }
 let recPickShows=new Set(),recToFriends=new Set(),recItemNotes={},recSel=null;
 function startRecommend(){recPickShows=new Set();recToFriends=new Set();recItemNotes={};renderRecPick();openSheet('recPickSheet');}
+// Who's picked shows up in the picker too, so a pre-chosen friend is never a surprise.
 function toggleRecPick(id){if(recPickShows.has(id))recPickShows.delete(id);else recPickShows.add(id);renderRecPick();}
 function renderRecPick(){
   const box=document.getElementById('recPickBody');if(!box)return;
@@ -9222,7 +9284,9 @@ function renderRecPick(){
     ${a.img?`<img src="${escH(a.img)}" alt="">`:`<div class="ph">${escH(((a.title||'?')[0]||'?').toUpperCase())}</div>`}
     <div class="pt-pick-info"><div class="pt-pick-t">${escH(a.title)}</div><div class="pt-pick-s">${escH((a.genre||'').split(',')[0]||(kindOf(a)==='read'?'Manga':'Anime'))}</div></div>
     <span class="pt-pick-check">${on?icon('check'):''}</span></button>`;}).join('');
-  box.innerHTML=`<button class="src-opt" onclick="pickFromList()"><div class="src-name">${icon('home')} Pick right on your list</div><div class="src-sub">Browse your rows and tap shows to pick — easiest way to find things</div></button>
+  const preset=[...(recToFriends||[])].map(c=>friendDisplay(c)).filter(Boolean);
+  box.innerHTML=(preset.length?`<p class="ai-desc" style="margin:2px 0 10px">Going to <b>${escH(preset.join(', '))}</b>.</p>`:'')
+    +`<button class="src-opt" onclick="pickFromList()"><div class="src-name">${icon('home')} Pick right on your list</div><div class="src-sub">Browse your rows and tap shows to pick — easiest way to find things</div></button>
     <div class="dt-label" style="margin-top:14px">Or quick-pick here</div>
     <div class="pt-picks">${rows||'<p class="ai-desc">Your list is empty.</p>'}</div>
     <button class="dt-watch rec-next rec-cta" onclick="proceedRecommend()">${icon('chevron-right')} Next — notes & friends (${recPickShows.size})</button>`;
@@ -9235,8 +9299,8 @@ function pcTap(id,ev){
 }
 function updateRecSelBar(){const el=document.getElementById('recSelCount');if(el&&recSel)el.textContent=recSel.size+(recSel.size===1?' show':' shows');}
 function cancelRecSel(){recSel=null;document.body.classList.remove('recsel');render();}
-function doneRecSel(){if(!recSel||!recSel.size){toast('Tap a few shows first');return;}recPickShows=new Set(recSel);recSel=null;document.body.classList.remove('recsel');render();recToFriends=new Set();renderRecSend();openSheet('recSendSheet');}
-function proceedRecommend(){if(!recPickShows.size){toast('Pick at least one show');return;}recToFriends=new Set();renderRecSend();openSheet('recSendSheet');}
+function doneRecSel(){if(!recSel||!recSel.size){toast('Tap a few shows first');return;}recPickShows=new Set(recSel);recSel=null;document.body.classList.remove('recsel');render();if(!recToFriends)recToFriends=new Set();renderRecSend();openSheet('recSendSheet');}
+function proceedRecommend(){if(!recPickShows.size){toast('Pick at least one show');return;}if(!recToFriends)recToFriends=new Set();renderRecSend();openSheet('recSendSheet');}
 function toggleRecFriend(code){if(recToFriends.has(code))recToFriends.delete(code);else recToFriends.add(code);renderRecSend();}
 function setItemNote(id,v){recItemNotes[id]=v;}
 function removeRecShow(id){recPickShows.delete(id);delete recItemNotes[id];renderRecSend();}
@@ -9251,7 +9315,7 @@ function renderRecSend(){
     <input class="ai-prompt-in rc-note-in" placeholder="Note for this one (optional)" maxlength="300" value="${escH(recItemNotes[a.id]||'')}" oninput="setItemNote('${a.id}',this.value)"></div>
     <button class="rc-note-x" onclick="removeRecShow('${a.id}')" aria-label="Remove this show">${icon('x')}</button>
   </div>`).join('');
-  const friendHTML=fr.length?fr.map(f=>{const on=recToFriends.has(f.code),col=friendColor(f.code);return `<button class="rs-pick${on?' on':''}" onclick="toggleRecFriend('${escH(f.code)}')"><span class="fr-dot" style="background:${col}"></span><span class="rs-name">${escH(f.name)}</span><span class="pt-pick-check">${on?icon('check'):''}</span></button>`;}).join(''):`<p class="ai-desc">No accepted friends yet — <b onclick="openSheet('friendsSheet')" style="color:var(--a);cursor:pointer">add a friend</b> first (they have to accept).</p>`;
+  const friendHTML=fr.length?fr.map(f=>{const on=recToFriends.has(f.code),live=!!frOnline[f.code];return `<button class="rs-pick${on?' on':''}" onclick="toggleRecFriend('${escH(f.code)}')"><span class="fr-dot" style="background:${live?'var(--fin)':friendColor(f.code)};${live?'box-shadow:0 0 0 3px var(--finbg)':''}"></span><span class="rs-name">${escH(friendLabel(f))}${live?' <span style="color:var(--fin);font-size:11px">online</span>':''}</span><span class="pt-pick-check">${on?icon('check'):''}</span></button>`;}).join(''):`<p class="ai-desc">No accepted friends yet — <b onclick="openSheet('friendsSheet')" style="color:var(--a);cursor:pointer">add a friend</b> first (they have to accept).</p>`;
   box.innerHTML=`<div class="dt-label">${icon('edit')} A note for each show</div>
     <p class="ai-desc">Personalise each one — a romance and a dark thriller can carry different notes.</p>
     <div class="rc-notes">${noteRows}</div>

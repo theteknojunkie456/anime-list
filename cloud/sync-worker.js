@@ -96,6 +96,25 @@ export default {
       return json({ ok: true, updatedAt: Date.now() }, 200, cors);
     }
 
+    // ── who's around ────────────────────────────────────────────────────────
+    // Your friends' codes are already in your list, and each one has a live
+    // channel while their app is open. Asking those channels directly means
+    // presence needs no heartbeat, no stored timestamp and no cleanup — close
+    // the app and you are offline the same instant.
+    if (op === 'presence') {
+      const codes = (Array.isArray(body.codes) ? body.codes : [])
+        .map(c => String(c || '')).filter(c => /^[A-Za-z0-9]{10,64}$/.test(c)).slice(0, 25);
+      const online = {};
+      await Promise.all(codes.map(async c => {
+        try {
+          const r = await env.CHAN.get(env.CHAN.idFromName(c)).fetch('https://chan/probe', { method: 'POST', body: '__probe__' });
+          const j = await r.json();
+          online[c] = !!(j && j.online);
+        } catch { online[c] = false; }
+      }));
+      return json({ ok: true, online }, 200, cors);
+    }
+
     // ── friend recommendations ──────────────────────────────────────────────
     // A tiny per-user mailbox: friends send show recommendations to your friend
     // code, you pull them and they surface as a "Your Friends Recommend" row.
@@ -367,6 +386,10 @@ export class UserChannel {
       return new Response(null, { status: 101, webSocket: client });
     }
     const msg = (await request.text()) || 'ping';
+    // Presence probe. The open socket IS the presence signal — this object only
+    // exists while someone is connected — so there is nothing to store, nothing
+    // to expire, and nothing to get stale.
+    if (msg === '__probe__') return new Response(JSON.stringify({ online: this.sockets.size > 0 }), { headers: { 'Content-Type': 'application/json' } });
     for (const s of [...this.sockets]) {
       try { s.send(msg); } catch (e) { this.sockets.delete(s); }
     }

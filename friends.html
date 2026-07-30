@@ -209,11 +209,15 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
   display:inline-flex;align-items:center;gap:6px;transition:background-color .15s,color .15s,box-shadow .15s;
 }
 .fchip .fn{font-size:9.5px;font-weight:800;opacity:0.65;font-variant-numeric:tabular-nums;}
+/* No backdrop-filter here. A blurred element has to sample the backdrop behind
+   it, which forces the region under the row into its own composited surface —
+   and the edge of that surface is a hairline pinned along the bottom of the
+   pills, all the way across. Translucency, a thin light border and a soft shadow
+   give the same glass without asking the compositor for a backdrop. */
 .fchip,.sort-btn{
-  background:color-mix(in srgb,var(--bg3) 80%,transparent);
-  border:1px solid rgba(255,255,255,.15);
-  -webkit-backdrop-filter:blur(14px) saturate(1.25);backdrop-filter:blur(14px) saturate(1.25);
-  box-shadow:0 4px 14px -6px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.07);
+  background:color-mix(in srgb,var(--bg3) 88%,transparent);
+  border:1px solid rgba(255,255,255,.16);
+  box-shadow:0 4px 14px -6px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.08);
 }
 .fchip.on{background:color-mix(in srgb,var(--a) 34%,color-mix(in srgb,var(--bg3) 55%,transparent));border-color:color-mix(in srgb,var(--a) 45%,transparent);color:var(--a2);}
 .fchip.on-watching{background:color-mix(in srgb,var(--wat) 34%,color-mix(in srgb,var(--bg3) 55%,transparent));border-color:color-mix(in srgb,var(--wat) 45%,transparent);color:var(--wat);}

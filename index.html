@@ -167,8 +167,13 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 /* The pills float ON the list rather than sitting in a row above it: the scroll
    area now starts behind them (negative margin) and pays it back as padding, so
    posters slide underneath instead of being cut off at a container edge. */
-.ctrl-row{display:flex;align-items:center;gap:10px;padding:10px 18px 0;position:relative;z-index:6;pointer-events:none;margin-bottom:-41px;}
-.ctrl-row>*{pointer-events:auto;}
+/* The row itself must NOT be a stacking context. Giving it position+z-index made
+   it one, and a composited box sitting over a scrolling layer draws a seam along
+   its edge — a hairline pinned to the bottom of the pills, right across the
+   screen. The pills carry the z-index individually instead, so there's no
+   full-width layer boundary for the compositor to leave an edge on. */
+.ctrl-row{display:flex;align-items:center;gap:10px;padding:10px 18px 0;pointer-events:none;margin-bottom:-41px;}
+.ctrl-row>*{pointer-events:auto;position:relative;z-index:6;}
 /* filters scroll on their own; a soft fade at the right edge instead of a hard cut-off */
 .filt-scroll{flex:0 1 auto;min-width:0;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;}
 .filt-scroll::-webkit-scrollbar{display:none;}

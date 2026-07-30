@@ -288,6 +288,22 @@ export default {
       const type = op === 'fr_accept' ? 'accept' : 'request';
       // de-dupe: one live message of each type per (from → to)
       list = list.filter(m => !(m && m.type === type && m.from && m.from.code === fromCode));
+      // Accepting also settles the request that prompted it. Left in place, that
+      // request sits in the accepter's mailbox forever and can resurface as a
+      // pending invite between two people who are already friends.
+      if (type === 'accept') {
+        const mine = 'frq:' + fromCode;
+        try {
+          const s2 = await env.LISTS.get(mine);
+          if (s2) {
+            const l2 = JSON.parse(s2);
+            if (Array.isArray(l2)) {
+              const pruned = l2.filter(m => !(m && m.type === 'request' && m.from && m.from.code === to));
+              if (pruned.length !== l2.length) await env.LISTS.put(mine, JSON.stringify(pruned));
+            }
+          }
+        } catch {}
+      }
       const message = { id: type[0] + fromCode.slice(0, 8) + Date.now().toString(36), type, from: { code: fromCode, name: fromName }, at: Date.now() };
       list.push(message);
       if (list.length > 200) list = list.slice(list.length - 200);

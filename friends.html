@@ -8895,7 +8895,9 @@ function renameFriendPrompt(code){
 }
 // Pull my mailbox: auto-add anyone who ACCEPTED my request; surface incoming requests.
 async function pullFriendReqs(){
-  if(IS_NATIVE)return;
+  // Was disabled on the official app while the Friends UI stayed visible, so the
+  // app could send a request and never receive the acceptance — the friendship
+  // existed on one side only. Receiving has to work wherever sending does.
   const code=myFriendCode(); if(!code) return;
   try{
     const r=await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({op:'fr_pull',code})});
@@ -8990,7 +8992,7 @@ function onPartyInvite(data){
   }});
 }
 function connectFriendWS(){
-  if(IS_NATIVE)return;
+  // And the live channel, which is what makes any of it arrive without a reload.
   const code=myFriendCode(); if(!code)return;
   if(friendWS&&(friendWS.readyState===0||friendWS.readyState===1))return;   // connecting/open already
   try{
@@ -9012,7 +9014,7 @@ function connectFriendWS(){
 let recsIn=[];
 function loadRecsCache(){try{const a=JSON.parse(localStorage.getItem('recs_in')||'[]');recsIn=Array.isArray(a)?a:[];}catch{recsIn=[];}}
 async function pullRecs(){
-  if(IS_NATIVE)return;
+  // Same gate, same consequence: recommendations sent to the app went nowhere.
   const code=myFriendCode(); if(!code) return;
   try{
     const r=await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({op:'rec_pull',code})});

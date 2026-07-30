@@ -8062,19 +8062,31 @@ function pvSearchHere(){
 }
 // Offer the recovery a moment after a deep link opens — long enough not to nag
 // when the page is simply loading, soon enough to be there when it 404s.
+// Two different rescues used to be able to sit on the video at once — "Wrong
+// page?" at 3.5s and "Still blank?" at 5s — on top of the site's own header. One
+// at a time, and the more serious one wins.
 let _pvWrongT=0;
 function pvOfferFix(){
   const b=document.getElementById('pvWrong'); if(!b)return;
   b.classList.remove('on'); clearTimeout(_pvWrongT);
-  _pvWrongT=setTimeout(()=>b.classList.add('on'),3500);
+  _pvWrongT=setTimeout(()=>{
+    const blocked=document.getElementById('pvBlocked');
+    if(blocked&&blocked.classList.contains('on'))return;   // nothing painted — that panel is the useful one
+    b.classList.add('on');
+  },3500);
 }
 let _pvBlockT=0;
 function pvWatchBlocked(f){
   const box=document.getElementById('pvBlocked'); if(!box)return;
   box.classList.remove('on'); clearTimeout(_pvBlockT);
-  let painted=false;
-  try{f.addEventListener('load',()=>{painted=true;},{once:true});}catch(e){}
-  _pvBlockT=setTimeout(()=>{ if(!painted)box.classList.add('on'); },5000);
+  // A slow site can paint after the deadline. Whenever the frame loads, the
+  // panel goes away again — it used to stay up over a page you could see.
+  const painted=()=>{clearTimeout(_pvBlockT);box.classList.remove('on');};
+  try{f.addEventListener('load',painted);}catch(e){}
+  _pvBlockT=setTimeout(()=>{
+    box.classList.add('on');
+    const w=document.getElementById('pvWrong'); if(w)w.classList.remove('on');
+  },8000);
 }
 // Reading source (AsuraScans by default). AsuraScans series live at
 // /comics/<slug>-<suffix>, where the suffix is a CONSTANT site-wide token (not a

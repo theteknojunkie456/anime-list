@@ -1172,12 +1172,27 @@ body.no-party .friend-only{display:flex;}
 .rec-badge-note{margin-top:4px;font-size:13px;color:var(--t1);font-style:italic;}
 .fr-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.08);}
 .fr-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0;}
-.fr-info{flex:1;min-width:0;}
+.fr-info{flex:1;min-width:0;display:block;}
+.fr-open .fr-name,.fr-open .fr-code{display:block;}
 .fr-name{font-weight:700;font-size:14px;}
 .fr-code{font-size:11px;color:var(--t2);font-family:ui-monospace,monospace;overflow:hidden;text-overflow:ellipsis;}
 .fr-x{background:none;border:0;color:var(--t2);cursor:pointer;min-width:44px;min-height:44px;display:flex;align-items:center;justify-content:center;}
 .fr-x .ico{width:16px;height:16px;}
 .fr-err{color:#ff6b6b;font-size:12px;margin-top:6px;min-height:14px;}
+/* The row header is a button, not a div with a click handler: it has to be
+   reachable by keyboard, because every per-friend action now lives behind it. */
+.fr-open{flex:1;min-width:0;display:flex;align-items:center;gap:10px;padding:9px 0;background:none;border:0;color:inherit;font:inherit;text-align:left;cursor:pointer;}
+.fr-open:focus-visible,.src-chip:focus-visible,.fr-x:focus-visible,.fr-accept:focus-visible,.pt-code-cta:focus-visible{outline:2px solid var(--a2);outline-offset:2px;border-radius:10px;}
+/* Presence is a ring, never the dot's own colour — the dot already carries who
+   this is, and two meanings in one swatch collide (green friend, offline). */
+.fr-dot.live{outline:2px solid var(--fin);outline-offset:2px;}
+.fr-row.open{background:var(--bg3);border-bottom-color:transparent;border-radius:12px;padding:0 11px 11px;margin:4px 0;}
+.fr-chev{display:flex;opacity:.5;flex-shrink:0;transition:transform .18s cubic-bezier(.22,1,.36,1);}
+.fr-chev .ico{width:16px;height:16px;}
+.fr-row.open .fr-chev{transform:rotate(90deg);}
+.fr-danger{color:#ff8080;}
+.fr-danger.armed{border-color:#ff6b6b;background:rgba(255,107,107,.14);color:#ff9b9b;}
+@media (prefers-reduced-motion:reduce){.fr-chev{transition:none;}}
 .rs-friend{margin-bottom:10px;}
 .rs-pick{width:100%;display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:11px 12px;color:var(--t1);cursor:pointer;}
 .rs-friend.on .rs-pick{border-color:var(--a);}
@@ -9071,8 +9086,32 @@ async function pullFriendPresence(){
   try{
     const r=await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({op:'presence',codes})});
     const j=r.ok?await r.json():null;
-    if(j&&j.online){frOnline=j.online;try{renderFriends();}catch(e){}}
+    if(j&&j.online){frOnline=j.online;try{paintPresence();}catch(e){}}
   }catch(e){}
+}
+// A presence tick must never re-render the sheet. It used to, and a full
+// innerHTML rewrite every 25 seconds deleted whatever you were typing into
+// "Their friend code" — a 16-character code you had just pasted, gone, with
+// the caret. So the tick patches the dots and sublines it owns and touches
+// nothing else. Re-sorting is left to the next real render for the same
+// reason: the list must not move under your finger.
+function paintPresence(){
+  const box=document.getElementById('friendsBody'); if(!box)return;
+  const fr=friendsList();
+  box.querySelectorAll('.fr-row[data-code]').forEach(row=>{
+    const code=row.getAttribute('data-code'), f=fr.find(x=>x&&x.code===code); if(!f)return;
+    const on=!!frOnline[code];
+    const dot=row.querySelector('[data-dot]'); if(dot)dot.classList.toggle('live',on);
+    const sub=row.querySelector('[data-sub]');
+    if(sub){
+      const fromThem=recsIn.filter(e=>e&&e.from&&e.from.code===code).reduce((n,e)=>n+((e.items||[]).length),0);
+      sub.innerHTML=friendSub(f,on,fromThem,recsSent().filter(e=>e&&e.code===code).length);
+    }
+    const btn=row.querySelector('.fr-open'); if(btn)btn.setAttribute('aria-label',friendLabel(f)+(on?', online':', offline'));
+  });
+  const lab=document.getElementById('frCountLabel');
+  const onCount=fr.filter(f=>frOnline[f.code]).length;
+  if(lab)lab.innerHTML=`${icon('users')} Friends · ${fr.length}${onCount?` · <span style="color:var(--fin)">${onCount} online</span>`:''}`;
 }
 // Only while the sheet is actually open — presence you can't see isn't worth a
 // request every half minute.
@@ -9215,48 +9254,67 @@ function renderFriends(){
   // send something to, or start a party with.
   const sorted=fr.slice().sort((a,b)=>(frOnline[b.code]?1:0)-(frOnline[a.code]?1:0)||friendLabel(a).localeCompare(friendLabel(b)));
   const onCount=fr.filter(f=>frOnline[f.code]).length;
-  const flist=fr.length?sorted.map(f=>friendRow(f)).join(''):'<p class="ai-desc">No friends yet — share your code, or send a request below.</p>';
+  const flist=fr.length?sorted.map(f=>friendRow(f)).join(''):'<p class="ai-desc">No friends yet. Open <b>Your code &amp; adding friends</b> to share your code or send a request.</p>';
   box.innerHTML=`
-    <div class="dt-label">${icon('star')} Your name</div>
-    <input class="ai-prompt-in" id="frName" placeholder="What friends see" value="${escH(name)}" maxlength="40" oninput="setMyFriendName(this.value)">
-    <div class="dt-label" style="margin-top:16px">${icon('users')} Your friend code</div>
-    <p class="ai-desc">Share this so friends can send you a request.</p>
-    <div class="pt-code"><div class="pt-code-val">${escH(code)}</div><button class="pt-code-cta" onclick="copyFriendCode()" aria-label="Copy code">${icon('copy')}</button></div>
     ${reqHTML}
-    <div class="dt-label" style="margin-top:18px">${icon('plus')} Add a friend</div>
-    <input class="ai-prompt-in" id="frAddCode" placeholder="Their friend code" autocapitalize="off" autocomplete="off" spellcheck="false">
-    <input class="ai-prompt-in" id="frAddName" placeholder="Name them (optional)" maxlength="40" style="margin-top:8px">
-    <button class="parse-btn" onclick="doAddFriend()">Send friend request</button>
-    <div class="fr-err" id="frErr"></div>
-    ${outHTML}
-    <div class="dt-label" style="margin-top:20px">${icon('users')} Friends · ${fr.length}${onCount?` · <span style="color:var(--fin)">${onCount} online</span>`:''}</div>
+    <div class="dt-label" id="frCountLabel">${icon('users')} Friends · ${fr.length}${onCount?` · <span style="color:var(--fin)">${onCount} online</span>`:''}</div>
     <div class="fr-list">${flist}</div>
+    ${outHTML}
     <button class="dt-watch" style="margin-top:16px" onclick="startRecommend()">${icon('send')} Recommend shows to friends</button>
+    <details class="src-fold" ${fr.length?'':'open'}>
+      <summary>${icon('plus')} Your code &amp; adding friends</summary>
+      <div class="dt-label">${icon('star')} Your name</div>
+      <input class="ai-prompt-in" id="frName" placeholder="What friends see" value="${escH(name)}" maxlength="40" oninput="setMyFriendName(this.value)">
+      <div class="dt-label" style="margin-top:16px">${icon('users')} Your friend code</div>
+      <p class="ai-desc">Share this so friends can send you a request.</p>
+      <div class="pt-code"><div class="pt-code-val">${escH(code)}</div><button class="pt-code-cta" onclick="copyFriendCode()" aria-label="Copy code">${icon('copy')}</button></div>
+      <div class="dt-label" style="margin-top:16px">${icon('plus')} Add a friend</div>
+      <input class="ai-prompt-in" id="frAddCode" placeholder="Their friend code" autocapitalize="off" autocomplete="off" spellcheck="false">
+      <input class="ai-prompt-in" id="frAddName" placeholder="Name them (optional)" maxlength="40" style="margin-top:8px">
+      <button class="parse-btn" onclick="doAddFriend()">Send friend request</button>
+      <div class="fr-err" id="frErr"></div>
+    </details>
     ${sentRecsHTML()}`;
 }
 // One friend, one row, one tap. Rename / remove / recommend / invite used to be
 // scattered across the sheet and the row; they all live here now, opened by the
 // person they apply to.
-let frOpenCode=null;
-function toggleFriendRow(code){frOpenCode=(frOpenCode===code)?null:code;renderFriends();}
+let frOpenCode=null, frArmedRemove=null, _frArmT=null;
+function toggleFriendRow(code){frOpenCode=(frOpenCode===code)?null:code;frArmedRemove=null;renderFriends();}
 function friendRow(f){
-  const on=!!frOnline[f.code], open=frOpenCode===f.code;
+  const on=!!frOnline[f.code], open=frOpenCode===f.code, armed=frArmedRemove===f.code;
   const fromThem=recsIn.filter(e=>e&&e.from&&e.from.code===f.code).reduce((n,e)=>n+((e.items||[]).length),0);
   const sentThem=recsSent().filter(e=>e&&e.code===f.code).length;
+  return `<div class="fr-row${open?' open':''}" data-code="${escH(f.code)}" style="flex-wrap:wrap">
+    <button class="fr-open" aria-expanded="${open?'true':'false'}" onclick="toggleFriendRow('${escH(f.code)}')">
+      <span class="fr-dot${on?' live':''}" data-dot style="background:${friendColor(f.code)}"></span>
+      <span class="fr-info"><span class="fr-name">${escH(friendLabel(f))}</span><span class="fr-code" data-sub>${friendSub(f,on,fromThem,sentThem)}</span></span>
+      <span class="fr-chev">${icon('chevron-right')}</span>
+    </button>
+    ${open?`<div class="src-picks" style="flex:1 0 100%;margin-top:2px">
+      <button class="src-chip" onclick="recommendTo('${escH(f.code)}')">${icon('send')} Recommend</button>
+      ${partyCode?`<button class="src-chip" onclick="partyInviteFriend('${escH(f.code)}')">${icon('users')} Invite to party</button>`:''}
+      <button class="src-chip" onclick="renameFriendPrompt('${escH(f.code)}')">${icon('edit')} Rename</button>
+      <button class="src-chip fr-danger${armed?' armed':''}" onclick="armRemoveFriend('${escH(f.code)}')">${icon('x')} ${armed?'Tap again to remove':'Remove'}</button>
+      <div class="fr-code" style="flex:1 0 100%;margin-top:2px">${escH(f.code)}${f.alias&&f.name&&f.alias!==f.name?' · aka '+escH(f.name):''}</div>
+    </div>`:''}
+  </div>`;
+}
+// Their code, and whether they're around. Kept as its own function so the
+// presence tick can rewrite just this string in place.
+function friendSub(f,on,fromThem,sentThem){
   const bits=[on?'<span style="color:var(--fin)">Online now</span>':'Offline'];
   if(fromThem)bits.push(`${fromThem} rec${fromThem===1?'':'s'} from them`);
   if(sentThem)bits.push(`${sentThem} sent`);
-  return `<div class="fr-row" style="${open?'background:var(--bg3);border-radius:12px;':''}flex-wrap:wrap;cursor:pointer" onclick="toggleFriendRow('${escH(f.code)}')">
-    <span class="fr-dot" style="background:${on?'var(--fin)':friendColor(f.code)};${on?'box-shadow:0 0 0 3px var(--finbg)':'opacity:.45'}"></span>
-    <div class="fr-info"><div class="fr-name">${escH(friendLabel(f))}</div><div class="fr-code">${bits.join(' · ')}</div></div>
-    <span style="opacity:.5;transform:rotate(${open?'90':'0'}deg);transition:transform .15s">${icon('chevron-right')}</span>
-    ${open?`<div class="src-picks" style="flex:1 0 100%;margin-top:10px" onclick="event.stopPropagation()">
-      <button class="src-chip on" onclick="recommendTo('${escH(f.code)}')">${icon('send')} Recommend</button>
-      <button class="src-chip" onclick="partyInviteFriend('${escH(f.code)}')">${icon('users')} Invite to party</button>
-      <button class="src-chip" onclick="renameFriendPrompt('${escH(f.code)}')">${icon('edit')} Rename</button>
-      <button class="src-chip" onclick="removeFriend('${escH(f.code)}')">${icon('x')} Remove</button>
-    </div>`:''}
-  </div>`;
+  return bits.join(' · ');
+}
+// Removing a friend can only be undone by both of you adding each other again,
+// so it takes two taps. Disarms itself, so an armed button can't sit waiting.
+function armRemoveFriend(code){
+  clearTimeout(_frArmT);
+  if(frArmedRemove===code){frArmedRemove=null;removeFriend(code);return;}
+  frArmedRemove=code;renderFriends();
+  _frArmT=setTimeout(()=>{if(frArmedRemove===code){frArmedRemove=null;renderFriends();}},4000);
 }
 // Straight from their row into the picker, with them already chosen — the old
 // path made you pick shows, then hunt for the person you started from.

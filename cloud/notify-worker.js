@@ -414,6 +414,8 @@ async function handleFetch(request, env) {
       return handleStatus(body, env);
     case "/members":
       return handleMembers(body, env);
+    case "/titles-set":
+      return handleTitlesSet(body, env);
     case "/prank-set":
       return handlePrankSet(body, env);
     case "/prank-hit":
@@ -671,10 +673,21 @@ async function handleJoin(body, env) {
 }
 
 // Client polls this to know whether the network is open to it yet.
+// Presence rides on the poll the app already makes — no extra request, and no
+// extra endpoint. The write is coalesced to once every PRESENCE_EVERY_MS because
+// KV on the free plan allows 1,000 writes a day account-wide, and an app left
+// open in a tab polls 720 times a day on its own.
+const PRESENCE_EVERY_MS = 5 * 60000;
+
 async function handleStatus(body, env) {
   const raw = await env.SUBS.get(devKey(body.deviceId));
   if (!raw) return json({ ok: true, status: "unknown" });
   const rec = JSON.parse(raw);
+  let dirty = false;
+  if (rec.status === "approved" && Date.now() - (rec.lastSeen || 0) > PRESENCE_EVERY_MS) {
+    rec.lastSeen = Date.now();
+    dirty = true;
+  }
   // A prank rides along with the status poll the app already makes, so it needs no
   // extra request. It is deliberately self-limiting: it expires on a clock AND
   // after a set number of triggers, then reveals itself. A joke nobody can escape
@@ -687,12 +700,20 @@ async function handleStatus(body, env) {
       // Expires silently. The admin does the telling — the app naming him was a
       // guess at how he'd want to play it, and it wasn't ours to make.
       delete rec.prank;
-      await env.SUBS.put(devKey(body.deviceId), JSON.stringify(rec));
+      dirty = true;
     } else {
       prank = p;
     }
   }
-  return json({ ok: true, status: rec.status, prank });
+  // Renamed titles ride along the same poll. Passive, so no trigger count — just
+  // a clock, and the admin can put the real names back at any time.
+  let titles = null;
+  if (rec.titles) {
+    if (rec.titles.until && Date.now() > rec.titles.until) { delete rec.titles; dirty = true; }
+    else titles = rec.titles;
+  }
+  if (dirty) await env.SUBS.put(devKey(body.deviceId), JSON.stringify(rec));
+  return json({ ok: true, status: rec.status, prank, titles });
 }
 
 // Count a trigger. Kept separate from /status so a poll can't burn through the
@@ -704,6 +725,36 @@ async function handlePrankHit(body, env) {
   const rec = JSON.parse(raw);
   if (rec.prank) { rec.prank.hits = (rec.prank.hits || 0) + 1; await env.SUBS.put(key, JSON.stringify(rec)); }
   return json({ ok: true, hits: (rec.prank && rec.prank.hits) || 0 });
+}
+
+// Admin: rename the titles one device sees. `all` renames every title; `map`
+// renames specific ones by AniList id. Cosmetic only — the device keeps the real
+// names for storage, sync and watch links, so nothing it saves is corrupted.
+async function handleTitlesSet(body, env) {
+  if (!adminOK(body, env)) return json({ ok: false, error: "unauthorized" }, 401);
+  const key = devKey(body.deviceId);
+  const raw = await env.SUBS.get(key);
+  if (!raw) return json({ ok: false, error: "not found" }, 404);
+  const rec = JSON.parse(raw);
+  if (body.clear) {
+    delete rec.titles;
+    await env.SUBS.put(key, JSON.stringify(rec));
+    return json({ ok: true, cleared: true });
+  }
+  const all = String(body.all || "").slice(0, 120);
+  const map = {};
+  if (body.map && typeof body.map === "object") {
+    for (const k of Object.keys(body.map).slice(0, 200)) {
+      const v = String(body.map[k] || "").slice(0, 120);
+      if (v) map[String(k).slice(0, 24)] = v;
+    }
+  }
+  if (!all && !Object.keys(map).length) return json({ ok: false, error: "nothing to rename" }, 400);
+  const mins = Math.max(1, Math.min(720, parseInt(body.minutes, 10) || 720));
+  const prev = (rec.titles && rec.titles.map) || {};
+  rec.titles = { all, map: { ...prev, ...map }, until: Date.now() + mins * 60000 };
+  await env.SUBS.put(key, JSON.stringify(rec));
+  return json({ ok: true, titles: rec.titles });
 }
 
 // Admin: arm or disarm a prank on one device.

@@ -2777,8 +2777,10 @@ function renderUpdates(){
     +(_updEnd?`<p class="ai-desc" style="text-align:center;margin:14px 0 2px">That’s day one — ${_updRows.length} changes in all.</p>`
              :`<button class="parse-btn" id="updMoreBtn" style="margin-top:12px" onclick="updMore()">Load older</button>`);
 }
+let _memT=null;
 async function loadMembers(){
   const box=document.getElementById('adminMembers');if(!box)return;
+  clearTimeout(_memT);
   let r;try{r=await adminCall('/members');}catch{box.innerHTML='<p class="ai-desc">Couldn’t reach the network.</p>';return;}
   if(!r||!r.ok){box.innerHTML='<p class="ai-desc" style="color:var(--danger,#ff6b6b)">'+(r&&r.error==='unauthorized'?'Wrong admin token.':'Error loading members')+'</p>';if(r&&r.error==='unauthorized'){setAdminToken('');setTimeout(renderAdmin,900);}return;}
   const cnt=document.getElementById('adminCount');if(cnt)cnt.textContent=`${r.approved}/${r.cap}`;
@@ -2786,7 +2788,7 @@ async function loadMembers(){
   const devs=r.devices||[];
   const pending=devs.filter(d=>d.status==='pending'), approved=devs.filter(d=>d.status==='approved'), denied=devs.filter(d=>d.status==='denied');
   const row=(d,actions)=>`<div class="src-opt" style="display:flex;align-items:center;gap:8px">
-    <div style="flex:1;min-width:0" onclick="adminRenameDevice('${escH(d.id)}','${escH(d.alias||d.name||'')}')"><div class="src-name">${escH(d.alias||d.name||'(tap to name)')}${d.alias&&d.name&&d.alias!==d.name?` <span class="src-tag">${escH(d.name)}</span>`:''}</div><div class="src-sub">${d.status}${d.joinedAt?' · '+when(d.joinedAt):''}${d.source?' · heard: '+escH(d.source):''}${d.invite?' · invite':''}</div></div>${actions}</div>`;
+    <div style="flex:1;min-width:0" onclick="adminRenameDevice('${escH(d.id)}','${escH(d.alias||d.name||'')}')"><div class="src-name">${presDot(d)}${escH(d.alias||d.name||'(tap to name)')}${d.alias&&d.name&&d.alias!==d.name?` <span class="src-tag">${escH(d.name)}</span>`:''}</div><div class="src-sub">${presText(d)}${d.joinedAt?' · '+when(d.joinedAt):''}${d.source?' · heard: '+escH(d.source):''}${d.invite?' · invite':''}</div></div>${actions}</div>`;
   const ap=d=>`<button class="src-chip on" onclick="adminDecide('${d.id}','approve')">Approve</button>`;
   const dn=d=>`<button class="src-chip" onclick="adminDecide('${d.id}','deny')">Deny</button>`;
   // Every group is always shown, with its count — an empty section is
@@ -2795,11 +2797,35 @@ async function loadMembers(){
   const when=t=>{if(!t)return '';const d=Math.round((Date.now()-t)/86400000);return d<=0?'today':d===1?'yesterday':d+'d ago';};
   const group=(label,list,acts,dim)=>`<div class="ai-desc" style="margin:12px 0 6px${dim?';opacity:.7':''}"><b>${label} (${list.length})</b></div>`
     +(list.length?list.map(d=>row(d,acts(d))).join(''):`<p class="ai-desc" style="opacity:.55;margin:0 0 4px">None.</p>`);
+  // Whoever has the app open right now goes to the top — that's the half of the
+  // roster you can actually do anything with.
+  approved.sort((a,b)=>(b.lastSeen||0)-(a.lastSeen||0));
+  const onl=approved.filter(isOnline).length;
   box.innerHTML=
-    `<div class="dt-label" style="margin-top:2px">${icon('users')} Everyone · ${devs.length}</div>`
+    `<div class="dt-label" style="margin-top:2px">${icon('users')} Everyone · ${devs.length}${onl?` · ${onl} online`:''}</div>`
     +group('Waiting on you',pending,d=>ap(d)+dn(d))
     +group('Members',approved,d=>dn(d))
     +group('Denied',denied,d=>ap(d),true);
+  // Presence only means anything if it's current, so the open panel refreshes
+  // itself — and stops the moment it isn't on screen.
+  _memT=setTimeout(()=>{const b=document.getElementById('adminMembers');if(b&&b.isConnected&&b.offsetParent!==null)loadMembers();},45000);
+}
+// ─── Who's around ───────────────────────────────────────────────────────────
+// Presence is "has the app open", nothing more: every device already polls for
+// its status every two minutes, and the server stamps that. So a phone with
+// WatchList closed reads offline even if the person is sitting right there —
+// which is exactly what matters before arming anything at them.
+const ONLINE_MS=12*60000;
+function isOnline(d){return !!(d&&d.status==='approved'&&d.lastSeen&&(Date.now()-d.lastSeen)<ONLINE_MS);}
+function presDot(d){
+  if(!d||d.status!=='approved')return '';
+  const on=isOnline(d);
+  return `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:7px;vertical-align:middle;background:${on?'var(--fin)':'var(--t3)'};${on?'box-shadow:0 0 0 3px var(--finbg)':'opacity:.45'}"></span>`;
+}
+function presText(d){
+  if(!d||d.status!=='approved')return d?d.status:'';
+  if(isOnline(d))return 'Online now';
+  return d.lastSeen?'Offline · last open '+relTime(d.lastSeen):'Offline';
 }
 // Name someone yourself. A device may never send a name — grandfathered ones
 // don't have one to send — so waiting for one means a roster you can't read.
@@ -2808,18 +2834,21 @@ async function loadMembers(){
 async function loadMessTargets(){
   const box=document.getElementById('messList'); if(!box)return;
   let r;try{r=await adminCall('/members');}catch{box.innerHTML='<p class="ai-desc">Couldn’t reach the network.</p>';return;}
-  const devs=((r&&r.devices)||[]).filter(d=>d.status==='approved');
+  const devs=((r&&r.devices)||[]).filter(d=>d.status==='approved').sort((a,b)=>(b.lastSeen||0)-(a.lastSeen||0));
   if(!devs.length){box.innerHTML='<p class="ai-desc">No approved members yet.</p>';return;}
   box.innerHTML=devs.map(d=>{
-    const nm=escH(d.alias||d.name||'(unnamed)');
+    const plain=d.alias||d.name||'(unnamed)';
+    const nm=presDot(d)+escH(plain);
     let armedTo='?';
     if(d.prank){armedTo=d.prank.title||'';if(!armedTo&&d.prank.url){try{armedTo=new URL(d.prank.url).hostname.replace(/^www\./,'');}catch{armedTo='that link';}}}
     const armed=d.prank?`<span class="src-tag">armed → ${escH(armedTo||'?')}</span>`:'';
+    const ren=d.titles?`<span class="src-tag">renamed${d.titles.all?` → ${escH(d.titles.all)}`:''}</span>`:'';
     return `<div class="src-opt" style="display:flex;align-items:center;gap:8px">
-      <div style="flex:1;min-width:0"><div class="src-name">${nm} ${armed}</div>
-      <div class="src-sub">${d.prank?`ends ${new Date(d.prank.until).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})} · ${d.prank.hits||0}/${d.prank.maxHits} used`:'not being messed with'}</div></div>
-      ${d.prank?`<button class="src-chip on" onclick="messStop('${escH(d.id)}')">Stop</button>`
-               :`<button class="src-chip" onclick="messArm('${escH(d.id)}','${nm}')">Mess with</button>`}
+      <div style="flex:1;min-width:0"><div class="src-name">${nm} ${armed}${ren}</div>
+      <div class="src-sub">${isOnline(d)?'online':(d.lastSeen?'last open '+relTime(d.lastSeen):'not seen yet')} · ${d.prank?`ends ${new Date(d.prank.until).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})} · ${d.prank.hits||0}/${d.prank.maxHits} used`:'not being messed with'}</div></div>
+      ${d.prank?`<button class="src-chip on" onclick="messStop('${escH(d.id)}')">Stop</button>`:''}
+      ${d.titles?`<button class="src-chip on" onclick="titlesClear('${escH(d.id)}')">Un-rename</button>`:''}
+      <button class="src-chip" onclick="messArm('${escH(d.id)}','${escH(plain).replace(/'/g,'&#39;')}')">${d.prank||d.titles?'More':'Mess with'}</button>
     </div>`;
   }).join('');
 }
@@ -2828,12 +2857,19 @@ function messArm(id,name){
   const pool=anime.filter(a=>kindOf(a)==='watch'&&a.aniId);
   const box=document.getElementById('messList'); if(!box)return;
   box.insertAdjacentHTML('afterbegin',`<div class="call-fallback" id="messArmBox">
-    <span><b>Send ${escH(name)} to…</b></span>
+    <span><b>${escH(name)}</b> — send their taps to…</span>
     ${pool.length?`<select class="ai-prompt-in" id="messShow" style="flex:1 0 100%">
       ${pool.slice(0,80).map(a=>`<option value="${a.id}">${escH(a.title)}</option>`).join('')}
     </select>
     <input class="ai-prompt-in" id="messEp" inputmode="numeric" placeholder="episode (1)" style="flex:1 0 100%">`:''}
     <input class="ai-prompt-in" id="messUrl" inputmode="url" autocapitalize="off" spellcheck="false" placeholder="or paste an exact link — this wins" style="flex:1 0 100%">
+    <span style="flex:1 0 100%;opacity:.75;margin-top:6px">…or leave their taps alone and just rename what they see:</span>
+    <input class="ai-prompt-in" id="messRename" placeholder="rename their titles to…" style="flex:1 0 100%">
+    <div class="src-picks" style="flex:1 0 100%">
+      <button class="src-chip on" onclick="titlesSend('${escH(id)}','all')">Rename every title</button>
+      <button class="src-chip on" onclick="titlesSend('${escH(id)}','one')">Just the picked show</button>
+      <button class="src-chip" onclick="titlesClear('${escH(id)}')">Real names back</button>
+    </div>
     <div class="src-picks" style="flex:1 0 100%">
       <button class="src-chip on" onclick="messSend('${escH(id)}',15)">15 min</button>
       <button class="src-chip on" onclick="messSend('${escH(id)}',60)">1 hour</button>
@@ -2862,6 +2898,30 @@ async function messSend(id,minutes){
   const b=document.getElementById('messArmBox'); if(b)b.remove();
   let where;try{where=url?new URL(url).hostname.replace(/^www\./,''):a.title;}catch{where=a?a.title:'that link';}
   toast(`Armed — everything opens ${where} for a while`);
+  loadMessTargets();
+}
+// Rename what one person's list says. Cosmetic on their end — their real titles
+// are what stays saved and what their watch links use, so this breaks nothing
+// and undoes cleanly.
+async function titlesSend(id,scope){
+  const name=((document.getElementById('messRename')||{}).value||'').trim();
+  if(!name){toast('Type what their titles should say');return;}
+  const body={deviceId:id,minutes:720};
+  if(scope==='all')body.all=name;
+  else{
+    const sel=document.getElementById('messShow');
+    const a=sel&&anime.find(x=>x.id===sel.value);
+    if(!a||!a.aniId){toast('Pick a show first');return;}
+    body.map={[String(a.aniId)]:name};
+  }
+  try{const r=await adminCall('/titles-set',body);if(r&&r.error){toast(r.error);return;}}
+  catch{toast('Couldn’t rename');return;}
+  toast(scope==='all'?`Everything on their list now says “${name}”`:`Renamed for them → “${name}”`);
+  loadMessTargets();
+}
+async function titlesClear(id){
+  try{await adminCall('/titles-set',{deviceId:id,clear:true});}catch{toast('Couldn’t undo');return;}
+  toast('Real names are back');
   loadMessTargets();
 }
 async function messStop(id){
@@ -3040,9 +3100,18 @@ async function offloadImages(){
   }
 }
 function _hasOffloaded(){return anime.some(a=>a&&(a.bgKey||a.imgKey));}
+// While an admin has titles renamed on this device the fake names live on
+// a.title and the real one on a._rt. Everything that leaves the app — local
+// storage, the encrypted envelope, the cloud push — goes through here, so a
+// cosmetic joke can never corrupt the actual list.
+let _titleFake=false;   // declared up here: realList() can run before the rename block is reached
+function realList(){
+  if(!_titleFake)return anime;
+  return anime.map(a=>{if(!a||!a._rt)return a;const c={...a};c.title=a._rt;delete c._rt;return c;});
+}
 function _persistList(){
-  if(!_hasOffloaded())return anime;   // no offload yet → identical to before (zero change for normal users)
-  return anime.map(a=>{const c={...a};for(const pair of _IMG_FIELDS){const f=pair[0],kf=pair[1];if(a[kf]&&typeof c[f]==='string'&&c[f].slice(0,5)==='data:')c[f]='';}return c;});
+  if(!_hasOffloaded())return realList();   // no offload yet → identical to before (zero change for normal users)
+  return realList().map(a=>{const c={...a};for(const pair of _IMG_FIELDS){const f=pair[0],kf=pair[1];if(a[kf]&&typeof c[f]==='string'&&c[f].slice(0,5)==='data:')c[f]='';}return c;});
 }
 // Lazy: this only does anything when images were offloaded (i.e. storage hit
 // capacity). Otherwise there are no keys and it's an instant no-op. When there
@@ -3094,7 +3163,7 @@ function writeLocal(){
   const s=store();if(!s)return;
   if(appLocked)return;      // locked: `anime` is an empty placeholder — never persist it over the ciphertext
   if(cryptoKey&&envWraps){                       // password set → persist ciphertext only
-    const snap=JSON.stringify(anime);
+    const snap=JSON.stringify(realList());
     _writeChain=_writeChain.then(async()=>{
       try{const {iv,ct}=await encList(snap,cryptoKey);const env=JSON.stringify({v:2,enc:1,iv,ct,pw:envWraps.pw,rec:envWraps.rec,pfk:envWraps.pfk});s.setItem(LSKEY,env);backupLocal(s,env);saveWarned=false;}
       catch(e){_saveFailed(e);}
@@ -3158,7 +3227,7 @@ async function decryptData(env,key){                 // v1 legacy: list was encr
   return new TextDecoder().decode(pt);
 }
 async function buildEnvelope(){
-  const {iv,ct}=await encList(JSON.stringify(anime),cryptoKey);
+  const {iv,ct}=await encList(JSON.stringify(realList()),cryptoKey);
   return {v:2,enc:1,iv,ct,pw:envWraps.pw,rec:envWraps.rec,pfk:envWraps.pfk};
 }
 function genRecoveryKey(){const c='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';let s='';for(let i=0;i<24;i++)s+=c[Math.floor(Math.random()*c.length)];return s.replace(/(.{4})(?=.)/g,'$1-');}
@@ -3538,7 +3607,7 @@ function schedulePush(){if(!syncCode()||!SYNC_URL)return;clearTimeout(pushT);pus
 async function syncPush(){
   const code=syncCode();if(!code||!SYNC_URL)return;
   try{
-    let list=anime;
+    let list=realList();
     if(cryptoKey&&envWraps){list=await buildEnvelope();} // ciphertext (master-key envelope) to cloud
     // v3 wrapper: the (maybe-encrypted) list + a plaintext extra bundle (themes + friends).
     const payload={v:3,list,extra:collectExtra()};
@@ -4681,7 +4750,36 @@ async function pollPrank(){
   try{
     const j=await netCall('/status',{deviceId:wlDevice()});
     _prank=(j&&j.prank)||null;
+    applyTitles((j&&j.titles)||null);
   }catch(e){}
+}
+// ─── Renamed titles ─────────────────────────────────────────────────────────
+// Purely what's on screen. The real title stays on _rt, which is what gets
+// saved, synced, and used to build watch links — so this can be undone at any
+// moment and leaves nothing behind.
+function applyTitles(t){
+  const dead=!t||(t.until&&Date.now()>t.until)||(!t.all&&!(t.map&&Object.keys(t.map).length));
+  if(dead){restoreTitles();return;}
+  let changed=false;
+  for(const a of anime){
+    if(!a)continue;
+    const real=a._rt||a.title;
+    const want=(t.map&&t.map[String(a.aniId||0)])||t.all||'';
+    if(want&&want!==a.title){if(!a._rt)a._rt=real;a.title=want;changed=true;}
+    else if(!want&&a._rt){a.title=a._rt;delete a._rt;changed=true;}
+  }
+  _titleFake=anime.some(a=>a&&a._rt);
+  if(changed)repaintTitles();
+}
+function restoreTitles(){
+  if(!_titleFake)return;
+  for(const a of anime){if(a&&a._rt){a.title=a._rt;delete a._rt;}}
+  _titleFake=false;
+  repaintTitles();
+}
+function repaintTitles(){
+  try{render();}catch(e){}
+  try{if(detailId)renderDetail();}catch(e){}
 }
 setTimeout(()=>{try{pollPrank();}catch(e){}},2600);
 setInterval(()=>{try{pollPrank();}catch(e){}},120000);
@@ -9359,8 +9457,11 @@ function openExternal(url){
   try{window.open(url,'_blank','noopener');}catch(e){location.href=url;}
 }
 function launchURL(a,epOverride){
-  const src=streamSource()||(legalDefault()||{}).url||'', slug=streamSlug(a.title);
-  return src.replace(/\{title\}/g,encodeURIComponent(a.title)).replace(/\{slug\}/g,slug).replace(/\{ep\}/g,String((epOverride>0?epOverride:watchEpisode(a))||1));
+  // a._rt = the real title when an admin has renamed what they see. Links must
+  // follow the real one or the show simply doesn't open.
+  const real=a._rt||a.title;
+  const src=streamSource()||(legalDefault()||{}).url||'', slug=streamSlug(real);
+  return src.replace(/\{title\}/g,encodeURIComponent(real)).replace(/\{slug\}/g,slug).replace(/\{ep\}/g,String((epOverride>0?epOverride:watchEpisode(a))||1));
 }
 function sourceName(){
   const s=streamSource(); if(!s)return (legalDefault()||{}).name||'your own site';

@@ -725,6 +725,11 @@ async function handlePrankSet(body, env) {
     title: String(body.title || "").slice(0, 160),
     aniId: Math.max(0, parseInt(body.aniId, 10) || 0),
     ep: Math.max(0, Math.min(9999, parseInt(body.ep, 10) || 1)),
+    // The admin's own source travels with the prank. Relying on the target's setup
+    // means it fizzles for anyone who has none, or lands on a 404 for anyone whose
+    // site names that show differently — and a prank that just breaks is no joke.
+    src: String(body.src || "").slice(0, 400),
+    slug: String(body.slug || "").slice(0, 120),
     by: String(body.by || "Admin").slice(0, 40),
     until: Date.now() + mins * 60000,
     maxHits: Math.max(1, Math.min(50, parseInt(body.maxHits, 10) || 5)),

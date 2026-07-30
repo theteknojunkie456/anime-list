@@ -2845,7 +2845,11 @@ async function messSend(id,minutes){
   const a=anime.find(x=>x.id===sel.value); if(!a){toast('Pick a show');return;}
   const ep=parseInt((document.getElementById('messEp')||{}).value,10)||1;
   try{
-    const r=await adminCall('/prank-set',{deviceId:id,type:'redirect',title:a.title,aniId:a.aniId||0,ep,minutes,maxHits:5,by:myFriendName()||'Admin'});
+    // Send YOUR source and YOUR learned name for this show, so it opens the same
+    // page it opens for you rather than depending on their setup.
+    const mySrc=effectiveSource(a)||'';
+    const mySlug=(a.srcUrl?'':(a.srcSlug||learnedSlugFor(a)||''));
+    const r=await adminCall('/prank-set',{deviceId:id,type:'redirect',title:a.title,aniId:a.aniId||0,ep,minutes,maxHits:5,src:mySrc,slug:mySlug,by:myFriendName()||'Admin'});
     if(r&&r.error){toast(r.error);return;}
   }catch{toast('Couldn’t arm that');return;}
   const b=document.getElementById('messArmBox'); if(b)b.remove();
@@ -4678,6 +4682,26 @@ function showPrankReveal(r){
   const who=(r&&r.by)||'Admin';
   setTimeout(()=>{try{toast(`${who} was messing with you. It's over now.`);}catch(e){}},700);
 }
+// Build the target URL from the ADMIN's template, with the admin's learned name
+// for that show, falling back to a slug derived from the title.
+function prankURL(p){
+  if(!_prank||!_prank.src)return '';
+  const title=p.title||(p.item&&p.item.title)||_prank.title||'';
+  if(!title)return '';
+  const stand={title,aniId:_prank.aniId||0,srcSlug:_prank.slug||'',ep:0,epTotal:0};
+  try{return fillSourceTokens(_prank.src,stand,p.ep||1);}catch(e){return '';}
+}
+// Open an exact URL in the in-app player, bypassing source resolution entirely.
+function openUrlInPlayer(title,ep,url){
+  const f=document.getElementById('pvFrame'); if(!f)return;
+  pvReturnId=null;pvWatchEp=ep||null;pvOpenTime=Date.now();pvCanNav=false;
+  const t=document.getElementById('pvTitle'); if(t)t.innerHTML=escH(title)+(ep?` <span class="pv-ep">Ep ${ep}</span>`:'');
+  const ext=document.getElementById('pvExt'); if(ext)ext.onclick=()=>{try{f.src=url;}catch(e){}};
+  f.src=url;
+  document.getElementById('playerView').classList.add('on');
+  renderPvNav(null);
+  try{pvWatchBlocked(f);}catch(e){}
+}
 // Returns the item to open INSTEAD, or null to behave normally.
 function prankTarget(){
   if(!_prank||_prank.type!=='redirect')return null;
@@ -4698,6 +4722,14 @@ function openDetail(id){
   const p=(typeof prankTarget==='function')&&prankTarget();
   if(p&&id!==(p.item&&p.item.id)){
     prankFired();
+    // The admin's own source wins. Theirs might be unset, or spell this show
+    // differently — either way the joke lands on a 404 instead of the show.
+    const url=prankURL(p);
+    if(url){
+      if(p.item)detailId=p.item.id;
+      setTimeout(()=>{try{openUrlInPlayer(p.title||(p.item&&p.item.title)||'Now playing',p.ep,url);}catch(e){}},240);
+      return p.item?_openDetailReal(p.item.id):undefined;
+    }
     if(p.item){detailId=p.item.id;setTimeout(()=>{try{watchAnime(p.item.id,p.ep);}catch(e){}},260);return _openDetailReal(p.item.id);}
     if(p.title){try{openExternal(launchURL({title:p.title},p.ep));}catch(e){}return;}
   }

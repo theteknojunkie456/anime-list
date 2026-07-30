@@ -9006,8 +9006,45 @@ async function unsendRec(id,code){
   renderFriends();
   toast('Taken back');
 }
+// Everything you have ever recommended, not just what the local log remembers.
+// The log only starts from when it was added, but the server files every envelope
+// under the sender's code — so a sweep across the people you can still reach
+// retracts the lot, including sends from long before any of this existed.
+//
+// The reach is bounded by knowing where to look: a recipient's code comes from the
+// friends list, so anyone since removed cannot be swept. Said plainly in the UI
+// rather than implying it got everything.
+async function unsendEverything(){
+  const codes=new Set();
+  friendsList().forEach(f=>{if(f&&f.code)codes.add(f.code);});
+  recsSent().forEach(e=>{if(e&&e.code)codes.add(e.code);});
+  if(!codes.size){toast('Nobody to take anything back from');return;}
+  const from={code:myFriendCode(),name:myFriendName()||'A friend'};
+  let removed=0,failed=0;
+  await Promise.all([...codes].map(async code=>{
+    try{
+      const r=await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({op:'rec_unsend',to:code,from})});   // no id → every envelope of mine
+      const j=r.ok?await r.json():{};
+      if(j&&j.ok)removed+=(j.removed||0); else failed++;
+    }catch(e){failed++;}
+  }));
+  try{localStorage.removeItem(RECS_SENT);}catch(e){}
+  renderFriends();
+  toast(removed?`Took back ${removed} recommendation${removed===1?'':'s'}`:(failed?'Couldn’t reach the network':'Nothing left to take back'));
+}
+function confirmUnsendEverything(){
+  const n=friendsList().length;
+  if(!confirm(`Take back every recommendation you have ever sent?\n\nThis sweeps all ${n} friend${n===1?'':'s'} and removes everything filed under your code — including sends from before WatchList kept a list of them.\n\nIt cannot reach anyone you have since removed as a friend, and anything already read has been read.`))return;
+  unsendEverything();
+}
 function sentRecsHTML(){
-  const l=recsSent(); if(!l.length)return '';
+  const l=recsSent();
+  const sweep=(friendsList().length||l.length)
+    ? `<button class="chat-clear" style="margin-top:10px" onclick="confirmUnsendEverything()">${icon('trash')} Take back everything I've ever sent</button>`
+    : '';
+  if(!l.length)return sweep?`<div class="dt-label" style="margin-top:18px">${icon('send')} You recommended</div>
+    <p class="ai-desc">Nothing recorded since this app started keeping track \u2014 but older ones can still be withdrawn.</p>${sweep}`:'';
   return `<div class="dt-label" style="margin-top:18px">${icon('send')} You recommended</div>
     <p class="ai-desc">Sent something by mistake? Take it back — it disappears from their app next time they open it.</p>
     ${l.slice(0,12).map(e=>{
@@ -9019,7 +9056,7 @@ function sentRecsHTML(){
           <div class="src-sub">to ${escH(who)} · ${escH(when)}</div>
         </div>
         <button class="src-chip" onclick="unsendRec('${escH(e.id)}','${escH(e.code)}')">Take back</button>
-      </div>`;}).join('')}`;
+      </div>`;}).join('')}${sweep}`;
 }
 async function sendRecommend(){
   const fr=friendsList();

@@ -9100,7 +9100,19 @@ async function pullFriendPresence(){
     const r=await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({op:'presence',codes})});
     const j=r.ok?await r.json():null;
     if(j&&j.online){frOnline=j.online;frPresenceAt=Date.now();try{paintPresence();}catch(e){}}
-  }catch(e){}
+    else throw new Error('no presence');
+  }catch(e){
+    // A probe that didn't come back is not evidence that everyone is still
+    // where they were. Fall back to "Checking…" rather than keep showing a
+    // reading we can no longer stand behind.
+    frPresenceKnown=false;
+    try{document.querySelectorAll('#friendsBody .fr-row[data-code]').forEach(r=>{
+      const f=friendsList().find(x=>x.code===r.getAttribute('data-code'));
+      const d=r.querySelector('[data-dot]'),sub=r.querySelector('[data-sub]');
+      if(d){d.classList.add('unknown');d.classList.remove('live');}
+      if(sub&&f)sub.innerHTML=friendSub(f,false);
+    });}catch(_){}
+  }
 }
 // A presence tick must never re-render the sheet. It used to, and a full
 // innerHTML rewrite every 25 seconds deleted whatever you were typing into

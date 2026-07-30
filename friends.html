@@ -1190,7 +1190,19 @@ body.no-party .friend-only{display:flex;}
 .fr-chev{display:flex;opacity:.5;flex-shrink:0;transition:transform .18s cubic-bezier(.22,1,.36,1);}
 .fr-chev .ico{width:16px;height:16px;}
 .fr-row.open .fr-chev{transform:rotate(90deg);}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0;}
 .fr-danger{color:#ff8080;}
+/* The row's own padding lives on the button, so the two don't stack and a
+   friend row measures the same as the request rows above it. */
+.fr-row.has-open{padding:0;}
+.fr-row.open{padding:0 11px 11px;}
+.fr-dot.unknown{opacity:.3;}
+.fr-hint{font-size:11.5px;color:var(--t3);margin:-2px 0 8px;line-height:1.45;}
+.fr-undo{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;background:var(--bg3);border:1px solid var(--b2);margin:6px 0;}
+.fr-undo-t{flex:1;min-width:0;font-size:12.5px;color:var(--t2);}
+.fr-saved{font-size:11px;color:var(--fin);opacity:0;transition:opacity .2s;}
+.fr-saved.on{opacity:1;}
+@media (prefers-reduced-motion:reduce){.fr-saved{transition:none;}}
 .fr-danger.armed{border-color:#ff6b6b;background:rgba(255,107,107,.14);color:#ff9b9b;}
 @media (prefers-reduced-motion:reduce){.fr-chev{transition:none;}}
 .rs-friend{margin-bottom:10px;}
@@ -9079,14 +9091,14 @@ function onPartyInvite(data){
 // ─── Who's around ───────────────────────────────────────────────────────────
 // A friend is "online" when their app is open, because that is when their live
 // channel exists. Nothing is stored and nothing expires — we just ask.
-let frOnline={}, _frPresT=null;
+let frOnline={}, frWasOnline={}, frPresenceKnown=false, frPresenceAt=0, _frPresT=null;
 async function pullFriendPresence(){
   const codes=friendsList().map(f=>f&&f.code).filter(Boolean);
   if(!codes.length){frOnline={};return;}
   try{
     const r=await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({op:'presence',codes})});
     const j=r.ok?await r.json():null;
-    if(j&&j.online){frOnline=j.online;try{paintPresence();}catch(e){}}
+    if(j&&j.online){frOnline=j.online;frPresenceAt=Date.now();try{paintPresence();}catch(e){}}
   }catch(e){}
 }
 // A presence tick must never re-render the sheet. It used to, and a full
@@ -9097,27 +9109,49 @@ async function pullFriendPresence(){
 // reason: the list must not move under your finger.
 function paintPresence(){
   const box=document.getElementById('friendsBody'); if(!box)return;
-  const fr=friendsList();
-  box.querySelectorAll('.fr-row[data-code]').forEach(row=>{
+  const list=box.querySelector('.fr-list'); if(!list)return;
+  const fr=friendsList(), was=frWasOnline;
+  frPresenceKnown=true;
+  const rows=[...list.querySelectorAll('.fr-row[data-code]')];
+  rows.forEach(row=>{
     const code=row.getAttribute('data-code'), f=fr.find(x=>x&&x.code===code); if(!f)return;
     const on=!!frOnline[code];
-    const dot=row.querySelector('[data-dot]'); if(dot)dot.classList.toggle('live',on);
-    const sub=row.querySelector('[data-sub]');
-    if(sub){
-      const fromThem=recsIn.filter(e=>e&&e.from&&e.from.code===code).reduce((n,e)=>n+((e.items||[]).length),0);
-      sub.innerHTML=friendSub(f,on,fromThem,recsSent().filter(e=>e&&e.code===code).length);
-    }
-    const btn=row.querySelector('.fr-open'); if(btn)btn.setAttribute('aria-label',friendLabel(f)+(on?', online':', offline'));
+    const dot=row.querySelector('[data-dot]'); if(dot){dot.classList.toggle('live',on);dot.classList.remove('unknown');}
+    const sub=row.querySelector('[data-sub]'); if(sub)sub.innerHTML=friendSub(f,on);
   });
+  // Reordering moves whole rows; it can't disturb the add-friend inputs, which
+  // live in the details fold further down. So the online-first order the sheet
+  // promises actually happens, instead of waiting for the next full render.
+  const order=fr.slice().sort(frOrder).map(f=>f.code);
+  order.forEach(code=>{const row=rows.find(r=>r.getAttribute('data-code')===code);if(row)list.appendChild(row);});
   const lab=document.getElementById('frCountLabel');
   const onCount=fr.filter(f=>frOnline[f.code]).length;
   if(lab)lab.innerHTML=`${icon('users')} Friends · ${fr.length}${onCount?` · <span style="color:var(--fin)">${onCount} online</span>`:''}`;
+  // Somebody arriving is worth saying out loud — a colour change is invisible
+  // to anyone using a screen reader.
+  const arrived=fr.filter(f=>frOnline[f.code]&&!was[f.code]).map(friendLabel);
+  frWasOnline={...frOnline};
+  const live=document.getElementById('frLive');
+  if(live&&arrived.length)live.textContent=arrived.length===1?`${arrived[0]} is online`:`${arrived.join(', ')} are online`;
 }
 // Only while the sheet is actually open — presence you can't see isn't worth a
 // request every half minute.
+// Escape unwinds the row one layer at a time — armed remove, then rename, then
+// the open row itself — before anything else gets to close the whole sheet.
+document.addEventListener('keydown',e=>{
+  if(e.key!=='Escape')return;
+  const sh=document.getElementById('friendsSheet'); if(!sh||!sh.classList.contains('on'))return;
+  if(frArmedRemove){frArmedRemove=null;renderFriends();e.stopPropagation();return;}
+  if(frRenaming){frRenaming=null;renderFriends();e.stopPropagation();return;}
+  if(frOpenCode){const c=frOpenCode;frOpenCode=null;renderFriends();e.stopPropagation();
+    const b=document.querySelector(`.fr-row[data-code="${CSS.escape(c)}"] .fr-open`);if(b)b.focus();}
+},true);
 function friendPresenceWatch(on){
   clearTimeout(_frPresT);
   if(!on)return;
+  // A reading from ten minutes ago isn't presence. Show "Checking…" rather than
+  // a stale "Online now" until this session's own probe lands.
+  if(Date.now()-frPresenceAt>60000)frPresenceKnown=false;
   pullFriendPresence();
   const tick=()=>{
     const sh=document.getElementById('friendsSheet');
@@ -9248,73 +9282,136 @@ function openHub(){ openSheet('hubSheet'); }
 function renderFriends(){
   const box=document.getElementById('friendsBody');if(!box)return;
   const code=myFriendCode(),name=myFriendName(),fr=friendsList(),out=friendsOut(),reqs=friendReqs;
-  const reqHTML=reqs.length?`<div class="dt-label" style="margin-top:18px">${icon('inbox')} Friend requests · ${reqs.length}</div>`+reqs.map(r=>`<div class="fr-row"><span class="fr-dot" style="background:${friendColor(r.from.code)}"></span><div class="fr-info"><div class="fr-name">${escH(r.from.name)}</div><div class="fr-code">wants to be friends</div></div><button class="fr-accept" onclick="acceptReq('${escH(r.id)}')">${icon('check')} Accept</button><button class="fr-x" onclick="denyReq('${escH(r.id)}')" aria-label="Deny">${icon('x')}</button></div>`).join(''):'';
-  const outHTML=out.length?`<div class="dt-label" style="margin-top:16px">Pending · ${out.length}</div>`+out.map(f=>`<div class="fr-row"><span class="fr-dot" style="background:${friendColor(f.code)};opacity:.4"></span><div class="fr-info"><div class="fr-name">${escH(f.name||f.code)}</div><div class="fr-code">request sent — waiting to accept</div></div><button class="fr-x" onclick="cancelOutgoing('${escH(f.code)}')" aria-label="Cancel">${icon('x')}</button></div>`).join(''):'';
+  const reqHTML=reqs.length?`<div class="dt-label" style="margin-top:18px">${icon('inbox')} Friend requests · ${reqs.length}</div>`+reqs.map(r=>`<div class="fr-row"><span class="fr-dot" style="background:${friendColor(r.from.code)}"></span><div class="fr-info"><div class="fr-name">${escH(r.from.name)}</div><div class="fr-code">wants to be friends</div></div><button class="fr-accept" onclick="acceptReq('${escH(r.id)}')">${icon('check')} Accept</button><button class="fr-x" onclick="denyReq('${escH(r.id)}')" aria-label="Deny ${escH(r.from.name)}">${icon('x')}</button></div>`).join(''):'';
+  const outHTML=out.length?`<div class="dt-label" style="margin-top:16px">Pending · ${out.length}</div>`+out.map(f=>`<div class="fr-row"><span class="fr-dot" style="background:${friendColor(f.code)};opacity:.4"></span><div class="fr-info"><div class="fr-name">${escH(f.name||shortCode(f.code))}</div><div class="fr-code">request sent — waiting for them to accept</div></div><button class="fr-x" onclick="cancelOutgoing('${escH(f.code)}')" aria-label="Cancel request">${icon('x')}</button></div>`).join(''):'';
   // Whoever is in the app right now comes first — they're who you'd actually
   // send something to, or start a party with.
-  const sorted=fr.slice().sort((a,b)=>(frOnline[b.code]?1:0)-(frOnline[a.code]?1:0)||friendLabel(a).localeCompare(friendLabel(b)));
+  const sorted=fr.slice().sort(frOrder);
   const onCount=fr.filter(f=>frOnline[f.code]).length;
-  const flist=fr.length?sorted.map(f=>friendRow(f)).join(''):'<p class="ai-desc">No friends yet. Open <b>Your code &amp; adding friends</b> to share your code or send a request.</p>';
+  const flist=fr.length?sorted.map(f=>friendRow(f)).join(''):'<p class="ai-desc">No friends yet. Open <b>Your code &amp; adding friends</b> below to share your code or send a request.</p>';
   box.innerHTML=`
+    <div id="frLive" class="sr-only" aria-live="polite" role="status"></div>
     ${reqHTML}
     <div class="dt-label" id="frCountLabel">${icon('users')} Friends · ${fr.length}${onCount?` · <span style="color:var(--fin)">${onCount} online</span>`:''}</div>
+    ${fr.length?`<p class="fr-hint">A green ring means that friend has WatchList open right now. Tap anyone for what you can do with them.</p>`:''}
+    ${undoHTML()}
     <div class="fr-list">${flist}</div>
     ${outHTML}
-    <button class="dt-watch" style="margin-top:16px" onclick="startRecommend()">${icon('send')} Recommend shows to friends</button>
+    ${fr.length?`<button class="parse-btn" onclick="startRecommend()">${icon('send')} Recommend to several friends at once</button>`:''}
     <details class="src-fold" ${fr.length?'':'open'}>
       <summary>${icon('plus')} Your code &amp; adding friends</summary>
-      <div class="dt-label">${icon('star')} Your name</div>
-      <input class="ai-prompt-in" id="frName" placeholder="What friends see" value="${escH(name)}" maxlength="40" oninput="setMyFriendName(this.value)">
+      <div class="dt-label">${icon('star')} Your name <span class="fr-saved" id="frSaved">Saved</span></div>
+      <input class="ai-prompt-in" id="frName" placeholder="What friends see" value="${escH(name)}" maxlength="40" oninput="setMyFriendName(this.value);flashSaved()">
       <div class="dt-label" style="margin-top:16px">${icon('users')} Your friend code</div>
-      <p class="ai-desc">Share this so friends can send you a request.</p>
-      <div class="pt-code"><div class="pt-code-val">${escH(code)}</div><button class="pt-code-cta" onclick="copyFriendCode()" aria-label="Copy code">${icon('copy')}</button></div>
+      <p class="ai-desc">Share this so friends can send you a request. It's the only thing they need.</p>
+      <div class="pt-code"><div class="pt-code-val">${escH(code)}</div><button class="pt-code-cta" onclick="copyFriendCode()" aria-label="Copy your friend code">${icon('copy')}</button></div>
       <div class="dt-label" style="margin-top:16px">${icon('plus')} Add a friend</div>
-      <input class="ai-prompt-in" id="frAddCode" placeholder="Their friend code" autocapitalize="off" autocomplete="off" spellcheck="false">
-      <input class="ai-prompt-in" id="frAddName" placeholder="Name them (optional)" maxlength="40" style="margin-top:8px">
+      <input class="ai-prompt-in" id="frAddCode" placeholder="Their friend code" autocapitalize="off" autocomplete="off" spellcheck="false" oninput="checkAddCode()" onkeydown="if(event.key==='Enter'){event.preventDefault();doAddFriend();}">
+      <input class="ai-prompt-in" id="frAddName" placeholder="Name them (optional)" maxlength="40" style="margin-top:8px" onkeydown="if(event.key==='Enter'){event.preventDefault();doAddFriend();}">
       <button class="parse-btn" onclick="doAddFriend()">Send friend request</button>
       <div class="fr-err" id="frErr"></div>
     </details>
     ${sentRecsHTML()}`;
 }
+// Online first, then by name. One comparator, so the first paint and every
+// presence repaint agree on the order.
+function frOrder(a,b){return (frOnline[b.code]?1:0)-(frOnline[a.code]?1:0)||friendLabel(a).localeCompare(friendLabel(b));}
+// Enough of a code to tell two unnamed friends apart without opening either.
+function shortCode(c){return '…'+String(c||'').slice(-4);}
+function flashSaved(){const e=document.getElementById('frSaved');if(!e)return;e.classList.add('on');clearTimeout(flashSaved._t);flashSaved._t=setTimeout(()=>e.classList.remove('on'),1400);}
+// Say what is wrong with a pasted code while they can still fix it, rather than
+// after they press send.
+function checkAddCode(){
+  const i=document.getElementById('frAddCode'),e=document.getElementById('frErr'); if(!i||!e)return;
+  const v=cleanCode(i.value);
+  if(!v){e.textContent='';return;}
+  if(v===myFriendCode())e.textContent='That one is yours.';
+  else if(friendsList().some(f=>f.code===v))e.textContent=`Already friends with ${friendDisplay(v,'them')}.`;
+  else if(v.length<10)e.textContent='A friend code is at least 10 characters.';
+  else e.textContent='';
+}
+// Codes get pasted out of chats, links and screenshots. Take the code out of
+// whatever came with it rather than rejecting the paste.
+function cleanCode(raw){const m=String(raw||'').match(/[A-Za-z0-9]{10,64}/);return m?m[0]:String(raw||'').replace(/[^A-Za-z0-9]/g,'');}
 // One friend, one row, one tap. Rename / remove / recommend / invite used to be
 // scattered across the sheet and the row; they all live here now, opened by the
 // person they apply to.
-let frOpenCode=null, frArmedRemove=null, _frArmT=null;
-function toggleFriendRow(code){frOpenCode=(frOpenCode===code)?null:code;frArmedRemove=null;renderFriends();}
+let frOpenCode=null, frArmedRemove=null, frRenaming=null, frUndo=null, _frArmT=null, _frUndoT=null;
+function toggleFriendRow(code){frOpenCode=(frOpenCode===code)?null:code;frArmedRemove=null;frRenaming=null;renderFriends();
+  if(frOpenCode){const r=document.querySelector(`.fr-row[data-code="${CSS.escape(code)}"] .fr-open`);if(r)r.focus();}}
 function friendRow(f){
-  const on=!!frOnline[f.code], open=frOpenCode===f.code, armed=frArmedRemove===f.code;
-  const fromThem=recsIn.filter(e=>e&&e.from&&e.from.code===f.code).reduce((n,e)=>n+((e.items||[]).length),0);
-  const sentThem=recsSent().filter(e=>e&&e.code===f.code).length;
-  return `<div class="fr-row${open?' open':''}" data-code="${escH(f.code)}" style="flex-wrap:wrap">
+  const on=!!frOnline[f.code], open=frOpenCode===f.code, armed=frArmedRemove===f.code, renaming=frRenaming===f.code;
+  return `<div class="fr-row has-open${open?' open':''}" data-code="${escH(f.code)}" style="flex-wrap:wrap">
     <button class="fr-open" aria-expanded="${open?'true':'false'}" onclick="toggleFriendRow('${escH(f.code)}')">
-      <span class="fr-dot${on?' live':''}" data-dot style="background:${friendColor(f.code)}"></span>
-      <span class="fr-info"><span class="fr-name">${escH(friendLabel(f))}</span><span class="fr-code" data-sub>${friendSub(f,on,fromThem,sentThem)}</span></span>
+      <span class="fr-dot${on?' live':''}${frPresenceKnown?'':' unknown'}" data-dot style="background:${friendColor(f.code)}"></span>
+      <span class="fr-info"><span class="fr-name">${escH(friendLabel(f))}</span><span class="fr-code" data-sub>${friendSub(f,on)}</span></span>
       <span class="fr-chev">${icon('chevron-right')}</span>
     </button>
     ${open?`<div class="src-picks" style="flex:1 0 100%;margin-top:2px">
-      <button class="src-chip" onclick="recommendTo('${escH(f.code)}')">${icon('send')} Recommend</button>
+      ${renaming?`<input class="ai-prompt-in" id="frRenameIn" style="flex:1 0 100%" maxlength="40" placeholder="Call them…" value="${escH(f.alias||f.name||'')}" onkeydown="if(event.key==='Enter'){event.preventDefault();commitRename('${escH(f.code)}');}if(event.key==='Escape'){event.preventDefault();frRenaming=null;renderFriends();}">
+      <button class="src-chip on" onclick="commitRename('${escH(f.code)}')">${icon('check')} Save name</button>
+      <button class="src-chip" onclick="frRenaming=null;renderFriends()">Cancel</button>`
+      :`<button class="src-chip" onclick="recommendTo('${escH(f.code)}')">${icon('send')} Recommend</button>
       ${partyCode?`<button class="src-chip" onclick="partyInviteFriend('${escH(f.code)}')">${icon('users')} Invite to party</button>`:''}
-      <button class="src-chip" onclick="renameFriendPrompt('${escH(f.code)}')">${icon('edit')} Rename</button>
-      <button class="src-chip fr-danger${armed?' armed':''}" onclick="armRemoveFriend('${escH(f.code)}')">${icon('x')} ${armed?'Tap again to remove':'Remove'}</button>
-      <div class="fr-code" style="flex:1 0 100%;margin-top:2px">${escH(f.code)}${f.alias&&f.name&&f.alias!==f.name?' · aka '+escH(f.name):''}</div>
+      <button class="src-chip" onclick="startRename('${escH(f.code)}')">${icon('edit')} Rename</button>
+      <button class="src-chip fr-danger${armed?' armed':''}" onclick="armRemoveFriend('${escH(f.code)}')">${icon('x')} ${armed?'Tap again to remove':'Remove'}</button>`}
+      <div class="fr-code" style="flex:1 0 100%;margin-top:2px">${escH(f.code)}${f.alias&&f.name&&f.alias!==f.name?' · they call themselves '+escH(f.name):''}</div>
     </div>`:''}
   </div>`;
 }
-// Their code, and whether they're around. Kept as its own function so the
-// presence tick can rewrite just this string in place.
-function friendSub(f,on,fromThem,sentThem){
-  const bits=[on?'<span style="color:var(--fin)">Online now</span>':'Offline'];
+// Their state in one line: whether they're around, and enough to tell them apart
+// when they never named themselves.
+function friendSub(f,on){
+  const fromThem=recsIn.filter(e=>e&&e.from&&e.from.code===f.code).reduce((n,e)=>n+((e.items||[]).length),0);
+  const sentThem=recsSent().filter(e=>e&&e.code===f.code).length;
+  const bits=[!frPresenceKnown?'Checking…':(on?'<span style="color:var(--fin)">Online now</span>':'Offline')];
+  if(!f.alias&&!f.name)bits.push(shortCode(f.code));
   if(fromThem)bits.push(`${fromThem} rec${fromThem===1?'':'s'} from them`);
   if(sentThem)bits.push(`${sentThem} sent`);
   return bits.join(' · ');
 }
+// Renaming happens in the row, not in a browser prompt box — same place as
+// everything else you can do to that person, and cancellable.
+function startRename(code){frRenaming=code;frArmedRemove=null;renderFriends();
+  const i=document.getElementById('frRenameIn');if(i){i.focus();i.select();}}
+function commitRename(code){
+  const i=document.getElementById('frRenameIn'); if(!i)return;
+  const fr=friendsList(),f=fr.find(x=>x.code===code); if(!f)return;
+  const v=i.value.trim().slice(0,40);
+  if(v)f.alias=v; else delete f.alias;         // clearing it resets to their own name
+  saveFriends(fr);
+  frRenaming=null;renderFriends();
+  toast(v?`Now called ${v}`:'Back to their own name');
+}
+function renameFriendPrompt(code){startRename(code);}   // old entry point, same behaviour
 // Removing a friend can only be undone by both of you adding each other again,
-// so it takes two taps. Disarms itself, so an armed button can't sit waiting.
+// so it takes two taps AND leaves an undo behind. Both disarm themselves.
 function armRemoveFriend(code){
   clearTimeout(_frArmT);
-  if(frArmedRemove===code){frArmedRemove=null;removeFriend(code);return;}
+  if(frArmedRemove===code){frArmedRemove=null;removeFriendUndoable(code);return;}
   frArmedRemove=code;renderFriends();
   _frArmT=setTimeout(()=>{if(frArmedRemove===code){frArmedRemove=null;renderFriends();}},4000);
+}
+function removeFriendUndoable(code){
+  const f=friendsList().find(x=>x.code===code); if(!f)return;
+  frUndo={f,at:Date.now()};
+  if(frOpenCode===code)frOpenCode=null;
+  saveFriends(friendsList().filter(x=>x.code!==code));
+  renderFriends();
+  clearTimeout(_frUndoT);
+  _frUndoT=setTimeout(()=>{frUndo=null;renderFriends();},12000);
+}
+function undoRemoveFriend(){
+  if(!frUndo)return;
+  const l=friendsList();
+  if(!l.some(x=>x.code===frUndo.f.code)){l.push(frUndo.f);saveFriends(l);}
+  frUndo=null;clearTimeout(_frUndoT);renderFriends();
+  toast('Put back');
+}
+function undoHTML(){
+  if(!frUndo)return '';
+  return `<div class="fr-undo"><span class="fr-undo-t">Removed <b>${escH(friendLabel(frUndo.f))}</b>.</span>
+    <button class="src-chip on" onclick="undoRemoveFriend()">${icon('rotate-ccw')||icon('check')} Undo</button></div>`;
 }
 // Straight from their row into the picker, with them already chosen — the old
 // path made you pick shows, then hunt for the person you started from.
@@ -9324,12 +9421,17 @@ function recommendTo(code){
 }
 function copyFriendCode(){const c=myFriendCode();try{navigator.clipboard.writeText(c);toast('Code copied');}catch{toast(c);}}
 async function doAddFriend(){
-  const code=(document.getElementById('frAddCode')||{}).value||'';
-  const name=(document.getElementById('frAddName')||{}).value||'';
-  const e=document.getElementById('frErr'); if(e)e.textContent='Sending…';
+  const ci=document.getElementById('frAddCode'), ni=document.getElementById('frAddName');
+  const code=cleanCode((ci||{}).value||''), name=(ni||{}).value||'';
+  const e=document.getElementById('frErr');
+  if(!code){if(e)e.textContent='Paste their friend code first.';if(ci)ci.focus();return;}
+  if(e)e.textContent='Sending…';
   const err=await sendFriendRequest(code,name);
-  if(err){if(e)e.textContent=err;return;}
-  renderFriends();toast('Friend request sent');
+  // The code they typed stays put on failure — it is the one thing here that is
+  // painful to retype, and half the failures are worth a second try.
+  if(err){if(e)e.textContent=err;if(ci)ci.focus();return;}
+  if(ci)ci.value='';if(ni)ni.value='';
+  renderFriends();toast('Request sent — they have to accept it');
 }
 let recPickShows=new Set(),recToFriends=new Set(),recItemNotes={},recSel=null;
 function startRecommend(){recPickShows=new Set();recToFriends=new Set();recItemNotes={};renderRecPick();openSheet('recPickSheet');}
@@ -9442,9 +9544,9 @@ function sentRecsHTML(){
     ? `<button class="chat-clear" style="margin-top:10px" onclick="confirmUnsendEverything()">${icon('trash')} Take back everything I've ever sent</button>`
     : '';
   if(!l.length)return sweep?`<div class="dt-label" style="margin-top:18px">${icon('send')} You recommended</div>
-    <p class="ai-desc">Nothing recorded since this app started keeping track \u2014 but older ones can still be withdrawn.</p>${sweep}`:'';
+    <p class="ai-desc">Nothing here yet. Anything you send from now on shows up here, and you can take it back.</p>${sweep}`:'';
   return `<div class="dt-label" style="margin-top:18px">${icon('send')} You recommended</div>
-    <p class="ai-desc">Sent something by mistake? Take it back — it disappears from their app next time they open it.</p>
+    <p class="ai-desc">Sent something by mistake? Take it back, and it disappears from their app the next time they open it.</p>
     ${l.slice(0,12).map(e=>{
       const who=friendDisplay(e.code,'A friend');
       const when=(()=>{const d=Math.round((Date.now()-(e.at||0))/86400000);return d<=0?'today':d===1?'yesterday':d+' days ago';})();

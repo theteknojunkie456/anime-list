@@ -140,7 +140,7 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
    the CONTENT (a mask, not a painted scrim) means posters dissolve into whatever
    is behind them — which is a per-title ambient gradient, so a solid scrim would
    have been a visible band of the wrong colour. */
-.page{flex:1;overflow-y:auto;overscroll-behavior:none;padding-top:47px;padding-bottom:calc(var(--safe-b) + 86px);}
+.page{flex:1;overflow-y:auto;overscroll-behavior:none;padding-bottom:calc(var(--safe-b) + 86px);}
 
 /* ── HEADER ── */
 .hdr{padding:calc(var(--safe-t) + 12px) 18px 0;display:flex;align-items:center;justify-content:space-between;}
@@ -174,13 +174,11 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 /* The pills float ON the list rather than sitting in a row above it: the scroll
    area now starts behind them (negative margin) and pays it back as padding, so
    posters slide underneath instead of being cut off at a container edge. */
-/* The row itself must NOT be a stacking context. Giving it position+z-index made
-   it one, and a composited box sitting over a scrolling layer draws a seam along
-   its edge — a hairline pinned to the bottom of the pills, right across the
-   screen. The pills carry the z-index individually instead, so there's no
-   full-width layer boundary for the compositor to leave an edge on. */
-.ctrl-row{display:flex;align-items:center;gap:10px;padding:10px 18px 0;pointer-events:none;margin-bottom:-41px;}
-.ctrl-row>*{pointer-events:auto;position:relative;z-index:6;}
+/* Back in its own band, on purpose. Floating the pills over the list removed the
+   edge under them — and that edge is what makes the row read as part of the app
+   rather than a banner pasted on top of it. The list starts below the row again,
+   so its top edge draws the line and the pills sit on the page's own shading. */
+.ctrl-row{display:flex;align-items:center;gap:10px;padding:10px 18px 0;}
 /* filters scroll on their own; a soft fade at the right edge instead of a hard cut-off */
 .filt-scroll{flex:0 1 auto;min-width:0;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;}
 .filt-scroll::-webkit-scrollbar{display:none;}

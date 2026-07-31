@@ -8051,6 +8051,10 @@ function testSource(){
 function pvOpenExternal(){
   const a=anime.find(x=>x.id===pvReturnId); if(!a){toast('Nothing to open');return;}
   const u=(streamURL(a).url)||findUrl(a);
+  // Reaching for the browser while the blank panel is up is the clearest signal
+  // there is that this host won't frame — clearer than any timer.
+  const blocked=document.getElementById('pvBlocked');
+  if(blocked&&blocked.classList.contains('on'))noteFrame(srcHost(effectiveSource(a)||u),false);
   if(u&&u!=='about:blank')openExternal(u);
 }
 // Episode-grid tap: open the episode on your source AND move your progress to it —
@@ -8091,6 +8095,17 @@ async function watchAnime(id,epArg){
   // player watches for a frame that never paints and offers the browser then.
   // Only the built-in presets (which we know refuse framing) go straight out.
   const _own=!!(a.srcUrl&&String(a.srcUrl).trim())||!!streamSource();
+  // Your own source still gets the player — that's where the sandbox is. But if
+  // THIS host has already proved twice that it refuses to be framed, opening it
+  // there only buys you a blank rectangle and an eight-second wait, so it goes
+  // straight out. One session that works clears the record and it frames again.
+  const _refuses=_own&&frameRefuses(srcHost(src))&&!embedTarget(streamURL(a,ep0).url||src);
+  if(_refuses){
+    armExternalWatch(a,ep0||1);
+    openExternal(streamURL(a,ep0).url||launchURL(a,ep0));
+    toast(`${sourceName()} won't play inside the app — opening it`);
+    return;
+  }
   if(!_own&&!embedTarget(streamURL(a,ep0).url||src)){
     armExternalWatch(a,ep0||1);
     openExternal(launchURL(a,ep0));
@@ -8707,6 +8722,26 @@ function refreshSrcExNote(){const n=document.getElementById('srcExNote');if(n)n.
 // anineko may call it initial-d-first-stage where another site says initial_d.
 // Applying one site's names to a different site would break working links.
 const SLUG_MAP_KEY='site_slugs';
+// ─── WHICH SITES ACTUALLY FRAME ─────────────────────────────────────────────
+// A site that refuses framing looks identical to one that's still loading, and
+// cross-origin rules mean we can't ask. So the app stops guessing and starts
+// remembering: per host, how often the escape hatch was actually needed, and how
+// often a session ran long enough that it plainly worked. Two clear failures
+// with nothing on the other side and that host skips the player, so nobody stares
+// at a blank rectangle for eight seconds again. One good session clears it.
+const FRAME_KEY='frame_ok';
+function frameLog(){try{const v=JSON.parse(localStorage.getItem(FRAME_KEY)||'{}');return (v&&typeof v==='object')?v:{};}catch{return{};}}
+function saveFrameLog(m){try{localStorage.setItem(FRAME_KEY,JSON.stringify(m));}catch{}}
+function noteFrame(host,ok){
+  host=String(host||'').toLowerCase(); if(!host)return;
+  const m=frameLog(), e=m[host]||{ok:0,bad:0};
+  if(ok){e.ok++;e.bad=0;}else{e.bad++;}                 // proof it works wipes the doubt
+  m[host]=e; saveFrameLog(m);
+}
+function frameRefuses(host){
+  const e=frameLog()[String(host||'').toLowerCase()];
+  return !!(e&&!e.ok&&e.bad>=2);
+}
 function srcHost(tpl){try{return new URL(String(tpl||'').replace(/\{[^}]+\}/g,'x')).hostname.replace(/^www\./,'').toLowerCase();}catch{return '';}}
 function slugMap(){try{const v=JSON.parse(localStorage.getItem(SLUG_MAP_KEY)||'{}');return (v&&typeof v==='object')?v:{};}catch{return{};}}
 function saveSlugMap(m){try{localStorage.setItem(SLUG_MAP_KEY,JSON.stringify(m));}catch{}}
@@ -10012,6 +10047,12 @@ function closePlayer(){
   const v=document.getElementById('playerView'); if(v)v.classList.remove('on');
   const f=document.getElementById('pvFrame'); if(f)f.src='about:blank';
   const id=pvReturnId, ep=pvWatchEp, elapsed=pvOpenTime?Date.now()-pvOpenTime:0;
+  // Stayed a while and never needed the escape hatch → it framed fine.
+  try{
+    const it=anime.find(x=>x.id===id);
+    const blocked=document.getElementById('pvBlocked');
+    if(it&&elapsed>20000&&!(blocked&&blocked.classList.contains('on')))noteFrame(srcHost(effectiveSource(it)),true);
+  }catch(e){}
   pvReturnId=null; pvWatchEp=null; pvOpenTime=0;
   if(!id||!ep) return;
   const a=anime.find(x=>x.id===id);

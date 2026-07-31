@@ -84,6 +84,8 @@ let anime = [];   // the whole library
   aniId, malId,                     // external ids (dedup + metadata refresh)
   airAt, airEp, airChk,             // next-episode airing (watch only)
   dur,                              // per-episode minutes → total watch-time
+  aniScore,                         // AniList community score 0-100; ranks the picker + "Top rated" sort
+  scoreTried,                       // stamped even when a title has no score, so it isn't refetched forever
   adultChk,                         // stamped once verified non-adult (§7)
   upd                               // last-updated timestamp (sort + sync)
 }
@@ -229,11 +231,27 @@ is embeddable it plays inline, otherwise it opens in the browser.
 - **No custom source (either build):** `routeFree(a)` lists where the title
   actually is — the user's own services first, then AniList's official
   `externalLinks`, then free searches — and remembers the pick.
-- **Embeddable source** → inline player. `embedTarget()` is an allowlist:
-  YouTube, archive.org, and a **private/LAN address** (your own Jellyfin/Plex/
-  Emby). Absence of a blocking header is not permission, so the list is explicit.
+- **A source the user chose** → inline player, always. `_own` is true when
+  `a.srcUrl` is set (a per-title pick or a pinned link) or a global custom source
+  exists. The player's iframe is sandboxed **without** `allow-popups` or
+  `allow-top-navigation`, so a framed site cannot spawn tabs or navigate the app
+  away — that sandbox is the reason to prefer the player at all. The overlay
+  frame in `openYT()` carries the same sandbox.
+- **`embedTarget()`** is a separate allowlist used for *auto-embedding* things
+  nobody configured: YouTube, archive.org, and a **private/LAN address** (your
+  own Jellyfin/Plex/Emby). Absence of a blocking header is not permission, so the
+  list is explicit.
 - **Anything else** → `openExternal`, with `armExternalWatch()` starting the
   time-away clock so progress is still tracked on return.
+
+**Which hosts actually frame (`frame_ok`).** A site refusing to be framed looks
+identical to one still loading, and cross-origin rules mean the app can't ask —
+so it remembers instead of re-testing. Two behavioural signals, not a timer:
+tapping *Open in browser* while the blank panel is up records a failure, and a
+session past 20s that never needed the escape hatch records a success. Two
+failures with no successes and that host skips the player entirely rather than
+showing a blank rectangle for eight seconds; one good session clears the record.
+Counts only, per hostname — nothing about what was watched.
 
 Previously a custom source always framed and a preset always opened, so the same
 "watch" behaved differently depending on which settings field had been filled —

@@ -1722,7 +1722,7 @@ body.recsel .pcard{position:relative;}
     <div class="lock-title" id="joinTitle">Request to join</div>
     <div class="lock-sub" id="joinSub">WatchList is invite-only. Send a request and Admin will let you in.</div>
     <div id="joinFields">
-      <input id="joinName" class="lock-in" type="text" placeholder="Your name" autocomplete="name">
+      <input id="joinName" class="lock-in" type="text" placeholder="Your name" autocomplete="name" required maxlength="40" enterkeyhint="send" onkeydown="if(event.key==='Enter'){event.preventDefault();requestJoin();}">
       <div class="join-hint">So Admin knows it’s you — you can change it later.</div>
       <div class="join-hint" style="margin-top:14px;text-align:center">How did you hear about WatchList?</div>
       <div class="src-picks" id="joinSourceChips" style="justify-content:center">
@@ -2617,16 +2617,18 @@ async function networkGate(){
   if(!gateOn())return false;                              // feature off → open to all
   const force=gateTestMode()==='force';                   // preview mode ignores the shortcuts below
   if(!force&&netStatus()==='approved')return false;       // cached approval → open, revalidate below
-  // Grandfather: anyone already using the app keeps working, no request needed.
-  if(!force&&(hasStoredList()||(Array.isArray(anime)&&anime.length))){setNetStatus('approved');
-    // Send the name they've already given the app (parties, friends) rather than
-    // the "(existing)" placeholder — that placeholder is exactly why the roster
-    // was a column of anonymous rows.
-    try{netCall('/join',{deviceId:wlDevice(),name:knownName()||'(existing)',...joinIdentity()});}catch{}
+  // Having a list on this device used to be enough to walk straight in, and the
+  // app filed the person as "(existing)" — which is precisely how the roster
+  // became a column of rows nobody could identify. It now only skips the gate
+  // when the app already knows a real name to send; anyone else is asked for one
+  // like everybody else, so no row ever arrives anonymous.
+  const nm0=knownName();
+  if(!force&&nm0&&(hasStoredList()||(Array.isArray(anime)&&anime.length))){setNetStatus('approved');
+    try{netCall('/join',{deviceId:wlDevice(),name:nm0,...joinIdentity()});}catch{}
     return false;}
   // New device → ask the network where it stands.
   let st='unknown';
-  try{const inv=localStorage.getItem(NET_INVITE)||'';const j=await netCall('/join',{deviceId:wlDevice(),name:knownName(),invite:inv,...joinIdentity()});st=j.status||'unknown';}
+  try{const inv=localStorage.getItem(NET_INVITE)||'';const j=await netCall('/join',{deviceId:wlDevice(),name:nm0,invite:inv,...joinIdentity()});st=j.status||'unknown';}
   catch{ // can't reach the server: don't trap a brand-new user in a dead wall — let them in as a local-only guest.
     return false; }
   if(st==='approved'){setNetStatus('approved');return false;}
@@ -2640,14 +2642,27 @@ function showJoinGate(st){
   const f=document.getElementById('joinFields'),setIco=n=>{if(ic)ic.innerHTML=icon(n);};
   if(st==='denied'){setIco('x');if(t)t.textContent='Not approved';if(s)s.textContent='Admin hasn’t approved this request. Ask whoever shared the link with you.';if(f)f.style.display='none';if(b)b.style.display='none';if(r)r.style.display='';}
   else if(st==='pending'){setIco('clock');if(t)t.textContent='Waiting for Admin';if(s)s.textContent='Your request was sent. You’ll be let in as soon as Admin approves it.';if(f)f.style.display='none';if(b)b.style.display='none';if(r)r.style.display='';pollJoin();}
-  else{setIco('users');if(t)t.textContent='Request to join';if(s)s.textContent='WatchList is invite-only. Send a request and Admin will let you in.';if(f)f.style.display='';if(b)b.style.display='';if(r)r.style.display='none';}
+  else{setIco('users');if(t)t.textContent='Request to join';if(s)s.textContent='WatchList is invite-only. Put your name in so Admin knows who you are, and they\u2019ll let you in.';if(f)f.style.display='';if(b)b.style.display='';if(r)r.style.display='none';
+    // Prefill whatever the app already knows them as, and put the cursor there —
+    // the name is the whole point of this screen now.
+    const n=document.getElementById('joinName');
+    if(n){if(!n.value)n.value=knownName();setTimeout(()=>{try{n.focus();}catch(e){}},80);}
+  }
   el.classList.add('on');
 }
 function hideJoinGate(){const el=document.getElementById('joinScreen');if(el)el.classList.remove('on');}
 async function requestJoin(){
-  const nm=(document.getElementById('joinName')||{}).value||'';
+  const el=document.getElementById('joinName');
+  const nm=String((el||{}).value||'').trim();
   const src=_joinSource||'';
   const err=document.getElementById('joinErr');if(err)err.textContent='';
+  // No nameless requests. An unnamed row is one the admin has to guess at later,
+  // and guessing is the thing this is meant to stop.
+  if(nm.length<2){
+    if(err)err.textContent='Put your name in first — Admin needs to know who this is.';
+    if(el)try{el.focus();}catch(e){}
+    return;
+  }
   try{const inv=localStorage.getItem(NET_INVITE)||'';const j=await netCall('/join',{deviceId:wlDevice(),name:nm,source:src,invite:inv,...joinIdentity()});
     if(j.status==='approved'){setNetStatus('approved');hideJoinGate();location.reload();return;}
     showJoinGate('pending');

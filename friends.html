@@ -2322,8 +2322,13 @@ body.recsel .pcard{position:relative;}
     <!-- Learn the site's own name for this show, from one working address. -->
     <div class="pv-set" id="pvSet">
       <div class="pv-set-t" id="pvSetTitle"></div>
-      <div class="pv-set-s">Find the show on this site, then paste that page's address. WatchList remembers what this site calls it, so every episode works from now on.</div>
-      <input class="ai-prompt-in" id="pvSetIn" placeholder="paste the address of the right page" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url">
+      <div class="pv-set-s">Search the site right here, then type the show's name the way the site spells it. WatchList remembers it and every episode works from then on — pasting the address works too, if that's easier.</div>
+      <input class="ai-prompt-in" id="pvSetName" placeholder="what this site calls the show" autocomplete="off" autocapitalize="off" spellcheck="false" onkeydown="if(event.key==='Enter'){event.preventDefault();pvSetFromName();}">
+      <div class="pv-set-row" style="margin-bottom:8px">
+        <button class="parse-btn" style="flex:1" onclick="pvSetFromName()">Set from the name</button>
+        <button class="parse-btn" style="flex:0 0 auto;width:auto;padding:0 16px" onclick="pvSearchHere()">Search this site</button>
+      </div>
+      <input class="ai-prompt-in" id="pvSetIn" placeholder="or paste the address of the right page" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url">
       <div class="pv-set-row">
         <button class="parse-btn" style="flex:1" onclick="pvSetFromURL()">Set</button>
         <button class="parse-btn" style="flex:0 0 auto;width:auto;padding:0 16px" onclick="pvOpenExternal()">Open in browser</button>
@@ -8150,8 +8155,34 @@ function pvSetPrompt(){
   const box=document.getElementById('pvSet'); if(!box)return;
   document.getElementById('pvWrong').classList.remove('on');
   document.getElementById('pvSetTitle').textContent=`Where is “${a.title}” on this site?`;
-  const inp=document.getElementById('pvSetIn'); inp.value='';
-  box.classList.add('on'); try{inp.focus();}catch(e){}
+  const inp=document.getElementById('pvSetIn'); if(inp)inp.value='';
+  const nm=document.getElementById('pvSetName'); if(nm)nm.value='';
+  box.classList.add('on');
+  // Focus the name field — that's the short path now; the address box is the fallback.
+  try{(nm||inp).focus();}catch(e){}
+}
+// The frame is cross-origin, so WatchList can never read what page you navigated
+// to inside it — that's a browser boundary, not a missing feature. But you can
+// SEE the name on screen, and the name is the only part we actually need: it
+// becomes the slug every future episode link is built from. So type what the
+// site calls it and skip the address entirely.
+function pvSetFromName(){
+  const a=anime.find(x=>x.id===pvReturnId); if(!a){toast('Nothing open');return;}
+  const raw=((document.getElementById('pvSetName')||{}).value||'').trim();
+  if(!raw){toast('Type the name as this site spells it');return;}
+  // Accept a slug, a title, or a whole URL pasted in the wrong box.
+  let name=raw;
+  try{if(/^https?:\/\//i.test(raw)){const segs=new URL(raw).pathname.split('/').filter(Boolean);name=segs[segs.length-1]||raw;}}catch(e){}
+  const slug=streamSlug(name.replace(/[_-]?(ep|episode)[-_]?\d+$/i,''));
+  if(!slug){toast('Couldn\u2019t make a name out of that');return;}
+  const tpl=effectiveSource(a)||'';
+  a.srcSlug=slug;
+  setLearnedSlug(a,slug,tpl);
+  try{save();}catch(e){}
+  const box=document.getElementById('pvSet'); if(box)box.classList.remove('on');
+  toast(`Got it \u2014 \u201c${a.title}\u201d is \u201c${slug}\u201d here`);
+  const fixed=streamURL(a,pvWatchEp||1).url;
+  if(fixed)document.getElementById('pvFrame').src=fixed;
 }
 function pvSetFromURL(){
   const a=anime.find(x=>x.id===pvReturnId); if(!a)return;
@@ -8211,7 +8242,10 @@ function pvSearchHere(){
   if(!u||u==='about:blank'){toast('No source to search');return;}
   document.getElementById('pvFrame').src=u;
   pvCanNav=false; renderPvNav(null);
-  toast('Searching the site for this title');
+  // Open the set panel with it: you're about to read the right name off the
+  // results, and the next thing you want is somewhere to put it.
+  try{pvSetPrompt();const n=document.getElementById('pvSetName');if(n)n.value='';}catch(e){}
+  toast('Search the site, then set the name it uses');
 }
 // Offer the recovery a moment after a deep link opens — long enough not to nag
 // when the page is simply loading, soon enough to be there when it 404s.
@@ -9062,8 +9096,12 @@ function openYT(target,label){
   const v=document.getElementById('ytView'),f=document.getElementById('ytFrame'),t=document.getElementById('ytTitle');
   if(!v||!f||!target)return false;
   if(t)t.textContent=label||'Watch';
+  // Same sandbox the main player uses. embedTarget() can hand this a private
+  // host or an archive.org page, not just YouTube, and this frame was the one
+  // place a framed site could still open tabs or navigate the whole app away.
   f.innerHTML='<iframe src="'+escH(target)+'" title="'+escH(label||'Watch')+
-    '" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>';
+    '" sandbox="allow-scripts allow-same-origin allow-forms allow-presentation allow-orientation-lock"'+
+    ' allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="no-referrer"></iframe>';
   v.classList.add('on');
   return true;
 }

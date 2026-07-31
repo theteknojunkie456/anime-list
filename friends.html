@@ -55,6 +55,9 @@
 [data-theme=zoro]{--aFg:#140b06;--bg:#050e07;--bg2:#0a140c;--bg3:#0f1c12;--bg4:#142418;--bg5:#192c1e;--b1:rgba(38,158,64,0.07);--b2:rgba(38,158,64,0.14);--b3:rgba(38,158,64,0.26);--t1:#e6f4e8;--t2:#99c2a0;--t3:#579d65;--a:#26a040;--a2:#46c860;--ag:rgba(38,160,64,0.13);--glow:rgba(38,160,64,0.22);--fin:#4ecb82;--finbg:rgba(78,203,130,0.11);--wat:#e85050;--watbg:rgba(232,80,80,0.11);--pln:#5b9cf6;--plnbg:rgba(91,156,246,0.11);--topgrad:linear-gradient(180deg,#020e04 0%,#050e07 100%);}
 [data-theme=chopper]{--aFg:#140b06;--bg:#0c080f;--bg2:#150f1c;--bg3:#1c1428;--bg4:#231934;--bg5:#2a1e40;--b1:rgba(214,72,114,0.07);--b2:rgba(214,72,114,0.14);--b3:rgba(214,72,114,0.26);--t1:#fceef6;--t2:#d1a7c1;--t3:#ad7ba2;--a:#d84872;--a2:#f87098;--ag:rgba(216,72,114,0.13);--glow:rgba(216,72,114,0.24);--fin:#60d4a0;--finbg:rgba(96,212,160,0.11);--wat:#f5a040;--watbg:rgba(245,160,64,0.11);--pln:#7ab4f5;--plnbg:rgba(122,180,245,0.11);--topgrad:linear-gradient(180deg,#1a0610 0%,#0c080f 100%);}
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+/* Nothing may scroll the page sideways, on any handset. A single overlong word
+   or one stray element shouldn't be able to shift the whole layout. */
+html,body{max-width:100%;overflow-x:hidden;}
 html,body{height:100%;overscroll-behavior-y:none;}
 body{
   font-family:var(--fb);background:var(--bg);color:var(--t1);
@@ -895,8 +898,16 @@ body.first-paint .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards
 .wn-dot{width:7px;height:7px;border-radius:99px;background:var(--b2);transition:width .2s ease,background .2s ease;}
 .wn-dot.on{width:21px;background:var(--a);}
 /* Player recovery bar — shown a few seconds after a deep link opens. */
-.pv-wrong{position:absolute;left:50%;transform:translateX(-50%);bottom:14px;z-index:4;display:none;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;
-  padding:8px 10px 8px 14px;border-radius:22px;background:var(--bg2);border:1px solid var(--b3);box-shadow:0 10px 30px rgba(0,0,0,.5);max-width:min(94%,420px);}
+/* Letting this wrap turned it into a four-row block sitting over the middle of
+   the page — worse than the problem it exists to solve. It's one slim line now:
+   it scrolls sideways if a narrow phone can't fit it, and never grows taller. */
+.pv-wrong{position:absolute;left:8px;right:8px;bottom:10px;z-index:4;display:none;align-items:center;gap:7px;flex-wrap:nowrap;
+  overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;
+  padding:7px 8px 7px 12px;border-radius:16px;background:color-mix(in srgb,var(--bg2) 94%,transparent);border:1px solid var(--b3);box-shadow:0 10px 30px rgba(0,0,0,.5);}
+.pv-wrong::-webkit-scrollbar{display:none;}
+.pv-wrong-t{flex:0 0 auto;}
+.pv-wrong-b{flex:0 0 auto;}
+.pv-wrong-x{flex:0 0 auto;margin-left:auto;position:sticky;right:0;background:var(--bg2);}
 .pv-wrong.on{display:flex;}
 .pv-wrong-t{font-size:12.5px;font-weight:700;color:var(--t1);}
 .pv-wrong-b{font-size:12px;font-weight:700;padding:7px 12px;border-radius:99px;background:var(--bg4);border:1px solid var(--b2);color:var(--t1);white-space:nowrap;cursor:pointer;}
@@ -1183,6 +1194,26 @@ body.call-full{overflow:hidden;}
 .party-call-x.unavailable{opacity:.38;}
 .party-call-bar #callStatus{font-weight:700;color:var(--t2);}
 .party-call-bar #callStatus b{color:var(--t1);}
+/* Small handsets — an SE, a mini, or anyone running Display Zoom, which makes a
+   normal phone report about 320px. The player carries the most chrome, so it is
+   what runs out of room first. */
+@media(max-width:380px){
+  .pv-top{padding:calc(var(--safe-t) + 8px) 10px 8px;gap:6px;}
+  .playerview .sv-back,.pv-ext{width:34px;height:34px;border-radius:10px;}
+  .pv-ext .ico{width:16px;height:16px;}
+  .pv-title{font-size:13.5px;}
+  .pv-title .pv-ep{font-size:12px;margin-left:5px;}
+  .pv-nav{padding:9px 10px calc(var(--safe-b) + 9px);gap:6px;}
+  .pv-nav-arrow{width:42px;}
+  .pv-nav-mark{font-size:13px;}
+  .pv-wrong{gap:6px;padding:6px 7px 6px 10px;}
+  .pv-wrong-t{font-size:11.5px;}
+  .pv-wrong-b{font-size:11.5px;padding:6px 9px;}
+  .hdr-title{font-size:19px;}
+  .hdr-actions{gap:5px;}
+  .hbtn{width:35px;height:35px;}
+  .nbtn small{font-size:8.5px;letter-spacing:.02em;}
+}
 @media(max-width:420px){
   .party-call-bar{gap:6px;padding:10px 8px 9px 12px;flex-wrap:wrap;}
   .party-call-bar #callStatus{font-size:12.5px;flex:1 0 100%;order:-1;margin-bottom:2px;}
@@ -1586,7 +1617,7 @@ body.recsel .pcard{position:relative;}
   .pv-nav-arrow{width:42px;height:38px;border-radius:11px;}
   .pv-nav-arrow .ico{width:19px;height:19px;}
   .pv-nav-mark{height:38px;font-size:13px;border-radius:11px;}
-  .pv-wrong{bottom:8px;padding:6px 8px 6px 12px;gap:6px;}
+  .pv-wrong{bottom:6px;padding:5px 8px 5px 11px;gap:6px;}
   .pv-wrong-t{font-size:11.5px;}
   .pv-wrong-b{font-size:11.5px;padding:6px 10px;}
   .hdr{padding-top:calc(var(--safe-t) + 8px);}
@@ -2321,9 +2352,9 @@ body.recsel .pcard{position:relative;}
          this puts the two recoveries one tap away instead of behind an icon. -->
     <div class="pv-wrong" id="pvWrong">
       <span class="pv-wrong-t">Wrong page?</span>
-      <button class="pv-wrong-b" onclick="pvTrySpelling()">Try another spelling</button>
-      <button class="pv-wrong-b" onclick="pvSearchHere()">Search this title</button>
-      <button class="pv-wrong-b prim" onclick="pvSetPrompt()">Set the right one</button>
+      <button class="pv-wrong-b" onclick="pvTrySpelling()" title="Try another spelling">Spelling</button>
+      <button class="pv-wrong-b" onclick="pvSearchHere()" title="Search this site for the show">Search</button>
+      <button class="pv-wrong-b prim" onclick="pvSetPrompt()" title="Set the right page">Set it</button>
       <button class="pv-wrong-x" onclick="document.getElementById('pvWrong').classList.remove('on')" aria-label="Dismiss"><i data-ic="x"></i></button>
     </div>
     <!-- Learn the site's own name for this show, from one working address. -->

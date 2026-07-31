@@ -6790,6 +6790,8 @@ async function toggleVoice(){
 }
 function leaveVoice(){
   voiceOn=false;
+  try{const t=document.getElementById('voiceTap');if(t)t.remove();}catch(e){}
+  _voiceAudios=[];
   Object.keys(vpcs).forEach(vpcClose);
   if(voiceStream){voiceStream.getTracks().forEach(t=>t.stop());voiceStream=null;}
   if(partyActive())wsSend({t:'voice',on:false});
@@ -6804,12 +6806,36 @@ function toggleMute(){
 function vpcClose(uid){const pc=vpcs[uid];if(pc){try{if(pc._audio){pc._audio.srcObject=null;pc._audio.remove();pc._audio=null;}}catch(e){}try{pc.close();}catch(e){}delete vpcs[uid];}}
 // Attach the remote mic to a real (hidden) <audio> in the DOM — a detached new Audio()
 // often stays silent, especially on iOS Safari.
+// Every remote voice stream lands here. Two things used to go wrong silently:
+// display:none can stop a media element playing at all in some WebKit builds, and
+// a rejected play() — which is what iOS does to audio that starts without a tap —
+// was only written to the console. Both add up to "I can't hear him" with nothing
+// on screen to say why.
+let _voiceAudios=[];
 function vpcAttach(pc,stream){try{
-  const a=document.createElement('audio');a.autoplay=true;a.setAttribute('playsinline','');a.style.display='none';
+  const a=document.createElement('audio');a.autoplay=true;a.setAttribute('playsinline','');
+  // Rendered, but zero-sized: kept out of the layout without display:none.
+  a.style.cssText='position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;left:-9999px';
   a.srcObject=stream;document.body.appendChild(a);
-  const p=a.play&&a.play();if(p&&p.catch)p.catch(err=>console.log('[voice] play() blocked: '+(err&&err.message)));
+  _voiceAudios.push(a);
+  const p=a.play&&a.play();
+  if(p&&p.catch)p.catch(err=>{console.log('[voice] play() blocked: '+(err&&err.message));voiceNeedsTap();});
   pc._audio=a;console.log('[voice] remote audio attached');
 }catch(e){console.log('[voice] attach error '+(e&&e.message));}}
+// iOS won't start audio that nobody asked for. A tap is all it needs, so ask for
+// one instead of leaving the call mute with no explanation.
+function voiceNeedsTap(){
+  if(document.getElementById('voiceTap'))return;
+  const b=document.createElement('button');
+  b.id='voiceTap';b.className='pk-btn prim';
+  b.style.cssText='position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--safe-b) + 88px);z-index:210;box-shadow:0 10px 30px rgba(0,0,0,.55)';
+  b.textContent='Tap to hear everyone';
+  b.onclick=()=>{
+    _voiceAudios.forEach(a=>{try{const q=a.play&&a.play();if(q&&q.catch)q.catch(()=>{});}catch(e){}});
+    b.remove();toast('Voice on');
+  };
+  document.body.appendChild(b);
+}
 async function vpcConnect(uid){                          // I offer (I hold the smaller uid)
   if(vpcs[uid]||!voiceStream)return;
   console.log('[voice] offering to '+uid);

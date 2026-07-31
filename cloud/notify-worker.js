@@ -424,6 +424,8 @@ async function handleFetch(request, env) {
       return handleDecide(body, env, "denied");
     case "/invite":
       return handleInvite(body, env);
+    case "/forget":
+      return handleForget(body, env);
     case "/admin-register":
       return handleAdminRegister(body, env);
     case "/cap":
@@ -603,11 +605,50 @@ async function handleRename(body, env) {
   await env.SUBS.put(key, JSON.stringify(rec));
   return json({ ok: true, alias: rec.alias || "" });
 }
+// A device id lives in localStorage, and iOS throws a home-screen app's
+// localStorage away — on eviction, after a stretch of not opening it, when
+// storage is cleared. The app then generates a fresh id, the server sees someone
+// it has never met, and the admin gets ANOTHER "wants in" for a person who has
+// been a member for weeks. That is where a roster of fourteen anonymous rows
+// comes from, not from people opening the app.
+//
+// The sync code and the friend code are the same kind of secret but survive
+// differently — they're written down, shared, and restored from a backup — so
+// they act as a stable identity. If either one already belongs to a record, this
+// device IS that person: the record moves to the new id, and nobody is notified.
+const idxKey = (v) => "idn:" + String(v).replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 64);
+async function adoptByIdentity(id, body, env) {
+  const ids = [body.sync, body.fcode].filter(v => typeof v === "string" && v.length >= 10);
+  for (const v of ids) {
+    const prevId = await env.SUBS.get(idxKey(v));
+    if (!prevId || prevId === id) continue;
+    const raw = await env.SUBS.get(devKey(prevId));
+    if (!raw) continue;
+    const rec = JSON.parse(raw);
+    rec.id = id;
+    rec.rejoinedAt = Date.now();
+    rec.devices = Math.min(50, (rec.devices || 1) + 1);   // how many times this person has been re-issued an id
+    await env.SUBS.put(devKey(id), JSON.stringify(rec));
+    await env.SUBS.delete(devKey(prevId));                // one person, one row
+    for (const v2 of ids) await env.SUBS.put(idxKey(v2), id);
+    return rec;
+  }
+  return null;
+}
+async function rememberIdentity(id, body, env) {
+  for (const v of [body.sync, body.fcode]) {
+    if (typeof v === "string" && v.length >= 10) await env.SUBS.put(idxKey(v), id);
+  }
+}
 async function handleJoin(body, env) {
   const id = String(body.deviceId || "").replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 64);
   if (!id) return json({ ok: false, error: "deviceId required" }, 400);
   const key = devKey(id);
   const existing = await env.SUBS.get(key);
+  if (!existing) {
+    const adopted = await adoptByIdentity(id, body, env);
+    if (adopted) return json({ ok: true, status: adopted.status, name: adopted.alias || adopted.name || "", rejoined: true });
+  }
   if (existing) {
     // Already known — report status, don't re-notify. But do fill in a name if we
     // never got one: grandfathered devices register as "(existing)", which is why
@@ -620,6 +661,7 @@ async function handleJoin(body, env) {
       rec.name = incoming;
       await env.SUBS.put(key, JSON.stringify(rec));
     }
+    await rememberIdentity(id, body, env);
     return json({ ok: true, status: rec.status, name: rec.alias || rec.name || "" });
   }
 
@@ -649,6 +691,7 @@ async function handleJoin(body, env) {
     joinedAt: Date.now(),
   };
   await env.SUBS.put(key, JSON.stringify(rec));
+  await rememberIdentity(id, body, env);
 
   // Tell the admin about EVERY new person. It only fired for pending before, so
   // anyone arriving through an auto-approve invite joined invisibly — the admin
@@ -739,6 +782,16 @@ async function handleAdminRegister(body, env) {
   if (!body.subscription || !body.subscription.endpoint) return json({ ok: false, error: "subscription required" }, 400);
   await env.SUBS.put("admin:endpoint", JSON.stringify(body.subscription));
   return json({ ok: true });
+}
+
+// Admin: delete a device record outright. There was no way to remove one, so a
+// roster that filled up with re-registrations could only grow.
+async function handleForget(body, env) {
+  if (!adminOK(body, env)) return json({ ok: false, error: "unauthorized" }, 401);
+  const id = String(body.deviceId || "").replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 64);
+  if (!id) return json({ ok: false, error: "deviceId required" }, 400);
+  await env.SUBS.delete(devKey(id));
+  return json({ ok: true, forgotten: id });
 }
 
 async function handleMembers(body, env) {

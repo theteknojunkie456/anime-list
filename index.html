@@ -2594,6 +2594,17 @@ async function netCall(path,body){
 // Any name this person has already told the app — their party display name, or the
 // name they use with friends. Asking again for something we already know is how you
 // end up with a roster full of "(unnamed)".
+// The device id lives in localStorage, which iOS is free to throw away — and
+// when it does, this app looks like a stranger to the network. The sync code and
+// friend code are the same kind of token but people keep them: they're shared,
+// written down, restored from a backup. Sending them lets the server recognise a
+// returning member instead of filing another anonymous request.
+function joinIdentity(){
+  const out={};
+  try{const sc=(typeof syncCode==='function'&&syncCode())||'';if(sc)out.sync=sc;}catch(e){}
+  try{const fc=(typeof myFriendCode==='function'&&myFriendCode())||'';if(fc)out.fcode=fc;}catch(e){}
+  return out;
+}
 function knownName(){
   try{
     const n=(typeof myFriendName==='function'&&myFriendName())||localStorage.getItem('party_name')||localStorage.getItem('friend_name')||'';
@@ -2611,11 +2622,11 @@ async function networkGate(){
     // Send the name they've already given the app (parties, friends) rather than
     // the "(existing)" placeholder — that placeholder is exactly why the roster
     // was a column of anonymous rows.
-    try{netCall('/join',{deviceId:wlDevice(),name:knownName()||'(existing)'});}catch{}
+    try{netCall('/join',{deviceId:wlDevice(),name:knownName()||'(existing)',...joinIdentity()});}catch{}
     return false;}
   // New device → ask the network where it stands.
   let st='unknown';
-  try{const inv=localStorage.getItem(NET_INVITE)||'';const j=await netCall('/join',{deviceId:wlDevice(),name:knownName(),invite:inv});st=j.status||'unknown';}
+  try{const inv=localStorage.getItem(NET_INVITE)||'';const j=await netCall('/join',{deviceId:wlDevice(),name:knownName(),invite:inv,...joinIdentity()});st=j.status||'unknown';}
   catch{ // can't reach the server: don't trap a brand-new user in a dead wall — let them in as a local-only guest.
     return false; }
   if(st==='approved'){setNetStatus('approved');return false;}
@@ -2637,7 +2648,7 @@ async function requestJoin(){
   const nm=(document.getElementById('joinName')||{}).value||'';
   const src=_joinSource||'';
   const err=document.getElementById('joinErr');if(err)err.textContent='';
-  try{const inv=localStorage.getItem(NET_INVITE)||'';const j=await netCall('/join',{deviceId:wlDevice(),name:nm,source:src,invite:inv});
+  try{const inv=localStorage.getItem(NET_INVITE)||'';const j=await netCall('/join',{deviceId:wlDevice(),name:nm,source:src,invite:inv,...joinIdentity()});
     if(j.status==='approved'){setNetStatus('approved');hideJoinGate();location.reload();return;}
     showJoinGate('pending');
   }catch{if(err)err.textContent='Couldn’t reach the network — try again.';}
@@ -2900,9 +2911,10 @@ async function loadMembers(){
   const devs=r.devices||[];
   const pending=devs.filter(d=>d.status==='pending'), approved=devs.filter(d=>d.status==='approved'), denied=devs.filter(d=>d.status==='denied');
   const row=(d,actions)=>`<div class="src-opt" style="display:flex;align-items:center;gap:8px">
-    <div style="flex:1;min-width:0" onclick="adminRenameDevice('${escH(d.id)}','${escH(d.alias||d.name||'')}')"><div class="src-name">${presDot(d)}${escH(d.alias||d.name||'(tap to name)')}${d.alias&&d.name&&d.alias!==d.name?` <span class="src-tag">${escH(d.name)}</span>`:''}</div><div class="src-sub">${presText(d)}${d.joinedAt?' · '+when(d.joinedAt):''}${d.source?' · heard: '+escH(d.source):''}${d.invite?' · invite':''}</div></div>${actions}</div>`;
+    <div style="flex:1;min-width:0" onclick="adminRenameDevice('${escH(d.id)}','${escH(d.alias||d.name||'')}')"><div class="src-name">${presDot(d)}${escH(d.alias||d.name||'(tap to name)')}${d.alias&&d.name&&d.alias!==d.name?` <span class="src-tag">${escH(d.name)}</span>`:''}</div><div class="src-sub">${presText(d)}${d.joinedAt?' · '+when(d.joinedAt):''}${d.devices>1?` · ${d.devices} sign-ins`:''}${d.source?' · heard: '+escH(d.source):''}${d.invite?' · invite':''}</div></div>${actions}</div>`;
   const ap=d=>`<button class="src-chip on" onclick="adminDecide('${d.id}','approve')">Approve</button>`;
   const dn=d=>`<button class="src-chip" onclick="adminDecide('${d.id}','deny')">Deny</button>`;
+  const rm=d=>`<button class="src-chip fr-danger" onclick="adminForget('${d.id}')">Remove</button>`;
   // Every group is always shown, with its count — an empty section is
   // information too ("nobody is waiting on me"), and a section that only appears
   // when non-empty means you can't tell the difference between none and broken.
@@ -2915,9 +2927,9 @@ async function loadMembers(){
   const onl=approved.filter(isOnline).length;
   box.innerHTML=
     `<div class="dt-label" style="margin-top:2px">${icon('users')} Everyone · ${devs.length}${onl?` · ${onl} online`:''}</div>`
-    +group('Waiting on you',pending,d=>ap(d)+dn(d))
-    +group('Members',approved,d=>dn(d))
-    +group('Denied',denied,d=>ap(d),true);
+    +group('Waiting on you',pending,d=>ap(d)+dn(d)+rm(d))
+    +group('Members',approved,d=>dn(d)+rm(d))
+    +group('Denied',denied,d=>ap(d)+rm(d),true);
   // Presence only means anything if it's current, so the open panel refreshes
   // itself — and stops the moment it isn't on screen.
   _memT=setTimeout(()=>{const b=document.getElementById('adminMembers');if(b&&b.isConnected&&b.offsetParent!==null)loadMembers();},45000);
@@ -3003,6 +3015,23 @@ async function titlesClear(id){
   try{await adminCall('/titles-set',{deviceId:id,clear:true});}catch{toast('Couldn’t undo');return;}
   toast('Real names are back');
   loadRenameTargets();
+}
+// Removing a roster row is permanent and there is no undo on the server, so it
+// asks first — and says what actually happens, since a removed device that still
+// has the app will simply request access again.
+let _forgetArmed=null;
+async function adminForget(id){
+  if(_forgetArmed!==id){
+    _forgetArmed=id;
+    toast('Tap Remove again to delete this row');
+    setTimeout(()=>{if(_forgetArmed===id)_forgetArmed=null;},4000);
+    return;
+  }
+  _forgetArmed=null;
+  try{const r=await adminCall('/forget',{deviceId:id});if(r&&r.error){toast(r.error);return;}}
+  catch{toast('Couldn\u2019t remove that');return;}
+  toast('Removed from the roster');
+  loadMembers();
 }
 async function adminRenameDevice(id,current){
   const v=prompt('Name this person',current||'');

@@ -113,7 +113,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
    first ~200px ramp from black — a long, smooth falloff, not a hard edge — and
    the glow blooms lower, behind the artwork rather than behind the chrome.
    A short ramp here reads as a bright stripe; keep it generous. */
-.ambient::after{content:'';position:absolute;inset:0;pointer-events:none;opacity:.028;mix-blend-mode:overlay;
+.ambient::after{content:'';position:absolute;inset:0;pointer-events:none;opacity:.022;
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");}
 .ambient{position:fixed;inset:0;z-index:-2;pointer-events:none;background:linear-gradient(to bottom,rgba(0,0,0,1.000) 0px,rgba(0,0,0,0.826) 22px,rgba(0,0,0,0.670) 43px,rgba(0,0,0,0.531) 65px,rgba(0,0,0,0.410) 87px,rgba(0,0,0,0.306) 108px,rgba(0,0,0,0.218) 130px,rgba(0,0,0,0.146) 152px,rgba(0,0,0,0.089) 173px,rgba(0,0,0,0.047) 195px,rgba(0,0,0,0.019) 217px,rgba(0,0,0,0.004) 238px,rgba(0,0,0,0.000) 260px),linear-gradient(to top,rgba(0,0,0,1.000) 0px,rgba(0,0,0,0.826) 22px,rgba(0,0,0,0.670) 43px,rgba(0,0,0,0.531) 65px,rgba(0,0,0,0.410) 87px,rgba(0,0,0,0.306) 108px,rgba(0,0,0,0.218) 130px,rgba(0,0,0,0.146) 152px,rgba(0,0,0,0.089) 173px,rgba(0,0,0,0.047) 195px,rgba(0,0,0,0.019) 217px,rgba(0,0,0,0.004) 238px,rgba(0,0,0,0.000) 260px),radial-gradient(120% 78% at 50% 18%,color-mix(in srgb,var(--amb) 48%,transparent) 0%,color-mix(in srgb,var(--amb) 16%,transparent) 46%,transparent 96%),radial-gradient(80% 62% at 84% 32%,color-mix(in srgb,var(--amb) 18%,transparent) 0%,transparent 92%),var(--topgrad);transition:--amb 1.1s ease;}
 /* Background brightness veil — lifts the dark backdrop toward light; the top is
@@ -238,7 +238,7 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 .hero:active{transform:scale(0.985);}
 .hero-cta{transition:transform .16s,box-shadow .16s;}
 .hero-bg{position:absolute;inset:0;background-size:cover;background-position:center 22%;filter:saturate(1.05);}
-/* per-title banner art rendered as an <img> so it lazy-loads + can gracefully drop on error (falls back to the gradient .hero-bg beneath it) */
+/* per-title banner art rendered as an <img decoding="async"> so it lazy-loads + can gracefully drop on error (falls back to the gradient .hero-bg beneath it) */
 .hero-bg-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 30%;filter:saturate(1.08);animation:kenburns 28s ease-in-out infinite alternate;will-change:transform;}
 @keyframes kenburns{from{transform:scale(1.06) translate(0,0);}to{transform:scale(1.18) translate(-2.5%,-3%);}}
 /* Phase-2 motion: staggered reveals + tactile press */
@@ -379,7 +379,7 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 .bb-slide{position:relative;flex:0 0 100%;min-height:240px;display:flex;align-items:flex-end;cursor:pointer;overflow:hidden;}
 .bb-slide .hero-bg-img{animation:kenburns 24s ease-in-out infinite alternate;}
 .bb-dots{position:absolute;bottom:15px;right:16px;z-index:4;display:flex;gap:6px;}
-.bb-dot{width:7px;height:7px;border-radius:99px;background:rgba(255,255,255,0.42);transition:all .35s cubic-bezier(.2,1,.3,1);cursor:pointer;}
+.bb-dot{width:7px;height:7px;border-radius:99px;background:rgba(255,255,255,0.42);transition:width .35s cubic-bezier(.2,1,.3,1),background-color .35s cubic-bezier(.2,1,.3,1),opacity .35s;cursor:pointer;}
 .bb-dot.on{background:#fff;width:20px;}
 .row-div{font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--t3);padding:22px 18px 2px;animation:fadeUp .4s ease both;}
 
@@ -515,7 +515,7 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 .onb-note{margin-top:16px;font-size:12px;color:var(--t3);max-width:300px;line-height:1.5;}
 .onb-foot{display:flex;align-items:center;justify-content:space-between;padding:14px 24px calc(var(--safe-b,0px) + 20px);gap:16px;}
 .onb-dots{display:flex;gap:7px;align-items:center;}
-.onb-dot{width:7px;height:7px;border-radius:50%;background:var(--bg5);transition:all .22s;}
+.onb-dot{width:7px;height:7px;border-radius:50%;background:var(--bg5);transition:width .22s,background-color .22s;}
 .onb-dot.on{background:var(--a2);width:22px;border-radius:99px;}
 .onb-next{background:var(--a);color:var(--aFg,#fff);border:0;border-radius:99px;padding:12px 28px;font-family:var(--fd);font-size:14.5px;font-weight:800;box-shadow:0 8px 22px -6px var(--glow);white-space:nowrap;}
 .sheet{
@@ -600,7 +600,7 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 .dt-fav.on{background:var(--ag);border-color:var(--a);color:var(--a2);}
 .dt-label{font-size:10px;font-weight:800;color:var(--t3);text-transform:uppercase;letter-spacing:0.1em;margin:16px 0 8px;}
 .dt-status{display:flex;gap:6px;}
-.dpick{flex:1;padding:9px 0;border-radius:11px;font-size:11px;font-weight:800;background:var(--bg4);border:1px solid var(--b2);color:var(--t3);transition:all .13s;}
+.dpick{flex:1;padding:9px 0;border-radius:11px;font-size:11px;font-weight:800;background:var(--bg4);border:1px solid var(--b2);color:var(--t3);transition:background-color .13s,border-color .13s,color .13s;}
 .dpick.on-plan{background:var(--plnbg);border-color:var(--pln);color:var(--pln);}
 .dpick.on-watching{background:var(--watbg);border-color:var(--wat);color:var(--wat);}
 .dpick.on-finished{background:var(--finbg);border-color:var(--fin);color:var(--fin);}
@@ -787,7 +787,7 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 .frow2{display:flex;gap:12px;}
 .frow2 .fgroup{flex:1;}
 .status-pick{display:flex;gap:7px;}
-.spick{flex:1;padding:11px 0;border-radius:12px;font-size:10.5px;font-weight:800;background:var(--bg3);border:1px solid var(--bn);color:var(--t2);transition:all .14s;box-shadow:var(--elev1);}
+.spick{flex:1;padding:11px 0;border-radius:12px;font-size:10.5px;font-weight:800;background:var(--bg3);border:1px solid var(--bn);color:var(--t2);transition:background-color .14s,border-color .14s,color .14s;box-shadow:var(--elev1);}
 .spick.on-plan,.spick.on-watching,.spick.on-finished,.spick.on-dropped{
   background:color-mix(in srgb,var(--a) 20%,var(--bg3));border-color:transparent;color:var(--a2);
   box-shadow:0 3px 12px -5px var(--glow);
@@ -1432,7 +1432,7 @@ body.recsel .pcard{position:relative;}
   position:fixed;left:50%;bottom:calc(var(--safe-b) + 96px);transform:translateX(-50%) translateY(20px);
   background:var(--bg5);border:1px solid var(--b3);color:var(--t1);
   font-size:12.5px;font-weight:700;padding:11px 18px;border-radius:99px;z-index:99;
-  opacity:0;pointer-events:none;transition:all .25s;white-space:nowrap;max-width:88vw;overflow:hidden;text-overflow:ellipsis;
+  opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;white-space:nowrap;max-width:88vw;overflow:hidden;text-overflow:ellipsis;
   box-shadow:0 8px 24px rgba(0,0,0,0.45);
 }
 .toast.on{opacity:1;transform:translateX(-50%) translateY(0);}
@@ -1818,7 +1818,7 @@ body.recsel .pcard{position:relative;}
   <div class="fgroup" id="coverPrev">
     <label class="flabel">Cover</label>
     <div style="display:flex;align-items:center;gap:10px;">
-      <img id="coverImg" alt="" style="width:44px;height:62px;border-radius:9px;object-fit:cover;border:1px solid var(--b1);display:none">
+      <img decoding="async" id="coverImg" alt="" style="width:44px;height:62px;border-radius:9px;object-fit:cover;border:1px solid var(--b1);display:none">
       <button class="dact" type="button" style="flex:0 0 auto;padding:10px 14px" onclick="document.getElementById('coverFile').click()"><i data-ic="camera"></i> Upload</button>
       <button class="dact danger" type="button" id="coverRemoveBtn" onclick="clearCover()" style="display:none;padding:10px 14px">Remove</button>
       <input type="file" id="coverFile" accept="image/*" style="display:none" onchange="coverFileChosen(this)">
@@ -1827,7 +1827,7 @@ body.recsel .pcard{position:relative;}
   <div class="fgroup" id="bgPrev">
     <label class="flabel">Background photo</label>
     <div style="display:flex;align-items:center;gap:10px;">
-      <img id="bgImgPreview" alt="" style="width:70px;height:44px;border-radius:9px;object-fit:cover;border:1px solid var(--b1);display:none">
+      <img decoding="async" id="bgImgPreview" alt="" style="width:70px;height:44px;border-radius:9px;object-fit:cover;border:1px solid var(--b1);display:none">
       <button class="dact" type="button" style="flex:0 0 auto;padding:10px 14px" onclick="document.getElementById('bgFile').click()"><i data-ic="image"></i> Upload</button>
       <button class="dact danger" type="button" id="bgRemoveBtn" onclick="clearBg()" style="display:none;padding:10px 14px">Remove</button>
       <input type="file" id="bgFile" accept="image/*" style="display:none" onchange="bgFileChosen(this)">
@@ -4297,7 +4297,7 @@ function resumeRailHTML(items,isRead){
     const p=known?Math.round(prog(a)*100):0;
     const art=titleBg(a)||a.img;
     const ch=((a.title||'?').trim()[0]||'?').toUpperCase().replace(/['"<&]/g,'?');
-    const bg=art?`<img class="rz-img" src="${escH(art)}" loading="lazy" alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'rz-ph',textContent:'${ch}'}))">`:`<div class="rz-ph">${ch}</div>`;
+    const bg=art?`<img decoding="async" class="rz-img" src="${escH(art)}" loading="lazy" alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'rz-ph',textContent:'${ch}'}))">`:`<div class="rz-ph">${ch}</div>`;
     return `<button class="rz-card" onclick="resumeWatch('${a.id}')">
       ${bg}<div class="rz-scrim"></div>
       <div class="rz-play">${icon('play')}</div>
@@ -4526,7 +4526,7 @@ function posterCard(a,nSeas){
   const multi=nSeas>1;
   const title=multi?seasonBase(a.title):a.title;
   const img=a.img
-    ?`<img class="pcard-img" src="${escH(a.img)}" loading="lazy" alt="" onerror="this.remove()">`
+    ?`<img decoding="async" class="pcard-img" src="${escH(a.img)}" loading="lazy" alt="" onerror="this.remove()">`
     :`<div class="pcard-ph">${((title||'?').trim()[0]||'?').toUpperCase().replace(/['"<&]/g,'?')}</div>`;
   const p=prog(a);
   const bar=(a.status==='watching'&&a.epTotal)?`<div class="pbar"><div class="pfill" style="width:${Math.round(p*100)}%"></div></div>`:'';
@@ -4566,7 +4566,7 @@ let bbItems=[],bbIdx=0,bbTimer=0,bbP=1;   // bbP = physical slide index (clones 
 function bbSlideHTML(a){
   const art=titleBg(a);
   let bg=`<div class="hero-bg" style="background:linear-gradient(135deg,var(--bg4),var(--bg2))"></div>`;
-  if(art)bg+=`<img class="hero-bg-img" src="${escH(art)}" loading="lazy" alt="" onerror="this.remove()">`;
+  if(art)bg+=`<img decoding="async" class="hero-bg-img" src="${escH(art)}" loading="lazy" alt="" onerror="this.remove()">`;
   else if(safeImg(a.img))bg=`<div class="hero-bg" style="background-image:url('${safeImg(a.img)}')"></div>`;
   const av=accentVars(a),p=prog(a),air=airingInfo(a);
   const airHTML=air?`<div class="hero-air">${icon('calendar')} Ep ${air.ep} · airs ${air.when}</div>`:'';
@@ -4660,7 +4660,7 @@ function airingRailHTML(items){
   const card=a=>{
     const inf=airingInfo(a),art=titleBg(a)||a.img;
     const ch=((a.title||'?').trim()[0]||'?').toUpperCase().replace(/['"<&]/g,'?');
-    const bg=art?`<img class="rz-img" src="${escH(art)}" loading="lazy" alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'rz-ph',textContent:'${ch}'}))">`:`<div class="rz-ph">${ch}</div>`;
+    const bg=art?`<img decoding="async" class="rz-img" src="${escH(art)}" loading="lazy" alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'rz-ph',textContent:'${ch}'}))">`:`<div class="rz-ph">${ch}</div>`;
     const when=inf?(inf.ep?`Ep ${inf.ep} · ${inf.when}`:inf.when):'';
     return `<button class="rz-card" onclick="openDetail('${a.id}')">
       ${bg}<div class="rz-scrim"></div>
@@ -4861,11 +4861,11 @@ function renderDetail(){
   const a=anime.find(x=>x.id===detailId);if(!a)return;
   const read=kindOf(a)==='read';
   const cover=a.img
-    ?`<img class="dt-cover" src="${escH(a.img)}" alt="" onerror="this.remove()">`
+    ?`<img decoding="async" loading="lazy" class="dt-cover" src="${escH(a.img)}" alt="" onerror="this.remove()">`
     :`<div class="dt-cover-ph">${((a.title||'?').trim()[0]||'?').toUpperCase().replace(/['"<&]/g,'?')}</div>`;
   // per-title banner header + accent tint (scoped to this sheet only, never the global chrome)
   const art=titleBg(a);
-  const bannerHTML=art?`<div class="dt-banner"><img class="dt-banner-img" src="${escH(art)}" loading="lazy" alt="" onerror="this.closest('.dt-banner').remove()"><div class="dt-banner-scrim"></div></div>`:'';
+  const bannerHTML=art?`<div class="dt-banner"><img decoding="async" class="dt-banner-img" src="${escH(art)}" loading="lazy" alt="" onerror="this.closest('.dt-banner').remove()"><div class="dt-banner-scrim"></div></div>`:'';
   const statusBtns=Object.keys(STATUS_META).map(s=>
     `<button class="dpick${a.status===s?' on-'+s:''}" onclick="setDetailStatus('${s}')">${STATUS_META[s].icon} ${s==='plan'?'Plan':s==='watching'?'Watch':s==='finished'?'Done':'Drop'}</button>`).join('');
   const p=prog(a);
@@ -4914,7 +4914,7 @@ function renderDetail(){
     seasonsHTML=`<div class="dt-label">${read?'Parts':'Seasons'} · ${sibs.length}</div>
     <div class="dt-seasons">${sibs.map(s=>{const cur=s.id===a.id,st=STATUS_META[s.status];
       return `<button class="dt-season${cur?' cur':''}"${cur?'':` onclick="openDetail('${s.id}')"`}>
-        ${s.img?`<img src="${escH(s.img)}" alt="">`:`<div class="ph">${escH(((s.title||'?').trim()[0]||'?').toUpperCase())}</div>`}
+        ${s.img?`<img decoding="async" src="${escH(s.img)}" alt="">`:`<div class="ph">${escH(((s.title||'?').trim()[0]||'?').toUpperCase())}</div>`}
         <div class="dt-season-info"><div class="dt-season-t">${schEsc(s.title)}</div><div class="dt-season-s">${st?st.label:s.status}${s.epTotal?` · ${s.ep||0}/${s.epTotal}`:''}</div></div>
         ${cur?'<span class="dt-season-here">Viewing</span>':icon('chevron-right')}
       </button>`;}).join('')}</div>`;
@@ -5230,7 +5230,7 @@ function paintFranchise(){
     const img=s.img||(mine&&mine.img)||'';
     const open=mine?` onclick="openDetail('${mine.id}')"`:'';
     return `<div class="dt-season${cur?' cur':''}${done?' done':''}${mine?'':' off'}"${open}>
-      ${img?`<img src="${escH(img)}" alt="">`:`<div class="ph">${escH((title.trim()[0]||'?').toUpperCase())}</div>`}
+      ${img?`<img decoding="async" src="${escH(img)}" alt="">`:`<div class="ph">${escH((title.trim()[0]||'?').toUpperCase())}</div>`}
       <div class="dt-season-info"><div class="dt-season-t">${schEsc(title)}</div><div class="dt-season-s">${schEsc(sub)}</div></div>
       ${up}${cur?'<span class="dt-season-here">Viewing</span>':''}${check}
     </div>`;
@@ -5271,7 +5271,7 @@ async function offerNextSeason(a){
   const box=document.getElementById('nextBody'); if(!box)return;
   box.innerHTML=`<p class="ai-desc" style="margin-top:2px">You just finished <b>${escH(a.title)}</b>. There's more.</p>
     <div class="next-card">
-      ${nxt.coverImage&&nxt.coverImage.large?`<img src="${escH(nxt.coverImage.large)}" alt="">`:'<div class="next-ph"></div>'}
+      ${nxt.coverImage&&nxt.coverImage.large?`<img decoding="async" src="${escH(nxt.coverImage.large)}" alt="">`:'<div class="next-ph"></div>'}
       <div class="next-info">
         <div class="next-t">${escH(title)}</div>
         <div class="next-s">${soon?'Not out yet':(nxt.episodes?`${nxt.episodes} episodes`:'Sequel')}${nxt.seasonYear?` · ${nxt.seasonYear}`:''}</div>
@@ -7430,7 +7430,7 @@ function renderParty(){
   // Reliable cross-network A/V (Jitsi): the recommended path — talk + share your
   // screen with audio, connects anywhere. The custom voice above is the P2P fallback.
   const jitsiBtn=`<button class="pt-jitsi${_jitsiApi?' on':''}" onclick="openJitsi()">${icon('users')}<span>${_jitsiApi?'Back to voice &amp; screen':'Voice &amp; screen share'}</span><span class="pt-jitsi-tag">${_jitsiApi?'live':'works anywhere'}</span></button>`;
-  const now=r.title?`<div class="pt-now">${r.img?`<img src="${safeImg(r.img)}" alt="">`:''}<div><div class="pt-now-t">${schEsc(r.title)}</div><div class="pt-now-s">${r.ep?`Episode ${r.ep}`:'Ready'} · ${r.members.length} watching</div></div></div>`:'';
+  const now=r.title?`<div class="pt-now">${r.img?`<img decoding="async" src="${safeImg(r.img)}" alt="">`:''}<div><div class="pt-now-t">${schEsc(r.title)}</div><div class="pt-now-s">${r.ep?`Episode ${r.ep}`:'Ready'} · ${r.members.length} watching</div></div></div>`:'';
   let hostCtl='';
   const sharing=!!r.sharing, iShare=r.sharing===meUid;
   // Shared "Up next" queue — visible to everyone; the host can remove items and pull the head.
@@ -7445,7 +7445,7 @@ function renderParty(){
   };
   const queueBlock=qlist.length?`<div class="dt-label" style="margin-top:14px">Up next · ${qlist.length}${partyIsHost?'':' · vote for what’s next'}</div>
     <div class="pt-picklist">${qlist.map((q,i)=>`<div class="pt-pick pt-qitem">
-      ${q.img?`<img src="${safeImg(q.img)}" alt="">`:`<div class="ph">${((q.title||'?')[0]||'?').toUpperCase()}</div>`}
+      ${q.img?`<img decoding="async" src="${safeImg(q.img)}" alt="">`:`<div class="ph">${((q.title||'?')[0]||'?').toUpperCase()}</div>`}
       <div class="pt-pick-info"><div class="pt-pick-t">${schEsc(q.title)}</div><div class="pt-pick-s">${q.ep?`Episode ${q.ep} · `:''}added by ${schEsc(q.by||'?')}</div></div>
       ${qActs(q,i)}</div>`).join('')}</div>`:'';
   if(partyIsHost&&iShare){
@@ -7463,7 +7463,7 @@ function renderParty(){
       .sort((x,y)=>(y.status==='watching')-(x.status==='watching')||(y.upd||0)-(x.upd||0));
     const row=a=>{const cov=titleBg(a)||a.img,ep=Math.min((a.ep||0)+1,a.epTotal||((a.ep||0)+1)),on=r.animeId===a.id;
       return `<button class="pt-pick${on?' on':''}" onclick="partyPick('${a.id}')">
-        ${cov?`<img src="${escH(cov)}" alt="">`:`<div class="ph">${escH(((a.title||'?')[0]||'?').toUpperCase())}</div>`}
+        ${cov?`<img decoding="async" src="${escH(cov)}" alt="">`:`<div class="ph">${escH(((a.title||'?')[0]||'?').toUpperCase())}</div>`}
         <div class="pt-pick-info"><div class="pt-pick-t">${schEsc(a.title)}</div><div class="pt-pick-s">Episode ${ep}${a.epTotal?` · ${a.epTotal} eps`:''}</div></div>
         <span class="pt-pick-q" onclick="event.stopPropagation();partyQueueAdd('${a.id}')">+ Queue</span>
         <span class="pt-pick-go">${icon('play')}</span></button>`;};
@@ -7490,7 +7490,7 @@ function renderParty(){
       .sort((x,y)=>(y.status==='watching')-(x.status==='watching')||(y.upd||0)-(x.upd||0));
     if(mine.length)hostCtl+=`<div class="dt-label" style="margin-top:14px">Add to the queue</div><div class="pt-picklist">${mine.map(a=>{const cov=titleBg(a)||a.img,ep=Math.min((a.ep||0)+1,a.epTotal||((a.ep||0)+1));
       return `<button class="pt-pick" onclick="partyQueueAdd('${a.id}')">
-        ${cov?`<img src="${escH(cov)}" alt="">`:`<div class="ph">${escH(((a.title||'?')[0]||'?').toUpperCase())}</div>`}
+        ${cov?`<img decoding="async" src="${escH(cov)}" alt="">`:`<div class="ph">${escH(((a.title||'?')[0]||'?').toUpperCase())}</div>`}
         <div class="pt-pick-info"><div class="pt-pick-t">${schEsc(a.title)}</div><div class="pt-pick-s">Episode ${ep}${a.epTotal?` · ${a.epTotal} eps`:''}</div></div>
         <span class="pt-pick-q">+ Queue</span></button>`;}).join('')}</div>`;
   }
@@ -7877,7 +7877,7 @@ function paintPickCard(a,quiet){
   const el=document.getElementById('pkCard'); if(!el)return;
   el.className='pk-card'+(el.classList.contains('spinning')?' spinning':'');
   el.innerHTML=`
-    ${a.img?`<img class="pk-cover" src="${escH(safeImg(a.img))}" alt="">`:'<div class="pk-cover"></div>'}
+    ${a.img?`<img decoding="async" loading="lazy" class="pk-cover" src="${escH(safeImg(a.img))}" alt="">`:'<div class="pk-cover"></div>'}
     <div class="pk-body">
       <div class="pk-name">${escH(a.title)}</div>
       <div class="pk-meta">${escH([score,eps,hrs].filter(Boolean).join(' · '))}</div>
@@ -9547,7 +9547,7 @@ function friendRecRowHTML(){
 }
 function recCard(k,rec){
   const it=rec.item,s0=rec.senders[0],col=friendColor(s0.code);
-  const img=it.img?`<img class="pcard-img" src="${escH(it.img)}" loading="lazy" alt="" onerror="this.remove()">`:`<div class="pcard-ph">${escH(((it.title||'?').trim()[0]||'?').toUpperCase())}</div>`;
+  const img=it.img?`<img decoding="async" class="pcard-img" src="${escH(it.img)}" loading="lazy" alt="" onerror="this.remove()">`:`<div class="pcard-ph">${escH(((it.title||'?').trim()[0]||'?').toUpperCase())}</div>`;
   const more=rec.senders.length>1?` +${rec.senders.length-1}`:'';
   return `<div class="pcard rec-card" style="--fc:${col}" onclick="openRecDetail('${encodeURIComponent(k)}')">
     <div class="pcard-wrap rec-wrap">${img}<span class="rec-flag" style="background:${col}">${icon('users')}</span></div>
@@ -9570,7 +9570,7 @@ function renderRecDetail(){
   const rec=recByAni()[recDetailKey];
   if(!rec){box.innerHTML='<p class="ai-desc">This recommendation is no longer available.</p>';return;}
   const it=rec.item;
-  const cover=it.img?`<img class="dt-cover" src="${escH(it.img)}" alt="" onerror="this.remove()">`:`<div class="dt-cover-ph">${escH(((it.title||'?').trim()[0]||'?').toUpperCase())}</div>`;
+  const cover=it.img?`<img decoding="async" loading="lazy" class="dt-cover" src="${escH(it.img)}" alt="" onerror="this.remove()">`:`<div class="dt-cover-ph">${escH(((it.title||'?').trim()[0]||'?').toUpperCase())}</div>`;
   const chips=(it.genre||'').split(',').map(g=>g.trim()).filter(Boolean).map(g=>`<span class="chip">${escH(g)}</span>`).join('');
   box.innerHTML=`
     <div class="dt-top">${cover}<div class="dt-info"><div class="dt-title">${escH(it.title)}</div><div class="dt-meta">${it.kind==='read'?'Manga / manhwa':'Anime'}</div></div></div>
@@ -9762,7 +9762,7 @@ function renderRecPick(){
   const box=document.getElementById('recPickBody');if(!box)return;
   const items=anime.filter(a=>a.title).slice().sort((a,b)=>(b.upd||0)-(a.upd||0));
   const rows=items.map(a=>{const on=recPickShows.has(a.id);return `<button class="pt-pick${on?' on':''}" onclick="toggleRecPick('${a.id}')">
-    ${a.img?`<img src="${escH(a.img)}" alt="">`:`<div class="ph">${escH(((a.title||'?')[0]||'?').toUpperCase())}</div>`}
+    ${a.img?`<img decoding="async" src="${escH(a.img)}" alt="">`:`<div class="ph">${escH(((a.title||'?')[0]||'?').toUpperCase())}</div>`}
     <div class="pt-pick-info"><div class="pt-pick-t">${escH(a.title)}</div><div class="pt-pick-s">${escH((a.genre||'').split(',')[0]||(kindOf(a)==='read'?'Manga':'Anime'))}</div></div>
     <span class="pt-pick-check">${on?icon('check'):''}</span></button>`;}).join('');
   const preset=[...(recToFriends||[])].map(c=>friendDisplay(c)).filter(Boolean);
@@ -9791,7 +9791,7 @@ function renderRecSend(){
   if(!shows.length){box.innerHTML='<p class="ai-desc">No shows selected.</p>';return;}
   const fr=friendsList();
   const noteRows=shows.map(a=>`<div class="rc-note">
-    ${a.img?`<img class="rc-note-img" src="${escH(a.img)}" alt="" onerror="this.remove()">`:`<div class="rc-note-ph">${escH(((a.title||'?')[0]||'?').toUpperCase())}</div>`}
+    ${a.img?`<img decoding="async" class="rc-note-img" src="${escH(a.img)}" alt="" onerror="this.remove()">`:`<div class="rc-note-ph">${escH(((a.title||'?')[0]||'?').toUpperCase())}</div>`}
     <div class="rc-note-main"><div class="rc-note-t">${escH(a.title)}</div>
     <input class="ai-prompt-in rc-note-in" placeholder="Note for this one (optional)" maxlength="300" value="${escH(recItemNotes[a.id]||'')}" oninput="setItemNote('${a.id}',this.value)"></div>
     <button class="rc-note-x" onclick="removeRecShow('${a.id}')" aria-label="Remove this show">${icon('x')}</button>
@@ -10962,7 +10962,7 @@ function renderPicker(){
   const el=document.getElementById('pickBody');if(!el)return;
   const rowHTML=(c,i)=>{
     const ch=((c.title||'?').charAt(0)||'?').replace(/[^A-Za-z0-9]/g,'')||'?';
-    const cover=c.img?`<img class="pick-img" src="${escH(c.img)}" alt="" loading="lazy" onerror="this.outerHTML='<div class=\\'pick-ph\\'>${ch}</div>'">`:`<div class="pick-ph">${ch}</div>`;
+    const cover=c.img?`<img decoding="async" class="pick-img" src="${escH(c.img)}" alt="" loading="lazy" onerror="this.outerHTML='<div class=\\'pick-ph\\'>${ch}</div>'">`:`<div class="pick-ph">${ch}</div>`;
     return`<button class="pick-row" onclick="applyCandidate(${i})">${cover}
       <div class="pick-txt"><div class="pick-t">${schEsc(c.title)}</div><div class="pick-s">${schEsc(c.sub||'')}</div></div>
       <span class="set-chev">${icon('chevron-right')}</span></button>`;
@@ -11135,7 +11135,7 @@ function renderSchedDays(ws,eps){
       dEps.forEach(e=>{
         const t=new Date(e.airingAt*1000).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
         const ch=((e.title||'?').charAt(0)||'?').replace(/[^A-Za-z0-9]/g,'')||'?';
-        const thumb=e.img?'<img class="sched-thumb" src="'+escH(e.img)+'" alt="" loading="lazy" onerror="this.outerHTML=schPh(\''+ch+'\')">':schPh(ch);
+        const thumb=e.img?'<img decoding="async" class="sched-thumb" src="'+escH(e.img)+'" alt="" loading="lazy" onerror="this.outerHTML=schPh(\''+ch+'\')">':schPh(ch);
         const bell=notifSet&&e.aniId&&notifSet.has(e.aniId)?'<span class="sched-bell" title="Notifications on">'+icon('bell')+'</span>':'';
         var _isRel=e.id&&(''+e.id).indexOf('rel:')===0;var _click=_isRel?("addRelatedSched('"+e.aniId+"')"):("openDetail('"+e.id+"')");var _newt=_isRel?'<span class="sched-new">NEW</span>':'';rows+='<div class="sched-row" onclick="'+_click+'">'+thumb+'<div class="sched-row-main"><div class="sched-row-title">'+schEsc(e.title)+_newt+bell+'</div><div class="sched-row-sub">Ep '+(e.episode||'?')+' \u00b7 '+t+'</div></div></div>';
       });
@@ -11167,7 +11167,7 @@ function fyGridHTML(recs){
     const genres=(r.genres||[]).slice(0,2).join(' · ');
     const srcs=[...x.srcs];
     const because='Because you watched '+schEsc(srcs[0]||'')+(srcs.length>1?' +'+(srcs.length-1)+' more':'');
-    const cover=img?'<img class="fy-img" src="'+escH(img)+'" alt="" loading="lazy" onerror="this.outerHTML=fyPh(\''+ch+'\')">':fyPh(ch);
+    const cover=img?'<img decoding="async" class="fy-img" src="'+escH(img)+'" alt="" loading="lazy" onerror="this.outerHTML=fyPh(\''+ch+'\')">':fyPh(ch);
     return '<div class="fy-card"><div class="fy-wrap">'+cover+score+'</div><div class="fy-title">'+schEsc(t)+'</div>'+(genres?'<div class="fy-meta">'+schEsc(genres)+'</div>':'')+'<div class="fy-because">'+because+'</div><button class="fy-plan" onclick="fyPlan('+r.id+',this)">'+icon('plus')+'Plan</button></div>';
   }).join('')+'</div>';
 }

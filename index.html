@@ -8738,6 +8738,23 @@ function noteFrame(host,ok){
   if(ok){e.ok++;e.bad=0;}else{e.bad++;}                 // proof it works wipes the doubt
   m[host]=e; saveFrameLog(m);
 }
+// The ledger decides, silently, that a site can't be played inside the app. That
+// is a good default and a bad thing to be stuck with: a site that was down for a
+// day, or a run of bad luck, would keep opening in the browser forever with no
+// way to see why or say otherwise. So it's visible, and one tap forgets it.
+function frameBlockedHTML(){
+  const m=frameLog();
+  const off=Object.keys(m).filter(h=>frameRefuses(h));
+  if(!off.length)return '';
+  return `<div class="dt-label" style="margin-top:18px">Opens in the browser</div>
+    <p class="ai-desc">These wouldn't play inside the app when tried, so Watch sends them straight out instead of showing you a blank screen. Tap one to give it another go.</p>
+    <div class="src-picks">${off.map(h=>`<button class="src-chip" onclick="forgetFrameVerdict('${escH(h)}')">${escH(h)} · try again</button>`).join('')}</div>`;
+}
+function forgetFrameVerdict(host){
+  const m=frameLog(); delete m[String(host||'').toLowerCase()]; saveFrameLog(m);
+  toast(`${host} will be tried in the app again`);
+  try{renderSource();}catch(e){}
+}
 function frameRefuses(host){
   const e=frameLog()[String(host||'').toLowerCase()];
   return !!(e&&!e.ok&&e.bad>=2);
@@ -9971,6 +9988,7 @@ function renderSource(){
         <button class="src-chip${slugPref()==='english'?' on':''}" onclick="setSlugPref('english')">English</button>
       </div>
       <p class="ai-desc" id="srcExNote" style="margin-top:8px;font-size:11px">${srcExNoteHTML()}</p>
+      ${frameBlockedHTML()}
 
       ${IS_NATIVE?`
       <div class="dt-label" style="margin-top:20px">${icon('film')} Services you pay for</div>

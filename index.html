@@ -146,14 +146,20 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 .hdr{padding:calc(var(--safe-t) + 12px) 18px 0;display:flex;align-items:center;justify-content:space-between;}
 .hdr-title{font-size:21px;font-weight:900;letter-spacing:-0.5px;display:flex;align-items:center;gap:8px;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;}
 .hdr-title::before{content:'';width:5px;height:18px;border-radius:99px;background:linear-gradient(180deg,var(--a2),var(--a));box-shadow:0 0 12px var(--glow);}
+/* 36px buttons six pixels apart, five in a row, is under the 44px a fingertip
+   actually needs — which reads as the bar being unreliable rather than small.
+   The button stays compact (the header has a title to fit next to it) and grows
+   an invisible 44px hit area instead, so nothing moves and every tap lands. */
 .hbtn{
-  width:36px;height:36px;border-radius:12px;font-size:16px;
+  position:relative;width:38px;height:38px;border-radius:12px;font-size:16px;
   background:var(--bg3);border:1px solid var(--b2);
-  display:flex;align-items:center;justify-content:center;transition:transform .12s,background .16s,border-color .16s;
+  display:flex;align-items:center;justify-content:center;transition:transform .12s,background-color .16s,border-color .16s;
 }
+.hbtn::after{content:'';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:44px;height:44px;}
+.hbtn:focus-visible{outline:2px solid var(--a2);outline-offset:2px;}
 .hbtn:active{transform:scale(0.9);}
 .hbtn.bell-on{background:color-mix(in srgb,var(--a) 22%,var(--bg3));border-color:transparent;color:var(--a2);box-shadow:0 4px 14px -6px var(--glow);}
-.hdr-actions{display:flex;align-items:center;gap:6px;}
+.hdr-actions{display:flex;align-items:center;gap:7px;}
 .search-row{padding:10px 18px 0;display:flex;align-items:center;gap:8px;}
 .search-wrap{position:relative;flex:1;min-width:0;}
 .search-ico{position:absolute;left:13px;top:50%;transform:translateY(-50%);font-size:13px;opacity:0.5;}
@@ -1736,7 +1742,7 @@ body.recsel .pcard{position:relative;}
 </div>
 <div id="app">
   <div class="hdr">
-    <div class="hdr-title" onclick="adminTap()">WatchList</div>
+    <div class="hdr-title" role="button" tabindex="0" onclick="adminTap()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();adminTap();}">WatchList</div>
     <div class="hdr-actions">
       <button class="hbtn" onclick="openHub()" title="Friends & Watch Party" aria-label="Friends and Watch Party"><i data-ic="users"></i></button>
       <button class="hbtn" onclick="openForYou()" title="For You — tailored recommendations" aria-label="For You recommendations"><i data-ic="compass"></i></button>

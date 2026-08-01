@@ -55,9 +55,6 @@
 [data-theme=zoro]{--aFg:#140b06;--bg:#050e07;--bg2:#0a140c;--bg3:#0f1c12;--bg4:#142418;--bg5:#192c1e;--b1:rgba(38,158,64,0.07);--b2:rgba(38,158,64,0.14);--b3:rgba(38,158,64,0.26);--t1:#e6f4e8;--t2:#99c2a0;--t3:#579d65;--a:#26a040;--a2:#46c860;--ag:rgba(38,160,64,0.13);--glow:rgba(38,160,64,0.22);--fin:#4ecb82;--finbg:rgba(78,203,130,0.11);--wat:#e85050;--watbg:rgba(232,80,80,0.11);--pln:#5b9cf6;--plnbg:rgba(91,156,246,0.11);--topgrad:linear-gradient(180deg,#020e04 0%,#050e07 100%);}
 [data-theme=chopper]{--aFg:#140b06;--bg:#0c080f;--bg2:#150f1c;--bg3:#1c1428;--bg4:#231934;--bg5:#2a1e40;--b1:rgba(214,72,114,0.07);--b2:rgba(214,72,114,0.14);--b3:rgba(214,72,114,0.26);--t1:#fceef6;--t2:#d1a7c1;--t3:#ad7ba2;--a:#d84872;--a2:#f87098;--ag:rgba(216,72,114,0.13);--glow:rgba(216,72,114,0.24);--fin:#60d4a0;--finbg:rgba(96,212,160,0.11);--wat:#f5a040;--watbg:rgba(245,160,64,0.11);--pln:#7ab4f5;--plnbg:rgba(122,180,245,0.11);--topgrad:linear-gradient(180deg,#1a0610 0%,#0c080f 100%);}
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
-/* Nothing may scroll the page sideways, on any handset. A single overlong word
-   or one stray element shouldn't be able to shift the whole layout. */
-html,body{max-width:100%;overflow-x:hidden;}
 html,body{height:100%;overscroll-behavior-y:none;}
 body{
   font-family:var(--fb);background:var(--bg);color:var(--t1);
@@ -78,8 +75,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 @media(hover:hover){
   .hbtn:hover{background:var(--bg4);border-color:var(--b3);}
   .pcard:hover{transform:translateY(-5px);}
-  .pcard:hover .pcard{contain:layout paint style;}
-.pcard-img{box-shadow:0 12px 28px rgba(0,0,0,0.5);border-color:var(--b3);}
+  .pcard:hover .pcard-img{box-shadow:0 12px 28px rgba(0,0,0,0.5);border-color:var(--b3);}
   .schip:hover,.nbtn:hover,.sort-row .schip:hover{color:var(--t1);}
   .dact:hover,.spick:hover,.dpick:hover,.aitab:hover,.prog-btn:hover,.parse-btn:hover,.imp-all:hover{border-color:var(--b3);}
   .submit-btn:hover,.autofill-btn:hover,.ai-run-btn:hover{filter:brightness(1.08);}
@@ -246,7 +242,7 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 .hero:active{transform:scale(0.985);}
 .hero-cta{transition:transform .16s,box-shadow .16s;}
 .hero-bg{position:absolute;inset:0;background-size:cover;background-position:center 22%;filter:saturate(1.05);}
-/* per-title banner art rendered as an <img decoding="async"> so it lazy-loads + can gracefully drop on error (falls back to the gradient .hero-bg beneath it) */
+/* per-title banner art rendered as an <img> so it lazy-loads + can gracefully drop on error (falls back to the gradient .hero-bg beneath it) */
 .hero-bg-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 30%;filter:saturate(1.08);animation:kenburns 28s ease-in-out infinite alternate;will-change:transform;}
 @keyframes kenburns{from{transform:scale(1.06) translate(0,0);}to{transform:scale(1.18) translate(-2.5%,-3%);}}
 /* Phase-2 motion: staggered reveals + tactile press */
@@ -1856,7 +1852,7 @@ body.recsel .pcard{position:relative;}
   <div class="fgroup" id="coverPrev">
     <label class="flabel">Cover</label>
     <div style="display:flex;align-items:center;gap:10px;">
-      <img decoding="async" id="coverImg" alt="" style="width:44px;height:62px;border-radius:9px;object-fit:cover;border:1px solid var(--b1);display:none">
+      <img id="coverImg" alt="" style="width:44px;height:62px;border-radius:9px;object-fit:cover;border:1px solid var(--b1);display:none">
       <button class="dact" type="button" style="flex:0 0 auto;padding:10px 14px" onclick="document.getElementById('coverFile').click()"><i data-ic="camera"></i> Upload</button>
       <button class="dact danger" type="button" id="coverRemoveBtn" onclick="clearCover()" style="display:none;padding:10px 14px">Remove</button>
       <input type="file" id="coverFile" accept="image/*" style="display:none" onchange="coverFileChosen(this)">
@@ -1865,7 +1861,7 @@ body.recsel .pcard{position:relative;}
   <div class="fgroup" id="bgPrev">
     <label class="flabel">Background photo</label>
     <div style="display:flex;align-items:center;gap:10px;">
-      <img decoding="async" id="bgImgPreview" alt="" style="width:70px;height:44px;border-radius:9px;object-fit:cover;border:1px solid var(--b1);display:none">
+      <img id="bgImgPreview" alt="" style="width:70px;height:44px;border-radius:9px;object-fit:cover;border:1px solid var(--b1);display:none">
       <button class="dact" type="button" style="flex:0 0 auto;padding:10px 14px" onclick="document.getElementById('bgFile').click()"><i data-ic="image"></i> Upload</button>
       <button class="dact danger" type="button" id="bgRemoveBtn" onclick="clearBg()" style="display:none;padding:10px 14px">Remove</button>
       <input type="file" id="bgFile" accept="image/*" style="display:none" onchange="bgFileChosen(this)">
@@ -4379,7 +4375,7 @@ function resumeRailHTML(items,isRead){
     const p=known?Math.round(prog(a)*100):0;
     const art=titleBg(a)||a.img;
     const ch=((a.title||'?').trim()[0]||'?').toUpperCase().replace(/['"<&]/g,'?');
-    const bg=art?`<img decoding="async" class="rz-img" src="${escH(art)}" loading="lazy" alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'rz-ph',textContent:'${ch}'}))">`:`<div class="rz-ph">${ch}</div>`;
+    const bg=art?`<img class="rz-img" src="${escH(art)}" loading="lazy" alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'rz-ph',textContent:'${ch}'}))">`:`<div class="rz-ph">${ch}</div>`;
     return `<button class="rz-card" onclick="resumeWatch('${a.id}')">
       ${bg}<div class="rz-scrim"></div>
       <div class="rz-play">${icon('play')}</div>
@@ -4608,7 +4604,7 @@ function posterCard(a,nSeas){
   const multi=nSeas>1;
   const title=multi?seasonBase(a.title):a.title;
   const img=a.img
-    ?`<img decoding="async" class="pcard-img" src="${escH(a.img)}" loading="lazy" alt="" onerror="this.remove()">`
+    ?`<img class="pcard-img" src="${escH(a.img)}" loading="lazy" alt="" onerror="this.remove()">`
     :`<div class="pcard-ph">${((title||'?').trim()[0]||'?').toUpperCase().replace(/['"<&]/g,'?')}</div>`;
   const p=prog(a);
   const bar=(a.status==='watching'&&a.epTotal)?`<div class="pbar"><div class="pfill" style="width:${Math.round(p*100)}%"></div></div>`:'';
@@ -4648,7 +4644,7 @@ let bbItems=[],bbIdx=0,bbTimer=0,bbP=1;   // bbP = physical slide index (clones 
 function bbSlideHTML(a){
   const art=titleBg(a);
   let bg=`<div class="hero-bg" style="background:linear-gradient(135deg,var(--bg4),var(--bg2))"></div>`;
-  if(art)bg+=`<img decoding="async" class="hero-bg-img" src="${escH(art)}" loading="lazy" alt="" onerror="this.remove()">`;
+  if(art)bg+=`<img class="hero-bg-img" src="${escH(art)}" loading="lazy" alt="" onerror="this.remove()">`;
   else if(safeImg(a.img))bg=`<div class="hero-bg" style="background-image:url('${safeImg(a.img)}')"></div>`;
   const av=accentVars(a),p=prog(a),air=airingInfo(a);
   const airHTML=air?`<div class="hero-air">${icon('calendar')} Ep ${air.ep} · airs ${air.when}</div>`:'';
@@ -4742,7 +4738,7 @@ function airingRailHTML(items){
   const card=a=>{
     const inf=airingInfo(a),art=titleBg(a)||a.img;
     const ch=((a.title||'?').trim()[0]||'?').toUpperCase().replace(/['"<&]/g,'?');
-    const bg=art?`<img decoding="async" class="rz-img" src="${escH(art)}" loading="lazy" alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'rz-ph',textContent:'${ch}'}))">`:`<div class="rz-ph">${ch}</div>`;
+    const bg=art?`<img class="rz-img" src="${escH(art)}" loading="lazy" alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'rz-ph',textContent:'${ch}'}))">`:`<div class="rz-ph">${ch}</div>`;
     const when=inf?(inf.ep?`Ep ${inf.ep} · ${inf.when}`:inf.when):'';
     return `<button class="rz-card" onclick="openDetail('${a.id}')">
       ${bg}<div class="rz-scrim"></div>
@@ -4943,11 +4939,11 @@ function renderDetail(){
   const a=anime.find(x=>x.id===detailId);if(!a)return;
   const read=kindOf(a)==='read';
   const cover=a.img
-    ?`<img decoding="async" loading="lazy" class="dt-cover" src="${escH(a.img)}" alt="" onerror="this.remove()">`
+    ?`<img loading="lazy" class="dt-cover" src="${escH(a.img)}" alt="" onerror="this.remove()">`
     :`<div class="dt-cover-ph">${((a.title||'?').trim()[0]||'?').toUpperCase().replace(/['"<&]/g,'?')}</div>`;
   // per-title banner header + accent tint (scoped to this sheet only, never the global chrome)
   const art=titleBg(a);
-  const bannerHTML=art?`<div class="dt-banner"><img decoding="async" class="dt-banner-img" src="${escH(art)}" loading="lazy" alt="" onerror="this.closest('.dt-banner').remove()"><div class="dt-banner-scrim"></div></div>`:'';
+  const bannerHTML=art?`<div class="dt-banner"><img class="dt-banner-img" src="${escH(art)}" loading="lazy" alt="" onerror="this.closest('.dt-banner').remove()"><div class="dt-banner-scrim"></div></div>`:'';
   const statusBtns=Object.keys(STATUS_META).map(s=>
     `<button class="dpick${a.status===s?' on-'+s:''}" onclick="setDetailStatus('${s}')">${STATUS_META[s].icon} ${s==='plan'?'Plan':s==='watching'?'Watch':s==='finished'?'Done':'Drop'}</button>`).join('');
   const p=prog(a);
@@ -4996,7 +4992,7 @@ function renderDetail(){
     seasonsHTML=`<div class="dt-label">${read?'Parts':'Seasons'} · ${sibs.length}</div>
     <div class="dt-seasons">${sibs.map(s=>{const cur=s.id===a.id,st=STATUS_META[s.status];
       return `<button class="dt-season${cur?' cur':''}"${cur?'':` onclick="openDetail('${s.id}')"`}>
-        ${s.img?`<img decoding="async" src="${escH(s.img)}" alt="">`:`<div class="ph">${escH(((s.title||'?').trim()[0]||'?').toUpperCase())}</div>`}
+        ${s.img?`<img src="${escH(s.img)}" alt="">`:`<div class="ph">${escH(((s.title||'?').trim()[0]||'?').toUpperCase())}</div>`}
         <div class="dt-season-info"><div class="dt-season-t">${schEsc(s.title)}</div><div class="dt-season-s">${st?st.label:s.status}${s.epTotal?` · ${s.ep||0}/${s.epTotal}`:''}</div></div>
         ${cur?'<span class="dt-season-here">Viewing</span>':icon('chevron-right')}
       </button>`;}).join('')}</div>`;
@@ -5312,7 +5308,7 @@ function paintFranchise(){
     const img=s.img||(mine&&mine.img)||'';
     const open=mine?` onclick="openDetail('${mine.id}')"`:'';
     return `<div class="dt-season${cur?' cur':''}${done?' done':''}${mine?'':' off'}"${open}>
-      ${img?`<img decoding="async" src="${escH(img)}" alt="">`:`<div class="ph">${escH((title.trim()[0]||'?').toUpperCase())}</div>`}
+      ${img?`<img src="${escH(img)}" alt="">`:`<div class="ph">${escH((title.trim()[0]||'?').toUpperCase())}</div>`}
       <div class="dt-season-info"><div class="dt-season-t">${schEsc(title)}</div><div class="dt-season-s">${schEsc(sub)}</div></div>
       ${up}${cur?'<span class="dt-season-here">Viewing</span>':''}${check}
     </div>`;
@@ -5353,7 +5349,7 @@ async function offerNextSeason(a){
   const box=document.getElementById('nextBody'); if(!box)return;
   box.innerHTML=`<p class="ai-desc" style="margin-top:2px">You just finished <b>${escH(a.title)}</b>. There's more.</p>
     <div class="next-card">
-      ${nxt.coverImage&&nxt.coverImage.large?`<img decoding="async" src="${escH(nxt.coverImage.large)}" alt="">`:'<div class="next-ph"></div>'}
+      ${nxt.coverImage&&nxt.coverImage.large?`<img src="${escH(nxt.coverImage.large)}" alt="">`:'<div class="next-ph"></div>'}
       <div class="next-info">
         <div class="next-t">${escH(title)}</div>
         <div class="next-s">${soon?'Not out yet':(nxt.episodes?`${nxt.episodes} episodes`:'Sequel')}${nxt.seasonYear?` · ${nxt.seasonYear}`:''}</div>
@@ -7538,7 +7534,7 @@ function renderParty(){
   // Reliable cross-network A/V (Jitsi): the recommended path — talk + share your
   // screen with audio, connects anywhere. The custom voice above is the P2P fallback.
   const jitsiBtn=`<button class="pt-jitsi${_jitsiApi?' on':''}" onclick="openJitsi()">${icon('users')}<span>${_jitsiApi?'Back to voice &amp; screen':'Voice &amp; screen share'}</span><span class="pt-jitsi-tag">${_jitsiApi?'live':'works anywhere'}</span></button>`;
-  const now=r.title?`<div class="pt-now">${r.img?`<img decoding="async" src="${safeImg(r.img)}" alt="">`:''}<div><div class="pt-now-t">${schEsc(r.title)}</div><div class="pt-now-s">${r.ep?`Episode ${r.ep}`:'Ready'} · ${r.members.length} watching</div></div></div>`:'';
+  const now=r.title?`<div class="pt-now">${r.img?`<img src="${safeImg(r.img)}" alt="">`:''}<div><div class="pt-now-t">${schEsc(r.title)}</div><div class="pt-now-s">${r.ep?`Episode ${r.ep}`:'Ready'} · ${r.members.length} watching</div></div></div>`:'';
   let hostCtl='';
   const sharing=!!r.sharing, iShare=r.sharing===meUid;
   // Shared "Up next" queue — visible to everyone; the host can remove items and pull the head.
@@ -7553,7 +7549,7 @@ function renderParty(){
   };
   const queueBlock=qlist.length?`<div class="dt-label" style="margin-top:14px">Up next · ${qlist.length}${partyIsHost?'':' · vote for what’s next'}</div>
     <div class="pt-picklist">${qlist.map((q,i)=>`<div class="pt-pick pt-qitem">
-      ${q.img?`<img decoding="async" src="${safeImg(q.img)}" alt="">`:`<div class="ph">${((q.title||'?')[0]||'?').toUpperCase()}</div>`}
+      ${q.img?`<img src="${safeImg(q.img)}" alt="">`:`<div class="ph">${((q.title||'?')[0]||'?').toUpperCase()}</div>`}
       <div class="pt-pick-info"><div class="pt-pick-t">${schEsc(q.title)}</div><div class="pt-pick-s">${q.ep?`Episode ${q.ep} · `:''}added by ${schEsc(q.by||'?')}</div></div>
       ${qActs(q,i)}</div>`).join('')}</div>`:'';
   if(partyIsHost&&iShare){
@@ -7571,7 +7567,7 @@ function renderParty(){
       .sort((x,y)=>(y.status==='watching')-(x.status==='watching')||(y.upd||0)-(x.upd||0));
     const row=a=>{const cov=titleBg(a)||a.img,ep=Math.min((a.ep||0)+1,a.epTotal||((a.ep||0)+1)),on=r.animeId===a.id;
       return `<button class="pt-pick${on?' on':''}" onclick="partyPick('${a.id}')">
-        ${cov?`<img decoding="async" src="${escH(cov)}" alt="">`:`<div class="ph">${escH(((a.title||'?')[0]||'?').toUpperCase())}</div>`}
+        ${cov?`<img src="${escH(cov)}" alt="">`:`<div class="ph">${escH(((a.title||'?')[0]||'?').toUpperCase())}</div>`}
         <div class="pt-pick-info"><div class="pt-pick-t">${schEsc(a.title)}</div><div class="pt-pick-s">Episode ${ep}${a.epTotal?` · ${a.epTotal} eps`:''}</div></div>
         <span class="pt-pick-q" onclick="event.stopPropagation();partyQueueAdd('${a.id}')">+ Queue</span>
         <span class="pt-pick-go">${icon('play')}</span></button>`;};
@@ -7598,7 +7594,7 @@ function renderParty(){
       .sort((x,y)=>(y.status==='watching')-(x.status==='watching')||(y.upd||0)-(x.upd||0));
     if(mine.length)hostCtl+=`<div class="dt-label" style="margin-top:14px">Add to the queue</div><div class="pt-picklist">${mine.map(a=>{const cov=titleBg(a)||a.img,ep=Math.min((a.ep||0)+1,a.epTotal||((a.ep||0)+1));
       return `<button class="pt-pick" onclick="partyQueueAdd('${a.id}')">
-        ${cov?`<img decoding="async" src="${escH(cov)}" alt="">`:`<div class="ph">${escH(((a.title||'?')[0]||'?').toUpperCase())}</div>`}
+        ${cov?`<img src="${escH(cov)}" alt="">`:`<div class="ph">${escH(((a.title||'?')[0]||'?').toUpperCase())}</div>`}
         <div class="pt-pick-info"><div class="pt-pick-t">${schEsc(a.title)}</div><div class="pt-pick-s">Episode ${ep}${a.epTotal?` · ${a.epTotal} eps`:''}</div></div>
         <span class="pt-pick-q">+ Queue</span></button>`;}).join('')}</div>`;
   }
@@ -7985,7 +7981,7 @@ function paintPickCard(a,quiet){
   const el=document.getElementById('pkCard'); if(!el)return;
   el.className='pk-card'+(el.classList.contains('spinning')?' spinning':'');
   el.innerHTML=`
-    ${a.img?`<img decoding="async" loading="lazy" class="pk-cover" src="${escH(safeImg(a.img))}" alt="">`:'<div class="pk-cover"></div>'}
+    ${a.img?`<img loading="lazy" class="pk-cover" src="${escH(safeImg(a.img))}" alt="">`:'<div class="pk-cover"></div>'}
     <div class="pk-body">
       <div class="pk-name">${escH(a.title)}</div>
       <div class="pk-meta">${escH([score,eps,hrs].filter(Boolean).join(' · '))}</div>
@@ -9655,7 +9651,7 @@ function friendRecRowHTML(){
 }
 function recCard(k,rec){
   const it=rec.item,s0=rec.senders[0],col=friendColor(s0.code);
-  const img=it.img?`<img decoding="async" class="pcard-img" src="${escH(it.img)}" loading="lazy" alt="" onerror="this.remove()">`:`<div class="pcard-ph">${escH(((it.title||'?').trim()[0]||'?').toUpperCase())}</div>`;
+  const img=it.img?`<img class="pcard-img" src="${escH(it.img)}" loading="lazy" alt="" onerror="this.remove()">`:`<div class="pcard-ph">${escH(((it.title||'?').trim()[0]||'?').toUpperCase())}</div>`;
   const more=rec.senders.length>1?` +${rec.senders.length-1}`:'';
   return `<div class="pcard rec-card" style="--fc:${col}" onclick="openRecDetail('${encodeURIComponent(k)}')">
     <div class="pcard-wrap rec-wrap">${img}<span class="rec-flag" style="background:${col}">${icon('users')}</span></div>
@@ -9678,7 +9674,7 @@ function renderRecDetail(){
   const rec=recByAni()[recDetailKey];
   if(!rec){box.innerHTML='<p class="ai-desc">This recommendation is no longer available.</p>';return;}
   const it=rec.item;
-  const cover=it.img?`<img decoding="async" loading="lazy" class="dt-cover" src="${escH(it.img)}" alt="" onerror="this.remove()">`:`<div class="dt-cover-ph">${escH(((it.title||'?').trim()[0]||'?').toUpperCase())}</div>`;
+  const cover=it.img?`<img loading="lazy" class="dt-cover" src="${escH(it.img)}" alt="" onerror="this.remove()">`:`<div class="dt-cover-ph">${escH(((it.title||'?').trim()[0]||'?').toUpperCase())}</div>`;
   const chips=(it.genre||'').split(',').map(g=>g.trim()).filter(Boolean).map(g=>`<span class="chip">${escH(g)}</span>`).join('');
   box.innerHTML=`
     <div class="dt-top">${cover}<div class="dt-info"><div class="dt-title">${escH(it.title)}</div><div class="dt-meta">${it.kind==='read'?'Manga / manhwa':'Anime'}</div></div></div>
@@ -9870,7 +9866,7 @@ function renderRecPick(){
   const box=document.getElementById('recPickBody');if(!box)return;
   const items=anime.filter(a=>a.title).slice().sort((a,b)=>(b.upd||0)-(a.upd||0));
   const rows=items.map(a=>{const on=recPickShows.has(a.id);return `<button class="pt-pick${on?' on':''}" onclick="toggleRecPick('${a.id}')">
-    ${a.img?`<img decoding="async" src="${escH(a.img)}" alt="">`:`<div class="ph">${escH(((a.title||'?')[0]||'?').toUpperCase())}</div>`}
+    ${a.img?`<img src="${escH(a.img)}" alt="">`:`<div class="ph">${escH(((a.title||'?')[0]||'?').toUpperCase())}</div>`}
     <div class="pt-pick-info"><div class="pt-pick-t">${escH(a.title)}</div><div class="pt-pick-s">${escH((a.genre||'').split(',')[0]||(kindOf(a)==='read'?'Manga':'Anime'))}</div></div>
     <span class="pt-pick-check">${on?icon('check'):''}</span></button>`;}).join('');
   const preset=[...(recToFriends||[])].map(c=>friendDisplay(c)).filter(Boolean);
@@ -9899,7 +9895,7 @@ function renderRecSend(){
   if(!shows.length){box.innerHTML='<p class="ai-desc">No shows selected.</p>';return;}
   const fr=friendsList();
   const noteRows=shows.map(a=>`<div class="rc-note">
-    ${a.img?`<img decoding="async" class="rc-note-img" src="${escH(a.img)}" alt="" onerror="this.remove()">`:`<div class="rc-note-ph">${escH(((a.title||'?')[0]||'?').toUpperCase())}</div>`}
+    ${a.img?`<img class="rc-note-img" src="${escH(a.img)}" alt="" onerror="this.remove()">`:`<div class="rc-note-ph">${escH(((a.title||'?')[0]||'?').toUpperCase())}</div>`}
     <div class="rc-note-main"><div class="rc-note-t">${escH(a.title)}</div>
     <input class="ai-prompt-in rc-note-in" placeholder="Note for this one (optional)" maxlength="300" value="${escH(recItemNotes[a.id]||'')}" oninput="setItemNote('${a.id}',this.value)"></div>
     <button class="rc-note-x" onclick="removeRecShow('${a.id}')" aria-label="Remove this show">${icon('x')}</button>
@@ -11070,7 +11066,7 @@ function renderPicker(){
   const el=document.getElementById('pickBody');if(!el)return;
   const rowHTML=(c,i)=>{
     const ch=((c.title||'?').charAt(0)||'?').replace(/[^A-Za-z0-9]/g,'')||'?';
-    const cover=c.img?`<img decoding="async" class="pick-img" src="${escH(c.img)}" alt="" loading="lazy" onerror="this.outerHTML='<div class=\\'pick-ph\\'>${ch}</div>'">`:`<div class="pick-ph">${ch}</div>`;
+    const cover=c.img?`<img class="pick-img" src="${escH(c.img)}" alt="" loading="lazy" onerror="this.outerHTML='<div class=\\'pick-ph\\'>${ch}</div>'">`:`<div class="pick-ph">${ch}</div>`;
     return`<button class="pick-row" onclick="applyCandidate(${i})">${cover}
       <div class="pick-txt"><div class="pick-t">${schEsc(c.title)}</div><div class="pick-s">${schEsc(c.sub||'')}</div></div>
       <span class="set-chev">${icon('chevron-right')}</span></button>`;
@@ -11243,7 +11239,7 @@ function renderSchedDays(ws,eps){
       dEps.forEach(e=>{
         const t=new Date(e.airingAt*1000).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
         const ch=((e.title||'?').charAt(0)||'?').replace(/[^A-Za-z0-9]/g,'')||'?';
-        const thumb=e.img?'<img decoding="async" class="sched-thumb" src="'+escH(e.img)+'" alt="" loading="lazy" onerror="this.outerHTML=schPh(\''+ch+'\')">':schPh(ch);
+        const thumb=e.img?'<img class="sched-thumb" src="'+escH(e.img)+'" alt="" loading="lazy" onerror="this.outerHTML=schPh(\''+ch+'\')">':schPh(ch);
         const bell=notifSet&&e.aniId&&notifSet.has(e.aniId)?'<span class="sched-bell" title="Notifications on">'+icon('bell')+'</span>':'';
         var _isRel=e.id&&(''+e.id).indexOf('rel:')===0;var _click=_isRel?("addRelatedSched('"+e.aniId+"')"):("openDetail('"+e.id+"')");var _newt=_isRel?'<span class="sched-new">NEW</span>':'';rows+='<div class="sched-row" onclick="'+_click+'">'+thumb+'<div class="sched-row-main"><div class="sched-row-title">'+schEsc(e.title)+_newt+bell+'</div><div class="sched-row-sub">Ep '+(e.episode||'?')+' \u00b7 '+t+'</div></div></div>';
       });
@@ -11275,7 +11271,7 @@ function fyGridHTML(recs){
     const genres=(r.genres||[]).slice(0,2).join(' · ');
     const srcs=[...x.srcs];
     const because='Because you watched '+schEsc(srcs[0]||'')+(srcs.length>1?' +'+(srcs.length-1)+' more':'');
-    const cover=img?'<img decoding="async" class="fy-img" src="'+escH(img)+'" alt="" loading="lazy" onerror="this.outerHTML=fyPh(\''+ch+'\')">':fyPh(ch);
+    const cover=img?'<img class="fy-img" src="'+escH(img)+'" alt="" loading="lazy" onerror="this.outerHTML=fyPh(\''+ch+'\')">':fyPh(ch);
     return '<div class="fy-card"><div class="fy-wrap">'+cover+score+'</div><div class="fy-title">'+schEsc(t)+'</div>'+(genres?'<div class="fy-meta">'+schEsc(genres)+'</div>':'')+'<div class="fy-because">'+because+'</div><button class="fy-plan" onclick="fyPlan('+r.id+',this)">'+icon('plus')+'Plan</button></div>';
   }).join('')+'</div>';
 }

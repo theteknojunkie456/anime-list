@@ -372,29 +372,41 @@ async function notifyChan(env, code, kind, data) {
 // and we push a tiny message ("rec"/"fr") to every socket, so the app refreshes
 // instantly. No stored state — just the live connections.
 export class UserChannel {
-  constructor(state, env) { this.state = state; this.sockets = new Set(); }
+  constructor(state, env) {
+    this.state = state;
+    // The client pings every 25s to hold the socket open. Answered by the
+    // runtime itself, so a keepalive never wakes this object at all.
+    try { this.state.setWebSocketAutoResponse(new WebSocketRequestResponsePair('p', 'pong')); } catch (e) {}
+  }
   async fetch(request) {
     if (request.headers.get('Upgrade') === 'websocket') {
       const pair = new WebSocketPair();
       const client = pair[0], server = pair[1];
-      server.accept();
-      this.sockets.add(server);
-      const drop = () => this.sockets.delete(server);
-      server.addEventListener('close', drop);
-      server.addEventListener('error', drop);
-      // ignore anything the client sends (it only sends keepalive pings)
+      // HIBERNATABLE, and this is the whole ballgame. server.accept() keeps the
+      // Durable Object resident — and therefore billing DURATION — for as long
+      // as anyone holds the socket open. This channel is opened by every app on
+      // launch and reconnects automatically, so a handful of people with
+      // WatchList open was enough to bill wall-clock time all day and blow the
+      // free tier's 13,000 GB-s. acceptWebSocket lets it sleep between messages
+      // and pay for nothing while idle; the socket stays connected either way.
+      this.state.acceptWebSocket(server);
       return new Response(null, { status: 101, webSocket: client });
     }
     const msg = (await request.text()) || 'ping';
-    // Presence probe. The open socket IS the presence signal — this object only
-    // exists while someone is connected — so there is nothing to store, nothing
-    // to expire, and nothing to get stale.
-    if (msg === '__probe__') return new Response(JSON.stringify({ online: this.sockets.size > 0 }), { headers: { 'Content-Type': 'application/json' } });
-    for (const s of [...this.sockets]) {
-      try { s.send(msg); } catch (e) { this.sockets.delete(s); }
+    const socks = this.state.getWebSockets();
+    // Presence probe. An open socket IS the presence signal, so there is nothing
+    // to store, nothing to expire and nothing to go stale.
+    if (msg === '__probe__') return new Response(JSON.stringify({ online: socks.length > 0 }), { headers: { 'Content-Type': 'application/json' } });
+    for (const s of socks) {
+      try { s.send(msg); } catch (e) {}
     }
     return new Response('ok');
   }
+  // Hibernation delivers these instead of addEventListener. The client only ever
+  // sends keepalives, which the auto-response above already handles.
+  async webSocketMessage(ws, msg) {}
+  async webSocketClose(ws) { try { ws.close(); } catch (e) {} }
+  async webSocketError(ws) { try { ws.close(); } catch (e) {} }
 }
 
 // ── PARTY ROOM (Durable Object) ─────────────────────────────────────────────

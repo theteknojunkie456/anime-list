@@ -672,6 +672,12 @@ body.first-paint .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards
 .dt-fold[open]>summary{border-bottom:1px solid var(--b1);}
 .dt-fold>*:not(summary){margin-left:14px;margin-right:14px;}
 .dt-fold>*:last-child{margin-bottom:14px;}
+.dt-chs{display:flex;flex-wrap:wrap;gap:7px;padding:2px 0 4px;}
+.dt-ch{min-width:44px;height:38px;padding:0 10px;border-radius:11px;background:var(--bg3);border:1px solid var(--b1);color:var(--t2);font-family:var(--fd);font-size:13px;font-weight:800;transition:background-color .14s,border-color .14s,color .14s;}
+.dt-ch.seen{opacity:.45;}
+.dt-ch.next{border-color:var(--a);background:var(--ag);color:var(--a2);}
+.dt-ch:active{transform:scale(.95);}
+.dt-ch:focus-visible{outline:2px solid var(--a2);outline-offset:2px;}
 .dt-eps{display:flex;gap:10px;overflow-x:auto;padding:2px 2px 6px;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;}
 .dt-eps::-webkit-scrollbar{display:none;}
 .dt-ep{flex:0 0 auto;width:150px;background:none;border:none;padding:0;cursor:pointer;text-align:left;scroll-snap-align:start;}
@@ -4979,8 +4985,13 @@ function renderDetail(){
   // per-title banner header + accent tint (scoped to this sheet only, never the global chrome)
   const art=titleBg(a);
   const bannerHTML=art?`<div class="dt-banner"><img class="dt-banner-img" src="${escH(art)}" loading="lazy" alt="" onerror="this.closest('.dt-banner').remove()"><div class="dt-banner-scrim"></div></div>`:'';
+  // Watch/Plan/Done/Drop reads wrong on a manga. Same four states, said the way
+  // that kind of thing is actually talked about.
+  const stLabel=st=>read
+    ? (st==='plan'?'To read':st==='watching'?'Reading':st==='finished'?'Read':'Dropped')
+    : (st==='plan'?'Plan':st==='watching'?'Watch':st==='finished'?'Done':'Drop');
   const statusBtns=Object.keys(STATUS_META).map(s=>
-    `<button class="dpick${a.status===s?' on-'+s:''}" onclick="setDetailStatus('${s}')">${STATUS_META[s].icon} ${s==='plan'?'Plan':s==='watching'?'Watch':s==='finished'?'Done':'Drop'}</button>`).join('');
+    `<button class="dpick${a.status===s?' on-'+s:''}" onclick="setDetailStatus('${s}')">${STATUS_META[s].icon} ${stLabel(s)}</button>`).join('');
   const p=prog(a);
   const progHTML=`<div class="dt-label">${read?'Reading progress':'Episode progress'}</div>
     <div class="prog-row">
@@ -5064,6 +5075,7 @@ function renderDetail(){
     <div class="dt-label">Status</div>
     <div class="dt-status">${statusBtns}</div>
     <div id="dtRich" class="dt-rich"></div>
+    ${read&&a.aniId?`<div id="dtChapters"></div>`:''}
     ${stars}
     ${seasonsHTML}
     ${chips?`<div class="dt-label">Genres</div><div class="chips">${chips}</div>`:''}
@@ -5093,7 +5105,43 @@ function renderDetail(){
     else loadFranchise(a.id,a.aniId);
   }
   if(kindOf(a)==='watch'&&a.aniId)loadRichDetail(a.aniId,a.id);
+  if(read&&a.aniId)loadChapters(a.aniId,a.id,a.title);
 }
+// ─── CHAPTER LIST ───────────────────────────────────────────────────────────
+// The watch side gets an episode strip; reading had nothing, because AniList's
+// chapter count is null for anything still releasing. The count comes from the
+// same MangaUpdates lookup the alerts use, so an ongoing series has a real
+// number here — and every chapter is one tap into the reader.
+let _chCache={};
+async function loadChapters(aniId,forId,title){
+  const mount=document.getElementById('dtChapters'); if(!mount)return;
+  const paint=n=>{
+    if(detailId!==forId)return;
+    const el=document.getElementById('dtChapters'); if(!el)return;
+    const it=anime.find(x=>x.id===forId); if(!it)return;
+    if(!n){el.innerHTML='';return;}
+    const cur=Math.min(it.ep||0,n);
+    const all=_chAll[forId]===1;
+    const lo=all?1:Math.max(1,cur-2), hi=all?n:Math.min(n,Math.max(cur+8,8));
+    const cells=[];
+    for(let i=lo;i<=hi;i++){
+      const cls=i<=cur?' seen':(i===cur+1?' next':'');
+      cells.push(`<button class="dt-ch${cls}" onclick="readManga('${forId}',${i})">${i}</button>`);
+    }
+    const hidden=n-cells.length;
+    el.innerHTML=`<div class="dt-label" style="margin-top:16px">${icon('book')} Chapters<span class="dt-eps-tag">${n} out</span></div>
+      <div class="dt-chs">${cells.join('')}</div>`
+      +(hidden>0?`<button class="dt-pin-toggle" onclick="_chAll['${forId}']=1;loadChapters(${aniId},'${forId}')">${icon('layers')} Show all ${n} chapters</button>`:'');
+  };
+  if(_chCache[aniId]!==undefined){paint(_chCache[aniId]);return;}
+  try{
+    const r=await fetch(NOTIFY_URL+'/chapters',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({aniId,title:title||''})});
+    const j=r.ok?await r.json():null;
+    _chCache[aniId]=(j&&j.latest)||0;
+  }catch(e){_chCache[aniId]=0;}
+  paint(_chCache[aniId]);
+}
+let _chAll={};
 // ─── RICH DETAIL — synopsis, meta, trailer, characters, "more like this" ─────
 // Loads AniList's full metadata on open (cached per id) and renders it into #dtRich,
 // so clicking an anime shows everything about it, in the WatchList theme.
@@ -8139,11 +8187,15 @@ function watchEpisode(a){
 //     the main title until fetchCovers fills them in)
 // Search sites are less fragile than deep title URLs (slugs/domains churn), so a
 // {query}/{title} search template is the recommended shape.
-const SRC_TOKEN_RE=/\{(title|query|queryplus|slug|slug_|ep|ep2|ep3|episode|titleenglish|titleromaji|titlenative|anilistid|malid)\}/i;
+// {ch} is the reading side's {ep} — the Sources paste flow writes it, so it has
+// to be a token the builder knows, or a reading template is never recognised as
+// one and the raw "{ch}" ends up in the address.
+const SRC_TOKEN_RE=/\{(title|query|queryplus|slug|slug_|ep|ep2|ep3|episode|ch|ch2|ch3|chapter|titleenglish|titleromaji|titlenative|anilistid|malid)\}/i;
 const SRC_SEARCH_RE=/\{(title|query|slug|titleenglish|titleromaji|titlenative|anilistid|malid)\}/i; // any non-episode token
 function fillSourceTokens(template,a,ep){
   const t=a.title||'', enc=encodeURIComponent;
-  const raw={ep:(ep||1),episode:(ep||1),ep2:String(ep||1).padStart(2,'0'),ep3:String(ep||1).padStart(3,'0'),queryplus:streamSlug(slugTitle(a)).replace(/-/g,'+'),anilistid:a.aniId||'',malid:a.malId||''};  // verbatim ({ep2}=01, {ep3}=001, {queryplus}=attack+on+titan)
+  const raw={ep:(ep||1),episode:(ep||1),ep2:String(ep||1).padStart(2,'0'),ep3:String(ep||1).padStart(3,'0'),
+    ch:(ep||1),chapter:(ep||1),ch2:String(ep||1).padStart(2,'0'),ch3:String(ep||1).padStart(3,'0'),queryplus:streamSlug(slugTitle(a)).replace(/-/g,'+'),anilistid:a.aniId||'',malid:a.malId||''};  // verbatim ({ep2}=01, {ep3}=001, {queryplus}=attack+on+titan)
   // a.srcSlug is what the SITE calls this show, learned from a working link the
   // user set (see pvSetFromURL). It beats anything we can derive, because the
   // site's own spelling is the only one that's authoritative — "Initial D" is
@@ -8439,17 +8491,19 @@ function readSource(){try{return localStorage.getItem('read_src')||'';}catch{ret
 function usingDefaultReadSource(){return !readSource();}
 // A per-title pin (a.srcUrl) overrides the global reading source for that title.
 function effectiveReadSource(a){return (a&&a.srcUrl&&String(a.srcUrl).trim())||readSource();}
-function readURL(a){
+function readURL(a,chArg){
   const src=effectiveReadSource(a);
+  const ch=(chArg>0?chArg:(a.ep||0)+1);
   if(!src) return `${READ_DEFAULT}/comics/${streamSlug(slugTitle(a))}-${ASURA_SUFFIX}`;   // AsuraScans deep-link
-  if(SRC_TOKEN_RE.test(src)) return fillSourceTokens(src,a,(a.ep||0)+1);   // {slug}/{query}/{titleRomaji}…; {ep}=next chapter
+  if(SRC_TOKEN_RE.test(src)) return fillSourceTokens(src,a,ch);   // {slug}/{query}/{titleRomaji}…; {ch}=the chapter
   return src;
 }
-function readManga(id){
+function readManga(id,chArg){
   const a=anime.find(x=>x.id===id); if(!a) return;
   if(kindOf(a)!=='read'){toast('Read is for your reading list');return;}
   pvReturnId=id;
-  const url=readURL(a);
+  const ch=(chArg>0?chArg:0);
+  const url=readURL(a,ch);
   document.getElementById('pvTitle').textContent=a.title;
   const ext=document.getElementById('pvExt');
   // Same 404 recovery as watch: load the reading site IN-FRAME so its own search is
@@ -8458,7 +8512,8 @@ function readManga(id){
   ext.onclick=()=>{document.getElementById('pvFrame').src=findRead;};
   document.getElementById('pvFrame').src=url;
   document.getElementById('playerView').classList.add('on');
-  savePvSession(id,0,'read');   // survive an iOS background/reload mid-read
+  pvWatchEp=ch||null;           // which chapter this is, so leaving can bank it
+  savePvSession(id,ch,'read');  // survive an iOS background/reload mid-read
   pvCanNav=false; renderPvNav(null);   // no episode stepping while reading
 }
 // ─── IN-PLAYER BINGE CONTROLS ────────────────────────────────────────────────

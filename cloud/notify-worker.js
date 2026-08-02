@@ -427,6 +427,10 @@ async function handleFetch(request, env) {
       return handleStatus(body, env);
     case "/members":
       return handleMembers(body, env);
+    case "/manga-tracked":
+      return handleMangaTracked(body, env);
+    case "/chapters":
+      return handleChapters(body, env);
     case "/mu-list":
       return handleMuList(body, env);
     case "/mu-pin":
@@ -765,8 +769,35 @@ async function handleStatus(body, env) {
   return json({ ok: true, status: rec.status, titles });
 }
 
-// Admin: what every tracked series matched to on MangaUpdates, so a wrong match
-// is visible rather than silently never notifying.
+// Public: how many chapters a series has, so the app can draw a chapter list.
+// Same MangaUpdates lookup the alerts use and the same permanent cache, so this
+// is nearly always a single KV read — the app asks once per series and the
+// answer is shared by everyone.
+async function handleChapters(body, env) {
+  const aniId = Math.max(0, parseInt(body.aniId, 10) || 0);
+  if (!aniId) return json({ ok: false, error: "aniId required" }, 400);
+  const feed = await chapterFeed();
+  const rec = feed[String(aniId)];
+  return json({ ok: true, latest: (rec && rec.chapter) || 0, title: (rec && rec.title) || "", type: (rec && rec.type) || "" });
+}
+
+// The Action asks for this: every series anyone is tracking, with the names to
+// search MangaUpdates by. Admin-gated — it's a list of what the group reads.
+async function handleMangaTracked(body, env) {
+  if (!adminOK(body, env)) return json({ ok: false, error: "unauthorized" }, 401);
+  const subs = await loadAllSubs(env);
+  const idSet = new Set();
+  for (const { record } of subs) for (const id of record.mangaIds || []) idSet.add(id);
+  const ids = [...idSet].slice(0, 300);
+  if (!ids.length) return json({ ok: true, series: [] });
+  const titles = await anilistMangaTitles(ids);
+  return json({
+    ok: true,
+    series: ids.map((id) => ({ aniId: id, names: (titles.get(id) || {}).names || [] })),
+  });
+}
+
+// Admin: what each tracked series resolved to, straight from the published feed.
 async function handleMuList(body, env) {
   if (!adminOK(body, env)) return json({ ok: false, error: "unauthorized" }, 401);
   const subs = await loadAllSubs(env);
@@ -774,78 +805,26 @@ async function handleMuList(body, env) {
   for (const { record } of subs) for (const id of record.mangaIds || []) idSet.add(id);
   const ids = [...idSet].slice(0, 200);
   if (!ids.length) return json({ ok: true, series: [] });
+  const feed = await chapterFeed();
   const titles = await anilistMangaTitles(ids);
-  const series = [];
-  for (const id of ids) {
-    const c = await env.SUBS.get("mu:" + id);
-    const t = titles.get(id) || {};
-    const muId = c && c !== "none" ? Number(c) : null;
-    let muTitle = "", muType = "", chapter = null;
-    if (muId) {
-      const v = await muLatest(muId);
-      if (v) { muTitle = v.title; muType = v.type; chapter = v.chapter; }
-      await sleep(400);
-    }
-    series.push({
-      aniId: id,
-      title: (t.names && t.names[0]) || "",
-      country: t.country || "",
-      muId, muTitle, muType, chapter,
-      matched: !!muId,
-      unresolved: c === "none",
-    });
-  }
-  return json({ ok: true, series });
-}
-
-// Admin: pin a series to a specific MangaUpdates id, re-run the search with a
-// different name, or clear the mapping. The chapter baseline is dropped with it
-// so the next pass re-reads where the series stands instead of firing a burst.
-async function handleMuPin(body, env) {
-  if (!adminOK(body, env)) return json({ ok: false, error: "unauthorized" }, 401);
-  const aniId = Math.max(0, parseInt(body.aniId, 10) || 0);
-  if (!aniId) return json({ ok: false, error: "aniId required" }, 400);
-  const raw = String(body.value == null ? "" : body.value).trim();
-
-  let muId = null, note = "";
-  if (body.clear || raw === "") {
-    await env.SUBS.delete("mu:" + aniId);
-    note = "cleared — it will be looked up again on the next pass";
-  } else if (/^\d{6,}$/.test(raw)) {
-    muId = Number(raw);
-  } else {
-    // Not an id: treat it as the name to search MangaUpdates by.
-    try {
-      const r = await fetch(MU + "/series/search", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ search: raw.slice(0, 120), perpage: 1 }),
-      });
-      const d = await r.json().catch(() => null);
-      const rec = d && d.results && d.results[0] && d.results[0].record;
-      if (rec && rec.series_id) muId = rec.series_id;
-    } catch {}
-    if (!muId) return json({ ok: false, error: "no series found by that name" }, 404);
-  }
-
-  let checked = null;
-  if (muId) {
-    checked = await muLatest(muId);
-    if (!checked) return json({ ok: false, error: "that id doesn't answer — check it" }, 400);
-    await env.SUBS.put("mu:" + aniId, String(muId));
-    note = `pinned to ${checked.title} (chapter ${checked.chapter})`;
-  }
-
-  // Forget the baseline everywhere so the new mapping re-reads rather than
-  // announcing the gap between the old series and the new one.
-  const subs = await loadAllSubs(env);
-  for (const { key, record } of subs) {
-    if (record.chapters && record.chapters[aniId] !== undefined) {
-      delete record.chapters[aniId];
-      await env.SUBS.put(key, JSON.stringify(record));
-    }
-  }
-  return json({ ok: true, muId, note, title: checked ? checked.title : "", chapter: checked ? checked.chapter : null });
+  return json({
+    ok: true,
+    series: ids.map((id) => {
+      const t = titles.get(id) || {};
+      const f = feed[String(id)] || {};
+      return {
+        aniId: id,
+        title: (t.names && t.names[0]) || "",
+        country: t.country || "",
+        muId: f.muId || null,
+        muTitle: f.title || "",
+        muType: f.type || "",
+        chapter: f.chapter || null,
+        matched: !!f.muId,
+        unresolved: !!f && f.muId === null,
+      };
+    }),
+  });
 }
 
 // Admin: rename the titles one device sees. `all` renames every title; `map`
@@ -1155,75 +1134,22 @@ async function fetchAiredSchedules(ids, afterSec, beforeSec) {
  * each series is one GET, calls are spaced out, and the whole pass runs at most
  * hourly rather than on the 15-minute airing cadence. Chapters are weekly.
  */
-const MU = "https://api.mangaupdates.com/v1";
-
-const flatTitle = (t) => String(t || "").toLowerCase().replace(/[^a-z0-9]/g, "");
-
-/**
- * Match by NAME, across every name a series is known by — romaji, English and
- * native. Manhwa and manhua are the reason: a Korean or Chinese series is
- * romanised differently by every database, so one spelling is a coin flip.
- *
- * And never trust hit #1 blindly. Searching "Lore Olympus" returns "Olimpos" —
- * an unrelated series with eleven chapters — because their index has no entry
- * for it. Taking that would have pinned the wrong series and reported someone
- * else's chapters forever. A candidate has to actually resemble one of the names
- * we hold, or it counts as no match.
- */
-function muCandidateOk(candidate, names) {
-  const c = flatTitle(candidate);
-  if (!c) return false;
-  for (const n of names) {
-    const f = flatTitle(n);
-    if (!f || f.length < 4) continue;
-    if (c === f) return true;
-    // Contained either way covers "Solo Leveling" vs "Solo Leveling (Novel)"
-    // and subtitle-carrying entries, without accepting a two-word overlap.
-    if (c.length >= 6 && f.length >= 6 && (c.includes(f) || f.includes(c))) return true;
-  }
-  return false;
-}
-
-async function muLookupId(aniId, names, env) {
-  const cacheKey = "mu:" + aniId;
-  const hit = await env.SUBS.get(cacheKey);
-  if (hit) return hit === "none" ? null : Number(hit);
-  const tries = [...new Set((names || []).filter(Boolean).map((n) => String(n).slice(0, 120)))];
-  let id = null, transient = false;
-  for (const name of tries) {
-    let d = null;
-    try {
-      const r = await fetch(MU + "/series/search", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ search: name, perpage: 5 }),
-      });
-      d = await r.json().catch(() => null);
-    } catch { transient = true; continue; }
-    for (const res of (d && d.results) || []) {
-      const rec = res && res.record;
-      if (!rec || !rec.series_id) continue;
-      if (muCandidateOk(rec.title, tries)) { id = rec.series_id; break; }
-    }
-    if (id) break;
-    await sleep(900);
-  }
-  if (!id && transient) return null;      // network trouble isn't evidence of absence
-  await env.SUBS.put(cacheKey, id ? String(id) : "none");
-  return id;
-}
-
-async function muLatest(seriesId) {
+// MangaUpdates answers 403 to Worker egress (Cloudflare bot protection) and 403
+// to browsers as well, so neither this file nor the app can ask it directly.
+// A scheduled GitHub Action does the lookup from a runner it doesn't block and
+// commits the result; Pages serves it, and this reads it from there.
+const CHAPTERS_URL = "https://theteknojunkie456.github.io/anime-list/data/chapters.json";
+let _chFeed = null, _chFeedAt = 0;
+async function chapterFeed() {
+  if (_chFeed && Date.now() - _chFeedAt < 900000) return _chFeed;
   try {
-    const r = await fetch(MU + "/series/" + seriesId);
-    const d = await r.json().catch(() => null);
-    if (!d) return null;
-    const n = Number(d.latest_chapter);
-    if (!Number.isFinite(n) || n <= 0) return null;
-    // type is Manga / Manhwa / Manhua / Artbook etc. Worth carrying: it's the
-    // quickest way to spot that a manhwa matched something that isn't one.
-    return { chapter: n, title: d.title || "A series", type: d.type || "" };
-  } catch { return null; }
+    const r = await fetch(CHAPTERS_URL, { cf: { cacheTtl: 600 } });
+    if (!r.ok) return _chFeed || {};
+    const d = await r.json();
+    _chFeed = (d && d.series) || {};
+    _chFeedAt = Date.now();
+  } catch { return _chFeed || {}; }
+  return _chFeed;
 }
 
 /** AniList ids -> titles, so a series can be found on MangaUpdates by name. */
@@ -1252,60 +1178,28 @@ async function anilistMangaTitles(ids) {
 }
 
 async function notifyNewChapters(env, subs) {
-  // Weekly releases don't need a quarter-hourly poll, and their API deserves the
-  // restraint. One pass an hour.
+  // Weekly releases don't need a quarter-hourly poll, and the feed only moves
+  // when the Action runs. One pass an hour.
   const lastRaw = await env.SUBS.get("cfg:mangaRunAt");
-  const last = lastRaw ? Number(lastRaw) : 0;
-  if (Date.now() - last < 55 * 60000) return;
+  if (lastRaw && Date.now() - Number(lastRaw) < 55 * 60000) return;
   await env.SUBS.put("cfg:mangaRunAt", String(Date.now()));
 
-  const idSet = new Set();
-  for (const { record } of subs) for (const id of record.mangaIds || []) idSet.add(id);
-  const ids = [...idSet];
-  if (!ids.length) return;
-
-  // Which of these do we still need a MangaUpdates id for?
-  const need = [];
-  const muIds = new Map();
-  for (const id of ids) {
-    const c = await env.SUBS.get("mu:" + id);
-    if (c === null) need.push(id);
-    else if (c !== "none") muIds.set(id, Number(c));
-  }
-  if (need.length) {
-    const titles = await anilistMangaTitles(need);
-    for (const id of need) {
-      const t = titles.get(id);
-      if (!t || !t.names || !t.names.length) continue;
-      const mu = await muLookupId(id, t.names, env);
-      if (mu) muIds.set(id, mu);
-      await sleep(900);
-    }
-  }
-  if (!muIds.size) return;
-
-  // One call per series, shared across every subscriber.
-  const latest = new Map();
-  for (const [aniId, muId] of muIds) {
-    const v = await muLatest(muId);
-    if (v) latest.set(aniId, v);
-    await sleep(900);
-  }
-  if (!latest.size) return;
+  const feed = await chapterFeed();
+  if (!feed || !Object.keys(feed).length) return;
 
   for (const { key, record } of subs) {
     if (!record.chapters || typeof record.chapters !== "object") record.chapters = {};
     let dirty = false, expired = false;
     for (const id of record.mangaIds || []) {
-      const cur = latest.get(id);
-      if (!cur) continue;
+      const cur = feed[String(id)];
+      if (!cur || !cur.chapter) continue;
       const seen = record.chapters[id];
       // First sighting is remembered silently — otherwise adding a series would
       // announce a chapter that came out months ago.
       if (seen === undefined) { record.chapters[id] = cur.chapter; dirty = true; continue; }
       if (cur.chapter <= seen) continue;
       const res = await sendPush(record.subscription, {
-        title: cur.title,
+        title: cur.title || "New chapter",
         body: `Chapter ${cur.chapter} is out`,
         url: "/",
         tag: "wl-ch-" + id,

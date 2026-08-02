@@ -1,0 +1,44 @@
+name: Chapter counts
+
+# MangaUpdates returns 403 to Cloudflare Workers and to browsers, so the lookup
+# can't live in the app or the notify worker. A GitHub runner is neither, so it
+# gets a normal answer — this fetches the counts and commits them, and Pages
+# serves the result to both.
+on:
+  schedule:
+    - cron: '17 */6 * * *'   # four times a day, offset off the hour
+  workflow_dispatch:          # and on demand, which is how to test it
+
+permissions:
+  contents: write
+
+concurrency:
+  group: chapters
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Fetch chapter counts
+        env:
+          ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
+        run: node scripts/chapters.mjs
+
+      - name: Commit if anything moved
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet -- data/chapters.json; then
+            echo "no change"
+            exit 0
+          fi
+          git add data/chapters.json
+          git commit -m "Chapter counts: refresh [skip ci]"
+          git push

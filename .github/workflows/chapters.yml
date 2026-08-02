@@ -28,7 +28,9 @@ jobs:
 
       - name: Fetch chapter counts
         env:
-          ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
+          # Same secret the announce workflow uses — it must match the notify
+          # worker's ADMIN_TOKEN, and it already exists in this repo.
+          ADMIN_TOKEN: ${{ secrets.NOTIFY_ADMIN_TOKEN }}
         run: node scripts/chapters.mjs
 
       - name: Commit if anything moved

@@ -1,4 +1,10 @@
-const CACHE = 'animelist-v7';
+// Bumped v7 -> v8 deliberately. The activate handler deletes every cache whose
+// name isn't the current one, so changing this name forces every installed app
+// to drop what it stored and refetch. Network-first should already keep things
+// current, but an installed iOS app that has been offline or backgrounded can
+// hold an old bundle for a long time — and "the fix didn't work" has looked
+// exactly like that more than once.
+const CACHE = 'animelist-v8';
 const ASSETS = ['./index.html', './friends.html', './manifest.json'];
 
 self.addEventListener('install', e => {

@@ -1019,6 +1019,12 @@ body.first-paint .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards
 .src-chip{font-family:var(--fd);font-size:12.5px;font-weight:700;color:var(--t2);background:var(--bg3);border:1px solid var(--b1);border-radius:999px;padding:9px 15px;transition:border-color .15s,background .15s,color .15s;}
 .src-chip.on{border-color:var(--a);background:var(--ag);color:var(--a2);}
 .src-chip.yours{border-color:var(--b3);color:var(--t1);}
+/* Anime and manga are two setups, so the sheet says so before anything else. */
+.src-tabs{display:flex;gap:8px;padding:2px 0 4px;}
+.src-tab{flex:1;display:flex;align-items:center;justify-content:center;gap:7px;padding:11px 0;border-radius:13px;font-family:var(--fd);font-size:13.5px;font-weight:800;background:var(--bg3);border:1px solid var(--b1);color:var(--t2);transition:background-color .15s,border-color .15s,color .15s;}
+.src-tab.on{background:var(--ag);border-color:var(--a);color:var(--a2);}
+.src-tab .ico{width:15px;height:15px;}
+.src-tab:focus-visible{outline:2px solid var(--a2);outline-offset:2px;}
 .src-chip.yours.on{border-color:var(--a);color:var(--a2);}
 .src-chip:active{transform:scale(.96);}
 .src-ai{margin-top:12px;padding:12px 13px;border-radius:12px;background:var(--ag);border:1px solid var(--b2);}
@@ -10025,6 +10031,76 @@ function sourceName(){
   const p=WATCH_PRESETS.find(x=>x.url===s); if(p)return p.name;
   try{return new URL(s.replace(/\{[^}]+\}/g,'x')).hostname.replace(/^www\./,'');}catch{return 'the site';}
 }
+// ─── SOURCES: two setups, not one with a footnote ───────────────────────────
+// Reading had a single input tucked at the bottom of the watch fold, so manga
+// felt like an afterthought and the teach-by-paste flow — the good part — was
+// anime-only. The sheet now has two halves with the same tools in each.
+function srcTab(){try{return localStorage.getItem('src_tab')==='read'?'read':'watch';}catch{return'watch';}}
+function setSrcTab(t){try{localStorage.setItem('src_tab',t==='read'?'read':'watch');}catch{}renderSource();}
+function readSourceHTML(rcustom){
+  const host=u=>{try{return new URL(String(u).replace(/\{[^}]+\}/g,'x')).hostname.replace(/^www\./,'');}catch{return String(u).slice(0,32);}};
+  return `
+    <p class="ai-desc" style="margin-top:2px">Tapping <b>Read</b> on a manga, manhwa or webtoon opens it wherever you pick here. Separate from anime — changing one never touches the other.</p>
+
+    <div class="src-quick">
+      <div class="src-quick-t">${icon('sparkles')} Read on your own site</div>
+      <p class="ai-desc" style="margin:7px 0 11px;font-size:12.5px">Open your reader, go to <b>any</b> chapter of <b>any</b> series, and paste that page's address. That one link is the whole setup — WatchList works out the pattern and uses it for everything you read.</p>
+      <input class="ai-prompt-in" id="rsrcQuickIn" placeholder="paste that chapter's address" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url" oninput="readQuickSetup()">
+      <div id="rsrcQuickOut" class="src-quick-out" style="display:none"></div>
+    </div>
+
+    <div class="dt-label">${icon('book')} Where Read opens</div>
+    <button class="src-opt${!rcustom?' on':''}" onclick="setReadSource('')">
+      <div class="src-name">AsuraScans <span class="src-tag">Built-in</span></div>
+      <div class="src-sub">Jumps straight to the series — no setup</div>
+    </button>
+    ${rcustom?`<button class="src-opt on" onclick="setReadSource('')">
+      <div class="src-name">${escH(host(rcustom))} <span class="src-tag">Yours</span></div>
+      <div class="src-sub">${escH(String(rcustom).slice(0,72))}</div>
+    </button>`:''}
+
+    <details class="src-fold" data-fold="readmore" style="margin-top:16px">
+      <summary>${icon('settings')} Write the address out yourself</summary>
+      <p class="ai-desc">Only if the paste box above didn't suit.</p>
+      <input class="ai-prompt-in" id="rsrcCustom" placeholder="https://reader.com/manga/{slug}/chapter-{ch}" value="${rcustom?String(rcustom).replace(/"/g,'&quot;'):''}" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url">
+      <button class="parse-btn" onclick="saveReadSource()">Use this site instead</button>
+      <div class="src-toks" style="margin-top:10px">
+        ${['{query}','{slug}','{ch}','{titleRomaji}','{titleEnglish}'].map(t=>`<button type="button" class="src-tok" onclick="insertReadToken('${t}')">${t}</button>`).join('')}
+      </div>
+      <p class="ai-desc" style="margin-top:8px;font-size:11px"><code>{slug}</code> is the series name as that site writes it, <code>{ch}</code> the chapter number. Leave <code>{ch}</code> out and Read opens the series page.</p>
+    </details>`;
+}
+// The same teach-by-paste the anime side uses — one chapter's address is enough
+// to work out the pattern for every series.
+function readQuickSetup(){
+  const inp=document.getElementById('rsrcQuickIn'),out=document.getElementById('rsrcQuickOut');
+  if(!inp||!out)return;
+  const raw=(inp.value||'').trim();
+  if(raw.length<12){out.style.display='none';return;}
+  const url=normSrc(raw);
+  const tpl=templatizeSearchURL(url).replace(/\{ep\}/g,'{ch}');
+  out.style.display='block';
+  if(!/\{(query|slug|ch)\}/.test(tpl)){
+    out.innerHTML=`<div class="src-quick-bad">${icon('search')} I can't tell which series that address points at.<br>Copy a <b>single chapter's</b> page — its address usually has the series name in it.</div>`;
+    out.dataset.tpl='';return;
+  }
+  let site='your site';try{site=new URL(url).hostname.replace(/^www\./,'');}catch(e){}
+  out.dataset.tpl=tpl;
+  out.innerHTML=`<div class="src-quick-good">${icon('check')} Got it — <b>${escH(site)}</b>.<br>
+    <span style="font-family:ui-monospace,Menlo,monospace;font-size:11.5px;word-break:break-all;opacity:.8">${escH(tpl)}</span></div>
+    <button class="parse-btn" style="margin-top:9px" onclick="readQuickUse()">Use this for everything I read</button>`;
+}
+function readQuickUse(){
+  const out=document.getElementById('rsrcQuickOut'); if(!out||!out.dataset.tpl)return;
+  setReadSource(out.dataset.tpl);
+  const i=document.getElementById('rsrcQuickIn'); if(i)i.value='';
+}
+function insertReadToken(t){
+  const el=document.getElementById('rsrcCustom'); if(!el)return;
+  const a=el.selectionStart||el.value.length,b=el.selectionEnd||a;
+  el.value=el.value.slice(0,a)+t+el.value.slice(b);
+  el.focus();el.setSelectionRange(a+t.length,a+t.length);
+}
 function renderSource(){
   const box=document.getElementById('sourceBody'); if(!box) return;
   // Hiding/renaming rebuilds this whole sheet, which would snap open folds shut
@@ -10040,7 +10116,13 @@ function renderSource(){
   const chips=customServices().filter(s=>!isHiddenSrc(s.name)).map(s=>`<button class="src-chip yours${custom===s.url?' on':''}" onclick="setSourceById('${s.id}')">${escH(s.name)}</button>`).join('')
     +WATCH_PRESETS.filter(p=>!isHiddenSrc(p.name)).map(p=>`<button class="src-chip${custom===p.url?' on':''}" onclick="setSource('${p.url}')">${escH(p.name)}</button>`).join('');
   const myCount=customServices().length, hiddenCount=hiddenSrc().length;
-  box.innerHTML=`
+  const tab=srcTab();
+  const tabs=`<div class="src-tabs">
+      <button class="src-tab${tab==='watch'?' on':''}" onclick="setSrcTab('watch')">${icon('play')} Anime</button>
+      <button class="src-tab${tab==='read'?' on':''}" onclick="setSrcTab('read')">${icon('book')} Manga</button>
+    </div>`;
+  if(tab==='read'){box.innerHTML=tabs+readSourceHTML(rcustom);try{if(scroller)scroller.scrollTop=prevScroll;}catch{}return;}
+  box.innerHTML=tabs+`
     <p class="ai-desc" style="margin-top:2px">Tapping <b>Watch</b> on a show opens it wherever you pick here.</p>
 
     <div class="src-quick">
@@ -10103,13 +10185,6 @@ function renderSource(){
       <p class="ai-desc">Tick what you subscribe to and Watch offers "Open in …" for each.</p>
       <div class="src-picks">${PAID_SERVICES.map(s=>`<button class="src-chip${myServices().includes(s.id)?' on':''}" onclick="toggleService('${s.id}')">${s.name}</button>`).join('')}</div>`:''}
 
-      <div class="dt-label" style="margin-top:20px">${icon('book')} Where manga opens</div>
-      <button class="src-opt${!rcustom?' on':''}" onclick="setReadSource('')">
-        <div class="src-name">AsuraScans <span class="src-tag">Built-in</span></div>
-        <div class="src-sub">Jumps straight to the series</div>
-      </button>
-      <input class="ai-prompt-in" id="rsrcCustom" placeholder="comick.io — or a full URL" value="${rcustom?rcustom.replace(/"/g,'&quot;'):''}" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url" style="margin-top:9px">
-      <button class="parse-btn" onclick="saveReadSource()">Use this site instead</button>
     </details>
 `;
   // Put the fold you were using back where it was — same scroll, still open.

@@ -331,8 +331,10 @@ async function handleSubscribe(body, env) {
       },
     },
     animeIds,
+    mangaIds: normalizeAnimeIds(body.mangaIds) || [],
     tz,
     notified: {},
+    chapters: {},
   };
   await env.SUBS.put(key, JSON.stringify(record));
   return json({ ok: true });
@@ -362,6 +364,17 @@ async function handleUpdate(body, env) {
   }
   const record = JSON.parse(raw);
   record.animeIds = animeIds;
+  // Manga rides alongside. Anime has an airing schedule; manga has only a
+  // chapter COUNT, so tracking here means noticing when that count goes up.
+  const mangaIds = normalizeAnimeIds(body.mangaIds);
+  if (mangaIds !== null) {
+    record.mangaIds = mangaIds;
+    if (record.chapters && typeof record.chapters === "object") {
+      const keep = {};
+      for (const id of mangaIds) if (record.chapters[id] !== undefined) keep[id] = record.chapters[id];
+      record.chapters = keep;
+    } else record.chapters = {};
+  }
   // Drop notified entries for ids no longer tracked (keeps map tidy).
   if (record.notified && typeof record.notified === "object") {
     const keep = {};
@@ -1041,9 +1054,78 @@ async function fetchAiredSchedules(ids, afterSec, beforeSec) {
   return results;
 }
 
+/**
+ * Manga has no airing schedule — AniList publishes a chapter COUNT and nothing
+ * about when the next one lands. So this notices the count going up, which is
+ * the honest version of "a chapter is out": it follows AniList's data, which
+ * itself trails a real release by a day or two.
+ */
+async function fetchMangaChapters(ids) {
+  const out = new Map();
+  for (const batch of chunk(ids, 50)) {
+    const q = `query($ids:[Int]){Page(perPage:50){media(id_in:$ids,type:MANGA){id chapters title{romaji english}}}}`;
+    let data = null;
+    try {
+      const r = await fetch("https://graphql.anilist.co", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ query: q, variables: { ids: batch } }),
+      });
+      if (r.status === 429) { await sleep(5000); continue; }
+      data = await r.json().catch(() => null);
+    } catch { /* leave this batch for the next run */ }
+    const media = data?.data?.Page?.media || [];
+    for (const m of media) {
+      if (!m || !m.id || !m.chapters) continue;
+      out.set(m.id, { chapters: m.chapters, title: (m.title && (m.title.english || m.title.romaji)) || "A series" });
+    }
+    await sleep(700);
+  }
+  return out;
+}
+
+async function notifyNewChapters(env, subs) {
+  const idSet = new Set();
+  for (const { record } of subs) for (const id of record.mangaIds || []) idSet.add(id);
+  const ids = [...idSet];
+  if (!ids.length) return;
+
+  const now = await fetchMangaChapters(ids);
+  if (!now.size) return;
+
+  for (const { key, record } of subs) {
+    if (!record.chapters || typeof record.chapters !== "object") record.chapters = {};
+    let dirty = false, expired = false;
+    for (const id of record.mangaIds || []) {
+      const cur = now.get(id);
+      if (!cur) continue;
+      const seen = record.chapters[id];
+      // First time we've seen this series: remember the count, say nothing.
+      // Otherwise every manga on every list would announce itself on day one.
+      if (seen === undefined) { record.chapters[id] = cur.chapters; dirty = true; continue; }
+      if (cur.chapters <= seen) continue;
+      const res = await sendPush(record.subscription, {
+        title: cur.title,
+        body: `Chapter ${cur.chapters} is out`,
+        url: "/",
+        tag: "wl-ch-" + id,
+      }, env);
+      if (res && res.expired) { expired = true; break; }
+      record.chapters[id] = cur.chapters;
+      dirty = true;
+      await sleep(250);
+    }
+    if (expired) { await env.SUBS.delete(key); continue; }
+    if (dirty) await env.SUBS.put(key, JSON.stringify(record));
+  }
+}
+
 async function handleScheduled(env) {
   const subs = await loadAllSubs(env);
   if (subs.length === 0) return;
+  // Manga first and independently: an early return in the airing pass (nothing
+  // aired in the last 40 minutes, which is most runs) must not skip it.
+  try { await notifyNewChapters(env, subs); } catch (e) {}
 
   // Union of tracked ids.
   const idSet = new Set();

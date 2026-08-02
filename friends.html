@@ -3870,6 +3870,9 @@ function pushSupported(){return ('Notification'in window)&&('PushManager'in wind
 // aniIds of the shows we want the worker to poll: Watching/Plan watch items that have a captured AniList id.
 function upcomingRelated(){try{return (JSON.parse(localStorage.getItem('upcoming_related')||'[]')||[]).filter(r=>r&&r.aniId);}catch(e){return[];}}
 function notifyAnimeIds(){const own=anime.filter(a=>kindOf(a)==='watch'&&(a.status==='watching'||a.status==='plan'||a.status==='finished')&&a.aniId).map(a=>a.aniId);const rel=upcomingRelated().map(r=>r.aniId).filter(Boolean);return [...new Set(own.concat(rel))];}
+// Manga you're actually following. Anime gets an airing time; manga gets a
+// chapter count, so the server watches that count and tells you when it moves.
+function notifyMangaIds(){return [...new Set(anime.filter(a=>kindOf(a)==='read'&&(a.status==='watching'||a.status==='plan')&&a.aniId).map(a=>a.aniId))];}
 async function getPushSub(){try{const reg=await navigator.serviceWorker.ready;return await reg.pushManager.getSubscription();}catch{return null;}}
 async function enableNotify(){
   if(typeof IS_NATIVE!=='undefined'&&IS_NATIVE){setNotifyOn(true);try{nativeScheduleNotifs();}catch{}toast('Notifications on');renderNotifyUI();return;}
@@ -3886,7 +3889,7 @@ async function enableNotify(){
       try{await fetchCovers();}catch{}
       ids=notifyAnimeIds();
     }
-    const r=await fetch(NOTIFY_URL+'/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({subscription:sub,animeIds:ids,tz:(Intl.DateTimeFormat().resolvedOptions().timeZone)||'UTC'})});
+    const r=await fetch(NOTIFY_URL+'/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({subscription:sub,animeIds:ids,mangaIds:notifyMangaIds(),tz:(Intl.DateTimeFormat().resolvedOptions().timeZone)||'UTC'})});
     if(!r.ok)throw new Error('subscribe '+r.status);
     setNotifyOn(true);
     toast(ids.length?`Notifications on · tracking ${ids.length} show${ids.length!==1?'s':''}`:'Notifications on · open your shows so covers/ids load');
@@ -3935,7 +3938,7 @@ async function notifyUpdate(){
   if(!pushSupported())return;
   try{
     const sub=await getPushSub();if(!sub)return;
-    await fetch(NOTIFY_URL+'/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({endpoint:sub.endpoint,animeIds:notifyAnimeIds()})});
+    await fetch(NOTIFY_URL+'/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({endpoint:sub.endpoint,animeIds:notifyAnimeIds(),mangaIds:notifyMangaIds()})});
   }catch{}
 }
 // "I haven't seen anything" is almost always "nothing aired", not "it's broken" —

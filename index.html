@@ -2653,9 +2653,13 @@ async function networkGate(){
   if(!force&&nm0&&(hasStoredList()||(Array.isArray(anime)&&anime.length))){setNetStatus('approved');
     try{netCall('/join',{deviceId:wlDevice(),name:nm0,...joinIdentity()});}catch{}
     return false;}
-  // New device → ask the network where it stands.
+  // ASK, don't register. This call used to file a join request the moment the
+  // app opened — with an empty name, because nobody had been asked for one yet —
+  // so anyone who closed the app at the join screen left a "(tap to name)" row
+  // behind and pinged the admin about it. probe:1 means "tell me my status";
+  // the record is only created when they actually submit the form, with a name.
   let st='unknown';
-  try{const inv=localStorage.getItem(NET_INVITE)||'';const j=await netCall('/join',{deviceId:wlDevice(),name:nm0,invite:inv,...joinIdentity()});st=j.status||'unknown';}
+  try{const inv=localStorage.getItem(NET_INVITE)||'';const j=await netCall('/join',{deviceId:wlDevice(),name:nm0,invite:inv,probe:1,...joinIdentity()});st=j.status||'unknown';}
   catch{ // can't reach the server: don't trap a brand-new user in a dead wall — let them in as a local-only guest.
     return false; }
   if(st==='approved'){setNetStatus('approved');return false;}

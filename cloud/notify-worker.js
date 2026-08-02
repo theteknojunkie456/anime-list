@@ -665,6 +665,13 @@ async function handleJoin(body, env) {
     return json({ ok: true, status: rec.status, name: rec.alias || rec.name || "" });
   }
 
+  // A PROBE is the app asking "where do I stand?" on launch, before the person
+  // has seen the join screen. It must never create anything: registering here is
+  // what filled the roster with nameless pending rows and pushed the admin a
+  // request for someone who had not asked for anything yet. Unknown device +
+  // probe = say so and write nothing.
+  if (body.probe) return json({ ok: true, status: "unknown", probe: true });
+
   // Optional invite: an 'auto' code approves on the spot (still counts toward the
   // cap); a 'request' code just tags where they came from.
   let status = "pending", inviteCode = "";

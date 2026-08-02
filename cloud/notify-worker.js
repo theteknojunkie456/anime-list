@@ -1055,63 +1055,134 @@ async function fetchAiredSchedules(ids, afterSec, beforeSec) {
 }
 
 /**
- * Manga has no airing schedule — AniList publishes a chapter COUNT and nothing
- * about when the next one lands. So this notices the count going up, which is
- * the honest version of "a chapter is out": it follows AniList's data, which
- * itself trails a real release by a day or two.
+ * CHAPTER RELEASES — MangaUpdates
+ *
+ * AniList can't do this: its `chapters` field is a TOTAL and stays null for the
+ * whole time a series is releasing, so the ongoing series people actually want
+ * alerts for have no number to watch. MangaUpdates tracks releases themselves
+ * and reports latest_chapter for ongoing series (One Piece 1189, Berserk 386),
+ * keyless. So the count comes from there.
+ *
+ * Their service is small and volunteer-run, so this is deliberately gentle: the
+ * AniList-id -> MangaUpdates-id mapping is looked up once and cached forever,
+ * each series is one GET, calls are spaced out, and the whole pass runs at most
+ * hourly rather than on the 15-minute airing cadence. Chapters are weekly.
  */
-async function fetchMangaChapters(ids) {
+const MU = "https://api.mangaupdates.com/v1";
+
+async function muLookupId(aniId, title, env) {
+  const cacheKey = "mu:" + aniId;
+  const hit = await env.SUBS.get(cacheKey);
+  if (hit) return hit === "none" ? null : Number(hit);
+  let id = null;
+  try {
+    const r = await fetch(MU + "/series/search", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ search: String(title || "").slice(0, 120), perpage: 1 }),
+    });
+    const d = await r.json().catch(() => null);
+    const rec = d && d.results && d.results[0] && d.results[0].record;
+    if (rec && rec.series_id) id = rec.series_id;
+  } catch { return null; }   // transient: don't cache a failure as "none"
+  // Cached either way — a title with no match shouldn't be searched every hour.
+  await env.SUBS.put(cacheKey, id ? String(id) : "none");
+  return id;
+}
+
+async function muLatest(seriesId) {
+  try {
+    const r = await fetch(MU + "/series/" + seriesId);
+    const d = await r.json().catch(() => null);
+    if (!d) return null;
+    const n = Number(d.latest_chapter);
+    if (!Number.isFinite(n) || n <= 0) return null;
+    return { chapter: n, title: d.title || "A series" };
+  } catch { return null; }
+}
+
+/** AniList ids -> titles, so a series can be found on MangaUpdates by name. */
+async function anilistMangaTitles(ids) {
   const out = new Map();
   for (const batch of chunk(ids, 50)) {
-    const q = `query($ids:[Int]){Page(perPage:50){media(id_in:$ids,type:MANGA){id chapters title{romaji english}}}}`;
-    let data = null;
+    const q = `query($ids:[Int]){Page(perPage:50){media(id_in:$ids,type:MANGA){id title{romaji english}}}}`;
     try {
       const r = await fetch("https://graphql.anilist.co", {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
         body: JSON.stringify({ query: q, variables: { ids: batch } }),
       });
-      if (r.status === 429) { await sleep(5000); continue; }
-      data = await r.json().catch(() => null);
-    } catch { /* leave this batch for the next run */ }
-    const media = data?.data?.Page?.media || [];
-    for (const m of media) {
-      if (!m || !m.id || !m.chapters) continue;
-      out.set(m.id, { chapters: m.chapters, title: (m.title && (m.title.english || m.title.romaji)) || "A series" });
-    }
+      const d = await r.json().catch(() => null);
+      for (const m of d?.data?.Page?.media || []) {
+        if (m && m.id) out.set(m.id, (m.title && (m.title.english || m.title.romaji)) || "");
+      }
+    } catch { /* next run */ }
     await sleep(700);
   }
   return out;
 }
 
 async function notifyNewChapters(env, subs) {
+  // Weekly releases don't need a quarter-hourly poll, and their API deserves the
+  // restraint. One pass an hour.
+  const lastRaw = await env.SUBS.get("cfg:mangaRunAt");
+  const last = lastRaw ? Number(lastRaw) : 0;
+  if (Date.now() - last < 55 * 60000) return;
+  await env.SUBS.put("cfg:mangaRunAt", String(Date.now()));
+
   const idSet = new Set();
   for (const { record } of subs) for (const id of record.mangaIds || []) idSet.add(id);
   const ids = [...idSet];
   if (!ids.length) return;
 
-  const now = await fetchMangaChapters(ids);
-  if (!now.size) return;
+  // Which of these do we still need a MangaUpdates id for?
+  const need = [];
+  const muIds = new Map();
+  for (const id of ids) {
+    const c = await env.SUBS.get("mu:" + id);
+    if (c === null) need.push(id);
+    else if (c !== "none") muIds.set(id, Number(c));
+  }
+  if (need.length) {
+    const titles = await anilistMangaTitles(need);
+    for (const id of need) {
+      const t = titles.get(id);
+      if (!t) continue;
+      const mu = await muLookupId(id, t, env);
+      if (mu) muIds.set(id, mu);
+      await sleep(900);
+    }
+  }
+  if (!muIds.size) return;
+
+  // One call per series, shared across every subscriber.
+  const latest = new Map();
+  for (const [aniId, muId] of muIds) {
+    const v = await muLatest(muId);
+    if (v) latest.set(aniId, v);
+    await sleep(900);
+  }
+  if (!latest.size) return;
 
   for (const { key, record } of subs) {
     if (!record.chapters || typeof record.chapters !== "object") record.chapters = {};
     let dirty = false, expired = false;
     for (const id of record.mangaIds || []) {
-      const cur = now.get(id);
+      const cur = latest.get(id);
       if (!cur) continue;
       const seen = record.chapters[id];
-      // First time we've seen this series: remember the count, say nothing.
-      // Otherwise every manga on every list would announce itself on day one.
-      if (seen === undefined) { record.chapters[id] = cur.chapters; dirty = true; continue; }
-      if (cur.chapters <= seen) continue;
+      // First sighting is remembered silently — otherwise adding a series would
+      // announce a chapter that came out months ago.
+      if (seen === undefined) { record.chapters[id] = cur.chapter; dirty = true; continue; }
+      if (cur.chapter <= seen) continue;
       const res = await sendPush(record.subscription, {
         title: cur.title,
-        body: `Chapter ${cur.chapters} is out`,
+        body: `Chapter ${cur.chapter} is out`,
         url: "/",
         tag: "wl-ch-" + id,
       }, env);
       if (res && res.expired) { expired = true; break; }
-      record.chapters[id] = cur.chapters;
+      record.chapters[id] = cur.chapter;
       dirty = true;
       await sleep(250);
     }

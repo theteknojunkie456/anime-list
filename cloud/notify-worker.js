@@ -778,11 +778,20 @@ async function handleMuList(body, env) {
   const series = [];
   for (const id of ids) {
     const c = await env.SUBS.get("mu:" + id);
+    const t = titles.get(id) || {};
+    const muId = c && c !== "none" ? Number(c) : null;
+    let muTitle = "", muType = "", chapter = null;
+    if (muId) {
+      const v = await muLatest(muId);
+      if (v) { muTitle = v.title; muType = v.type; chapter = v.chapter; }
+      await sleep(400);
+    }
     series.push({
       aniId: id,
-      title: titles.get(id) || "",
-      muId: c && c !== "none" ? Number(c) : null,
-      matched: !!(c && c !== "none"),
+      title: (t.names && t.names[0]) || "",
+      country: t.country || "",
+      muId, muTitle, muType, chapter,
+      matched: !!muId,
       unresolved: c === "none",
     });
   }
@@ -1148,22 +1157,58 @@ async function fetchAiredSchedules(ids, afterSec, beforeSec) {
  */
 const MU = "https://api.mangaupdates.com/v1";
 
-async function muLookupId(aniId, title, env) {
+const flatTitle = (t) => String(t || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+
+/**
+ * Match by NAME, across every name a series is known by — romaji, English and
+ * native. Manhwa and manhua are the reason: a Korean or Chinese series is
+ * romanised differently by every database, so one spelling is a coin flip.
+ *
+ * And never trust hit #1 blindly. Searching "Lore Olympus" returns "Olimpos" —
+ * an unrelated series with eleven chapters — because their index has no entry
+ * for it. Taking that would have pinned the wrong series and reported someone
+ * else's chapters forever. A candidate has to actually resemble one of the names
+ * we hold, or it counts as no match.
+ */
+function muCandidateOk(candidate, names) {
+  const c = flatTitle(candidate);
+  if (!c) return false;
+  for (const n of names) {
+    const f = flatTitle(n);
+    if (!f || f.length < 4) continue;
+    if (c === f) return true;
+    // Contained either way covers "Solo Leveling" vs "Solo Leveling (Novel)"
+    // and subtitle-carrying entries, without accepting a two-word overlap.
+    if (c.length >= 6 && f.length >= 6 && (c.includes(f) || f.includes(c))) return true;
+  }
+  return false;
+}
+
+async function muLookupId(aniId, names, env) {
   const cacheKey = "mu:" + aniId;
   const hit = await env.SUBS.get(cacheKey);
   if (hit) return hit === "none" ? null : Number(hit);
-  let id = null;
-  try {
-    const r = await fetch(MU + "/series/search", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ search: String(title || "").slice(0, 120), perpage: 1 }),
-    });
-    const d = await r.json().catch(() => null);
-    const rec = d && d.results && d.results[0] && d.results[0].record;
-    if (rec && rec.series_id) id = rec.series_id;
-  } catch { return null; }   // transient: don't cache a failure as "none"
-  // Cached either way — a title with no match shouldn't be searched every hour.
+  const tries = [...new Set((names || []).filter(Boolean).map((n) => String(n).slice(0, 120)))];
+  let id = null, transient = false;
+  for (const name of tries) {
+    let d = null;
+    try {
+      const r = await fetch(MU + "/series/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ search: name, perpage: 5 }),
+      });
+      d = await r.json().catch(() => null);
+    } catch { transient = true; continue; }
+    for (const res of (d && d.results) || []) {
+      const rec = res && res.record;
+      if (!rec || !rec.series_id) continue;
+      if (muCandidateOk(rec.title, tries)) { id = rec.series_id; break; }
+    }
+    if (id) break;
+    await sleep(900);
+  }
+  if (!id && transient) return null;      // network trouble isn't evidence of absence
   await env.SUBS.put(cacheKey, id ? String(id) : "none");
   return id;
 }
@@ -1175,7 +1220,9 @@ async function muLatest(seriesId) {
     if (!d) return null;
     const n = Number(d.latest_chapter);
     if (!Number.isFinite(n) || n <= 0) return null;
-    return { chapter: n, title: d.title || "A series" };
+    // type is Manga / Manhwa / Manhua / Artbook etc. Worth carrying: it's the
+    // quickest way to spot that a manhwa matched something that isn't one.
+    return { chapter: n, title: d.title || "A series", type: d.type || "" };
   } catch { return null; }
 }
 
@@ -1183,7 +1230,7 @@ async function muLatest(seriesId) {
 async function anilistMangaTitles(ids) {
   const out = new Map();
   for (const batch of chunk(ids, 50)) {
-    const q = `query($ids:[Int]){Page(perPage:50){media(id_in:$ids,type:MANGA){id title{romaji english}}}}`;
+    const q = `query($ids:[Int]){Page(perPage:50){media(id_in:$ids,type:MANGA){id countryOfOrigin title{romaji english native}}}}`;
     try {
       const r = await fetch("https://graphql.anilist.co", {
         method: "POST",
@@ -1192,7 +1239,11 @@ async function anilistMangaTitles(ids) {
       });
       const d = await r.json().catch(() => null);
       for (const m of d?.data?.Page?.media || []) {
-        if (m && m.id) out.set(m.id, (m.title && (m.title.english || m.title.romaji)) || "");
+        if (!m || !m.id) continue;
+        const t = m.title || {};
+        // Every name it goes by. Manhwa in particular is romanised differently
+        // by every database, so one spelling isn't enough to find it.
+        out.set(m.id, { names: [t.english, t.romaji, t.native].filter(Boolean), country: m.countryOfOrigin || "" });
       }
     } catch { /* next run */ }
     await sleep(700);
@@ -1225,8 +1276,8 @@ async function notifyNewChapters(env, subs) {
     const titles = await anilistMangaTitles(need);
     for (const id of need) {
       const t = titles.get(id);
-      if (!t) continue;
-      const mu = await muLookupId(id, t, env);
+      if (!t || !t.names || !t.names.length) continue;
+      const mu = await muLookupId(id, t.names, env);
       if (mu) muIds.set(id, mu);
       await sleep(900);
     }

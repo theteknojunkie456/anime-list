@@ -10043,11 +10043,11 @@ function setSrcTab(t){try{localStorage.setItem('src_tab',t==='read'?'read':'watc
 function readSourceHTML(rcustom){
   const host=u=>{try{return new URL(String(u).replace(/\{[^}]+\}/g,'x')).hostname.replace(/^www\./,'');}catch{return String(u).slice(0,32);}};
   return `
-    <p class="ai-desc" style="margin-top:2px">Tapping <b>Read</b> on a manga, manhwa or webtoon opens it wherever you pick here. Separate from anime — changing one never touches the other.</p>
+    <p class="ai-desc" style="margin-top:2px">Tapping <b>Read</b> opens it wherever you pick here — manga, manhwa, manhua, webtoons and light novels all use this. Separate from anime: changing one never touches the other.</p>
 
     <div class="src-quick">
       <div class="src-quick-t">${icon('sparkles')} Read on your own site</div>
-      <p class="ai-desc" style="margin:7px 0 11px;font-size:12.5px">Open your reader, go to <b>any</b> chapter of <b>any</b> series, and paste that page's address. That one link is the whole setup — WatchList works out the pattern and uses it for everything you read.</p>
+      <p class="ai-desc" style="margin:7px 0 11px;font-size:12.5px">Open your reader, go to <b>any</b> chapter or episode of <b>any</b> series, and paste that page's address. That one link is the whole setup — WatchList works out the pattern and uses it for everything you read.</p>
       <input class="ai-prompt-in" id="rsrcQuickIn" placeholder="paste that chapter's address" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url" oninput="readQuickSetup()">
       <div id="rsrcQuickOut" class="src-quick-out" style="display:none"></div>
     </div>
@@ -10109,6 +10109,7 @@ function readQuickUse(){
 // between databases, so some series match the wrong entry and some match none —
 // and either way the symptom is silence. This makes the match visible and
 // correctable instead of leaving you to wonder why nothing arrives.
+const flatT=t=>String(t||'').toLowerCase().replace(/[^a-z0-9]/g,'');
 async function loadMuList(){
   const box=document.getElementById('muList'); if(!box)return;
   box.innerHTML='<p class="ai-desc">Checking\u2026</p>';
@@ -10117,10 +10118,16 @@ async function loadMuList(){
   const list=r.series||[];
   if(!list.length){box.innerHTML='<p class="ai-desc">No manga is being tracked yet \u2014 add some with Reading or Plan status and turn notifications on.</p>';return;}
   box.innerHTML=list.map(x=>{
-    const state=x.matched?`matched \u00b7 MU ${x.muId}`:(x.unresolved?'no match found':'not looked up yet');
+    // Show what it actually landed on. A manhwa that matched a five-chapter
+    // "Manga" is the tell that the name collided with something unrelated.
+    let state;
+    if(x.matched)state=`${x.muTitle||('MU '+x.muId)}${x.muType?' \u00b7 '+x.muType:''}${x.chapter?' \u00b7 latest ch '+x.chapter:''}`;
+    else if(x.unresolved)state='no match on MangaUpdates \u2014 common for Webtoon Originals';
+    else state='not looked up yet';
+    const odd=x.matched&&x.muTitle&&x.title&&flatT(x.muTitle)!==flatT(x.title)&&!flatT(x.muTitle).includes(flatT(x.title))&&!flatT(x.title).includes(flatT(x.muTitle));
     return `<div class="src-opt" style="display:block">
-      <div class="src-name">${escH(x.title||('AniList '+x.aniId))}</div>
-      <div class="src-sub">${escH(state)}</div>
+      <div class="src-name">${escH(x.title||('AniList '+x.aniId))}${x.country&&x.country!=='JP'?` <span class="src-tag">${escH(x.country)}</span>`:''}</div>
+      <div class="src-sub"${odd?' style="color:#ff9b9b"':''}>${odd?'\u26a0 ':''}${escH(state)}</div>
       <div style="display:flex;gap:8px;margin-top:9px">
         <input class="ai-prompt-in" id="mu_${x.aniId}" placeholder="MangaUpdates id, or the name they use" autocomplete="off" spellcheck="false">
         <button class="src-chip on" onclick="muPin(${x.aniId})">Pin</button>
@@ -10162,7 +10169,7 @@ function renderSource(){
   const tab=srcTab();
   const tabs=`<div class="src-tabs">
       <button class="src-tab${tab==='watch'?' on':''}" onclick="setSrcTab('watch')">${icon('play')} Anime</button>
-      <button class="src-tab${tab==='read'?' on':''}" onclick="setSrcTab('read')">${icon('book')} Manga</button>
+      <button class="src-tab${tab==='read'?' on':''}" onclick="setSrcTab('read')">${icon('book')} Reading</button>
     </div>`;
   if(tab==='read'){box.innerHTML=tabs+readSourceHTML(rcustom);try{if(scroller)scroller.scrollTop=prevScroll;}catch{}return;}
   box.innerHTML=tabs+`

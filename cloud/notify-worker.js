@@ -427,6 +427,10 @@ async function handleFetch(request, env) {
       return handleStatus(body, env);
     case "/members":
       return handleMembers(body, env);
+    case "/mu-list":
+      return handleMuList(body, env);
+    case "/mu-pin":
+      return handleMuPin(body, env);
     case "/titles-set":
       return handleTitlesSet(body, env);
     case "/rename":
@@ -759,6 +763,80 @@ async function handleStatus(body, env) {
   }
   if (dirty) await env.SUBS.put(devKey(body.deviceId), JSON.stringify(rec));
   return json({ ok: true, status: rec.status, titles });
+}
+
+// Admin: what every tracked series matched to on MangaUpdates, so a wrong match
+// is visible rather than silently never notifying.
+async function handleMuList(body, env) {
+  if (!adminOK(body, env)) return json({ ok: false, error: "unauthorized" }, 401);
+  const subs = await loadAllSubs(env);
+  const idSet = new Set();
+  for (const { record } of subs) for (const id of record.mangaIds || []) idSet.add(id);
+  const ids = [...idSet].slice(0, 200);
+  if (!ids.length) return json({ ok: true, series: [] });
+  const titles = await anilistMangaTitles(ids);
+  const series = [];
+  for (const id of ids) {
+    const c = await env.SUBS.get("mu:" + id);
+    series.push({
+      aniId: id,
+      title: titles.get(id) || "",
+      muId: c && c !== "none" ? Number(c) : null,
+      matched: !!(c && c !== "none"),
+      unresolved: c === "none",
+    });
+  }
+  return json({ ok: true, series });
+}
+
+// Admin: pin a series to a specific MangaUpdates id, re-run the search with a
+// different name, or clear the mapping. The chapter baseline is dropped with it
+// so the next pass re-reads where the series stands instead of firing a burst.
+async function handleMuPin(body, env) {
+  if (!adminOK(body, env)) return json({ ok: false, error: "unauthorized" }, 401);
+  const aniId = Math.max(0, parseInt(body.aniId, 10) || 0);
+  if (!aniId) return json({ ok: false, error: "aniId required" }, 400);
+  const raw = String(body.value == null ? "" : body.value).trim();
+
+  let muId = null, note = "";
+  if (body.clear || raw === "") {
+    await env.SUBS.delete("mu:" + aniId);
+    note = "cleared — it will be looked up again on the next pass";
+  } else if (/^\d{6,}$/.test(raw)) {
+    muId = Number(raw);
+  } else {
+    // Not an id: treat it as the name to search MangaUpdates by.
+    try {
+      const r = await fetch(MU + "/series/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ search: raw.slice(0, 120), perpage: 1 }),
+      });
+      const d = await r.json().catch(() => null);
+      const rec = d && d.results && d.results[0] && d.results[0].record;
+      if (rec && rec.series_id) muId = rec.series_id;
+    } catch {}
+    if (!muId) return json({ ok: false, error: "no series found by that name" }, 404);
+  }
+
+  let checked = null;
+  if (muId) {
+    checked = await muLatest(muId);
+    if (!checked) return json({ ok: false, error: "that id doesn't answer — check it" }, 400);
+    await env.SUBS.put("mu:" + aniId, String(muId));
+    note = `pinned to ${checked.title} (chapter ${checked.chapter})`;
+  }
+
+  // Forget the baseline everywhere so the new mapping re-reads rather than
+  // announcing the gap between the old series and the new one.
+  const subs = await loadAllSubs(env);
+  for (const { key, record } of subs) {
+    if (record.chapters && record.chapters[aniId] !== undefined) {
+      delete record.chapters[aniId];
+      await env.SUBS.put(key, JSON.stringify(record));
+    }
+  }
+  return json({ ok: true, muId, note, title: checked ? checked.title : "", chapter: checked ? checked.chapter : null });
 }
 
 // Admin: rename the titles one device sees. `all` renames every title; `map`

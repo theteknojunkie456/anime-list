@@ -10062,6 +10062,12 @@ function readSourceHTML(rcustom){
       <div class="src-sub">${escH(String(rcustom).slice(0,72))}</div>
     </button>`:''}
 
+    ${isAdminDevice()?`<details class="src-fold" data-fold="mualerts" style="margin-top:16px" ontoggle="if(this.open)loadMuList()">
+      <summary>${icon('bell')} Chapter alerts \u2014 what each series matched</summary>
+      <p class="ai-desc">Alerts come from MangaUpdates, matched to your series by title. A title they spell differently can match the wrong entry or nothing at all \u2014 this is where to correct it.</p>
+      <div id="muList"><p class="ai-desc">Open to load\u2026</p></div>
+    </details>`:''}
+
     <details class="src-fold" data-fold="readmore" style="margin-top:16px">
       <summary>${icon('settings')} Write the address out yourself</summary>
       <p class="ai-desc">Only if the paste box above didn't suit.</p>
@@ -10097,6 +10103,40 @@ function readQuickUse(){
   const out=document.getElementById('rsrcQuickOut'); if(!out||!out.dataset.tpl)return;
   setReadSource(out.dataset.tpl);
   const i=document.getElementById('rsrcQuickIn'); if(i)i.value='';
+}
+// ─── CHAPTER ALERTS: fix a wrong match ──────────────────────────────────────
+// The alert pipeline finds each series on MangaUpdates by name. Names differ
+// between databases, so some series match the wrong entry and some match none —
+// and either way the symptom is silence. This makes the match visible and
+// correctable instead of leaving you to wonder why nothing arrives.
+async function loadMuList(){
+  const box=document.getElementById('muList'); if(!box)return;
+  box.innerHTML='<p class="ai-desc">Checking\u2026</p>';
+  let r;try{r=await adminCall('/mu-list');}catch{box.innerHTML='<p class="ai-desc">Couldn\u2019t reach the network.</p>';return;}
+  if(!r||!r.ok){box.innerHTML='<p class="ai-desc">'+escH((r&&r.error)||'Error')+'</p>';return;}
+  const list=r.series||[];
+  if(!list.length){box.innerHTML='<p class="ai-desc">No manga is being tracked yet \u2014 add some with Reading or Plan status and turn notifications on.</p>';return;}
+  box.innerHTML=list.map(x=>{
+    const state=x.matched?`matched \u00b7 MU ${x.muId}`:(x.unresolved?'no match found':'not looked up yet');
+    return `<div class="src-opt" style="display:block">
+      <div class="src-name">${escH(x.title||('AniList '+x.aniId))}</div>
+      <div class="src-sub">${escH(state)}</div>
+      <div style="display:flex;gap:8px;margin-top:9px">
+        <input class="ai-prompt-in" id="mu_${x.aniId}" placeholder="MangaUpdates id, or the name they use" autocomplete="off" spellcheck="false">
+        <button class="src-chip on" onclick="muPin(${x.aniId})">Pin</button>
+        ${x.matched||x.unresolved?`<button class="src-chip" onclick="muPin(${x.aniId},1)">Clear</button>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+async function muPin(aniId,clear){
+  const el=document.getElementById('mu_'+aniId);
+  const value=clear?'':String((el&&el.value)||'').trim();
+  if(!clear&&!value){toast('Paste an id, or the name they use');return;}
+  let r;try{r=await adminCall('/mu-pin',{aniId,value,clear:clear?1:0});}catch{toast('Couldn\u2019t reach the network');return;}
+  if(!r||!r.ok){toast((r&&r.error)||'Didn\u2019t work');return;}
+  toast(r.note||'Saved');
+  loadMuList();
 }
 function insertReadToken(t){
   const el=document.getElementById('rsrcCustom'); if(!el)return;

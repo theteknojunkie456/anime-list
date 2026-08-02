@@ -10109,7 +10109,32 @@ function readQuickSetup(){
   const raw=(inp.value||'').trim();
   if(raw.length<12){out.style.display='none';return;}
   const url=normSrc(raw);
-  const tpl=templatizeSearchURL(url).replace(/\{ep\}/g,'{ch}');
+  let tpl=templatizeSearchURL(url).replace(/\{ep\}/g,'{ch}');
+  // Readers are mostly SERIES pages — /comics/<name>, /manga/<name>, /series/<name>
+  // — with no chapter in the address at all, so the episode-shaped templatiser
+  // finds nothing to hold on to. The last path segment IS the series name here,
+  // so take it. Many readers append a fixed token to every slug (AsuraScans ends
+  // them all with the same short hex); that stays in the template, or every other
+  // series would resolve to a 404.
+  if(!/\{(query|slug|ch)\}/.test(tpl)){
+    try{
+      const u=new URL(url), segs=u.pathname.split('/').filter(Boolean);
+      const nameSeg=i=>{const m=/^(.*?)-([0-9a-f]{4,10})$/i.exec(segs[i]);segs[i]=m?('{slug}-'+m[2]):'{slug}';};
+      if(segs.length){
+        // A chapter in the address must become {ch}, not {slug} — otherwise every
+        // series resolves to the one chapter number that happened to be pasted.
+        const CH=/^(chapter|chap|ch|c|episode|ep|e)[-_]?(\d+(?:[.-]\d+)?)$/i;
+        const last=segs.length-1;
+        if(CH.test(segs[last])){
+          segs[last]=segs[last].replace(/\d+(?:[.-]\d+)?$/,'{ch}');
+          if(last-1>=0)nameSeg(last-1);
+        } else if(/^\d+(?:\.\d+)?$/.test(segs[last])&&last-1>=0){
+          segs[last]='{ch}'; nameSeg(last-1);      // .../series-name/235
+        } else nameSeg(last);
+        tpl=u.origin+'/'+segs.join('/')+(u.pathname.endsWith('/')?'/':'')+u.search;
+      }
+    }catch(e){}
+  }
   out.style.display='block';
   if(!/\{(query|slug|ch)\}/.test(tpl)){
     out.innerHTML=`<div class="src-quick-bad">${icon('search')} I can't tell which series that address points at.<br>Copy a <b>single chapter's</b> page — its address usually has the series name in it.</div>`;

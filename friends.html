@@ -11043,7 +11043,7 @@ function airingNeedy(a){
 }
 // !a.adultChk forces a one-time isAdult verification of EVERY title — even ones
 // already fully enriched — so adult content imported before this gate gets swept.
-function coverNeedy(){return anime.filter(a=>!a.adultChk||(!a.img&&!a.imgTried)||(!a.eps&&!a.detTried)||(!a.banner&&!a.bannerTried)||(!a.aniScore&&!a.scoreTried)||airingNeedy(a));}
+function coverNeedy(){return anime.filter(a=>!a.adultChk||(!a.img&&!a.imgTried)||(!a.eps&&!a.detTried)||(!a.banner&&!a.bannerTried)||(!a.aniScore&&!a.scoreTried)||(!a.aniId&&!a.idTried)||airingNeedy(a));}
 async function fetchCovers(){
   if(coverRunning)return;coverRunning=true;
   let netFails=0,adultRemoved=0,batchSize=25;
@@ -11065,7 +11065,7 @@ async function fetchCovers(){
         // being fetched for the detail sheet and thrown away; storing it is what
         // lets anything in the app rank by "is this actually good".
         const fields=read
-          ?'title{romaji english native} coverImage{large extraLarge color} bannerImage chapters volumes genres isAdult averageScore'
+          ?'id title{romaji english native} coverImage{large extraLarge color} bannerImage chapters volumes genres isAdult averageScore'
           :'id title{romaji english native} coverImage{large extraLarge color} bannerImage episodes duration genres isAdult averageScore nextAiringEpisode{airingAt episode}';
         // Known season? Refresh that EXACT media by id — a title search would drift to
         // whatever AniList ranks first (often a different, currently-airing season),
@@ -11135,8 +11135,11 @@ async function fetchCovers(){
             }
             if(!a.genre&&m.genres&&m.genres.length)a.genre=m.genres.slice(0,3).join(', ');
           }
+          // The id belongs on BOTH kinds. It was only ever stored for anime, which
+          // is why nothing on a reading list could be tracked: chapter alerts and
+          // the chapter list are both keyed by it, and manga simply never had one.
+          if(m.id)a.aniId=m.id;
           if(!read){ // record (or clear) the upcoming-episode air time
-            if(m.id)a.aniId=m.id; // AniList media id — the notify worker matches airing shows by this
             const na=m.nextAiringEpisode;
             if(na&&na.airingAt){a.airAt=na.airingAt;a.airEp=na.episode;}
             else{a.airAt=0;a.airEp=0;}
@@ -11148,6 +11151,7 @@ async function fetchCovers(){
         a.bannerTried=true; // stamp even when bannerImage was null (some titles have none) so we don't refetch forever
         a.detTried=true;
         a.scoreTried=1; // some titles genuinely have no score — stamp so they aren't refetched forever
+        a.idTried=1;    // same for the id: a title AniList doesn't carry shouldn't be asked about forever
         a.adultChk=1;   // verified against AniList's isAdult flag (adult ones already removed above)
       });
       if(adultIds.length){const gone=new Set(adultIds);anime=anime.filter(a=>!gone.has(a.id));adultRemoved+=adultIds.length;

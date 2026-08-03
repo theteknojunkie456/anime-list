@@ -5134,9 +5134,13 @@ async function loadChapters(aniId,forId,title){
       cells.push(`<button class="dt-ch${cls}" onclick="readManga('${forId}',${i})">${i}</button>`);
     }
     const hidden=n-cells.length;
+    const deep=readHasChapter(it);
     el.innerHTML=`<div class="dt-label" style="margin-top:16px">${icon('book')} Chapters<span class="dt-eps-tag">${n} out</span></div>
       <div class="dt-chs">${cells.join('')}</div>`
-      +(hidden>0?`<button class="dt-pin-toggle" onclick="_chAll['${forId}']=1;loadChapters(${aniId},'${forId}')">${icon('layers')} Show all ${n} chapters</button>`:'');
+      +(hidden>0?`<button class="dt-pin-toggle" onclick="_chAll['${forId}']=1;loadChapters(${aniId},'${forId}')">${icon('layers')} Show all ${n} chapters</button>`:'')
+      // Without a chapter token every one of these opens the same series page,
+      // which looks broken. Say why, and say exactly what fixes it.
+      +(deep?'':`<p class="ai-desc" style="margin-top:8px;font-size:11.5px">These open the series page — your reading source points at a series, not a chapter. To jump straight to a chapter, open <b>Sources → Reading</b> and paste the address of <b>a chapter</b> instead.</p>`);
   };
   const ck=aniId||('t:'+String(title||'').toLowerCase());
   if(_chCache[ck]!==undefined){paint(_chCache[ck]);return;}
@@ -8497,6 +8501,13 @@ function readSource(){try{return localStorage.getItem('read_src')||'';}catch{ret
 function usingDefaultReadSource(){return !readSource();}
 // A per-title pin (a.srcUrl) overrides the global reading source for that title.
 function effectiveReadSource(a){return (a&&a.srcUrl&&String(a.srcUrl).trim())||readSource();}
+// Can this source point at a specific chapter, or only at the series? A reader's
+// series page — /comics/<name> — is what the paste flow gets from a series
+// address, and there is nowhere in it to put a number.
+function readHasChapter(a){
+  const src=effectiveReadSource(a);
+  return !!src && /\{(ch|ch2|ch3|chapter|ep|ep2|ep3|episode)\}/i.test(src);
+}
 function readURL(a,chArg){
   const src=effectiveReadSource(a);
   const ch=(chArg>0?chArg:(a.ep||0)+1);
@@ -10203,8 +10214,10 @@ function readQuickSetup(){
   }
   let site='your site';try{site=new URL(url).hostname.replace(/^www\./,'');}catch(e){}
   out.dataset.tpl=tpl;
+  const deep=/\{(ch|ch2|ch3|chapter)\}/i.test(tpl);
   out.innerHTML=`<div class="src-quick-good">${icon('check')} Got it — <b>${escH(site)}</b>.<br>
     <span style="font-family:ui-monospace,Menlo,monospace;font-size:11.5px;word-break:break-all;opacity:.8">${escH(tpl)}</span></div>
+    ${deep?'':`<p class="ai-desc" style="margin:8px 0 0;font-size:11.5px">That address points at the <b>series</b>, so Read will open its chapter list. Paste <b>a chapter's</b> address instead and every chapter becomes one tap.</p>`}
     <button class="parse-btn" style="margin-top:9px" onclick="readQuickUse()">Use this for everything I read</button>`;
 }
 function readQuickUse(){

@@ -11043,6 +11043,105 @@ function airingNeedy(a){
 }
 // !a.adultChk forces a one-time isAdult verification of EVERY title — even ones
 // already fully enriched — so adult content imported before this gate gets swept.
+// Second pass for titles AniList didn't recognise: cheap spelling variants
+// first, and only what's still missing goes to the AI — the key is the user's
+// and the punctuation cases don't need it. One request for the whole batch.
+async function fixUnmatchedTitles(){
+  const stuck=anime.filter(a=>a&&a.nameFix&&!a.aniId&&!a.idTried);
+  if(!stuck.length)return;
+  const search=async (t,type)=>{
+    const q=`{a:Page(perPage:1){media(search:${JSON.stringify(t)},type:${type}){id title{romaji english native}}}}`;
+    try{
+      const r=await fetch('https://graphql.anilist.co',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query:q})});
+      const d=await r.json();
+      const m=(d&&d.data&&d.data.a&&d.data.a.media||[])[0];
+      return m||null;
+    }catch(e){return null;}
+  };
+  const accept=(a,m,typed)=>{
+    const names=[m.title&&m.title.english,m.title&&m.title.romaji,m.title&&m.title.native].filter(Boolean);
+    if(!names.some(n=>titleLooksRight(n,typed)))return false;
+    a.aniId=m.id; delete a.nameFix;
+    return true;
+  };
+  // 1) spelling variants — free, and covers the apostrophe cases
+  for(const a of stuck){
+    const type=kindOf(a)==='read'?'MANGA':'ANIME';
+    for(const v of titleVariants(a.title).slice(1)){    // [0] is what already failed
+      const m=await search(v,type);
+      await pause(700);
+      if(m&&accept(a,m,a.title))break;
+    }
+  }
+  const left=stuck.filter(a=>!a.aniId);
+  if(!left.length){try{save();renderHome();}catch(e){}return;}
+
+  // 2) the AI, only for what's genuinely spelled differently — a romanisation,
+  //    an official English title, a series known by another name entirely.
+  const key=getKey();
+  if(!key){left.forEach(a=>{a.idTried=1;});try{save();}catch(e){}return;}
+  const list=left.slice(0,20).map((a,i)=>`${i+1}. ${a.title} (${kindOf(a)==='read'?'manga/manhwa/novel':'anime'})`).join('\n');
+  const prompt=`These titles were not found on AniList, probably because of spelling, romanisation, or the user typing a fan translation.\nFor each, give the title AniList itself uses (its English or romaji entry). If you don't know the series, give an empty string — a wrong guess is worse than none.\n\n${list}\n\nReply with ONLY a JSON array of strings, one per numbered item, in order.`;
+  let names=[];
+  try{
+    const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-5',max_tokens:900,messages:[{role:'user',content:prompt}]})});
+    const d=await r.json();
+    const txt=((d.content||[])[0]||{}).text||'';
+    const mm=txt.match(/\[[\s\S]*\]/);
+    if(mm)names=JSON.parse(mm[0]);
+  }catch(e){}
+  for(let i=0;i<left.length;i++){
+    const a=left[i], guess=String(names[i]||'').trim();
+    if(!guess){a.idTried=1;continue;}
+    const m=await search(guess,kindOf(a)==='read'?'MANGA':'ANIME');
+    await pause(700);
+    // The AI's answer is a lead, not an authority: it still has to look like the
+    // series that was asked about, or the id is refused.
+    if(!(m&&(accept(a,m,a.title)||accept(a,m,guess))))a.idTried=1;
+  }
+  try{save();renderHome();}catch(e){}
+}
+// ─── WHEN ANILIST CAN'T FIND A TITLE ────────────────────────────────────────
+// AniList's search is fussy about punctuation. "The Extras Academy Survival
+// Guide" finds nothing; the entry is "The Extra's Academy Survival Guide" with a
+// curly apostrophe, and dropping the possessive s finds it. Korean and Chinese
+// titles hit this constantly, and a title that never matches gets no AniList id,
+// which silently costs it chapter alerts, the chapter list and airing dates.
+//
+// Truncating words is NOT safe: "Academy Survival Guide" confidently returns an
+// unrelated series. So every candidate is checked against what was typed before
+// it's accepted — a wrong match is worse than none, because it's invisible.
+function titleVariants(t){
+  const base=String(t||'').trim(); if(!base)return [];
+  const out=[base];
+  const straight=base.replace(/[\u2018\u2019\u02bc]/g,"'");
+  const curly=base.replace(/'/g,'\u2019');
+  const none=base.replace(/[\u2018\u2019\u02bc']/g,'');
+  out.push(straight,curly,none);
+  // "Extras" is usually "Extra's" typed without the apostrophe.
+  out.push(none.replace(/\b(\w{3,})s\b/g,'$1'));
+  out.push(base.replace(/\b(\w{3,})s\b/g,"$1's"));
+  return [...new Set(out.map(x=>x.trim()).filter(x=>x&&x.length>2))];
+}
+const _flatT=t=>String(t||'').toLowerCase().replace(/[^a-z0-9]/g,'');
+// Same guard the MangaUpdates matcher uses: it has to actually resemble the ask.
+function titleLooksRight(candidate,typed){
+  const c=_flatT(candidate), f=_flatT(typed);
+  if(!c||f.length<4)return false;
+  if(c===f)return true;
+  if(c.length>=6&&f.length>=6&&(c.includes(f)||f.includes(c)))return true;
+  // "extraacademysurvivalguide" vs "extrasacademysurvivalguide" — one edit apart.
+  if(Math.abs(c.length-f.length)<=2){
+    let i=0,j=0,diff=0;
+    while(i<c.length&&j<f.length){
+      if(c[i]===f[j]){i++;j++;continue;}
+      if(++diff>2)return false;
+      if(c.length>f.length)i++; else if(f.length>c.length)j++; else {i++;j++;}
+    }
+    return diff+Math.abs((c.length-i)-(f.length-j))<=2;
+  }
+  return false;
+}
 function coverNeedy(){return anime.filter(a=>!a.adultChk||(!a.img&&!a.imgTried)||(!a.eps&&!a.detTried)||(!a.banner&&!a.bannerTried)||(!a.aniScore&&!a.scoreTried)||(!a.aniId&&!a.idTried)||airingNeedy(a));}
 async function fetchCovers(){
   if(coverRunning)return;coverRunning=true;
@@ -11145,7 +11244,7 @@ async function fetchCovers(){
             else{a.airAt=0;a.airEp=0;}
           }
         }
-        if(!m){a.scoreTried=1;a.detTried=true;a.bannerTried=true;if(!a.img)a.imgTried=true;}   // AniList has no such title — stop asking
+        if(!m){a.nameFix=1;a.detTried=true;a.bannerTried=true;if(!a.img)a.imgTried=true;}   // no match on the title as typed — try harder below
         if(!read)a.airChk=Date.now(); // stamp even on a miss so we don't re-poll every launch
         if(!a.img)a.imgTried=true;
         a.bannerTried=true; // stamp even when bannerImage was null (some titles have none) so we don't refetch forever
@@ -11160,7 +11259,7 @@ async function fetchCovers(){
       await pause(1000); // stay comfortably under AniList's per-minute limit
     }
     if(adultRemoved)toast(`Blocked ${adultRemoved} adult title${adultRemoved!==1?'s':''} — not allowed`);
-  }finally{coverRunning=false;try{checkResumedDone();}catch(e){}try{scanUpcomingRelated();}catch(e){}}
+  }finally{coverRunning=false;try{await fixUnmatchedTitles();}catch(e){}try{checkResumedDone();}catch(e){}try{scanUpcomingRelated();}catch(e){}}
 }
 // ─── AUTOFILL ───────────────────────────────────────────────────────────────
 // Searching used to take the first hit from the first API that answered. Jikan

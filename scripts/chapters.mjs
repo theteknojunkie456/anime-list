@@ -35,6 +35,7 @@ function looksRight(candidate, names) {
 
 async function muSearch(names) {
   for (const name of names) {
+    let matches = [];
     try {
       const r = await fetch(MU + '/series/search', {
         method: 'POST',
@@ -45,9 +46,21 @@ async function muSearch(names) {
       const d = await r.json();
       for (const res of d.results || []) {
         const rec = res.record;
-        if (rec && rec.series_id && looksRight(rec.title, names)) return { id: rec.series_id, title: rec.title };
+        if (rec && rec.series_id && looksRight(rec.title, names)) {
+          matches.push({ id: rec.series_id, title: rec.title, type: rec.type || '' });
+        }
       }
     } catch (e) { console.log(`  search "${name}" failed: ${e.message}`); }
+
+    if (matches.length) {
+      // A web novel and its comic adaptation are separate entries with almost the
+      // same name, and the novel usually carries no chapter count — so matching
+      // it means silence. Prefer the comic; fall back to the novel only if that
+      // is genuinely all there is.
+      const isNovel = (m) => /novel/i.test(m.type) || /\(\s*novel\s*\)/i.test(m.title);
+      const comic = matches.find((m) => !isNovel(m));
+      return comic || matches[0];
+    }
     await sleep(1200);
   }
   return null;

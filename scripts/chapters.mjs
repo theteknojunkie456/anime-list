@@ -122,7 +122,12 @@ for (const [aniId, names] of work) {
   await sleep(1200);
   if (!latest) { out.series[aniId] = { ...known, names, muId }; continue; }
   if (known.chapter !== latest.chapter) changed++;
-  out.series[aniId] = { names, muId, chapter: latest.chapter, title: latest.title, type: latest.type };
+  // Keep every name this series is known by — AniList's, MangaUpdates' own, and
+  // whatever the user typed. The app looks a series up by title when it has no
+  // AniList id yet, so an alias is the difference between a chapter list and a
+  // blank space.
+  const allNames = [...new Set([...(known.names || []), ...names, latest.title].filter(Boolean))];
+  out.series[aniId] = { names: allNames, muId, chapter: latest.chapter, title: latest.title, type: latest.type };
 }
 
 await fs.mkdir('data', { recursive: true });

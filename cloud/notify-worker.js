@@ -775,9 +775,27 @@ async function handleStatus(body, env) {
 // answer is shared by everyone.
 async function handleChapters(body, env) {
   const aniId = Math.max(0, parseInt(body.aniId, 10) || 0);
-  if (!aniId) return json({ ok: false, error: "aniId required" }, 400);
+  const title = String(body.title || "").slice(0, 160);
+  if (!aniId && !title) return json({ ok: false, error: "aniId or title required" }, 400);
   const feed = await chapterFeed();
-  const rec = feed[String(aniId)];
+  let rec = aniId ? feed[String(aniId)] : null;
+  // Fall back to the name. An AniList id only lands after a cover pass resolves
+  // it, and a series the app hasn't resolved yet would otherwise show nothing
+  // even though the count is sitting right here. The feed keeps every name each
+  // series is known by, so the title alone is enough to find it.
+  if (!rec && title) {
+    const flat = (t) => String(t || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+    const want = flat(title);
+    if (want.length >= 4) {
+      for (const v of Object.values(feed)) {
+        const names = [...(v.names || []), v.title].filter(Boolean);
+        if (names.some((n) => {
+          const f = flat(n);
+          return f && (f === want || (f.length >= 6 && want.length >= 6 && (f.includes(want) || want.includes(f))));
+        })) { rec = v; break; }
+      }
+    }
+  }
   return json({ ok: true, latest: (rec && rec.chapter) || 0, title: (rec && rec.title) || "", type: (rec && rec.type) || "" });
 }
 

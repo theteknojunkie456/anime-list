@@ -5080,7 +5080,7 @@ function renderDetail(){
     <div class="dt-label">Status</div>
     <div class="dt-status">${statusBtns}</div>
     <div id="dtRich" class="dt-rich"></div>
-    ${read&&a.aniId?`<div id="dtChapters"></div>`:''}
+    ${read?`<div id="dtChapters"></div>`:''}
     ${stars}
     ${seasonsHTML}
     ${chips?`<div class="dt-label">Genres</div><div class="chips">${chips}</div>`:''}
@@ -5110,7 +5110,7 @@ function renderDetail(){
     else loadFranchise(a.id,a.aniId);
   }
   if(kindOf(a)==='watch'&&a.aniId)loadRichDetail(a.aniId,a.id);
-  if(read&&a.aniId)loadChapters(a.aniId,a.id,a.title);
+  if(read)loadChapters(a.aniId||0,a.id,a.title);
 }
 // ─── CHAPTER LIST ───────────────────────────────────────────────────────────
 // The watch side gets an episode strip; reading had nothing, because AniList's
@@ -5138,13 +5138,14 @@ async function loadChapters(aniId,forId,title){
       <div class="dt-chs">${cells.join('')}</div>`
       +(hidden>0?`<button class="dt-pin-toggle" onclick="_chAll['${forId}']=1;loadChapters(${aniId},'${forId}')">${icon('layers')} Show all ${n} chapters</button>`:'');
   };
-  if(_chCache[aniId]!==undefined){paint(_chCache[aniId]);return;}
+  const ck=aniId||('t:'+String(title||'').toLowerCase());
+  if(_chCache[ck]!==undefined){paint(_chCache[ck]);return;}
   try{
     const r=await fetch(NOTIFY_URL+'/chapters',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({aniId,title:title||''})});
     const j=r.ok?await r.json():null;
-    _chCache[aniId]=(j&&j.latest)||0;
-  }catch(e){_chCache[aniId]=0;}
-  paint(_chCache[aniId]);
+    _chCache[ck]=(j&&j.latest)||0;
+  }catch(e){_chCache[ck]=0;}
+  paint(_chCache[ck]);
 }
 let _chAll={};
 // ─── RICH DETAIL — synopsis, meta, trailer, characters, "more like this" ─────

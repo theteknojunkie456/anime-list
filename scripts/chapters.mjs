@@ -128,17 +128,43 @@ async function muReleases(names) {
     .map(([ch, date]) => ({ ch, date }))
     .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.ch - b.ch));
 
-  // How often does this series actually land? Median gap, not mean — one
-  // hiatus shouldn't drag the estimate out for a series that's weekly again.
-  const gaps = [];
-  for (let i = 1; i < list.length; i++) {
-    const g = Math.round((Date.parse(list[i].date) - Date.parse(list[i - 1].date)) / 864e5);
-    if (g > 0 && g <= 60) gaps.push(g);          // >60d is a hiatus, not a cadence
-  }
-  gaps.sort((a, b) => a - b);
-  const cadence = gaps.length >= 3 ? gaps[Math.floor(gaps.length / 2)] : null;
+  // Rate, not gap. A median gap is measured between the rows we happened to
+  // catch, so one missed release reads a weekly series as biweekly — which is
+  // exactly what it did to The Stellar Swordmaster (15 of 16 releases on a
+  // Wednesday, called 14-day). Chapters per day is immune to holes: six
+  // chapters across six weeks is weekly whether or not all six were seen.
+  // Measured over the recent window, so an old hiatus doesn't drag it either.
+  const dayOf = (r) => new Date(r.date + 'T12:00:00').getDay();
 
-  return { list: list.slice(-16), cadence };
+  // Two groups translating the same series keep two different chapter numbers on
+  // two different days, and merging them is nonsense: The Extra's Academy
+  // Survival Guide has a Monday source around ch 94-98 and a Thursday source
+  // around ch 106-116, which together read as a 3-day cadence. Neither is a
+  // majority, so "most rows wins" doesn't separate them either — but whichever
+  // posted LAST is the one still running, and that's the one a reader is on.
+  const liveDay = dayOf(list[list.length - 1]);
+  const stream = list.filter((r) => dayOf(r) === liveDay);
+  const weekday = stream.length >= 3 ? liveDay : null;
+
+  // Median of per-pair rates, not first-to-last: a hole in the harvest spans
+  // several chapters at once, and averaging across it drags a weekly series
+  // toward biweekly. Each pair carries its own chapters-per-day, and the median
+  // ignores the pairs that straddle a gap.
+  const recent = (weekday == null ? list : stream).slice(-9);
+  let cadence = null;
+  const rates = [];
+  for (let i = 1; i < recent.length; i++) {
+    const days = (Date.parse(recent[i].date) - Date.parse(recent[i - 1].date)) / 864e5;
+    const chs = recent[i].ch - recent[i - 1].ch;
+    if (days > 0 && chs > 0) rates.push(days / chs);
+  }
+  if (rates.length >= 2) {
+    rates.sort((a, b) => a - b);
+    const med = rates[Math.floor(rates.length / 2)];
+    if (med >= 0.5 && med <= 60) cadence = Math.round(med);
+  }
+
+  return { list: list.slice(-16), cadence, weekday };
 }
 
 async function trackedSeries() {
@@ -266,13 +292,16 @@ for (const [aniId, names] of work) {
   // Kept even when a run comes back empty — a search hiccup shouldn't wipe the
   // history the calendar draws from.
   const rel = await muReleases(allNames);
+  const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   if (rel && rel.list.length) {
     out.series[aniId].releases = rel.list;
     if (rel.cadence) out.series[aniId].cadence = rel.cadence;
-    console.log(`    ${rel.list.length} dated releases${rel.cadence ? `, ~every ${rel.cadence}d` : ''}`);
+    if (rel.weekday != null) out.series[aniId].weekday = rel.weekday;
+    console.log(`    ${rel.list.length} dated releases${rel.cadence ? `, ~every ${rel.cadence}d` : ''}${rel.weekday != null ? ` on ${DAYS[rel.weekday]}` : ''}`);
   } else if (known.releases) {
     out.series[aniId].releases = known.releases;
     if (known.cadence) out.series[aniId].cadence = known.cadence;
+    if (known.weekday != null) out.series[aniId].weekday = known.weekday;
   }
 
   // What does the READER call it? Nothing can derive that — AsuraScans calls

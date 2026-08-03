@@ -1548,6 +1548,8 @@ body.recsel .pcard{position:relative;}
 /* A chapter date is projected from the series' own rhythm, not announced by
    anyone — so it reads a step quieter than a confirmed airing. */
 .sched-row.is-read .sched-row-sub{color:var(--t3);}
+.sched-cd{color:var(--t2);font-weight:800;}
+.sched-day.is-today .sched-cd{color:var(--a);}
 .sched-row.is-read .sched-thumb,.sched-row.is-read .sched-thumb-ph{border-style:dashed;opacity:.92;}
 .sched-empty-day{padding:11px 14px;font-size:12px;color:var(--t3);font-weight:600;border-top:1px solid var(--bn2);}
 .sched-loading,.sched-empty-all{text-align:center;padding:52px 26px;color:var(--t2);animation:fadeUp .35s ease both;}
@@ -5562,6 +5564,7 @@ function openSheet(id){
 }
 function closeAll(){
   try{sheetFocusGuard(null,false);}catch(e){}
+  try{if(schedTickT){clearInterval(schedTickT);schedTickT=null;}}catch(e){}
   document.querySelectorAll('.sheet').forEach(s=>s.classList.remove('on'));
   document.getElementById('overlay').classList.remove('on');
   try{updatePartyPill();}catch{}
@@ -11558,6 +11561,41 @@ function schedGo(dir){if(dir==='today')schedOffset=0;else schedOffset+=dir;rende
 // are projected from the last one that actually landed. Labelled "expected",
 // because that is exactly what it is — a scanlation slipping a week is normal
 // and shouldn't read as a broken promise.
+// "in 2d 4h" — how long until it lands. Anime carries a real broadcast time
+// from AniList so the countdown is exact to the minute; a chapter only ever has
+// a date (no platform publishes a time for one), so it counts whole days and
+// says so rather than implying a precision that doesn't exist.
+function schedCountdown(sec,dayOnly){
+  const d=sec*1000-Date.now();
+  if(d<=0)return 'out now';
+  if(dayOnly){
+    // Calendar days, not 24-hour blocks — something landing tomorrow morning is
+    // "tomorrow" even when it's less than a day away.
+    const a=new Date();a.setHours(0,0,0,0);
+    const b=new Date(sec*1000);b.setHours(0,0,0,0);
+    const dd=Math.round((b-a)/864e5);
+    return dd<=0?'today':dd===1?'tomorrow':'in '+dd+' days';
+  }
+  const mins=Math.round(d/60000),hrs=Math.floor(mins/60),days=Math.floor(hrs/24);
+  if(days>0)return 'in '+days+'d '+(hrs%24)+'h';
+  if(hrs>0)return 'in '+hrs+'h '+(mins%60)+'m';
+  return mins<=0?'any minute':'in '+mins+'m';
+}
+let schedTickT=null;
+function schedTick(){
+  const els=document.querySelectorAll('#schedDays .sched-cd');
+  if(!els.length){clearInterval(schedTickT);schedTickT=null;return;}
+  els.forEach(el=>{
+    const at=Number(el.getAttribute('data-at'))||0;
+    if(at)el.textContent=schedCountdown(at,el.getAttribute('data-day')==='1');
+  });
+}
+function schedTickStart(){
+  clearInterval(schedTickT);
+  // A minute is enough for a countdown measured in hours, and keeps a sheet
+  // sitting open off the main thread.
+  schedTickT=setInterval(schedTick,60000);
+}
 function schedReadEntries(startSec,endSec){
   const out=[];
   anime.filter(a=>kindOf(a)==='read'&&(a.status==='watching'||a.status==='plan')).forEach(a=>{
@@ -11569,12 +11607,20 @@ function schedReadEntries(startSec,endSec){
     // A series that stopped months ago has a cadence on paper only. Projecting
     // one would fill the calendar with chapters that are never coming.
     if((Date.now()-lastAt)/864e5>Math.max(60,cad*4))return;
-    let t=lastAt;
-    for(let i=0;i<12;i++){
+    const wd=(rec.weekday==null?null:Number(rec.weekday));
+    let t=lastAt;const seen={};
+    for(let i=0;i<14;i++){
       t+=cad*864e5;
-      const sec=Math.floor(t/1000);
-      if(sec>=endSec)break;
-      if(sec<startSec)continue;
+      const dt=new Date(t);
+      // A series that posts on the same day every week is stating its schedule
+      // outright — land on that day instead of drifting off whichever release
+      // happened to be harvested last.
+      if(wd!=null){const sh=(wd-dt.getDay()+7)%7;dt.setDate(dt.getDate()+(sh>3?sh-7:sh));}
+      const sec=Math.floor(dt.getTime()/1000);
+      if(sec<startSec||sec>=endSec)continue;
+      // Snapping can pull two cycles onto the same day; one entry per day.
+      const dk=dt.getFullYear()+'-'+dt.getMonth()+'-'+dt.getDate();
+      if(seen[dk])continue;seen[dk]=1;
       out.push({id:a.id,title:a.title,img:a.img,airingAt:sec,aniId:a.aniId,read:true,cadence:cad});
     }
   });
@@ -11705,13 +11751,15 @@ function renderSchedDays(ws,eps){
         const nset=e.read?notifSetR:notifSet;
         const bell=nset&&e.aniId&&nset.has(e.aniId)?'<span class="sched-bell" title="Notifications on">'+icon('bell')+'</span>':'';
         var _isRel=e.id&&(''+e.id).indexOf('rel:')===0;var _click=_isRel?("addRelatedSched('"+e.aniId+"')"):("openDetail('"+e.id+"')");var _newt=_isRel?'<span class="sched-new">NEW</span>':'';
-        var _sub=e.read?('New chapter \u00b7 expected'+(e.cadence?' \u00b7 ~every '+e.cadence+'d':'')):('Ep '+(e.episode||'?')+' \u00b7 '+t);
+        var _cd='<span class="sched-cd" data-at="'+e.airingAt+'"'+(e.read?' data-day="1"':'')+'>'+schedCountdown(e.airingAt,!!e.read)+'</span>';
+        var _sub=(e.read?('New chapter \u00b7 expected'):('Ep '+(e.episode||'?')+' \u00b7 '+t))+' \u00b7 '+_cd;
         rows+='<div class="sched-row'+(e.read?' is-read':'')+'" onclick="'+_click+'">'+thumb+'<div class="sched-row-main"><div class="sched-row-title">'+schEsc(e.title)+_newt+bell+'</div><div class="sched-row-sub">'+_sub+'</div></div></div>';
       });
     }else rows='<div class="sched-empty-day">—</div>';
     html+='<div class="'+cls+'"><div class="sched-day-head"><span class="sched-day-name">'+day.toLocaleDateString([],{weekday:'long'})+'</span><span class="sched-day-date">'+schedFmt(day)+'</span>'+pill+'</div><div class="sched-day-body">'+rows+'</div></div>';
   }
   cont.innerHTML=html;
+  schedTickStart();
 }
 
 // ─── FOR YOU (tailored recommendations — AniList recommendation graph) ───────

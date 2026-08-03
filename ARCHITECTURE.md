@@ -153,6 +153,38 @@ art/metadata/airing. It's also the enforcement point for the adult gate (§7).
 Entry points that add items — `submitForm()` (typed add), `doImport()` (paste),
 `aniListEntries()`/`malEntries()` (account import) — all funnel through it.
 
+### Chapter data — why it comes through a GitHub Action
+
+AniList's `chapters` field is null for most ongoing manga, so chapter counts and
+release dates come from **MangaUpdates**. That API cannot be called from where
+you'd expect: it returns **403 to Cloudflare Worker egress and 403 to browsers**
+(an `Origin` header alone is enough). A GitHub runner is neither, so
+`.github/workflows/chapters.yml` runs `scripts/chapters.mjs` four times a day and
+commits `data/chapters.json`; Pages serves it, and both the app and the notify
+Worker read it from there. Nothing secret is published — only public series data.
+
+Per series the file carries:
+
+| field | what it is |
+|---|---|
+| `names` | every alias — AniList synonyms, MangaUpdates associated titles, whatever the user typed |
+| `chapter` | latest chapter (`latest_chapter`), verified against the readers themselves |
+| `releases` | up to 16 real dated releases, `{ch, date}` |
+| `cadence` | median gap in days between them |
+| `readSlug` | what each reader calls it, resolved by probing aliases |
+
+Two API quirks are load-bearing. `releases/search` **ignores `series_id`** and
+lets `orderby` override the query — the only parameter it honours is `search`,
+so releases are fetched by name and every row is checked against `names` before
+it's kept (fuzzy search alone once matched "Lore Olympus" to "Olimpos"). And
+readers like AsuraScans stamp a **rotating site-wide code** onto every series
+URL, so the code is scraped each run rather than hardcoded; the constant in
+`index.html` is only a fallback.
+
+`feedRec(a)` is the app's lookup into this file — by AniList id, falling back to
+alias matching for items that don't have one yet. `feedSlug()` (deep links) and
+`schedReadEntries()` (the calendar) both go through it.
+
 ---
 
 ## 7. Content safety — the adult gate (do not weaken)

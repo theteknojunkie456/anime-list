@@ -8497,7 +8497,28 @@ function pvWatchBlocked(f){
 // per-series hash), so we can deep-link straight to the title. If a slug ever
 // misses, the site shows its own 404-with-search — and the ⤴ button opens search.
 const READ_DEFAULT='https://asurascans.com';
-const ASURA_SUFFIX='1d35e5bd';   // constant across all series; update if the site changes it
+// The site stamps every series URL with the same code — and ROTATES it. This
+// constant was 1d35e5bd; the site moved to 00dcbf97 and every deep link built
+// from the old one started 404ing, which is what a hardcoded value guarantees
+// eventually. It's only the fallback now: the chapters feed carries whatever the
+// site is using today, scraped by the Action, and that wins.
+const ASURA_SUFFIX='1d35e5bd';
+let _readerCodes=null;
+async function readerCodes(){
+  if(_readerCodes)return _readerCodes;
+  try{
+    const r=await fetch('data/chapters.json?cb='+Math.floor(Date.now()/3600000));
+    const d=r.ok?await r.json():null;
+    _readerCodes=(d&&d.readers)||{};
+  }catch(e){_readerCodes={};}
+  return _readerCodes;
+}
+function asuraSuffix(){
+  try{const c=_readerCodes&&_readerCodes['asurascans.com'];if(c&&c.suffix)return c.suffix;}catch(e){}
+  return ASURA_SUFFIX;
+}
+// Warm it early so the first Read of a session already has today's code.
+setTimeout(()=>{try{readerCodes();}catch(e){}},1800);
 function readSource(){try{return localStorage.getItem('read_src')||'';}catch{return'';}}
 function usingDefaultReadSource(){return !readSource();}
 // A per-title pin (a.srcUrl) overrides the global reading source for that title.
@@ -8520,6 +8541,8 @@ function readURL(a,chArg){
   if(!src){
     const learned=(a&&a.srcSlug&&String(a.srcSlug).trim())||learnedSlugFor(a)||'';
     if(learned)return `${READ_DEFAULT}/comics/${learned}`;
+    const code=asuraSuffix();
+    if(code)return `${READ_DEFAULT}/comics/${streamSlug(slugTitle(a))}-${code}`;
     return `${READ_DEFAULT}/?s=${encodeURIComponent(slugTitle(a).replace(/-/g,' '))}`;
   }
   if(SRC_TOKEN_RE.test(src)) return fillSourceTokens(src,a,ch);   // {slug}/{query}/{titleRomaji}…; {ch}=the chapter

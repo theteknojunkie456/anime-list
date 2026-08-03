@@ -92,6 +92,34 @@ async function trackedSeries() {
   return d.series || [];
 }
 
+/**
+ * Readers that stamp every series URL with the same rotating code — AsuraScans
+ * puts /comics/<name>-<code> on all of them — silently break every deep link the
+ * day they rotate it. The app shipped 1d35e5bd hardcoded; the site is on
+ * 00dcbf97 now, which is exactly why some series 404 and others redirect.
+ *
+ * A runner can read the site, so the current code is scraped here and published
+ * with the chapter data. The app reads it instead of its own stale constant.
+ */
+async function readerSuffix(host) {
+  try {
+    const r = await fetch(`https://${host}/`, { headers: { 'User-Agent': UA } });
+    if (!r.ok) { console.log(`  ${host} -> HTTP ${r.status}`); return null; }
+    const html = await r.text();
+    const counts = new Map();
+    for (const m of html.matchAll(/\/comics\/[a-z0-9-]+?-([0-9a-f]{6,10})(?=["'\/?#])/gi)) {
+      counts.set(m[1], (counts.get(m[1]) || 0) + 1);
+    }
+    if (!counts.size) return null;
+    // The one nearly every link carries is the site-wide code; anything else is
+    // a leftover on an old entry.
+    const [code, n] = [...counts.entries()].sort((a, b) => b[1] - a[1])[0];
+    if (n < 5) { console.log(`  ${host}: no confident code (best ${code} x${n})`); return null; }
+    console.log(`  ${host}: code ${code} (on ${n} links)`);
+    return code;
+  } catch (e) { console.log(`  ${host} failed: ${e.message}`); return null; }
+}
+
 const prev = await fs.readFile(OUT, 'utf8').then(JSON.parse).catch(() => ({ series: {} }));
 const out = { updatedAt: new Date().toISOString(), series: { ...(prev.series || {}) } };
 
@@ -128,6 +156,14 @@ for (const [aniId, names] of work) {
   // blank space.
   const allNames = [...new Set([...(known.names || []), ...names, latest.title].filter(Boolean))];
   out.series[aniId] = { names: allNames, muId, chapter: latest.chapter, title: latest.title, type: latest.type };
+}
+
+// Per-reader codes, refreshed every run so a rotation is picked up within hours.
+out.readers = { ...(prev.readers || {}) };
+for (const host of ['asurascans.com']) {
+  const code = await readerSuffix(host);
+  if (code) out.readers[host] = { suffix: code, at: new Date().toISOString() };
+  await sleep(1000);
 }
 
 await fs.mkdir('data', { recursive: true });

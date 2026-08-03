@@ -80,6 +80,67 @@ async function muLatest(seriesId) {
   } catch { return null; }
 }
 
+/**
+ * Dated releases for one series — what makes a reading calendar possible.
+ *
+ * The releases endpoint ignores `series_id` (it answers the global feed no
+ * matter what you pass), and `orderby` silently overrides the query too. What
+ * it does honour is `search`. So ask by name and keep only the rows that are
+ * really this series: fuzzy search plus a strict alias check is what stops
+ * "Lore Olympus" picking up "Olimpos" the way the title matcher once did.
+ */
+function chapterNum(raw) {
+  // "1-2" means a double release; the chapter reached is the last number.
+  const nums = String(raw || '').match(/\d+(?:\.\d+)?/g);
+  return nums && nums.length ? Number(nums[nums.length - 1]) : null;
+}
+
+async function muReleases(names) {
+  const seen = new Map();                       // chapter -> earliest date seen
+  for (const name of names.slice(0, 4)) {
+    try {
+      const r = await fetch(MU + '/releases/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'User-Agent': UA },
+        body: JSON.stringify({ search: String(name).slice(0, 120), perpage: 50 }),
+      });
+      if (r.ok) {
+        const d = await r.json();
+        for (const row of d.results || []) {
+          const rec = (row && row.record) || row;
+          if (!rec || !rec.release_date) continue;
+          if (!looksRight(rec.title, names)) continue;
+          const ch = chapterNum(rec.chapter);
+          if (ch == null) continue;
+          const prev = seen.get(ch);
+          // Several groups can list the same chapter; the first one out is the
+          // date a reader actually got it.
+          if (!prev || rec.release_date < prev) seen.set(ch, rec.release_date);
+        }
+      }
+    } catch (e) { console.log(`  releases "${name}" failed: ${e.message}`); }
+    await sleep(1200);
+    if (seen.size >= 10) break;                 // enough to read a rhythm from
+  }
+  if (!seen.size) return null;
+
+  const list = [...seen.entries()]
+    .map(([ch, date]) => ({ ch, date }))
+    .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.ch - b.ch));
+
+  // How often does this series actually land? Median gap, not mean — one
+  // hiatus shouldn't drag the estimate out for a series that's weekly again.
+  const gaps = [];
+  for (let i = 1; i < list.length; i++) {
+    const g = Math.round((Date.parse(list[i].date) - Date.parse(list[i - 1].date)) / 864e5);
+    if (g > 0 && g <= 60) gaps.push(g);          // >60d is a hiatus, not a cadence
+  }
+  gaps.sort((a, b) => a - b);
+  const cadence = gaps.length >= 3 ? gaps[Math.floor(gaps.length / 2)] : null;
+
+  return { list: list.slice(-16), cadence };
+}
+
 async function trackedSeries() {
   if (!TOKEN) {
     console.log('No ADMIN_TOKEN set — refreshing only the series already in the file.');
@@ -200,6 +261,19 @@ for (const [aniId, names] of work) {
   // blank space.
   const allNames = [...new Set([...(known.names || []), ...names, latest.title, ...(latest.assoc || [])].filter(Boolean))];
   out.series[aniId] = { names: allNames, muId, chapter: latest.chapter, title: latest.title, type: latest.type };
+
+  // Dated releases, so reading can sit on the calendar next to airing anime.
+  // Kept even when a run comes back empty — a search hiccup shouldn't wipe the
+  // history the calendar draws from.
+  const rel = await muReleases(allNames);
+  if (rel && rel.list.length) {
+    out.series[aniId].releases = rel.list;
+    if (rel.cadence) out.series[aniId].cadence = rel.cadence;
+    console.log(`    ${rel.list.length} dated releases${rel.cadence ? `, ~every ${rel.cadence}d` : ''}`);
+  } else if (known.releases) {
+    out.series[aniId].releases = known.releases;
+    if (known.cadence) out.series[aniId].cadence = known.cadence;
+  }
 
   // What does the READER call it? Nothing can derive that — AsuraScans calls
   // "The Patron of Villains" raising-villains-the-right-way — but every alias is

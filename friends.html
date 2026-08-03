@@ -1545,6 +1545,10 @@ body.recsel .pcard{position:relative;}
 .sched-row-title{font-size:13px;font-weight:700;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
 .sched-bell{font-size:10px;margin-left:4px;}
 .sched-row-sub{font-size:11px;font-weight:700;color:var(--wat);margin-top:3px;}
+/* A chapter date is projected from the series' own rhythm, not announced by
+   anyone — so it reads a step quieter than a confirmed airing. */
+.sched-row.is-read .sched-row-sub{color:var(--t3);}
+.sched-row.is-read .sched-thumb,.sched-row.is-read .sched-thumb-ph{border-style:dashed;opacity:.92;}
 .sched-empty-day{padding:11px 14px;font-size:12px;color:var(--t3);font-weight:600;border-top:1px solid var(--bn2);}
 .sched-loading,.sched-empty-all{text-align:center;padding:52px 26px;color:var(--t2);animation:fadeUp .35s ease both;}
 .sched-loading .sched-spin{font-size:30px;display:inline-block;animation:spin .9s linear infinite;margin-bottom:14px;}
@@ -8524,19 +8528,23 @@ async function readerCodes(){
 // alias AniList and MangaUpdates publish. It beats anything derived from the
 // title: "The Patron of Villains" is raising-villains-the-right-way on Asura,
 // and no amount of slugifying gets you there.
-function feedSlug(a,host){
+function feedRec(a){
   try{
-    if(!_feedSeries||!host)return '';
+    if(!_feedSeries)return null;
     const flat=t=>String(t||'').toLowerCase().replace(/[^a-z0-9]/g,'');
     const byId=a&&a.aniId&&_feedSeries[String(a.aniId)];
-    const rec=byId||Object.values(_feedSeries).find(v=>{
+    return byId||Object.values(_feedSeries).find(v=>{
       const want=flat(a&&a.title);
       return want.length>3&&[...(v.names||[]),v.title].filter(Boolean).some(n=>{
         const f=flat(n);return f===want||(f.length>5&&want.length>5&&(f.includes(want)||want.includes(f)));
       });
-    });
-    return (rec&&rec.readSlug&&rec.readSlug[host])||'';
-  }catch(e){return '';}
+    })||null;
+  }catch(e){return null;}
+}
+function feedSlug(a,host){
+  if(!host)return '';
+  const rec=feedRec(a);
+  return (rec&&rec.readSlug&&rec.readSlug[host])||'';
 }
 function asuraSuffix(){
   try{const c=_readerCodes&&_readerCodes['asurascans.com'];if(c&&c.suffix)return c.suffix;}catch(e){}
@@ -11544,6 +11552,34 @@ function schedDayKey(d){return d.getFullYear()*10000+(d.getMonth()+1)*100+d.getD
 function schedFmt(d){return d.toLocaleDateString([],{month:'short',day:'numeric'});}
 function schedLabel(off){return off===0?'This Week':off===-1?'Last Week':off===1?'Next Week':(off<0?(-off)+' weeks ago':'In '+off+' weeks');}
 function schedGo(dir){if(dir==='today')schedOffset=0;else schedOffset+=dir;renderSchedule();}
+// Reading on the calendar. Nothing publishes "chapter 47, Thursday 6pm" the way
+// AniList does for episodes, so the date comes from rhythm instead: the Action
+// records real dated releases per series and their median gap, and the next ones
+// are projected from the last one that actually landed. Labelled "expected",
+// because that is exactly what it is — a scanlation slipping a week is normal
+// and shouldn't read as a broken promise.
+function schedReadEntries(startSec,endSec){
+  const out=[];
+  anime.filter(a=>kindOf(a)==='read'&&(a.status==='watching'||a.status==='plan')).forEach(a=>{
+    const rec=feedRec(a);if(!rec)return;
+    const rel=rec.releases||[],cad=Number(rec.cadence)||0;
+    if(!rel.length||!cad)return;
+    const lastAt=Date.parse(rel[rel.length-1].date+'T12:00:00');
+    if(!isFinite(lastAt))return;
+    // A series that stopped months ago has a cadence on paper only. Projecting
+    // one would fill the calendar with chapters that are never coming.
+    if((Date.now()-lastAt)/864e5>Math.max(60,cad*4))return;
+    let t=lastAt;
+    for(let i=0;i<12;i++){
+      t+=cad*864e5;
+      const sec=Math.floor(t/1000);
+      if(sec>=endSec)break;
+      if(sec<startSec)continue;
+      out.push({id:a.id,title:a.title,img:a.img,airingAt:sec,aniId:a.aniId,read:true,cadence:cad});
+    }
+  });
+  return out;
+}
 function schedWatchItems(){const own=anime.filter(a=>kindOf(a)==='watch'&&(a.status==='watching'||a.status==='plan'));const rel=upcomingRelated().map(r=>({id:'rel:'+r.aniId,title:r.title,img:r.img||'',aniId:r.aniId,airAt:r.airAt||0,airEp:r.airEp||0}));return own.concat(rel);}
 // Scan every tracked show's AniList relations for NEW seasons/OVAs/movies/specials not
 // yet in your list; stash the upcoming ones so they flow into the schedule + notifications.
@@ -11612,14 +11648,17 @@ function renderSchedule(){
       '<div class="sched-week"><div class="sched-week-title">'+schedLabel(schedOffset)+'</div><div class="sched-week-range">'+schedFmt(ws)+' – '+schedFmt(we)+'</div></div>'+
       '<button class="sched-arrow" onclick="schedGo(1)" aria-label="Next week">'+icon('chevron-right')+'</button></div>'+
     (schedOffset!==0?'<div class="sched-toolbar"><button class="sched-today-btn" onclick="schedGo(\'today\')">Jump to this week</button></div>':'')+
-    '<div class="sched-days" id="schedDays"><div class="sched-loading"><div class="sched-spin">'+icon('loader')+'</div><p>Loading episodes…</p></div></div>';
+    '<div class="sched-days" id="schedDays"><div class="sched-loading"><div class="sched-spin">'+icon('loader')+'</div><p>Loading schedule…</p></div></div>';
   loadSchedWeek(ws);
 }
 async function loadSchedWeek(ws){
   const startSec=Math.floor(ws.getTime()/1000),endSec=startSec+7*86400;
   let eps=schedCache[startSec];
   if(!eps){try{eps=await fetchSchedEpisodes(startSec,endSec);}catch(e){eps=schedFallback(startSec,endSec);}schedCache[startSec]=eps;}
-  renderSchedDays(ws,eps);
+  // Added after the cache, so a week already fetched still picks up chapters —
+  // and it's local work off the feed, so there's no request to wait on.
+  try{await readerCodes();}catch(e){}
+  renderSchedDays(ws,eps.concat(schedReadEntries(startSec,endSec)).sort((x,y)=>x.airingAt-y.airingAt));
 }
 function schedFallback(startSec,endSec){
   const out=[];schedWatchItems().forEach(a=>{if(a.airAt&&a.airAt>=startSec&&a.airAt<endSec)out.push({id:a.id,title:a.title,img:a.img,episode:a.airEp||0,airingAt:a.airAt,aniId:a.aniId});});
@@ -11646,8 +11685,9 @@ async function fetchSchedEpisodes(startSec,endSec){
 }
 function renderSchedDays(ws,eps){
   const cont=document.getElementById('schedDays');if(!cont)return;
-  if(!eps.length){cont.innerHTML='<div class="sched-empty-all"><div class="empty-icon">'+icon('calendar')+'</div><p>No episodes airing this week for your list.<br>Add a currently-airing show to <b>Watching</b> and it\'ll show up here.</p></div>';return;}
+  if(!eps.length){cont.innerHTML='<div class="sched-empty-all"><div class="empty-icon">'+icon('calendar')+'</div><p>Nothing airing or releasing this week.<br>Add an airing show to <b>Watching</b>, or a running series to <b>Reading</b>, and it\'ll show up here.</p></div>';return;}
   const notifSet=notifyOn()?new Set(notifyAnimeIds()):null;
+  const notifSetR=notifyOn()&&typeof notifyMangaIds==='function'?new Set(notifyMangaIds()):null;
   const todayKey=schedDayKey(new Date());
   let html='';
   for(let i=0;i<7;i++){
@@ -11662,8 +11702,11 @@ function renderSchedDays(ws,eps){
         const t=new Date(e.airingAt*1000).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
         const ch=((e.title||'?').charAt(0)||'?').replace(/[^A-Za-z0-9]/g,'')||'?';
         const thumb=e.img?'<img class="sched-thumb" src="'+escH(e.img)+'" alt="" loading="lazy" onerror="this.outerHTML=schPh(\''+ch+'\')">':schPh(ch);
-        const bell=notifSet&&e.aniId&&notifSet.has(e.aniId)?'<span class="sched-bell" title="Notifications on">'+icon('bell')+'</span>':'';
-        var _isRel=e.id&&(''+e.id).indexOf('rel:')===0;var _click=_isRel?("addRelatedSched('"+e.aniId+"')"):("openDetail('"+e.id+"')");var _newt=_isRel?'<span class="sched-new">NEW</span>':'';rows+='<div class="sched-row" onclick="'+_click+'">'+thumb+'<div class="sched-row-main"><div class="sched-row-title">'+schEsc(e.title)+_newt+bell+'</div><div class="sched-row-sub">Ep '+(e.episode||'?')+' \u00b7 '+t+'</div></div></div>';
+        const nset=e.read?notifSetR:notifSet;
+        const bell=nset&&e.aniId&&nset.has(e.aniId)?'<span class="sched-bell" title="Notifications on">'+icon('bell')+'</span>':'';
+        var _isRel=e.id&&(''+e.id).indexOf('rel:')===0;var _click=_isRel?("addRelatedSched('"+e.aniId+"')"):("openDetail('"+e.id+"')");var _newt=_isRel?'<span class="sched-new">NEW</span>':'';
+        var _sub=e.read?('New chapter \u00b7 expected'+(e.cadence?' \u00b7 ~every '+e.cadence+'d':'')):('Ep '+(e.episode||'?')+' \u00b7 '+t);
+        rows+='<div class="sched-row'+(e.read?' is-read':'')+'" onclick="'+_click+'">'+thumb+'<div class="sched-row-main"><div class="sched-row-title">'+schEsc(e.title)+_newt+bell+'</div><div class="sched-row-sub">'+_sub+'</div></div></div>';
       });
     }else rows='<div class="sched-empty-day">—</div>';
     html+='<div class="'+cls+'"><div class="sched-day-head"><span class="sched-day-name">'+day.toLocaleDateString([],{weekday:'long'})+'</span><span class="sched-day-date">'+schedFmt(day)+'</span>'+pill+'</div><div class="sched-day-body">'+rows+'</div></div>';
@@ -11672,19 +11715,21 @@ function renderSchedDays(ws,eps){
 }
 
 // ─── FOR YOU (tailored recommendations — AniList recommendation graph) ───────
-let fyCache=null;
+let fyCache={watch:null,read:null};
 function fyPh(ch){return '<div class="fy-ph">'+ch+'</div>';}
 function openForYou(){openSheet('forYouSheet');}
-function refreshForYou(){fyCache=null;renderForYou();}
+function refreshForYou(){fyCache[viewKind==='read'?'read':'watch']=null;renderForYou();}
 function renderForYou(){
   const body=document.getElementById('forYouBody');if(!body)return;
-  const intro='<div class="fy-intro">Tailored to what you watch — community picks from AniList that aren\'t on your list yet.</div>';
-  if(fyCache){body.innerHTML=intro+fyGridHTML(fyCache);return;}
-  body.innerHTML=intro+'<div class="fy-loading"><div class="fy-spin">'+icon('loader')+'</div><p>Finding shows you\'ll love…</p></div>';
-  computeForYou().then(recs=>{fyCache=recs;const sh=document.getElementById('forYouSheet');if(sh&&sh.classList.contains('on'))renderForYou();}).catch(()=>{fyCache=[];renderForYou();});
+  const kind=viewKind==='read'?'read':'watch',isRead=kind==='read';
+  const intro='<div class="fy-intro">Tailored to what you '+(isRead?'read':'watch')+' — community picks that aren\'t on your list yet.</div>';
+  if(fyCache[kind]){body.innerHTML=intro+fyGridHTML(fyCache[kind],kind);return;}
+  body.innerHTML=intro+'<div class="fy-loading"><div class="fy-spin">'+icon('loader')+'</div><p>Finding '+(isRead?'series':'shows')+' you\'ll love…</p></div>';
+  computeForYou(kind).then(recs=>{fyCache[kind]=recs;const sh=document.getElementById('forYouSheet');if(sh&&sh.classList.contains('on'))renderForYou();}).catch(()=>{fyCache[kind]=[];renderForYou();});
 }
-function fyGridHTML(recs){
-  if(!recs||!recs.length)return '<div class="fy-empty"><div class="empty-icon">'+icon('compass')+'</div><p>No fresh picks yet. Add or finish a few shows under <b>Watching</b> and we\'ll tailor recommendations to your taste.</p></div>';
+function fyGridHTML(recs,kind){
+  const isRead=kind==='read';
+  if(!recs||!recs.length)return '<div class="fy-empty"><div class="empty-icon">'+icon('compass')+'</div><p>No fresh picks yet. Add or finish a few '+(isRead?'series under <b>Reading</b>':'shows under <b>Watching</b>')+' and we\'ll tailor recommendations to your taste.</p></div>';
   return '<div class="fy-grid">'+recs.map(x=>{
     const r=x.rec,t=r.title.english||r.title.romaji||'?';
     const ch=((t.charAt(0)||'?').replace(/[^A-Za-z0-9]/g,''))||'?';
@@ -11692,22 +11737,23 @@ function fyGridHTML(recs){
     const score=r.averageScore?'<div class="fy-score">'+icon('star')+Math.round(r.averageScore)+'</div>':'';
     const genres=(r.genres||[]).slice(0,2).join(' · ');
     const srcs=[...x.srcs];
-    const because='Because you watched '+schEsc(srcs[0]||'')+(srcs.length>1?' +'+(srcs.length-1)+' more':'');
+    const because='Because you '+(isRead?'read ':'watched ')+schEsc(srcs[0]||'')+(srcs.length>1?' +'+(srcs.length-1)+' more':'');
     const cover=img?'<img class="fy-img" src="'+escH(img)+'" alt="" loading="lazy" onerror="this.outerHTML=fyPh(\''+ch+'\')">':fyPh(ch);
-    return '<div class="fy-card"><div class="fy-wrap">'+cover+score+'</div><div class="fy-title">'+schEsc(t)+'</div>'+(genres?'<div class="fy-meta">'+schEsc(genres)+'</div>':'')+'<div class="fy-because">'+because+'</div><button class="fy-plan" onclick="fyPlan('+r.id+',this)">'+icon('plus')+'Plan</button></div>';
+    return '<div class="fy-card"><div class="fy-wrap">'+cover+score+'</div><div class="fy-title">'+schEsc(t)+'</div>'+(genres?'<div class="fy-meta">'+schEsc(genres)+'</div>':'')+'<div class="fy-because">'+because+'</div><button class="fy-plan" onclick="fyPlan('+r.id+',this,\''+kind+'\')">'+icon('plus')+'Plan</button></div>';
   }).join('')+'</div>';
 }
-async function computeForYou(){
+async function computeForYou(kind){
+  const K=kind==='read'?'read':'watch',WANT=K==='read'?'MANGA':'ANIME';
   const W={finished:3,watching:2,plan:1};
-  let sources=anime.filter(a=>kindOf(a)==='watch'&&a.aniId&&W[a.status]);
-  if(!sources.length){try{if(typeof fetchCovers==='function')await fetchCovers();}catch(e){}sources=anime.filter(a=>kindOf(a)==='watch'&&a.aniId&&W[a.status]);}
+  let sources=anime.filter(a=>kindOf(a)===K&&a.aniId&&W[a.status]);
+  if(!sources.length){try{if(typeof fetchCovers==='function')await fetchCovers();}catch(e){}sources=anime.filter(a=>kindOf(a)===K&&a.aniId&&W[a.status]);}
   if(!sources.length)return [];
   const top=sources.map(a=>({aniId:a.aniId,title:a.title,w:W[a.status]})).sort((a,b)=>b.w-a.w).slice(0,24);
   const onList=new Set(anime.map(a=>a.aniId).filter(Boolean));
   const agg={};
   for(let i=0;i<top.length;i+=8){
     const batch=top.slice(i,i+8);
-    const q='{'+batch.map((s,j)=>'m'+j+':Media(id:'+s.aniId+'){recommendations(sort:RATING_DESC,perPage:8){nodes{rating mediaRecommendation{id isAdult title{romaji english} coverImage{large} genres averageScore}}}}').join(' ')+'}';
+    const q='{'+batch.map((s,j)=>'m'+j+':Media(id:'+s.aniId+'){recommendations(sort:RATING_DESC,perPage:8){nodes{rating mediaRecommendation{id type isAdult title{romaji english} coverImage{large} genres averageScore}}}}').join(' ')+'}';
     try{
       const r=await fetch('https://graphql.anilist.co',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({query:q})});
       if(r.status===429){await pause(1500);i-=8;continue;}
@@ -11716,6 +11762,7 @@ async function computeForYou(){
         const md=data['m'+idx];if(!md||!md.recommendations)return;
         (md.recommendations.nodes||[]).forEach(n=>{
           const rec=n.mediaRecommendation;if(!rec||!rec.id||onList.has(rec.id))return;
+          if(rec.type&&rec.type!==WANT)return;               // a manga's anime adaptation is not a reading pick
           if(isAdultMedia(rec))return;                      // never recommend adult titles
           if(!rec.coverImage||!rec.coverImage.large)return;
           if(!agg[rec.id])agg[rec.id]={score:0,srcs:new Set(),rec};
@@ -11731,13 +11778,14 @@ async function computeForYou(){
   arr.sort((a,b)=>b.score-a.score);
   return arr.slice(0,20);
 }
-function fyPlan(aniId,btn){
-  const x=(fyCache||[]).find(o=>o.rec.id===aniId);if(!x)return;
+function fyPlan(aniId,btn,kind){
+  kind=kind==='read'?'read':'watch';
+  const x=(fyCache[kind]||[]).find(o=>o.rec.id===aniId);if(!x)return;
   const r=x.rec;
-  anime.unshift({id:uid(),title:r.title.english||r.title.romaji,status:'plan',kind:'watch',aniId:r.id,img:(r.coverImage&&r.coverImage.large)||'',eps:'',epTotal:0,time:'',genre:(r.genres||[]).join(', '),order:[],notes:'',rating:0,fav:false,upd:Date.now()});
+  anime.unshift({id:uid(),title:r.title.english||r.title.romaji,status:'plan',kind:kind,aniId:r.id,img:(r.coverImage&&r.coverImage.large)||'',eps:'',epTotal:0,time:'',genre:(r.genres||[]).join(', '),order:[],notes:'',rating:0,fav:false,upd:Date.now()});
   dedupeAnime();save();render();setTimeout(fetchCovers,300);
   if(typeof toast==='function')toast('Added to Plan');
-  fyCache=(fyCache||[]).filter(o=>o.rec.id!==aniId);
+  fyCache[kind]=(fyCache[kind]||[]).filter(o=>o.rec.id!==aniId);
   const card=btn&&btn.closest?btn.closest('.fy-card'):null;
   if(card){card.classList.add('leaving');setTimeout(()=>{card.parentNode&&card.remove();},300);}
 }

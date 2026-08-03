@@ -3888,7 +3888,12 @@ function upcomingRelated(){try{return (JSON.parse(localStorage.getItem('upcoming
 function notifyAnimeIds(){const own=anime.filter(a=>kindOf(a)==='watch'&&(a.status==='watching'||a.status==='plan'||a.status==='finished')&&a.aniId).map(a=>a.aniId);const rel=upcomingRelated().map(r=>r.aniId).filter(Boolean);return [...new Set(own.concat(rel))];}
 // Manga you're actually following. Anime gets an airing time; manga gets a
 // chapter count, so the server watches that count and tells you when it moves.
-function notifyMangaIds(){return [...new Set(anime.filter(a=>kindOf(a)==='read'&&(a.status==='watching'||a.status==='plan')&&a.aniId).map(a=>a.aniId))];}
+// 'finished' is in here for the same reason it's in the anime list: a series you
+// have caught up on is the one you most want told about. Plenty of people mark
+// an ongoing manga Read once they're current rather than leaving it Reading, and
+// those were getting no chapter alerts at all. A genuinely completed series
+// costs nothing to carry — its chapter count never moves, so it never fires.
+function notifyMangaIds(){return [...new Set(anime.filter(a=>kindOf(a)==='read'&&(a.status==='watching'||a.status==='plan'||a.status==='finished')&&a.aniId).map(a=>a.aniId))];}
 async function getPushSub(){try{const reg=await navigator.serviceWorker.ready;return await reg.pushManager.getSubscription();}catch{return null;}}
 async function enableNotify(){
   if(typeof IS_NATIVE!=='undefined'&&IS_NATIVE){setNotifyOn(true);try{nativeScheduleNotifs();}catch{}toast('Notifications on');renderNotifyUI();return;}

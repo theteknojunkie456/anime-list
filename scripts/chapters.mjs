@@ -72,7 +72,11 @@ async function muLatest(seriesId) {
     if (!r.ok) return null;
     const d = await r.json();
     const n = Number(d.latest_chapter);
-    return Number.isFinite(n) && n > 0 ? { chapter: n, title: d.title || '', type: d.type || '' } : null;
+    if (!Number.isFinite(n) || n <= 0) return null;
+    // Associated names answer "what else is this called" — the reader usually
+    // uses one of these rather than the title everyone else uses.
+    const assoc = (d.associated || []).map((a) => a && a.title).filter(Boolean);
+    return { chapter: n, title: d.title || '', type: d.type || '', assoc };
   } catch { return null; }
 }
 
@@ -101,6 +105,37 @@ async function trackedSeries() {
  * A runner can read the site, so the current code is scraped here and published
  * with the chapter data. The app reads it instead of its own stale constant.
  */
+/**
+ * What does the READER call this series? Nothing can derive it — AsuraScans
+ * calls "The Patron of Villains" raising-villains-the-right-way — but every
+ * alias is published somewhere: AniList synonyms and MangaUpdates associated
+ * names. Try each as a slug and keep the one the site actually serves.
+ */
+// Readers this resolves for. Adding one is a line: its host, the path series
+// live under, and whether it stamps a rotating code onto every slug.
+const READERS = [
+  { host: 'asurascans.com', path: 'comics', code: true },
+  { host: 'reaperscans.com', path: 'series', code: false },
+  { host: 'flamecomics.xyz', path: 'series', code: false },
+];
+
+async function resolveReaderSlug(reader, code, names) {
+  const tried = new Set();
+  for (const n of names) {
+    const slug = String(n).toLowerCase().replace(/['\u2019]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    if (!slug || slug.length < 4 || tried.has(slug)) continue;
+    tried.add(slug);
+    const suffix = reader.code && code ? '-' + code : '';
+    const url = `https://${reader.host}/${reader.path}/${slug}${suffix}`;
+    try {
+      const r = await fetch(url, { headers: { 'User-Agent': UA }, redirect: 'manual' });
+      if (r.status === 200) { console.log(`    ${reader.host}: ${slug}`); return slug; }
+    } catch {}
+    await sleep(700);
+  }
+  return null;
+}
+
 async function readerSuffix(host) {
   try {
     const r = await fetch(`https://${host}/`, { headers: { 'User-Agent': UA } });
@@ -133,6 +168,15 @@ const work = new Map();
 for (const [aniId, rec] of Object.entries(out.series)) work.set(Number(aniId), rec.names || [rec.title].filter(Boolean));
 for (const s of tracked || []) if (s && s.aniId) work.set(Number(s.aniId), (s.names || []).filter(Boolean));
 
+// Reader codes FIRST — the per-series slug test builds a URL with today's code.
+// Per-reader codes, refreshed every run so a rotation is picked up within hours.
+out.readers = { ...(prev.readers || {}) };
+for (const reader of READERS.filter((r) => r.code)) {
+  const code = await readerSuffix(reader.host);
+  if (code) out.readers[reader.host] = { suffix: code, at: new Date().toISOString() };
+  await sleep(1000);
+}
+
 console.log(`${work.size} series to check`);
 let changed = 0, missing = 0;
 
@@ -154,16 +198,28 @@ for (const [aniId, names] of work) {
   // whatever the user typed. The app looks a series up by title when it has no
   // AniList id yet, so an alias is the difference between a chapter list and a
   // blank space.
-  const allNames = [...new Set([...(known.names || []), ...names, latest.title].filter(Boolean))];
+  const allNames = [...new Set([...(known.names || []), ...names, latest.title, ...(latest.assoc || [])].filter(Boolean))];
   out.series[aniId] = { names: allNames, muId, chapter: latest.chapter, title: latest.title, type: latest.type };
-}
 
-// Per-reader codes, refreshed every run so a rotation is picked up within hours.
-out.readers = { ...(prev.readers || {}) };
-for (const host of ['asurascans.com']) {
-  const code = await readerSuffix(host);
-  if (code) out.readers[host] = { suffix: code, at: new Date().toISOString() };
-  await sleep(1000);
+  // What does the READER call it? Nothing can derive that — AsuraScans calls
+  // "The Patron of Villains" raising-villains-the-right-way — but every alias is
+  // published somewhere, and now they're all in allNames. Try each as a slug and
+  // keep the one the site actually serves. Done once, then remembered.
+  const slugs = { ...(known.readSlug || {}) };
+  const probed = { ...(known.readTried || {}) };
+  const WEEK = 7 * 864e5;
+  for (const reader of READERS) {
+    if (slugs[reader.host]) continue;                       // known, and never re-probed
+    // A miss is remembered too, or a series that simply isn't on this reader
+    // costs a handful of requests every single run, forever. Retried weekly in
+    // case it gets added later.
+    if (probed[reader.host] && Date.now() - probed[reader.host] < WEEK) continue;
+    const code = (out.readers[reader.host] || {}).suffix || null;
+    const slug = await resolveReaderSlug(reader, code, allNames);
+    if (slug) slugs[reader.host] = slug; else probed[reader.host] = Date.now();
+  }
+  if (Object.keys(slugs).length) out.series[aniId].readSlug = slugs;
+  if (Object.keys(probed).length) out.series[aniId].readTried = probed;
 }
 
 await fs.mkdir('data', { recursive: true });

@@ -8210,7 +8210,13 @@ function fillSourceTokens(template,a,ep){
   // user set (see pvSetFromURL). It beats anything we can derive, because the
   // site's own spelling is the only one that's authoritative — "Initial D" is
   // "initial-d-first-stage" on one site and "initial_d" on the next.
-  const _slug=(a&&a.srcSlug&&String(a.srcSlug).trim())||learnedSlugFor(a)||streamSlug(slugTitle(a));
+  let _slug=(a&&a.srcSlug&&String(a.srcSlug).trim())||learnedSlugFor(a)||'';
+  if(!_slug){
+    // Before falling back to a title-derived guess, ask the feed what this site
+    // actually calls it — that's the whole point of resolving it once.
+    try{const h=srcHost(template);if(h)_slug=feedSlug(a,h)||'';}catch(e){}
+  }
+  if(!_slug)_slug=streamSlug(slugTitle(a));
   const txt={title:t,query:t,slug:_slug,slug_:_slug.replace(/-/g,'_'),titleenglish:a.titleEn||t,titleromaji:a.titleRo||t,titlenative:a.titleNa||t}; // url-encoded ({slug_}=attack_on_titan)
   return String(template||'').replace(/\{(\w+)\}/g,(m,k)=>{
     const key=k.toLowerCase();
@@ -8503,15 +8509,34 @@ const READ_DEFAULT='https://asurascans.com';
 // eventually. It's only the fallback now: the chapters feed carries whatever the
 // site is using today, scraped by the Action, and that wins.
 const ASURA_SUFFIX='1d35e5bd';
-let _readerCodes=null;
+let _readerCodes=null,_feedSeries=null;
 async function readerCodes(){
   if(_readerCodes)return _readerCodes;
   try{
     const r=await fetch('data/chapters.json?cb='+Math.floor(Date.now()/3600000));
     const d=r.ok?await r.json():null;
     _readerCodes=(d&&d.readers)||{};
-  }catch(e){_readerCodes={};}
+    _feedSeries=(d&&d.series)||{};
+  }catch(e){_readerCodes={};_feedSeries={};}
   return _readerCodes;
+}
+// The name THIS reader uses for this series, worked out by the Action from every
+// alias AniList and MangaUpdates publish. It beats anything derived from the
+// title: "The Patron of Villains" is raising-villains-the-right-way on Asura,
+// and no amount of slugifying gets you there.
+function feedSlug(a,host){
+  try{
+    if(!_feedSeries||!host)return '';
+    const flat=t=>String(t||'').toLowerCase().replace(/[^a-z0-9]/g,'');
+    const byId=a&&a.aniId&&_feedSeries[String(a.aniId)];
+    const rec=byId||Object.values(_feedSeries).find(v=>{
+      const want=flat(a&&a.title);
+      return want.length>3&&[...(v.names||[]),v.title].filter(Boolean).some(n=>{
+        const f=flat(n);return f===want||(f.length>5&&want.length>5&&(f.includes(want)||want.includes(f)));
+      });
+    });
+    return (rec&&rec.readSlug&&rec.readSlug[host])||'';
+  }catch(e){return '';}
 }
 function asuraSuffix(){
   try{const c=_readerCodes&&_readerCodes['asurascans.com'];if(c&&c.suffix)return c.suffix;}catch(e){}
@@ -8542,6 +8567,9 @@ function readURL(a,chArg){
     const learned=(a&&a.srcSlug&&String(a.srcSlug).trim())||learnedSlugFor(a)||'';
     if(learned)return `${READ_DEFAULT}/comics/${learned}`;
     const code=asuraSuffix();
+    // What the site itself calls it, resolved for us, beats a guess from the title.
+    const known=feedSlug(a,'asurascans.com');
+    if(known)return `${READ_DEFAULT}/comics/${known}${code?'-'+code:''}`;
     if(code)return `${READ_DEFAULT}/comics/${streamSlug(slugTitle(a))}-${code}`;
     return `${READ_DEFAULT}/?s=${encodeURIComponent(slugTitle(a).replace(/-/g,' '))}`;
   }

@@ -8384,6 +8384,7 @@ function pvSetPrompt(){
 // site calls it and skip the address entirely.
 function pvSetFromName(){
   const a=anime.find(x=>x.id===pvReturnId); if(!a){toast('Nothing open');return;}
+  const isRead=kindOf(a)==='read';
   const raw=((document.getElementById('pvSetName')||{}).value||'').trim();
   if(!raw){toast('Type the name as this site spells it');return;}
   // Accept a slug, a title, or a whole URL pasted in the wrong box.
@@ -8391,13 +8392,13 @@ function pvSetFromName(){
   try{if(/^https?:\/\//i.test(raw)){const segs=new URL(raw).pathname.split('/').filter(Boolean);name=segs[segs.length-1]||raw;}}catch(e){}
   const slug=streamSlug(name.replace(/[_-]?(ep|episode)[-_]?\d+$/i,''));
   if(!slug){toast('Couldn\u2019t make a name out of that');return;}
-  const tpl=effectiveSource(a)||'';
+  const tpl=(isRead?effectiveReadSource(a):effectiveSource(a))||'';
   a.srcSlug=slug;
   setLearnedSlug(a,slug,tpl);
   try{save();}catch(e){}
   const box=document.getElementById('pvSet'); if(box)box.classList.remove('on');
   toast(`Got it \u2014 \u201c${a.title}\u201d is \u201c${slug}\u201d here`);
-  const fixed=streamURL(a,pvWatchEp||1).url;
+  const fixed=isRead?readURL(a,pvWatchEp||0):streamURL(a,pvWatchEp||1).url;
   if(fixed)document.getElementById('pvFrame').src=fixed;
 }
 function pvSetFromURL(){
@@ -8511,7 +8512,16 @@ function readHasChapter(a){
 function readURL(a,chArg){
   const src=effectiveReadSource(a);
   const ch=(chArg>0?chArg:(a.ep||0)+1);
-  if(!src) return `${READ_DEFAULT}/comics/${streamSlug(slugTitle(a))}-${ASURA_SUFFIX}`;   // AsuraScans deep-link
+  // No source set. The old guess was READ_DEFAULT + title + a "site-wide" code,
+  // but that code is per-series: /comics/the-patron-of-villains-1d35e5bd is a
+  // 404 while /comics/solo-leveling-1d35e5bd resolves. A guess that fails half
+  // the time is worse than a search that always lands, so unless this exact
+  // series' name has been learned, search.
+  if(!src){
+    const learned=(a&&a.srcSlug&&String(a.srcSlug).trim())||learnedSlugFor(a)||'';
+    if(learned)return `${READ_DEFAULT}/comics/${learned}`;
+    return `${READ_DEFAULT}/?s=${encodeURIComponent(slugTitle(a).replace(/-/g,' '))}`;
+  }
   if(SRC_TOKEN_RE.test(src)) return fillSourceTokens(src,a,ch);   // {slug}/{query}/{titleRomaji}…; {ch}=the chapter
   return src;
 }
@@ -8532,6 +8542,10 @@ function readManga(id,chArg){
   pvWatchEp=ch||null;           // which chapter this is, so leaving can bank it
   savePvSession(id,ch,'read');  // survive an iOS background/reload mid-read
   pvCanNav=false; renderPvNav(null);   // no episode stepping while reading
+  // Reading never had this. A reader names each series its own way — and some
+  // append a per-series code no title can predict — so landing on the wrong page
+  // is normal and there was no way to correct it. Same bar the watch side gets.
+  _pvSpell=0; pvOfferFix();
 }
 // ─── IN-PLAYER BINGE CONTROLS ────────────────────────────────────────────────
 // Step episodes or bank-and-advance without leaving the player. Only wired up
@@ -10191,7 +10205,11 @@ function readQuickSetup(){
   if(!/\{(query|slug|ch)\}/.test(tpl)){
     try{
       const u=new URL(url), segs=u.pathname.split('/').filter(Boolean);
-      const nameSeg=i=>{const m=/^(.*?)-([0-9a-f]{4,10})$/i.exec(segs[i]);segs[i]=m?('{slug}-'+m[2]):'{slug}';};
+      // The whole segment is the slug, code and all. Sites like AsuraScans append
+      // a per-series code — verified: -059be resolves for one series and 404s on
+      // the next — so keeping it in the template poisons every other series. The
+      // per-series name is learned instead, which is what {slug} is for.
+      const nameSeg=i=>{segs[i]='{slug}';};
       if(segs.length){
         // A chapter in the address must become {ch}, not {slug} — otherwise every
         // series resolves to the one chapter number that happened to be pasted.

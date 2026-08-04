@@ -173,6 +173,7 @@ Per series the file carries:
 | `cadence` | days per chapter — median of per-pair rates, from the live stream |
 | `weekday` | the day it actually posts on (0=Sun), when it keeps one |
 | `readSlug` | what each reader calls it, resolved by probing aliases |
+| `readChapter` / `readAt` / `readHost` | what the reader itself is serving, and when it last updated |
 
 Two API quirks are load-bearing. `releases/search` **ignores `series_id`** and
 lets `orderby` override the query — the only parameter it honours is `search`,
@@ -194,6 +195,21 @@ Survival Guide has a Monday source near ch 94 and a Thursday source near ch 116,
 together reading as a 3-day cadence). Neither is a majority, so "most rows wins"
 can't separate them — whichever posted *last* is the stream still running, and
 that's the one measured.
+
+**The reader is scraped too, and it is the better anchor.** MangaUpdates'
+release feed indexes one scanlation stream and can sit dozens of chapters
+behind what is actually published — it had The Stellar Swordmaster at ch 120
+while the reader was serving 131 — so a projection anchored on its last row
+starts two weeks stale. The reader's chapter list is what the user opens, and
+its timestamps are relative (`4 days ago`, `last week`), so only the newest row
+is precise; that is exactly the row an anchor needs, and the ±1 day relative
+dates carry is absorbed by the weekday snap. Chapter alerts fire on
+`max(chapter, readChapter)`: if a chapter is already sitting on the reader,
+"it's out" is true whether or not the database agrees yet.
+
+A note on domains: **`asuratoons.com` is no longer Asura** — it redirects to an
+ad-campaign tracker (`anast-nch.com/zokvisitor/…`) and must not be read from.
+`asuracomic.net` redirects to `asurascans.com`, which is the live site.
 
 `feedRec(a)` is the app's lookup into this file — by AniList id, falling back to
 alias matching for items that don't have one yet. `feedSlug()` (deep links) and

@@ -8493,17 +8493,84 @@ function pvOfferFix(){
   },3500);
 }
 let _pvBlockT=0;
+// Did the site refuse to be framed, or did it actually load?
+//
+// A refused frame STILL FIRES load — the browser paints its own "refused to
+// connect" page inside it. That's why the escape hatch used to vanish on
+// exactly the pages that needed it, and why the ledger below never learned
+// anything: every refusal looked like a successful load.
+//
+// The error page isn't the site. It stays on about:blank, so reading its
+// location succeeds; a real cross-origin page throws SecurityError instead.
+// That difference is the only signal the browser gives us cross-origin.
+function pvFrameRefused(f){
+  try{
+    const w=f.contentWindow; if(!w)return false;
+    const h=w.location.href;
+    return !h||h==='about:blank';
+  }catch(e){return false;}          // threw = genuinely cross-origin = it loaded
+}
+// Reachable? A no-cors request tells us nothing about the RESPONSE, which is
+// fine — we only need to know whether anything answered at all. It resolves
+// (opaque) for a live host that merely refuses framing, and rejects when the
+// name doesn't resolve or nothing is listening.
+async function pvProbeHost(host,t,d,btn){
+  let alive=false;
+  try{
+    const c=new AbortController(); const to=setTimeout(()=>c.abort(),6000);
+    await fetch('https://'+host+'/',{mode:'no-cors',signal:c.signal,cache:'no-store'});
+    clearTimeout(to); alive=true;
+  }catch(e){alive=false;}
+  if(alive)return;                       // framing block — the copy already fits
+  // Framing was never the problem, so drop the verdict the load handler just
+  // recorded. Left in place it would reach "refuses" after two tries and send
+  // Watch out to the browser silently — landing on the same dead host with no
+  // explanation, which is strictly worse than this panel.
+  try{const m=frameLog(); delete m[host]; saveFrameLog(m);}catch(e){}
+  if(t)t.textContent='This source isn\u2019t reachable';
+  if(d)d.textContent=host+' didn\u2019t answer. If it moved or shut down, pick a different source.';
+  // Opening a dead host in the browser fails the same way, so don't offer it.
+  if(btn){btn.textContent='Change source';btn.setAttribute('onclick','closePlayer();openSheet(\'sourceSheet\')');}
+}
 function pvWatchBlocked(f){
   const box=document.getElementById('pvBlocked'); if(!box)return;
+  const host=srcHost(f.src||'');
   box.classList.remove('on'); clearTimeout(_pvBlockT);
-  // A slow site can paint after the deadline. Whenever the frame loads, the
-  // panel goes away again — it used to stay up over a page you could see.
-  const painted=()=>{clearTimeout(_pvBlockT);box.classList.remove('on');};
-  try{f.addEventListener('load',painted);}catch(e){}
-  _pvBlockT=setTimeout(()=>{
+  const btn=box.querySelector('.parse-btn');
+  const show=(sure)=>{
     box.classList.add('on');
+    const t=box.querySelector('.pv-blocked-t'),d=box.querySelector('.pv-blocked-s');
+    // When we know, say so plainly instead of asking the user to diagnose it.
+    if(t)t.textContent=sure?'This site won\u2019t open in the app':'Still blank?';
+    if(d)d.textContent=sure?'It blocks being shown inside other apps. Open it in your browser instead.'
+                           :'Some sites don\u2019t allow being opened inside another app.';
+    if(btn){btn.textContent='Open in browser';btn.setAttribute('onclick','pvOpenExternal()');}
     const w=document.getElementById('pvWrong'); if(w)w.classList.remove('on');
-  },8000);
+    // "Blocked from framing" and "this host is gone" look identical from in here
+    // — both paint an error page. They need opposite advice, though: opening a
+    // dead domain in the browser fails exactly the same way. A no-cors probe
+    // separates them, because it only resolves if something answered.
+    if(sure&&host)pvProbeHost(host,t,d,btn);
+  };
+  // A slow site can paint after the deadline. Whenever the frame really loads,
+  // the panel goes away again — it used to stay up over a page you could see.
+  const painted=()=>{
+    if(pvFrameRefused(f)){
+      clearTimeout(_pvBlockT);
+      show(true);
+      noteFrame(host,false);        // feed the ledger, so next time Watch routes out
+      return;
+    }
+    clearTimeout(_pvBlockT); box.classList.remove('on');
+    noteFrame(host,true);           // proof it works wipes any earlier doubt
+  };
+  // One listener, not one per episode. These used to stack up across a binge;
+  // now that the handler writes to the ledger, stale copies would count a single
+  // refusal several times over and blacklist a site that works.
+  try{if(f._pvPainted)f.removeEventListener('load',f._pvPainted);}catch(e){}
+  f._pvPainted=painted;
+  try{f.addEventListener('load',painted);}catch(e){}
+  _pvBlockT=setTimeout(()=>show(false),8000);
 }
 // Reading source (AsuraScans by default). AsuraScans series live at
 // /comics/<slug>-<suffix>, where the suffix is a CONSTANT site-wide token (not a

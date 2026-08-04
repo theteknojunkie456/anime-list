@@ -207,6 +207,11 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 }
 .schip.on{background:color-mix(in srgb,var(--a) 20%,var(--bg3));border-color:transparent;color:var(--a2);box-shadow:0 3px 12px -5px var(--glow);}
 .filt-row{display:flex;gap:6px;flex-shrink:0;}
+/* The app's established alert red (#ff6b6b — same as .dact.danger and the form
+   errors), so this reads as "needs attention" rather than as another filter. */
+.fchip-warn{background:color-mix(in srgb,#ff6b6b 15%,var(--bg3));border-color:color-mix(in srgb,#ff6b6b 45%,transparent)!important;color:#ff8b8b;}
+.fchip-warn svg{width:13px;height:13px;margin-right:5px;vertical-align:-2px;}
+.fchip-warn .fn{background:color-mix(in srgb,#ff6b6b 26%,transparent);color:#ff8b8b;}
 .fchip{
   flex-shrink:0;padding:7px 13px;border-radius:99px;font-size:11.5px;font-weight:700;
   background:var(--bg3);border:1px solid transparent;color:var(--t2);
@@ -4600,8 +4605,43 @@ function renderFiltRow(){
     const n=counts[f]||0;
     return`<button class="fchip${cls?' '+cls:''}" onclick="setFilter('${f}')">${l}<span class="fn">${n}</span></button>`;
   }).join('')
+  // An unmatched title is invisible to everything downstream — no chapter count,
+  // no chapter list, no calendar entry, no alerts — and nothing said so. It only
+  // showed as a missing cover, which reads as a slow image, not a broken record.
+  // Shown only when there's something to fix, so it's absent on a healthy list.
+  +(function(){
+    const un=items.filter(a=>!a.aniId).length;
+    if(!un)return '';
+    return `<button class="fchip fchip-warn" onclick="retryUnmatched()" title="These aren't linked to a database entry yet">`
+      +icon('refresh')+`${un} unmatched<span class="fn">Fix</span></button>`;
+  })()
   // Sits with the Plan chip because that's the pile you stare at without choosing.
   ;   // "Decide" used to sit here, crowding the filter row it had nothing to do with — it lives under "Not sure what to watch?" now.
+}
+// Retry the titles that never matched. They carry idTried/imgTried flags so the
+// enrichment loop stops asking about them forever — a title AniList genuinely
+// doesn't carry shouldn't cost a request every pass. Clearing those flags is
+// what makes a retry a retry; then the normal loop runs, and fixUnmatchedTitles
+// takes whatever's still stuck through spelling variants and one AI call.
+let _reMatching=false;
+async function retryUnmatched(){
+  if(_reMatching){toast('Already looking');return;}
+  const stuck=anime.filter(a=>kindOf(a)===viewKind&&!a.aniId);
+  if(!stuck.length){toast('Nothing to fix');return;}
+  _reMatching=true;
+  stuck.forEach(a=>{delete a.idTried;delete a.detTried;delete a.bannerTried;delete a.imgTried;delete a.scoreTried;a.nameFix=1;});
+  try{save();}catch(e){}
+  toast(`Looking up ${stuck.length}\u2026`);
+  try{
+    if(typeof fetchCovers==='function')await fetchCovers();
+    if(typeof fixUnmatchedTitles==='function')await fixUnmatchedTitles();
+  }catch(e){}
+  _reMatching=false;
+  const left=anime.filter(a=>kindOf(a)===viewKind&&!a.aniId).length;
+  const fixed=stuck.length-left;
+  try{save();render();}catch(e){}
+  toast(fixed>0?(left?`Matched ${fixed}, ${left} still stuck`:`Matched all ${fixed}`)
+               :'Still no match \u2014 try renaming them');
 }
 // Two different ratings, so both say whose: 'Rating' is your own stars, 'Top
 // rated' is AniList's community score, stored per title since the score work.

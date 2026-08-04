@@ -170,7 +170,8 @@ Per series the file carries:
 | `names` | every alias — AniList synonyms, MangaUpdates associated titles, whatever the user typed |
 | `chapter` | latest chapter (`latest_chapter`), verified against the readers themselves |
 | `releases` | up to 16 real dated releases, `{ch, date}` |
-| `cadence` | median gap in days between them |
+| `cadence` | days per chapter — median of per-pair rates, from the live stream |
+| `weekday` | the day it actually posts on (0=Sun), when it keeps one |
 | `readSlug` | what each reader calls it, resolved by probing aliases |
 
 Two API quirks are load-bearing. `releases/search` **ignores `series_id`** and
@@ -180,6 +181,19 @@ it's kept (fuzzy search alone once matched "Lore Olympus" to "Olimpos"). And
 readers like AsuraScans stamp a **rotating site-wide code** onto every series
 URL, so the code is scraped each run rather than hardcoded; the constant in
 `index.html` is only a fallback.
+
+Cadence is deliberately **not** a median gap between releases. A gap is measured
+between the rows the harvest happened to catch, so one miss reads a weekly series
+as biweekly — it called The Stellar Swordmaster 14-day while 15 of its 16
+releases were on a Wednesday. Rate (chapters per day) is immune to holes, and the
+median of per-pair rates ignores the pairs that straddle one.
+
+The other trap is **merged release streams**: two groups translate the same
+series under different chapter numbers on different days (The Extra's Academy
+Survival Guide has a Monday source near ch 94 and a Thursday source near ch 116,
+together reading as a 3-day cadence). Neither is a majority, so "most rows wins"
+can't separate them — whichever posted *last* is the stream still running, and
+that's the one measured.
 
 `feedRec(a)` is the app's lookup into this file — by AniList id, falling back to
 alias matching for items that don't have one yet. `feedSlug()` (deep links) and

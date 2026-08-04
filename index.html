@@ -9465,7 +9465,7 @@ https://example.com/watch/{slug}/episode-{ep}`;
       toast('Pattern learned — check it, then save it');
     }
   }catch(e){
-    toast(e===NO_KEY?'Add your AI key first':'AI error — check your key and try again');
+    toast(e===NO_KEY?'Add your AI key first':aiReason(e));
   }finally{
     if(btn){btn.disabled=false;btn.innerHTML=old;}
   }
@@ -10847,16 +10847,65 @@ function saveKey(){
   toast(prov+' key saved');            // name the provider so they know it registered
   renderModelPicker();updateKeyBtn();       // <- updateKeyBtn was missing: button stayed "Add AI Key"
 }
+// Say which of these it actually is. "Check your key" is right for exactly one
+// of them and useless for the rest.
+function aiReason(e){
+  if(e===NO_KEY)return '';
+  const st=e&&e.status, d=String((e&&(e.detail||e.message))||'');
+  if(st===401||st===403)return 'Your AI key was rejected — it may have been revoked or copied incompletely.';
+  if(st===429)return 'Rate limited by the AI provider. Wait a minute and try again.';
+  if(st===402||/quota|credit|billing/i.test(d))return 'That key is out of credit or quota.';
+  if(modelRejected(e))return 'The AI model was retired and no fallback worked. Nothing you did wrong.';
+  if(st>=500)return 'The AI provider is having problems. Try again shortly.';
+  if(!st)return 'Couldn\u2019t reach the AI provider — check your connection.';
+  return d?('AI provider said: '+d.slice(0,140)):('AI error '+st);
+}
 function aiErrorHTML(e){
   return e===NO_KEY
     ?'This needs a free AI key. Tap the <b>AI</b> tab (bottom bar) → <b>Add a free key</b> — it walks you through getting one from Groq in about two minutes. The key stays on this device only.'
-    :'Connection error — check your key and try again.';
+    :escH(aiReason(e));
+}
+// Every provider explains itself in the response BODY; throwing away everything
+// but the status is how "your model was retired" and "you're rate limited" both
+// became "check your key" — advice that fixes neither and sends you hunting for
+// a problem you don't have.
+async function aiFail(res){
+  let detail='';
+  try{
+    const t=(await res.text()).slice(0,600);
+    try{const j=JSON.parse(t);detail=(j.error&&(j.error.message||j.error.code))||j.message||'';}
+    catch(e){detail=t;}
+  }catch(e){}
+  const err=new Error(detail||('API '+res.status));
+  err.status=res.status; err.detail=detail;
+  return err;
+}
+// Providers retire models on their own schedule, and a hardcoded name turns into
+// a dead app the day they do. If the model is the thing being rejected, try the
+// next one instead of blaming the key.
+const AI_FALLBACKS={
+  'api.groq.com':['llama-3.3-70b-versatile','llama-3.1-8b-instant','openai/gpt-oss-120b'],
+  'openrouter.ai':['meta-llama/llama-3.3-70b-instruct:free','meta-llama/llama-3.1-8b-instruct:free'],
+};
+function modelRejected(err){
+  const d=String(err&&err.detail||'').toLowerCase();
+  return (err&&(err.status===404||err.status===400))&&
+    /model|decommission|deprecat|not found|does not exist|unsupported/.test(d);
 }
 async function callOpenAICompat(url,key,model,prompt){
-  const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify({model,max_tokens:1000,messages:[{role:'user',content:prompt}]})});
-  if(!res.ok)throw new Error('API '+res.status);
-  const data=await res.json();
-  return data.choices?.[0]?.message?.content||'No response.';
+  let host='';try{host=new URL(url).hostname.replace(/^api\./,'');}catch(e){}
+  const chain=[model,...((AI_FALLBACKS[new URL(url).hostname]||[]).filter(m=>m!==model))];
+  let last=null;
+  for(const m of chain){
+    const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify({model:m,max_tokens:1000,messages:[{role:'user',content:prompt}]})});
+    if(res.ok){
+      const data=await res.json();
+      return data.choices?.[0]?.message?.content||'No response.';
+    }
+    last=await aiFail(res);
+    if(!modelRejected(last))throw last;      // a real failure — don't burn the other models on it
+  }
+  throw last;
 }
 async function callAI(prompt){
   const key=getKey();
@@ -10867,12 +10916,12 @@ async function callAI(prompt){
     return callOpenAICompat('https://openrouter.ai/api/v1/chat/completions',key,'meta-llama/llama-3.3-70b-instruct:free',prompt);
   if(key.startsWith('AIza')){
     const res=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{maxOutputTokens:1000}})});
-    if(!res.ok)throw new Error('API '+res.status);
+    if(!res.ok)throw await aiFail(res);
     const data=await res.json();
     return data.candidates?.[0]?.content?.parts?.[0]?.text||'No response.';
   }
   const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-5',max_tokens:1000,messages:[{role:'user',content:prompt}]})});
-  if(!res.ok)throw new Error('API '+res.status);
+  if(!res.ok)throw await aiFail(res);
   const data=await res.json();
   return data.content?.[0]?.text||'No response.';
 }

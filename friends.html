@@ -8561,7 +8561,7 @@ async function pvProbeHost(host,t,d,btn){
     await fetch('https://'+host+'/',{mode:'no-cors',signal:c.signal,cache:'no-store'});
     clearTimeout(to); alive=true;
   }catch(e){alive=false;}
-  if(alive)return;                       // framing block — the copy already fits
+  if(alive){noteFrame(host,false,true);return;}   // reachable but won't frame — settled
   // Framing was never the problem, so drop the verdict the load handler just
   // recorded. Left in place it would reach "refuses" after two tries and send
   // Watch out to the browser silently — landing on the same dead host with no
@@ -9126,10 +9126,16 @@ const SLUG_MAP_KEY='site_slugs';
 const FRAME_KEY='frame_ok';
 function frameLog(){try{const v=JSON.parse(localStorage.getItem(FRAME_KEY)||'{}');return (v&&typeof v==='object')?v:{};}catch{return{};}}
 function saveFrameLog(m){try{localStorage.setItem(FRAME_KEY,JSON.stringify(m));}catch{}}
-function noteFrame(host,ok){
+function noteFrame(host,ok,sure){
   host=String(host||'').toLowerCase(); if(!host)return;
   const m=frameLog(), e=m[host]||{ok:0,bad:0};
-  if(ok){e.ok++;e.bad=0;}else{e.bad++;}                 // proof it works wipes the doubt
+  // `sure` is a CONFIRMED refusal: the frame loaded an error page and the host
+  // answered a probe, so it's reachable and simply won't be embedded. That
+  // doesn't flake the way a timeout does — miruro sits behind a Cloudflare
+  // challenge that sets X-Frame-Options: SAMEORIGIN, and it will still be set
+  // tomorrow. Counting it as decisive sends Watch straight out next time
+  // instead of showing the same dead frame twice more.
+  if(ok){e.ok++;e.bad=0;}else{e.bad=sure?Math.max(e.bad+1,2):e.bad+1;}
   m[host]=e; saveFrameLog(m);
 }
 // The ledger decides, silently, that a site can't be played inside the app. That

@@ -223,6 +223,54 @@ async function resolveReaderSlug(reader, code, names) {
   return null;
 }
 
+/**
+ * What the READER itself says — the source of truth for what the app links to.
+ *
+ * MangaUpdates' release feed indexes one scanlation stream and lags badly (it
+ * had The Patron of Villains at ch 32 while Asura was serving 46), so anchoring
+ * a projection on it drifts. The reader's own chapter list doesn't lag: it IS
+ * what the user opens.
+ *
+ * Dates there are relative ("4 days ago", "last week"), so only the newest row
+ * is precise — but that's the one that matters, because it's the anchor every
+ * future chapter is projected from.
+ */
+function agoToDate(txt) {
+  const t = String(txt || '').toLowerCase().trim();
+  const now = Date.now();
+  if (/^today$/.test(t)) return new Date(now);
+  if (/^yesterday$/.test(t)) return new Date(now - 864e5);
+  if (/^last week$/.test(t)) return new Date(now - 7 * 864e5);
+  const m = t.match(/^(\d+)\s*(hour|day|week|month|year)s?\s*ago$/);
+  if (!m) return null;
+  const n = Number(m[1]);
+  const per = { hour: 1 / 24, day: 1, week: 7, month: 30, year: 365 }[m[2]];
+  return new Date(now - n * per * 864e5);
+}
+
+async function readerLatest(reader, code, slug) {
+  const suffix = reader.code && code ? '-' + code : '';
+  const url = `https://${reader.host}/${reader.path}/${slug}${suffix}`;
+  try {
+    const r = await fetch(url, { headers: { 'User-Agent': UA } });
+    if (!r.ok) return null;
+    const html = await r.text();
+    // Strip tags to plain text; the list renders as "Chapter 46" then "4 days ago"
+    // with markup between, so match across the gap rather than guessing at DOM.
+    const txt = html.replace(/<[^>]+>/g, '|');
+    const rows = [];
+    const re = /Chapter \|+(\d+(?:\.\d+)?)\|+((?:\d+\s*(?:hour|day|week|month|year)s?\s*ago|last week|yesterday|today))/gi;
+    for (const m of txt.matchAll(re)) {
+      const d = agoToDate(m[2]);
+      if (d) rows.push({ ch: Number(m[1]), at: d });
+    }
+    if (!rows.length) return null;
+    rows.sort((a, b) => b.ch - a.ch);
+    const top = rows[0];
+    return { chapter: top.ch, at: top.at.toISOString().slice(0, 10), rows: rows.length };
+  } catch (e) { return null; }
+}
+
 async function readerSuffix(host) {
   try {
     const r = await fetch(`https://${host}/`, { headers: { 'User-Agent': UA } });
@@ -323,6 +371,23 @@ for (const [aniId, names] of work) {
   }
   if (Object.keys(slugs).length) out.series[aniId].readSlug = slugs;
   if (Object.keys(probed).length) out.series[aniId].readTried = probed;
+
+  // Ask the reader itself where the series is up to. Its chapter number is the
+  // one the app deep-links to, and its newest timestamp is a better projection
+  // anchor than the release feed's last row, which can be dozens behind.
+  for (const reader of READERS) {
+    const slug = slugs[reader.host];
+    if (!slug) continue;
+    const code = (out.readers[reader.host] || {}).suffix || null;
+    const live = await readerLatest(reader, code, slug);
+    await sleep(800);
+    if (!live) continue;
+    out.series[aniId].readChapter = live.chapter;
+    out.series[aniId].readAt = live.at;
+    out.series[aniId].readHost = reader.host;
+    console.log(`    ${reader.host}: ch ${live.chapter}, last ${live.at}`);
+    break;                                     // first reader that answers wins
+  }
 }
 
 await fs.mkdir('data', { recursive: true });

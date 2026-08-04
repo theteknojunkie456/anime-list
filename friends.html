@@ -11601,8 +11601,16 @@ function schedReadEntries(startSec,endSec){
   anime.filter(a=>kindOf(a)==='read'&&(a.status==='watching'||a.status==='plan')).forEach(a=>{
     const rec=feedRec(a);if(!rec)return;
     const rel=rec.releases||[],cad=Number(rec.cadence)||0;
-    if(!rel.length||!cad)return;
-    const lastAt=Date.parse(rel[rel.length-1].date+'T12:00:00');
+    if(!cad)return;
+    // Anchor on the READER when it answered. The release feed indexes one
+    // scanlation stream and can sit dozens of chapters behind what's actually
+    // published — it had The Stellar Swordmaster at 120 while the reader served
+    // 131 — so projecting from it starts two weeks stale. The reader's own
+    // timestamps are relative ("4 days ago"), hence ±1 day; the weekday snap
+    // below absorbs exactly that.
+    const anchor=rec.readAt||(rel.length?rel[rel.length-1].date:'');
+    if(!anchor)return;
+    const lastAt=Date.parse(anchor+'T12:00:00');
     if(!isFinite(lastAt))return;
     // A series that stopped months ago has a cadence on paper only. Projecting
     // one would fill the calendar with chapters that are never coming.

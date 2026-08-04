@@ -796,7 +796,7 @@ async function handleChapters(body, env) {
       }
     }
   }
-  return json({ ok: true, latest: (rec && rec.chapter) || 0, title: (rec && rec.title) || "", type: (rec && rec.type) || "" });
+  return json({ ok: true, latest: Math.max((rec && rec.chapter) || 0, (rec && rec.readChapter) || 0), title: (rec && rec.title) || "", type: (rec && rec.type) || "" });
 }
 
 // The Action asks for this: every series anyone is tracking, with the names to
@@ -1210,20 +1210,26 @@ async function notifyNewChapters(env, subs) {
     let dirty = false, expired = false;
     for (const id of record.mangaIds || []) {
       const cur = feed[String(id)];
-      if (!cur || !cur.chapter) continue;
+      if (!cur) continue;
+      // Whichever source is further ahead. MangaUpdates is curated and usually
+      // right, but the reader is what the user actually opens — if a chapter is
+      // already sitting there, "it's out" is true, and waiting for the database
+      // to catch up would just deliver the news late.
+      const latest = Math.max(Number(cur.chapter) || 0, Number(cur.readChapter) || 0);
+      if (!latest) continue;
       const seen = record.chapters[id];
       // First sighting is remembered silently — otherwise adding a series would
       // announce a chapter that came out months ago.
-      if (seen === undefined) { record.chapters[id] = cur.chapter; dirty = true; continue; }
-      if (cur.chapter <= seen) continue;
+      if (seen === undefined) { record.chapters[id] = latest; dirty = true; continue; }
+      if (latest <= seen) continue;
       const res = await sendPush(record.subscription, {
         title: cur.title || "New chapter",
-        body: `Chapter ${cur.chapter} is out`,
+        body: `Chapter ${latest} is out`,
         url: "/",
         tag: "wl-ch-" + id,
       }, env);
       if (res && res.expired) { expired = true; break; }
-      record.chapters[id] = cur.chapter;
+      record.chapters[id] = latest;
       dirty = true;
       await sleep(250);
     }

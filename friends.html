@@ -207,6 +207,21 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 }
 .schip.on{background:color-mix(in srgb,var(--a) 20%,var(--bg3));border-color:transparent;color:var(--a2);box-shadow:0 3px 12px -5px var(--glow);}
 .filt-row{display:flex;gap:6px;flex-shrink:0;}
+/* Its own row, full width. It lived in the filter row and made that
+   horizontally-scrolling row wide enough to push "All" off the left edge — an
+   alert shouldn't cost you a filter, and a wider tap target is the point. */
+.fixbar{display:none;}
+.fixbar.on{display:flex;align-items:center;gap:9px;margin:9px 18px 0;padding:8px 10px 8px 12px;
+  border-radius:12px;background:color-mix(in srgb,#ff6b6b 12%,var(--bg2));
+  border:1px solid color-mix(in srgb,#ff6b6b 34%,transparent);}
+.fixbar-i{display:flex;flex:0 0 auto;color:#ff8b8b;}
+.fixbar-i svg{width:15px;height:15px;}
+.fixbar-t{flex:1 1 auto;min-width:0;font-size:12.5px;font-weight:700;color:#ff8b8b;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.fixbar-b{flex:0 0 auto;padding:6px 14px;border-radius:99px;border:0;cursor:pointer;
+  font-family:inherit;font-size:12px;font-weight:800;color:#1a0b0b;background:#ff8b8b;}
+.fixbar-b:active{transform:scale(.96);}
+
 /* The app's established alert red (#ff6b6b — same as .dact.danger and the form
    errors), so this reads as "needs attention" rather than as another filter. */
 .fchip-warn{background:color-mix(in srgb,#ff6b6b 15%,var(--bg3));border-color:color-mix(in srgb,#ff6b6b 45%,transparent)!important;color:#ff8b8b;}
@@ -1816,6 +1831,7 @@ body.recsel .pcard{position:relative;}
     </div>
     <div class="kind-seg" id="kindSeg"></div>
   </div>
+  <div class="fixbar" id="fixBar"></div>
   <div class="ctrl-row">
     <div class="filt-scroll"><div class="filt-row" id="filtRow"></div></div>
     <div class="sort-wrap">
@@ -4605,18 +4621,61 @@ function renderFiltRow(){
     const n=counts[f]||0;
     return`<button class="fchip${cls?' '+cls:''}" onclick="setFilter('${f}')">${l}<span class="fn">${n}</span></button>`;
   }).join('')
-  // An unmatched title is invisible to everything downstream — no chapter count,
-  // no chapter list, no calendar entry, no alerts — and nothing said so. It only
-  // showed as a missing cover, which reads as a slow image, not a broken record.
-  // Shown only when there's something to fix, so it's absent on a healthy list.
-  +(function(){
-    const un=items.filter(a=>!a.aniId).length;
-    if(!un)return '';
-    return `<button class="fchip fchip-warn" onclick="retryUnmatched()" title="These aren't linked to a database entry yet">`
-      +icon('refresh')+`${un} unmatched<span class="fn">Fix</span></button>`;
-  })()
   // Sits with the Plan chip because that's the pile you stare at without choosing.
   ;   // "Decide" used to sit here, crowding the filter row it had nothing to do with — it lives under "Not sure what to watch?" now.
+}
+// Two different kinds of broken, and only one of them was being counted.
+//
+// A title with no aniId never matched anything — invisible to chapter counts,
+// the calendar and alerts. But a title that DID match can still be wrong on
+// screen: a lossy import strips apostrophes and case, so "The Ogre's Bride"
+// is stored as "the ogre s bride" even though the record behind it is correct.
+// Those read as broken to anyone looking at the list, and there were far more
+// of them than unmatched ones.
+//
+// They're also the easy case: normalise both and they're identical, which is
+// exactly what makes the fix safe to apply without asking. A title that differs
+// by more than punctuation and case is a deliberate rename and is left alone.
+const _tnorm=t=>String(t||'').toLowerCase().replace(/[^a-z0-9]/g,'');
+function canonTitle(a){
+  const c=a.titleEn||a.titleRo||'';
+  if(!c||!a.aniId)return '';
+  if(c===a.title)return '';
+  return _tnorm(c)===_tnorm(a.title)?c:'';     // same title, better spelling
+}
+function needsFix(kind){
+  const items=anime.filter(a=>kindOf(a)===kind);
+  return {
+    unmatched:items.filter(a=>!a.aniId),
+    mistitled:items.filter(a=>canonTitle(a)),
+  };
+}
+function renderFixBar(){
+  const bar=document.getElementById('fixBar'); if(!bar)return;
+  const {unmatched,mistitled}=needsFix(viewKind);
+  const n=unmatched.length+mistitled.length;
+  if(!n){bar.className='fixbar';bar.innerHTML='';return;}
+  // Name both kinds — "6 unmatched" while a dozen titles look mangled reads as
+  // the app miscounting.
+  const bits=[];
+  if(mistitled.length)bits.push(mistitled.length+' with messy names');
+  if(unmatched.length)bits.push(unmatched.length+' not linked');
+  bar.className='fixbar on';
+  bar.innerHTML=`<span class="fixbar-i">${icon('refresh')}</span>`
+    +`<span class="fixbar-t">${bits.join(' \u00b7 ')}</span>`
+    +`<button class="fixbar-b" onclick="fixAll()">Fix all</button>`;
+}
+// One tap, and the instant part really is instant: the messy names are fixed
+// from data already on the device, with no network at all. Only the genuinely
+// unlinked titles need a lookup, and they run after, so the list visibly
+// improves straight away instead of after a round trip.
+async function fixAll(){
+  const {unmatched,mistitled}=needsFix(viewKind);
+  let renamed=0;
+  mistitled.forEach(a=>{const c=canonTitle(a);if(c){a.title=c;a.upd=Date.now();renamed++;}});
+  if(renamed){try{save();render();}catch(e){}toast(`Fixed ${renamed} name${renamed>1?'s':''}`);}
+  if(!unmatched.length){if(!renamed)toast('Nothing to fix');return;}
+  await retryUnmatched();
 }
 // Retry the titles that never matched. They carry idTried/imgTried flags so the
 // enrichment loop stops asking about them forever — a title AniList genuinely
@@ -4648,6 +4707,7 @@ async function retryUnmatched(){
 const SORT_MODES=[['recent','clock','Recent'],['az',null,'A–Z'],['rating','star','Your rating'],['score','trophy','Top rated'],['progress','play','Progress'],['duration','film','Shortest']];
 const MENU_FILTS=[['finished','check','Finished'],['dropped','x','Dropped']];   // extra filters tucked in the menu
 function renderSortRow(){
+  try{renderFixBar();}catch(e){}
   const curSort=SORT_MODES.find(x=>x[0]===sortMode)||SORT_MODES[0];
   const activeFilt=MENU_FILTS.find(x=>x[0]===filterStatus);   // Finished/Dropped active?
   const btn=document.getElementById('sortBtn');

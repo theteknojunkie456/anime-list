@@ -490,7 +490,7 @@ async function handleTest(body, env) {
       record.subscription,
       {
         title: "WatchList",
-        body: "Notifications are working — you'll hear from us when an episode drops.",
+        body: "Notifications are working — new episodes and chapters both land here.",
         url: "/",
         tag: "watchlist-test",
       },
@@ -693,6 +693,16 @@ async function handleJoin(body, env) {
   // probe = say so and write nothing.
   if (body.probe) return json({ ok: true, status: "unknown", probe: true });
 
+  // A name is required to CREATE a record, and the server is where that has to
+  // be enforced. The join form already refuses a blank name, but a client
+  // running an older cached bundle doesn't — which is exactly how three
+  // nameless rows appeared on Jul 31 - Aug 1, after the form was fixed. An
+  // unnamed row is one the admin has to guess at later, and guessing is the
+  // thing this is meant to stop. Stale clients self-heal on next open (the
+  // service worker is network-first), so this rejects rather than accommodates.
+  const nm = String(body.name || "").trim().slice(0, 40);
+  if (nm.length < 2) return json({ ok: false, error: "name required" }, 400);
+
   // Optional invite: an 'auto' code approves on the spot (still counts toward the
   // cap); a 'request' code just tags where they came from.
   let status = "pending", inviteCode = "";
@@ -713,7 +723,7 @@ async function handleJoin(body, env) {
 
   const rec = {
     id, status,
-    name: String(body.name || "").slice(0, 40),
+    name: nm,
     source: String(body.source || "").slice(0, 40),   // how they heard about it
     invite: inviteCode,
     joinedAt: Date.now(),

@@ -159,8 +159,14 @@ AniList's `chapters` field is null for most ongoing manga, so chapter counts and
 release dates come from **MangaUpdates**. That API cannot be called from where
 you'd expect: it returns **403 to Cloudflare Worker egress and 403 to browsers**
 (an `Origin` header alone is enough). A GitHub runner is neither, so
-`.github/workflows/chapters.yml` runs `scripts/chapters.mjs` four times a day and
-commits `data/chapters.json`; Pages serves it, and both the app and the notify
+`.github/workflows/chapters.yml` fires `scripts/chapters.mjs` hourly and commits
+`data/chapters.json`. The script decides whether to do anything: it works every
+hour on the days a tracked series actually releases (and the day after, since the
+runner is UTC and a late chapter lands on the next date), and falls back to a
+six-hour floor otherwise — polling MangaUpdates and the readers 24 times a day is
+rude, rate-limit bait, and pointless for a weekly series. The release days come
+from each series' own `weekday`, not from the workflow, so a series that moves to
+Sundays is followed without editing anything; Pages serves it, and both the app and the notify
 Worker read it from there. Nothing secret is published — only public series data.
 
 Per series the file carries:

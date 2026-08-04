@@ -291,6 +291,37 @@ async function readerSuffix(host) {
 }
 
 const prev = await fs.readFile(OUT, 'utf8').then(JSON.parse).catch(() => ({ series: {} }));
+
+/**
+ * Should this run do any work?
+ *
+ * The workflow now fires hourly, but hammering MangaUpdates and the readers 24
+ * times a day is both rude and a good way to get rate-limited — and pointless,
+ * since a weekly series moves on one known day. So: hourly ON the days a
+ * tracked series actually releases, and the old every-6-hours floor otherwise.
+ *
+ * The days aren't hardcoded. Each series carries the weekday it posts on, so
+ * this follows the data — a series that moves to Sundays is picked up on the
+ * next full run with no edit here.
+ */
+function shouldRun(prevData) {
+  const series = Object.values(prevData.series || {});
+  if (!series.length) return true;                       // nothing known yet
+  const today = new Date().getDay();
+  // Yesterday counts too: a chapter posted late in the day lands on the next
+  // date in UTC, and the runner is UTC.
+  const yesterday = (today + 6) % 7;
+  const due = series.some((s) => s.weekday === today || s.weekday === yesterday);
+  if (due) return true;
+  const last = Date.parse(prevData.updatedAt || 0) || 0;
+  return Date.now() - last > 6 * 3600e3;
+}
+
+if (!shouldRun(prev)) {
+  console.log('Nothing releases today and the file is fresh — skipping this run.');
+  process.exit(0);                                       // no write, so no commit
+}
+
 const out = { updatedAt: new Date().toISOString(), series: { ...(prev.series || {}) } };
 
 let tracked = null;

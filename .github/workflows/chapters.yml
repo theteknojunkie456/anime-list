@@ -6,7 +6,11 @@ name: Chapter counts
 # serves the result to both.
 on:
   schedule:
-    - cron: '17 */6 * * *'   # four times a day, offset off the hour
+    # Hourly, but the script decides whether to do anything: it works every hour
+    # on the days a tracked series actually releases, and falls back to roughly
+    # every six hours otherwise. The release days come from the data, not from
+    # this file, so they follow a series that changes its schedule.
+    - cron: '17 * * * *'     # every hour, offset off the hour
   workflow_dispatch:          # and on demand, which is how to test it
 
 permissions:

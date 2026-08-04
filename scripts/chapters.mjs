@@ -271,6 +271,33 @@ async function readerLatest(reader, code, slug) {
   } catch (e) { return null; }
 }
 
+/**
+ * Can a browser put this host in an iframe?
+ *
+ * The app cannot answer this itself. Cross-origin isolation means a page is
+ * never told whether its frame was blocked — github.com (X-Frame-Options:
+ * DENY) is indistinguishable from a page that loaded fine, whichever way you
+ * poke at it. But the headers say so plainly, and a runner can read them.
+ *
+ * Caveat worth keeping honest: a host behind a bot challenge answers with the
+ * CHALLENGE page's headers, not its own. Cloudflare's challenge sets SAMEORIGIN
+ * regardless of what the site would send, so that case is reported separately
+ * rather than being called a refusal — it is genuinely unknown from here.
+ */
+async function hostFrames(host) {
+  try {
+    const r = await fetch(`https://${host}/`, { headers: { 'User-Agent': UA }, redirect: 'follow' });
+    const xfo = (r.headers.get('x-frame-options') || '').toLowerCase().trim();
+    const csp = (r.headers.get('content-security-policy') || '').toLowerCase();
+    const fa = (csp.match(/frame-ancestors([^;]*)/) || [])[1] || '';
+    const challenged = !!r.headers.get('cf-mitigated') || r.status === 403;
+    let verdict = 'ok';
+    if (xfo === 'deny' || xfo === 'sameorigin' || /'none'|'self'/.test(fa)) verdict = 'blocked';
+    if (challenged) verdict = 'unknown';         // headers belong to the challenge, not the site
+    return { frames: verdict, xfo: xfo || null, at: new Date().toISOString() };
+  } catch (e) { return null; }
+}
+
 async function readerSuffix(host) {
   try {
     const r = await fetch(`https://${host}/`, { headers: { 'User-Agent': UA } });
@@ -317,7 +344,10 @@ function shouldRun(prevData) {
   return Date.now() - last > 6 * 3600e3;
 }
 
-if (!shouldRun(prev)) {
+// A hand-triggered run is someone asking for it NOW — skipping would make the
+// workflow_dispatch button do nothing, which is the opposite of what it's for.
+const FORCE = process.env.FORCE === '1' || process.env.GITHUB_EVENT_NAME === 'workflow_dispatch';
+if (!FORCE && !shouldRun(prev)) {
   console.log('Nothing releases today and the file is fresh — skipping this run.');
   process.exit(0);                                       // no write, so no commit
 }
@@ -341,6 +371,21 @@ for (const reader of READERS.filter((r) => r.code)) {
   const code = await readerSuffix(reader.host);
   if (code) out.readers[reader.host] = { suffix: code, at: new Date().toISOString() };
   await sleep(1000);
+}
+
+// Framing verdicts for the hosts the app can send you to. Cheap (one request
+// each) and the list is short, so it refreshes every run — a site that changes
+// its policy is picked up the same day.
+out.frames = { ...(prev.frames || {}) };
+const FRAME_HOSTS = [
+  ...READERS.map((r) => r.host),
+  'miruro.tv', 'pluto.tv', 'therokuchannel.roku.com', 'www.peacocktv.com',
+  'www.retrocrush.tv', 'watch.plex.tv', 'anineko.to',
+];
+for (const h of [...new Set(FRAME_HOSTS)]) {
+  const v = await hostFrames(h);
+  if (v) { out.frames[h] = v; console.log(`  frames ${h}: ${v.frames}${v.xfo ? ` (${v.xfo})` : ''}`); }
+  await sleep(500);
 }
 
 console.log(`${work.size} series to check`);

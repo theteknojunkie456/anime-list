@@ -377,10 +377,40 @@ for (const reader of READERS.filter((r) => r.code)) {
 // each) and the list is short, so it refreshes every run — a site that changes
 // its policy is picked up the same day.
 out.frames = { ...(prev.frames || {}) };
+
+// The built-ins, plus whatever people are actually using. Measuring only the
+// presets meant a custom source — the kind most likely to be an unknown
+// quantity — was never checked at all, so the app had no verdict for the one
+// host it mattered most for.
+//
+// POST, and the list is nested under `sources`: a GET answers 405, which would
+// have made this whole thing fail silently and measure nothing.
+async function sharedHosts() {
+  try {
+    const r = await fetch(NOTIFY + '/sources', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'User-Agent': UA },
+      body: '{}',
+    });
+    if (!r.ok) { console.log(`  shared sources -> HTTP ${r.status}`); return []; }
+    const d = await r.json();
+    const list = (d.sources && d.sources.list) || d.list || [];
+    return list
+      .map((x) => {
+        // Source URLs are templates ({slug}, {ep}) — neutralise the placeholders
+        // before parsing or the URL constructor throws on every one of them.
+        try { return new URL(String(x.url || x).replace(/\{[^}]+\}/g, 'x')).hostname; }
+        catch { return ''; }
+      })
+      .filter(Boolean);
+  } catch (e) { console.log(`  shared sources failed: ${e.message}`); return []; }
+}
+
 const FRAME_HOSTS = [
   ...READERS.map((r) => r.host),
   'miruro.tv', 'pluto.tv', 'therokuchannel.roku.com', 'www.peacocktv.com',
   'www.retrocrush.tv', 'watch.plex.tv', 'anineko.to',
+  ...(await sharedHosts()),
 ];
 for (const h of [...new Set(FRAME_HOSTS)]) {
   const v = await hostFrames(h);

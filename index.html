@@ -8764,6 +8764,7 @@ function pvWatchBlocked(f){
   const box=document.getElementById('pvBlocked'); if(!box)return;
   const host=srcHost(f.src||'');
   box.classList.remove('on'); clearTimeout(_pvBlockT);
+  if(f._pvSrcSeen!==f.src){f._pvSrcSeen=f.src;f._pvAuto=0;}   // new episode = new chance
   const btn=box.querySelector('.parse-btn');
   const show=()=>{
     box.classList.add('on');
@@ -8815,7 +8816,22 @@ function pvWatchBlocked(f){
   try{if(f._pvPainted)f.removeEventListener('load',f._pvPainted);}catch(e){}
   f._pvPainted=painted;
   try{f.addEventListener('load',painted);}catch(e){}
-  _pvBlockT=setTimeout(show,8000);
+  // Retry once on our own before bothering the user. A verification gate very
+  // often clears on the second load — the first request is what triggers it —
+  // so a panel that appears without the app having tried again is a panel that
+  // half the time didn't need to exist. Once only, and never for a host already
+  // known to refuse, where reloading is just a slower way to fail.
+  const canAuto=!f._pvAuto&&framesVerdict(host)!=='blocked';
+  _pvBlockT=setTimeout(()=>{
+    if(canAuto){
+      f._pvAuto=1;
+      const u=f.src; f.src='about:blank';
+      setTimeout(()=>{f.src=u;},60);
+      _pvBlockT=setTimeout(show,9000);
+      return;
+    }
+    show();
+  },6000);
 }
 // Reading source (AsuraScans by default). AsuraScans series live at
 // /comics/<slug>-<suffix>, where the suffix is a CONSTANT site-wide token (not a

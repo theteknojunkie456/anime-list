@@ -210,6 +210,21 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 /* Its own row, full width. It lived in the filter row and made that
    horizontally-scrolling row wide enough to push "All" off the left edge — an
    alert shouldn't cost you a filter, and a wider tap target is the point. */
+/* One stuck title per row: what you have, and what the database offers. */
+.fx-row{padding:12px 18px;border-top:1px solid var(--bn2);}
+.fx-row.fx-done{opacity:.55;}
+.fx-have{font-size:13px;font-weight:800;color:var(--t1);margin-bottom:8px;word-break:break-word;}
+.fx-opts{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px;}
+.fx-opts::-webkit-scrollbar{display:none;}
+.fx-opt{flex:0 0 96px;display:flex;flex-direction:column;gap:5px;padding:0;border:0;background:none;cursor:pointer;font-family:inherit;text-align:left;}
+.fx-opt img,.fx-ph{width:96px;height:136px;border-radius:9px;object-fit:cover;background:var(--bg4);border:1px solid var(--b2);display:block;}
+.fx-opt-t{font-size:11px;font-weight:700;color:var(--t2);line-height:1.3;}
+.fx-opt-t em{font-style:normal;color:var(--t3);}
+.fx-opt:active{transform:scale(.96);}
+.fx-load,.fx-none{font-size:12px;color:var(--t3);align-self:center;}
+.fx-rename{flex:0 0 auto;align-self:center;margin-left:4px;padding:7px 12px;border-radius:99px;
+  border:1px solid var(--b2);background:var(--bg3);color:var(--t2);font-family:inherit;font-size:11.5px;font-weight:700;cursor:pointer;}
+.fx-ok{font-size:12px;font-weight:800;color:var(--fin);}
 .fixbar{display:none;}
 .fixbar.on{display:flex;align-items:center;gap:9px;margin:9px 18px 0;padding:8px 10px 8px 12px;
   border-radius:12px;background:color-mix(in srgb,#ff6b6b 12%,var(--bg2));
@@ -2366,6 +2381,17 @@ body.recsel .pcard{position:relative;}
 </div>
 
 <!-- STREAMING SOURCE — config lives here, so the player itself stays bare -->
+<!-- Telling someone "no match, try renaming them" names neither the titles nor
+     what to rename them TO. This shows each one with what the database actually
+     has, so the fix is a tap instead of a guessing game. -->
+<div class="sheet" id="fixSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <div class="sheet-title"><i data-ic="refresh"></i> Fix titles</div>
+    <button class="sheet-cancel" onclick="closeAll()">Done</button>
+  </div>
+  <div id="fixBody"></div>
+</div>
 <div class="sheet" id="sourceSheet">
   <div class="sheet-handle"></div>
   <div class="sheet-header">
@@ -4677,6 +4703,90 @@ async function fixAll(){
   if(!unmatched.length){if(!renamed)toast('Nothing to fix');return;}
   await retryUnmatched();
 }
+// ─── FIX TITLES THAT NEVER MATCHED ──────────────────────────────────────────
+// "Still no match — try renaming them" named neither the titles nor what to
+// rename them to, and the automatic rescue leans on an AI key that may be dead.
+// This asks the database what it has and lets the answer be a tap.
+// A lossy import doesn't just look wrong, it breaks searching outright: strip
+// the apostrophe from "The Ogre's Bride" and you get an orphan "s" token, and
+// AniList returns NOTHING for "the ogre s bride" while "the ogre's bride"
+// finds it first try. Same for "tamon s b side" -> "tamon's b-side".
+// So repair the obvious damage before deciding a title has no match.
+function titleRepairs(t){
+  const raw=String(t||'').trim(); if(!raw)return [];
+  const out=[raw];
+  // orphan possessive: "ogre s bride" -> "ogre's bride"
+  const poss=raw.replace(/\b([A-Za-z]{2,})\s+s\b/g,"$1's");
+  if(poss!==raw)out.push(poss);
+  // stranded single letters: "b side" -> "b-side"
+  const hy=poss.replace(/\b([A-Za-z])\s+([A-Za-z]{2,})\b/g,'$1-$2');
+  if(hy!==poss&&hy!==raw)out.push(hy);
+  // last resort: the distinctive words only, which fuzzy search handles well
+  const STOP=/^(the|a|an|of|and|to|in|is|i|am|my|me|be|was|it|s)$/i;
+  const key=raw.split(/\s+/).filter(w=>w.length>2&&!STOP.test(w)).slice(0,4).join(' ');
+  if(key&&key.toLowerCase()!==raw.toLowerCase())out.push(key);
+  return [...new Set(out)];
+}
+async function fixCandidates(a){
+  const type=kindOf(a)==='read'?'MANGA':'ANIME';
+  for(const t of titleRepairs(a.title)){
+    let hits=[];
+    try{hits=await aniSearch(t,type);}catch(e){}
+    if(hits.length)return hits;
+    await pause(350);
+  }
+  return [];
+}
+async function openFixSheet(){
+  openSheet('fixSheet');
+  const body=document.getElementById('fixBody'); if(!body)return;
+  const stuck=anime.filter(a=>kindOf(a)===viewKind&&!a.aniId);
+  if(!stuck.length){body.innerHTML='<p class="ai-desc" style="padding:18px">Everything here is linked up.</p>';return;}
+  body.innerHTML='<p class="ai-desc" style="padding:0 18px 4px">Tap the right one and it links up — cover, episodes, dates and alerts all follow.</p>'
+    +stuck.map(a=>`<div class="fx-row" id="fx-${escH(a.id)}">
+      <div class="fx-have">${escH(a.title||'(untitled)')}</div>
+      <div class="fx-opts" id="fxo-${escH(a.id)}"><span class="fx-load">Looking…</span></div>
+    </div>`).join('');
+  // One at a time — AniList rate-limits hard, and a burst is how a whole batch
+  // comes back empty and looks like "no match" all over again.
+  for(const a of stuck){
+    const box=document.getElementById('fxo-'+a.id); if(!box)continue;
+    let hits=await fixCandidates(a);
+    if(!hits.length){
+      box.innerHTML='<span class="fx-none">Nothing found for this name</span>'
+        +`<button class="fx-rename" onclick="fixRename('${escH(a.id)}')">Rename</button>`;
+      await pause(400); continue;
+    }
+    box.innerHTML=hits.slice(0,4).map(m=>{
+      const t=(m.title.english||m.title.romaji||'?');
+      const yr=(m.startDate&&m.startDate.year)||'';
+      const img=m.coverImage&&m.coverImage.large;
+      return `<button class="fx-opt" onclick="fixPick('${escH(a.id)}',${m.id})">`
+        +(img?`<img src="${escH(img)}" alt="" loading="lazy">`:'<span class="fx-ph"></span>')
+        +`<span class="fx-opt-t">${schEsc(t)}${yr?` <em>${yr}</em>`:''}</span></button>`;
+    }).join('')+`<button class="fx-rename" onclick="fixRename('${escH(a.id)}')">None of these</button>`;
+    await pause(400);
+  }
+}
+async function fixPick(id,aniId){
+  const a=anime.find(x=>x.id===id); if(!a)return;
+  a.aniId=aniId;
+  // Clear the "already asked, don't ask again" flags so the normal enrichment
+  // pass fills in cover, episodes, dates and canonical titles from the id.
+  delete a.idTried;delete a.imgTried;delete a.detTried;delete a.bannerTried;delete a.scoreTried;delete a.nameFix;
+  a.upd=Date.now();
+  const row=document.getElementById('fx-'+id);
+  if(row){row.classList.add('fx-done');row.innerHTML='<div class="fx-have">'+escH(a.title)+'</div><span class="fx-ok">Linked</span>';}
+  try{save();}catch(e){}
+  try{await fetchCovers();}catch(e){}
+  try{save();render();}catch(e){}
+  if(row)row.querySelector('.fx-have').textContent=a.title;
+}
+function fixRename(id){
+  const a=anime.find(x=>x.id===id); if(!a)return;
+  closeAll();
+  try{editItem(id);}catch(e){toast('Open it and change the title');}
+}
 // Retry the titles that never matched. They carry idTried/imgTried flags so the
 // enrichment loop stops asking about them forever — a title AniList genuinely
 // doesn't carry shouldn't cost a request every pass. Clearing those flags is
@@ -4699,8 +4809,11 @@ async function retryUnmatched(){
   const left=anime.filter(a=>kindOf(a)===viewKind&&!a.aniId).length;
   const fixed=stuck.length-left;
   try{save();render();}catch(e){}
-  toast(fixed>0?(left?`Matched ${fixed}, ${left} still stuck`:`Matched all ${fixed}`)
-               :'Still no match \u2014 try renaming them');
+  if(left){
+    // Don't dead-end on "try renaming them" — show them and let a tap do it.
+    toast(fixed>0?`Matched ${fixed}, ${left} need a hand`:`${left} need a hand`);
+    try{openFixSheet();}catch(e){}
+  }else toast(`Matched all ${fixed}`);
 }
 // Two different ratings, so both say whose: 'Rating' is your own stars, 'Top
 // rated' is AniList's community score, stored per title since the score work.

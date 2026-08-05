@@ -294,7 +294,7 @@ async function hostFrames(host) {
     let verdict = 'ok';
     if (xfo === 'deny' || xfo === 'sameorigin' || /'none'|'self'/.test(fa)) verdict = 'blocked';
     if (challenged) verdict = 'unknown';         // headers belong to the challenge, not the site
-    return { frames: verdict, xfo: xfo || null, at: new Date().toISOString() };
+    return { frames: verdict, xfo: xfo || null, challenged, at: new Date().toISOString() };
   } catch (e) { return null; }
 }
 
@@ -384,7 +384,45 @@ const FRAME_HOSTS = [
 ];
 for (const h of [...new Set(FRAME_HOSTS)]) {
   const v = await hostFrames(h);
-  if (v) { out.frames[h] = v; console.log(`  frames ${h}: ${v.frames}${v.xfo ? ` (${v.xfo})` : ''}`); }
+  if (!v) continue;
+  const was = out.frames[h] || {};
+
+  // Whether a host answers with a bot challenge varies run to run, so the raw
+  // reading flaps: reaperscans measured 'blocked' one run and 'unknown' the
+  // next, purely on whether the runner got challenged. Two rules stop that
+  // turning into a working source going dark.
+  //
+  // 1. A challenged reading tells us nothing about the SITE, so it must never
+  //    overwrite a real measurement. Keep what we knew.
+  if (v.challenged && was.frames && was.frames !== 'unknown') {
+    console.log(`  frames ${h}: challenged, keeping ${was.frames}`);
+    await sleep(500);
+    continue;
+  }
+
+  // 2. 'blocked' is the only verdict that stops the app from even trying, so it
+  //    has to earn it twice in a row. One flaky read shouldn't silently retire a
+  //    source that works.
+  if (v.frames === 'blocked') {
+    // The streak has to be tracked separately from the verdict we PUBLISH.
+    // Strike one publishes 'unknown' (keep trying), so keying the count off the
+    // published value reset it every run and 'blocked' could never be confirmed.
+    const priorStreak = (was.pending === 'blocked' || was.frames === 'blocked') ? (was.strikes || 1) : 0;
+    const strikes = priorStreak + 1;
+    if (strikes < 2) {
+      out.frames[h] = { ...v, frames: was.frames === 'ok' ? 'ok' : 'unknown', strikes, pending: 'blocked' };
+      console.log(`  frames ${h}: blocked (strike ${strikes}/2 — still trying)`);
+      await sleep(500);
+      continue;
+    }
+    out.frames[h] = { ...v, strikes };
+    console.log(`  frames ${h}: blocked (confirmed)`);
+    await sleep(500);
+    continue;
+  }
+
+  out.frames[h] = v;                              // ok / unknown, measured cleanly
+  console.log(`  frames ${h}: ${v.frames}${v.xfo ? ` (${v.xfo})` : ''}`);
   await sleep(500);
 }
 

@@ -8745,26 +8745,54 @@ async function pvProbeHost(host,t,d,btn){
   if(d)d.textContent=host+' didn\u2019t answer. If it moved or shut down, pick a different source.';
   // Opening a dead host in the browser fails the same way, so don't offer it.
   if(btn){btn.textContent='Change source';btn.setAttribute('onclick','closePlayer();openSheet(\'sourceSheet\')');}
+  /* no browser hand-off: a host that answers nothing fails there too */
+}
+// Reload what's already loaded. A verification gate often passes on a second
+// attempt, and this keeps that inside the app rather than punting you out.
+function pvRetryFrame(){
+  const f=document.getElementById('pvFrame'); if(!f)return;
+  const box=document.getElementById('pvBlocked'); if(box)box.classList.remove('on');
+  const u=f.src; f.src='about:blank';
+  setTimeout(()=>{f.src=u;try{pvWatchBlocked(f);}catch(e){}},60);
+  toast('Trying again\u2026');
 }
 function pvWatchBlocked(f){
   const box=document.getElementById('pvBlocked'); if(!box)return;
   const host=srcHost(f.src||'');
   box.classList.remove('on'); clearTimeout(_pvBlockT);
   const btn=box.querySelector('.parse-btn');
-  const show=(sure)=>{
+  const show=()=>{
     box.classList.add('on');
     const t=box.querySelector('.pv-blocked-t'),d=box.querySelector('.pv-blocked-s');
-    // When we know, say so plainly instead of asking the user to diagnose it.
-    if(t)t.textContent=sure?'This site won\u2019t open in the app':'Still blank?';
-    if(d)d.textContent=sure?'It blocks being shown inside other apps. Open it in your browser instead.'
-                           :'Some sites don\u2019t allow being opened inside another app.';
-    if(btn){btn.textContent='Open in browser';btn.setAttribute('onclick','pvOpenExternal()');}
+    const v=host?framesVerdict(host):'unknown';
+    // A blank frame has three different causes and they are not the user's fault
+    // in any of them. Saying which one it is stops the app looking broken when
+    // it is working exactly as it should.
+    if(v==='unknown'){
+      // The host had a "prove you're human" gate up when we measured it. Those
+      // gates refuse to render inside another app, and the pass earned in a
+      // browser isn't visible in here — a phone deliberately walls the two
+      // apart. Only the site itself can lift that, so this explains rather than
+      // pretends there's a fix.
+      if(t)t.textContent='This site wants to verify you';
+      if(d)d.textContent='It\u2019s asking to check you\u2019re human, and it won\u2019t do that inside an app. Nothing\u2019s broken on your end.';
+    }else if(v==='blocked'){
+      if(t)t.textContent='This site won\u2019t open in the app';
+      if(d)d.textContent='It doesn\u2019t allow being shown inside other apps.';
+    }else{
+      if(t)t.textContent='Still blank?';
+      if(d)d.textContent='It may just be slow. Give it another go.';
+    }
+    if(btn){
+      const again=v!=='blocked';
+      btn.textContent=again?'Try again':'Change source';
+      btn.setAttribute('onclick',again?'pvRetryFrame()':'closePlayer();openSheet(\'sourceSheet\')');
+    }
     const w=document.getElementById('pvWrong'); if(w)w.classList.remove('on');
-    // "Blocked from framing" and "this host is gone" look identical from in here
-    // — both paint an error page. They need opposite advice, though: opening a
-    // dead domain in the browser fails exactly the same way. A no-cors probe
+    // "Won't embed" and "this host is gone" look identical from in here — both
+    // paint an error page — but they need opposite advice. A no-cors probe
     // separates them, because it only resolves if something answered.
-    if(sure&&host)pvProbeHost(host,t,d,btn);
+    if(host)pvProbeHost(host,t,d,btn);
   };
   // A slow site can paint after the deadline. Whenever the frame really loads,
   // the panel goes away again — it used to stay up over a page you could see.
@@ -8780,7 +8808,7 @@ function pvWatchBlocked(f){
   try{if(f._pvPainted)f.removeEventListener('load',f._pvPainted);}catch(e){}
   f._pvPainted=painted;
   try{f.addEventListener('load',painted);}catch(e){}
-  _pvBlockT=setTimeout(()=>show(false),8000);
+  _pvBlockT=setTimeout(show,8000);
 }
 // Reading source (AsuraScans by default). AsuraScans series live at
 // /comics/<slug>-<suffix>, where the suffix is a CONSTANT site-wide token (not a

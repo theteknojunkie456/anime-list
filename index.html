@@ -8478,6 +8478,10 @@ function testSource(){
 function pvOpenExternal(){
   const a=anime.find(x=>x.id===pvReturnId); if(!a){toast('Nothing to open');return;}
   const u=(streamURL(a).url)||findUrl(a);
+  // Leaving for the browser mid-episode still counts as watching it — the other
+  // hand-off paths arm this, and this one didn't, so progress silently stalled
+  // for exactly the sources that can only be watched out there.
+  try{armExternalWatch(a,(typeof pvWatchEp!=='undefined'&&pvWatchEp)||watchEpisode(a)||1);}catch(e){}
   // Reaching for the browser while the blank panel is up is the clearest signal
   // there is that this host won't frame — clearer than any timer.
   const blocked=document.getElementById('pvBlocked');
@@ -8784,9 +8788,12 @@ function pvWatchBlocked(f){
       if(d)d.textContent='It may just be slow. Give it another go.';
     }
     if(btn){
+      // A confirmed refusal has nowhere to go inside the app — offering only
+      // "Change source" makes the show unwatchable on a source that works
+      // perfectly well in a browser. Somewhere beats nowhere.
       const again=v!=='blocked';
-      btn.textContent=again?'Try again':'Change source';
-      btn.setAttribute('onclick',again?'pvRetryFrame()':'closePlayer();openSheet(\'sourceSheet\')');
+      btn.textContent=again?'Try again':'Open in browser';
+      btn.setAttribute('onclick',again?'pvRetryFrame()':'pvOpenExternal()');
     }
     const w=document.getElementById('pvWrong'); if(w)w.classList.remove('on');
     // "Won't embed" and "this host is gone" look identical from in here — both

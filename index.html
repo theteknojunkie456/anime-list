@@ -5525,6 +5525,26 @@ async function loadChapters(aniId,forId,title){
       // which looks broken. Say why, and say exactly what fixes it.
       +(deep?'':`<p class="ai-desc" style="margin-top:8px;font-size:11.5px">These open the series page — your reading source points at a series, not a chapter. To jump straight to a chapter, open <b>Sources → Reading</b> and paste the address of <b>a chapter</b> instead.</p>`);
   };
+  // How many chapters does YOUR source actually have?
+  //
+  // This used to be one number for everyone — the highest count across every
+  // database and reader we know of. If your reader is twenty chapters behind
+  // that, the strip offered you chapters that 404 on the site you actually
+  // read from; if it's ahead, the ones you could read weren't listed at all.
+  // The feed now records a count per reader, so the right answer is the one
+  // for the host your source points at.
+  const _it=anime.find(x=>x.id===forId);
+  try{
+    await readerCodes();
+    const rec=_it?feedRec(_it):null;
+    const host=srcHost(effectiveReadSource(_it||{})||READ_DEFAULT);
+    const mine=rec&&rec.readBy&&rec.readBy[host];
+    // Keyed by host as well: the same series has a different count on a
+    // different reader, so caching it under the series alone would serve the
+    // old site's number the moment someone switches source.
+    if(mine&&mine.chapter){ _chCache[ck0(aniId,title)+'@'+host]=mine.chapter; paint(mine.chapter); return; }
+  }catch(e){}
+
   const ck=aniId||('t:'+String(title||'').toLowerCase());
   if(_chCache[ck]!==undefined){paint(_chCache[ck]);return;}
   try{
@@ -5534,6 +5554,9 @@ async function loadChapters(aniId,forId,title){
   }catch(e){_chCache[ck]=0;}
   paint(_chCache[ck]);
 }
+// Same cache key the fallback path uses, so a source-specific answer and a
+// generic one never collide in the cache.
+function ck0(aniId,title){return aniId||('t:'+String(title||'').toLowerCase());}
 let _chAll={};
 // ─── RICH DETAIL — synopsis, meta, trailer, characters, "more like this" ─────
 // Loads AniList's full metadata on open (cached per id) and renders it into #dtRich,

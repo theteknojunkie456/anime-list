@@ -519,6 +519,11 @@ for (const [aniId, names] of work) {
   // Ask the reader itself where the series is up to. Its chapter number is the
   // one the app deep-links to, and its newest timestamp is a better projection
   // anchor than the release feed's last row, which can be dozens behind.
+  // Every reader that answers, not just the first. Readers disagree — one may be
+  // twenty chapters ahead of another — and the count someone should see is the
+  // count on the site THEY read from, not whichever host happened to reply
+  // first. Keeping them all is what lets the app pick per user.
+  const readBy = { ...(known.readBy || {}) };
   for (const reader of READERS) {
     const slug = slugs[reader.host];
     if (!slug) continue;
@@ -526,11 +531,21 @@ for (const [aniId, names] of work) {
     const live = await readerLatest(reader, code, slug);
     await sleep(800);
     if (!live) continue;
-    out.series[aniId].readChapter = live.chapter;
-    out.series[aniId].readAt = live.at;
-    out.series[aniId].readHost = reader.host;
+    readBy[reader.host] = { chapter: live.chapter, at: live.at };
     console.log(`    ${reader.host}: ch ${live.chapter}, last ${live.at}`);
-    break;                                     // first reader that answers wins
+  }
+  if (Object.keys(readBy).length) {
+    out.series[aniId].readBy = readBy;
+    // Keep the flat fields too: they're what the notify worker and the calendar
+    // anchor read, and the highest count across readers is the right answer for
+    // "is there a new chapter anywhere".
+    let best = null;
+    for (const [host, v] of Object.entries(readBy)) {
+      if (!best || v.chapter > best.v.chapter) best = { host, v };
+    }
+    out.series[aniId].readChapter = best.v.chapter;
+    out.series[aniId].readAt = best.v.at;
+    out.series[aniId].readHost = best.host;
   }
 }
 

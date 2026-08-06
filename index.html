@@ -3597,7 +3597,12 @@ async function resumeSession(){
     return true;
   }catch(e){cryptoKey=null;forgetSessionKey();return false;}
 }
-function finishUnlock(){try{rememberSessionKey();}catch(e){}hideLock();render();renderLockUI();setTimeout(syncOnOpen,200);try{setTimeout(fetchCovers,600);}catch{}try{restorePlayer();}catch{}try{alBootSync();}catch{}try{if(_pendingPartyJoin){var _pc=_pendingPartyJoin;_pendingPartyJoin=null;setTimeout(function(){try{window.wlJoinParty(_pc);}catch(e){}},350);}}catch{}}
+function finishUnlock(){try{rememberSessionKey();}catch(e){}hideLock();render();renderLockUI();setTimeout(syncOnOpen,200);
+  // The real list only exists from this moment. The startup update already ran
+  // against the empty placeholder that stands in while locked, so without this
+  // the server keeps that empty snapshot and every alert stays dead until some
+  // unrelated edit happens to push a good list.
+  try{setTimeout(notifyUpdate,400);}catch(e){}try{setTimeout(fetchCovers,600);}catch{}try{restorePlayer();}catch{}try{alBootSync();}catch{}try{if(_pendingPartyJoin){var _pc=_pendingPartyJoin;_pendingPartyJoin=null;setTimeout(function(){try{window.wlJoinParty(_pc);}catch(e){}},350);}}catch{}}
 async function tryUnlock(){                            // unlock with the password
   const i=document.getElementById('lockPw'),err=document.getElementById('lockErr');
   const pw=i?i.value:'';if(!pw)return;if(err)err.textContent='';

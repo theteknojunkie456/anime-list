@@ -2770,7 +2770,7 @@ async function requestJoin(){
     return;
   }
   try{const inv=localStorage.getItem(NET_INVITE)||'';const j=await netCall('/join',{deviceId:wlDevice(),name:nm,source:src,invite:inv,...joinIdentity()});
-    if(j.status==='approved'){setNetStatus('approved');hideJoinGate();location.reload();return;}
+    if(j.status==='approved'){setNetStatus('approved');hideJoinGate();safeReload();return;}
     showJoinGate('pending');
   }catch{if(err)err.textContent='Couldn’t reach the network — try again.';}
 }
@@ -3254,7 +3254,7 @@ let _pollT=null;
 async function pollJoin(once){
   clearTimeout(_pollT);
   try{const j=await netCall('/status',{deviceId:wlDevice()});
-    if(j.status==='approved'){setNetStatus('approved');hideJoinGate();location.reload();return;}
+    if(j.status==='approved'){setNetStatus('approved');hideJoinGate();safeReload();return;}
     if(j.status==='denied'){showJoinGate('denied');return;}
   }catch{}
   if(!once)_pollT=setTimeout(pollJoin,15000);   // keep checking while they wait
@@ -3282,6 +3282,17 @@ function migrate(list){
   mapped.forEach(a=>{a.img=safeImg(a.img);a.banner=safeImg(a.banner);a.bgImage=safeImg(a.bgImage);});
   return dedupeList(mapped).kept;   // never load a list with duplicates
 }
+// Did the list we're holding come from a FAILURE rather than from the user?
+//
+// When storage is corrupt, load() falls back to DEFAULT_DATA — sample content.
+// That list is not empty and the corrupt store can't be counted, so every
+// "don't push a shrunken list" guard waves it through, and the sample data
+// replaces a real cloud backup. The backup is the only way back from corrupt
+// storage, so that single push would close the last door.
+//
+// A fresh install landing on the same defaults is fine and must still sync;
+// only the corrupt path is untrusted.
+let listUntrusted=false;
 function load(){
   const s=store();
   const parseInto=raw=>{const p=JSON.parse(raw);if(isEnvelope(p)){appLocked=true;anime=[];return true;}anime=migrate(p);return true;};
@@ -3297,6 +3308,7 @@ function load(){
     try{const d=s&&s.getItem(LSKEY);if(d&&!s.getItem(LSKEY+'_corrupt'))s.setItem(LSKEY+'_corrupt',d);}catch{}
     try{const bak=s&&s.getItem(LSKEY+'_bak');if(bak){parseInto(bak);return;}}catch{}
     anime=migrate(JSON.parse(JSON.stringify(DEFAULT_DATA)));
+    listUntrusted=true;      // sample data standing in for a real list — never publish it
     try{setTimeout(()=>toast('Couldn’t read your saved list — a copy was kept. Restore from backup if it looks empty.'),800);}catch{}
   }
 }
@@ -3855,6 +3867,7 @@ async function syncPush(){
   // would overwrite a good backup with nothing, and the person doing it would
   // be someone who set a password — i.e. protecting that data.
   if(typeof appLocked!=='undefined'&&appLocked)return;
+  if(typeof listUntrusted!=='undefined'&&listUntrusted)return;   // defaults after corrupt storage
   {
     const have=realList().length, stored=storedCount();
     // Empty in memory while the device still holds items = not loaded yet.
@@ -3898,6 +3911,10 @@ async function syncOnOpen(){
         // already refuses empty; this brings auto-sync in line.)
         if(!arr.length && anime.length){syncPush();return;}
         anime=migrate(arr);writeLocal();setSyncAt(res.updatedAt);render();renderSyncUI();toast('Synced from cloud');
+        // A real list has arrived, so whatever was standing in for it is gone
+        // and publishing is safe again. Without this, one corrupt read would
+        // leave the device permanently unable to back up.
+        listUntrusted=false;
         // The list just changed underneath the startup update — that one fired
         // on a timer at 1600ms, and on iOS, where local storage gets evicted,
         // it fires against a list that hasn't been restored yet. Re-send now
@@ -4065,6 +4082,7 @@ async function notifyUpdate(){
     // list — writeLocal already refuses to persist it over the ciphertext, and
     // sending it is the same mistake against the server.
     if(typeof appLocked!=='undefined'&&appLocked)return;
+    if(typeof listUntrusted!=='undefined'&&listUntrusted)return;
     const animeIds=notifyAnimeIds(),mangaIds=notifyMangaIds();
     const n=animeIds.length+mangaIds.length;
     // The count guard alone can't save a device that already sent a bad list —
@@ -12329,8 +12347,7 @@ try{
       // guard against the very first install (no prior controller) and reload loops.
       if(reloading||!hadController)return;
       reloading=true;
-      _snapUpd();
-      location.reload();
+      safeReload();          // waits if they're mid-episode, mid-party or typing
     });
     navigator.serviceWorker.register('./sw.js').then(reg=>{
       reg.update();
@@ -12484,10 +12501,33 @@ function _restoreUpd(){
     if(s.s)sortMode=s.s;
   }catch(e){_updSnap=null;}
 }
+// NOTHING interrupts someone who is watching.
+//
+// A new service worker takes over the instant it installs (sw.js calls
+// skipWaiting + clients.claim), and the controllerchange handler reloaded on
+// the spot — so every deploy threw anyone mid-episode back to the source site
+// at zero seconds, with the whole episode to sit through again. _updBusy()
+// already described exactly when that's unacceptable; the reload path just
+// never asked.
+//
+// Every reload now goes through here. If the moment is bad it waits for a
+// better one rather than cancelling — the update still lands, just not on top
+// of someone's episode.
+let _pendingReload=false;
+function safeReload(){
+  if(_pendingReload)return;
+  _pendingReload=true;
+  const go=()=>{
+    let busy=false; try{busy=_updBusy();}catch(e){}
+    if(busy){setTimeout(go,4000);return;}     // still watching — ask again shortly
+    try{_snapUpd();}catch(e){}
+    location.reload();
+  };
+  go();
+}
 function _applyUpdate(){
   if(!_updateReady||_updBusy())return;
-  _snapUpd();
-  location.reload();
+  safeReload();
 }
 async function checkUpdate(){
   const v=await _liveVer(); if(!v)return;

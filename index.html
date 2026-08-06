@@ -3834,8 +3834,34 @@ function syncPayloadSize(){try{return new Blob([JSON.stringify({v:3,list:anime,e
 function genCode(){let s='';const c='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';for(let i=0;i<20;i++)s+=c[Math.floor(Math.random()*c.length)];return s;}
 let pushT;
 function schedulePush(){if(!syncCode()||!SYNC_URL)return;clearTimeout(pushT);pushT=setTimeout(syncPush,2500);}
+// How many items are actually PERSISTED on this device? Encrypted storage isn't
+// an array, so it answers -1 for "can't tell" rather than 0 — the difference
+// between "genuinely empty" and "unreadable from here" decides whether a push
+// is safe, and conflating them is how a backup gets destroyed.
+function storedCount(){
+  try{
+    const raw=(store()||localStorage).getItem(LSKEY);
+    if(!raw)return 0;
+    const v=JSON.parse(raw);
+    return Array.isArray(v)?v.length:-1;
+  }catch(e){return -1;}
+}
 async function syncPush(){
   const code=syncCode();if(!code||!SYNC_URL)return;
+  // This REPLACES the cloud copy, which is the recovery path for everything
+  // else — so it must never run against a list that merely looks empty.
+  //
+  // Locked: `anime` is a placeholder standing in for the ciphertext. Pushing it
+  // would overwrite a good backup with nothing, and the person doing it would
+  // be someone who set a password — i.e. protecting that data.
+  if(typeof appLocked!=='undefined'&&appLocked)return;
+  {
+    const have=realList().length, stored=storedCount();
+    // Empty in memory while the device still holds items = not loaded yet.
+    if(!have&&stored!==0)return;
+    // A 90% collapse is the same story as the notify list: not a deletion.
+    if(stored>=10&&have<stored*0.4)return;
+  }
   try{
     let list=realList();
     if(cryptoKey&&envWraps){list=await buildEnvelope();} // ciphertext (master-key envelope) to cloud

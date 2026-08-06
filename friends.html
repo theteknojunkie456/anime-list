@@ -8916,11 +8916,18 @@ function readURL(a,chArg){
   if(SRC_TOKEN_RE.test(src)) return fillSourceTokens(src,a,ch);   // {slug}/{query}/{titleRomaji}…; {ch}=the chapter
   return src;
 }
-function readManga(id,chArg){
+async function readManga(id,chArg){
   const a=anime.find(x=>x.id===id); if(!a) return;
   if(kindOf(a)!=='read'){toast('Read is for your reading list');return;}
   pvReturnId=id;
   const ch=(chArg>0?chArg:0);
+  // The feed carries what the READER calls this series — Asura serves
+  // /comics/star-embracing-swordmaster, not /comics/the-stellar-swordmaster —
+  // and without it the URL falls back to a slug made from the title, which
+  // 404s. That fallback fired whenever a chapter was tapped before the feed
+  // finished loading, so wait for it. It's cached after the first fetch, so
+  // this costs nothing on every subsequent tap.
+  try{await readerCodes();}catch(e){}
   const url=readURL(a,ch);
   document.getElementById('pvTitle').textContent=a.title;
   const ext=document.getElementById('pvExt');

@@ -11231,9 +11231,62 @@ function setAITab(t){
   });
   if(t==='chat')renderChatThread(false);
 }
-function listSummary(){
-  const g=st=>anime.filter(a=>a.status===st).map(a=>a.title+(a.rating?` (my rating ${a.rating}/5)`:'')).join(', ')||'none';
-  return`My list:\nFinished: ${g('finished')}\nWatching: ${g('watching')}\nPlan to watch: ${g('plan')}\nDropped: ${g('dropped')}`;
+// What the AI is actually told about you.
+//
+// This used to be titles and nothing else — no genres, no scores, no progress,
+// and reading folded in with watching as if they were the same taste. Every AI
+// feature in the app is built on it, so asking for a personal recommendation
+// meant asking a model to infer taste from a list of names.
+//
+// It was also unbounded: a 200-title list is thousands of tokens, which on a
+// free key is a slow request, a truncated one, or a refusal.
+function _aiLine(a){
+  const bits=[];
+  if(a.rating)bits.push('rated '+a.rating+'/5');
+  if(a.fav)bits.push('favourite');
+  if(a.aniScore)bits.push('community '+Math.round(a.aniScore)+'%');
+  const g=(a.genre||'').split(',').map(x=>x.trim()).filter(Boolean).slice(0,3).join('/');
+  if(g)bits.push(g);
+  // Progress only where it says something — "3/12" is useful, "0/12" isn't.
+  if(a.ep>0&&a.epTotal)bits.push(a.ep+'/'+a.epTotal);
+  else if(a.ep>0)bits.push('at '+a.ep);
+  return a.title+(bits.length?' ['+bits.join(', ')+']':'');
+}
+function listSummary(opts){
+  const kind=(opts&&opts.kind)||null;          // 'watch' | 'read' | null = both
+  const CAP=(opts&&opts.cap)||55;
+  const pick=(k,st)=>anime.filter(a=>kindOf(a)===k&&a.status===st);
+  // Rated and favourite titles say the most about taste, so they survive the
+  // cap first; the rest fill whatever room is left, newest first.
+  const rank=arr=>arr.slice().sort((x,y)=>
+      ((y.fav?2:0)+(y.rating||0))-((x.fav?2:0)+(x.rating||0)) || (y.upd||0)-(x.upd||0));
+  const section=(label,arr)=>{
+    if(!arr.length)return '';
+    const shown=rank(arr).slice(0,CAP);
+    const extra=arr.length-shown.length;
+    return `${label} (${arr.length}): `+shown.map(_aiLine).join('; ')
+      +(extra>0?` … and ${extra} more`:'')+'\n';
+  };
+  let out='';
+  if(kind!=='read'){
+    out+='WATCHING LIST\n';
+    out+=section('Finished',pick('watch','finished'));
+    out+=section('Currently watching',pick('watch','watching'));
+    out+=section('Plan to watch',pick('watch','plan'));
+    out+=section('Dropped',pick('watch','dropped'));
+  }
+  const anyRead=anime.some(a=>kindOf(a)==='read');
+  if(kind!=='watch'&&anyRead){
+    // Kept separate on purpose: what someone reads and what they watch are
+    // different appetites, and merging them produced recommendations that
+    // matched neither.
+    out+='\nREADING LIST (manga / manhwa / webtoons — recommend these separately)\n';
+    out+=section('Finished',pick('read','finished'));
+    out+=section('Currently reading',pick('read','watching'));
+    out+=section('Plan to read',pick('read','plan'));
+    out+=section('Dropped',pick('read','dropped'));
+  }
+  return out.trim()||'The list is empty.';
 }
 const NO_KEY='NO_KEY';
 function getKey(){try{return localStorage.getItem('anthropic_key')||'';}catch{return'';}}
@@ -11352,7 +11405,19 @@ async function runRecommend(){
   const pref=document.getElementById('recPrompt').value.trim();
   setLoading('recBtn','recResp',true);
   try{
-    const text=await callAI(`${listSummary()}\n\nBased on this list, recommend 4-5 titles I should watch next${pref?` (preference: ${pref})`:''}. For each, give the title and a 1-2 sentence reason tied to what I've already watched. Format as:\n**[Title]** — [reason]`);
+    // Follow the side they're on. Recommending anime to someone looking at
+    // their manga list was the old behaviour, and no amount of prompt polish
+    // fixes an answer that's about the wrong medium.
+    const isRead=viewKind==='read';
+    const noun=isRead?'manga / manhwa / webtoons':'shows';
+    const text=await callAI(`${listSummary({kind:isRead?'read':'watch'})}
+
+Recommend 4-5 ${noun} I should ${isRead?'read':'watch'} next${pref?` (preference: ${pref})`:''}.
+
+Use the detail you've been given, not just the titles: my own ratings are the strongest signal, favourites next, then the genres I keep returning to. Say why each fits MY list specifically — name the title of mine it follows from. Skip anything already listed above, and don't recommend ${isRead?'anime adaptations of things I already read':'manga; these are shows to watch'}.
+
+Format each as:
+**[Title]** — [one or two sentences, referencing a specific title of mine]`);
     const r=document.getElementById('recResp');r.className='ai-resp on';
     r.innerHTML=`<div class="ai-badge">${icon('sparkles')} Recommendations</div>${text.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>')}`;
   }catch(e){const r=document.getElementById('recResp');r.className='ai-resp on';r.innerHTML=aiErrorHTML(e);}
@@ -11371,7 +11436,16 @@ function saveChat(){try{localStorage.setItem('chat_hist',JSON.stringify(chatHist
 function chatContext(){
   const line=a=>a.title+(a.genre?' ['+a.genre+']':'')+(a.rating?' — rated '+a.rating+'/5':'');
   const g=(kind,st)=>anime.filter(a=>kindOf(a)===kind&&a.status===st);
-  const names=l=>l.map(line).join('; ')||'nothing yet';
+  // Bounded. This goes in the system prompt of EVERY chat message, so an
+  // unbounded finished list meant a long-time user paid for their whole history
+  // on each turn — slow on a free key, and refused outright once it exceeded the
+  // context. Rated and favourite titles carry the taste, so they survive first.
+  const names=l=>{
+    if(!l.length)return 'nothing yet';
+    const ranked=l.slice().sort((x,y)=>((y.fav?2:0)+(y.rating||0))-((x.fav?2:0)+(x.rating||0))||(y.upd||0)-(x.upd||0));
+    const shown=ranked.slice(0,40), extra=l.length-shown.length;
+    return shown.map(line).join('; ')+(extra>0?`; … and ${extra} more`:'');
+  };
 
   // Mid-watch progress is the most conversational fact there is — "you're four
   // episodes from the end of X" is something a friend would know and a bot wouldn't.
@@ -11639,7 +11713,10 @@ async function runRank(){
   try{
     const pln=anime.filter(a=>a.status==='plan').map(a=>a.title);
     if(!pln.length){document.getElementById('rankResp').innerHTML='Nothing in Plan to Watch yet!';document.getElementById('rankBtn').classList.remove('loading');return;}
-    const text=await callAI(`${listSummary()}\n\nRank my Plan to Watch list in the best viewing order${pref?` (priority: ${pref})`:''}. Consider variety, length, and mood progression. Numbered list with one-sentence reason per entry.`);
+    const _r=viewKind==='read';
+    const text=await callAI(`${listSummary({kind:_r?'read':'watch'})}
+
+Rank my ${_r?'Plan to Read':'Plan to Watch'} list in the best order${pref?` (priority: ${pref})`:''}. Consider variety, length and mood progression, and use my ratings and genres to judge what I'll actually enjoy. Numbered list, one sentence of reasoning each.`);
     const r=document.getElementById('rankResp');r.className='ai-resp on';
     r.innerHTML=`<div class="ai-badge">${icon('sparkles')} Ranked Order</div>${text.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>')}`;
   }catch(e){const r=document.getElementById('rankResp');r.className='ai-resp on';r.innerHTML=aiErrorHTML(e);}
@@ -11650,7 +11727,11 @@ async function aiCardInsight(id){
   const box=document.getElementById('ai-box-detail');if(!box)return;
   box.innerHTML=`<div class="ai-insight-box"><div class="ai-badge">${icon('sparkles')} AI Insight</div><div class="dots"><span>.</span><span>.</span><span>.</span></div></div>`;
   try{
-    const text=await callAI(`${listSummary()}\n\nThe user is looking at "${a.title}" (${a.genre||'anime'}, ${a.eps||'unknown length'}).\n\nGive one short personalized insight (2-3 sentences). Why they'd love it based on their list, what mood it's best for, or a key thing to know. Be specific and reference their actual list.`);
+    const text=await callAI(`${listSummary({kind:kindOf(a)})}
+
+I'm looking at "${a.title}" (${a.genre||'no genre listed'}, ${a.eps||'unknown length'}${a.aniScore?`, community ${Math.round(a.aniScore)}%`:''}).
+
+Give one short insight, 2-3 sentences. Why I'd love it given what I've rated highly, what mood it suits, or the one thing worth knowing going in. Reference a specific title from my list rather than speaking generally.`);
     box.innerHTML=`<div class="ai-insight-box"><div class="ai-badge">${icon('sparkles')} AI Insight</div>${text}</div>`;
   }catch(e){box.innerHTML=`<div class="ai-insight-box"><div class="ai-badge">${icon('sparkles')} AI Insight</div>${aiErrorHTML(e)}</div>`;}
 }

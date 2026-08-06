@@ -816,6 +816,9 @@ html.watching .bb-slide .hero-bg-img{animation-play-state:paused!important;}
    video reappears once the geometry has settled. Half a second of black beats
    half a second of a picture sliding at an angle. */
 html.rotating .pv-frame{opacity:0;}
+/* Belt and braces: even if the class is somehow set while iOS is presenting,
+   never hide the element it is presenting from. */
+html.rotating .pv-frame:fullscreen,html.rotating .pv-frame:-webkit-full-screen{opacity:1!important;}
 .playerview{position:fixed;inset:0;z-index:120;background:#000;display:flex;flex-direction:column;transform:translateY(100%);transition:transform .38s cubic-bezier(.2,1,.28,1);}
 /* `none`, not `translateY(0)`. A position:fixed element that still carries a
    transform is composited against a snapshotted viewport and becomes the
@@ -13062,8 +13065,23 @@ setTimeout(()=>{try{notifyUpdate();}catch{}},1600);   // repairs a subscription 
 // Orientation changes had no handling at all, and a rotation mid-episode is
 // exactly when the app is least able to afford a visual glitch.
 let _rotT=0;
+// Is a video being presented by iOS itself right now?
+// For a cross-origin player the fullscreen element is the IFRAME, so this sees
+// it even though the video inside is untouchable.
+function nativeFullscreen(){
+  try{
+    return !!(document.fullscreenElement||document.webkitFullscreenElement||
+              document.webkitCurrentFullScreenElement||document.msFullscreenElement);
+  }catch(e){return false;}
+}
 function _freezeMotion(){
   try{
+    // Hands off entirely while iOS owns the screen. The frame-hiding rule below
+    // sets opacity:0 on the very element iOS is presenting from, and hiding that
+    // element is a fine way to make it drop out of fullscreen — which is the
+    // exact complaint: rotating in fullscreen kicks you out. Our chrome isn't
+    // even visible here, so there is nothing to protect.
+    if(nativeFullscreen())return;
     const r=document.documentElement;
     r.classList.add('rotating');
     clearTimeout(_rotT);

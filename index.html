@@ -225,6 +225,14 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 .fx-rename{flex:0 0 auto;align-self:center;margin-left:4px;padding:7px 12px;border-radius:99px;
   border:1px solid var(--b2);background:var(--bg3);color:var(--t2);font-family:inherit;font-size:11.5px;font-weight:700;cursor:pointer;}
 .fx-ok{font-size:12px;font-weight:800;color:var(--fin);}
+/* What happens when you tap Watch, stated before any settings — a newcomer met
+   the paste-your-own-site form first and reasonably assumed setup was required. */
+.src-now{margin:4px 0 16px;padding:12px 14px;border-radius:14px;
+  background:linear-gradient(180deg,color-mix(in srgb,var(--a) 13%,var(--bg2)),var(--bg2));
+  border:1px solid color-mix(in srgb,var(--a) 26%,transparent);}
+.src-now-t{font-size:13.5px;font-weight:700;color:var(--t1);line-height:1.45;}
+.src-now-t svg{width:15px;height:15px;vertical-align:-3px;margin-right:6px;color:var(--a);}
+.src-now-s{margin-top:5px;font-size:12px;color:var(--t3);line-height:1.45;}
 .fixbar{display:none;}
 .fixbar.on{display:flex;align-items:center;gap:9px;margin:9px 18px 0;padding:8px 10px 8px 12px;
   border-radius:12px;background:color-mix(in srgb,#ff6b6b 12%,var(--bg2));
@@ -10921,17 +10929,19 @@ function renderSource(){
       <button class="src-tab${tab==='read'?' on':''}" onclick="setSrcTab('read')">${icon('book')} Reading</button>
     </div>`;
   if(tab==='read'){box.innerHTML=tabs+readSourceHTML(rcustom);try{if(scroller)scroller.scrollTop=prevScroll;}catch{}return;}
+  // A newcomer used to meet the ADVANCED path first: a big "paste your site's
+  // address" card, before anything said that Watch already works. That reads as
+  // a setup screen you have to get through, when in fact there is nothing to do.
+  // So: say what tapping Watch does right now, then offer the choices, and keep
+  // the custom-site flow folded away for people who actually want it.
+  const nowOpens = noSourceMode() ? 'ask you which site to use'
+                 : custom ? ('open '+escH(host(custom)))
+                 : (freeDefault()? ('search '+escH(freeDefault().name)) : 'have nowhere to go yet');
   box.innerHTML=tabs+`
-    <p class="ai-desc" style="margin-top:2px">Tapping <b>Watch</b> on a show opens it wherever you pick here.</p>
-
-    <div class="src-quick">
-      <div class="src-quick-t">${icon('sparkles')} Watch on your own site</div>
-      <p class="ai-desc" style="margin:7px 0 11px;font-size:12.5px">Open your site, start <b>any</b> episode of <b>any</b> show, and paste that page's address below. That one link is the whole setup — no key, no second step: WatchList works out the pattern and uses it for every show.</p>
-      <input class="ai-prompt-in" id="srcQuickIn" placeholder="paste that episode's address" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url" oninput="quickSetup()">
-      <div id="srcQuickOut" class="src-quick-out" style="display:none"></div>
-      <button class="src-quick-share" id="shareMineBtn" onclick="shareMine()">${icon('send')} Share mine<span>${custom?escH(host(custom)):'anyone can use your setup'}</span></button>
+    <div class="src-now">
+      <div class="src-now-t">${icon('play')} Tap <b>Watch</b> on any show and it'll ${nowOpens}.</div>
+      <div class="src-now-s">${custom||noSourceMode()?'Change it below whenever you like.':'That already works — nothing to set up. Pick a different site below if you\'d rather.'}</div>
     </div>
-
 
     <div class="dt-label">${icon('play')} Where Watch opens</div>
     <button class="src-opt${!custom&&!noSourceMode()?' on':''}" onclick="setSource('')">
@@ -10943,6 +10953,14 @@ function renderSource(){
       <div class="src-name">${icon('x')} Ask me each time <span class="src-tag">No source</span></div>
       <div class="src-sub">Watch stays put and brings you here instead</div>
     </button>
+
+    <details class="src-fold" data-fold="own" style="margin-top:16px"${O('own')}>
+      <summary>${icon('sparkles')} Use a site of your own</summary>
+      <p class="ai-desc" style="margin:9px 0 11px;font-size:12.5px">Open your site, start <b>any</b> episode of <b>any</b> show, and paste that page's address. That one link is the whole setup — WatchList works out the pattern and uses it for every show.</p>
+      <input class="ai-prompt-in" id="srcQuickIn" placeholder="paste that episode's address" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url" oninput="quickSetup()">
+      <div id="srcQuickOut" class="src-quick-out" style="display:none"></div>
+      <button class="src-quick-share" id="shareMineBtn" onclick="shareMine()">${icon('send')} Share mine<span>${custom?escH(host(custom)):'anyone can use your setup'}</span></button>
+    </details>
 
     <details class="src-fold" data-fold="settings"${O('settings')} style="margin-top:16px">
       <summary>${icon('settings')} Everything else</summary>

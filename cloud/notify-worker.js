@@ -363,10 +363,39 @@ async function handleUpdate(body, env) {
     return json({ ok: false, error: "subscription not found" }, 404);
   }
   const record = JSON.parse(raw);
+
+  // Refuse an update that would gut the tracked list.
+  //
+  // The client sends whatever it holds at that instant and this replaces the
+  // stored copy outright, so one call made before the list loaded — or while
+  // the app was locked — wiped it. That happened: 99 shows and 3 manga became 1
+  // and 0, and every episode and chapter alert stopped without a word.
+  //
+  // The client now guards against it, but clients update on their own schedule
+  // and a stale cached build is exactly what caused it. Guarding here protects
+  // every device immediately, including ones that will not see new code for
+  // days.
+  //
+  // It matters doubly because the prune below drops chapter baselines for ids
+  // no longer listed. A collapse therefore didn't just stop alerts, it erased
+  // the record of which chapter each series was last at — and since a first
+  // sighting is deliberately silent, the next real chapter would be swallowed
+  // too.
+  const mangaIdsRaw = normalizeAnimeIds(body.mangaIds);
+  {
+    const beforeN = (record.animeIds || []).length + (record.mangaIds || []).length;
+    const afterN = animeIds.length + (mangaIdsRaw !== null ? mangaIdsRaw.length : (record.mangaIds || []).length);
+    if (beforeN >= 10 && afterN < beforeN * 0.4) {
+      // ok:true, not an error — an old client would just retry an error forever,
+      // and there is nothing for it to fix. The stored list simply stands.
+      return json({ ok: true, ignored: "collapse", kept: beforeN, sent: afterN });
+    }
+  }
+
   record.animeIds = animeIds;
   // Manga rides alongside. Anime has an airing schedule; manga has only a
   // chapter COUNT, so tracking here means noticing when that count goes up.
-  const mangaIds = normalizeAnimeIds(body.mangaIds);
+  const mangaIds = mangaIdsRaw;
   if (mangaIds !== null) {
     record.mangaIds = mangaIds;
     if (record.chapters && typeof record.chapters === "object") {

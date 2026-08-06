@@ -3932,6 +3932,19 @@ async function syncOnOpen(){
         // real copy: push it back up instead of destroying it. (Manual syncRestore
         // already refuses empty; this brings auto-sync in line.)
         if(!arr.length && anime.length){syncPush();return;}
+        // Empty was covered; a COLLAPSE was not. The bug this app just fixed
+        // published a 1-item list, not an empty one — that sails past the check
+        // above and wins on timestamp, wiping a full list on every other device.
+        // A 90% drop is far more likely to be another device in a bad state than
+        // a deliberate mass deletion, and local is recoverable while the wipe is
+        // not: push local back up instead. A genuine clear-out still applies
+        // through Restore, which asks first.
+        if(anime.length>=10 && arr.length < anime.length*0.4){
+          try{logProblem('sync','refused a collapsed cloud copy',arr.length+' vs '+anime.length);}catch(e){}
+          toast(`Backup looked wrong (${arr.length} vs ${anime.length}) — kept this device's list`);
+          syncPush();
+          return;
+        }
         anime=migrate(arr);writeLocal();setSyncAt(res.updatedAt);render();renderSyncUI();toast('Synced from cloud');
         // A real list has arrived, so whatever was standing in for it is gone
         // and publishing is safe again. Without this, one corrupt read would

@@ -3866,7 +3866,14 @@ async function syncOnOpen(){
         // real copy: push it back up instead of destroying it. (Manual syncRestore
         // already refuses empty; this brings auto-sync in line.)
         if(!arr.length && anime.length){syncPush();return;}
-        anime=migrate(arr);writeLocal();setSyncAt(res.updatedAt);render();renderSyncUI();toast('Synced from cloud');return;}
+        anime=migrate(arr);writeLocal();setSyncAt(res.updatedAt);render();renderSyncUI();toast('Synced from cloud');
+        // The list just changed underneath the startup update — that one fired
+        // on a timer at 1600ms, and on iOS, where local storage gets evicted,
+        // it fires against a list that hasn't been restored yet. Re-send now
+        // that the real list is here, or the server keeps whatever near-empty
+        // snapshot it was handed and every alert quietly stops.
+        try{notifyUpdate();}catch(e){}
+        return;}
     }
     syncPush(); // local is current or newer — make sure the cloud has it
   }catch{}
@@ -4023,14 +4030,25 @@ async function notifyUpdate(){
   if(!pushSupported())return;
   try{
     const sub=await getPushSub();if(!sub)return;
+    // While locked, `anime` is an empty placeholder standing in for the real
+    // list — writeLocal already refuses to persist it over the ciphertext, and
+    // sending it is the same mistake against the server.
+    if(typeof appLocked!=='undefined'&&appLocked)return;
     const animeIds=notifyAnimeIds(),mangaIds=notifyMangaIds();
     const n=animeIds.length+mangaIds.length;
+    // The count guard alone can't save a device that already sent a bad list —
+    // once the server holds 1, every later 1 looks like a legitimate small list.
+    // So check against what's actually STORED on the device rather than against
+    // the last thing sent: if the list on disk is bigger than what's in memory,
+    // memory hasn't finished loading and nothing should be sent yet.
+    let stored=0;
+    try{
+      const raw=localStorage.getItem(LSKEY);
+      if(raw){const v=JSON.parse(raw);if(Array.isArray(v))stored=v.length;}   // encrypted -> not an array -> 0, guard stays inert
+    }catch(e){}
+    if(stored>n+2&&stored>=5)return;              // memory behind disk — not loaded yet
     let last=0; try{last=Number(localStorage.getItem(NOTIFY_SENT_KEY))||0;}catch(e){}
-    if(last>=10&&n<last*0.4){
-      // Looks like an unloaded list. Skip this one; the next update with a real
-      // list goes through normally.
-      return;
-    }
+    if(last>=10&&n<last*0.4)return;               // a real list doesn't collapse 90% at once
     await fetch(NOTIFY_URL+'/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({endpoint:sub.endpoint,animeIds,mangaIds})});
     try{localStorage.setItem(NOTIFY_SENT_KEY,String(n));}catch(e){}
   }catch{}

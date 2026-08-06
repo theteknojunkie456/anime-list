@@ -805,7 +805,14 @@ html.rotating *,html.rotating *::before,html.rotating *::after{transition:none!i
    player, where nobody can see them, for the whole length of an episode. */
 html.watching .bb-slide .hero-bg-img{animation-play-state:paused!important;}
 .playerview{position:fixed;inset:0;z-index:120;background:#000;display:flex;flex-direction:column;transform:translateY(100%);transition:transform .38s cubic-bezier(.2,1,.28,1);}
-.playerview.on{transform:translateY(0);}
+/* `none`, not `translateY(0)`. A position:fixed element that still carries a
+   transform is composited against a snapshotted viewport and becomes the
+   containing block for its fixed descendants — and iOS resizes the visual
+   viewport in stages through a rotation, so that layer lags or mis-scales while
+   the rest of the page has already moved. translateY(0) is a transform;
+   `none` is the identity, so the slide-in still animates from translateY(100%)
+   but nothing is left composited once it's open. */
+.playerview.on{transform:none;}
 .pv-top{flex-shrink:0;display:flex;align-items:center;gap:9px;padding:calc(var(--safe-t) + 12px) 14px 12px;background:linear-gradient(180deg,#161618 0%,#0a0a0c 100%);border-bottom:1px solid rgba(255,255,255,.06);}
 /* on the player's black surface the back button joins the glass button set (scoped so the share view's back is untouched) */
 .playerview .sv-back{width:40px;height:40px;border-radius:12px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);color:#fff;transition:background .15s,transform .12s;}

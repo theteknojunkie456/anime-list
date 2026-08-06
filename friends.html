@@ -4563,8 +4563,10 @@ function renderThemeGrid(){
 // The single biggest "open app → back to watching" lever: in-progress titles that
 // jump STRAIGHT into the next episode's player, skipping the detail page. Only
 // anime (aniId + known episode count) can deep-link to an episode, so the rail is
-// watch-list only — a reading equivalent would land on a search, not a resume.
-function resumeItems(pool){
+// Both sides now. The note here used to say a reading equivalent "would land on
+// a search, not a resume" — true before the chapters feed knew what each reader
+// calls a series, and false since.
+function resumeItems(pool,isRead){
   // The home screen's single watching surface: EVERY watching title, seasons of a
   // series collapsed to one card, most-recently-touched first. (The old separate
   // "Watching" row was merged in here — see renderHome. The "Watching" tab up top
@@ -4572,27 +4574,34 @@ function resumeItems(pool){
   // Shows with new episodes waiting (you're "behind") float to the front — the
   // most-pressing thing to watch — then fall back to most-recently-touched.
   const behindMap={};try{behindItems().forEach(x=>{if(x&&x.a)behindMap[x.a.id]=x.behind||0;});}catch(e){}
-  const list=pool.filter(a=>a.status==='watching' && kindOf(a)==='watch')
+  const list=pool.filter(a=>a.status==='watching' && kindOf(a)===(isRead?'read':'watch'))
     .sort((a,b)=>{const ba=behindMap[a.id]||0,bb=behindMap[b.id]||0;return ba!==bb?bb-ba:(b.upd||0)-(a.upd||0);});
   return collapseSeries(list).map(c=>c.a);
 }
 function resumeRailHTML(items,isRead){
-  if(isRead||!items||!items.length) return '';   // reading has no episode deep-link; items pre-filtered by caller
+  // Reading was excluded because it "has no episode deep-link". That stopped
+  // being true when chapter links landed — readManga(id, chapter) opens a
+  // specific chapter the same way watching opens an episode — so the reading
+  // side was missing its most useful shelf for no remaining reason.
+  if(!items||!items.length) return '';
   const card=a=>{
     // Titles with a known episode count show "Episode N" + a progress bar (resume);
     // ones without (movies, or metadata not yet fetched) just show the title, so the
     // merged-in Watching titles still render cleanly.
-    const known=!!a.epTotal;
-    const next=known?Math.min((a.ep||0)+1,a.epTotal):0;
-    const p=known?Math.round(prog(a)*100):0;
+    // Chapters are open-ended: a running series has no total, so "chapter 132 of
+    // ?" can't be a progress bar. Show the next number, skip the bar.
+    const known=isRead?((a.ep||0)>0):!!a.epTotal;
+    const next=isRead?((a.ep||0)+1):(known?Math.min((a.ep||0)+1,a.epTotal):0);
+    const p=(!isRead&&known)?Math.round(prog(a)*100):0;
+    const showBar=!isRead&&known;
     const art=titleBg(a)||a.img;
     const ch=((a.title||'?').trim()[0]||'?').toUpperCase().replace(/['"<&]/g,'?');
     const bg=art?`<img class="rz-img" src="${escH(art)}" loading="lazy" alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'rz-ph',textContent:'${ch}'}))">`:`<div class="rz-ph">${ch}</div>`;
-    return `<button class="rz-card" onclick="resumeWatch('${a.id}')">
+    return `<button class="rz-card" onclick="${isRead?`readManga('${a.id}',${next})`:`resumeWatch('${a.id}')`}">
       ${bg}<div class="rz-scrim"></div>
-      <div class="rz-play">${icon('play')}</div>
-      <div class="rz-meta"><div class="rz-title">${schEsc(a.title)}</div>${known?`<div class="rz-sub">Episode ${next}</div>`:''}</div>
-      ${known?`<div class="rz-bar"><div class="rz-fill" style="width:${p}%"></div></div>`:''}
+      <div class="rz-play">${icon(isRead?'book':'play')}</div>
+      <div class="rz-meta"><div class="rz-title">${schEsc(a.title)}</div>${known?`<div class="rz-sub">${isRead?'Chapter':'Episode'} ${next}</div>`:''}</div>
+      ${showBar?`<div class="rz-bar"><div class="rz-fill" style="width:${p}%"></div></div>`:''}
     </button>`;
   };
   // Loop the row when there's enough to overflow: render the set twice so it can
@@ -5182,7 +5191,7 @@ function renderHome(){
   heroAmb=spotlight[0]?titleAccent(spotlight[0]):'';setAmbient(heroAmb);
   // Continue-watching rail: the ONE watching surface on home — every watching
   // title, minus anything already up in the billboard so nothing appears twice.
-  const railItems=isRead?[]:resumeItems(pool).filter(a=>!spotSet.has(a.id));
+  const railItems=resumeItems(pool,isRead).filter(a=>!spotSet.has(a.id));
   // one banner at most: backup warning (critical) wins; otherwise the behind nudge
   const topBanner=shouldNudge()?nudgeHTML():(isRead?'':behindHTML());
   // A brand-new user who's started adding still sees the beginner shelf (up top) so

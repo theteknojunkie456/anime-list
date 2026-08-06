@@ -793,6 +793,9 @@ body.first-paint .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards
    straight after. Animations (spinners) keep running; only transitions, which
    are the ones interpolating toward stale geometry, are cut. */
 html.rotating *,html.rotating *::before,html.rotating *::after{transition:none!important;}
+/* The billboard's Ken Burns pan keeps compositing full-screen images behind the
+   player, where nobody can see them, for the whole length of an episode. */
+html.watching .bb-slide .hero-bg-img{animation-play-state:paused!important;}
 .playerview{position:fixed;inset:0;z-index:120;background:#000;display:flex;flex-direction:column;transform:translateY(100%);transition:transform .38s cubic-bezier(.2,1,.28,1);}
 .playerview.on{transform:translateY(0);}
 .pv-top{flex-shrink:0;display:flex;align-items:center;gap:9px;padding:calc(var(--safe-t) + 12px) 14px 12px;background:linear-gradient(180deg,#161618 0%,#0a0a0c 100%);border-bottom:1px solid rgba(255,255,255,.06);}
@@ -5075,7 +5078,7 @@ function bbSetup(items){
     },{passive:true});
     bb.addEventListener('click',e=>{if(swiped){e.stopPropagation();e.preventDefault();swiped=false;}},true); // a swipe shouldn't open the title
     bbGo(bbP);
-    bbTimer=setInterval(()=>bbGo(bbP+1),6000);
+    bbTimer=setInterval(()=>{if(watchingNow())return;bbGo(bbP+1);},6000);
   }
 }
 // Exactly one slide carries .bb-live at a time. Everything off-screen stops
@@ -5297,7 +5300,7 @@ function repaintTitles(){
   try{if(detailId)renderDetail();}catch(e){}
 }
 setTimeout(()=>{try{pollAdmin();}catch(e){}},2600);
-setInterval(()=>{try{pollAdmin();}catch(e){}},120000);
+setInterval(()=>{if(watchingNow())return;try{pollAdmin();}catch(e){}},120000);
 function openDetail(id){
   return _openDetailReal(id);
 }
@@ -6859,6 +6862,7 @@ function watchParty(title,ep,aniId){
   const purl=partyStreamURL(title,ep,aniId);
   document.getElementById('pvFrame').src=purl||"data:text/html,<body style='margin:0;background:%230b0b0f;color:%23aaa;font:15px -apple-system,system-ui;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px;height:100vh'>Set your own streaming source in Settings, or use <b style='color:%23fff'>&nbsp;Broadcast your screen&nbsp;</b> to watch together.</body>";
   document.getElementById('playerView').classList.add('on');
+  try{document.documentElement.classList.add('watching');}catch(e){}
   renderPvNav(null);
   partyInSession=true;partyCurEp=ep;hidePauseOverlay();renderPvHostBar();
   // Only the host is hands-on: they simply watch, and their player's position is
@@ -8741,6 +8745,7 @@ async function watchAnime(id,epArg){
   ext.onclick=()=>{const f=document.getElementById('pvFrame');f.src=findUrl(a);pvCanNav=false;renderPvNav(null);};
   const f=document.getElementById('pvFrame');
   document.getElementById('playerView').classList.add('on');
+  try{document.documentElement.classList.add('watching');}catch(e){}
   // binge controls light up only when the source can address a specific episode
   pvCanNav=!!ep&&/\{ep(isode)?\}/i.test(src);
   renderPvNav(a);
@@ -9117,6 +9122,7 @@ async function readManga(id,chArg){
   ext.onclick=()=>{document.getElementById('pvFrame').src=findRead;};
   document.getElementById('pvFrame').src=url;
   document.getElementById('playerView').classList.add('on');
+  try{document.documentElement.classList.add('watching');}catch(e){}
   pvWatchEp=ch||null;           // which chapter this is, so leaving can bank it
   savePvSession(id,ch,'read');  // survive an iOS background/reload mid-read
   pvCanNav=false; renderPvNav(null);   // no episode stepping while reading
@@ -11030,6 +11036,7 @@ function closePlayer(){
   clearPvSession();   // an intentional close — don't spring it back on next load
   partyInSession=false;hidePauseOverlay();try{renderPvHostBar();}catch{}
   const v=document.getElementById('playerView'); if(v)v.classList.remove('on');
+  try{document.documentElement.classList.remove('watching');}catch(e){}
   const f=document.getElementById('pvFrame'); if(f)f.src='about:blank';
   const id=pvReturnId, ep=pvWatchEp, elapsed=pvOpenTime?Date.now()-pvOpenTime:0;
   // Stayed a while and never needed the escape hatch → it framed fine.
@@ -12606,6 +12613,16 @@ function _restoreUpd(){
 // Every reload now goes through here. If the moment is bad it waits for a
 // better one rather than cancelling — the update still lands, just not on top
 // of someone's episode.
+// Is someone watching right now? Used to stand every background job down.
+//
+// iOS reclaims memory from a backgrounded PWA, and when it does the page
+// reloads and the episode starts over — which is the one failure the app can
+// influence but not command. Every joule spent animating a carousel nobody can
+// see, behind a full-screen player, is a joule pushing toward that eviction.
+function watchingNow(){
+  try{const e=document.getElementById('playerView');return !!(e&&e.classList.contains('on'));}
+  catch(e){return false;}
+}
 let _pendingReload=false;
 function safeReload(){
   if(_pendingReload)return;
@@ -12629,7 +12646,7 @@ async function checkUpdate(){
 }
 try{
   setTimeout(checkUpdate,3000);                                                         // learn the running version shortly after boot
-  setInterval(checkUpdate,30000);                                                       // then poll every 30s
+  setInterval(()=>{if(watchingNow())return;checkUpdate();},30000);                      // then poll every 30s, never mid-episode
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkUpdate();});// on refocus
   window.addEventListener('focus',()=>{checkUpdate();});                                 // re-poll (not just apply a pending one)
   window.addEventListener('online',()=>{checkUpdate();});                               // the moment the network is back

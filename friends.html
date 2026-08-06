@@ -804,6 +804,18 @@ html.rotating *,html.rotating *::before,html.rotating *::after{transition:none!i
 /* The billboard's Ken Burns pan keeps compositing full-screen images behind the
    player, where nobody can see them, for the whole length of an episode. */
 html.watching .bb-slide .hero-bg-img{animation-play-state:paused!important;}
+
+/* The tilt during a rotation is the VIDEO, not our chrome — reported that way,
+   and the frame that started this shows exactly that: upright UI, content at an
+   angle. A cross-origin iframe gets its own compositing layer, and iOS
+   re-projects that layer through its rotation animation while our chrome has
+   already re-laid out. We cannot reach inside the frame to stop it, and nothing
+   we do to our own layers changes what the compositor does to theirs.
+   So don't show it. The wrap behind is already black, playback and audio
+   continue untouched (opacity, not visibility — nothing is torn down), and the
+   video reappears once the geometry has settled. Half a second of black beats
+   half a second of a picture sliding at an angle. */
+html.rotating .pv-frame{opacity:0;}
 .playerview{position:fixed;inset:0;z-index:120;background:#000;display:flex;flex-direction:column;transform:translateY(100%);transition:transform .38s cubic-bezier(.2,1,.28,1);}
 /* `none`, not `translateY(0)`. A position:fixed element that still carries a
    transform is composited against a snapshotted viewport and becomes the
@@ -13057,7 +13069,10 @@ function _freezeMotion(){
     clearTimeout(_rotT);
     // Long enough to cover the rotation itself, short enough that nothing feels
     // stuck if it fires spuriously.
-    _rotT=setTimeout(()=>r.classList.remove('rotating'),480);
+    // 480ms covered the app's own transitions. The compositor's re-projection of
+    // an iframe layer outlasts that on iOS, and revealing the video a moment
+    // early shows precisely the artifact this is here to hide.
+    _rotT=setTimeout(()=>r.classList.remove('rotating'),700);
   }catch(e){}
 }
 try{window.addEventListener('orientationchange',_freezeMotion);}catch(e){}

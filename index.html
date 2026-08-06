@@ -12879,6 +12879,19 @@ try{document.getElementById('apiKeyIn').value=getKey();}catch{}
 // Coming back from a lock / backgrounded app: if we're still in a party but the socket
 // dropped while away, reconnect — don't sit there silently dead.
 document.addEventListener('visibilitychange',function(){if(!document.hidden&&partyCode&&(!partyWS||partyWS.readyState>1)){partyReconn=0;try{partyConnect(partyCode,false);}catch(e){}}});
+// The party was the only live connection with no recovery when the network came
+// back — updates, friends and sync all had one. Its own retry gives up after six
+// tries across about seventeen seconds, which a lift, a tunnel or a wifi-to-
+// cellular handoff outlasts easily; after that the party was dead until the
+// person left and rejoined, even though the phone was back online. Resetting the
+// counter matters as much as reconnecting: without it the retries are already
+// spent and the reconnect gets one attempt.
+try{window.addEventListener('online',function(){
+  if(!partyCode)return;
+  if(partyWS&&partyWS.readyState<=1)return;      // already connecting or connected
+  partyReconn=0;
+  try{partyConnect(partyCode,false);}catch(e){}
+});}catch(e){}
 try{const pc=localStorage.getItem('party_active');if(pc&&partyName())setTimeout(()=>partyJoin(pc),400);}catch{}
 try{if(_updSnap){const pg=document.getElementById('pageEl'),y=_updSnap.y||0;if(y&&pg)requestAnimationFrame(()=>requestAnimationFrame(()=>{try{pg.scrollTop=y;}catch(e){}}));setTimeout(()=>toast('Updated to the latest version'),700);_updSnap=null;}}catch{}
 // Friends recommendations (public web build): show cached instantly, then refresh.

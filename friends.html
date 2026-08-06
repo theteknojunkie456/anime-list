@@ -3390,17 +3390,32 @@ function isQuotaErr(e){
   const n=String(e.name||''), c=Number(e.code);
   return n==='QuotaExceededError'||n==='NS_ERROR_DOM_QUOTA_REACHED'||c===22||c===1014;
 }
+// A save that keeps failing is silent data loss: every edit still shows on
+// screen, so the app looks fine, and the next reload throws all of it away.
+// Warning once per session was how that stayed quiet — someone could carry on
+// editing for an hour believing it was saved.
+let _saveWarnAt=0, _saveFails=0;
 function _saveFailed(e){
-  if(saveWarned)return;
-  saveWarned=true;
-  if(isQuotaErr(e))toast('Storage full — remove an uploaded cover to free space');
-  else{
-    try{console.error('[WatchList] save failed',e);}catch(_){}
+  _saveFails++;
+  try{logProblem('save',(e&&(e.name||e.message))||'save failed',isQuotaErr(e)?'quota':'');}catch(_){}
+  try{console.error('[WatchList] save failed',e);}catch(_){}
+  // Re-warn periodically rather than once ever — not on every keystroke, but
+  // often enough that "nothing is being saved" cannot go unnoticed.
+  const now=Date.now();
+  if(now-_saveWarnAt<60000)return;
+  _saveWarnAt=now; saveWarned=true;
+  if(isQuotaErr(e)){
+    // Once it has failed repeatedly the honest advice isn't "free a little
+    // space" — it's get the list somewhere it can't be lost.
+    toast(_saveFails>=3?'Storage still full — back up or export your list before you lose it'
+                       :'Storage full — remove an uploaded cover to free space');
+  }else{
     // Name the failure in the message itself. "Something went wrong" is
     // unreportable — on a phone there's no console to open, so the one person
     // who can diagnose it never learns what it was.
     const why=(e&&(e.name||e.constructor&&e.constructor.name))||'unknown';
-    toast(`Couldn’t save (${String(why).slice(0,24)}) — your list is safe, try again`);
+    toast(_saveFails>=3?`Still can’t save (${String(why).slice(0,20)}) — export your list now`
+                       :`Couldn’t save (${String(why).slice(0,24)}) — it’s still on screen, try again`);
   }
 }
 function writeLocal(){

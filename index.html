@@ -786,6 +786,13 @@ body.first-paint .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards
 .dt-pin-toggle svg{width:14px;height:14px;}
 .dt-watch .ico{width:19px;height:19px;fill:currentColor;}
 /* Full-screen in-app player */
+/* Rotating a phone re-lays the entire app out in one go. Anything with a
+   transition animates THROUGH the new geometry instead of snapping to it —
+   on a player that fills the screen, that reads as the video tearing or
+   tilting. Motion is suppressed for the length of the rotation and restored
+   straight after. Animations (spinners) keep running; only transitions, which
+   are the ones interpolating toward stale geometry, are cut. */
+html.rotating *,html.rotating *::before,html.rotating *::after{transition:none!important;}
 .playerview{position:fixed;inset:0;z-index:120;background:#000;display:flex;flex-direction:column;transform:translateY(100%);transition:transform .38s cubic-bezier(.2,1,.28,1);}
 .playerview.on{transform:translateY(0);}
 .pv-top{flex-shrink:0;display:flex;align-items:center;gap:9px;padding:calc(var(--safe-t) + 12px) 14px 12px;background:linear-gradient(180deg,#161618 0%,#0a0a0c 100%);border-bottom:1px solid rgba(255,255,255,.06);}
@@ -12802,6 +12809,30 @@ setTimeout(syncOnOpen,300);
 setTimeout(()=>{try{pullSrcPacks();}catch(e){}},2400);   // a shared setup waiting for you
 // If notifications are on, re-sync the tracked show list with the worker on load (fire-and-forget).
 setTimeout(()=>{try{notifyUpdate();}catch{}},1600);   // repairs a subscription tracking nothing
+// Orientation changes had no handling at all, and a rotation mid-episode is
+// exactly when the app is least able to afford a visual glitch.
+let _rotT=0;
+function _freezeMotion(){
+  try{
+    const r=document.documentElement;
+    r.classList.add('rotating');
+    clearTimeout(_rotT);
+    // Long enough to cover the rotation itself, short enough that nothing feels
+    // stuck if it fires spuriously.
+    _rotT=setTimeout(()=>r.classList.remove('rotating'),480);
+  }catch(e){}
+}
+try{window.addEventListener('orientationchange',_freezeMotion);}catch(e){}
+try{if(screen&&screen.orientation&&screen.orientation.addEventListener)screen.orientation.addEventListener('change',_freezeMotion);}catch(e){}
+// resize fires constantly on iOS as the URL bar collapses during a scroll, and
+// killing transitions on every one of those would make the whole app feel dead.
+// Only an actual flip between portrait and landscape counts.
+let _wasLandscape=null;
+try{_wasLandscape=window.innerWidth>window.innerHeight;}catch(e){}
+try{window.addEventListener('resize',()=>{
+  const now=window.innerWidth>window.innerHeight;
+  if(now!==_wasLandscape){_wasLandscape=now;_freezeMotion();}
+});}catch(e){}
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)syncOnOpen();});
 try{window.addEventListener('online',()=>syncOnOpen());}catch(e){}   // cloud sync recovers the moment the network is back
 

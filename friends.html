@@ -4008,11 +4008,31 @@ function scheduleNotifyUpdate(){if(!notifyOn())return;clearTimeout(notifyUpdT);n
 // never set it) kept its subscription on the server with an EMPTY show list: the
 // broadcasts arrived, but the every-15-minutes airing check had nothing to look
 // at, so "new episode" alerts could never fire. Now the subscription decides.
+// This sends whatever the list holds RIGHT NOW, and it replaces the server's
+// copy outright — so a single call made before the list has loaded wipes it.
+// That is not hypothetical: a tracked list went from 99 shows and 3 manga to 1
+// and 0, which silently ends every episode and chapter alert until something
+// happens to send a good list again.
+//
+// A real list doesn't collapse by 90% in one step. A collapse like that means
+// the list wasn't ready, not that it was emptied — so it's refused, and the
+// previous good list stays. Deleting everything deliberately still works: it
+// just takes the next update, once the count is genuinely small.
+const NOTIFY_SENT_KEY='wl_notify_count';
 async function notifyUpdate(){
   if(!pushSupported())return;
   try{
     const sub=await getPushSub();if(!sub)return;
-    await fetch(NOTIFY_URL+'/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({endpoint:sub.endpoint,animeIds:notifyAnimeIds(),mangaIds:notifyMangaIds()})});
+    const animeIds=notifyAnimeIds(),mangaIds=notifyMangaIds();
+    const n=animeIds.length+mangaIds.length;
+    let last=0; try{last=Number(localStorage.getItem(NOTIFY_SENT_KEY))||0;}catch(e){}
+    if(last>=10&&n<last*0.4){
+      // Looks like an unloaded list. Skip this one; the next update with a real
+      // list goes through normally.
+      return;
+    }
+    await fetch(NOTIFY_URL+'/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({endpoint:sub.endpoint,animeIds,mangaIds})});
+    try{localStorage.setItem(NOTIFY_SENT_KEY,String(n));}catch(e){}
   }catch{}
 }
 // "I haven't seen anything" is almost always "nothing aired", not "it's broken" —

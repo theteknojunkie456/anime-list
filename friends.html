@@ -8184,6 +8184,58 @@ function finishOnb(){ const v=document.getElementById('onb'); if(v)v.classList.r
 // ─── SETTINGS HUB ───────────────────────────────────────────────────────────
 // Each row states its own status, so "backup is off" is visible at a glance
 // instead of buried inside a panel nobody opens.
+// ─── WHAT WENT WRONG ────────────────────────────────────────────────────────
+// There are hundreds of `catch{}` blocks in here, and until now a failed
+// promise vanished without trace — nothing listened for unhandledrejection at
+// all. So "it bugged out" was unanswerable: the only evidence a tester could
+// give was a video, and the only diagnosis was guesswork.
+//
+// This keeps the last 25 problems on the DEVICE. Nothing is transmitted:
+// crash reports are the kind of thing that quietly turns into telemetry, and
+// this app doesn't send anything anywhere without being asked.
+const ERR_KEY='wl_errs';
+function logProblem(kind,msg,extra){
+  try{
+    const list=recentProblems();
+    const e={t:Date.now(),k:kind,m:String(msg||'').slice(0,300)};
+    if(extra)e.x=String(extra).slice(0,200);
+    // Identical error repeating (a loop) shouldn't push everything else out.
+    const last=list[list.length-1];
+    if(last&&last.m===e.m&&last.k===e.k){last.n=(last.n||1)+1;last.t=e.t;}
+    else list.push(e);
+    localStorage.setItem(ERR_KEY,JSON.stringify(list.slice(-25)));
+  }catch(e){}
+}
+function recentProblems(){
+  try{const v=JSON.parse(localStorage.getItem(ERR_KEY)||'[]');return Array.isArray(v)?v:[];}catch(e){return [];}
+}
+try{
+  window.addEventListener('error',ev=>{
+    // Failed images/scripts fire here too and are noise, not faults.
+    if(ev&&ev.target&&ev.target!==window&&ev.target.tagName)return;
+    logProblem('error',ev&&ev.message,ev&&ev.filename?((ev.filename||'').split('/').pop()+':'+ev.lineno):'');
+  },true);
+  window.addEventListener('unhandledrejection',ev=>{
+    const r=ev&&ev.reason;
+    logProblem('promise',(r&&(r.message||r))||'rejected',(r&&r.status)?('HTTP '+r.status):'');
+  });
+}catch(e){}
+function problemsText(){
+  const list=recentProblems();
+  if(!list.length)return 'No problems recorded.';
+  const ver=(typeof RELEASE!=='undefined'?RELEASE:'')||'';
+  return `WatchList ${ver} · ${navigator.userAgent}\n`+list.map(e=>{
+    const when=new Date(e.t).toISOString().replace('T',' ').slice(0,19);
+    return `${when}  [${e.k}] ${e.m}${e.x?'  ('+e.x+')':''}${e.n>1?'  x'+e.n:''}`;
+  }).join('\n');
+}
+function copyProblems(){
+  const t=problemsText();
+  try{navigator.clipboard.writeText(t);toast('Copied — paste it to whoever asked');}
+  catch(e){try{prompt('Copy this:',t);}catch(e2){}}
+}
+function clearProblems(){try{localStorage.removeItem(ERR_KEY);}catch(e){}renderSettings();toast('Cleared');}
+
 function renderSettings(){
   const el=document.getElementById('settingsBody');if(!el)return;
   const backedUp=!!syncCode();
@@ -8202,6 +8254,12 @@ function renderSettings(){
   // Admin row appears only on the device where your admin token is stored — so it
   // shows for you and no one else. ?admin=1 is the one-time way to set it up.
   if(adminToken())rows.push({ic:'users',col:'#ff6b6b',h:'Admin',p:'Approve members, invites, broadcast, cards',go:'openAdmin()'});
+  // Only when there's something to report — a permanently visible "problems"
+  // row makes a working app look broken.
+  const probs=recentProblems();
+  if(probs.length)rows.push({ic:'clipboard',col:'#ff6b6b',h:'Something went wrong',
+    p:probs.length+(probs.length===1?' problem recorded':' problems recorded')+' — tap to copy the details',
+    go:'copyProblems()',warn:true});
   el.innerHTML=rows.map(r=>
     `<button class="set-row${r.warn?' warn':''}" style="--sc:${r.col}" onclick="${r.go}">
       <div class="set-ico">${icon(r.ic)}</div>

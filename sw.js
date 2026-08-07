@@ -1,10 +1,11 @@
+// Bumped v8 -> v9 to drop the caches the old fetch handler had grown (see below).
 // Bumped v7 -> v8 deliberately. The activate handler deletes every cache whose
 // name isn't the current one, so changing this name forces every installed app
 // to drop what it stored and refetch. Network-first should already keep things
 // current, but an installed iOS app that has been offline or backgrounded can
 // hold an old bundle for a long time — and "the fix didn't work" has looked
 // exactly like that more than once.
-const CACHE = 'animelist-v8';
+const CACHE = 'animelist-v9';
 const ASSETS = ['./index.html', './friends.html', './manifest.json'];
 
 self.addEventListener('install', e => {
@@ -56,6 +57,28 @@ self.addEventListener('notificationclick', e => {
   );
 });
 
+// Cache entries are keyed by PATH, with the query string dropped. Two reasons,
+// both of which the old full-URL keying got wrong:
+//
+//  1. Unbounded growth. The version check requests `./?_ck=<Date.now()>` — a URL
+//     that is unique every single time. It uses HEAD (not cacheable) on GitHub
+//     Pages, but falls back to a plain GET whenever a proxy strips the ETag, and
+//     the bundle is ~880KB. Under full-URL keying each of those was kept
+//     forever. The chapter feed's hourly `?cb=` bucket added 24 more a day. On
+//     iOS, an origin over its quota is evicted whole — and the list goes with it.
+//
+//  2. Offline misses. Nothing ever requests `data/chapters.json` without a
+//     `?cb=`, so a cache keyed on the full URL never matched offline and fell
+//     through to the index.html fallback — handing HTML to something that was
+//     about to call .json() on it.
+//
+// A query string on a same-origin URL here is always a cache-buster or a deep
+// link into the same document (?admin=1, ?join=CODE), never a different
+// resource, so one entry per path is both correct and enough.
+function cacheKey(request) {
+  const u = new URL(request.url);
+  return u.origin + u.pathname;
+}
 self.addEventListener('fetch', e => {
   // Only handle same-origin requests; API calls (Jikan, TVMaze, Anthropic…) go straight to the network
   if (new URL(e.request.url).origin !== self.location.origin) return;
@@ -65,11 +88,11 @@ self.addEventListener('fetch', e => {
       // Only GET, OK responses are cacheable (HEAD version-checks would throw).
       if (e.request.method === 'GET' && res && res.ok) {
         const copy = res.clone();
-        caches.open(CACHE).then(c => c.put(e.request, copy)).catch(() => {});
+        caches.open(CACHE).then(c => c.put(cacheKey(e.request), copy)).catch(() => {});
       }
       return res;
     }).catch(() =>
-      caches.match(e.request).then(r => r || caches.match('./index.html'))
+      caches.match(cacheKey(e.request)).then(r => r || caches.match('./index.html'))
     )
   );
 });

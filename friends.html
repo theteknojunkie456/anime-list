@@ -924,6 +924,14 @@ html.rotating .pv-frame:fullscreen,html.rotating .pv-frame:-webkit-full-screen{o
   background:var(--bg3);border:1px solid var(--b2);color:var(--t1);outline:none;min-width:0;
 }
 .ai-prompt-in:focus{border-color:var(--a);box-shadow:0 0 0 3px var(--ag);background:var(--bg2);}
+/* A pasted address is the one piece of content here that reliably outruns a
+   phone's width, and a single-line <input> can only ever show its first ~40
+   characters — the rest is gone unless you scrub a caret through it on a
+   touchscreen. That is what "it's cut off" was. These wrap, so the whole address
+   is readable at any width, and Enter still never inserts a newline: they behave
+   exactly like the inputs they replaced. */
+textarea.ai-prompt-in{resize:none;line-height:1.45;display:block;}
+.urlin{white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;font-size:12.5px;}
 .ai-prompt-in::placeholder{color:var(--t3);}
 .ai-run-btn{padding:11px 18px;border-radius:12px;font-size:12.5px;font-weight:800;background:var(--a);color:var(--aFg);flex-shrink:0;}
 .ai-run-btn.loading{opacity:0.5;pointer-events:none;}
@@ -2487,7 +2495,7 @@ body.recsel .pcard{position:relative;}
         <button class="parse-btn" style="flex:1" onclick="pvSetFromName()">Set from the name</button>
         <button class="parse-btn" style="flex:0 0 auto;width:auto;padding:0 16px" onclick="pvSearchHere()">Search this site</button>
       </div>
-      <input class="ai-prompt-in" id="pvSetIn" placeholder="or paste the address of the right page" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url">
+      <textarea class="ai-prompt-in urlin" rows="2" id="pvSetIn" placeholder="or paste the address of the right page" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url" onkeydown="if(event.key==='Enter')event.preventDefault();"></textarea>
       <div class="pv-set-row">
         <button class="parse-btn" style="flex:1" onclick="pvSetFromURL()">Set</button>
         <button class="parse-btn" style="flex:0 0 auto;width:auto;padding:0 16px" onclick="pvOpenExternal()">Open in browser</button>
@@ -2952,7 +2960,7 @@ function renderAdmin(){
       <input class="ai-prompt-in" id="msgTitle" placeholder="Card title (e.g. Watch anime on…)" style="margin-bottom:8px">
       <input class="ai-prompt-in" id="msgBody" placeholder="Message" style="margin-bottom:8px">
       <input class="ai-prompt-in" id="msgCta" placeholder="Button text (optional)" style="margin-bottom:8px">
-      <input class="ai-prompt-in" id="msgUrl" placeholder="Button link (optional)" inputmode="url">
+      <textarea class="ai-prompt-in urlin" rows="2" id="msgUrl" placeholder="Button link (optional)" inputmode="url" onkeydown="if(event.key==='Enter')event.preventDefault();"></textarea>
       <div class="ai-desc" style="margin:10px 0 6px">Target — applies to both Show and Clear</div>
       <div class="msg-tgt-seg" id="msgTargetSeg">
         <button type="button" class="msg-tgt on" onclick="pickMsgTarget('all',this)">All</button>
@@ -2970,7 +2978,7 @@ function renderAdmin(){
       <summary>${icon('play')} Recommended sources</summary>
       <p class="ai-desc" style="margin-top:8px">Services shown under <b>Recommended</b> in every member’s Watch — no setup on their end.</p>
       <div id="adminSrcList"><p class="ai-desc">Loading…</p></div>
-      <input class="ai-prompt-in" id="asURL" placeholder="paste a service’s search page (or a {query} link)" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url" style="margin-top:8px" oninput="asHintName()">
+      <textarea class="ai-prompt-in urlin" rows="2" id="asURL" placeholder="paste a service’s search page (or a {query} link)" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url" style="margin-top:8px" oninput="asHintName()" onkeydown="if(event.key==='Enter')event.preventDefault();"></textarea>
       <input class="ai-prompt-in" id="asName" placeholder="name" autocomplete="off" spellcheck="false" style="margin-top:8px">
       <button class="src-chip" style="margin-top:8px" onclick="adminSrcAddRow()">Add source</button>
       <div style="display:flex;gap:8px;margin-top:10px">
@@ -5493,7 +5501,7 @@ function renderDetail(){
     ${titleWatchPickerHTML(a)}
     <button class="dt-pin-toggle" onclick="togglePin()">${icon('external')} ${a.srcUrl?'Advanced: edit the direct link':'Advanced: paste a direct episode link'}</button>
     <div id="dtPin" style="display:none">
-      <input class="ai-prompt-in" id="dtPinIn" placeholder="https://site.com/watch/slug/ep-{ep}" value="${escH(a.srcUrl||'')}" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url">
+      <textarea class="ai-prompt-in urlin" rows="2" id="dtPinIn" placeholder="https://site.com/watch/slug/ep-{ep}" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url" onkeydown="if(event.key==='Enter')event.preventDefault();">${escH(a.srcUrl||'')}</textarea>
       <div style="display:flex;gap:8px;margin-top:8px">
         <button class="parse-btn" style="flex:1" onclick="savePin('${a.id}')">Save</button>
         <button class="parse-btn" style="flex:0 0 auto;width:auto;padding-left:16px;padding-right:16px" onclick="testPin('${a.id}')">Test</button>
@@ -5515,7 +5523,7 @@ function renderDetail(){
     ${kindOf(a)==='read'?`<button class="dt-watch" onclick="readManga('${a.id}')">${icon('book')} ${(a.ep||0)>0?'Continue Reading':'Start Reading'}</button>
     <button class="dt-pin-toggle" onclick="togglePin()">${icon('external')} ${a.srcUrl?'Direct link pinned — edit':'Pin a direct link for this title'}</button>
     <div id="dtPin" style="display:none">
-      <input class="ai-prompt-in" id="dtPinIn" placeholder="https://reader.com/manga/{slug}" value="${escH(a.srcUrl||'')}" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url">
+      <textarea class="ai-prompt-in urlin" rows="2" id="dtPinIn" placeholder="https://reader.com/manga/{slug}" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url" onkeydown="if(event.key==='Enter')event.preventDefault();">${escH(a.srcUrl||'')}</textarea>
       <div style="display:flex;gap:8px;margin-top:8px">
         <button class="parse-btn" style="flex:1" onclick="savePin('${a.id}')">Save</button>
         <button class="parse-btn" style="flex:0 0 auto;width:auto;padding-left:16px;padding-right:16px" onclick="testPin('${a.id}')">Test</button>
@@ -10988,7 +10996,7 @@ function readSourceHTML(rcustom){
     <details class="src-fold" data-fold="readown" style="margin-top:16px">
       <summary>${icon('edit')} Use a reader of your own</summary>
       <p class="ai-desc" style="margin:9px 0 11px;font-size:12.5px">Open your reader, go to <b>any</b> chapter of <b>any</b> series, and paste that page's address. That one link is the whole setup — WatchList works out the pattern and uses it for everything you read.</p>
-      <input class="ai-prompt-in" id="rsrcQuickIn" placeholder="paste that chapter's address" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url" oninput="readQuickSetup()">
+      <textarea class="ai-prompt-in urlin" rows="2" id="rsrcQuickIn" placeholder="paste that chapter's address" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url" oninput="readQuickSetup()" onkeydown="if(event.key==='Enter')event.preventDefault();"></textarea>
       <div id="rsrcQuickOut" class="src-quick-out" style="display:none"></div>
       ${rcustom?`<button class="src-quick-share" onclick="setReadSource('')" style="margin-top:10px">${icon('x')} Go back to AsuraScans<span>${escH(host(rcustom))} is set right now</span></button>`:''}
     </details>
@@ -10996,7 +11004,7 @@ function readSourceHTML(rcustom){
     <details class="src-fold" data-fold="readmore" style="margin-top:16px">
       <summary>${icon('settings')} Write the address out yourself</summary>
       <p class="ai-desc">Only if the paste box didn't suit.</p>
-      <input class="ai-prompt-in" id="rsrcCustom" placeholder="https://reader.com/manga/{slug}/chapter-{ch}" value="${rcustom?String(rcustom).replace(/"/g,'&quot;'):''}" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url">
+      <textarea class="ai-prompt-in urlin" rows="2" id="rsrcCustom" placeholder="https://reader.com/manga/{slug}/chapter-{ch}" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url" onkeydown="if(event.key==='Enter')event.preventDefault();">${rcustom?escH(String(rcustom)):''}</textarea>
       <button class="parse-btn" onclick="saveReadSource()">Use this site instead</button>
       <div class="src-toks" style="margin-top:10px">
         ${['{query}','{slug}','{ch}','{titleRomaji}','{titleEnglish}'].map(t=>`<button type="button" class="src-tok" onclick="insertReadToken('${t}')">${t}</button>`).join('')}
@@ -11156,7 +11164,7 @@ function renderSource(){
     <details class="src-fold" data-fold="own" style="margin-top:16px"${O('own')}>
       <summary>${icon('edit')} Use a site of your own</summary>
       <p class="ai-desc" style="margin:9px 0 11px;font-size:12.5px">Open your site, start <b>any</b> episode of <b>any</b> show, and paste that page's address. That one link is the whole setup — WatchList works out the pattern and uses it for every show.</p>
-      <input class="ai-prompt-in" id="srcQuickIn" placeholder="paste that episode's address" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url" oninput="quickSetup()">
+      <textarea class="ai-prompt-in urlin" rows="2" id="srcQuickIn" placeholder="paste that episode's address" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url" oninput="quickSetup()" onkeydown="if(event.key==='Enter')event.preventDefault();"></textarea>
       <div id="srcQuickOut" class="src-quick-out" style="display:none"></div>
       <button class="src-quick-share" id="shareMineBtn" onclick="shareMine()">${icon('send')} Share mine<span>${custom?escH(host(custom)):'anyone can use your setup'}</span></button>
     </details>
@@ -11178,7 +11186,7 @@ function renderSource(){
       ${onlyMine()?'':`<div class="src-picks">${REGIONAL_SERVICES
         .filter(s=>!customServices().some(c=>c.name.toLowerCase()===s.name.toLowerCase()))
         .map(s=>`<button class="src-chip" onclick="addRegional('${escH(s.name)}')">${escH(s.name)} <span style="opacity:.55">${escH(s.region)}</span></button>`).join('')}</div>`}
-      <input class="ai-prompt-in" id="srcCustom" placeholder="https://site.com/watch/{slug}/ep-{ep}" value="${custom&&!WATCH_PRESETS.some(p=>p.url===custom)&&!customServices().some(s=>s.url===custom)?custom.replace(/"/g,'&quot;'):''}" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url" style="margin-top:10px" oninput="csHintName()">
+      <textarea class="ai-prompt-in urlin" rows="2" id="srcCustom" placeholder="https://site.com/watch/{slug}/ep-{ep}" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url" style="margin-top:10px" oninput="csHintName()" onkeydown="if(event.key==='Enter')event.preventDefault();">${custom&&!WATCH_PRESETS.some(p=>p.url===custom)&&!customServices().some(s=>s.url===custom)?escH(custom):''}</textarea>
       <input class="ai-prompt-in" id="csName" placeholder="name (auto-filled)" value="" autocomplete="off" spellcheck="false" style="margin-top:8px">
       <div style="display:flex;gap:8px;margin-top:8px">
         <button class="parse-btn" style="flex:1" onclick="addCustomServiceFromForm()">Save and use it</button>

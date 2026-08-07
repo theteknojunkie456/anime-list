@@ -11551,9 +11551,17 @@ function saveKey(){
 // of them and useless for the rest.
 function aiReason(e){
   if(e===NO_KEY)return '';
+  if(e&&e.unknownKey)return 'That key isn\u2019t one this app recognises. Google AI Studio keys start AIza, Groq gsk_, OpenRouter sk-or-, Claude sk-ant-.';
   const st=e&&e.status, d=String((e&&(e.detail||e.message))||'');
   if(st===401||st===403)return 'Your AI key was rejected — it may have been revoked or copied incompletely.';
-  if(st===429)return 'Rate limited by the AI provider. Wait a minute and try again.';
+  if(st===429){
+    const p=aiProvider();
+    // Groq and OpenRouter meter words per minute, and the chat sends the whole
+    // list every time — on a long list that is a 429 every other question, which
+    // looks like a broken app rather than a small allowance.
+    return 'Rate limited by the AI provider. Wait a minute and try again.'+
+      ((p==='groq'||p==='openrouter')?' If it keeps happening, a free Google AI Studio key (AIza\u2026) has far more room for a list this size.':'');
+  }
   if(st===402||/quota|credit|billing/i.test(d))return 'That key is out of credit or quota.';
   if(modelRejected(e))return 'The AI model was retired and no fallback worked. Nothing you did wrong.';
   if(st>=500)return 'The AI provider is having problems. Try again shortly.';
@@ -11583,18 +11591,33 @@ async function aiFail(res){
 // Providers retire models on their own schedule, and a hardcoded name turns into
 // a dead app the day they do. If the model is the thing being rejected, try the
 // next one instead of blaming the key.
-const AI_FALLBACKS={
-  'api.groq.com':['llama-3.3-70b-versatile','llama-3.1-8b-instant','openai/gpt-oss-120b'],
-  'openrouter.ai':['meta-llama/llama-3.3-70b-instruct:free','meta-llama/llama-3.1-8b-instruct:free'],
+// Gemini and Claude had no chain at all — the fallback only ever covered the two
+// OpenAI-compatible hosts. That was survivable while Groq was the recommendation;
+// it is not now that Gemini is, because one retirement at Google would take the
+// AI features out for everyone we sent there.
+const AI_EXTRA={
+  groq:['openai/gpt-oss-120b'],
+  openrouter:['meta-llama/llama-3.1-8b-instruct:free'],
+  gemini:['gemini-2.5-flash-lite'],
+  claude:['claude-haiku-4-5-20251001'],
 };
+// Whatever they picked comes first, then the rest of that provider's list, then
+// the spares. Picking a model in Settings used to change the chat and nothing
+// else: recommendations, ranking, Insight and autofill all ran on a hardcoded
+// name regardless of the choice.
+function modelChain(prov){
+  const seen=new Set(),out=[];
+  for(const m of [getModel()].concat(AI_MODELS[prov]||[],AI_EXTRA[prov]||[]))
+    if(m&&!seen.has(m)){seen.add(m);out.push(m);}
+  return out;
+}
 function modelRejected(err){
   const d=String(err&&err.detail||'').toLowerCase();
   return (err&&(err.status===404||err.status===400))&&
     /model|decommission|deprecat|not found|does not exist|unsupported/.test(d);
 }
-async function callOpenAICompat(url,key,model,prompt){
-  let host='';try{host=new URL(url).hostname.replace(/^api\./,'');}catch(e){}
-  const chain=[model,...((AI_FALLBACKS[new URL(url).hostname]||[]).filter(m=>m!==model))];
+async function callOpenAICompat(url,key,models,prompt){
+  const chain=Array.isArray(models)?models:[models];
   let last=null;
   for(const m of chain){
     const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify({model:m,max_tokens:1000,messages:[{role:'user',content:prompt}]})});
@@ -11607,23 +11630,32 @@ async function callOpenAICompat(url,key,model,prompt){
   }
   throw last;
 }
+function unknownKeyErr(){
+  const e=new Error('unrecognised key');e.unknownKey=true;return e;
+}
 async function callAI(prompt){
   const key=getKey();
   if(!key)throw NO_KEY;
-  if(key.startsWith('gsk_'))
-    return callOpenAICompat('https://api.groq.com/openai/v1/chat/completions',key,'llama-3.3-70b-versatile',prompt);
-  if(key.startsWith('sk-or-'))
-    return callOpenAICompat('https://openrouter.ai/api/v1/chat/completions',key,'meta-llama/llama-3.3-70b-instruct:free',prompt);
-  if(key.startsWith('AIza')){
-    const res=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{maxOutputTokens:1000}})});
-    if(!res.ok)throw await aiFail(res);
-    const data=await res.json();
-    return data.candidates?.[0]?.content?.parts?.[0]?.text||'No response.';
+  const prov=aiProvider();
+  if(!prov)throw unknownKeyErr();
+  const chain=modelChain(prov);
+  if(prov==='groq')       return callOpenAICompat('https://api.groq.com/openai/v1/chat/completions',key,chain,prompt);
+  if(prov==='openrouter') return callOpenAICompat('https://openrouter.ai/api/v1/chat/completions',key,chain,prompt);
+  let last=null;
+  for(const m of chain){
+    let res,text;
+    if(prov==='gemini'){
+      res=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+m+':generateContent',{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{maxOutputTokens:1000}})});
+      if(res.ok){const d=await res.json();text=d.candidates?.[0]?.content?.parts?.[0]?.text;}
+    }else{
+      res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:m,max_tokens:1000,messages:[{role:'user',content:prompt}]})});
+      if(res.ok){const d=await res.json();text=d.content?.[0]?.text;}
+    }
+    if(res.ok)return text||'No response.';
+    last=await aiFail(res);
+    if(!modelRejected(last))throw last;   // a real failure — don't burn the other models on it
   }
-  const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-5',max_tokens:1000,messages:[{role:'user',content:prompt}]})});
-  if(!res.ok)throw await aiFail(res);
-  const data=await res.json();
-  return data.content?.[0]?.text||'No response.';
+  throw last;
 }
 function setLoading(btnId,respId,on){
   const btn=document.getElementById(btnId),resp=document.getElementById(respId);
@@ -11918,23 +11950,32 @@ async function readSSE(resp,onData){
   const reader=resp.body.getReader(),dec=new TextDecoder();let buf='';
   while(true){const {done,value}=await reader.read();if(done)break;buf+=dec.decode(value,{stream:true});const parts=buf.split('\n');buf=parts.pop();for(let p of parts){p=p.replace(/\r$/,'');if(p.startsWith('data:'))onData(p.slice(p[5]===' '?6:5));}}
 }
+// The chat walks the same chain as everything else. A model is only ever swapped
+// before a single token has been emitted — once the stream is running, a failure
+// is a real one and is raised.
 async function callAIChatStream(history,onToken){
   const key=getKey();if(!key)throw NO_KEY;
-  const system=chatContext(),model=getModel();
-  if(key.startsWith('gsk_')||key.startsWith('sk-or-')){
-    const url=key.startsWith('gsk_')?'https://api.groq.com/openai/v1/chat/completions':'https://openrouter.ai/api/v1/chat/completions';
-    const resp=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify({model,messages:[{role:'system',content:system}].concat(history),stream:true,max_tokens:2000})});
-    if(!resp.ok)throw new Error('API '+resp.status);
-    let full='';await readSSE(resp,d=>{d=d.trim();if(d==='[DONE]'||!d)return;try{const j=JSON.parse(d);const t=j.choices?.[0]?.delta?.content;if(t){full+=t;onToken(t);}}catch(e){}});return full;
+  const prov=aiProvider();
+  if(!prov)throw unknownKeyErr();
+  const system=chatContext();
+  let last=null;
+  for(const model of modelChain(prov)){
+    let resp;
+    if(prov==='groq'||prov==='openrouter'){
+      const url=prov==='groq'?'https://api.groq.com/openai/v1/chat/completions':'https://openrouter.ai/api/v1/chat/completions';
+      resp=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify({model,messages:[{role:'system',content:system}].concat(history),stream:true,max_tokens:2000})});
+      if(resp.ok){let full='';await readSSE(resp,d=>{d=d.trim();if(d==='[DONE]'||!d)return;try{const j=JSON.parse(d);const t=j.choices?.[0]?.delta?.content;if(t){full+=t;onToken(t);}}catch(e){}});return full;}
+    }else if(prov==='gemini'){
+      resp=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+model+':streamGenerateContent?alt=sse',{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},body:JSON.stringify({systemInstruction:{parts:[{text:system}]},contents:history.map(m=>({role:m.role==='assistant'?'model':'user',parts:[{text:m.content}]})),generationConfig:{maxOutputTokens:2000}})});
+      if(resp.ok){let full='';await readSSE(resp,d=>{d=d.trim();if(!d)return;try{const j=JSON.parse(d);const t=j.candidates?.[0]?.content?.parts?.[0]?.text;if(t){full+=t;onToken(t);}}catch(e){}});return full;}
+    }else{
+      resp=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model,max_tokens:2000,system,messages:history,stream:true})});
+      if(resp.ok){let full='';await readSSE(resp,d=>{d=d.trim();if(!d)return;try{const j=JSON.parse(d);if(j.type==='content_block_delta'&&j.delta&&j.delta.text){full+=j.delta.text;onToken(j.delta.text);}}catch(e){}});return full;}
+    }
+    last=await aiFail(resp);
+    if(!modelRejected(last))throw last;
   }
-  if(key.startsWith('AIza')){
-    const resp=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+model+':streamGenerateContent?alt=sse',{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},body:JSON.stringify({systemInstruction:{parts:[{text:system}]},contents:history.map(m=>({role:m.role==='assistant'?'model':'user',parts:[{text:m.content}]})),generationConfig:{maxOutputTokens:2000}})});
-    if(!resp.ok)throw new Error('API '+resp.status);
-    let full='';await readSSE(resp,d=>{d=d.trim();if(!d)return;try{const j=JSON.parse(d);const t=j.candidates?.[0]?.content?.parts?.[0]?.text;if(t){full+=t;onToken(t);}}catch(e){}});return full;
-  }
-  const resp=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model,max_tokens:2000,system,messages:history,stream:true})});
-  if(!resp.ok)throw new Error('API '+resp.status);
-  let full='';await readSSE(resp,d=>{d=d.trim();if(!d)return;try{const j=JSON.parse(d);if(j.type==='content_block_delta'&&j.delta&&j.delta.text){full+=j.delta.text;onToken(j.delta.text);}}catch(e){}});return full;
+  throw last;
 }
 async function runRank(){
   const pref=document.getElementById('rankPrompt').value.trim();

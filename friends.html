@@ -143,8 +143,10 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 
 /* ── HEADER ── */
 .hdr{padding:calc(var(--safe-t) + 12px) 18px 0;display:flex;align-items:center;justify-content:space-between;}
-.hdr-title{font-size:21px;font-weight:900;letter-spacing:-0.5px;display:flex;align-items:center;gap:8px;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;}
-.hdr-title::before{content:'';width:5px;height:18px;border-radius:99px;background:linear-gradient(180deg,var(--a2),var(--a));box-shadow:0 0 12px var(--glow);}
+.hdr-title{font-size:21px;font-weight:800;letter-spacing:-0.6px;display:flex;align-items:baseline;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;}
+.hdr-title b{font-weight:800;}
+.hdr-title i{font-style:normal;font-weight:400;color:var(--t2);letter-spacing:-0.3px;}
+.hdr-title::after{content:'';width:5px;height:5px;border-radius:50%;background:var(--a);margin-left:3px;align-self:center;box-shadow:0 0 10px var(--glow);}
 /* 36px buttons six pixels apart, five in a row, is under the 44px a fingertip
    actually needs — which reads as the bar being unreliable rather than small.
    The button stays compact (the header has a title to fit next to it) and grows
@@ -351,7 +353,7 @@ body.first-paint .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards
 .set-chev{flex-shrink:0;color:var(--t3);display:flex;}
 .set-chev .ico{width:16px;height:16px;}
 /* ── "How do I get a key" walkthrough ── */
-.key-cta{width:100%;display:flex;align-items:center;justify-content:center;gap:8px;padding:14px;border:none;border-radius:13px;background:linear-gradient(135deg,var(--a),var(--a2));color:#fff;font-family:var(--fd);font-size:15px;font-weight:800;cursor:pointer;}
+.key-cta{width:100%;display:flex;align-items:center;justify-content:center;gap:8px;padding:14px;border:none;border-radius:13px;background:var(--a);color:var(--aFg);font-family:var(--fd);font-size:15px;font-weight:800;cursor:pointer;}
 .key-cta span{font-weight:600;font-size:12px;opacity:.85;}
 .key-cta:active{transform:scale(.98);}
 .keyhow{margin-top:14px;border-top:1px solid var(--b1);padding-top:12px;}
@@ -440,23 +442,23 @@ body.first-paint .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards
 .bb-dots{position:absolute;bottom:15px;right:16px;z-index:4;display:flex;gap:6px;}
 .bb-dot{width:7px;height:7px;border-radius:99px;background:rgba(255,255,255,0.42);transition:width .35s cubic-bezier(.2,1,.3,1),background-color .35s cubic-bezier(.2,1,.3,1),opacity .35s;cursor:pointer;}
 .bb-dot.on{background:#fff;width:20px;}
-.row-div{font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--t3);padding:22px 18px 2px;}
+.row-div{font-family:var(--fd);font-size:13px;font-weight:600;color:var(--t3);padding:26px 18px 4px;}
 
 /* ── CONTINUE WATCHING RAIL ── */
 /* Continue-watching: framed as its own band (hairline top + bottom), a row of
    uniform cinematic cards with one consistent glassy play button. */
 /* ── QUICK PICKS (help me decide) ── */
 .qp-sec{margin:16px 0 4px;}
-.qp-head{font-size:13px;font-weight:600;color:var(--t2);margin:0 0 9px;padding:0 18px;display:flex;align-items:center;gap:7px;}
-.qp-head svg{width:15px;height:15px;stroke-width:2.2;}
-.qp-chips{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding:0 18px 2px;scroll-padding:18px;}
+.qp-head{flex:0 0 auto;align-self:center;font-size:13px;font-weight:500;color:var(--t2);}
+.qp-chips{display:flex;align-items:center;gap:10px;overflow-x:auto;scrollbar-width:none;padding:0 18px 2px;scroll-padding:18px;}
 .qp-chips::-webkit-scrollbar{display:none;}
 .qp-chip{flex:0 0 auto;display:flex;align-items:center;gap:6px;padding:9px 14px;border-radius:12px;border:1px solid var(--b1);background:var(--bg2);color:var(--t1);font-size:13px;font-weight:600;cursor:pointer;transition:transform .12s ease,border-color .15s ease;}
 .qp-chip:active{transform:scale(.95);}
 .qp-chip svg{width:15px;height:15px;color:var(--a);stroke-width:2.2;}
 .rz-sec{margin-top:18px;padding:16px 0 15px;border-top:1px solid var(--b1);border-bottom:1px solid var(--b1);animation:fadeUp .4s ease both;}
-.rz-head{display:flex;align-items:center;gap:7px;padding:0 18px 12px;font-family:var(--fd);font-size:15px;font-weight:800;letter-spacing:-.2px;color:var(--t1);}
-.rz-head .ico{width:16px;height:16px;fill:var(--a2);color:var(--a2);}
+.rz-head{display:flex;align-items:center;gap:9px;padding:0 18px 12px;font-family:var(--fd);font-size:16px;font-weight:800;letter-spacing:-.3px;color:var(--t1);}
+.rz-head::before{content:'';width:6px;height:6px;flex-shrink:0;border-radius:50%;background:var(--a);}
+.rz-head::after{content:'';flex:1;height:1px;background:var(--bn2);}
 .rz-scroll{display:flex;gap:13px;overflow-x:auto;padding:0 18px 2px;scrollbar-width:none;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;}
 .rz-scroll::-webkit-scrollbar{display:none;}
 .rz-card{flex:0 0 clamp(212px,60vw,264px);scroll-snap-align:center;position:relative;aspect-ratio:16/9;border-radius:16px;overflow:hidden;background:var(--bg4);border:1px solid var(--b1);box-shadow:var(--elev1);text-align:left;}
@@ -474,10 +476,11 @@ body.first-paint .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards
 .rz-fill{height:100%;background:var(--a2);}
 /* ── ROWS ── */
 .row-sec{margin-top:16px;}
-.row-head{display:flex;align-items:baseline;gap:8px;padding:0 18px 10px;}
-.row-title{font-size:15px;font-weight:800;letter-spacing:-0.2px;}
-.row-title .ico{color:var(--rc,var(--t2));}
-.row-count{font-size:11px;font-weight:700;color:var(--t3);}
+.row-head{display:flex;align-items:center;gap:9px;padding:0 18px 10px;}
+.row-title{font-family:var(--fd);font-size:16px;font-weight:800;letter-spacing:-0.3px;white-space:nowrap;}
+.row-title::before{content:'';display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--rc,var(--t3));margin-right:8px;vertical-align:0.12em;}
+.row-count{font-size:11.5px;font-weight:600;color:var(--t3);font-variant-numeric:tabular-nums;}
+.row-head::after{content:'';flex:1;height:1px;background:var(--bn2);}
 .row-scroll{display:flex;gap:10px;overflow-x:auto;padding:2px 18px 6px;scroll-padding:18px;}
 .pcard{flex:0 0 104px;cursor:pointer;transition:transform .18s cubic-bezier(.32,.72,.28,1);}
 .pcard:active{transform:scale(0.94);}
@@ -493,19 +496,21 @@ body.first-paint .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards
 }
 .pcard-wrap{position:relative;}
 .pcard-badge{
-  position:absolute;top:7px;left:7px;font-size:8.5px;font-weight:800;letter-spacing:0.06em;
-  padding:3.5px 8px;border-radius:99px;
-  text-transform:uppercase;box-shadow:0 2px 8px rgba(0,0,0,0.35);
+  position:absolute;top:0;left:0;display:inline-flex;align-items:center;gap:5px;
+  font-size:9px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;
+  padding:6px 9px 7px 8px;border-radius:15px 0 12px 0;
+  background:rgba(8,8,11,0.72);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
 }
+.pcard-badge::before{content:'';width:5px;height:5px;border-radius:50%;background:currentColor;}
+.pcard-badge .ico{display:none;}
+.pcard-sub{font-size:10.5px;font-weight:500;color:var(--t3);margin-top:3px;font-variant-numeric:tabular-nums;}
 .pcard-fav{position:absolute;top:5px;right:7px;font-size:13px;text-shadow:0 1px 6px rgba(0,0,0,0.6);}
 .pcard-seas{position:absolute;bottom:7px;right:7px;display:inline-flex;align-items:center;gap:3px;font-size:9px;font-weight:800;padding:3px 7px 3px 6px;border-radius:99px;background:rgba(10,10,14,0.82);color:#fff;box-shadow:0 2px 8px rgba(0,0,0,0.4);}
-.pcard-dur{position:absolute;bottom:7px;left:7px;display:inline-flex;align-items:center;gap:3px;font-size:9px;font-weight:800;padding:3px 7px 3px 6px;border-radius:99px;background:rgba(10,10,14,0.82);color:#fff;box-shadow:0 2px 8px rgba(0,0,0,0.4);}
-.pcard-dur .ico{width:9px;height:9px;}
 .pcard-seas .ico{width:11px;height:11px;}
-.b-watching{background:rgba(245,166,35,0.28);color:#ffd48a;}
-.b-finished{background:rgba(52,196,114,0.28);color:#8ef0b6;}
-.b-plan{background:rgba(91,156,246,0.28);color:#a9ccff;}
-.b-dropped{background:rgba(154,151,164,0.32);color:#d5d3dc;}
+.b-watching{color:#ffc766;}
+.b-finished{color:#7fe6ac;}
+.b-plan{color:#9dc6ff;}
+.b-dropped{color:#c9c7d0;}
 .pcard .pbar{margin:8px 2px 0;}
 .pcard-title{
   font-size:11.5px;font-weight:600;line-height:1.3;margin-top:7px;color:var(--t1);
@@ -619,7 +624,7 @@ body.first-paint .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards
 .lockscreen.on{display:flex;}
 .lock-card{width:100%;max-width:340px;text-align:center;}
 .lock-emoji{font-size:46px;margin-bottom:14px;}
-.lock-ico{width:64px;height:64px;margin:0 auto 16px;border-radius:18px;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,var(--a),var(--a2));color:#fff;}
+.lock-ico{width:64px;height:64px;margin:0 auto 16px;border-radius:18px;display:flex;align-items:center;justify-content:center;background:var(--a);color:var(--aFg);}
 .lock-ico svg{width:30px;height:30px;stroke-width:2;}
 .lock-title{font-size:21px;font-weight:900;letter-spacing:-.3px;margin-bottom:6px;color:var(--t1);}
 .lock-sub{font-size:13.5px;color:var(--t2);margin-bottom:22px;}
@@ -630,14 +635,14 @@ body.first-paint .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards
 .admin-card{position:fixed;left:12px;right:12px;bottom:84px;z-index:150;max-width:520px;margin:0 auto;background:var(--bg2);border:1px solid var(--b2);border-radius:16px;padding:15px 16px 16px;box-shadow:0 12px 34px rgba(0,0,0,.34);}
 .admin-card-t{font-family:var(--fd);font-size:15px;font-weight:800;color:var(--t1);padding-right:24px;}
 .admin-card-b{font-size:13px;color:var(--t2);margin-top:5px;line-height:1.45;}
-.admin-card-cta{margin-top:11px;width:100%;padding:11px;border:none;border-radius:11px;background:linear-gradient(135deg,var(--a),var(--a2));color:#fff;font-family:var(--fd);font-weight:800;font-size:14px;cursor:pointer;}
+.admin-card-cta{margin-top:11px;width:100%;padding:11px;border:none;border-radius:11px;background:var(--a);color:var(--aFg);font-family:var(--fd);font-weight:800;font-size:14px;cursor:pointer;}
 .admin-card-cta:active{transform:scale(.98);}
 .admin-card-x{position:absolute;top:9px;right:9px;width:28px;height:28px;border:none;border-radius:9px;background:var(--bg3);color:var(--t2);display:flex;align-items:center;justify-content:center;cursor:pointer;}
 .admin-card-x svg{width:15px;height:15px;}
 .msg-tgt-seg{display:flex;gap:6px;}
 .msg-tgt{flex:1;padding:9px 6px;border:1px solid var(--b2);border-radius:10px;background:var(--bg3);color:var(--t2);font-family:var(--fd);font-weight:700;font-size:13px;cursor:pointer;transition:transform .1s;}
 .msg-tgt:active{transform:scale(.97);}
-.msg-tgt.on{background:linear-gradient(135deg,var(--a),var(--a2));color:#fff;border-color:transparent;}
+.msg-tgt.on{background:var(--a);color:var(--aFg);border-color:transparent;}
 .lock-in:focus{border-color:var(--a);box-shadow:0 0 0 3px var(--ag);}
 .lock-btn{width:100%;margin-top:12px;padding:14px;border-radius:14px;border:none;background:var(--a);color:var(--aFg);font-weight:800;font-size:15px;cursor:pointer;}
 .lock-btn:active{transform:scale(.97);}
@@ -756,7 +761,7 @@ body.first-paint .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards
 .dt-rec{flex-shrink:0;width:104px;background:none;border:none;padding:0;text-align:left;cursor:pointer;}
 .dt-rec-img{width:104px;height:148px;border-radius:12px;background:var(--bg4) center/cover no-repeat;border:1px solid var(--b2);box-shadow:0 6px 16px rgba(0,0,0,.3);position:relative;transition:transform .15s;}
 .dt-rec:active .dt-rec-img{transform:scale(.95);}
-.dt-rec-img::after{content:'＋';position:absolute;right:5px;bottom:5px;width:24px;height:24px;border-radius:50%;background:linear-gradient(135deg,var(--a),var(--a2));color:#fff;font-size:16px;font-weight:700;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 8px rgba(0,0,0,.35);}
+.dt-rec-img::after{content:'＋';position:absolute;right:5px;bottom:5px;width:24px;height:24px;border-radius:50%;background:var(--a);color:var(--aFg);font-size:16px;font-weight:700;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 8px rgba(0,0,0,.35);}
 .dt-rec-t{font-size:11.5px;color:var(--t2);line-height:1.3;margin-top:6px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
 .dt-seasons{display:flex;flex-direction:column;gap:8px;}
 .dt-season{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:var(--bg3);border:1px solid var(--b1);border-radius:13px;padding:9px 12px;transition:border-color .15s,background .15s;}
@@ -1160,7 +1165,7 @@ html.rotating .pv-frame:fullscreen,html.rotating .pv-frame:-webkit-full-screen{o
 .pt-play:disabled{opacity:.5;}
 .pt-chat{display:flex;flex-direction:column;gap:6px;max-height:40vh;overflow-y:auto;padding:10px 2px 2px;margin-top:8px;}
 .pt-msg{max-width:80%;align-self:flex-start;background:var(--bg3);border:1px solid var(--b1);border-radius:15px 15px 15px 6px;padding:8px 12px 7px;font-size:13.5px;line-height:1.38;color:var(--t1);word-break:break-word;box-shadow:0 2px 8px -5px rgba(0,0,0,.5);}
-.pt-msg.me{align-self:flex-end;background:linear-gradient(135deg,var(--a),var(--a2));border-color:transparent;color:#fff;border-radius:15px 15px 6px 15px;}
+.pt-msg.me{align-self:flex-end;background:var(--a);border-color:transparent;color:var(--aFg);border-radius:15px 15px 6px 15px;}
 .pt-msg .who{display:block;font-weight:800;font-size:11px;color:var(--a2);margin-bottom:2px;letter-spacing:.01em;}
 .pt-msg.me .who{display:none;}
 .pt-time{font-size:9.5px;color:var(--t3);margin-left:7px;opacity:.6;font-variant-numeric:tabular-nums;}
@@ -1170,7 +1175,7 @@ html.rotating .pv-frame:fullscreen,html.rotating .pv-frame:-webkit-full-screen{o
 .pt-chatbar{display:flex;gap:8px;margin-top:12px;}
 .pt-chatbar input{flex:1;height:46px;border-radius:14px;background:var(--bg3);border:1px solid var(--b2);color:var(--t1);padding:0 16px;font-size:14px;transition:border-color .15s,box-shadow .15s;}
 .pt-chatbar input:focus{border-color:var(--a);box-shadow:0 0 0 3px var(--ag);outline:none;}
-.pt-send{width:46px;height:46px;flex-shrink:0;border-radius:14px;background:linear-gradient(135deg,var(--a),var(--a2));color:#fff;border:0;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px -5px var(--glow);}
+.pt-send{width:46px;height:46px;flex-shrink:0;border-radius:14px;background:var(--a);color:var(--aFg);border:0;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px -5px var(--glow);}
 .pt-send:active{transform:scale(.94);}
 .pt-send .ico{width:18px;height:18px;fill:currentColor;}
 .party-count{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.86);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);display:none;flex-direction:column;align-items:center;justify-content:center;gap:8px;}
@@ -1472,7 +1477,7 @@ body.recsel .pcard{position:relative;}
 .pt-mact .ico{width:13px;height:13px;}
 .pt-mact-x{color:var(--a2);}
 /* voice chat controls */
-.pt-jitsi{width:100%;margin-top:12px;display:flex;align-items:center;justify-content:center;gap:9px;height:48px;border-radius:13px;background:linear-gradient(135deg,var(--a),var(--a2));border:0;color:#fff;font-family:var(--fd);font-weight:800;font-size:14px;cursor:pointer;transition:transform .1s;}
+.pt-jitsi{width:100%;margin-top:12px;display:flex;align-items:center;justify-content:center;gap:9px;height:48px;border-radius:13px;background:var(--a);border:0;color:var(--aFg);font-family:var(--fd);font-weight:800;font-size:14px;cursor:pointer;transition:transform .1s;}
 .pt-jitsi:active{transform:scale(.98);}
 .pt-jitsi.on{background:var(--ag);color:var(--a2);border:1px solid var(--a);}
 .pt-jitsi .ico{width:17px;height:17px;}
@@ -1761,12 +1766,12 @@ body.recsel .pcard{position:relative;}
 .pop-shelf::-webkit-scrollbar{display:none;}
 .pop-card{scroll-snap-align:start;background:none;border:none;padding:0;cursor:pointer;text-align:left;display:flex;flex-direction:column;gap:7px;}
 .pop-cover{width:112px;height:158px;border-radius:12px;background:var(--bg2) center/cover no-repeat;border:1px solid var(--b2);box-shadow:0 6px 16px rgba(0,0,0,.28);position:relative;transition:transform .15s;}
-.pop-cover::after{content:'＋';position:absolute;right:6px;bottom:6px;width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,var(--a),var(--a2));color:#fff;font-size:17px;font-weight:700;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 8px rgba(0,0,0,.35);}
+.pop-cover::after{content:'＋';position:absolute;right:6px;bottom:6px;width:26px;height:26px;border-radius:50%;background:var(--a);color:var(--aFg);font-size:17px;font-weight:700;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 8px rgba(0,0,0,.35);}
 .pop-card:active .pop-cover{transform:scale(.95);}
 /* picked from the beginner shelf — flip the ＋ badge to a check, ring the cover */
 .pop-card.added{cursor:default;}
 .pop-card.added .pop-cover{outline:2.5px solid var(--fin,#2fbf6b);outline-offset:2px;}
-.pop-card.added .pop-cover::after{content:'✓';background:linear-gradient(135deg,var(--fin,#37b26b),var(--fin,#2fbf6b));}
+.pop-card.added .pop-cover::after{content:'✓';background:var(--fin,#37b26b);}
 .pop-card.added .pop-name{color:var(--fin,#2fbf6b);}
 .pop-name{font-size:12px;color:var(--t2);line-height:1.3;max-width:112px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
 .pop-loading{color:var(--t3);font-size:13px;display:flex;align-items:center;gap:8px;padding:20px 2px;}
@@ -1870,7 +1875,7 @@ body.recsel .pcard{position:relative;}
 </div>
 <div id="app">
   <div class="hdr">
-    <div class="hdr-title" role="button" tabindex="0" onclick="adminTap()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();adminTap();}">WatchList</div>
+    <div class="hdr-title" role="button" tabindex="0" onclick="adminTap()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();adminTap();}"><b>Watch</b><i>list</i></div>
     <div class="hdr-actions">
       <button class="hbtn" onclick="openHub()" title="Friends & Watch Party" aria-label="Friends and Watch Party"><i data-ic="users"></i></button>
       <button class="hbtn" onclick="openForYou()" title="For You — tailored recommendations" aria-label="For You recommendations"><i data-ic="compass"></i></button>
@@ -2238,7 +2243,7 @@ body.recsel .pcard{position:relative;}
 <div class="sheet" id="nextSheet">
   <div class="sheet-handle"></div>
   <div class="sheet-header">
-    <div class="sheet-title"><i data-ic="sparkles"></i> What&rsquo;s next</div>
+    <div class="sheet-title"><i data-ic="layers"></i> What&rsquo;s next</div>
     <button class="sheet-cancel" onclick="dismissNextSeason()">Close</button>
   </div>
   <div id="nextBody"></div>
@@ -2256,7 +2261,7 @@ body.recsel .pcard{position:relative;}
 <div class="sheet" id="newsSheet">
   <div class="sheet-handle"></div>
   <div class="sheet-header">
-    <div class="sheet-title"><i data-ic="sparkles"></i> What’s new</div>
+    <div class="sheet-title"><i data-ic="star"></i> What’s new</div>
     <button class="sheet-cancel" onclick="closeAll()">Close</button>
   </div>
   <div id="newsBody"></div>
@@ -2328,7 +2333,7 @@ body.recsel .pcard{position:relative;}
   <p class="ai-desc">Paste your list from Notes, messages, or anywhere — one title per line, as messy as you like. After previewing, tap a status on each title (or use Set&nbsp;all). "Title | status | ep 5 | ★4" style lines are understood too.</p>
   <textarea class="import-paste" id="importPaste" placeholder="Attack on Titan&#10;Demon Slayer - watching&#10;One Piece | watching | ep 120&#10;..."></textarea>
   <button class="parse-btn" onclick="parseImport()">Preview Import</button>
-  <button class="parse-btn" id="aiCleanBtn" style="display:none;margin-top:8px;background:linear-gradient(135deg,var(--a),var(--a2));color:#fff" onclick="aiCleanImport()"><i data-ic="sparkles"></i> Clean up with AI — fixes typos, splits, sorts</button>
+  <button class="parse-btn" id="aiCleanBtn" style="display:none;margin-top:8px;background:var(--a);color:var(--aFg)" onclick="aiCleanImport()"><i data-ic="sparkles"></i> Clean up with AI — fixes typos, splits, sorts</button>
   <div class="preview-list" id="previewList"></div>
   <div class="import-actions" id="importActions" style="display:none">
     <button class="imp-all" onclick="toggleAllImport()">Toggle All</button>
@@ -2543,7 +2548,7 @@ body.recsel .pcard{position:relative;}
       <label class="cpick-lbl">Background<input type="color" class="cpick" id="ctBg" value="#111114"></label>
       <button class="ai-run-btn" style="flex:1" onclick="saveCustomTheme()">Save theme</button>
     </div>
-    <button class="src-chip" id="harmonizeBtn" style="width:100%;margin-top:10px;justify-content:center" onclick="harmonizeTheme()"><i data-ic="sparkles"></i> Harmonize</button>
+    <button class="src-chip" id="harmonizeBtn" style="width:100%;margin-top:10px;justify-content:center" onclick="harmonizeTheme()"><i data-ic="palette"></i> Harmonize</button>
   </div>
   <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--b1);">
     <div class="flabel" style="margin-bottom:10px">Background brightness</div>
@@ -2961,7 +2966,7 @@ function renderAdmin(){
     </details>
 
     <details class="src-fold">
-      <summary>${icon('sparkles')} Rename someone's titles</summary>
+      <summary>${icon('edit')} Rename someone's titles</summary>
       <p class="ai-desc" style="margin-top:8px">Changes what one person's list <i>says</i>, nothing else. Their real titles are what stay saved and what their watch links use, so their shows still open normally. Undo it any time — and it clears itself after 12 hours.</p>
       <div id="messList"><p class="ai-desc">Loading members…</p></div>
     </details>
@@ -4638,7 +4643,7 @@ function resumeRailHTML(items,isRead){
   // scroll forever, wrapping seamlessly at the seam (see rzLoop).
   const loop=items.length>=3;
   const cards=(loop?items.concat(items):items).map(card).join('');
-  return `<div class="rz-sec"><div class="rz-head">${icon('play')} Continue watching</div>
+  return `<div class="rz-sec"><div class="rz-head">Continue watching</div>
     <div class="rz-scroll" id="rzScroll"${loop?' data-loop="1"':''}>${cards}</div></div>`;
 }
 // Seamless infinite horizontal loop. The items are rendered twice; when the
@@ -4675,8 +4680,8 @@ function quickPickStripHTML(pool,isRead){
   if(pool.filter(a=>a.status==='watching'||a.status==='plan').length<2) return '';
   // One chip, not four. The moods still exist — they live inside the picker now,
   // where you can change your mind without going back to the home screen.
-  return `<div class="qp-sec"><div class="qp-head">${icon('bulb')} Not sure what to watch?</div>
-    <div class="qp-chips"><button class="qp-chip" onclick="decideForMe()">${icon('sparkles')}<span>Pick one for me</span></button></div></div>`;
+  return `<div class="qp-sec"><div class="qp-chips"><span class="qp-head">Not sure what to watch?</span>
+    <button class="qp-chip" onclick="decideForMe()">${icon('compass')}<span>Pick one for me</span></button></div></div>`;
 }
 // ─── HOME RENDER ────────────────────────────────────────────────────────────
 function sorted(list){
@@ -5029,17 +5034,17 @@ function posterCard(a,nSeas){
   const airHTML=air?`<div class="pcard-air">${icon('calendar')} ${air.when}</div>`:'';
   const seas=multi?`<span class="pcard-seas">${icon('layers')}${nSeas}</span>`:'';
   const twMins=kindOf(a)==='watch'?totalWatchMins(a):0;
-  const durBadge=twMins?`<span class="pcard-dur">${icon('clock')}${fmtWatch(twMins)}</span>`:'';
+  const durLine=twMins?`<div class="pcard-sub">${fmtWatch(twMins)}</div>`:'';
   return`<div class="pcard${recSel&&recSel.has(a.id)?' sel':''}" onclick="pcTap('${a.id}',event)">
     <div class="pcard-wrap">
       ${img}
       <span class="pcard-badge b-${a.status}">${STATUS_META[a.status].icon} ${a.status==='plan'?'PLAN':a.status.toUpperCase().slice(0,5)}</span>
       ${a.fav?'<span class="pcard-fav">'+icon('heart','fill')+'</span>':''}
       ${seas}
-      ${durBadge}
     </div>
     ${bar}
     <div class="pcard-title">${schEsc(title)}</div>
+    ${durLine}
     ${airHTML}
   </div>`;
 }
@@ -5233,8 +5238,8 @@ function renderHome(){
   // Watch list: no "Watching" row — it's merged into the Continue-watching rail
   // above. Reading list keeps its "Reading" row (reading has no rail).
   const rows=isRead
-    ?[['watching',icon('book')+' Reading'],['plan',icon('clipboard')+' Plan to Read'],['finished',icon('check')+' Finished'],['dropped',icon('x')+' Dropped']]
-    :[['plan',icon('clipboard')+' Plan to Watch'],['finished',icon('check')+' Finished'],['dropped',icon('x')+' Dropped']];
+    ?[['watching','Reading'],['plan','Plan to Read'],['finished','Finished'],['dropped','Dropped']]
+    :[['plan','Plan to Watch'],['finished','Finished'],['dropped','Dropped']];
   for(const[st,label]of rows){
     const rc=(STATUS_META[st]||{}).color||'var(--t2)';
     let items=S.filter(a=>a.status===st);
@@ -5246,14 +5251,14 @@ function renderHome(){
       <div class="row-scroll">${cells.map(s=>posterCard(s.a,s.n)).join('')}</div></div>`;
   }
   const favs=S.filter(a=>a.fav);
-  if(favs.length){const fc=collapseSeries(favs);html+=`<div class="row-sec" data-amb="${favs[0]?titleAccent(favs[0]):''}"><div class="row-head"><div class="row-title" style="--rc:var(--a2)">${icon('heart','fill')} Favorites</div><div class="row-count">${fc.length}</div></div>
+  if(favs.length){const fc=collapseSeries(favs);html+=`<div class="row-sec" data-amb="${favs[0]?titleAccent(favs[0]):''}"><div class="row-head"><div class="row-title" style="--rc:var(--a2)">Favorites</div><div class="row-count">${fc.length}</div></div>
     <div class="row-scroll">${fc.map(s=>posterCard(s.a,s.n)).join('')}</div></div>`;}
   // genre collections — browse your list by its most-common genres (Netflix-style lens)
   // Build from S (already sorted) so each genre bucket is in sort order — no re-sort.
   const gmap={};S.forEach(a=>(a.genre||'').split(',').map(g=>g.trim()).filter(Boolean).forEach(g=>{(gmap[g]=gmap[g]||[]).push(a);}));
   const topGenres=Object.keys(gmap).filter(g=>gmap[g].length>=2).sort((x,y)=>gmap[y].length-gmap[x].length).slice(0,4);
   if(topGenres.length){
-    html+=`<div class="row-div">Browse by genre</div>`;
+    html+=`<div class="row-div">Browse your list by genre</div>`;
     for(const g of topGenres){
       const items=gmap[g],gc=collapseSeries(items);
       html+=`<div class="row-sec" data-amb="${items[0]?titleAccent(items[0]):''}"><div class="row-head"><div class="row-title">${g}</div><div class="row-count">${gc.length}</div></div>
@@ -8228,7 +8233,7 @@ function maybeShowTutorial(){
 // ─── ONBOARDING (swipeable welcome + setup) ─────────────────────────────────
 const _iOS=/iP(hone|ad|od)/.test(navigator.userAgent)||(/Macintosh/.test(navigator.userAgent)&&navigator.maxTouchPoints>1);
 const ONB=[
-  {ic:'sparkles',oc:'#c084fc',title:'Welcome to WatchList',body:'Track every anime & manga, see the total time to binge a whole series, watch on free sources, and swap recommendations with friends — all in one place.'},
+  {ic:'layers',oc:'#c084fc',title:'Welcome to WatchList',body:'Track every anime & manga, see the total time to binge a whole series, watch on free sources, and swap recommendations with friends — all in one place.'},
   {ic:'upload',oc:'#4dabf7',imp:'Recommended',title:'Add to your Home Screen',body:_iOS
     ? 'Tap the <b>Share</b> button in Safari’s toolbar (the box with an ↑), scroll down, and tap <b>Add to Home Screen</b>. WatchList then opens full-screen like a real app — and on iPhone it’s the <b>only</b> way episode alerts can reach you.'
     : 'Open your browser’s menu and tap <b>Install app</b> (or <b>Add to Home screen</b>). WatchList opens full-screen like a real app, and notifications work.'},
@@ -8334,28 +8339,28 @@ function renderSettings(){
   const el=document.getElementById('settingsBody');if(!el)return;
   const backedUp=!!syncCode();
   const rows=[
-    {ic:'bulb',    col:'#f5b642', h:'How WatchList works', p:'A quick tour — and how not to lose your list', go:'openTutorial()'},
-    {ic:'cloud',   col:'#4dabf7', h:'Cloud backup',        p:backedUp?'On — restorable on any device':'Off — this list exists only on this device',
+    {ic:'bulb',     h:'How WatchList works', p:'A quick tour — and how not to lose your list', go:'openTutorial()'},
+    {ic:'cloud',    h:'Cloud backup',        p:backedUp?'On — restorable on any device':'Off — this list exists only on this device',
      go:"openSheet('backupSheet')", warn:!backedUp},
-    {ic:'lock',    col:'#51cf66', h:'Password',            p:encEnabled()?'On — your list is encrypted':'Off', go:"openSheet('securitySheet')"},
-    {ic:'bell',    col:'#ff6b6b', h:'Notifications',       p:notifyOn()?'On — you\'ll be told when an episode airs':'Off', go:'openNotifySheet()'},
-    {ic:'sparkles',col:'#c084fc', h:'AI & chat key',       p:getKey()?'On — '+(keyProvider(getKey())||'key')+' connected':'Off — add a free key to unlock chat', go:"openSheet('aiSheet')"},
-    {ic:'play',    col:'#20c997', h:'Sources', p:'Where Watch now / Read now open', go:"openSheet('sourceSheet')"},
-    {ic:'refresh', col:'#748ffc', h:'AniList sync',         p:alConnected()?'On — '+alUser()+' · progress syncs both ways':'Off — connect to sync progress everywhere', go:"openSheet('anilistSheet')"},
-    {ic:'clipboard',col:'#ff922b',h:'Import / Export',    p:'Paste a list in, or copy yours out', go:"openSheet('importSheet')"},
-    {ic:'palette', col:'#f783ac', h:'Theme',               p:'Colours, or build your own', go:"openSheet('themeSheet')"},
+    {ic:'lock',     h:'Password',            p:encEnabled()?'On — your list is encrypted':'Off', go:"openSheet('securitySheet')"},
+    {ic:'bell',     h:'Notifications',       p:notifyOn()?'On — you\'ll be told when an episode airs':'Off', go:'openNotifySheet()'},
+    {ic:'sparkles', h:'AI & chat key',       p:getKey()?'On — '+(keyProvider(getKey())||'key')+' connected':'Off — add a free key to unlock chat', go:"openSheet('aiSheet')"},
+    {ic:'play',     h:'Sources', p:'Where Watch now / Read now open', go:"openSheet('sourceSheet')"},
+    {ic:'refresh',  h:'AniList sync',        p:alConnected()?'On — '+alUser()+' · progress syncs both ways':'Off — connect to sync progress everywhere', go:"openSheet('anilistSheet')"},
+    {ic:'clipboard',h:'Import / Export',     p:'Paste a list in, or copy yours out', go:"openSheet('importSheet')"},
+    {ic:'palette',  h:'Theme',               p:'Colours, or build your own', go:"openSheet('themeSheet')"},
   ];
   // Admin row appears only on the device where your admin token is stored — so it
   // shows for you and no one else. ?admin=1 is the one-time way to set it up.
-  if(adminToken())rows.push({ic:'users',col:'#ff6b6b',h:'Admin',p:'Approve members, invites, broadcast, cards',go:'openAdmin()'});
+  if(adminToken())rows.push({ic:'users',h:'Admin',p:'Approve members, invites, broadcast, cards',go:'openAdmin()'});
   // Only when there's something to report — a permanently visible "problems"
   // row makes a working app look broken.
   const probs=recentProblems();
-  if(probs.length)rows.push({ic:'clipboard',col:'#ff6b6b',h:'Something went wrong',
+  if(probs.length)rows.push({ic:'clipboard',h:'Something went wrong',
     p:probs.length+(probs.length===1?' problem recorded':' problems recorded')+' — tap to copy the details',
     go:'copyProblems()',warn:true});
   el.innerHTML=rows.map(r=>
-    `<button class="set-row${r.warn?' warn':''}" style="--sc:${r.col}" onclick="${r.go}">
+    `<button class="set-row${r.warn?' warn':''}" onclick="${r.go}">
       <div class="set-ico">${icon(r.ic)}</div>
       <div class="set-txt"><div class="set-h">${r.h}</div><div class="set-p${r.warn?' warn':''}">${r.p}</div></div>
       <span class="set-chev">${icon('chevron-right')}</span>
@@ -10450,7 +10455,7 @@ function friendRecRowHTML(){
   const keys=Object.keys(map).filter(k=>{const it=map[k].item;const kind=it.kind==='read'?'read':'watch';return kind===viewKind && !inList(it);});
   if(!keys.length)return '';
   keys.sort((x,y)=>Math.max(0,...map[y].senders.map(s=>s.at))-Math.max(0,...map[x].senders.map(s=>s.at)));
-  return `<div class="row-sec"><div class="row-head"><div class="row-title" style="--rc:var(--a2)">${icon('users')} Your Friends Recommend</div><div class="row-count">${keys.length}</div></div><div class="row-scroll">${keys.map(k=>recCard(k,map[k])).join('')}</div></div>`;
+  return `<div class="row-sec"><div class="row-head"><div class="row-title" style="--rc:var(--a2)">Friends recommend</div><div class="row-count">${keys.length}</div></div><div class="row-scroll">${keys.map(k=>recCard(k,map[k])).join('')}</div></div>`;
 }
 function recCard(k,rec){
   const it=rec.item,s0=rec.senders[0],col=friendColor(s0.code);
@@ -10858,7 +10863,7 @@ function readSourceHTML(rcustom){
     </details>`:''}
 
     <details class="src-fold" data-fold="readown" style="margin-top:16px">
-      <summary>${icon('sparkles')} Use a reader of your own</summary>
+      <summary>${icon('edit')} Use a reader of your own</summary>
       <p class="ai-desc" style="margin:9px 0 11px;font-size:12.5px">Open your reader, go to <b>any</b> chapter of <b>any</b> series, and paste that page's address. That one link is the whole setup — WatchList works out the pattern and uses it for everything you read.</p>
       <input class="ai-prompt-in" id="rsrcQuickIn" placeholder="paste that chapter's address" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url" oninput="readQuickSetup()">
       <div id="rsrcQuickOut" class="src-quick-out" style="display:none"></div>
@@ -11026,7 +11031,7 @@ function renderSource(){
     </button>
 
     <details class="src-fold" data-fold="own" style="margin-top:16px"${O('own')}>
-      <summary>${icon('sparkles')} Use a site of your own</summary>
+      <summary>${icon('edit')} Use a site of your own</summary>
       <p class="ai-desc" style="margin:9px 0 11px;font-size:12.5px">Open your site, start <b>any</b> episode of <b>any</b> show, and paste that page's address. That one link is the whole setup — WatchList works out the pattern and uses it for every show.</p>
       <input class="ai-prompt-in" id="srcQuickIn" placeholder="paste that episode's address" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url" oninput="quickSetup()">
       <div id="srcQuickOut" class="src-quick-out" style="display:none"></div>

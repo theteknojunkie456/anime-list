@@ -4787,7 +4787,29 @@ function onPageScroll(){
 function accentVars(a){const ac=conditionAccent(titleAccent(a));if(!ac)return'';try{return`--a:${ac};--a2:${mix(ac,'#ffffff',0.28)};--ag:${rgba(ac,0.15)};--glow:${rgba(ac,0.26)};`;}catch{return'';}}
 function query(){return document.getElementById('searchIn').value.toLowerCase().trim();}
 
+// Rebuilding the home list costs 40–90ms of main thread on a 108-title list
+// (measured in Chrome; several times that on a phone) and it sits behind a
+// full-screen player, so while something is playing it paints nothing anyone can
+// see. Following along in-frame banks an episode mid-playback, which used to
+// mean paying that cost for a hidden view during a video — exactly the sort of
+// hitch the player is supposed to be free of. Mark it dirty, render on the way
+// out. flushRender() is called when the player closes.
+let _renderDirty=false,_detailDirty=false;
+// Keyed on the overlay's own state, not the `watching` class on <html>: three
+// paths set that class and only closePlayer() clears it, so a path that skipped
+// closePlayer would strand it and renders would stop for good — invisibly,
+// because that class otherwise only stands timers down. A stranded `.on` is a
+// full-screen panel you can see, which is not a silent failure.
+function _hidden(){
+  try{const v=document.getElementById('playerView');return !!(v&&v.classList.contains('on'));}
+  catch(e){return false;}
+}
+function flushRender(){
+  if(_renderDirty){_renderDirty=false;render();}
+  if(_detailDirty){_detailDirty=false;try{renderDetail();}catch(e){}}
+}
 function render(){
+  if(_hidden()){_renderDirty=true;return;}
   // Each section renders independently so one thrower can't blank the whole app.
   const step=fn=>{try{fn();}catch(e){try{console.error('render',e);}catch{}}};
   step(renderKindSeg);step(renderFiltRow);step(renderSortRow);step(renderHome);
@@ -5384,6 +5406,7 @@ function onDetailScroll(){
   });
 }
 function renderDetail(){
+  if(_hidden()){_detailDirty=true;return;}
   const a=anime.find(x=>x.id===detailId);if(!a)return;
   const read=kindOf(a)==='read';
   const cover=a.img
@@ -11240,6 +11263,7 @@ function closePlayer(){
   partyInSession=false;hidePauseOverlay();try{renderPvHostBar();}catch{}
   const v=document.getElementById('playerView'); if(v)v.classList.remove('on');
   try{document.documentElement.classList.remove('watching');}catch(e){}
+  flushRender();   // pay for everything the session deferred, once, now it's visible
   const f=document.getElementById('pvFrame'); if(f)f.src='about:blank';
   const id=pvReturnId, ep=pvWatchEp, elapsed=pvOpenTime?Date.now()-pvOpenTime:0;
   // Stayed a while and never needed the escape hatch → it framed fine.
@@ -11339,9 +11363,11 @@ function settleExternalWatch(){
   else if(elapsed>=PEEK_MS)markWatchedPrompt(id,ep,a.title);
   // under PEEK_MS: they bounced straight back — say nothing
 }
-// Settle when they return to the app, however they return.
-document.addEventListener('visibilitychange',()=>{if(!document.hidden)settleExternalWatch();});
-window.addEventListener('focus',()=>settleExternalWatch());
+// Settle when they return to the app, however they return. Coming back is also
+// the moment to pay off anything a player session deferred, in case it was
+// dismissed by a route that never reached closePlayer().
+document.addEventListener('visibilitychange',()=>{if(!document.hidden){settleExternalWatch();try{flushRender();}catch(e){}}});
+window.addEventListener('focus',()=>{settleExternalWatch();try{flushRender();}catch(e){}});
 // Core: advance progress + save. Returns the previous state so it can be undone.
 function applyWatched(id,ep){
   const a=anime.find(x=>x.id===id);if(!a)return null;

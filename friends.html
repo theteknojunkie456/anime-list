@@ -4882,10 +4882,17 @@ function canonTitle(a){
   if(c===a.title)return '';
   return _tnorm(c)===_tnorm(a.title)?c:'';     // same title, better spelling
 }
+// `noLink` means "I know this isn't in the database, leave it alone". Plenty of
+// things genuinely aren't on AniList — original work, small webtoons, live-action
+// that only TVMaze carries — and without a way to say so the fix bar was a red
+// banner that could never be cleared, re-querying the same titles over the
+// network on every Fix all and offering only "Rename": change a correctly-named
+// title to suit a database. The app's own rule about the problems row applies —
+// a permanent warning makes a working app look broken.
 function needsFix(kind){
   const items=anime.filter(a=>kindOf(a)===kind);
   return {
-    unmatched:items.filter(a=>!a.aniId),
+    unmatched:items.filter(a=>!a.aniId&&!a.noLink),
     mistitled:items.filter(a=>canonTitle(a)),
   };
 }
@@ -4953,7 +4960,7 @@ async function fixCandidates(a){
 async function openFixSheet(){
   openSheet('fixSheet');
   const body=document.getElementById('fixBody'); if(!body)return;
-  const stuck=anime.filter(a=>kindOf(a)===viewKind&&!a.aniId);
+  const stuck=anime.filter(a=>kindOf(a)===viewKind&&!a.aniId&&!a.noLink);
   if(!stuck.length){body.innerHTML='<p class="ai-desc" style="padding:18px">Everything here is linked up.</p>';return;}
   body.innerHTML='<p class="ai-desc" style="padding:0 18px 4px">Tap the right one and it links up — cover, episodes, dates and alerts all follow.</p>'
     +stuck.map(a=>`<div class="fx-row" id="fx-${escH(a.id)}">
@@ -4967,7 +4974,8 @@ async function openFixSheet(){
     let hits=await fixCandidates(a);
     if(!hits.length){
       box.innerHTML='<span class="fx-none">Nothing found for this name</span>'
-        +`<button class="fx-rename" onclick="fixRename('${escH(a.id)}')">Rename</button>`;
+        +`<button class="fx-rename" onclick="fixRename('${escH(a.id)}')">Rename</button>`
+        +`<button class="fx-rename" onclick="fixKeep('${escH(a.id)}')">Keep as is</button>`;
       await pause(400); continue;
     }
     box.innerHTML=hits.slice(0,4).map(m=>{
@@ -4977,13 +4985,14 @@ async function openFixSheet(){
       return `<button class="fx-opt" onclick="fixPick('${escH(a.id)}',${m.id})">`
         +(img?`<img src="${escH(img)}" alt="" loading="lazy">`:'<span class="fx-ph"></span>')
         +`<span class="fx-opt-t">${schEsc(t)}${yr?` <em>${yr}</em>`:''}</span></button>`;
-    }).join('')+`<button class="fx-rename" onclick="fixRename('${escH(a.id)}')">None of these</button>`;
+    }).join('')+`<button class="fx-rename" onclick="fixRename('${escH(a.id)}')">None of these</button>`
+      +`<button class="fx-rename" onclick="fixKeep('${escH(a.id)}')">Keep as is</button>`;
     await pause(400);
   }
 }
 async function fixPick(id,aniId){
   const a=anime.find(x=>x.id===id); if(!a)return;
-  a.aniId=aniId;
+  a.aniId=aniId; delete a.noLink;
   // Clear the "already asked, don't ask again" flags so the normal enrichment
   // pass fills in cover, episodes, dates and canonical titles from the id.
   delete a.idTried;delete a.imgTried;delete a.detTried;delete a.bannerTried;delete a.scoreTried;delete a.nameFix;
@@ -4994,6 +5003,19 @@ async function fixPick(id,aniId){
   try{await fetchCovers();}catch(e){}
   try{save();render();}catch(e){}
   if(row)row.querySelector('.fx-have').textContent=a.title;
+}
+// Says: this one has no database entry and that's correct. It keeps its cover,
+// its progress and everything else — it just stops being counted as broken, and
+// stops costing a lookup on every retry. Renaming it or picking a match later
+// undoes this on its own, because either is a fresh reason to look again.
+function fixKeep(id){
+  const a=anime.find(x=>x.id===id); if(!a)return;
+  a.noLink=1; a.upd=Date.now();
+  try{save();render();}catch(e){}
+  const row=document.getElementById('fx-'+id);
+  if(row){row.classList.add('fx-done');row.innerHTML='<div class="fx-have">'+escH(a.title)+'</div><span class="fx-ok">Kept</span>';}
+  const {unmatched}=needsFix(kindOf(a));
+  toast(unmatched.length?'Kept as is':'Kept — nothing left to fix');
 }
 function fixRename(id){
   const a=anime.find(x=>x.id===id); if(!a)return;
@@ -5008,7 +5030,7 @@ function fixRename(id){
 let _reMatching=false;
 async function retryUnmatched(){
   if(_reMatching){toast('Already looking');return;}
-  const stuck=anime.filter(a=>kindOf(a)===viewKind&&!a.aniId);
+  const stuck=anime.filter(a=>kindOf(a)===viewKind&&!a.aniId&&!a.noLink);
   if(!stuck.length){toast('Nothing to fix');return;}
   _reMatching=true;
   stuck.forEach(a=>{delete a.idTried;delete a.detTried;delete a.bannerTried;delete a.imgTried;delete a.scoreTried;a.nameFix=1;});
@@ -5019,7 +5041,7 @@ async function retryUnmatched(){
     if(typeof fixUnmatchedTitles==='function')await fixUnmatchedTitles();
   }catch(e){}
   _reMatching=false;
-  const left=anime.filter(a=>kindOf(a)===viewKind&&!a.aniId).length;
+  const left=anime.filter(a=>kindOf(a)===viewKind&&!a.aniId&&!a.noLink).length;
   const fixed=stuck.length-left;
   try{save();render();}catch(e){}
   if(left){
@@ -6193,7 +6215,12 @@ async function submitForm(){
   if(kindChanged){data.imgTried=!!pendingImg;data.detTried=false;} // switched Watch⇄Read — re-fetch cover/details from the right AniList type
   if(editingId){
     const i=anime.findIndex(a=>a.id===editingId);
-    if(i!==-1)anime[i]={...anime[i],...data};
+    if(i!==-1){
+      // A different title is a fresh reason to look it up, so "keep as is" lapses.
+      const renamed=prev&&data.title&&prev.title!==data.title;
+      anime[i]={...anime[i],...data};
+      if(renamed)delete anime[i].noLink;
+    }
     toast('Saved!');
   }else{
     anime.unshift({id:uid(),rating:0,fav:false,...data});

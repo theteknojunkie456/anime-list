@@ -9092,15 +9092,34 @@ const READ_DEFAULT='https://asurascans.com';
 // site is using today, scraped by the Action, and that wins.
 const ASURA_SUFFIX='1d35e5bd';
 let _readerCodes=null,_feedSeries=null,_frameVerdicts=null;
+// The Action commits chapter refreshes with [skip ci], which skips every
+// workflow for that commit — the Pages build included. So the copy served
+// alongside the app can sit a day or more behind what the Action actually
+// found; it did, and the notify worker missed two chapter releases because of
+// it. raw.githubusercontent serves what is on main with no build in between.
+//
+// The same-origin copy stays as the fallback, and it matters: it's the one the
+// service worker caches, so it is what answers offline, on a flaky connection,
+// or if GitHub rate-limits.
+const CHAPTERS_LIVE='https://raw.githubusercontent.com/theteknojunkie456/anime-list/main/data/chapters.json';
 async function readerCodes(){
   if(_readerCodes)return _readerCodes;
-  try{
-    const r=await fetch('data/chapters.json?cb='+Math.floor(Date.now()/3600000));
-    const d=r.ok?await r.json():null;
+  const apply=d=>{
     _readerCodes=(d&&d.readers)||{};
     _feedSeries=(d&&d.series)||{};
     _frameVerdicts=(d&&d.frames)||{};
-  }catch(e){_readerCodes={};_feedSeries={};_frameVerdicts={};}
+  };
+  // Whichever answers with real data wins, freshest first.
+  for(const url of [CHAPTERS_LIVE+'?cb='+Math.floor(Date.now()/300000),
+                    'data/chapters.json?cb='+Math.floor(Date.now()/3600000)]){
+    try{
+      const r=await fetch(url);
+      if(!r.ok)continue;
+      const d=await r.json();
+      if(d&&d.series){apply(d);return _readerCodes;}
+    }catch(e){}
+  }
+  apply(null);
   return _readerCodes;
 }
 // The name THIS reader uses for this series, worked out by the Action from every

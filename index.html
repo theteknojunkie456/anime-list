@@ -8323,7 +8323,7 @@ try{
 function problemsText(){
   const list=recentProblems();
   if(!list.length)return 'No problems recorded.';
-  const ver=(typeof RELEASE!=='undefined'?RELEASE:'')||'';
+  const ver=(typeof RELEASE!=='undefined'&&RELEASE&&RELEASE.v)||'';
   return `WatchList ${ver} · ${navigator.userAgent}\n`+list.map(e=>{
     const when=new Date(e.t).toISOString().replace('T',' ').slice(0,19);
     return `${when}  [${e.k}] ${e.m}${e.x?'  ('+e.x+')':''}${e.n>1?'  x'+e.n:''}`;
@@ -9268,6 +9268,78 @@ function pvMarkNext(){
   pvGoTo(a,ep+1);
   toast('Ep '+ep+' watched · now on Ep '+(ep+1));
 }
+// ─── FOLLOWING ALONG INSIDE THE FRAME ────────────────────────────────────────
+// Hardly anyone presses "Mark watched & next" — they use the source site's own
+// next-episode link, and progress silently falls behind by however many episodes
+// they got through.
+//
+// We cannot read the address the frame is on. It is another origin, and the
+// browser will not hand its URL over to us at all — the same rule that stops us
+// telling a blocked frame from one that's still loading. No amount of code gets
+// around it.
+//
+// What we CAN see is that the frame navigated, and how long they'd been sitting
+// on the episode when it did. A navigation that lands after most of an episode
+// has played is someone finishing and moving on, so bank that episode and follow
+// them to the next one. A navigation that lands two minutes in is an advert, a
+// redirect or a server switch, and is ignored.
+//
+// Sites whose player swaps episodes without navigating (single-page readers and
+// players) fire nothing at all — those are settled up from total time in the
+// player when it closes, in closePlayer().
+let _pvOwnNav=true;
+function pvEpLenMs(a){return Math.max(6,Math.min(90,(a&&a.dur)||24))*60*1000;}
+// Time on one episode before a navigation reads as "moved on" rather than "advert".
+function pvMovedOnMs(a){return Math.max(5*60*1000,Math.round(pvEpLenMs(a)*0.6));}
+// How far they'd have got in `elapsed`, starting from `ep`. The first episode is
+// covered by the existing auto-mark threshold; every further full episode-length
+// on top of it is another one watched.
+// Time alone can lie — a player left open with the phone in a pocket looks
+// identical to a binge. Following along in-frame has no such problem (it needs a
+// real navigation), so this is only the fallback for players that never
+// navigate, and it is capped: at worst it overshoots by PV_TIME_MAX, which the
+// Undo on the confirmation bar takes back in one tap.
+const PV_TIME_MAX=3;
+function pvReached(a,ep,elapsed){
+  const extra=Math.min(PV_TIME_MAX,Math.max(0,Math.floor(elapsed/pvEpLenMs(a))-1));
+  const n=ep+extra;
+  return a.epTotal?Math.min(n,a.epTotal):n;
+}
+function pvFrameNavigated(){
+  if(_pvOwnNav){_pvOwnNav=false;return;}          // that load was one we asked for
+  if(!pvReturnId||!pvWatchEp)return;
+  const a=anime.find(x=>x.id===pvReturnId);
+  if(!a||kindOf(a)!=='watch')return;              // reading has no clock to judge by
+  const total=a.epTotal||0;
+  if(!total||pvWatchEp>=total)return;
+  const dwell=pvOpenTime?Date.now()-pvOpenTime:0;
+  if(dwell<pvMovedOnMs(a))return;                 // too soon to be the next episode
+  applyWatched(pvReturnId,pvWatchEp);
+  const done=pvWatchEp;
+  pvWatchEp=done+1;
+  pvOpenTime=Date.now();                          // the new episode earns its own clock
+  const t=document.getElementById('pvTitle');
+  if(t)t.innerHTML=escH(a.title)+' <span class="pv-ep">Ep '+pvWatchEp+'</span>';
+  savePvSession(pvReturnId,pvWatchEp,'watch');
+  renderPvNav(a);
+  // Nothing here interrupts playback — no reload, no focus taken. The toast is
+  // skipped in native fullscreen, where it would not be visible anyway.
+  try{if(!nativeFullscreen())toast('Ep '+done+' watched \u00b7 following you to Ep '+pvWatchEp);}catch(e){}
+}
+// Every src we assign is ours; the next load after it is not the user navigating.
+// Intercepting the property covers all eleven call sites at once, including the
+// retry, the in-frame search and the about:blank on close.
+(function pvWatchFrameNav(){
+  const f=document.getElementById('pvFrame'); if(!f)return;
+  try{
+    const d=Object.getOwnPropertyDescriptor(HTMLIFrameElement.prototype,'src');
+    Object.defineProperty(f,'src',{configurable:true,
+      get(){return d.get.call(f);},
+      set(v){_pvOwnNav=true;d.set.call(f,v);}});
+  }catch(e){}
+  f.addEventListener('load',()=>{try{pvFrameNavigated();}catch(e){}});
+})();
+
 // ─── LIVE PLAYER RESUME — survive an iOS PWA reload/kill mid-stream ───────────
 // An installed PWA is purged from memory when you background it (go Home, or exit
 // fullscreen). Returning reloads the app from scratch, so the open player — pure
@@ -11153,7 +11225,7 @@ function closePlayer(){
   if(!id||!ep) return;
   const a=anime.find(x=>x.id===id);
   if(!a||kindOf(a)!=='watch'||ep<=(a.ep||0)) return;   // only anime, only if it advances
-  if(elapsed>=AUTO_MARK_MS) autoMarkWatched(id,ep);
+  if(elapsed>=AUTO_MARK_MS) autoMarkWatched(id,pvReached(a,ep,elapsed));
   else if(elapsed>=PEEK_MS) markWatchedPrompt(id,ep,a.title);
   // < PEEK_MS: they barely opened it — say nothing
 }
@@ -11207,7 +11279,7 @@ function settleExternalWatch(){
   if(src&&elapsed<PEEK_MS){offerHideSource(src);return;}
   const a=anime.find(x=>x.id===id);
   if(!a||kindOf(a)!=='watch'||ep<=(a.ep||0))return;   // only if it actually advances
-  if(elapsed>=AUTO_MARK_MS)autoMarkWatched(id,ep);
+  if(elapsed>=AUTO_MARK_MS)autoMarkWatched(id,pvReached(a,ep,elapsed));
   else if(elapsed>=PEEK_MS)markWatchedPrompt(id,ep,a.title);
   // under PEEK_MS: they bounced straight back — say nothing
 }
@@ -11244,7 +11316,8 @@ function markWatchedPrompt(id,ep,title){
 function autoMarkWatched(id,ep){
   const prev=applyWatched(id,ep);if(!prev)return;
   const a=anime.find(x=>x.id===id);const finished=a&&a.status==='finished'&&prev.status!=='finished';
-  showMWBar(finished?`Finished — marked <b>${a.epTotal} episodes</b> watched`:`Marked <b>Ep ${ep}</b> watched`,'Undo',()=>{
+  const span=ep-(prev.ep||0)>1?`Eps ${(prev.ep||0)+1}\u2013${ep}`:`Ep ${ep}`;
+  showMWBar(finished?`Finished — marked <b>${a.epTotal} episodes</b> watched`:`Marked <b>${span}</b> watched`,'Undo',()=>{
     const x=anime.find(y=>y.id===id);if(x){x.ep=prev.ep;x.status=prev.status;touch(x);save();render();if(detailId===id)renderDetail();}
     toast('Undone');
   });
@@ -12635,7 +12708,7 @@ try{
       safeReload();          // waits if they're mid-episode, mid-party or typing
     });
     navigator.serviceWorker.register('./sw.js').then(reg=>{
-      reg.update();
+      reg.update().catch(()=>{});
       // re-check for a new version whenever the app is brought back to the foreground
       document.addEventListener('visibilitychange',()=>{if(!document.hidden)reg.update().catch(()=>{});});
     }).catch(()=>{});
@@ -12691,6 +12764,7 @@ const RELEASE={
   title:'Nothing interrupts you now',
   push:'The app stays out of the way while you\u2019re watching \u2014 and your list is much harder to lose.',
   notes:[
+    'The app follows along while you watch. Use the site\u2019s own next-episode link instead of the button in here and your progress keeps up on its own \u2014 no more coming back to find you\u2019re still marked five episodes behind.',
     'While something is playing, nothing interrupts it. Updates wait, background checks stand down, and rotating into or out of fullscreen no longer throws you back to the start of the episode.',
     'Your list is much harder to lose. If a backup comes back looking wrong \u2014 half the titles, or none \u2014 the app keeps what\u2019s on your device and says so, instead of quietly overwriting you.',
     'Chapter alerts land on time again. Two went missing last week because the app was reading a stale copy of the release data; it now reads the live one.',

@@ -2369,9 +2369,9 @@ body.recsel .pcard{position:relative;}
   <div class="tut-step key-step">
     <div class="tut-ico"><i data-ic="cloud"></i></div>
     <div>
-      <div class="tut-h">Back up your list — do this first</div>
-      <div class="tut-p">Your list lives on <b>this device only</b>. Clearing your browser data, or deleting the app from your Home Screen, <b>erases it</b>. Turning on cloud backup gives you a <b>sync code</b>: save that code and your list can always be restored, and it follows you to any device.</div>
-      <button class="tut-do" onclick="tutGo('backupSheet')">Set up backup</button>
+      <div class="tut-h">Your list is backed up — save the code</div>
+      <div class="tut-p">Backup is <b>already on</b>. What you need from it is the <b>sync code</b>: it's the only thing that restores your list on a new phone, or after clearing your browser data. Save it somewhere you'll still have it if this device doesn't survive. You can turn backup off if you'd rather the list never left the device.</div>
+      <button class="tut-do" onclick="tutGo('backupSheet')">Show my code</button>
     </div>
   </div>
   <div class="tut-step">
@@ -3530,7 +3530,7 @@ function writeLocal(){
     offloadImages().then(()=>{try{const raw=JSON.stringify(_persistList());s.setItem(LSKEY,raw);backupLocal(s,raw);saveWarned=false;}catch(e2){_saveFailed(e2);}});
   }
 }
-function save(){writeLocal();schedulePush();scheduleNotifyUpdate();}
+function save(){writeLocal();try{ensureBackup();}catch(e){}schedulePush();scheduleNotifyUpdate();}
 // The other half of the mirror. localStorage is read synchronously at boot and
 // IndexedDB can't be, so this runs just after and only steps in when the local
 // read produced nothing real — an empty list or one that wouldn't parse. It can
@@ -4085,16 +4085,33 @@ async function syncOnOpen(){
   }catch{}
 }
 function syncEnableNew(){
-  setSyncCode(genCode());setSyncAt(0);
+  setSyncCode(genCode());setSyncAt(0);setBackupDeclined(false);
   syncPush().then(()=>{renderSyncUI();toast('Cloud backup is on');});
   renderSyncUI();
+}
+// Backup is on unless you turn it off. A list that exists on one device is one
+// cleared browser away from gone, and asking people to opt into not losing their
+// data means the ones who never found the setting are exactly the ones who lose
+// it. Turning it off is remembered, so this never overrides that choice.
+const BACKUP_OFF='backupoff_'+LSKEY;
+const CODE_SEEN='codeseen_'+LSKEY;
+function backupDeclined(){try{return localStorage.getItem(BACKUP_OFF)==='1';}catch{return false;}}
+function setBackupDeclined(v){try{v?localStorage.setItem(BACKUP_OFF,'1'):localStorage.removeItem(BACKUP_OFF);}catch{}}
+function codeSeen(){try{return localStorage.getItem(CODE_SEEN)==='1';}catch{return true;}}
+function markCodeSeen(){try{localStorage.setItem(CODE_SEEN,'1');}catch{}try{render();}catch(e){}}
+function ensureBackup(){
+  if(!SYNC_URL||syncCode()||backupDeclined())return;
+  if(appLocked||listUntrusted)return;       // never mint a code around a list we can't vouch for
+  if(!anime.length)return;                  // nothing to back up yet
+  setSyncCode(genCode());setSyncAt(0);
+  schedulePush();
 }
 async function syncRestore(){
   const raw=(document.getElementById('syncCodeIn').value||'').replace(/\s+/g,'');
   if(!/^[A-Za-z0-9]{10,64}$/.test(raw)){toast('That code looks off — check it');return;}
   const proceed=async()=>{
     try{
-      setSyncCode(raw);
+      setSyncCode(raw);setBackupDeclined(false);markCodeSeen();
       const res=await syncPull();
       const {inner,extra}=unwrapSync(res&&res.data);
       if(extra)applyExtra(extra);   // bring over themes + friends right away
@@ -4114,8 +4131,8 @@ async function syncRestore(){
   if(anime.length)askConfirm({title:'Restore from backup?',msg:"This replaces this device's list with the backup for that code.",yes:'Replace',onYes:proceed});
   else proceed();
 }
-function syncOff(){setSyncCode('');renderSyncUI();toast('Backup off — data stays on this device');}
-function copySyncCode(){const c=syncCode();if(!c)return;const done=()=>toast('Code copied');if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(c).then(done).catch(()=>fallbackCopy(c,done));else fallbackCopy(c,done);}
+function syncOff(){setSyncCode('');setBackupDeclined(true);renderSyncUI();try{render();}catch(e){}toast('Backup off — data stays on this device');}
+function copySyncCode(){const c=syncCode();if(!c)return;markCodeSeen();const done=()=>toast('Code copied');if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(c).then(done).catch(()=>fallbackCopy(c,done));else fallbackCopy(c,done);}
 function renderSyncUI(){
   const box=document.getElementById('syncBox');if(!box)return;
   const code=syncCode();
@@ -8509,12 +8526,20 @@ function renderSettings(){
 const NUDGE_FLAG='backup_nudge_'+LSKEY;
 function nudgeOff(){try{return localStorage.getItem(NUDGE_FLAG)==='1';}catch{return true;}}
 function dismissNudge(){try{localStorage.setItem(NUDGE_FLAG,'1');}catch{}renderHome();}
-function shouldNudge(){return anime.length>=5&&!syncCode()&&!nudgeOff();}
+function shouldNudge(){return anime.length>=5&&!syncCode()&&backupDeclined()&&!nudgeOff();}
 function nudgeHTML(){
+  // Backing up automatically is only half of it. The code is what restores the
+  // list on a new device, and a code nobody has ever seen restores nothing — so
+  // say it once, plainly, until they've actually looked at it.
+  if(syncCode()&&!codeSeen()&&anime.length)
+    return`<div class="nudge">${icon('cloud')}
+      <div class="nudge-t">Your list is backed up. Save your code — it's what restores it on a new device.</div>
+      <button class="nudge-go" onclick="openSheet('backupSheet');markCodeSeen()">Show code</button>
+    </div>`;
   if(!shouldNudge())return'';
   return`<div class="nudge">${icon('cloud')}
-    <div class="nudge-t">This list only exists on this device — back it up so you can't lose it.</div>
-    <button class="nudge-go" onclick="openSheet('backupSheet')">Back up</button>
+    <div class="nudge-t">Backup is off, so this list only exists on this device.</div>
+    <button class="nudge-go" onclick="openSheet('backupSheet')">Turn it on</button>
     <button class="nudge-x" onclick="dismissNudge()" aria-label="Dismiss">${icon('x')}</button>
   </div>`;
 }
@@ -13279,7 +13304,7 @@ try{if(_SR&&window.isSecureContext){const m=document.getElementById('chatMic');i
 
 // ─── INIT ───────────────────────────────────────────────────────────────────
 try{hydrateIcons();}catch{}
-load();try{_hadItemsAtLoad=anime.length>0;}catch{}try{setTimeout(restoreFromIDB,0);}catch{}try{purgeAdult();}catch{}try{if(!appLocked&&dedupeAnime())writeLocal();}catch{}loadTheme();try{seedHiddenDefaults();}catch{}try{_restoreUpd();}catch{}render();try{nativeScheduleNotifs();}catch{}try{hydrateImages();}catch{}
+load();try{_hadItemsAtLoad=anime.length>0;}catch{}try{setTimeout(restoreFromIDB,0);}catch{}try{setTimeout(()=>{try{ensureBackup();}catch(e){}},1200);}catch{}try{purgeAdult();}catch{}try{if(!appLocked&&dedupeAnime())writeLocal();}catch{}loadTheme();try{seedHiddenDefaults();}catch{}try{_restoreUpd();}catch{}render();try{nativeScheduleNotifs();}catch{}try{hydrateImages();}catch{}
 // After the list is up — and after the tutorial has had its chance to claim a
 // new install — tell returning users what changed in the update they just got.
 try{setTimeout(maybeShowWhatsNew,900);}catch{}

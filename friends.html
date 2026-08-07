@@ -6921,7 +6921,7 @@ function partyStreamURL(title,ep,aniId){
   return fillSourceTokens(src,item,ep||1);
 }
 function watchParty(title,ep,aniId){
-  pvReturnId=null;pvWatchEp=null;pvOpenTime=0;pvCanNav=false;
+  pvReturnId=null;pvWatchEp=null;pvOpenTime=0;pvCanNav=false;_pvReadFrom=null;
   document.getElementById('pvTitle').textContent=title+(ep?` · Ep ${ep}`:'')+' · Party';
   // Search recovery should use their own copy of the show when they have one, so
   // a corrected name is used here too.
@@ -9201,7 +9201,9 @@ async function readManga(id,chArg){
   // this costs nothing on every subsequent tap.
   try{await readerCodes();}catch(e){}
   const url=readURL(a,ch);
-  document.getElementById('pvTitle').textContent=a.title;
+  pvOpenTime=Date.now();                       // reading never had a clock — nothing was ever banked
+  _pvReadFrom={ep:a.ep||0,status:a.status};    // where this sitting started, so one Undo covers all of it
+  document.getElementById('pvTitle').innerHTML=escH(a.title)+(ch?` <span class="pv-ep">Ch ${ch}</span>`:'');
   const ext=document.getElementById('pvExt');
   // Same 404 recovery as watch: load the reading site IN-FRAME so its own search is
   // one tap away, rather than kicking out to a new tab and typing the title again.
@@ -9300,6 +9302,14 @@ function pvMovedOnMs(a){return Math.max(5*60*1000,Math.round(pvEpLenMs(a)*0.6));
 // navigate, and it is capped: at worst it overshoots by PV_TIME_MAX, which the
 // Undo on the confirmation bar takes back in one tap.
 const PV_TIME_MAX=3;
+// Reading gets no time-based fallback: a chapter has no length, so minutes in
+// the reader say nothing about how many you got through. Navigation is the whole
+// signal — but readers that paginate page-by-page navigate constantly, so a
+// chapter only counts once you've been on it long enough to have actually read
+// one. Below that it's a page turn, a redirect, or the wrong chapter.
+const PV_READ_MS=90*1000;        // on one chapter this long → read it
+const PV_READ_PEEK_MS=45*1000;   // under this → said nothing, they were just looking
+let _pvReadFrom=null;
 function pvReached(a,ep,elapsed){
   const extra=Math.min(PV_TIME_MAX,Math.max(0,Math.floor(elapsed/pvEpLenMs(a))-1));
   const n=ep+extra;
@@ -9308,23 +9318,23 @@ function pvReached(a,ep,elapsed){
 function pvFrameNavigated(){
   if(_pvOwnNav){_pvOwnNav=false;return;}          // that load was one we asked for
   if(!pvReturnId||!pvWatchEp)return;
-  const a=anime.find(x=>x.id===pvReturnId);
-  if(!a||kindOf(a)!=='watch')return;              // reading has no clock to judge by
+  const a=anime.find(x=>x.id===pvReturnId); if(!a)return;
+  const read=kindOf(a)==='read';
   const total=a.epTotal||0;
-  if(!total||pvWatchEp>=total)return;
+  if(read?(total&&pvWatchEp>=total):(!total||pvWatchEp>=total))return;
   const dwell=pvOpenTime?Date.now()-pvOpenTime:0;
-  if(dwell<pvMovedOnMs(a))return;                 // too soon to be the next episode
+  if(dwell<(read?PV_READ_MS:pvMovedOnMs(a)))return;   // a page turn / an advert, not the next one
   applyWatched(pvReturnId,pvWatchEp);
   const done=pvWatchEp;
   pvWatchEp=done+1;
-  pvOpenTime=Date.now();                          // the new episode earns its own clock
+  pvOpenTime=Date.now();                          // the next one earns its own clock
   const t=document.getElementById('pvTitle');
-  if(t)t.innerHTML=escH(a.title)+' <span class="pv-ep">Ep '+pvWatchEp+'</span>';
-  savePvSession(pvReturnId,pvWatchEp,'watch');
+  if(t)t.innerHTML=escH(a.title)+' <span class="pv-ep">'+(read?'Ch ':'Ep ')+pvWatchEp+'</span>';
+  savePvSession(pvReturnId,pvWatchEp,read?'read':'watch');
   renderPvNav(a);
   // Nothing here interrupts playback — no reload, no focus taken. The toast is
   // skipped in native fullscreen, where it would not be visible anyway.
-  try{if(!nativeFullscreen())toast('Ep '+done+' watched \u00b7 following you to Ep '+pvWatchEp);}catch(e){}
+  try{if(!nativeFullscreen())toast((read?'Ch ':'Ep ')+done+(read?' read':' watched')+' \u00b7 following you to '+(read?'Ch ':'Ep ')+pvWatchEp);}catch(e){}
 }
 // Every src we assign is ours; the next load after it is not the user navigating.
 // Intercepting the property covers all eleven call sites at once, including the
@@ -9360,7 +9370,11 @@ function restorePlayer(){
   const a=anime.find(x=>x.id===s.id);
   if(!a){clearPvSession();return;}
   if(String(s.kind||'').indexOf('yt:')===0){ playYouTube(String(s.kind).slice(3),s.id,s.ep); return; }
-  if(s.kind==='read'){ if(kindOf(a)==='read')readManga(s.id); else clearPvSession(); return; }
+  if(s.kind==='read'){
+    if(kindOf(a)!=='read'){clearPvSession();return;}
+    readManga(s.id,s.ep||0).then(()=>{if(pvReturnId===s.id&&s.t){pvOpenTime=s.t;}}).catch(()=>{});
+    return;
+  }
   if(kindOf(a)!=='watch'||!a.aniId){clearPvSession();return;}
   watchAnime(s.id);
   if(pvReturnId===s.id){pvOpenTime=s.t;savePvSession(s.id,pvWatchEp,'watch');}   // keep the original clock so a long watch still auto-marks
@@ -11221,13 +11235,42 @@ function closePlayer(){
     const blocked=document.getElementById('pvBlocked');
     if(it&&elapsed>20000&&!(blocked&&blocked.classList.contains('on')))noteFrame(srcHost(effectiveSource(it)),true);
   }catch(e){}
-  pvReturnId=null; pvWatchEp=null; pvOpenTime=0;
+  const from=_pvReadFrom;
+  pvReturnId=null; pvWatchEp=null; pvOpenTime=0; _pvReadFrom=null;
   if(!id||!ep) return;
   const a=anime.find(x=>x.id===id);
-  if(!a||kindOf(a)!=='watch'||ep<=(a.ep||0)) return;   // only anime, only if it advances
+  if(!a) return;
+  if(kindOf(a)==='read'){ settleRead(a,ep,elapsed,from); return; }
+  if(ep<=(a.ep||0)) return;                            // only if it advances
   if(elapsed>=AUTO_MARK_MS) autoMarkWatched(id,pvReached(a,ep,elapsed));
   else if(elapsed>=PEEK_MS) markWatchedPrompt(id,ep,a.title);
   // < PEEK_MS: they barely opened it — say nothing
+}
+// Closing the reader. Anything the follow-along already banked stays banked —
+// it is written as it happens so an iOS purge mid-read can't lose it — but the
+// chapter they were still on when they closed has had no navigation to prove it,
+// so time on it decides. One Undo then covers the whole sitting, from wherever
+// they picked it up to wherever they left off.
+function settleRead(a,ch,elapsed,from){
+  const start=from?from.ep:(a.ep||0);
+  if(ch>(a.ep||0)){
+    if(elapsed>=PV_READ_MS) applyWatched(a.id,ch);
+    else if(elapsed>=PV_READ_PEEK_MS){
+      showMWBar(`Read <b>Ch ${ch}</b> of ${schEsc(a.title)}?`,'Mark read',()=>{
+        applyWatched(a.id,ch);toast(`Saved — up to Ch ${ch}`);
+      });
+      return;
+    }
+  }
+  const now=a.ep||0;
+  if(now<=start) return;                               // nothing moved — say nothing
+  const span=now-start>1?`Ch ${start+1}\u2013${now}`:`Ch ${now}`;
+  const finished=a.status==='finished'&&from&&from.status!=='finished';
+  showMWBar(finished?`Finished — marked <b>${a.epTotal} chapters</b> read`:`Marked <b>${span}</b> read`,'Undo',()=>{
+    const x=anime.find(y=>y.id===a.id);
+    if(x){x.ep=start;x.status=(from&&from.status)||x.status;touch(x);save();render();if(detailId===x.id)renderDetail();}
+    toast('Undone');
+  });
 }
 // ─── PROGRESS FOR EXTERNAL WATCHES ──────────────────────────────────────────
 // Opening in the browser used to mean losing progress tracking, because

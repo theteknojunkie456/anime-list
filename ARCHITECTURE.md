@@ -336,6 +336,64 @@ recommended names once (`admin_sources_seen`), so a member's later manual hide
 sticks until the admin pushes a fresh set. Templatized like custom sources via
 `customServiceURL()`.
 
+### Progress marking — what the app is allowed to know
+
+The frame is cross-origin. `iframe.contentWindow.location` is unreadable and
+always will be; this is the same rule that stops the app telling a blocked frame
+from a loading one. Two signals are readable and everything below is built on
+them: **that the frame navigated** (the `load` event fires on the element for
+every completed navigation, whatever the origin) and **how long the current
+episode had been open** when it did.
+
+`pvFrameNavigated()` is wired to that `load` event. Navigations the app caused
+are excluded by intercepting `src` on the element itself with
+`Object.defineProperty` — one interception covers all eleven assignment sites,
+including the retry, the in-frame search and the `about:blank` on close, and
+`_pvOwnNav` is consumed by the next load.
+
+| | gate | on close |
+|---|---|---|
+| Watching | `pvMovedOnMs(a)` — 60% of `a.dur`, floor 5 min (14.4 min for a 24-min episode) | `pvReached()` — one episode per `pvEpLenMs` elapsed, capped at `PV_TIME_MAX` (3) |
+| Reading | `PV_READ_MS` — flat 90s | current chapter only; 90s banks, `PV_READ_PEEK_MS` (45s) asks |
+
+Reading gets **no** time-based multi-chapter settle. A chapter has no duration,
+so minutes in the reader carry no information about how many were read — and
+page-by-page readers navigate constantly, which is what the 90s gate is for.
+
+Watching banks on close; reading banks **as it happens**, because an iOS purge
+mid-read would otherwise lose the whole sitting. `_pvReadFrom` records where the
+sitting started so one Undo still covers all of it.
+
+The time-based path is capped because it cannot distinguish a binge from a phone
+in a pocket. Following along has no such problem — it requires a real navigation
+— so it is uncapped. Everything auto-applied surfaces an Undo.
+
+`settleExternalWatch()` runs the same `pvReached()` maths on time *away* for
+sources that opened in the browser.
+
+### AI providers
+
+Key prefix picks the provider: `AIza` Google AI Studio, `gsk_` Groq, `sk-or-`
+OpenRouter, `sk-ant-` Claude. An unrecognised key is rejected by name rather
+than posted at Anthropic.
+
+**Google AI Studio is what the walkthrough recommends.** `chatContext()` sends
+the whole list every message — ~3,200 tokens on a 108-title list — and Groq's
+free tier meters tokens per minute (6K–12K), so a long conversation 429s. Google
+meters requests. Groq is still offered, faster, with the trade stated.
+
+`modelChain(prov)` = the model picked in Settings, then `AI_MODELS[prov]`, then
+`AI_EXTRA[prov]`. **Every** provider has a chain — a hardcoded model name is a
+dead app the day it is retired. Both `callAI()` (recommend, rank, Insight,
+autofill) and `callAIChatStream()` walk it, and a model is only ever swapped
+before a token has been emitted. `modelRejected()` distinguishes "this model is
+gone" from a real failure so one bad key doesn't burn the whole chain.
+
+Every failure goes through `aiFail()`, which keeps the response **body** —
+`aiReason()` needs it to tell a retired model from a rate limit from a bad key.
+Raising a bare `new Error('API ' + status)` carries no `.status` and degrades to
+"check your connection", which is what the chat used to do.
+
 ### What's new (§9 companion)
 Updates apply silently, so `RELEASE` in `index.html` carries a date-stamped,
 plain-language changelog and `maybeShowWhatsNew()` shows it once per version to

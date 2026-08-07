@@ -2073,9 +2073,9 @@ body.recsel .pcard{position:relative;}
     <div class="sheet-title"><i data-ic="key"></i> AI Key</div>
     <button class="sheet-cancel" onclick="closeKeySheet()">Done</button>
   </div>
-  <!-- One-tap path: jump straight to Groq's key page, then paste from clipboard.
+  <!-- One-tap path: jump straight to AI Studio's key page, then paste from clipboard.
        No typing a URL by hand, no hunting the menu — the two real friction points. -->
-  <button class="key-cta" onclick="getFreeKey()"><i data-ic="external"></i> Get a free key <span>Groq · no card · ~2 min</span></button>
+  <button class="key-cta" onclick="getFreeKey()"><i data-ic="external"></i> Get a free key <span>Google AI Studio · no card · ~2 min</span></button>
   <div style="display:flex;gap:8px;margin-top:10px;">
     <input class="ai-prompt-in" id="apiKeyIn" type="password" placeholder="…then paste it here" autocomplete="off">
     <button class="ai-run-btn" id="keyPasteBtn" onclick="pasteKey()" title="Paste from clipboard"><i data-ic="clipboard"></i></button>
@@ -2089,14 +2089,13 @@ body.recsel .pcard{position:relative;}
   <details class="keyhow">
     <summary>How do I get a free key? (2 minutes)</summary>
     <div class="keyhow-body">
-      <p class="ai-desc" style="margin:0 0 12px">Groq is free, takes about two minutes, and <b style="color:var(--t1)">doesn't ask for a credit card</b>.</p>
-      <div class="keystep"><span class="keynum">1</span><div>Tap <b><a onclick="openExternal('https://console.groq.com/keys')" style="color:var(--a2);cursor:pointer">console.groq.com/keys</a></b> to open Groq.</div></div>
-      <div class="keystep"><span class="keynum">2</span><div>Tap <b>Sign up</b> — use your Google account, or an email address. Confirm the email if it asks. (It lands you right on the keys page.)</div></div>
-      <div class="keystep"><span class="keynum">3</span><div>Already had an account? You're on the API Keys page now.</div></div>
-      <div class="keystep"><span class="keynum">4</span><div>Tap <b>Create API Key</b>. Give it any name — "WatchList" is fine.</div></div>
-      <div class="keystep"><span class="keynum">5</span><div><b style="color:var(--a2)">Copy it straight away.</b> It starts with <code>gsk_</code>, and Groq only ever shows it once — if you close the box you'll just make a new one, which is fine.</div></div>
-      <div class="keystep"><span class="keynum">6</span><div>Come back here, paste it in the box above, tap <b>Save</b>. Done.</div></div>
-      <p class="ai-desc" style="margin-top:12px">Prefer somewhere else? <b>aistudio.google.com</b> (key starts <code>AIza</code>) and <b>openrouter.ai</b> (<code>sk-or-</code>) are also free, and paid Claude keys (<code>sk-ant-</code>) work too. The app recognises which is which on its own.</p>
+      <p class="ai-desc" style="margin:0 0 12px">Google AI Studio is free, takes about two minutes, and <b style="color:var(--t1)">doesn't ask for a credit card</b>. It's the one to pick: the chat sends your whole list every time you ask something, and this is the free key with room for that.</p>
+      <div class="keystep"><span class="keynum">1</span><div>Tap <b><a onclick="openExternal('https://aistudio.google.com/apikey')" style="color:var(--a2);cursor:pointer">aistudio.google.com/apikey</a></b> to open AI Studio.</div></div>
+      <div class="keystep"><span class="keynum">2</span><div>Sign in with your Google account. Accept the terms if it asks — it lands you on the API keys page.</div></div>
+      <div class="keystep"><span class="keynum">3</span><div>Tap <b>Create API key</b>. If it asks for a project, take the one it offers.</div></div>
+      <div class="keystep"><span class="keynum">4</span><div><b style="color:var(--a2)">Copy it.</b> It starts with <code>AIza</code>. You can come back and copy it again later, so there's no rush.</div></div>
+      <div class="keystep"><span class="keynum">5</span><div>Come back here, paste it in the box above, tap <b>Save</b>. Done.</div></div>
+      <p class="ai-desc" style="margin-top:12px">Prefer somewhere else? <b>console.groq.com</b> (<code>gsk_</code>) is free and much faster to answer, but its free allowance is measured in words per minute rather than questions per day, so a long conversation about a big list runs into it. <b>openrouter.ai</b> (<code>sk-or-</code>) is free too, and paid Claude keys (<code>sk-ant-</code>) work. The app recognises which is which on its own.</p>
     </div>
   </details>
 </div>
@@ -11563,7 +11562,7 @@ function aiReason(e){
 }
 function aiErrorHTML(e){
   return e===NO_KEY
-    ?'This needs a free AI key. Tap the <b>AI</b> tab (bottom bar) → <b>Add a free key</b> — it walks you through getting one from Groq in about two minutes. The key stays on this device only.'
+    ?'This needs a free AI key. Tap the <b>AI</b> tab (bottom bar) → <b>Add a free key</b> — it walks you through getting one from Google AI Studio in about two minutes. The key stays on this device only.'
     :escH(aiReason(e));
 }
 // Every provider explains itself in the response BODY; throwing away everything
@@ -11890,7 +11889,7 @@ function openKeySheet(){const inp=document.getElementById('apiKeyIn');if(inp)inp
 // straight there, so there's no menu to hunt. Open the how-to too, in case they
 // want the steps.
 function getFreeKey(){
-  openExternal('https://console.groq.com/keys');
+  openExternal('https://aistudio.google.com/apikey');
   const d=document.querySelector('#keySheet .keyhow');if(d)d.open=true;
   toast('Sign up, create a key, copy it — then come back and paste');
 }

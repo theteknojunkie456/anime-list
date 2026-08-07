@@ -503,6 +503,7 @@ body.first-paint .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards
 }
 .pcard-badge::before{content:'';width:5px;height:5px;border-radius:50%;background:currentColor;}
 .pcard-badge .ico{display:none;}
+.pcard-badge{max-width:calc(100% - 14px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .pcard-sub{font-size:10.5px;font-weight:500;color:var(--t3);margin-top:3px;font-variant-numeric:tabular-nums;}
 .pcard-fav{position:absolute;top:5px;right:7px;font-size:13px;text-shadow:0 1px 6px rgba(0,0,0,0.6);}
 .pcard-seas{position:absolute;bottom:7px;right:7px;display:inline-flex;align-items:center;gap:3px;font-size:9px;font-weight:800;padding:3px 7px 3px 6px;border-radius:99px;background:rgba(10,10,14,0.82);color:#fff;box-shadow:0 2px 8px rgba(0,0,0,0.4);}
@@ -2674,13 +2675,22 @@ const DEFAULT_DATA=[];   // new users start with their own empty list, not a dem
 let anime=[],sortMode='recent',filterStatus='all',detailId=null,editingId=null,curStatus='plan',deleteId=null,importItems=[],curAITab='rec',curTheme='default',viewKind='watch',curKind='watch';
 function kindOf(a){return (a&&a.kind)==='read'?'read':'watch';}
 const STATUS_META={
-  watching:{label:'Watching',icon:icon('play'),color:'var(--wat)'},
-  plan:{label:'Plan to Watch',icon:icon('clipboard'),color:'var(--pln)'},
-  finished:{label:'Finished',icon:icon('check'),color:'var(--fin)'},
-  dropped:{label:'Dropped',icon:icon('x'),color:'var(--drp)'},
+  watching:{label:'Watching',tag:'Watching',icon:icon('play'),color:'var(--wat)'},
+  plan:{label:'Plan to Watch',tag:'Plan',icon:icon('clipboard'),color:'var(--pln)'},
+  finished:{label:'Finished',tag:'Done',icon:icon('check'),color:'var(--fin)'},
+  dropped:{label:'Dropped',tag:'Dropped',icon:icon('x'),color:'var(--drp)'},
 };
 
 // ─── STORAGE ───────────────────────────────────────────────────────────────
+// The state a cover badge announces, said the way that kind of thing is talked
+// about: a manga is Reading, not Watching.
+function statusTag(a){
+  const st=(a&&a.status)||'plan';
+  if(a&&kindOf(a)==='read')
+    return st==='plan'?'To read':st==='watching'?'Reading':st==='finished'?'Read':'Dropped';
+  return (STATUS_META[st]||{}).tag||st;
+}
+
 const LSKEY='animelist_friends_v4';
 // Respect the OS "reduce motion" setting for JS-driven scrolling too. CSS animations
 // are already neutralized globally (see the prefers-reduced-motion block), but a
@@ -5039,7 +5049,7 @@ function posterCard(a,nSeas){
   return`<div class="pcard${recSel&&recSel.has(a.id)?' sel':''}" onclick="pcTap('${a.id}',event)">
     <div class="pcard-wrap">
       ${img}
-      <span class="pcard-badge b-${a.status}">${STATUS_META[a.status].icon} ${a.status==='plan'?'PLAN':a.status.toUpperCase().slice(0,5)}</span>
+      <span class="pcard-badge b-${a.status}">${statusTag(a)}</span>
       ${a.fav?'<span class="pcard-fav">'+icon('heart','fill')+'</span>':''}
       ${seas}
     </div>

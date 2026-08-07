@@ -1195,7 +1195,18 @@ async function fetchAiredSchedules(ids, afterSec, beforeSec) {
 // to browsers as well, so neither this file nor the app can ask it directly.
 // A scheduled GitHub Action does the lookup from a runner it doesn't block and
 // commits the result; Pages serves it, and this reads it from there.
-const CHAPTERS_URL = "https://theteknojunkie456.github.io/anime-list/data/chapters.json";
+// Read the repo directly, not GitHub Pages.
+//
+// The Action commits chapter refreshes with [skip ci], which tells GitHub to
+// skip every workflow for that commit — including the Pages build. So Pages
+// only picked up new chapter data when some unrelated push happened to trigger
+// a rebuild, and sat 30 hours stale in between. The worker compared today's
+// chapters against yesterday's feed, saw no change, and sent nothing: two real
+// chapter releases passed with no alert.
+//
+// raw.githubusercontent serves what is actually on main, with no build step in
+// between, so a chapter committed at 16:10 is readable at 16:10.
+const CHAPTERS_URL = "https://raw.githubusercontent.com/theteknojunkie456/anime-list/main/data/chapters.json";
 let _chFeed = null, _chFeedAt = 0;
 async function chapterFeed() {
   if (_chFeed && Date.now() - _chFeedAt < 900000) return _chFeed;

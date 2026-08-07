@@ -3380,7 +3380,41 @@ function load(){
   }
 }
 let saveWarned=false;let _writeChain=Promise.resolve();
-function backupLocal(s,val){try{s.setItem(LSKEY+'_bak',val);}catch{}}   // best-effort last-known-good mirror
+// The list lived in exactly one place. `_bak` is a second copy, but it sits in
+// localStorage next to the original, so everything that takes one takes both:
+// "clear website data", the ~5MB cap (which _saveFailed exists because we hit),
+// and Safari's eviction of a whole localStorage bucket. Cloud backup is the real
+// answer and is opt-in, which means the default install has no redundancy at all.
+//
+// So: mirror every write into IndexedDB as well. Different store, far larger
+// quota, and not cleared by the paths that clear localStorage alone. It is not a
+// substitute for cloud backup — an origin evicted wholesale takes IDB too — but
+// it covers the common half for free and asks nobody to decide anything.
+//
+// It goes in the existing `img` store under a reserved key rather than a store of
+// its own: adding one would need an IDB version upgrade, and an upgrade blocks
+// while any other tab holds the database open, which is a bad trade for a
+// best-effort mirror.
+const IDB_LIST_KEY='__list__';
+let _mirrorPend=null,_mirrorAt=0,_mirrorT=0;
+function mirrorList(val){
+  _mirrorPend=val;
+  const flush=()=>{
+    _mirrorT=0;
+    const v=_mirrorPend; if(v==null)return;
+    _mirrorPend=null;_mirrorAt=Date.now();
+    idbSet(IDB_LIST_KEY,v).catch(()=>{});
+  };
+  if(_mirrorT)return;
+  const since=Date.now()-_mirrorAt;
+  if(since>=8000)flush(); else _mirrorT=setTimeout(flush,8000-since);
+}
+function flushMirror(){if(_mirrorPend!=null){const v=_mirrorPend;_mirrorPend=null;clearTimeout(_mirrorT);_mirrorT=0;idbSet(IDB_LIST_KEY,v).catch(()=>{});}}
+try{
+  document.addEventListener('visibilitychange',()=>{if(document.hidden)flushMirror();});
+  window.addEventListener('pagehide',flushMirror);
+}catch(e){}
+function backupLocal(s,val){try{s.setItem(LSKEY+'_bak',val);}catch{}mirrorList(val);}   // best-effort last-known-good mirror
 // ── Big-image offload to IndexedDB ──────────────────────────────────────────
 // localStorage is a hard ~5MB browser cap; base64 covers/backgrounds blow past
 // it. When a save can't fit, we move those images into IndexedDB (hundreds of
@@ -3497,6 +3531,35 @@ function writeLocal(){
   }
 }
 function save(){writeLocal();schedulePush();scheduleNotifyUpdate();}
+// The other half of the mirror. localStorage is read synchronously at boot and
+// IndexedDB can't be, so this runs just after and only steps in when the local
+// read produced nothing real — an empty list or one that wouldn't parse. It can
+// never overwrite a list that loaded fine.
+//
+// Deletions are safe: every write is mirrored, including the one that empties the
+// list, so the mirror is empty too and there is nothing to resurrect. That is why
+// the non-empty check below is the whole guard it needs.
+async function restoreFromIDB(){
+  try{
+    if(appLocked)return;                       // ciphertext path looks after itself
+    if(!listUntrusted&&anime.length)return;    // a real list loaded — leave it alone
+    let raw='';
+    try{raw=await idbGet(IDB_LIST_KEY);}catch(e){return;}
+    if(!raw)return;
+    let arr=null;
+    try{const parsed=JSON.parse(raw);if(isEnvelope(parsed))return;arr=migrate(parsed);}catch(e){return;}
+    if(!Array.isArray(arr)||!arr.length)return;
+    if(!listUntrusted&&anime.length)return;    // re-check: load may have finished late
+    anime=arr;
+    listUntrusted=false;
+    try{_hadItemsAtLoad=true;}catch(e){}
+    try{writeLocal();}catch(e){}               // put it back where it belongs
+    try{render();}catch(e){}
+    try{hydrateImages();}catch(e){}
+    try{logProblem('storage','restored the list from the on-device mirror',arr.length+' titles');}catch(e){}
+    toast(`Restored ${arr.length} titles from this device's backup copy`);
+  }catch(e){}
+}
 
 // ─── PASSWORD LOCK — AES-GCM encryption of the whole list (local + cloud) ────
 const ENCFLAG='enc_'+LSKEY;
@@ -13216,7 +13279,7 @@ try{if(_SR&&window.isSecureContext){const m=document.getElementById('chatMic');i
 
 // ─── INIT ───────────────────────────────────────────────────────────────────
 try{hydrateIcons();}catch{}
-load();try{_hadItemsAtLoad=anime.length>0;}catch{}try{purgeAdult();}catch{}try{if(!appLocked&&dedupeAnime())writeLocal();}catch{}loadTheme();try{seedHiddenDefaults();}catch{}try{_restoreUpd();}catch{}render();try{nativeScheduleNotifs();}catch{}try{hydrateImages();}catch{}
+load();try{_hadItemsAtLoad=anime.length>0;}catch{}try{setTimeout(restoreFromIDB,0);}catch{}try{purgeAdult();}catch{}try{if(!appLocked&&dedupeAnime())writeLocal();}catch{}loadTheme();try{seedHiddenDefaults();}catch{}try{_restoreUpd();}catch{}render();try{nativeScheduleNotifs();}catch{}try{hydrateImages();}catch{}
 // After the list is up — and after the tutorial has had its chance to claim a
 // new install — tell returning users what changed in the update they just got.
 try{setTimeout(maybeShowWhatsNew,900);}catch{}

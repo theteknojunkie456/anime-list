@@ -68,6 +68,11 @@ struct WatchListShell: UIViewRepresentable {
         wv.uiDelegate = context.coordinator   // grants mic access to the web app (voice/Jitsi)
         context.coordinator.web = wv
         context.coordinator.observeLinks()
+        // iOS warns before it suspends; the web layer often doesn't hear it in
+        // time, and a session that ends by being swiped away or killed fires
+        // nothing at all. Poke the page on both so the last position is banked
+        // while there's still a runloop to bank it on.
+        context.coordinator.observeLifecycle()
 
         broadcaster.picker.frame = CGRect(x: -20, y: -20, width: 1, height: 1)
         broadcaster.picker.alpha = 0.01
@@ -142,6 +147,18 @@ struct WatchListShell: UIViewRepresentable {
         let broadcaster: BroadcastController
         weak var web: WKWebView?
         weak var ucc: WKUserContentController?
+
+        func observeLifecycle() {
+            let nc = NotificationCenter.default
+            for n in [UIApplication.willResignActiveNotification,
+                      UIApplication.didEnterBackgroundNotification,
+                      UIApplication.willTerminateNotification] {
+                nc.addObserver(forName: n, object: nil, queue: .main) { [weak self] _ in
+                    self?.web?.evaluateJavaScript("try{window.flushPos&&window.flushPos()}catch(e){}",
+                                                  in: nil, in: .page, completionHandler: nil)
+                }
+            }
+        }
         init(broadcaster: BroadcastController) { self.broadcaster = broadcaster }
 
         // Deep-link → join-party plumbing. A tapped invite link (watchlist://party/CODE)

@@ -9607,10 +9607,45 @@ function pvMarkNext(){
 //
 // The web build never receives these calls and loses nothing.
 let _rp={at:0,t:0,d:0,paused:true,ep:0}, _posDirty=false;
-// Position moves every few seconds; writing on every report would thrash storage
-// and the cloud. Flush on a slow timer, and whenever the player closes.
+// A watch session ends in far more ways than "tapped Back": the screen locks,
+// the app is swiped away, a call comes in, iOS purges a backgrounded app without
+// warning. None of those run any code of ours. Anything that only persists on a
+// timer or on close will lose the last stretch, and on iOS it will lose it often.
+//
+// So the second is written on a separate, tiny key of its own — a few dozen
+// bytes, cheap enough to rewrite on every report — while the item field (which
+// is what syncs) keeps its slower cadence. The expensive write stays throttled;
+// the cheap one is effectively continuous, so the worst case is the ~5 seconds
+// since the last report rather than the 30 since the last save.
+const POS_KEY='wl_pos';
+function _posWrite(id,ep,t,d){
+  try{localStorage.setItem(POS_KEY,JSON.stringify({id,ep,t:Math.round(t),d:Math.round(d),at:Date.now()}));}catch(e){}
+}
+function _posClear(){try{localStorage.removeItem(POS_KEY);}catch(e){}}
+// On boot, fold anything the last session didn't get to write back into the item.
+function restorePos(){
+  let p=null; try{p=JSON.parse(localStorage.getItem(POS_KEY)||'null');}catch(e){}
+  if(!p||!p.id||!p.ep||!p.t)return;
+  if(Date.now()-(p.at||0)>30*86400000){_posClear();return;}   // a month old is not a resume point
+  const a=anime.find(x=>x.id===p.id);
+  if(!a||kindOf(a)!=='watch'){_posClear();return;}
+  if(p.ep<=(a.ep||0)){_posClear();return;}                     // watched since — nothing to resume
+  if((a.posAt||0)>=(p.at||0))return;                           // the item already has this or newer
+  a.pos=p.t;a.posOf=p.d;a.posEp=p.ep;a.posAt=p.at;
+  try{save();}catch(e){}
+}
 function flushPos(){ if(!_posDirty)return; _posDirty=false; try{save();}catch(e){} }
+try{window.flushPos=flushPos;}catch(e){}   // the shell calls this by name on suspend
 try{setInterval(()=>{try{flushPos();}catch(e){}},30000);}catch(e){}
+// Every way out of a session that fires anything at all. pagehide and freeze are
+// the ones that survive a swipe-away on iOS; visibilitychange covers the lock
+// screen and the app switcher.
+try{
+  document.addEventListener('visibilitychange',()=>{if(document.hidden)try{flushPos();}catch(e){}});
+  window.addEventListener('pagehide',()=>{try{flushPos();}catch(e){}});
+  window.addEventListener('freeze',()=>{try{flushPos();}catch(e){}});
+  window.addEventListener('beforeunload',()=>{try{flushPos();}catch(e){}});
+}catch(e){}
 function fmtPos(sec){
   sec=Math.max(0,Math.round(sec||0));
   const m=Math.floor(sec/60),ss=sec%60;
@@ -9641,10 +9676,11 @@ window.wlNativePlayback=function(info){
     // is worth keeping: the first minute is titles, and the last stretch means
     // you finished, which the episode number already records.
     if(t>60&&t<d*RP_DONE){
+      _posWrite(a.id,pvWatchEp,t,d);        // cheap, every report — survives a kill
       if(Math.abs((a.pos||0)-t)>15||a.posEp!==pvWatchEp)_posDirty=true;
       a.pos=Math.round(t);a.posOf=Math.round(d);a.posEp=pvWatchEp;a.posAt=Date.now();
     }else if(a.pos&&a.posEp===pvWatchEp&&t>=d*RP_DONE){
-      delete a.pos;delete a.posOf;delete a.posEp;delete a.posAt;_posDirty=true;
+      delete a.pos;delete a.posOf;delete a.posEp;delete a.posAt;_posDirty=true;_posClear();
     }
     const total=a.epTotal||0;
     if(t/d<RP_DONE)return;
@@ -11758,6 +11794,9 @@ window.addEventListener('focus',()=>{settleExternalWatch();try{flushRender();}ca
 function applyWatched(id,ep){
   const a=anime.find(x=>x.id===id);if(!a)return null;
   const prev={ep:a.ep||0,status:a.status};
+  // However the episode got marked — here, by hand, by the stepper — a resume
+  // point for it or anything before it is now a lie.
+  if(a.posEp&&a.posEp<=ep){delete a.pos;delete a.posOf;delete a.posEp;delete a.posAt;try{_posClear();}catch(e){}}
   a.ep=a.epTotal?Math.min(ep,a.epTotal):ep;
   if(a.epTotal&&a.ep===a.epTotal&&a.status!=='finished')a.status='finished';
   else if(a.status==='plan')a.status='watching';
@@ -13720,7 +13759,7 @@ try{if(_SR&&window.isSecureContext){const m=document.getElementById('chatMic');i
 
 // ─── INIT ───────────────────────────────────────────────────────────────────
 try{hydrateIcons();}catch{}
-load();try{_hadItemsAtLoad=anime.length>0;}catch{}try{setTimeout(()=>{try{fetchSequels();}catch(e){}},6000);}catch{}try{setTimeout(restoreFromIDB,0);}catch{}try{setTimeout(()=>{try{ensureBackup();}catch(e){}},1200);}catch{}try{purgeAdult();}catch{}try{if(!appLocked&&dedupeAnime())writeLocal();}catch{}loadTheme();try{seedHiddenDefaults();}catch{}try{_restoreUpd();}catch{}render();try{nativeScheduleNotifs();}catch{}try{hydrateImages();}catch{}
+load();try{_hadItemsAtLoad=anime.length>0;}catch{}try{restorePos();}catch(e){}try{setTimeout(()=>{try{fetchSequels();}catch(e){}},6000);}catch{}try{setTimeout(restoreFromIDB,0);}catch{}try{setTimeout(()=>{try{ensureBackup();}catch(e){}},1200);}catch{}try{purgeAdult();}catch{}try{if(!appLocked&&dedupeAnime())writeLocal();}catch{}loadTheme();try{seedHiddenDefaults();}catch{}try{_restoreUpd();}catch{}render();try{nativeScheduleNotifs();}catch{}try{hydrateImages();}catch{}
 // After the list is up — and after the tutorial has had its chance to claim a
 // new install — tell returning users what changed in the update they just got.
 try{setTimeout(maybeShowWhatsNew,900);}catch{}

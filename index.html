@@ -4955,10 +4955,25 @@ function setViewKind(k){
   render();document.getElementById('pageEl').scrollTo({top:0,behavior:_scrollBehavior()});
 }
 // ─── AIRING (AniList nextAiringEpisode, display-only) ───────────────────────
+// The day something lands is the day you care about it most, and this used to go
+// blank the instant the clock passed the air time — so a show released this
+// morning read as having nothing due. Anything that aired earlier today keeps a
+// label, and says it's out rather than counting down to a moment that's gone.
+function airedToday(a){
+  if(kindOf(a)!=='watch'||!a.airAt)return false;
+  const ms=a.airAt*1000;
+  if(ms>Date.now())return false;
+  const d=new Date();d.setHours(0,0,0,0);
+  return ms>=d.getTime();
+}
 function airingInfo(a){
   if(kindOf(a)!=='watch'||!a.airAt)return null;
   const ms=a.airAt*1000;
-  if(ms<Date.now())return null; // aired already — refreshed opportunistically by fetchCovers
+  if(ms<Date.now()){
+    if(!airedToday(a))return null;   // properly in the past — refreshed by fetchCovers
+    const t=new Date(ms).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
+    return{ep:a.airEp||0,soon:true,out:true,day:'',time:t,date:'',when:'Out now'};
+  }
   const d=new Date(ms);
   // Within a week → weekday + time ("Wed 4:00 PM"); further out → the actual date
   // ("Aug 6"), so a premiere months away doesn't read as this coming Wednesday.
@@ -5350,7 +5365,12 @@ function onSearchInput(){clearTimeout(_searchT);_searchT=setTimeout(renderHome,1
 // next 7 days, soonest first. Self-hides when nothing qualifies — no clutter.
 function airingThisWeek(){
   const now=Date.now(),wk=now+7*86400000;
-  return anime.filter(a=>kindOf(a)==='watch'&&(a.status==='watching'||a.status==='plan')&&a.airAt&&a.airAt*1000>now&&a.airAt*1000<=wk)
+  // From the start of today, not from this instant: an episode that aired three
+  // hours ago is the most interesting thing on the rail, and it used to drop off
+  // it the moment it became available.
+  const day=new Date();day.setHours(0,0,0,0);
+  const from=day.getTime();
+  return anime.filter(a=>kindOf(a)==='watch'&&(a.status==='watching'||a.status==='plan')&&a.airAt&&a.airAt*1000>from&&a.airAt*1000<=wk)
     .sort((x,y)=>x.airAt-y.airAt);
 }
 function airingRailHTML(items){
@@ -5633,7 +5653,7 @@ function renderDetail(){
         <div class="dt-title">${schEsc(a.title)}</div>
         <div class="dt-meta">${[a.eps, kindOf(a)==='read'?a.time:''].filter(Boolean).join(' · ')}</div>
         ${(()=>{if(kindOf(a)!=='watch')return '';const tw=totalWatchMins(a),fm=filmMins(a);if(!tw)return '';return `<div class="dt-runtime">${icon('clock')} <b>${fmtWatch(tw)}</b> to watch${a.epTotal?` all ${a.epTotal} episodes`:''}${fm?`<span class="dt-runtime-films"> + ${fmtWatch(fm)} of films</span>`:''}</div>`;})()}
-        ${(()=>{const air=airingInfo(a);return air?`<div class="dt-air">${icon('calendar')} Ep ${air.ep} · airs ${air.when}</div>`:'';})()}
+        ${(()=>{const air=airingInfo(a);return air?`<div class="dt-air">${icon('calendar')} Ep ${air.ep} · ${air.out?'out now':'airs '+air.when}</div>`:'';})()}
         <button class="dt-fav${a.fav?' on':''}" onclick="toggleFav()">${a.fav?icon('heart','fill')+' Favorited':icon('heart')+' Favorite'}</button>
       </div>
     </div>

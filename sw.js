@@ -1,3 +1,4 @@
+// Bumped v9 -> v10: notificationclick now rebases onto the app's own scope.
 // Bumped v8 -> v9 to drop the caches the old fetch handler had grown (see below).
 // Bumped v7 -> v8 deliberately. The activate handler deletes every cache whose
 // name isn't the current one, so changing this name forces every installed app
@@ -5,7 +6,7 @@
 // current, but an installed iOS app that has been offline or backgrounded can
 // hold an old bundle for a long time — and "the fix didn't work" has looked
 // exactly like that more than once.
-const CACHE = 'animelist-v9';
+const CACHE = 'animelist-v10';
 const ASSETS = ['./index.html', './friends.html', './manifest.json'];
 
 self.addEventListener('install', e => {
@@ -37,22 +38,34 @@ self.addEventListener('push', e => {
   e.waitUntil(self.registration.showNotification(title, options));
 });
 
+// The notify worker sends ROOT-relative paths ("/", "/?show=123"). This app is
+// served from a subpath — /anime-list/ — so "/" resolves to the domain root,
+// which is not WatchList. Tapping a notification landed on the wrong page
+// entirely. Rebase whatever arrives onto this worker's own scope, which IS the
+// app, so a tap always opens WatchList however the payload is written.
+function appURL(raw) {
+  try { return new URL(String(raw || './').replace(/^\/+/, ''), self.registration.scope).href; }
+  catch (e) { return self.registration.scope; }
+}
 // Focus an existing tab (or open one) when a notification is tapped
 self.addEventListener('notificationclick', e => {
   e.notification.close();
-  const url = (e.notification.data && e.notification.data.url) || './';
+  const target = appURL(e.notification.data && e.notification.data.url);
   e.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
       for (const c of list) {
+        // Only ours: matchAll can hand back windows for other pages on this
+        // origin, and focusing one of those is how a tap ends up somewhere else.
+        if (!c.url || c.url.indexOf(self.registration.scope) !== 0) continue;
         if (!('focus' in c)) continue;
         // Focusing alone left them on whatever screen they were already on, so the
         // notification's deep link did nothing. Tell the page where to go — and
         // navigate as a fallback for clients that ignore the message.
-        try { c.postMessage({ type: 'wl-open', url: url }); } catch (e) {}
-        if (c.navigate && !c.url.endsWith(url)) { try { c.navigate(url); } catch (e) {} }
+        try { c.postMessage({ type: 'wl-open', url: target }); } catch (e) {}
+        if (c.navigate && c.url !== target) { try { c.navigate(target); } catch (e) {} }
         return c.focus();
       }
-      if (self.clients.openWindow) return self.clients.openWindow(url);
+      if (self.clients.openWindow) return self.clients.openWindow(target);
     })
   );
 });

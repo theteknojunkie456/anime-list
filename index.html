@@ -5633,7 +5633,7 @@ function renderDetail(){
   const sibs=seriesOf(a);
   let seasonsHTML='';
   if(kindOf(a)==='watch'&&a.aniId){
-    seasonsHTML=`<div id="dt-franchise" style="min-height:76px"><div class="dt-season-load">${icon('loader')} Loading seasons…</div></div>`;
+    seasonsHTML=`<div id="dt-franchise" style="min-height:76px"><div class="dt-season-load">${icon('loader')} Loading seasons, films &amp; specials…</div></div>`;
   }else if(sibs.length>1){
     seasonsHTML=`<div class="dt-label">${read?'Parts':'Seasons'} · ${sibs.length}</div>
     <div class="dt-seasons">${sibs.map(s=>{const cur=s.id===a.id,st=STATUS_META[s.status];
@@ -5887,7 +5887,12 @@ function richDetailHTML(d,forId){
 // Plus an AniList title search as a cheap third net. All merged by AniList id /
 // MAL id into one normalized list. Cached per franchise.
 let franchiseCache={},curFranchise=[],curFranchiseFor='';
-const SEASON_FMT=new Set(['TV','TV_SHORT','ONA']);   // the "seasons"; movies/OVAs/specials stay out
+const SEASON_FMT=new Set(['TV','TV_SHORT','ONA']);   // the numbered run — what "Season 2" means
+// Films, OVAs and specials used to be thrown away here, which meant a franchise
+// panel could tell you there were three seasons while saying nothing about the
+// two movies that come between them. They're kept now, in their own group, so
+// they're reachable without crowding the numbered run.
+const EXTRA_FMT=new Set(['MOVIE','SPECIAL','OVA']);
 function aniSeason(m){const na=m.nextAiringEpisode;return{aniId:m.id,malId:m.idMal||0,
   title:(m.title&&(m.title.english||m.title.romaji))||'?',
   year:(m.startDate&&m.startDate.year)||m.seasonYear||0,month:(m.startDate&&m.startDate.month)||0,
@@ -5984,7 +5989,7 @@ async function fetchFranchise(a){
   // 3) MyAnimeList graph — the independent second source
   if(seedMal){(await malGraph(seedMal)).forEach(d=>merge(malSeason(d)));}
   // keep only real seasons; always include the one you're viewing
-  let seasons=list.filter(s=>SEASON_FMT.has(s.format)||(a.aniId&&s.aniId===a.aniId));
+  let seasons=list.filter(s=>SEASON_FMT.has(s.format)||EXTRA_FMT.has(s.format)||(a.aniId&&s.aniId===a.aniId));
   if(a.aniId&&!seasons.some(s=>s.aniId===a.aniId))
     seasons.unshift({aniId:a.aniId,malId:a.malId||0,title:a.title,year:0,month:0,format:'TV',status:'',episodes:a.epTotal||0,img:a.img||'',airingAt:a.airAt||0,airEp:a.airEp||0,src:'self'});
   seasons.sort((x,y)=>(x.year||9999)-(y.year||9999)||(x.month||0)-(y.month||0));
@@ -5999,17 +6004,23 @@ async function loadFranchise(detId){
   paintFranchise();
 }
 function franchiseMine(s){return anime.find(x=>kindOf(x)==='watch'&&((s.aniId&&x.aniId===s.aniId)||(s.malId&&x.malId&&x.malId===s.malId)))||null;}
+function isExtra(s){return !!(s&&EXTRA_FMT.has(s.format)&&!SEASON_FMT.has(s.format));}
+function fmtLabel(s){return s.format==='MOVIE'?'Film':s.format==='OVA'?'OVA':s.format==='SPECIAL'?'Special':'';}
 function paintFranchise(){
   const box=document.getElementById('dt-franchise');if(!box)return;
   const seasons=curFranchise||[];
-  if(seasons.length<2){box.innerHTML='';return;}   // one season → nothing to group
+  if(seasons.length<2){box.innerHTML='';return;}   // one entry → nothing to group
   const a=anime.find(x=>x.id===detailId);
-  const rows=seasons.map((s,idx)=>{
+  // Indices are the flat position in curFranchise — toggleSeasonSeen() addresses
+  // them that way — so the split happens at render time, not in the data.
+  const rowFor=(s,idx)=>{
     const mine=franchiseMine(s),cur=mine&&a&&mine.id===a.id,done=mine&&mine.status==='finished';
     const title=s.title||'?';
     let sub;
+    const kind=fmtLabel(s);
     if(!mine)sub=(s.status==='NOT_YET_RELEASED'?'Upcoming':'Not on your list')+(s.year?` · ${s.year}`:'');
     else{const st=STATUS_META[mine.status];sub=(st?st.label:mine.status)+(mine.epTotal?` · ${mine.ep||0}/${mine.epTotal}`:'');}
+    if(kind)sub=kind+' · '+sub;
     let up='';
     if(s.airingAt&&s.airingAt*1000>Date.now()){
       const d=new Date(s.airingAt*1000),soon=(s.airingAt*1000-Date.now())<7*86400000;
@@ -6023,11 +6034,22 @@ function paintFranchise(){
       <div class="dt-season-info"><div class="dt-season-t">${schEsc(title)}</div><div class="dt-season-s">${schEsc(sub)}</div></div>
       ${up}${cur?'<span class="dt-season-here">Viewing</span>':''}${check}
     </div>`;
-  }).join('');
-  const allSeen=seasons.every(s=>{const mine=franchiseMine(s);return mine&&mine.status==='finished';});
-  box.innerHTML=`<div class="dt-seasons-head"><div class="dt-label">Seasons · ${seasons.length}</div>
-    <button class="dt-seenall" onclick="markFranchiseSeen()">${icon(allSeen?'check':'layers')} ${allSeen?'All seen':'Seen all'}</button></div>
-    <div class="dt-seasons">${rows}</div>`;
+  };
+  const idx=seasons.map((s,i)=>i);
+  const mainIdx=idx.filter(i=>!isExtra(seasons[i]));
+  const extraIdx=idx.filter(i=>isExtra(seasons[i]));
+  // "Seen all" still means the numbered run only. Silently marking somebody's
+  // films watched because they tapped it on the seasons list would be a lie.
+  const allSeen=mainIdx.length&&mainIdx.every(i=>{const mine=franchiseMine(seasons[i]);return mine&&mine.status==='finished';});
+  let html='';
+  if(mainIdx.length)
+    html+=`<div class="dt-seasons-head"><div class="dt-label">Seasons · ${mainIdx.length}</div>
+      <button class="dt-seenall" onclick="markFranchiseSeen()">${icon(allSeen?'check':'layers')} ${allSeen?'All seen':'Seen all'}</button></div>
+      <div class="dt-seasons">${mainIdx.map(i=>rowFor(seasons[i],i)).join('')}</div>`;
+  if(extraIdx.length)
+    html+=`<div class="dt-seasons-head" style="margin-top:14px"><div class="dt-label">Films, OVAs &amp; specials · ${extraIdx.length}</div></div>
+      <div class="dt-seasons">${extraIdx.map(i=>rowFor(seasons[i],i)).join('')}</div>`;
+  box.innerHTML=html;
 }
 // ─── WHAT'S NEXT ────────────────────────────────────────────────────────────
 // Finishing a season is the exact moment you'd want the next one, and it's also
@@ -6109,7 +6131,7 @@ function toggleSeasonSeen(idx){
   setTimeout(fetchCovers,300);
 }
 function markFranchiseSeen(){
-  const seasons=curFranchise||[];if(!seasons.length)return;
+  const seasons=(curFranchise||[]).filter(s=>!isExtra(s));if(!seasons.length)return;
   seasons.forEach(s=>{
     const mine=franchiseMine(s);
     if(mine){if(mine.status!=='finished'){mine.status='finished';if(mine.epTotal)mine.ep=mine.epTotal;touch(mine);alPushItem&&alPushItem(mine);}}

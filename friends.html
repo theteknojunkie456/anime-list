@@ -4184,13 +4184,19 @@ function renderSyncUI(){
         <button class="parse-btn" style="margin:0;flex:1" onclick="copySyncCode()">${icon('clipboard')} Copy code</button>
         <button class="imp-all" onclick="syncOff()">Turn off</button>
       </div>
-      <p class="ai-desc" style="margin-top:10px">On another device: install the app, open this panel, paste the code, tap <b>Use code</b>.</p>`;
+      <p class="ai-desc" style="margin-top:10px">On another device: install the app, open this panel, paste the code, tap <b>Use code</b>.</p>
+      <div class="dt-label" style="margin-top:16px">${icon('refresh')} Bring another list here</div>
+      <p class="ai-desc">Restoring replaces what's on this device with the list saved under that code.</p>
+      <div style="display:flex;gap:8px;">
+        <textarea class="ai-prompt-in urlin" rows="2" id="syncCodeIn" placeholder="paste a code to restore" autocomplete="off" autocapitalize="characters" spellcheck="false" onkeydown="if(event.key==='Enter'){event.preventDefault();syncRestore();}"></textarea>
+        <button class="ai-run-btn" onclick="syncRestore()">Use code</button>
+      </div>`;
   }else{
     box.innerHTML=`<div class="dt-label">${icon('cloud')} Cloud backup · OFF</div>${meter}
       <p class="ai-desc">Back up your list to the cloud so it survives losing your phone and syncs across your devices. Private — only someone with your secret code can open it.</p>
       <button class="parse-btn" style="margin-top:0" onclick="syncEnableNew()">Turn on cloud backup</button>
       <div style="display:flex;gap:8px;margin-top:8px;">
-        <input class="ai-prompt-in" id="syncCodeIn" placeholder="…or paste a code to restore" autocomplete="off">
+        <textarea class="ai-prompt-in urlin" rows="2" id="syncCodeIn" placeholder="…or paste a code to restore" autocomplete="off" autocapitalize="characters" spellcheck="false" onkeydown="if(event.key==='Enter'){event.preventDefault();syncRestore();}"></textarea>
         <button class="ai-run-btn" onclick="syncRestore()">Use code</button>
       </div>`;
   }

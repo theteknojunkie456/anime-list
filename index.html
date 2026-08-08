@@ -505,6 +505,10 @@ body.first-paint .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards
 .pcard-badge .ico{display:none;}
 .pcard-badge{max-width:calc(100% - 14px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .pcard-sub{font-size:10.5px;font-weight:500;color:var(--t3);margin-top:3px;font-variant-numeric:tabular-nums;}
+/* "You finished this and there's more" — said on the cover, permanently, instead
+   of in a sheet that appears once and is gone. */
+.pcard-next{display:flex;align-items:center;gap:4px;margin-top:3px;font-size:10.5px;font-weight:700;color:var(--a2);}
+.pcard-next .ico{width:11px;height:11px;}
 .pcard-fav{position:absolute;top:5px;right:7px;font-size:13px;text-shadow:0 1px 6px rgba(0,0,0,0.6);}
 .pcard-seas{position:absolute;bottom:7px;right:7px;display:inline-flex;align-items:center;gap:3px;font-size:9px;font-weight:800;padding:3px 7px 3px 6px;border-radius:99px;background:rgba(10,10,14,0.82);color:#fff;box-shadow:0 2px 8px rgba(0,0,0,0.4);}
 .pcard-seas .ico{width:11px;height:11px;}
@@ -775,6 +779,15 @@ body.first-paint .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards
 .dt-season-t{font-family:var(--fd);font-size:14px;font-weight:700;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .dt-season-s{font-size:11.5px;color:var(--t3);margin-top:2px;}
 .dt-season .ico{width:16px;height:16px;color:var(--t3);flex-shrink:0;}
+.dt-next{display:flex;align-items:center;gap:11px;margin-top:12px;padding:10px 11px;border-radius:14px;
+  background:color-mix(in srgb,var(--a) 11%,var(--bg3));border:1px solid color-mix(in srgb,var(--a) 28%,transparent);}
+.dt-next img,.dt-next-ph{width:38px;height:53px;border-radius:8px;object-fit:cover;flex-shrink:0;background:var(--bg4);}
+.dt-next-info{flex:1;min-width:0;}
+.dt-next-k{font-size:10.5px;font-weight:700;color:var(--a2);}
+.dt-next-t{font-family:var(--fd);font-size:13.5px;font-weight:700;color:var(--t1);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.dt-next-go{flex:0 0 auto;padding:8px 13px;border-radius:99px;background:var(--a);color:var(--aFg);font-size:12px;font-weight:800;}
+.dt-next-x{flex:0 0 auto;display:flex;color:var(--t3);padding:4px;}
+.dt-next-x .ico{width:15px;height:15px;}
 .dt-season-here{font-size:11px;font-weight:800;color:var(--a2);flex-shrink:0;}
 /* Marks a row that will put itself on your list when tapped, so the difference
    between "open this" and "add and open this" is visible before you commit. */
@@ -2252,15 +2265,6 @@ body.recsel .pcard{position:relative;}
     <button class="sheet-cancel" onclick="closeAll()">Done</button>
   </div>
   <div id="adminBody"></div>
-</div>
-
-<div class="sheet" id="nextSheet">
-  <div class="sheet-handle"></div>
-  <div class="sheet-header">
-    <div class="sheet-title"><i data-ic="layers"></i> What&rsquo;s next</div>
-    <button class="sheet-cancel" onclick="dismissNextSeason()">Close</button>
-  </div>
-  <div id="nextBody"></div>
 </div>
 
 <div class="sheet" id="srcOfferSheet">
@@ -5250,6 +5254,7 @@ function posterCard(a,nSeas){
     </div>
     ${bar}
     <div class="pcard-title">${schEsc(title)}</div>
+    ${(()=>{const n=nextUpOf(a);return n?`<div class="pcard-next">${icon('layers')} ${n.soon?'Next season coming':'Next season ready'}</div>`:'';})()}
     ${durLine}
     ${airHTML}
   </div>`;
@@ -5659,6 +5664,16 @@ function renderDetail(){
         <div class="dt-meta">${[a.eps, kindOf(a)==='read'?a.time:''].filter(Boolean).join(' · ')}</div>
         ${(()=>{if(kindOf(a)!=='watch')return '';const tw=totalWatchMins(a),fm=filmMins(a);if(!tw)return '';return `<div class="dt-runtime">${icon('clock')} <b>${fmtWatch(tw)}</b> to watch${a.epTotal?` all ${a.epTotal} episodes`:''}${fm?`<span class="dt-runtime-films"> + ${fmtWatch(fm)} of films</span>`:''}</div>`;})()}
         ${(()=>{const air=airingInfo(a);return air?`<div class="dt-air">${icon('calendar')} Ep ${air.ep} · ${air.out?'out now':'airs '+air.when}</div>`:'';})()}
+        ${(()=>{const n=nextUpOf(a);if(!n)return'';
+          return `<div class="dt-next">
+            ${n.img?`<img src="${escH(n.img)}" alt="">`:'<div class="dt-next-ph"></div>'}
+            <div class="dt-next-info">
+              <div class="dt-next-k">${n.soon?'Next season — not out yet':'Next season'}</div>
+              <div class="dt-next-t">${schEsc(n.title)}</div>
+            </div>
+            <button class="dt-next-go" onclick="addNextUp('${escH(a.id)}',event)">${n.soon?'Plan it':'Watch it'}</button>
+            <button class="dt-next-x" onclick="clearNextUp('${escH(a.id)}',event)" aria-label="Not interested">${icon('x')}</button>
+          </div>`;})()}
         <button class="dt-fav${a.fav?' on':''}" onclick="toggleFav()">${a.fav?icon('heart','fill')+' Favorited':icon('heart')+' Favorite'}</button>
       </div>
     </div>
@@ -6076,6 +6091,36 @@ async function fetchSequel(aniId){
     return e?e.node:null;
   }catch(e){return null;}
 }
+// Finishing something used to pop a sheet, once, and remember a "Not now"
+// forever — so the answer to "what's next?" existed for about four seconds and
+// then never again. The lookup is the same; what changes is that the result is
+// kept on the item, where the cover card and the show page can both point at it
+// for as long as it's true.
+function nextUpOf(a){
+  if(!a||kindOf(a)!=='watch')return null;
+  const n=a.nextUp;
+  if(!n||!n.id)return null;
+  if(anime.some(x=>x.aniId===n.id))return null;   // they added it — nothing left to offer
+  return n;
+}
+function clearNextUp(id,ev){
+  if(ev&&ev.stopPropagation)ev.stopPropagation();
+  const a=anime.find(x=>x.id===id);if(!a||!a.nextUp)return;
+  try{declineNext(a.nextUp.id);}catch(e){}
+  delete a.nextUp;touch(a);save();render();
+  if(detailId===id)renderDetail();
+}
+function addNextUp(id,ev){
+  if(ev&&ev.stopPropagation)ev.stopPropagation();
+  const a=anime.find(x=>x.id===id);const n=a&&nextUpOf(a);if(!n)return;
+  const item=seasonToItem({aniId:n.id,malId:0,title:n.title,img:n.img||'',episodes:n.eps||0,year:n.year||0},n.soon?'plan':'watching');
+  anime.unshift(item);
+  delete a.nextUp;touch(a);
+  save();render();
+  try{fetchCovers();}catch(e){}
+  openDetail(item.id);
+  toast(n.soon?('Added '+item.title+' to Plan'):('Added '+item.title));
+}
 async function offerNextSeason(a){
   if(!a||kindOf(a)!=='watch'||!a.aniId)return;
   const nxt=await fetchSequel(a.aniId);
@@ -6084,39 +6129,10 @@ async function offerNextSeason(a){
   if(anime.some(x=>x.aniId===nxt.id))return;                 // already on their list
   const title=(nxt.title&&(nxt.title.english||nxt.title.romaji))||'The next season';
   const soon=nxt.status==='NOT_YET_RELEASED';
-  const box=document.getElementById('nextBody'); if(!box)return;
-  box.innerHTML=`<p class="ai-desc" style="margin-top:2px">You just finished <b>${escH(a.title)}</b>. There's more.</p>
-    <div class="next-card">
-      ${nxt.coverImage&&nxt.coverImage.large?`<img src="${escH(nxt.coverImage.large)}" alt="">`:'<div class="next-ph"></div>'}
-      <div class="next-info">
-        <div class="next-t">${escH(title)}</div>
-        <div class="next-s">${soon?'Not out yet':(nxt.episodes?`${nxt.episodes} episodes`:'Sequel')}${nxt.seasonYear?` · ${nxt.seasonYear}`:''}</div>
-      </div>
-    </div>
-    <div style="display:flex;gap:8px;margin-top:14px">
-      <button class="parse-btn" style="flex:1" onclick="addNextSeason()">${soon?'Add to Plan':'Add and start watching'}</button>
-      <button class="parse-btn" style="flex:0 0 auto;width:auto;padding:0 18px" onclick="dismissNextSeason()">Not now</button>
-    </div>`;
-  _nextOffer={node:nxt,soon};
-  openSheet('nextSheet');
-}
-let _nextOffer=null;
-function addNextSeason(){
-  if(!_nextOffer){closeAll();return;}
-  const n=_nextOffer.node;
-  const item=seasonToItem({
-    aniId:n.id,malId:0,title:(n.title&&(n.title.english||n.title.romaji))||'Untitled',
-    img:(n.coverImage&&n.coverImage.large)||'',episodes:n.episodes||0,year:n.seasonYear||0,
-  },_nextOffer.soon?'plan':'watching');
-  anime.unshift(item);
-  _nextOffer=null;
-  save();render();closeAll();
-  toast(`${item.title} added`);
-  try{fetchCovers();}catch(e){}
-}
-function dismissNextSeason(){
-  if(_nextOffer&&_nextOffer.node)declineNext(_nextOffer.node.id);
-  _nextOffer=null;closeAll();
+  // Record it and repaint. No sheet, nothing to dismiss, nothing lost.
+  a.nextUp={id:nxt.id,title,img:(nxt.coverImage&&nxt.coverImage.large)||'',soon,eps:nxt.episodes||0,year:nxt.seasonYear||0};
+  touch(a);save();render();
+  if(detailId===a.id)renderDetail();
 }
 function seasonToItem(s,status){
   return {id:uid(),kind:'watch',status,title:s.title||'Untitled',aniId:s.aniId||0,malId:s.malId||0,

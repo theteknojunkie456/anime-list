@@ -9577,6 +9577,46 @@ function pvMarkNext(){
   pvGoTo(a,ep+1);
   toast('Ep '+ep+' watched · now on Ep '+(ep+1));
 }
+// ─── REAL PLAYBACK POSITION (native shell only) ─────────────────────────────
+// Everything below this in the file infers progress: a navigation after enough
+// dwell, a clock at close. Good inference, but the browser never lets the page
+// see a frame of the video, so it stays inference.
+//
+// The native shell is not the browser. It owns the web view, so it can inject a
+// script into EVERY frame — cross-origin ones included — and that script sits
+// inside the streaming site, next to the <video> element, reading currentTime.
+// It reports back here. When that's arriving, progress stops being a guess and
+// the heuristics stand down rather than double-counting.
+//
+// The web build never receives these calls and loses nothing.
+let _rp={at:0,t:0,d:0,paused:true,ep:0};
+const RP_FRESH_MS=45000;                 // no report in this long → assume it stopped
+const RP_DONE=0.85;                      // 85% of runtime = watched; clears credits
+function realPlaybackLive(){return !!_rp.at&&(Date.now()-_rp.at)<RP_FRESH_MS;}
+window.wlNativePlayback=function(info){
+  try{
+    if(!info)return;
+    const t=+info.t, d=+info.d;
+    if(!isFinite(t)||!isFinite(d)||d<=60)return;   // adverts and preview clips aren't episodes
+    if(_rp.ep!==pvWatchEp){_rp={at:0,t:0,d:0,paused:true,ep:pvWatchEp||0};}   // new episode, new clock
+    _rp.at=Date.now();_rp.t=t;_rp.d=d;_rp.paused=!!info.paused;
+    if(!pvReturnId||!pvWatchEp)return;
+    const a=anime.find(x=>x.id===pvReturnId);
+    if(!a||kindOf(a)!=='watch')return;
+    const total=a.epTotal||0;
+    if(t/d<RP_DONE)return;
+    if(pvWatchEp<=(a.ep||0))return;                 // already banked
+    applyWatched(pvReturnId,pvWatchEp);
+    const done=pvWatchEp;
+    if(total&&pvWatchEp>=total){try{if(!nativeFullscreen())toast('Finished '+a.title);}catch(e){}return;}
+    pvWatchEp=done+1;pvOpenTime=Date.now();_rp.ep=pvWatchEp;
+    const el=document.getElementById('pvTitle');
+    if(el)el.innerHTML=escH(a.title)+' <span class="pv-ep">Ep '+pvWatchEp+'</span>';
+    savePvSession(pvReturnId,pvWatchEp,'watch');
+    renderPvNav(a);
+    try{if(!nativeFullscreen())toast('Ep '+done+' watched');}catch(e){}
+  }catch(e){}
+};
 // ─── FOLLOWING ALONG INSIDE THE FRAME ────────────────────────────────────────
 // Hardly anyone presses "Mark watched & next" — they use the source site's own
 // next-episode link, and progress silently falls behind by however many episodes
@@ -9629,6 +9669,8 @@ function pvFrameNavigated(){
   const read=kindOf(a)==='read';
   const total=a.epTotal||0;
   if(read?(total&&pvWatchEp>=total):(!total||pvWatchEp>=total))return;
+  // A measurement is running — it decides, and a navigation is just a navigation.
+  if(!read&&realPlaybackLive())return;
   const dwell=pvOpenTime?Date.now()-pvOpenTime:0;
   if(dwell<(read?PV_READ_MS:pvMovedOnMs(a)))return;   // a page turn / an advert, not the next one
   applyWatched(pvReturnId,pvWatchEp);
@@ -11550,7 +11592,11 @@ function closePlayer(){
   if(!a) return;
   if(kindOf(a)==='read'){ settleRead(a,ep,elapsed,from); return; }
   if(ep<=(a.ep||0)) return;                            // only if it advances
-  if(elapsed>=AUTO_MARK_MS) autoMarkWatched(id,pvReached(a,ep,elapsed));
+  // Time-based catch-up exists because nothing could see the video. If something
+  // could, it has already banked what was actually watched — crediting extra
+  // episodes on top of that would invent progress.
+  if(realPlaybackLive()){ if(ep>(a.ep||0)&&_rp.d&&_rp.t/_rp.d>=RP_DONE)autoMarkWatched(id,ep); }
+  else if(elapsed>=AUTO_MARK_MS) autoMarkWatched(id,pvReached(a,ep,elapsed));
   else if(elapsed>=PEEK_MS) markWatchedPrompt(id,ep,a.title);
   // < PEEK_MS: they barely opened it — say nothing
 }

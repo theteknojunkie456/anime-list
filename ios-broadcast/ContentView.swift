@@ -39,6 +39,17 @@ struct WatchListShell: UIViewRepresentable {
         cfg.websiteDataStore = .default()                      // persist login/list across launches
         let ucc = WKUserContentController()
         ucc.add(context.coordinator, name: "wl")
+        // Injected into EVERY frame, cross-origin ones included. That is the whole
+        // point: a page cannot read another origin's <video>, but the app hosting
+        // the web view can put a script inside that origin, and from in there the
+        // element is just a local DOM node. This is what turns progress from a
+        // guess into a measurement — the web build has no equivalent and cannot.
+        //
+        // It reports position only, only while something is actually playing, and
+        // only from frames that have media, so the main frame stays silent.
+        ucc.addUserScript(WKUserScript(source: Self.playbackProbe,
+                                       injectionTime: .atDocumentEnd,
+                                       forMainFrameOnly: false))
         cfg.userContentController = ucc
 
         let wv = WKWebView(frame: .zero, configuration: cfg)
@@ -66,6 +77,37 @@ struct WatchListShell: UIViewRepresentable {
     }
 
     func updateUIView(_ uiView: WKWebView, context: Context) {}
+
+    /// Runs inside every frame. Finds the largest playing media element, and
+    /// reports where it is every few seconds. Nothing else is read and nothing is
+    /// written — this sits inside other people's sites and should behave like it.
+    static let playbackProbe = #"""
+    (function () {
+      if (window.__wlProbe) return; window.__wlProbe = 1;
+      function pick() {
+        var best = null, area = 0;
+        var els = document.querySelectorAll('video');
+        for (var i = 0; i < els.length; i++) {
+          var v = els[i];
+          if (v.paused || v.ended || !isFinite(v.duration) || v.duration <= 60) continue;
+          var a = (v.clientWidth || 0) * (v.clientHeight || 0);
+          if (a >= area) { area = a; best = v; }
+        }
+        return best;
+      }
+      function tick() {
+        try {
+          var v = pick(); if (!v) return;
+          window.webkit.messageHandlers.wl.postMessage({
+            type: 'play', t: v.currentTime, d: v.duration, paused: !!v.paused
+          });
+        } catch (e) {}
+      }
+      setInterval(tick, 5000);
+      document.addEventListener('play', tick, true);
+      document.addEventListener('pause', tick, true);
+    })();
+    """#
 
     final class Coordinator: NSObject, WKScriptMessageHandler, WKNavigationDelegate, WKUIDelegate {
         // Let the web app use the mic (voice chat + the embedded Jitsi call). Without a
@@ -136,7 +178,33 @@ struct WatchListShell: UIViewRepresentable {
 
         func userContentController(_ ucc: WKUserContentController, didReceive msg: WKScriptMessage) {
             guard let body = msg.body as? [String: Any] else { return }
-            switch body["type"] as? String ?? "" {
+            let kind = body["type"] as? String ?? ""
+
+            // A message handler is reachable from EVERY frame, and this app frames
+            // third-party streaming sites by design. Without this check any of them
+            // could have called savepw, broadcast or openurl — writing the Keychain,
+            // starting a screen broadcast, or opening a URL of their choosing. Only
+            // 'play' is expected from a subframe; everything else must come from the
+            // app's own page.
+            if kind != "play" && !msg.frameInfo.isMainFrame {
+                NSLog("WatchList: REFUSED '%@' from a subframe (%@)", kind,
+                      msg.frameInfo.securityOrigin.host)
+                return
+            }
+            if kind == "play" {
+                guard let t = body["t"] as? Double, let d = body["d"] as? Double,
+                      t.isFinite, d.isFinite, d > 60, t >= 0, t <= d + 1 else { return }
+                let paused = (body["paused"] as? Bool) ?? false
+                // Hand it to the app's own page, which is where progress lives.
+                let js = String(format: "window.wlNativePlayback&&window.wlNativePlayback({t:%f,d:%f,paused:%@})",
+                                t, d, paused ? "true" : "false")
+                DispatchQueue.main.async { [weak self] in
+                    self?.web?.evaluateJavaScript(js, in: nil,
+                                                  in: .page, completionHandler: nil)
+                }
+                return
+            }
+            switch kind {
             case "code":
                 let c = (body["code"] as? String ?? "").uppercased(); if !c.isEmpty { AppGroup.partyCode = c }
             case "broadcast":

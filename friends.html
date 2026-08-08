@@ -12577,7 +12577,57 @@ function titleLooksRight(candidate,typed){
   }
   return false;
 }
-function coverNeedy(){return anime.filter(a=>!a.adultChk||(!a.img&&!a.imgTried)||(!a.eps&&!a.detTried)||(!a.banner&&!a.bannerTried)||(!a.aniScore&&!a.scoreTried)||(!a.aniId&&!a.idTried)||(kindOf(a)!=='read'&&a.aniId&&!a.seqTried)||airingNeedy(a));}
+function coverNeedy(){return anime.filter(a=>!a.adultChk||(!a.img&&!a.imgTried)||(!a.eps&&!a.detTried)||(!a.banner&&!a.bannerTried)||(!a.aniScore&&!a.scoreTried)||(!a.aniId&&!a.idTried)||airingNeedy(a));}
+// Sequels get their OWN pass, deliberately, and a much smaller batch.
+//
+// `relations` is expensive: AniList scores a query for complexity and caps it at
+// 500. One title with relations costs ~36 against ~20 without, so folding it
+// into the 25-wide enrichment batch took that request to 900 and AniList
+// rejected the WHOLE thing — covers, scores and air times included, for every
+// list longer than about thirteen titles. Measured, not guessed: the batch
+// returned "Max query complexity should be 500 but got 900".
+//
+// Ten at a time lands around 360. It runs after covers, so nothing visible waits
+// on it, and a failure costs a marker rather than the artwork.
+const SEQ_BATCH=10;
+function seqNeedy(){return anime.filter(a=>kindOf(a)!=='read'&&a.aniId&&!a.seqTried);}
+let seqRunning=false;
+async function fetchSequels(){
+  if(seqRunning)return; seqRunning=true;
+  try{
+    let fails=0;
+    while(true){
+      const batch=seqNeedy().slice(0,SEQ_BATCH);
+      if(!batch.length)break;
+      const q='{'+batch.map((a,i)=>`s${i}:Media(id:${a.aniId},type:ANIME){relations{edges{relationType node{id type isAdult genres format status episodes seasonYear title{romaji english} coverImage{large}}}}}`).join(' ')+'}';
+      let data=null;
+      try{
+        const r=await fetch('https://graphql.anilist.co',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({query:q})});
+        if(r.status===429){await pause(4000);continue;}
+        const body=await r.json().catch(()=>null);
+        data=body&&body.data;
+      }catch(e){}
+      if(!data){ if(++fails>=3)break; await pause(2500); continue; }
+      fails=0;
+      batch.forEach((a,i)=>{
+        const m=data['s'+i];
+        a.seqTried=1;                       // stamp either way, or this retries forever
+        if(!m)return;
+        try{
+          const eds=(m.relations&&m.relations.edges)||[];
+          const e=eds.find(x=>x&&x.relationType==='SEQUEL'&&x.node&&x.node.type==='ANIME'&&!isAdultMedia(x.node));
+          if(e){const n=e.node;
+            a.nextUp={id:n.id,title:(n.title&&(n.title.english||n.title.romaji))||'Next season',
+              img:(n.coverImage&&n.coverImage.large)||'',soon:n.status==='NOT_YET_RELEASED',
+              eps:n.episodes||0,year:n.seasonYear||0};
+          }else if(a.nextUp)delete a.nextUp;  // AniList no longer lists one
+        }catch(e){}
+      });
+      save();render();
+      await pause(700);
+    }
+  }finally{seqRunning=false;}
+}
 async function fetchCovers(){
   if(coverRunning)return;coverRunning=true;
   let netFails=0,adultRemoved=0,batchSize=25;
@@ -12600,11 +12650,7 @@ async function fetchCovers(){
         // lets anything in the app rank by "is this actually good".
         const fields=read
           ?'id title{romaji english native} coverImage{large extraLarge color} bannerImage chapters volumes genres isAdult averageScore'
-          // relations rides along here rather than costing its own request: the
-          // "there's a next season" marker is wanted on every card, and firing a
-          // per-title lookup for a 108-title list to find that out would be absurd
-          // when this batch is already asking AniList about the same media.
-          :'id title{romaji english native} coverImage{large extraLarge color} bannerImage episodes duration genres isAdult averageScore nextAiringEpisode{airingAt episode} relations{edges{relationType node{id type isAdult genres format status episodes seasonYear title{romaji english} coverImage{large}}}}';
+          :'id title{romaji english native} coverImage{large extraLarge color} bannerImage episodes duration genres isAdult averageScore nextAiringEpisode{airingAt episode}';
         // Known season? Refresh that EXACT media by id — a title search would drift to
         // whatever AniList ranks first (often a different, currently-airing season),
         // pinning the wrong air date. Only unknown items fall back to a title search.
@@ -12681,20 +12727,6 @@ async function fetchCovers(){
             const na=m.nextAiringEpisode;
             if(na&&na.airingAt){a.airAt=na.airingAt;a.airEp=na.episode;}
             else{a.airAt=0;a.airEp=0;}
-            // …and whether there's a season after this one. Stored on the item so
-            // the cover card can say so without asking anything, on every card,
-            // not only the ones you happen to have finished.
-            try{
-              const eds=(m.relations&&m.relations.edges)||[];
-              const e=eds.find(x=>x&&x.relationType==='SEQUEL'&&x.node&&x.node.type==='ANIME'&&!isAdultMedia(x.node));
-              if(e){
-                const n=e.node;
-                a.nextUp={id:n.id,title:(n.title&&(n.title.english||n.title.romaji))||'Next season',
-                  img:(n.coverImage&&n.coverImage.large)||'',soon:n.status==='NOT_YET_RELEASED',
-                  eps:n.episodes||0,year:n.seasonYear||0};
-              }else if(a.nextUp)delete a.nextUp;   // AniList no longer lists one
-            }catch(e){}
-            a.seqTried=1;
           }
         }
         if(!m){a.nameFix=1;a.detTried=true;a.bannerTried=true;if(!a.img)a.imgTried=true;}   // no match on the title as typed — try harder below
@@ -13565,7 +13597,7 @@ try{if(_SR&&window.isSecureContext){const m=document.getElementById('chatMic');i
 
 // ─── INIT ───────────────────────────────────────────────────────────────────
 try{hydrateIcons();}catch{}
-load();try{_hadItemsAtLoad=anime.length>0;}catch{}try{setTimeout(restoreFromIDB,0);}catch{}try{setTimeout(()=>{try{ensureBackup();}catch(e){}},1200);}catch{}try{purgeAdult();}catch{}try{if(!appLocked&&dedupeAnime())writeLocal();}catch{}loadTheme();try{seedHiddenDefaults();}catch{}try{_restoreUpd();}catch{}render();try{nativeScheduleNotifs();}catch{}try{hydrateImages();}catch{}
+load();try{_hadItemsAtLoad=anime.length>0;}catch{}try{setTimeout(()=>{try{fetchSequels();}catch(e){}},6000);}catch{}try{setTimeout(restoreFromIDB,0);}catch{}try{setTimeout(()=>{try{ensureBackup();}catch(e){}},1200);}catch{}try{purgeAdult();}catch{}try{if(!appLocked&&dedupeAnime())writeLocal();}catch{}loadTheme();try{seedHiddenDefaults();}catch{}try{_restoreUpd();}catch{}render();try{nativeScheduleNotifs();}catch{}try{hydrateImages();}catch{}
 // After the list is up — and after the tutorial has had its chance to claim a
 // new install — tell returning users what changed in the update they just got.
 try{setTimeout(maybeShowWhatsNew,900);}catch{}

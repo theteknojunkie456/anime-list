@@ -4026,8 +4026,37 @@ async function syncPush(){
     // v3 wrapper: the (maybe-encrypted) list + a plaintext extra bundle (themes + friends).
     const payload={v:3,list,extra:collectExtra()};
     const r=await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({op:'push',code,data:payload})});
-    const d=await r.json();if(d&&d.ok)setSyncAt(d.updatedAt);
-  }catch{}
+    const d=await r.json();
+    if(d&&d.ok){setSyncAt(d.updatedAt);notePushOK();}
+    else notePushFail((d&&(d.error||d.ignored))||('HTTP '+r.status));
+  }catch(e){notePushFail((e&&e.message)||'no connection');}
+}
+// Every push failure used to be swallowed by an empty catch. That was survivable
+// while backup was opt-in and advisory. It is not now that it is the default
+// safety net: a backup that has quietly failed for a week is worse than no
+// backup, because the settings row keeps saying "restorable on any device" and
+// nobody goes looking until the device is gone and the answer matters.
+const PUSH_FAIL='pushfail_'+LSKEY;
+function pushState(){try{return JSON.parse(localStorage.getItem(PUSH_FAIL)||'null')||{n:0,at:0,why:''};}catch{return{n:0,at:0,why:''};}}
+function setPushState(v){try{localStorage.setItem(PUSH_FAIL,JSON.stringify(v));}catch{}}
+function notePushOK(){if(pushState().n)setPushState({n:0,at:0,why:''});}
+function notePushFail(why){
+  const prev=pushState();
+  const next={n:(prev.n||0)+1,at:Date.now(),why:String(why||'').slice(0,140)};
+  setPushState(next);
+  // One failure is a tunnel or a flaky minute. Three in a row is a fact worth
+  // recording where they can copy it, and worth saying out loud in Settings.
+  if(next.n===3||(next.n>3&&next.n%10===0)){try{logProblem('backup','cloud backup has failed '+next.n+' times in a row',next.why);}catch(e){}}
+}
+function backupFailing(){return pushState().n>=3;}
+// What the settings row actually knows, rather than what it hopes.
+function backupStatusLine(){
+  if(!syncCode())return backupDeclined()?'Off — this list exists only on this device':'Off — not backing up yet';
+  const st=pushState();
+  if(st.n>=3)return 'On, but the last '+st.n+' backups failed — tap to check';
+  const at=syncAt();
+  if(!at)return 'On — nothing has reached the cloud yet';
+  return 'On — backed up '+relTime(at);
 }
 async function syncPull(){
   const code=syncCode();if(!code||!SYNC_URL)return null;
@@ -4038,6 +4067,11 @@ async function syncOnOpen(){
   if(!syncCode()||appLocked)return;
   try{
     const res=await syncPull();
+    // A code whose cloud copy is empty is not a backup, however healthy it looks
+    // in Settings. That happens after a mint that never got a successful push,
+    // or if the stored copy is lost at the far end. Push now rather than wait for
+    // the next edit, which might be after the device is gone.
+    if(res&&!res.data&&realList().length&&!listUntrusted){syncPush();return;}
     if(res&&res.data&&res.updatedAt>syncAt()){ // another device wrote a newer copy
       const {inner,extra}=unwrapSync(res.data);
       if(extra)applyExtra(extra);              // themes + friends are plaintext — apply even if the list stays locked
@@ -8492,8 +8526,8 @@ function renderSettings(){
   const backedUp=!!syncCode();
   const rows=[
     {ic:'bulb',     h:'How WatchList works', p:'A quick tour — and how not to lose your list', go:'openTutorial()'},
-    {ic:'cloud',    h:'Cloud backup',        p:backedUp?'On — restorable on any device':'Off — this list exists only on this device',
-     go:"openSheet('backupSheet')", warn:!backedUp},
+    {ic:'cloud',    h:'Cloud backup',        p:backupStatusLine(),
+     go:"openSheet('backupSheet')", warn:!backedUp||backupFailing()},
     {ic:'lock',     h:'Password',            p:encEnabled()?'On — your list is encrypted':'Off', go:"openSheet('securitySheet')"},
     {ic:'bell',     h:'Notifications',       p:notifyOn()?'On — you\'ll be told when an episode airs':'Off', go:'openNotifySheet()'},
     {ic:'sparkles', h:'AI & chat key',       p:getKey()?'On — '+(keyProvider(getKey())||'key')+' connected':'Off — add a free key to unlock chat', go:"openSheet('aiSheet')"},
@@ -8528,6 +8562,14 @@ function nudgeOff(){try{return localStorage.getItem(NUDGE_FLAG)==='1';}catch{ret
 function dismissNudge(){try{localStorage.setItem(NUDGE_FLAG,'1');}catch{}renderHome();}
 function shouldNudge(){return anime.length>=5&&!syncCode()&&backupDeclined()&&!nudgeOff();}
 function nudgeHTML(){
+  // A backup that is failing is the one thing here worth interrupting for, and
+  // the useful answer is not "we'll retry" — it's a copy of the list they can
+  // hold right now, which Export gives them without any network at all.
+  if(backupFailing()&&anime.length)
+    return`<div class="nudge">${icon('cloud')}
+      <div class="nudge-t">Cloud backup isn't going through. Copy your list out so you have it either way.</div>
+      <button class="nudge-go" onclick="openSheet('importSheet')">Export</button>
+    </div>`;
   // Backing up automatically is only half of it. The code is what restores the
   // list on a new device, and a code nobody has ever seen restores nothing — so
   // say it once, plainly, until they've actually looked at it.

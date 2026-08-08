@@ -505,10 +505,7 @@ body.first-paint .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards
 .pcard-badge .ico{display:none;}
 .pcard-badge{max-width:calc(100% - 14px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .pcard-sub{font-size:10.5px;font-weight:500;color:var(--t3);margin-top:3px;font-variant-numeric:tabular-nums;}
-/* "You finished this and there's more" — said on the cover, permanently, instead
-   of in a sheet that appears once and is gone. */
-.pcard-next{display:flex;align-items:center;gap:4px;margin-top:3px;font-size:10.5px;font-weight:700;color:var(--a2);}
-.pcard-next .ico{width:11px;height:11px;}
+.pcard-sub{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .pcard-fav{position:absolute;top:5px;right:7px;font-size:13px;text-shadow:0 1px 6px rgba(0,0,0,0.6);}
 .pcard-seas{position:absolute;bottom:7px;right:7px;display:inline-flex;align-items:center;gap:3px;font-size:9px;font-weight:800;padding:3px 7px 3px 6px;border-radius:99px;background:rgba(10,10,14,0.82);color:#fff;box-shadow:0 2px 8px rgba(0,0,0,0.4);}
 .pcard-seas .ico{width:11px;height:11px;}
@@ -779,15 +776,13 @@ body.first-paint .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards
 .dt-season-t{font-family:var(--fd);font-size:14px;font-weight:700;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .dt-season-s{font-size:11.5px;color:var(--t3);margin-top:2px;}
 .dt-season .ico{width:16px;height:16px;color:var(--t3);flex-shrink:0;}
-.dt-next{display:flex;align-items:center;gap:11px;margin-top:12px;padding:10px 11px;border-radius:14px;
-  background:color-mix(in srgb,var(--a) 11%,var(--bg3));border:1px solid color-mix(in srgb,var(--a) 28%,transparent);}
-.dt-next img,.dt-next-ph{width:38px;height:53px;border-radius:8px;object-fit:cover;flex-shrink:0;background:var(--bg4);}
-.dt-next-info{flex:1;min-width:0;}
-.dt-next-k{font-size:10.5px;font-weight:700;color:var(--a2);}
-.dt-next-t{font-family:var(--fd);font-size:13.5px;font-weight:700;color:var(--t1);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.dt-next-go{flex:0 0 auto;padding:8px 13px;border-radius:99px;background:var(--a);color:var(--aFg);font-size:12px;font-weight:800;}
-.dt-next-x{flex:0 0 auto;display:flex;color:var(--t3);padding:4px;}
-.dt-next-x .ico{width:15px;height:15px;}
+.dt-next{display:flex;align-items:center;gap:9px;margin:12px 18px 0;padding:9px 10px 9px 13px;border-radius:13px;
+  background:var(--bg3);border:1px solid var(--bn2);}
+.dt-next-k{flex:0 0 auto;font-size:11px;font-weight:700;color:var(--t3);white-space:nowrap;}
+.dt-next-t{flex:1;min-width:0;font-size:12.5px;font-weight:600;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.dt-next-go{flex:0 0 auto;padding:7px 13px;border-radius:99px;background:var(--a);color:var(--aFg);font-size:11.5px;font-weight:800;}
+.dt-next-x{flex:0 0 auto;display:flex;color:var(--t3);padding:3px;}
+.dt-next-x .ico{width:14px;height:14px;}
 .dt-season-here{font-size:11px;font-weight:800;color:var(--a2);flex-shrink:0;}
 /* Marks a row that will put itself on your list when tapped, so the difference
    between "open this" and "add and open this" is visible before you commit. */
@@ -5244,7 +5239,12 @@ function posterCard(a,nSeas){
   const airHTML=air?`<div class="pcard-air">${icon('calendar')} ${air.when}</div>`:'';
   const seas=multi?`<span class="pcard-seas">${icon('layers')}${nSeas}</span>`:'';
   const twMins=kindOf(a)==='watch'?totalWatchMins(a):0;
-  const durLine=twMins?`<div class="pcard-sub">${fmtWatch(twMins)}</div>`:'';
+  // On its own row, in accent, with an icon, this wrapped to two lines and shouted
+  // louder than the title — on every card in a scrolling list. It's a clause on
+  // the line that already exists instead: no new row, no colour, no wrap.
+  const _nx=nextUpOf(a);
+  const durBits=[twMins?fmtWatch(twMins):'',_nx?(_nx.soon?'S2 soon':'S2 out'):''].filter(Boolean);
+  const durLine=durBits.length?`<div class="pcard-sub">${durBits.join(' \u00b7 ')}</div>`:'';
   return`<div class="pcard${recSel&&recSel.has(a.id)?' sel':''}" onclick="pcTap('${a.id}',event)">
     <div class="pcard-wrap">
       ${img}
@@ -5254,7 +5254,6 @@ function posterCard(a,nSeas){
     </div>
     ${bar}
     <div class="pcard-title">${schEsc(title)}</div>
-    ${(()=>{const n=nextUpOf(a);return n?`<div class="pcard-next">${icon('layers')} ${n.soon?'Next season coming':'Next season ready'}</div>`:'';})()}
     ${durLine}
     ${airHTML}
   </div>`;
@@ -5664,19 +5663,19 @@ function renderDetail(){
         <div class="dt-meta">${[a.eps, kindOf(a)==='read'?a.time:''].filter(Boolean).join(' · ')}</div>
         ${(()=>{if(kindOf(a)!=='watch')return '';const tw=totalWatchMins(a),fm=filmMins(a);if(!tw)return '';return `<div class="dt-runtime">${icon('clock')} <b>${fmtWatch(tw)}</b> to watch${a.epTotal?` all ${a.epTotal} episodes`:''}${fm?`<span class="dt-runtime-films"> + ${fmtWatch(fm)} of films</span>`:''}</div>`;})()}
         ${(()=>{const air=airingInfo(a);return air?`<div class="dt-air">${icon('calendar')} Ep ${air.ep} · ${air.out?'out now':'airs '+air.when}</div>`:'';})()}
-        ${(()=>{const n=nextUpOf(a);if(!n)return'';
-          return `<div class="dt-next">
-            ${n.img?`<img src="${escH(n.img)}" alt="">`:'<div class="dt-next-ph"></div>'}
-            <div class="dt-next-info">
-              <div class="dt-next-k">${n.soon?'Next season — not out yet':'Next season'}</div>
-              <div class="dt-next-t">${schEsc(n.title)}</div>
-            </div>
-            <button class="dt-next-go" onclick="addNextUp('${escH(a.id)}',event)">${n.soon?'Plan it':'Watch it'}</button>
-            <button class="dt-next-x" onclick="clearNextUp('${escH(a.id)}',event)" aria-label="Not interested">${icon('x')}</button>
-          </div>`;})()}
         <button class="dt-fav${a.fav?' on':''}" onclick="toggleFav()">${a.fav?icon('heart','fill')+' Favorited':icon('heart')+' Favorite'}</button>
       </div>
     </div>
+    ${(()=>{const n=nextUpOf(a);if(!n)return'';
+      // Beside the poster this had about 140px to work with, so "Next season"
+      // wrapped and the title clipped to "Ove…". Full width, one line, below the
+      // header — the same information with room to be read.
+      return `<div class="dt-next">
+        <span class="dt-next-k">${n.soon?'Next season, not out yet':'Next season'}</span>
+        <span class="dt-next-t">${schEsc(n.title)}</span>
+        <button class="dt-next-go" onclick="addNextUp('${escH(a.id)}',event)">${n.soon?'Plan it':'Watch it'}</button>
+        <button class="dt-next-x" onclick="clearNextUp('${escH(a.id)}',event)" aria-label="Not interested">${icon('x')}</button>
+      </div>`;})()}
     ${friendRecBadge(a)}
     ${(kindOf(a)==='watch'&&a.aniId)?`${progHTML}
     <button class="dt-watch" onclick="watchAnime('${a.id}')">${icon('play')} ${(a.ep||0)>0?'Continue Watching':'Start Watching'}</button>

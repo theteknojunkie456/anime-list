@@ -3534,7 +3534,7 @@ function writeLocal(){
     offloadImages().then(()=>{try{const raw=JSON.stringify(_persistList());s.setItem(LSKEY,raw);backupLocal(s,raw);saveWarned=false;}catch(e2){_saveFailed(e2);}});
   }
 }
-function save(){writeLocal();try{ensureBackup();}catch(e){}schedulePush();scheduleNotifyUpdate();}
+function save(){writeLocal();try{ensureBackup();}catch(e){}schedulePush();scheduleNotifyUpdate();try{publishNow();}catch(e){}}
 // The other half of the mirror. localStorage is read synchronously at boot and
 // IndexedDB can't be, so this runs just after and only steps in when the local
 // read produced nothing real — an empty list or one that wouldn't parse. It can
@@ -5447,7 +5447,7 @@ function renderHome(){
   // A brand-new user who's started adding still sees the beginner shelf (up top) so
   // they can keep stacking titles — it rides above their small list until dismissed.
   const beg=beginnerShelfActive(isRead);
-  let html=topBanner+(beg?beginnerShelfHTML():'')+(spotlight.length?billboardHTML(spotlight):'')+resumeRailHTML(railItems,isRead)+(isRead?'':airingRailHTML(airingThisWeek()))+quickPickStripHTML(pool,isRead)+friendRecRowHTML();
+  let html=topBanner+(beg?beginnerShelfHTML():'')+(spotlight.length?billboardHTML(spotlight):'')+resumeRailHTML(railItems,isRead)+friendsNowHTML(isRead)+(isRead?'':airingRailHTML(airingThisWeek()))+quickPickStripHTML(pool,isRead)+friendRecRowHTML();
   // each section wears its own status colour (STATUS_META) rather than the one
   // theme accent — the palette already exists, it was just unused outside chips
   // Watch list: no "Watching" row — it's merged into the Continue-watching rail
@@ -9585,6 +9585,90 @@ function pvMarkNext(){
   pvGoTo(a,ep+1);
   toast('Ep '+ep+' watched · now on Ep '+(ep+1));
 }
+// ─── WHAT YOUR FRIENDS ARE ON ───────────────────────────────────────────────
+// The list has been a single-player object: friends could be added, sent a
+// recommendation, or joined in a party, but there was no way to simply see what
+// someone is watching — the thing you'd actually open the app for.
+//
+// What's published is a digest, not the list: up to six in-progress titles and
+// where you are in them. It's keyed by your own friend code, which only you
+// know, and read back only by people who already hold that code — which means
+// you gave it to them. Sharing can be turned off, and turning it off deletes
+// what's up there rather than just hiding it.
+const NOW_OFF='now_off';
+function nowSharing(){try{return localStorage.getItem(NOW_OFF)!=='1';}catch{return true;}}
+function setNowSharing(on){
+  try{on?localStorage.removeItem(NOW_OFF):localStorage.setItem(NOW_OFF,'1');}catch{}
+  publishNow();                       // off → publishes nothing, which deletes it
+  try{renderFriends();}catch(e){}
+  toast(on?'Friends can see what you\u2019re watching':'Hidden — and removed from the cloud');
+}
+function nowDigest(){
+  if(!nowSharing()||appLocked||listUntrusted)return [];
+  return anime.filter(a=>a.status==='watching'&&(a.ep||0)>0)
+    .sort((x,y)=>(y.upd||0)-(x.upd||0)).slice(0,6)
+    .map(a=>({t:a.title,ep:a.ep||0,of:a.epTotal||0,img:/^https:\/\//.test(a.img||'')?a.img:'',ani:a.aniId||0,read:kindOf(a)==='read'}));
+}
+let _nowT=0,_nowLast='';
+function publishNow(){
+  const code=myFriendCode(); if(!code||!SYNC_URL)return;
+  clearTimeout(_nowT);
+  _nowT=setTimeout(async()=>{
+    const items=nowDigest();
+    const sig=JSON.stringify(items);
+    if(sig===_nowLast)return;          // nothing moved — don't spend a request on it
+    _nowLast=sig;
+    try{await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({op:'now_pub',code,items,name:(typeof myFriendName==='function'&&myFriendName())||''})});}catch(e){}
+  },4000);
+}
+let friendsNow={};
+async function pullFriendsNow(){
+  const codes=(friendsList()||[]).map(f=>f.code).filter(Boolean);
+  if(!codes.length||!SYNC_URL)return;
+  try{
+    const r=await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({op:'now_pull',codes})});
+    if(!r.ok)return;
+    const j=await r.json();
+    if(j&&j.now){friendsNow=j.now;try{render();}catch(e){}}
+  }catch(e){}
+}
+// One rail, watch side only, and only when somebody is actually mid-something.
+function friendsNowHTML(isRead){
+  const rows=[];
+  (friendsList()||[]).forEach(f=>{
+    const d=friendsNow[f.code]; if(!d||!Array.isArray(d.items))return;
+    d.items.forEach(it=>{
+      if(!it||!it.t)return;
+      if(!!it.read!==!!isRead)return;
+      rows.push({who:friendDisplay(f.code,d.name),it});
+    });
+  });
+  if(!rows.length)return '';
+  const card=r=>{
+    const it=r.it, ch=((it.t||'?').trim()[0]||'?').toUpperCase().replace(/['"<&]/g,'?');
+    const bg=it.img?`<img class="rz-img" src="${escH(it.img)}" loading="lazy" alt="" onerror="this.remove()">`:`<div class="rz-ph">${ch}</div>`;
+    const at=it.of?`${isRead?'Ch':'Ep'} ${it.ep} of ${it.of}`:`${isRead?'Ch':'Ep'} ${it.ep}`;
+    return `<button class="rz-card" onclick="openFriendWatch(${it.ani||0},'${escH(it.t).replace(/'/g,"\\'")}')">
+      ${bg}<div class="rz-scrim"></div>
+      <div class="rz-meta"><div class="rz-title">${schEsc(it.t)}</div><div class="rz-sub">${schEsc(r.who)} \u00b7 ${at}</div></div>
+    </button>`;
+  };
+  return `<div class="rz-sec"><div class="rz-head">Friends are ${isRead?'reading':'watching'}</div>
+    <div class="rz-scroll">${rows.slice(0,12).map(card).join('')}</div></div>`;
+}
+// Tapping one opens it if you have it, and otherwise adds it the same way the
+// franchise rows do — nothing typed, nothing searched.
+function openFriendWatch(aniId,title){
+  const mine=anime.find(a=>(aniId&&a.aniId===aniId)||(a.title||'').toLowerCase()===String(title||'').toLowerCase());
+  if(mine){openDetail(mine.id);return;}
+  const it=seasonToItem({aniId:aniId||0,malId:0,title:title||'Untitled',img:'',episodes:0,year:0},'plan');
+  anime.unshift(it);
+  try{save();render();}catch(e){}
+  try{fetchCovers();}catch(e){}
+  openDetail(it.id);
+  toast('Added '+(String(title).length>34?String(title).slice(0,34)+'\u2026':title));
+}
 // ─── REAL PLAYBACK POSITION (native shell only) ─────────────────────────────
 // Everything below this in the file infers progress: a navigation after enough
 // dwell, a clock at close. Good inference, but the browser never lets the page
@@ -11010,6 +11094,12 @@ function renderFriends(){
       <input class="ai-prompt-in" id="frAddName" placeholder="Name them (optional)" maxlength="40" style="margin-top:8px" onkeydown="if(event.key==='Enter'){event.preventDefault();doAddFriend();}">
       <button class="parse-btn" onclick="doAddFriend()">Send friend request</button>
       <div class="fr-err" id="frErr"></div>
+      <div class="dt-label" style="margin-top:16px">${icon('play')} What you're watching</div>
+      <p class="ai-desc">Friends see the handful of things you're part-way through, and how far in you are — never your whole list. Turning this off deletes what's already shared.</p>
+      <label class="ct-dk" style="margin-bottom:0">
+        <span>Show friends what I'm watching</span>
+        <span class="ct-tgl"><input type="checkbox" ${nowSharing()?'checked':''} onchange="setNowSharing(this.checked)"><span class="ct-tgl-track"></span></span>
+      </label>
     </details>
     ${sentRecsHTML()}`;
 }
@@ -13856,7 +13946,8 @@ try{window.addEventListener('resize',()=>{
   const now=window.innerWidth>window.innerHeight;
   if(now!==_wasLandscape){_wasLandscape=now;_freezeMotion();}
 });}catch(e){}
-document.addEventListener('visibilitychange',()=>{if(!document.hidden)syncOnOpen();});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden){syncOnOpen();try{pullFriendsNow();}catch(e){}}});
+try{setTimeout(()=>{try{pullFriendsNow();publishNow();}catch(e){}},3000);}catch(e){}
 try{window.addEventListener('online',()=>syncOnOpen());}catch(e){}   // cloud sync recovers the moment the network is back
 
 /* ═══════════════════════════════════════════════════════════════════════════

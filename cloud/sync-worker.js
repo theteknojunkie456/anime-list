@@ -353,6 +353,46 @@ export default {
       return json({ reqs: list }, 200, cors);
     }
 
+    // ── "what are they watching" ─────────────────────────────────────────────
+    // A tiny digest published under your own friend code, and read back by the
+    // people you've added. Deliberately NOT the list: a handful of in-progress
+    // titles and where you are in them, nothing else, so this can never become a
+    // second copy of the library sitting under a guessable key.
+    //
+    // Publishing is keyed by your own code, which only you know. Reading takes a
+    // set of codes — you can only read someone whose code you already hold, and
+    // holding it means they gave it to you.
+    if (op === 'now_pub') {
+      const code = String(body.code || '');
+      if (!/^[A-Za-z0-9]{10,64}$/.test(code)) return json({ error: 'bad code' }, 400, cors);
+      const raw = Array.isArray(body.items) ? body.items : [];
+      const items = raw.slice(0, 6).map((i) => ({
+        t: String((i && i.t) || '').slice(0, 120),
+        ep: Math.max(0, Math.min(9999, parseInt((i && i.ep) || 0, 10) || 0)),
+        of: Math.max(0, Math.min(9999, parseInt((i && i.of) || 0, 10) || 0)),
+        img: /^https:\/\//.test(String((i && i.img) || '')) ? String(i.img).slice(0, 300) : '',
+        ani: Math.max(0, Math.min(99999999, parseInt((i && i.ani) || 0, 10) || 0)),
+        read: !!(i && i.read),
+        at: Date.now(),
+      })).filter((i) => i.t);
+      const name = String((body.name || '')).slice(0, 40);
+      if (!items.length) { await env.LISTS.delete('now:' + code); return json({ ok: true, cleared: true }, 200, cors); }
+      await env.LISTS.put('now:' + code, JSON.stringify({ items, name, at: Date.now() }),
+        { expirationTtl: 60 * 60 * 24 * 14 });    // stale presence is worse than none
+      return json({ ok: true, n: items.length }, 200, cors);
+    }
+
+    if (op === 'now_pull') {
+      const codes = (Array.isArray(body.codes) ? body.codes : [])
+        .filter((c) => typeof c === 'string' && /^[A-Za-z0-9]{10,64}$/.test(c))
+        .slice(0, 40);
+      const out = {};
+      await Promise.all(codes.map(async (c) => {
+        try { const s = await env.LISTS.get('now:' + c); if (s) out[c] = JSON.parse(s); } catch {}
+      }));
+      return json({ ok: true, now: out }, 200, cors);
+    }
+
     return json({ error: 'bad op' }, 400, cors);
   },
 };

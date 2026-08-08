@@ -12595,20 +12595,32 @@ let seqRunning=false;
 async function fetchSequels(){
   if(seqRunning)return; seqRunning=true;
   try{
-    let fails=0;
+    let fails=0,size=SEQ_BATCH;
     while(true){
-      const batch=seqNeedy().slice(0,SEQ_BATCH);
+      const batch=seqNeedy().slice(0,size);
       if(!batch.length)break;
       const q='{'+batch.map((a,i)=>`s${i}:Media(id:${a.aniId},type:ANIME){relations{edges{relationType node{id type isAdult genres format status episodes seasonYear title{romaji english} coverImage{large}}}}}`).join(' ')+'}';
-      let data=null;
+      let data=null,allNull=false;
       try{
         const r=await fetch('https://graphql.anilist.co',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({query:q})});
         if(r.status===429){await pause(4000);continue;}
         const body=await r.json().catch(()=>null);
         data=body&&body.data;
+        if(data&&!Object.values(data).some(v=>v!=null)){allNull=true;data=null;}
       }catch(e){}
+      // Same all-or-nothing behaviour the covers pass already handles: ONE id
+      // AniList doesn't recognise — a hand-added title, a deleted entry — 404s
+      // the entire request with every alias null. Without this, a single bad id
+      // stamped its nine innocent neighbours as "has no sequel" and they were
+      // never asked about again. Halve until the bad one is alone, stamp it,
+      // carry on.
+      if(allNull){
+        if(size>1){size=Math.max(1,Math.floor(size/2));await pause(400);continue;}
+        if(batch[0])batch[0].seqTried=1;
+        size=SEQ_BATCH;save();await pause(400);continue;
+      }
       if(!data){ if(++fails>=3)break; await pause(2500); continue; }
-      fails=0;
+      fails=0;size=SEQ_BATCH;
       batch.forEach((a,i)=>{
         const m=data['s'+i];
         a.seqTried=1;                       // stamp either way, or this retries forever

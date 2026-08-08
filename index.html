@@ -4781,7 +4781,7 @@ function resumeRailHTML(items,isRead){
     return `<button class="rz-card" onclick="${isRead?`readManga('${a.id}',${next})`:`resumeWatch('${a.id}')`}">
       ${bg}<div class="rz-scrim"></div>
       <div class="rz-play">${icon(isRead?'book':'play')}</div>
-      <div class="rz-meta"><div class="rz-title">${schEsc(a.title)}</div>${known?`<div class="rz-sub">${isRead?'Chapter':'Episode'} ${next}</div>`:''}</div>
+      <div class="rz-meta"><div class="rz-title">${schEsc(a.title)}</div>${known?`<div class="rz-sub">${isRead?'Chapter':'Episode'} ${next}${(!isRead&&resumeAt(a))?` \u00b7 ${fmtPos(resumeAt(a))} in`:''}</div>`:''}</div>
       ${showBar?`<div class="rz-bar"><div class="rz-fill" style="width:${p}%"></div></div>`:''}
     </button>`;
   };
@@ -5602,7 +5602,8 @@ function renderDetail(){
   const statusBtns=Object.keys(STATUS_META).map(s=>
     `<button class="dpick${a.status===s?' on-'+s:''}" onclick="setDetailStatus('${s}')">${STATUS_META[s].icon} ${stLabel(s)}</button>`).join('');
   const p=prog(a);
-  const progHTML=`<div class="dt-label">${read?'Reading progress':'Episode progress'}</div>
+  const _res=resumeAt(a);
+  const progHTML=`<div class="dt-label">${read?'Reading progress':'Episode progress'}${_res?`<span style="margin-left:auto;font-family:var(--fb);font-size:11.5px;color:var(--a2);text-transform:none;letter-spacing:0">Ep ${a.posEp} \u00b7 ${fmtPos(_res)} in</span>`:''}</div>
     <div class="prog-row">
       <button class="prog-btn" onclick="bumpEp(-1)">−</button>
       <div class="prog-mid">
@@ -5678,7 +5679,7 @@ function renderDetail(){
       </div>`;})()}
     ${friendRecBadge(a)}
     ${(kindOf(a)==='watch'&&a.aniId)?`${progHTML}
-    <button class="dt-watch" onclick="watchAnime('${a.id}')">${icon('play')} ${(a.ep||0)>0?'Continue Watching':'Start Watching'}</button>
+    <button class="dt-watch" onclick="watchAnime('${a.id}')">${icon('play')} ${_res?`Resume Ep ${a.posEp} at ${fmtPos(_res)}`:((a.ep||0)>0?'Continue Watching':'Start Watching')}</button>
     ${titleWatchPickerHTML(a)}
     <button class="dt-pin-toggle" onclick="togglePin()">${icon('external')} ${a.srcUrl?'Advanced: edit the direct link':'Advanced: paste a direct episode link'}</button>
     <div id="dtPin" style="display:none">
@@ -9129,6 +9130,14 @@ async function watchAnime(id,epArg){
   const f=document.getElementById('pvFrame');
   document.getElementById('playerView').classList.add('on');
   try{document.documentElement.classList.add('watching');}catch(e){}
+  // Hand the resume point to the shell BEFORE the frame loads, so the script it
+  // injects into the site carries the position and can seek the moment the
+  // player has metadata. Nothing here touches the site: the app can't reach a
+  // cross-origin player, only the shell that owns the web view can.
+  try{
+    if(typeof IS_NATIVE!=='undefined'&&IS_NATIVE)
+      window.webkit.messageHandlers.wl.postMessage({type:'resume',t:(a.pos&&a.posEp===ep)?a.pos:0});
+  }catch(e){}
   // binge controls light up only when the source can address a specific episode
   pvCanNav=!!ep&&/\{ep(isode)?\}/i.test(src);
   renderPvNav(a);
@@ -9597,7 +9606,23 @@ function pvMarkNext(){
 // the heuristics stand down rather than double-counting.
 //
 // The web build never receives these calls and loses nothing.
-let _rp={at:0,t:0,d:0,paused:true,ep:0};
+let _rp={at:0,t:0,d:0,paused:true,ep:0}, _posDirty=false;
+// Position moves every few seconds; writing on every report would thrash storage
+// and the cloud. Flush on a slow timer, and whenever the player closes.
+function flushPos(){ if(!_posDirty)return; _posDirty=false; try{save();}catch(e){} }
+try{setInterval(()=>{try{flushPos();}catch(e){}},30000);}catch(e){}
+function fmtPos(sec){
+  sec=Math.max(0,Math.round(sec||0));
+  const m=Math.floor(sec/60),ss=sec%60;
+  return m>=60?`${Math.floor(m/60)}h ${m%60}m`:`${m}:${String(ss).padStart(2,'0')}`;
+}
+// A stored position only means anything for the episode it was taken on, which
+// is the next unwatched one. Once you've moved past it, it's history.
+function resumeAt(a){
+  if(!a||kindOf(a)!=='watch'||!a.pos||!a.posEp)return 0;
+  if(a.posEp!==((a.ep||0)+1))return 0;
+  return a.pos;
+}
 const RP_FRESH_MS=45000;                 // no report in this long → assume it stopped
 const RP_DONE=0.85;                      // 85% of runtime = watched; clears credits
 function realPlaybackLive(){return !!_rp.at&&(Date.now()-_rp.at)<RP_FRESH_MS;}
@@ -9611,6 +9636,16 @@ window.wlNativePlayback=function(info){
     if(!pvReturnId||!pvWatchEp)return;
     const a=anime.find(x=>x.id===pvReturnId);
     if(!a||kindOf(a)!=='watch')return;
+    // Where you actually got to, kept on the item so it survives the app being
+    // killed and rides the ordinary sync to your other devices. Only mid-episode
+    // is worth keeping: the first minute is titles, and the last stretch means
+    // you finished, which the episode number already records.
+    if(t>60&&t<d*RP_DONE){
+      if(Math.abs((a.pos||0)-t)>15||a.posEp!==pvWatchEp)_posDirty=true;
+      a.pos=Math.round(t);a.posOf=Math.round(d);a.posEp=pvWatchEp;a.posAt=Date.now();
+    }else if(a.pos&&a.posEp===pvWatchEp&&t>=d*RP_DONE){
+      delete a.pos;delete a.posOf;delete a.posEp;delete a.posAt;_posDirty=true;
+    }
     const total=a.epTotal||0;
     if(t/d<RP_DONE)return;
     if(pvWatchEp<=(a.ep||0))return;                 // already banked
@@ -11609,6 +11644,7 @@ function closePlayer(){
   partyInSession=false;hidePauseOverlay();try{renderPvHostBar();}catch{}
   const v=document.getElementById('playerView'); if(v)v.classList.remove('on');
   try{document.documentElement.classList.remove('watching');}catch(e){}
+  try{flushPos();}catch(e){}
   flushRender();   // pay for everything the session deferred, once, now it's visible
   const f=document.getElementById('pvFrame'); if(f)f.src='about:blank';
   const id=pvReturnId, ep=pvWatchEp, elapsed=pvOpenTime?Date.now()-pvOpenTime:0;

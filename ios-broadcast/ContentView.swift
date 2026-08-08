@@ -47,9 +47,10 @@ struct WatchListShell: UIViewRepresentable {
         //
         // It reports position only, only while something is actually playing, and
         // only from frames that have media, so the main frame stays silent.
-        ucc.addUserScript(WKUserScript(source: Self.playbackProbe,
+        ucc.addUserScript(WKUserScript(source: Self.probeSource(resumeAt: 0),
                                        injectionTime: .atDocumentEnd,
                                        forMainFrameOnly: false))
+        context.coordinator.ucc = ucc
         cfg.userContentController = ucc
 
         let wv = WKWebView(frame: .zero, configuration: cfg)
@@ -81,9 +82,25 @@ struct WatchListShell: UIViewRepresentable {
     /// Runs inside every frame. Finds the largest playing media element, and
     /// reports where it is every few seconds. Nothing else is read and nothing is
     /// written — this sits inside other people's sites and should behave like it.
+    /// Built per navigation so the resume point can be baked in — WKUserScript
+    /// has no channel of its own, and there is no public way to evaluate JS in a
+    /// named subframe, so the value travels with the script instead.
+    static func probeSource(resumeAt: Double) -> String {
+        return "window.__wlResume=\(Int(max(0, resumeAt)));\n" + playbackProbe
+    }
     static let playbackProbe = #"""
     (function () {
       if (window.__wlProbe) return; window.__wlProbe = 1;
+      var seeked = false;
+      function tryResume(v) {
+        // Once per frame, only forward, and never into the last stretch — landing
+        // on the credits would be worse than starting from the top.
+        if (seeked || !window.__wlResume) return;
+        var to = +window.__wlResume;
+        if (!(to > 30) || !isFinite(v.duration) || to > v.duration * 0.9) { seeked = true; return; }
+        if (v.currentTime > to - 5) { seeked = true; return; }
+        try { v.currentTime = to; seeked = true; } catch (e) {}
+      }
       function pick() {
         var best = null, area = 0;
         var els = document.querySelectorAll('video');
@@ -98,11 +115,17 @@ struct WatchListShell: UIViewRepresentable {
       function tick() {
         try {
           var v = pick(); if (!v) return;
+          tryResume(v);
           window.webkit.messageHandlers.wl.postMessage({
             type: 'play', t: v.currentTime, d: v.duration, paused: !!v.paused
           });
         } catch (e) {}
       }
+      // Metadata is what makes duration known, and duration is what makes a seek
+      // safe — so try again the moment it arrives, not only on the slow tick.
+      document.addEventListener('loadedmetadata', function (e) {
+        var v = e.target; if (v && v.tagName === 'VIDEO') { try { tryResume(v); } catch (err) {} }
+      }, true);
       setInterval(tick, 5000);
       document.addEventListener('play', tick, true);
       document.addEventListener('pause', tick, true);
@@ -118,6 +141,7 @@ struct WatchListShell: UIViewRepresentable {
         }
         let broadcaster: BroadcastController
         weak var web: WKWebView?
+        weak var ucc: WKUserContentController?
         init(broadcaster: BroadcastController) { self.broadcaster = broadcaster }
 
         // Deep-link → join-party plumbing. A tapped invite link (watchlist://party/CODE)
@@ -201,6 +225,20 @@ struct WatchListShell: UIViewRepresentable {
                 DispatchQueue.main.async { [weak self] in
                     self?.web?.evaluateJavaScript(js, in: nil,
                                                   in: .page, completionHandler: nil)
+                }
+                return
+            }
+            if kind == "resume" {
+                let t = (body["t"] as? Double) ?? 0
+                // Replace the injected script so the NEXT navigation carries the
+                // new point. Existing frames keep the old one, which is correct:
+                // they've already resumed, or already declined to.
+                DispatchQueue.main.async { [weak self] in
+                    guard let ucc = self?.ucc else { return }
+                    ucc.removeAllUserScripts()
+                    ucc.addUserScript(WKUserScript(source: WatchListShell.probeSource(resumeAt: t),
+                                                   injectionTime: .atDocumentEnd,
+                                                   forMainFrameOnly: false))
                 }
                 return
             }

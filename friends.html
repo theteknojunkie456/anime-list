@@ -776,6 +776,11 @@ body.first-paint .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards
 .dt-season-s{font-size:11.5px;color:var(--t3);margin-top:2px;}
 .dt-season .ico{width:16px;height:16px;color:var(--t3);flex-shrink:0;}
 .dt-season-here{font-size:11px;font-weight:800;color:var(--a2);flex-shrink:0;}
+/* Marks a row that will put itself on your list when tapped, so the difference
+   between "open this" and "add and open this" is visible before you commit. */
+.dt-season-add{flex-shrink:0;display:flex;opacity:.6;}
+.dt-season-add .ico{width:15px;height:15px;color:var(--t2);}
+.dt-season{cursor:pointer;}
 .dt-seasons-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:16px 0 8px;}
 .dt-seasons-head .dt-label{margin:0;}
 .dt-seenall{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:800;color:var(--a2);background:var(--ag);border:1px solid var(--b2);border-radius:99px;padding:5px 11px;flex-shrink:0;}
@@ -6028,11 +6033,11 @@ function paintFranchise(){
     }
     const check=`<button class="dt-seen-btn${done?' on':''}" onclick="event.stopPropagation();toggleSeasonSeen(${idx})" title="${done?'Watched — tap to unmark':'Mark as watched'}" aria-label="Mark season watched" aria-pressed="${done}">${icon('check')}</button>`;
     const img=s.img||(mine&&mine.img)||'';
-    const open=mine?` onclick="openDetail('${mine.id}')"`:'';
+    const open=` onclick="openSeason(${idx})"`;
     return `<div class="dt-season${cur?' cur':''}${done?' done':''}${mine?'':' off'}"${open}>
       ${img?`<img src="${escH(img)}" alt="">`:`<div class="ph">${escH((title.trim()[0]||'?').toUpperCase())}</div>`}
       <div class="dt-season-info"><div class="dt-season-t">${schEsc(title)}</div><div class="dt-season-s">${schEsc(sub)}</div></div>
-      ${up}${cur?'<span class="dt-season-here">Viewing</span>':''}${check}
+      ${up}${cur?'<span class="dt-season-here">Viewing</span>':''}${mine?'':'<span class="dt-season-add" aria-hidden="true">'+icon('plus')+'</span>'}${check}
     </div>`;
   };
   const idx=seasons.map((s,i)=>i);
@@ -6118,6 +6123,26 @@ function seasonToItem(s,status){
     img:s.img||'',eps:s.episodes?s.episodes+' eps':'',epTotal:s.episodes||0,
     ep:status==='finished'?(s.episodes||0):0,
     time:'',genre:'',order:[],notes:'',rating:0,fav:false,upd:Date.now()};
+}
+// Finishing S1 and wanting S2 shouldn't mean going back to search and typing the
+// name in. The franchise panel already knows exactly which season it is and has
+// its id, artwork and episode count — but a row for something not on your list
+// was inert: tickable, not openable. So tapping one now adds it and opens it, in
+// the same gesture that already opens the seasons you do have. Nothing is typed
+// and nothing is looked up twice.
+//
+// It goes on as Plan, not Watching: you haven't watched any of it yet, and the
+// first episode you mark promotes it on its own.
+function openSeason(idx){
+  const s=(curFranchise||[])[idx];if(!s)return;
+  const mine=franchiseMine(s);
+  if(mine){openDetail(mine.id);return;}
+  const it=seasonToItem(s,'plan');
+  anime.unshift(it);
+  try{save();render();}catch(e){}
+  try{setTimeout(fetchCovers,300);}catch(e){}
+  openDetail(it.id);
+  toast('Added '+(it.title.length>34?it.title.slice(0,34)+'\u2026':it.title));
 }
 function toggleSeasonSeen(idx){
   const s=(curFranchise||[])[idx];if(!s)return;

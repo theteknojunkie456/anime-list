@@ -4166,6 +4166,14 @@ async function syncRestore(){
   }
   if(!/^[A-Z0-9]{10,64}$/.test(raw)){toast('That code looks off — check it');return;}
   const proceed=async()=>{
+    // The code used to be adopted BEFORE the pull was tried, and the failure path
+    // only cleared it on a thrown error. So typing a code with nothing behind it
+    // — a typo, an old code, the wrong one of the two — silently replaced the
+    // working code on this device with a dead one, and the only clue was a
+    // cheerful "Code linked". Remember what we had, and put it back unless the
+    // new one actually proves itself.
+    const prevCode=syncCode(), prevAt=syncAt();
+    const restorePrev=()=>{try{setSyncCode(prevCode||'');setSyncAt(prevAt||0);renderSyncUI();render();}catch(e){}};
     try{
       setSyncCode(raw);setBackupDeclined(false);markCodeSeen();
       const res=await syncPull();
@@ -4179,10 +4187,13 @@ async function syncRestore(){
         toast('Enter this list’s password to unlock');
       }else if(inner&&Array.isArray(inner)&&inner.length){
         anime=migrate(inner);writeLocal();setSyncAt(res.updatedAt||Date.now());render();renderSyncUI();toast('Restored from cloud');
-      }else{ // nothing stored under that code yet — link this device and seed it
+      }else if(!prevCode){ // no backup here yet — adopting an empty code is fine, seed it
         setSyncAt(0);syncPush();renderSyncUI();toast('Code linked — this device now backs up here');
+      }else{ // there IS a working code here and the new one holds nothing — don't trade down
+        restorePrev();
+        toast('Nothing is stored under that code — kept the one you had');
       }
-    }catch{setSyncCode('');toast('Could not reach cloud — try again');}
+    }catch{restorePrev();toast('Could not reach cloud — try again');}
   };
   if(anime.length)askConfirm({title:'Restore from backup?',msg:"This replaces this device's list with the backup for that code.",yes:'Replace',onYes:proceed});
   else proceed();

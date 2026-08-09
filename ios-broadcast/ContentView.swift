@@ -104,7 +104,17 @@ struct WatchListShell: UIViewRepresentable {
         var to = +window.__wlResume;
         if (!(to > 30) || !isFinite(v.duration) || to > v.duration * 0.9) { seeked = true; return; }
         if (v.currentTime > to - 5) { seeked = true; return; }
-        try { v.currentTime = to; seeked = true; } catch (e) {}
+        seeked = true;
+        try { v.currentTime = to; } catch (e) {}
+        // Setting currentTime is a request, not a guarantee: plenty of players
+        // wrap the element, refuse a seek before their own buffering is ready, or
+        // snap straight back. Check whether it actually took, and say so — an app
+        // that promises "resume at 12:04" and silently starts from zero is worse
+        // than one that admits it can't.
+        setTimeout(function () {
+          var ok = Math.abs(v.currentTime - to) < 15;
+          try { window.webkit.messageHandlers.wl.postMessage({ type: 'seek', ok: ok, to: to }); } catch (e) {}
+        }, 1200);
       }
       function pick() {
         var best = null, area = 0;
@@ -231,6 +241,14 @@ struct WatchListShell: UIViewRepresentable {
             if kind != "play" && !msg.frameInfo.isMainFrame {
                 NSLog("WatchList: REFUSED '%@' from a subframe (%@)", kind,
                       msg.frameInfo.securityOrigin.host)
+                return
+            }
+            if kind == "seek" {
+                let ok = (body["ok"] as? Bool) ?? false
+                let js = "try{window.wlNativeSeek&&window.wlNativeSeek(\(ok ? "true" : "false"))}catch(e){}"
+                DispatchQueue.main.async { [weak self] in
+                    self?.web?.evaluateJavaScript(js, in: nil, in: .page, completionHandler: nil)
+                }
                 return
             }
             if kind == "play" {

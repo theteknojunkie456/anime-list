@@ -5679,7 +5679,7 @@ function renderDetail(){
       </div>`;})()}
     ${friendRecBadge(a)}
     ${(kindOf(a)==='watch'&&a.aniId)?`${progHTML}
-    <button class="dt-watch" onclick="watchAnime('${a.id}')">${icon('play')} ${_res?`Resume Ep ${a.posEp} at ${fmtPos(_res)}`:((a.ep||0)>0?'Continue Watching':'Start Watching')}</button>
+    <button class="dt-watch" onclick="watchAnime('${a.id}')">${icon('play')} ${(_res&&canResumeHere(a))?`Resume Ep ${a.posEp} at ${fmtPos(_res)}`:((a.ep||0)>0?'Continue Watching':'Start Watching')}</button>
     ${titleWatchPickerHTML(a)}
     <button class="dt-pin-toggle" onclick="togglePin()">${icon('external')} ${a.srcUrl?'Advanced: edit the direct link':'Advanced: paste a direct episode link'}</button>
     <div id="dtPin" style="display:none">
@@ -9134,7 +9134,7 @@ async function watchAnime(id,epArg){
   // injects into the site carries the position and can seek the moment the
   // player has metadata. Nothing here touches the site: the app can't reach a
   // cross-origin player, only the shell that owns the web view can.
-  pvSetResume((a.pos&&a.posEp===ep)?a.pos:0);
+  pvSetResume((a.pos&&a.posEp===ep&&canResumeHere(a))?a.pos:0);
   // binge controls light up only when the source can address a specific episode
   pvCanNav=!!ep&&/\{ep(isode)?\}/i.test(src);
   renderPvNav(a);
@@ -9622,6 +9622,39 @@ function pvSetResume(t){
 // as 100 seconds long is 85% watched after 85 seconds, and would otherwise bank
 // an episode nobody saw.
 const RP_MIN_WATCH=300;
+// Which sites can actually be resumed. Setting currentTime is a request: plenty
+// of players wrap the element or snap back, and the app has no way to know from
+// the outside. The shell tells us whether the seek landed, and we remember it per
+// host — so the button stops offering "Resume at 12:04" on a site that will
+// always start from zero. Two failures with nothing on the other side is the
+// same evidence rule the framing ledger uses.
+const SEEK_KEY='wl_seekok';
+function seekLedger(){try{return JSON.parse(localStorage.getItem(SEEK_KEY)||'{}')||{};}catch(e){return{};}}
+function noteSeek(host,ok){
+  if(!host)return;
+  const l=seekLedger(), r=l[host]||{ok:0,no:0};
+  if(ok)r.ok++; else r.no++;
+  l[host]=r;
+  try{localStorage.setItem(SEEK_KEY,JSON.stringify(l));}catch(e){}
+}
+function seekWorks(host){
+  if(!host)return true;                       // unknown is not a refusal
+  const r=seekLedger()[host]; if(!r)return true;
+  return !(r.no>=2&&!r.ok);
+}
+function currentWatchHost(){
+  try{const a=anime.find(x=>x.id===pvReturnId);return a?srcHost(effectiveSource(a)||''):'';}catch(e){return '';}
+}
+window.wlNativeSeek=function(ok){
+  try{
+    const host=currentWatchHost();
+    noteSeek(host,!!ok);
+    if(!ok){
+      try{logProblem('player','this site ignored a resume request',host||'unknown');}catch(e){}
+      try{if(!nativeFullscreen())toast('This site starts from the beginning \u2014 scrub to '+fmtPos(_rp.t||0));}catch(e){}
+    }
+  }catch(e){}
+};
 // A watch session ends in far more ways than "tapped Back": the screen locks,
 // the app is swiped away, a call comes in, iOS purges a backgrounded app without
 // warning. None of those run any code of ours. Anything that only persists on a
@@ -9673,6 +9706,11 @@ function resumeAt(a){
   if(a.posEp!==((a.ep||0)+1))return 0;
   return a.pos;
 }
+// The number is worth showing even where we can't jump to it — you can scrub to
+// it yourself — but the BUTTON shouldn't say "Resume" if pressing it won't.
+function canResumeHere(a){
+  try{return seekWorks(srcHost(effectiveSource(a)||''));}catch(e){return true;}
+}
 const RP_FRESH_MS=45000;                 // no report in this long → assume it stopped
 const RP_DONE=0.85;                      // 85% of runtime = watched; clears credits
 function realPlaybackLive(){return !!_rp.at&&(Date.now()-_rp.at)<RP_FRESH_MS;}
@@ -9688,6 +9726,17 @@ window.wlNativePlayback=function(info){
     if(_rp.ep===pvWatchEp&&_rp.d&&Math.abs(d-_rp.d)>_rp.d*0.25){ if(d<_rp.d)return; }
     if(_rp.ep!==pvWatchEp){_rp={at:0,t:0,d:0,paused:true,ep:pvWatchEp||0};}   // new episode, new clock
     _rp.at=Date.now();_rp.t=t;_rp.d=d;_rp.paused=!!info.paused;
+    // A frame that is playing a 20-minute video has rendered, is not blocked, and
+    // is not a verification gate. The blank-frame panel is driven by a timer and
+    // a load event, and the code already notes a load event "proves nothing about
+    // whether the SITE rendered". This does. Take the panel down and bank the
+    // success, instead of asking someone watching an episode whether it's blank.
+    try{
+      const box=document.getElementById('pvBlocked');
+      if(box&&box.classList.contains('on'))box.classList.remove('on');
+      clearTimeout(_pvBlockT);
+      if(!_rp.proved){_rp.proved=1;const h=currentWatchHost();if(h)noteFrame(h,true);}
+    }catch(e){}
     if(!pvReturnId||!pvWatchEp)return;
     const a=anime.find(x=>x.id===pvReturnId);
     if(!a||kindOf(a)!=='watch')return;
@@ -13446,15 +13495,33 @@ try{
 // build is live → reload to pick it up. Never yanks you out of a video or mid-type;
 // it waits for a calm moment (next refocus / when you're idle).
 let _bootVer=null,_updateReady=false,_updSnap=null;
+// The fallback here used to fetch the WHOLE app to read one header. index.html is
+// ~900KB and this runs every 30 seconds while the app is open, so on any network
+// that strips the ETag from a HEAD — a proxy, a captive portal, some mobile
+// carriers — it quietly became ~2MB a minute of someone's data to answer "is
+// there a new version".
+//
+// A Range request asks for one byte instead. It carries the same validators, and
+// a server that ignores Range sends 200 with the body — so the fallback is tried
+// once, and if the response wasn't a 206 the whole approach is abandoned for the
+// session rather than repeated forever.
+let _verMode='head';        // 'head' → 'range' → 'off'
 async function _liveVer(){
+  if(_verMode==='off')return '';
   const u='./?_ck='+Date.now();
+  const readV=r=>r.headers.get('etag')||r.headers.get('last-modified')||'';
   try{
-    let r=await fetch(u,{method:'HEAD',cache:'no-store'});
-    let v=r.headers.get('etag')||r.headers.get('last-modified')||'';
-    // Some hosts/proxies don't return a version header on HEAD — fall back to a
-    // no-store GET, which reliably carries the ETag on GitHub Pages.
-    if(!v){r=await fetch(u,{cache:'no-store'});v=r.headers.get('etag')||r.headers.get('last-modified')||'';}
-    return v;
+    let v=readV(await fetch(u,{method:'HEAD',cache:'no-store'}));
+    if(v)return v;
+    if(_verMode==='head')_verMode='range';
+    if(_verMode==='range'){
+      const r=await fetch(u,{cache:'no-store',headers:{Range:'bytes=0-0'}});
+      v=readV(r);
+      if(r.status!==206){_verMode='off';return '';}   // Range ignored — don't pull the bundle to find out again
+      if(v)return v;
+      _verMode='off';
+    }
+    return '';
   }catch(e){return '';}
 }
 // A silent reload mid-episode reads as the app randomly locking itself, because

@@ -9134,10 +9134,7 @@ async function watchAnime(id,epArg){
   // injects into the site carries the position and can seek the moment the
   // player has metadata. Nothing here touches the site: the app can't reach a
   // cross-origin player, only the shell that owns the web view can.
-  try{
-    if(typeof IS_NATIVE!=='undefined'&&IS_NATIVE)
-      window.webkit.messageHandlers.wl.postMessage({type:'resume',t:(a.pos&&a.posEp===ep)?a.pos:0});
-  }catch(e){}
+  pvSetResume((a.pos&&a.posEp===ep)?a.pos:0);
   // binge controls light up only when the source can address a specific episode
   pvCanNav=!!ep&&/\{ep(isode)?\}/i.test(src);
   renderPvNav(a);
@@ -9572,6 +9569,8 @@ function renderPvNav(a){
 function pvGoTo(a,ep){
   const url=episodeURL(a,ep); if(!url) return;
   pvWatchEp=ep;
+  pvSetResume((a.pos&&a.posEp===ep)?a.pos:0);   // this episode's point, or none
+  _rp={at:0,t:0,d:0,paused:true,ep:ep};
   document.getElementById('pvFrame').src=url;
   pvOfferFix();
   document.getElementById('pvTitle').innerHTML=escH(a.title)+' <span class="pv-ep">Ep '+ep+'</span>';
@@ -9607,6 +9606,22 @@ function pvMarkNext(){
 //
 // The web build never receives these calls and loses nothing.
 let _rp={at:0,t:0,d:0,paused:true,ep:0}, _posDirty=false;
+// A resume point belongs to ONE episode. The shell bakes it into the script it
+// injects, and that script is handed to every frame that loads afterwards — so
+// finishing an episode and using the site's own "next" link would hand episode 6
+// episode 5's resume point and skip twelve minutes of it. Anything that changes
+// which episode we're on has to retract it.
+function pvSetResume(t){
+  try{
+    if(typeof IS_NATIVE!=='undefined'&&IS_NATIVE)
+      window.webkit.messageHandlers.wl.postMessage({type:'resume',t:Math.max(0,Math.round(t||0))});
+  }catch(e){}
+}
+// An episode has to have been watched for a real length of time, not just a high
+// fraction of whatever the player claims. A 100-second trailer reporting itself
+// as 100 seconds long is 85% watched after 85 seconds, and would otherwise bank
+// an episode nobody saw.
+const RP_MIN_WATCH=300;
 // A watch session ends in far more ways than "tapped Back": the screen locks,
 // the app is swiped away, a call comes in, iOS purges a backgrounded app without
 // warning. None of those run any code of ours. Anything that only persists on a
@@ -9666,6 +9681,11 @@ window.wlNativePlayback=function(info){
     if(!info)return;
     const t=+info.t, d=+info.d;
     if(!isFinite(t)||!isFinite(d)||d<=60)return;   // adverts and preview clips aren't episodes
+    // Several frames can report at once — a pre-roll in one, the episode in
+    // another. Once a duration is established for this episode, a report that
+    // disagrees by more than a quarter is a different piece of media, not this
+    // one seeking. Keep the longest; it's the episode.
+    if(_rp.ep===pvWatchEp&&_rp.d&&Math.abs(d-_rp.d)>_rp.d*0.25){ if(d<_rp.d)return; }
     if(_rp.ep!==pvWatchEp){_rp={at:0,t:0,d:0,paused:true,ep:pvWatchEp||0};}   // new episode, new clock
     _rp.at=Date.now();_rp.t=t;_rp.d=d;_rp.paused=!!info.paused;
     if(!pvReturnId||!pvWatchEp)return;
@@ -9683,12 +9703,12 @@ window.wlNativePlayback=function(info){
       delete a.pos;delete a.posOf;delete a.posEp;delete a.posAt;_posDirty=true;_posClear();
     }
     const total=a.epTotal||0;
-    if(t/d<RP_DONE)return;
+    if(t/d<RP_DONE||t<RP_MIN_WATCH)return;
     if(pvWatchEp<=(a.ep||0))return;                 // already banked
     applyWatched(pvReturnId,pvWatchEp);
     const done=pvWatchEp;
     if(total&&pvWatchEp>=total){try{if(!nativeFullscreen())toast('Finished '+a.title);}catch(e){}return;}
-    pvWatchEp=done+1;pvOpenTime=Date.now();_rp.ep=pvWatchEp;
+    pvWatchEp=done+1;pvOpenTime=Date.now();_rp.ep=pvWatchEp;pvSetResume(0);
     const el=document.getElementById('pvTitle');
     if(el)el.innerHTML=escH(a.title)+' <span class="pv-ep">Ep '+pvWatchEp+'</span>';
     savePvSession(pvReturnId,pvWatchEp,'watch');
@@ -9755,6 +9775,7 @@ function pvFrameNavigated(){
   applyWatched(pvReturnId,pvWatchEp);
   const done=pvWatchEp;
   pvWatchEp=done+1;
+  pvSetResume(0);                                 // the next episode is not this one's resume point
   pvOpenTime=Date.now();                          // the next one earns its own clock
   const t=document.getElementById('pvTitle');
   if(t)t.innerHTML=escH(a.title)+' <span class="pv-ep">'+(read?'Ch ':'Ep ')+pvWatchEp+'</span>';

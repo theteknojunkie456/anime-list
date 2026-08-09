@@ -147,6 +147,7 @@ struct WatchListShell: UIViewRepresentable {
         let broadcaster: BroadcastController
         weak var web: WKWebView?
         weak var ucc: WKUserContentController?
+        var pendingResume: Double = 0
 
         func observeLifecycle() {
             let nc = NotificationCenter.default
@@ -235,6 +236,21 @@ struct WatchListShell: UIViewRepresentable {
             if kind == "play" {
                 guard let t = body["t"] as? Double, let d = body["d"] as? Double,
                       t.isFinite, d.isFinite, d > 60, t >= 0, t <= d + 1 else { return }
+                // A resume point is single-use. Once a player has reported, the
+                // frame carrying it has already seeked or already declined to, and
+                // leaving it armed means the NEXT thing to load — the next episode
+                // via the site's own link, or the site reloading itself — would be
+                // sent to a timestamp that belonged to something else.
+                if pendingResume > 0 {
+                    pendingResume = 0
+                    DispatchQueue.main.async { [weak self] in
+                        guard let ucc = self?.ucc else { return }
+                        ucc.removeAllUserScripts()
+                        ucc.addUserScript(WKUserScript(source: WatchListShell.probeSource(resumeAt: 0),
+                                                       injectionTime: .atDocumentEnd,
+                                                       forMainFrameOnly: false))
+                    }
+                }
                 let paused = (body["paused"] as? Bool) ?? false
                 // Hand it to the app's own page, which is where progress lives.
                 let js = String(format: "window.wlNativePlayback&&window.wlNativePlayback({t:%f,d:%f,paused:%@})",
@@ -247,6 +263,7 @@ struct WatchListShell: UIViewRepresentable {
             }
             if kind == "resume" {
                 let t = (body["t"] as? Double) ?? 0
+                pendingResume = t
                 // Replace the injected script so the NEXT navigation carries the
                 // new point. Existing frames keep the old one, which is correct:
                 // they've already resumed, or already declined to.

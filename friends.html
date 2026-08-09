@@ -4145,8 +4145,26 @@ function ensureBackup(){
   schedulePush();
 }
 async function syncRestore(){
-  const raw=(document.getElementById('syncCodeIn').value||'').replace(/\s+/g,'');
-  if(!/^[A-Za-z0-9]{10,64}$/.test(raw)){toast('That code looks off — check it');return;}
+  // Strip ANY separator, not just spaces. Codes get written down, pasted out of
+  // messages, and read aloud — hyphens and dots come back with them, and a
+  // hyphen used to fail the check below before the code was ever tried.
+  const raw=(document.getElementById('syncCodeIn').value||'').replace(/[^A-Za-z0-9]/g,'').toUpperCase();
+  // A recovery key is 24 characters and a sync code is 20, both from the same
+  // alphabet, and the app shows them in near-identical blocks of four. Pasting
+  // one into the other is the obvious mistake, and "that code looks off" sends
+  // you hunting for a typo in a perfectly good key. Name it instead.
+  if(raw.length===24&&/^[A-Z2-9]+$/.test(raw)){
+    toast('That\u2019s your password recovery key, not your sync code');
+    const e=document.getElementById('frErr')||null;
+    try{const box=document.getElementById('syncBox');
+      if(box&&!box.querySelector('.sync-mixup')){
+        const p=document.createElement('p');p.className='ai-desc sync-mixup';p.style.marginTop='8px';
+        p.innerHTML='That key unlocks your <b>password</b>. Your <b>sync code</b> is the 20-character one on this panel, on a device that already has your list.';
+        box.appendChild(p);
+      }}catch(_){}
+    return;
+  }
+  if(!/^[A-Z0-9]{10,64}$/.test(raw)){toast('That code looks off — check it');return;}
   const proceed=async()=>{
     try{
       setSyncCode(raw);setBackupDeclined(false);markCodeSeen();
@@ -4184,6 +4202,7 @@ function renderSyncUI(){
     box.innerHTML=`<div class="dt-label">${icon('cloud')} Cloud backup · ON</div>${meter}
       <p class="ai-desc"><b style="color:var(--a2)">Save this code somewhere safe</b> — a password manager, or email it to yourself. It's the only way back to your list if you lose or reinstall the app. Anyone with it can read your list and settings, so keep it to yourself.</p>
       <div class="synccode">${pretty}</div>
+      <p class="ai-desc" style="margin-top:6px;font-size:11.5px">Twenty characters, in five blocks. Not the same as the six-block <b>recovery key</b> from Password \u2014 that one unlocks encryption, this one finds your backup.</p>
       <div style="display:flex;gap:8px;margin-top:10px;">
         <button class="parse-btn" style="margin:0;flex:1" onclick="copySyncCode()">${icon('clipboard')} Copy code</button>
         <button class="imp-all" onclick="syncOff()">Turn off</button>

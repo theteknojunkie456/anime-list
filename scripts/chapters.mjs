@@ -206,6 +206,36 @@ const READERS = [
   { host: 'flamecomics.xyz', path: 'series', code: false },
 ];
 
+// Readers people actually use, discovered rather than hardcoded.
+//
+// The three above are the ones this script was written around, which means a
+// series that lives anywhere else is invisible to it — and the shared-source
+// list already knows where people read, because they configured it. Those hosts
+// are polled too, so "the latest chapter" stops meaning "the latest chapter on
+// one of three sites I happened to pick".
+//
+// A discovered host doesn't announce its URL shape, so a small set of common
+// ones is tried. resolveReaderSlug() already treats a miss as a miss and
+// remembers it for a week, so a wrong guess costs a handful of requests once,
+// not every run.
+const READER_PATHS = ['series', 'comics', 'manga', 'manhwa', 'read', 'title'];
+// Watch sites in the shared list would be probed pointlessly, so only hosts that
+// look like readers are taken. Cheap heuristic, and a wrong guess is self-
+// correcting: nothing resolves, it's recorded as a miss, and it stops being
+// asked. Better than skipping a genuine reader because it isn't on a list.
+function looksLikeReader(h) {
+  return /(scan|comic|manga|manhwa|manhua|toon|read|novel)/i.test(h);
+}
+async function discoveredReaders(hosts) {
+  const known = new Set(READERS.map((r) => r.host));
+  const out = [];
+  for (const h of [...new Set(hosts)]) {
+    if (known.has(h) || !looksLikeReader(h)) continue;
+    for (const path of READER_PATHS) out.push({ host: h, path, code: false, discovered: true });
+  }
+  return out;
+}
+
 async function resolveReaderSlug(reader, code, names) {
   const tried = new Set();
   for (const n of names) {
@@ -406,11 +436,19 @@ async function sharedHosts() {
   } catch (e) { console.log(`  shared sources failed: ${e.message}`); return []; }
 }
 
+const SHARED_HOSTS = await sharedHosts();
+// Probed for chapters alongside the built-in three. Deduped by host+path so a
+// site listed twice isn't asked twice.
+const EXTRA_READERS = await discoveredReaders(SHARED_HOSTS);
+if (EXTRA_READERS.length) {
+  console.log(`  discovered readers: ${[...new Set(EXTRA_READERS.map((r) => r.host))].join(', ')}`);
+  READERS.push(...EXTRA_READERS);
+}
 const FRAME_HOSTS = [
   ...READERS.map((r) => r.host),
   'miruro.tv', 'pluto.tv', 'therokuchannel.roku.com', 'www.peacocktv.com',
   'www.retrocrush.tv', 'watch.plex.tv', 'anineko.to',
-  ...(await sharedHosts()),
+  ...SHARED_HOSTS,
 ];
 for (const h of [...new Set(FRAME_HOSTS)]) {
   const v = await hostFrames(h);
@@ -504,6 +542,9 @@ for (const [aniId, names] of work) {
   const probed = { ...(known.readTried || {}) };
   const WEEK = 7 * 864e5;
   for (const reader of READERS) {
+    // A discovered host appears once per candidate path. The moment any of them
+    // resolves, the host is solved and the remaining paths are dead weight.
+    if (reader.discovered && slugs[reader.host]) continue;
     if (slugs[reader.host]) continue;                       // known, and never re-probed
     // A miss is remembered too, or a series that simply isn't on this reader
     // costs a handful of requests every single run, forever. Retried weekly in
@@ -511,7 +552,12 @@ for (const [aniId, names] of work) {
     if (probed[reader.host] && Date.now() - probed[reader.host] < WEEK) continue;
     const code = (out.readers[reader.host] || {}).suffix || null;
     const slug = await resolveReaderSlug(reader, code, allNames);
-    if (slug) slugs[reader.host] = slug; else probed[reader.host] = Date.now();
+    if (slug) {
+      slugs[reader.host] = slug;
+      // The path that answered is part of the address; without it the read step
+      // would rebuild the URL from the first candidate path and 404.
+      (out.series[aniId].readPath = out.series[aniId].readPath || {})[reader.host] = reader.path;
+    } else probed[reader.host] = Date.now();
   }
   if (Object.keys(slugs).length) out.series[aniId].readSlug = slugs;
   if (Object.keys(probed).length) out.series[aniId].readTried = probed;
@@ -524,9 +570,13 @@ for (const [aniId, names] of work) {
   // count on the site THEY read from, not whichever host happened to reply
   // first. Keeping them all is what lets the app pick per user.
   const readBy = { ...(known.readBy || {}) };
+  const readSeen = new Set();
   for (const reader of READERS) {
     const slug = slugs[reader.host];
-    if (!slug) continue;
+    if (!slug || readSeen.has(reader.host)) continue;
+    readSeen.add(reader.host);
+    const savedPath = ((known.readPath || {})[reader.host]) || ((out.series[aniId].readPath || {})[reader.host]);
+    if (savedPath && savedPath !== reader.path) { readSeen.delete(reader.host); continue; }
     const code = (out.readers[reader.host] || {}).suffix || null;
     const live = await readerLatest(reader, code, slug);
     await sleep(800);

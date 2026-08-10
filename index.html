@@ -4323,6 +4323,9 @@ function scheduleNotifyUpdate(){if(!notifyOn())return;clearTimeout(notifyUpdT);n
 // previous good list stays. Deleting everything deliberately still works: it
 // just takes the next update, once the count is genuinely small.
 const NOTIFY_SENT_KEY='wl_notify_count';
+// Per-kind high-water marks, so a collapse in one kind can't hide behind the
+// size of the other.
+const NOTIFY_KINDS_KEY='wl_notify_kinds';
 async function notifyUpdate(){
   if(!pushSupported())return;
   try{
@@ -4347,8 +4350,17 @@ async function notifyUpdate(){
     if(stored>n+2&&stored>=5)return;              // memory behind disk — not loaded yet
     let last=0; try{last=Number(localStorage.getItem(NOTIFY_SENT_KEY))||0;}catch(e){}
     if(last>=10&&n<last*0.4)return;               // a real list doesn't collapse 90% at once
+    // The guard above counts the WHOLE list, so one kind can empty out while the
+    // total barely moves — a reading list going from three tracked series to one
+    // is a 67% collapse in chapter alerts and about 2% of the total, which sails
+    // straight through. Each kind is now checked against what it last published.
+    let lastA=0,lastM=0;
+    try{const p=JSON.parse(localStorage.getItem(NOTIFY_KINDS_KEY)||'null')||{};lastA=p.a||0;lastM=p.m||0;}catch(e){}
+    if(lastA>=4&&animeIds.length<lastA*0.4){try{logProblem('notify','refused a collapsed episode-alert list',animeIds.length+' vs '+lastA);}catch(e){}return;}
+    if(lastM>=4&&mangaIds.length<lastM*0.4){try{logProblem('notify','refused a collapsed chapter-alert list',mangaIds.length+' vs '+lastM);}catch(e){}return;}
     await fetch(NOTIFY_URL+'/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({endpoint:sub.endpoint,animeIds,mangaIds})});
     try{localStorage.setItem(NOTIFY_SENT_KEY,String(n));}catch(e){}
+    try{localStorage.setItem(NOTIFY_KINDS_KEY,JSON.stringify({a:animeIds.length,m:mangaIds.length}));}catch(e){}
   }catch{}
 }
 // "I haven't seen anything" is almost always "nothing aired", not "it's broken" —
@@ -4373,12 +4385,25 @@ function notifyUIHTML(){
   const granted=(typeof IS_NATIVE!=='undefined'&&IS_NATIVE)?true:(('Notification'in window)&&Notification.permission==='granted');
   const on=notifyOn()&&granted;
   if(on){
-    const n=notifyAnimeIds().length, nx=nextAiring();
+    const n=notifyAnimeIds().length, m=notifyMangaIds().length, nx=nextAiring();
+    // Chapters were never mentioned here, so a reading list could be covered by
+    // nothing at all and the panel would still read "Tracking 14 shows".
+    const both=`Tracking <b>${n}</b> show${n!==1?'s':''}`+(m?` and <b>${m}</b> series for new chapters`:'')+`.`;
     const status=nx
-      ? `Tracking <b>${n}</b> show${n!==1?'s':''}. Next up: <b>${schEsc(nx.title)}</b>${nx.ep?' Ep '+nx.ep:''} — ${nx.when} (${nx.rel}).`
-      : `Tracking <b>${n}</b> show${n!==1?'s':''}. <b>Nothing's airing soon</b> — most of your list has finished, so it'll stay quiet until something new drops. That's expected, not a fault.`;
+      ? `${both} Next up: <b>${schEsc(nx.title)}</b>${nx.ep?' Ep '+nx.ep:''} — ${nx.when} (${nx.rel}).`
+      : `${both} <b>Nothing's airing soon</b> — most of your list has finished, so it'll stay quiet until something new drops. That's expected, not a fault.`;
+    // What's NOT covered, and why. A title with no AniList id can never be
+    // tracked — the alert is keyed by that id — so it drops out silently and
+    // stays out. Naming it is the difference between "alerts are broken" and
+    // "these two need linking".
+    const notTracked=anime.filter(a=>!a.aniId&&!a.noLink&&['watching','plan','finished'].includes(a.status));
+    const dropped=anime.filter(a=>kindOf(a)==='read'&&a.status==='dropped').length;
+    const gaps=notTracked.length?`<p class="ai-desc" style="color:var(--a2)">
+        <b>${notTracked.length}</b> ${notTracked.length===1?'title isn\u2019t':'titles aren\u2019t'} covered \u2014 ${schEsc(notTracked.slice(0,3).map(a=>a.title).join(', '))}${notTracked.length>3?` and ${notTracked.length-3} more`:''}.
+        ${notTracked.length===1?'It has':'They have'} no database link, and alerts are keyed to it. Link ${notTracked.length===1?'it':'them'} from the <b>Fix</b> bar on your list.</p>`:'';
+    const dropNote=dropped?`<p class="ai-desc" style="font-size:11.5px">${dropped} dropped series ${dropped===1?'is':'are'} deliberately left out.</p>`:'';
     return`<div class="dt-label">${icon('bell')} Episode notifications · ON</div>
-      <p class="ai-desc">${status}</p>
+      <p class="ai-desc">${status}</p>${gaps}${dropNote}
       ${(typeof IS_NATIVE!=='undefined'&&IS_NATIVE)?'':`<button class="parse-btn" style="margin-top:0" onclick="sendTestNotify()">Send a test notification</button>`}
       <button class="imp-all" style="width:100%;margin-top:8px" onclick="disableNotify()">Turn off notifications</button>`;
   }

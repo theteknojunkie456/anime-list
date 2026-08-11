@@ -1457,10 +1457,50 @@ textarea.ai-prompt-in{resize:none;line-height:1.45;display:block;}
 .pt-chip.host .dot{background:var(--a2);box-shadow:0 0 6px var(--a2);}
 .pt-host{display:inline-flex;margin-left:4px;}
 .pt-host .ico{width:11px;height:11px;color:var(--a2);}
-.pt-now{display:flex;align-items:center;gap:11px;background:var(--bg3);border:1px solid var(--b1);border-radius:14px;padding:11px 13px;margin-bottom:12px;}
-.pt-now img{width:44px;height:62px;border-radius:8px;object-fit:cover;flex-shrink:0;background:var(--bg4);}
-.pt-now-t{font-family:var(--fd);font-size:14px;font-weight:800;color:var(--t1);}
-.pt-now-s{font-size:12px;color:var(--t3);margin-top:2px;}
+/* ── PARTY: the two things you can do, as two things ── */
+.pt-start{padding:16px;border-radius:20px;background:color-mix(in srgb,var(--a) 10%,var(--bg2));
+  border:1px solid color-mix(in srgb,var(--a) 30%,transparent);}
+.pt-start-h{display:flex;align-items:center;gap:8px;font-family:var(--fd);font-size:16px;font-weight:800;
+  letter-spacing:-.02em;color:var(--t1);}
+.pt-start-h .ico{width:17px;height:17px;color:var(--a2);}
+.pt-start-p{margin:7px 0 14px;font-size:13px;line-height:1.5;color:var(--t2);}
+.pt-name{width:100%;padding:12px 14px;border-radius:13px;font-size:14px;font-family:inherit;
+  background:var(--bg);border:1px solid var(--bn);color:var(--t1);outline:none;}
+.pt-name::placeholder{color:var(--t3);}
+.pt-name:focus{border-color:var(--a);box-shadow:0 0 0 3px var(--ag);}
+.pt-go{width:100%;margin-top:10px;height:48px;border-radius:14px;border:0;background:var(--a);color:var(--aFg);
+  font-family:var(--fd);font-size:15px;font-weight:800;display:flex;align-items:center;justify-content:center;gap:8px;
+  box-shadow:0 8px 22px -6px var(--glow);transition:transform .12s;}
+.pt-go:active{transform:scale(.98);}
+.pt-go .ico{width:16px;height:16px;}
+.pt-or{display:flex;align-items:center;gap:12px;margin:18px 0;color:var(--t3);font-size:11px;font-weight:800;
+  letter-spacing:.1em;text-transform:uppercase;}
+.pt-or::before,.pt-or::after{content:'';flex:1;height:1px;background:var(--bn2);}
+.pt-join{padding:15px 16px;border-radius:20px;background:var(--bg2);border:1px solid var(--bn2);}
+.pt-join-h{font-size:13px;font-weight:700;color:var(--t2);margin-bottom:11px;}
+.pt-join-row{display:flex;gap:9px;}
+/* A code is characters, not prose — spaced out and monospaced so it can be read
+   back over a call without anyone spelling it twice. */
+.pt-code{flex:1;min-width:0;padding:12px 14px;border-radius:13px;background:var(--bg);border:1px solid var(--bn);
+  color:var(--t1);outline:none;text-transform:uppercase;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:17px;font-weight:700;letter-spacing:.24em;}
+.pt-code::placeholder{color:var(--t3);letter-spacing:.24em;}
+.pt-code:focus{border-color:var(--a);box-shadow:0 0 0 3px var(--ag);}
+.pt-joinbtn{flex:none;padding:0 20px;border-radius:13px;border:1px solid var(--bn2);background:var(--bg3);
+  color:var(--t1);font-family:var(--fd);font-size:14px;font-weight:800;}
+.pt-joinbtn:active{transform:scale(.97);}
+/* Now playing, in the same language as the resume card on home. */
+.pt-now{display:flex;align-items:center;gap:12px;background:color-mix(in srgb,var(--a) 10%,var(--bg2));
+  border:1px solid color-mix(in srgb,var(--a) 28%,transparent);border-radius:18px;padding:10px;margin-bottom:12px;}
+.pt-now img,.pt-now-ph{width:46px;height:46px;border-radius:13px;object-fit:cover;flex-shrink:0;background:var(--bg4);}
+.pt-now-ph{display:flex;align-items:center;justify-content:center;font-family:var(--fd);font-size:18px;font-weight:800;color:var(--t3);}
+.pt-now-b{min-width:0;flex:1;}
+.pt-now-k{font-size:9.5px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:var(--a2);}
+.pt-now-t{font-family:var(--fd);font-size:15px;font-weight:800;color:var(--t1);letter-spacing:-.02em;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;}
+.pt-now-s{font-size:11.5px;color:var(--t2);font-weight:600;margin-top:1px;}
+.pt-live{flex:none;align-self:flex-start;padding:3px 9px;border-radius:99px;background:var(--a);color:var(--aFg);
+  font-size:9.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;}
 .pe-note{display:flex;gap:11px;align-items:flex-start;background:var(--ag);border:1px solid var(--b2);border-radius:14px;padding:13px 14px;margin-bottom:14px;font-size:13px;line-height:1.5;color:var(--t1);}
 .pe-note .ico{width:20px;height:20px;flex-shrink:0;color:var(--a2);margin-top:1px;}
 .pe-steps{display:flex;flex-direction:column;gap:9px;margin-top:8px;}
@@ -9024,15 +9064,27 @@ function renderParty(){
   const box=document.getElementById('partyBody');if(!box)return;
   if(!partyActive()){
     const nm=partyName();
+    // There are exactly two things you can do here, and the old screen buried
+    // both under a paragraph and a pair of field labels: it read as a form to be
+    // completed rather than a choice to be made. Two panels, the one you're more
+    // likely to want first, and each says what will happen when you press it.
     box.innerHTML=`
-      <p class="ai-desc">${IS_NATIVE?`Watch together with friends: broadcast your screen so everyone sees it live, with a chat to talk through it.`:`Watch together with friends: the host shares their screen and everyone watches in sync, with a chat to talk through it.`}</p>
-      <div class="dt-label">${icon('users')} Your name</div>
-      <input class="ai-prompt-in" id="ptName" placeholder="e.g. ${nm||'Alex'}" value="${nm?nm.replace(/"/g,'&quot;'):''}" maxlength="24" autocomplete="off">
-      <button class="parse-btn" onclick="partyCreate()">${icon('users')} Start a party</button>
-      <div class="dt-label" style="margin-top:20px">Join a friend’s party</div>
-      <div style="display:flex;gap:8px">
-        <input class="ai-prompt-in" id="ptJoin" placeholder="Party code" maxlength="8" autocomplete="off" autocapitalize="characters" spellcheck="false" style="flex:1;margin:0;text-transform:uppercase">
-        <button class="pt-code-cta" style="width:auto;padding:0 16px" onclick="partyJoin()">Join</button>
+      <div class="pt-start">
+        <div class="pt-start-h">${icon('users')} Start a party</div>
+        <p class="pt-start-p">${IS_NATIVE
+          ?'Broadcast your screen so everyone sees exactly what you see, and talk it through as it plays.'
+          :'You share your screen, everyone watches in sync, and the chat runs alongside it.'}</p>
+        <input class="pt-name" id="ptName" placeholder="What should everyone call you?" value="${nm?nm.replace(/"/g,'&quot;'):''}" maxlength="24" autocomplete="off">
+        <button class="pt-go" onclick="partyCreate()">${icon('play')} Start a party</button>
+      </div>
+      <div class="pt-or"><span>or</span></div>
+      <div class="pt-join">
+        <div class="pt-join-h">Got a code from a friend?</div>
+        <div class="pt-join-row">
+          <input class="pt-code" id="ptJoin" placeholder="XXXXXX" maxlength="8" autocomplete="off" autocapitalize="characters" spellcheck="false" inputmode="text"
+                 oninput="this.value=this.value.toUpperCase()">
+          <button class="pt-joinbtn" onclick="partyJoin()">Join</button>
+        </div>
       </div>`;
     return;
   }
@@ -9048,7 +9100,11 @@ function renderParty(){
   // Reliable cross-network A/V (Jitsi): the recommended path — talk + share your
   // screen with audio, connects anywhere. The custom voice above is the P2P fallback.
   const jitsiBtn=`<button class="pt-jitsi${_jitsiApi?' on':''}" onclick="openJitsi()">${icon('users')}<span>${_jitsiApi?'Back to voice &amp; screen':'Voice &amp; screen share'}</span><span class="pt-jitsi-tag">${_jitsiApi?'live':'works anywhere'}</span></button>`;
-  const now=r.title?`<div class="pt-now">${r.img?`<img src="${safeImg(r.img)}" alt="">`:''}<div><div class="pt-now-t">${schEsc(r.title)}</div><div class="pt-now-s">${r.ep?`Episode ${r.ep}`:'Ready'} · ${r.members.length} watching</div></div></div>`:'';
+  const now=r.title?`<div class="pt-now">${r.img?`<img src="${safeImg(r.img)}" alt="">`:`<div class="pt-now-ph">${((r.title||'?')[0]||'?').toUpperCase()}</div>`}
+    <div class="pt-now-b"><div class="pt-now-k">${sharing?'On screen now':'Up now'}</div>
+    <div class="pt-now-t">${schEsc(r.title)}</div>
+    <div class="pt-now-s">${r.ep?`Episode ${r.ep}`:'Ready'} · ${r.members.length} watching</div></div>
+    ${sharing?`<span class="pt-live">live</span>`:''}</div>`:'';
   let hostCtl='';
   const sharing=!!r.sharing, iShare=r.sharing===meUid;
   // Shared "Up next" queue — visible to everyone; the host can remove items and pull the head.
@@ -14451,10 +14507,11 @@ function _updBusy(){
 // you'd explain it to a friend — what they can now do, not what the code does.
 // No version numbers or jargon in the notes; the date IS the version.
 const RELEASE={
-  v:'2026-08-11.8',
+  v:'2026-08-11.9',
   title:'Seasons, specials, and progress that keeps itself',
   push:'Every film and special on the show it belongs to \u2014 and progress that marks itself.',
   notes:[
+    'The watch party screen is two clear choices instead of a form: start one, or type a friend\u2019s code \u2014 and the code field is now spaced out and monospaced so it can be read aloud without spelling it twice.',
     'Watch parties can now stay in sync on real streaming sites, not just YouTube \u2014 in the iPhone app, everyone follows the host\u2019s position automatically, and only nudges when you\u2019ve drifted more than a few seconds.',
     'A party survives a tunnel: it keeps trying to reconnect for about a minute instead of giving up after fifteen seconds.',
     'Cards now say how much is waiting. A show you\u2019re behind on wears a \u201c7 new\u201d tag on its artwork, so the grid answers what to put on tonight instead of only what you own.',

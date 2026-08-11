@@ -902,8 +902,27 @@ body.first-paint .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards
   display:inline-flex;align-items:center;gap:7px;border-radius:12px;font-size:12px;font-weight:700;}
 .dt-title{font-size:19px;font-weight:900;letter-spacing:-0.3px;line-height:1.18;text-wrap:balance;}
 .dt-meta{font-size:11.5px;color:var(--t2);font-weight:600;margin-top:6px;line-height:1.5;}
-.dt-fav{background:var(--bg4);border:1px solid var(--b2);color:var(--t2);cursor:pointer;transition:background-color .15s,color .15s,border-color .15s;}
+/* This lived in the fact strip for a while and borrowed its shape from it. When
+   the strip went, so did the padding, the radius and the height — leaving a
+   button with a border and nothing else. It owns its shape now. */
+.dt-fav{
+  align-self:flex-start;margin-top:9px;
+  display:inline-flex;align-items:center;gap:7px;height:34px;padding:0 14px;
+  border-radius:99px;font-size:12.5px;font-weight:700;line-height:1;white-space:nowrap;
+  background:var(--bg4);border:1px solid var(--b2);color:var(--t2);cursor:pointer;
+  transition:background-color .15s,color .15s,border-color .15s,transform .12s;
+}
+.dt-fav:active{transform:scale(.96);}
 .dt-fav .ico{width:14px;height:14px;}
+/* Under the episode list. It was a raw bar butted straight against its own
+   caption at full width — no room, no restraint, and brighter than the artwork
+   above it. It reads as a footer to the list now: inset, quieter, with the
+   count beside it rather than crushed underneath. */
+.dt-epbar{display:flex;align-items:center;gap:12px;margin:14px 0 4px;}
+.dt-epbar .pbar{flex:1;height:4px;background:rgba(255,255,255,.10);}
+.dt-epbar .pfill{background:color-mix(in srgb,var(--a) 80%,transparent);}
+.dt-epbar span{flex:none;font-size:11.5px;font-weight:700;color:var(--t3);font-variant-numeric:tabular-nums;}
+
 /* Resume card — artwork, where you're going back to, one thing to press. */
 .resume-card{display:flex;align-items:center;gap:13px;width:calc(100% - 36px);margin:12px 18px 0;padding:10px;
   border-radius:18px;text-align:left;background:color-mix(in srgb,var(--a) 11%,var(--bg2));
@@ -3467,7 +3486,7 @@ async function loadMembers(){
   const devs=r.devices||[];
   const pending=devs.filter(d=>d.status==='pending'), approved=devs.filter(d=>d.status==='approved'), denied=devs.filter(d=>d.status==='denied');
   const row=(d,actions)=>`<div class="src-opt" style="display:flex;align-items:center;gap:8px">
-    <div style="flex:1;min-width:0" onclick="adminRenameDevice('${escH(d.id)}','${escH(d.alias||d.name||'')}')"><div class="src-name">${presDot(d)}${escH(d.alias||d.name||'(tap to name)')}${d.alias&&d.name&&d.alias!==d.name?` <span class="src-tag">${escH(d.name)}</span>`:''}</div><div class="src-sub">${presText(d)}${d.joinedAt?' · '+when(d.joinedAt):''}${d.devices>1?` · ${d.devices} sign-ins`:''}${d.source?' · heard: '+escH(d.source):''}${d.invite?' · invite':''}</div></div>${actions}</div>`;
+    <div style="flex:1;min-width:0" onclick="adminRenameDevice('${escH(d.id)}','${escH(memberLabel(d))}')"><div class="src-name">${presDot(d)}${escH(memberLabel(d)||'Unnamed \u00b7 tap to name')}${d.alias&&realMemberName(d.name)&&d.alias!==d.name?` <span class="src-tag">${escH(d.name)}</span>`:''}</div><div class="src-sub">${presText(d)}${d.joinedAt?' · '+when(d.joinedAt):''}${d.devices>1?` · ${d.devices} sign-ins`:''}${d.source?' · heard: '+escH(d.source):''}${d.invite?' · invite':''}</div></div>${actions}</div>`;
   const ap=d=>`<button class="src-chip on" onclick="adminDecide('${d.id}','approve')">Approve</button>`;
   const dn=d=>`<button class="src-chip" onclick="adminDecide('${d.id}','deny')">Deny</button>`;
   const rm=d=>`<button class="src-chip fr-danger" onclick="adminForget('${d.id}')">Remove</button>`;
@@ -3589,6 +3608,17 @@ async function adminForget(id){
   toast('Removed from the roster');
   loadMembers();
 }
+// "(existing)" was never a name. It is what the app filed grandfathered devices
+// under before a name was required, and rendering it as though someone had typed
+// it is why the roster has rows nobody can identify — it looked named, so nobody
+// tapped it. Anything placeholder-shaped now reads as unnamed, which is both
+// true and tappable.
+const _NONAMES=['(existing)','(tap to name)','guest','unknown',''];
+function realMemberName(n){
+  const v=String(n||'').trim();
+  return _NONAMES.indexOf(v.toLowerCase())>=0?'':v;
+}
+function memberLabel(d){return (d&&(String(d.alias||'').trim()||realMemberName(d.name)))||'';}
 async function adminRenameDevice(id,current){
   const v=prompt('Name this person',current||'');
   if(v===null)return;
@@ -14507,10 +14537,12 @@ function _updBusy(){
 // you'd explain it to a friend — what they can now do, not what the code does.
 // No version numbers or jargon in the notes; the date IS the version.
 const RELEASE={
-  v:'2026-08-11.9',
+  v:'2026-08-11.10',
   title:'Seasons, specials, and progress that keeps itself',
   push:'Every film and special on the show it belongs to \u2014 and progress that marks itself.',
   notes:[
+    'Fixed the Favourite button, which had lost its shape when the facts moved, and the progress bar under the episode list, which was full-width and louder than the artwork above it.',
+    'A member showing as \u201c(existing)\u201d now reads as unnamed and can be tapped to name \u2014 it was never a name, just what old devices were filed under before one was required.',
     'The watch party screen is two clear choices instead of a form: start one, or type a friend\u2019s code \u2014 and the code field is now spaced out and monospaced so it can be read aloud without spelling it twice.',
     'Watch parties can now stay in sync on real streaming sites, not just YouTube \u2014 in the iPhone app, everyone follows the host\u2019s position automatically, and only nudges when you\u2019ve drifted more than a few seconds.',
     'A party survives a tunnel: it keeps trying to reconnect for about a minute instead of giving up after fifteen seconds.',

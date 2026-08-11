@@ -731,6 +731,11 @@ async function handleJoin(body, env) {
   // service worker is network-first), so this rejects rather than accommodates.
   const nm = String(body.name || "").trim().slice(0, 40);
   if (nm.length < 2) return json({ ok: false, error: "name required" }, 400);
+  // "(existing)" is what grandfathered devices were filed under before a name was
+  // required. It is a placeholder that LOOKS like a name, which is worse than a
+  // blank: the roster shows it, the admin reads it as something someone typed,
+  // and nobody ever taps it to fix it. No new record may carry one.
+  if (/^\(|^(guest|unknown|someone)$/i.test(nm)) return json({ ok: false, error: "real name required" }, 400);
 
   // Optional invite: an 'auto' code approves on the spot (still counts toward the
   // cap); a 'request' code just tags where they came from.

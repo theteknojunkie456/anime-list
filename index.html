@@ -937,7 +937,13 @@ body.first-paint .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards
 .dt-epbar span{flex:none;font-size:11.5px;font-weight:700;color:var(--t3);font-variant-numeric:tabular-nums;}
 
 /* Resume card — artwork, where you're going back to, one thing to press. */
-.resume-card{display:flex;align-items:center;gap:13px;width:calc(100% - 36px);margin:12px 18px 0;padding:10px;
+.resume-wrap{position:relative;display:flex;align-items:center;margin:12px 18px 0;}
+.resume-x{position:absolute;right:6px;top:6px;width:26px;height:26px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;color:var(--t3);
+  background:color-mix(in srgb,var(--bg) 55%,transparent);border:0;cursor:pointer;transition:color .15s;}
+.resume-x:hover{color:var(--t1);}
+.resume-x .ico{width:13px;height:13px;}
+.resume-card{display:flex;align-items:center;gap:13px;flex:1;min-width:0;padding:10px;
   border-radius:18px;text-align:left;background:color-mix(in srgb,var(--a) 11%,var(--bg2));
   border:1px solid color-mix(in srgb,var(--a) 32%,transparent);cursor:pointer;transition:transform .12s;}
 .resume-card:active{transform:scale(.985);}
@@ -1018,7 +1024,14 @@ body.first-paint .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards
 .dt-ch.next{border-color:var(--a);background:var(--ag);color:var(--a2);}
 .dt-ch:active{transform:scale(.95);}
 .dt-ch:focus-visible{outline:2px solid var(--a2);outline-offset:2px;}
-.dt-eps{display:flex;gap:10px;overflow-x:auto;padding:2px 2px 6px;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;}
+/* A horizontal rail that stops 22px short of the screen reads as a finished row
+   with nothing after it. Bleeding it into the sheet's own padding — and paying
+   that padding back on the inside — keeps the first card aligned with everything
+   above while the row itself runs off the edge, which is what says "there is
+   more this way" without a single extra pixel of chrome. */
+.dt-eps{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;
+  margin-left:-22px;margin-right:-22px;padding:2px 22px 6px;scrollbar-width:none;}
+.dt-eps::-webkit-scrollbar{display:none;}
 .dt-eps::-webkit-scrollbar{display:none;}
 .dt-ep{flex:0 0 auto;width:150px;background:none;border:none;padding:0;cursor:pointer;text-align:left;scroll-snap-align:start;}
 .dt-ep-img{position:relative;width:150px;height:84px;border-radius:11px;background:var(--bg3) center/cover no-repeat;border:1px solid var(--b2);}
@@ -4120,7 +4133,13 @@ function showLock(){
   // So instead of making you aim at the button, ANY tap on the lock fires Face ID
   // (tapping the password field, its Unlock button, or the recovery link still do
   // their own thing). That collapses the app side to a single tap.
-  if(faceIDOn()&&!(typeof IS_NATIVE!=='undefined'&&IS_NATIVE)){
+  // Touch devices only. On a phone the biometric IS the fast path, so firing it
+  // on sight and on any tap collapses unlocking to one gesture. On a desktop the
+  // same code throws a system passkey dialog in your face every single time the
+  // lock appears, in front of the password field you were reaching for — the
+  // button is right there for anyone who wants it. Coarse pointer = the phone.
+  const _touch=(()=>{try{return matchMedia('(pointer:coarse)').matches;}catch(e){return false;}})();
+  if(faceIDOn()&&_touch&&!(typeof IS_NATIVE!=='undefined'&&IS_NATIVE)){
     setTimeout(()=>{try{tryUnlockFaceID(true);}catch{}},300);
     _lockTapH=function(ev){
       const t=ev.target;
@@ -6193,7 +6212,11 @@ function renderHome(){
   // genre collections — browse your list by its most-common genres (Netflix-style lens)
   // Build from S (already sorted) so each genre bucket is in sort order — no re-sort.
   const gmap={};S.forEach(a=>(a.genre||'').split(',').map(g=>g.trim()).filter(Boolean).forEach(g=>{(gmap[g]=gmap[g]||[]).push(a);}));
-  const topGenres=Object.keys(gmap).filter(g=>gmap[g].length>=2).sort((x,y)=>gmap[y].length-gmap[x].length).slice(0,4);
+  // Four was a guess made when a list was small. On a real library it means
+  // Action, Adventure, Comedy, Drama and nothing else — the broadest genres in
+  // the medium, which is precisely the set that tells you least. Ten reaches
+  // Mecha, Mystery, Psychological, Slice of Life: the ones you actually browse by.
+  const topGenres=Object.keys(gmap).filter(g=>gmap[g].length>=2).sort((x,y)=>gmap[y].length-gmap[x].length).slice(0,10);
   if(topGenres.length){
     html+=`<div class="row-div">Browse your list by genre</div>`;
     for(const g of topGenres){
@@ -9565,8 +9588,21 @@ function behindItems(){
     .filter(x=>x.behind>=1)
     .sort((x,y)=>y.behind-x.behind);
 }
+// Dismissable, because "pick up where you left off" is a suggestion and a
+// suggestion you cannot decline is a demand. It comes back when the situation
+// changes — a new episode, or a different show becoming the one you're most
+// behind on — rather than being gone for good, since the point is to be useful
+// tomorrow and not to be permanently silenced today.
+let _resumeGone='';
+function dismissResume(ev){
+  try{ev.stopPropagation();}catch(e){}
+  const items=behindItems();
+  _resumeGone=items.length?(items[0].a.id+':'+items[0].behind):'';
+  try{renderHome();}catch(e){}
+}
 function behindHTML(){
   const items=behindItems(); if(!items.length) return '';
+  if(_resumeGone===(items[0].a.id+':'+items[0].behind))return '';
   const {a,behind}=items[0];
   const more=items.length>1?` · +${items.length-1} more show${items.length>2?'s':''}`:'';
   // It was a sentence with a button on the end, and the sentence got longer the
@@ -9577,7 +9613,11 @@ function behindHTML(){
   const art=titleBg(a)||a.img;
   const ch=((a.title||'?').trim()[0]||'?').toUpperCase().replace(/['"<&]/g,'?');
   const next=(a.ep||0)+1;
-  return`<button class="resume-card" style="${accentVars(a)}" onclick="resumeWatch('${a.id}')">
+  // No accentVars here. Every other card on this screen wears the title's own
+  // colour, and this one sat above all of them wearing a different one — so the
+  // home screen opened on a colour clash with itself. It belongs to the app, not
+  // to the show, so it takes the theme.
+  return`<div class="resume-wrap"><button class="resume-card" onclick="resumeWatch('${a.id}')">
     ${art?`<img class="resume-art" src="${escH(art)}" alt="" loading="lazy" onerror="artFallback(this,${JSON.stringify(String(a.title||'?')).replace(/"/g,'&quot;')},'resume-ph')">`:`<span class="resume-ph">${ch}</span>`}
     <span class="resume-body">
       <span class="resume-k">Pick up where you left off</span>
@@ -9585,7 +9625,8 @@ function behindHTML(){
       <span class="resume-s">Episode ${next} · ${behind} waiting${more}</span>
     </span>
     <span class="resume-go">${icon('play')}</span>
-  </button>`;
+  </button>
+  <button class="resume-x" onclick="dismissResume(event)" aria-label="Dismiss">${icon('x')}</button></div>`;
 }
 
 // ─── STATS ──────────────────────────────────────────────────────────────────

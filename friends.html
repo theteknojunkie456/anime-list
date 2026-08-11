@@ -217,7 +217,10 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 .sort-btn.on,.sort-btn.filt-on{background:color-mix(in srgb,var(--a) 20%,var(--bg3));color:var(--a2);}
 .sort-btn .ico{width:13px;height:13px;}
 .sort-btn .ico:last-child{width:12px;height:12px;opacity:.7;}
-.sort-menu{position:absolute;right:0;top:calc(100% + 8px);z-index:60;min-width:172px;background:var(--bg2);border:1px solid var(--b2);border-radius:14px;padding:6px;box-shadow:0 18px 44px -12px rgba(0,0,0,.65);display:none;flex-direction:column;gap:2px;}
+.sort-menu{position:absolute;right:0;top:calc(100% + 8px);z-index:60;min-width:172px;background:var(--bg2);border:1px solid var(--b2);border-radius:14px;padding:6px;box-shadow:0 18px 44px -12px rgba(0,0,0,.65);display:none;flex-direction:column;gap:2px;
+  /* It grew an entry and could then run off the bottom of a short screen with no
+     way to reach the last one. Cap it against the viewport and let it scroll. */
+  max-height:min(62vh,420px);overflow-y:auto;overscroll-behavior:contain;}
 .sort-menu.on{display:flex;animation:sortIn .16s ease;}
 @keyframes sortIn{from{opacity:0;transform:translateY(-6px);}to{opacity:1;transform:none;}}
 .sort-opt{display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:10px;background:none;border:0;color:var(--t1);font-size:13.5px;font-weight:600;text-align:left;width:100%;cursor:pointer;}
@@ -633,8 +636,20 @@ body.first-paint .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards
   background:var(--bg3);border:1px solid var(--bn2);
   box-shadow:0 14px 34px -10px rgba(0,0,0,.62),0 3px 10px rgba(0,0,0,.34);
 }
+/* The + overhangs the top of the bar on purpose, and on iPhone its top was being
+   sliced off flat. WebKit clips descendants to the border box of any element
+   carrying backdrop-filter — so the blur cannot live on .nav itself. It moves to
+   a layer behind the buttons, which blurs identically and clips nothing.
+   Absolutely positioned, so it never becomes a sixth grid item. */
 @supports ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
-  .nav{background:color-mix(in srgb,var(--bg3) 76%,transparent);backdrop-filter:blur(22px) saturate(1.3);-webkit-backdrop-filter:blur(22px) saturate(1.3);}
+  .nav{background:transparent;border-color:transparent;box-shadow:none;}
+  .nav::before{
+    content:'';position:absolute;inset:0;border-radius:inherit;z-index:-1;
+    background:color-mix(in srgb,var(--bg3) 76%,transparent);
+    border:1px solid var(--bn2);
+    box-shadow:0 14px 34px -10px rgba(0,0,0,.62),0 3px 10px rgba(0,0,0,.34);
+    backdrop-filter:blur(22px) saturate(1.3);-webkit-backdrop-filter:blur(22px) saturate(1.3);
+  }
 }
 .nbtn{
   display:flex;flex-direction:column;align-items:center;gap:3px;justify-self:center;
@@ -648,7 +663,10 @@ body.first-paint .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards
 .nbtn.on{color:var(--a2);background:color-mix(in srgb,var(--a) 16%,transparent);}
 .nbtn.add{
   width:52px;height:52px;border-radius:50%;background:linear-gradient(180deg,var(--a2),var(--a));color:var(--aFg);font-size:25px;
-  justify-content:center;margin-top:-20px;padding:0;box-shadow:0 10px 26px -4px var(--glow),0 3px 10px rgba(0,0,0,0.4);
+  /* The lift is relative, not a negative margin: a margin gets absorbed into the
+     grid row's own sizing (it collapsed to 3px when the bar became a grid), and
+     it must not touch `transform`, which the press animation owns. */
+  justify-content:center;position:relative;top:-18px;padding:0;box-shadow:0 10px 26px -4px var(--glow),0 3px 10px rgba(0,0,0,0.4);
   border:1.5px solid rgba(255,255,255,0.14);
 }
 .nbtn.add:active{transform:scale(0.9) rotate(90deg);}
@@ -756,10 +774,27 @@ body.first-paint .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards
 .dt-top.has-banner .dt-title{text-shadow:0 2px 12px rgba(0,0,0,0.55);}
 .dt-cover{width:110px;height:156px;border-radius:16px;object-fit:cover;background:var(--bg4);border:1px solid var(--b2);flex-shrink:0;box-shadow:0 8px 24px rgba(0,0,0,0.4);}
 .dt-cover-ph{width:110px;height:156px;border-radius:16px;background:var(--bg4);border:1px solid var(--b2);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:34px;font-weight:900;color:var(--t3);}
-.dt-info{flex:1;min-width:0;display:flex;flex-direction:column;}
-.dt-title{font-size:18px;font-weight:900;letter-spacing:-0.3px;line-height:1.2;}
+/* The facts used to live in this column too — beside a 110px poster inside a
+   sheet, that leaves about 220px on a phone. Long titles wrapped to three lines,
+   the runtime pill wrapped to two and changed width from title to title, and
+   .dt-fav's margin-top:auto pushed the button to the bottom of a column whose
+   height depended on the poster, so the gap above it moved every time. That was
+   the "squished" and the "inconsistent" in one. They live in .dt-strip now, at
+   full sheet width, and the column holds the title alone. */
+.dt-info{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;gap:5px;}
+/* One row of facts, one shape, wrapping predictably. Uniform height and padding
+   across all three, so nothing reads as an odd one out. */
+.dt-strip{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 18px;}
+.dt-strip>*{
+  display:inline-flex;align-items:center;gap:7px;min-width:0;max-width:100%;
+  height:34px;padding:0 13px;border-radius:99px;
+  font-size:12px;font-weight:700;line-height:1;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis;
+}
+.dt-strip .ico{width:14px;height:14px;}
+.dt-title{font-size:19px;font-weight:900;letter-spacing:-0.3px;line-height:1.18;text-wrap:balance;}
 .dt-meta{font-size:11.5px;color:var(--t2);font-weight:600;margin-top:6px;line-height:1.5;}
-.dt-fav{align-self:flex-start;margin-top:auto;font-size:13px;font-weight:800;padding:8px 14px;border-radius:99px;background:var(--bg4);border:1px solid var(--b2);color:var(--t2);}
+.dt-fav{background:var(--bg4);border:1px solid var(--b2);color:var(--t2);cursor:pointer;transition:background-color .15s,color .15s,border-color .15s;}
 .dt-fav.on{background:var(--ag);border-color:var(--a);color:var(--a2);}
 .dt-label{font-family:var(--fd);font-size:12.5px;font-weight:600;color:var(--t3);margin:18px 0 8px;display:flex;align-items:center;gap:7px;flex-wrap:wrap;row-gap:6px;min-width:0;}
 .dt-label>*{min-width:0;}
@@ -1733,9 +1768,9 @@ body.recsel .pcard{position:relative;}
 /* ── AIRING SCHEDULE ── */
 .pcard-air{font-size:9.5px;font-weight:700;color:var(--wat);margin-top:4px;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .hero-air{display:inline-flex;align-items:center;gap:5px;margin-top:9px;font-size:11px;font-weight:700;color:#ffd9a0;background:rgba(245,166,35,0.18);border:1px solid rgba(245,166,35,0.34);padding:5px 11px;border-radius:99px;}
-.dt-air{display:inline-flex;align-items:center;gap:6px;margin-top:10px;font-size:11.5px;font-weight:700;color:var(--wat);background:var(--watbg);border:1px solid var(--wat);padding:7px 12px;border-radius:99px;align-self:flex-start;}
-.dt-runtime{display:inline-flex;align-items:center;gap:6px;margin-top:9px;font-size:12px;font-weight:700;color:var(--t1);background:color-mix(in srgb,var(--a) 12%,transparent);border:1px solid color-mix(in srgb,var(--a) 40%,transparent);padding:6px 11px;border-radius:99px;align-self:flex-start;flex-wrap:wrap;}
-.dt-runtime .ico{width:14px;height:14px;color:var(--a2);}
+.dt-air{color:var(--wat);background:var(--watbg);border:1px solid var(--wat);}
+.dt-runtime{color:var(--t1);background:color-mix(in srgb,var(--a) 12%,transparent);border:1px solid color-mix(in srgb,var(--a) 40%,transparent);}
+.dt-runtime .ico{color:var(--a2);}
 .dt-runtime b{color:var(--a2);}
 .dt-runtime-films{color:var(--t2);font-weight:600;}
 
@@ -5512,7 +5547,9 @@ async function retryUnmatched(){
 // Two different ratings, so both say whose: 'Rating' is your own stars, 'Top
 // rated' is AniList's community score, stored per title since the score work.
 const SORT_MODES=[['recent','clock','Recent'],['az',null,'A–Z'],['rating','star','Your rating'],['score','trophy','Top rated'],['progress','play','Progress'],['duration','film','Shortest']];
-const MENU_FILTS=[['finished','check','Finished'],['dropped','x','Dropped']];   // extra filters tucked in the menu
+// Favorites was a row on the home screen and nothing you could actually filter
+// TO — the one list you curate by hand, with no way to see only it.
+const MENU_FILTS=[['fav','heart','Favorites'],['finished','check','Finished'],['dropped','x','Dropped']];
 function renderSortRow(){
   try{renderFixBar();}catch(e){}
   const curSort=SORT_MODES.find(x=>x[0]===sortMode)||SORT_MODES[0];
@@ -5528,6 +5565,7 @@ function renderSortRow(){
   if(menu){
     const items=anime.filter(a=>kindOf(a)===viewKind); const cnt={finished:0,dropped:0};
     items.forEach(a=>{if(cnt[a.status]!==undefined)cnt[a.status]++;});
+    cnt.fav=items.filter(a=>a.fav).length;
     const sortHTML=SORT_MODES.map(([m,ic,t])=>`<button class="sort-opt${sortMode===m?' on':''}" onclick="pickSort('${m}')">${ic?icon(ic):'<span class="ico"></span>'}<span>${t}</span>${sortMode===m?`<span class="chk">${icon('check')}</span>`:''}</button>`).join('');
     const filtHTML=MENU_FILTS.map(([f,ic,t])=>`<button class="sort-opt${filterStatus===f?' on':''}" onclick="pickFilt('${f}')">${icon(ic)}<span>${t}</span><span class="sort-cnt">${cnt[f]||0}</span>${filterStatus===f?`<span class="chk">${icon('check')}</span>`:''}</button>`).join('');
     menu.innerHTML=sortHTML+`<div class="sort-div"></div>`+filtHTML;
@@ -5778,7 +5816,7 @@ function renderHome(){
   const pool=anime.filter(a=>kindOf(a)===viewKind);
   if(q||filterStatus!=='all'){
     let list=pool;
-    if(filterStatus!=='all')list=list.filter(a=>a.status===filterStatus);
+    if(filterStatus!=='all')list=list.filter(a=>filterStatus==='fav'?!!a.fav:a.status===filterStatus);
     // Sort normally FIRST, then order by relevance. Array.sort is stable, so two
     // titles that match equally well keep the order the list is meant to be in
     // rather than whatever order they happened to be stored in.
@@ -5788,11 +5826,11 @@ function renderHome(){
     }
     const hits=list;
     if(hits.length){el.innerHTML=`<div class="grid">${hits.map(posterCard).join('')}</div>`;return;}
-    const stLbl=filterStatus==='watching'?(isRead?'Reading':'Watching'):(STATUS_META[filterStatus]?STATUS_META[filterStatus].label:filterStatus);
+    const stLbl=filterStatus==='fav'?'Favorites':filterStatus==='watching'?(isRead?'Reading':'Watching'):(STATUS_META[filterStatus]?STATUS_META[filterStatus].label:filterStatus);
     const msg=q
       ?`No matches for “${schEsc(q)}”${filterStatus!=='all'?` in ${stLbl}`:` in your ${isRead?'reading':'watch'} list`}`
       :`Nothing in ${stLbl} yet`;
-    el.innerHTML=`<div class="empty"><div class="empty-icon">${q?icon('search'):(STATUS_META[filterStatus]?STATUS_META[filterStatus].icon:(isRead?icon('book'):icon('inbox')))}</div><p>${msg}</p></div>`;
+    el.innerHTML=`<div class="empty"><div class="empty-icon">${q?icon('search'):filterStatus==='fav'?icon('heart'):(STATUS_META[filterStatus]?STATUS_META[filterStatus].icon:(isRead?icon('book'):icon('inbox')))}</div><p>${msg}</p></div>`;
     return;
   }
   if(!pool.length){
@@ -6041,10 +6079,12 @@ function renderDetail(){
       <div class="dt-info">
         <div class="dt-title">${schEsc(a.title)}</div>
         <div class="dt-meta">${[a.eps, kindOf(a)==='read'?a.time:''].filter(Boolean).join(' · ')}</div>
-        ${(()=>{if(kindOf(a)!=='watch')return '';const tw=totalWatchMins(a),fm=filmMins(a);if(!tw)return '';return `<div class="dt-runtime">${icon('clock')} <b>${fmtWatch(tw)}</b> to watch${a.epTotal?` all ${a.epTotal} episodes`:''}${fm?`<span class="dt-runtime-films"> + ${fmtWatch(fm)} of films</span>`:''}</div>`;})()}
-        ${(()=>{const air=airingInfo(a);return air?`<div class="dt-air">${icon('calendar')} Ep ${air.ep} · ${air.out?(air.sub?'aired · subs soon':'out now'):'airs '+air.when}</div>`:'';})()}
-        <button class="dt-fav${a.fav?' on':''}" onclick="toggleFav()">${a.fav?icon('heart','fill')+' Favorited':icon('heart')+' Favorite'}</button>
       </div>
+    </div>
+    <div class="dt-strip">
+      ${(()=>{if(kindOf(a)!=='watch')return '';const tw=totalWatchMins(a),fm=filmMins(a);if(!tw)return '';return `<span class="dt-runtime">${icon('clock')}<b>${fmtWatch(tw)}</b>${a.epTotal?` · all ${a.epTotal} eps`:''}${fm?`<span class="dt-runtime-films"> +${fmtWatch(fm)} films</span>`:''}</span>`;})()}
+      ${(()=>{const air=airingInfo(a);return air?`<span class="dt-air">${icon('calendar')} Ep ${air.ep} · ${air.out?(air.sub?'aired · subs soon':'out now'):'airs '+air.when}</span>`:'';})()}
+      <button class="dt-fav${a.fav?' on':''}" onclick="toggleFav()">${a.fav?icon('heart','fill')+' Favorited':icon('heart')+' Favorite'}</button>
     </div>
     ${(()=>{const n=nextUpOf(a);if(!n)return'';
       // Beside the poster this had about 140px to work with, so "Next season"
@@ -14104,10 +14144,13 @@ function _updBusy(){
 // you'd explain it to a friend — what they can now do, not what the code does.
 // No version numbers or jargon in the notes; the date IS the version.
 const RELEASE={
-  v:'2026-08-11.1',
+  v:'2026-08-11.2',
   title:'Seasons, specials, and progress that keeps itself',
   push:'Every film and special on the show it belongs to \u2014 and progress that marks itself.',
   notes:[
+    'A show\u2019s facts \u2014 how long it takes, when the next episode lands, whether it\u2019s a favourite \u2014 sat in a narrow column beside the poster, so long titles squashed to three lines and the pills changed size and position from show to show. They now run full width in one row, all the same shape, in the same place every time.',
+    'Favorites is a filter now: it\u2019s in the sort menu with a count, so you can see only the ones you picked.',
+    'The + on the bottom bar was having its top sliced off on iPhone. Fixed, and it sits properly proud of the bar again.',
     'All / Watching / Plan is one segmented control now instead of three loose buttons \u2014 one track, and only the list you\u2019re actually in is filled, in that list\u2019s own colour. The counts read as counts.',
     'The bottom bar\u2019s five slots are now equal, so the + sits exactly in the middle and the spacing is even. It was drifting a few pixels off centre.',
     'Search finds what you mean. “aot” finds Attack on Titan, the Japanese name finds the English one, a doubled-letter shorthand like “jjk” works, and one wrong letter no longer means no results \u2014 with the closest match first.',

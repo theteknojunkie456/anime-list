@@ -286,9 +286,20 @@ struct WatchListShell: UIViewRepresentable {
                     }
                 }
                 let paused = (body["paused"] as? Bool) ?? false
+                // The address of the frame that is actually playing video is the
+                // single most reliable thing a site ever tells us about what it
+                // calls a show — and it costs the viewer nothing to say it. Taken
+                // from frameInfo, never from the page: a script in an ad frame can
+                // post any body it likes, but it cannot forge where it is running.
+                var frameJS = "''"
+                if let u = msg.frameInfo.request.url?.absoluteString, !u.isEmpty,
+                   let enc = try? JSONSerialization.data(withJSONObject: [u]),
+                   let arr = String(data: enc, encoding: .utf8) {
+                    frameJS = "\(arr)[0]"
+                }
                 // Hand it to the app's own page, which is where progress lives.
-                let js = String(format: "window.wlNativePlayback&&window.wlNativePlayback({t:%f,d:%f,paused:%@})",
-                                t, d, paused ? "true" : "false")
+                let js = String(format: "window.wlNativePlayback&&window.wlNativePlayback({t:%f,d:%f,paused:%@,frame:%@})",
+                                t, d, paused ? "true" : "false", frameJS)
                 DispatchQueue.main.async { [weak self] in
                     self?.web?.evaluateJavaScript(js, in: nil,
                                                   in: .page, completionHandler: nil)

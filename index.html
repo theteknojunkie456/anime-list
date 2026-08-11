@@ -8913,7 +8913,13 @@ function renderSettings(){
   if(adminToken())rows.push({ic:'users',h:'Admin',p:'Approve members, invites, broadcast, cards',go:'openAdmin()'});
   // Only when there's something to report — a permanently visible "problems"
   // row makes a working app look broken.
-  const probs=recentProblems();
+  //
+  // And only on the owner's device. "Something went wrong · 3 problems recorded
+  // — tap to copy the details" is a developer's tool wearing a warning colour:
+  // nobody else can read a stack trace, act on it, or send it anywhere, so all
+  // it does is tell them their app is broken and offer them nothing. Everyone
+  // still RECORDS problems; it's the alarming, unusable row that's owner-only.
+  const probs=adminToken()?recentProblems():[];
   if(probs.length)rows.push({ic:'clipboard',h:'Something went wrong',
     p:probs.length+(probs.length===1?' problem recorded':' problems recorded')+' — tap to copy the details',
     go:'copyProblems()',warn:true});
@@ -9280,7 +9286,14 @@ function fillSourceTokens(template,a,ep){
     // actually calls it — that's the whole point of resolving it once.
     try{const h=srcHost(template);if(h)_slug=feedSlug(a,h)||'';}catch(e){}
   }
-  if(!_slug)_slug=streamSlug(slugTitle(a));
+  if(!_slug){
+    // Last resort: derive one. Match how this site spells the shows it has
+    // already been taught, rather than always hyphen-plus-whatever-title-we-hold.
+    let st=null; try{st=siteSlugStyle(srcHost(template));}catch(e){}
+    const pick=(st&&st.which&&a[st.which])||slugTitle(a);
+    _slug=streamSlug(pick);
+    if(st&&st.sep==='_')_slug=_slug.replace(/-/g,'_');
+  }
   const txt={title:t,query:t,slug:_slug,slug_:_slug.replace(/-/g,'_'),titleenglish:a.titleEn||t,titleromaji:a.titleRo||t,titlenative:a.titleNa||t}; // url-encoded ({slug_}=attack_on_titan)
   return String(template||'').replace(/\{(\w+)\}/g,(m,k)=>{
     const key=k.toLowerCase();
@@ -9510,27 +9523,60 @@ function pvSetFromName(){
   const fixed=isRead?readURL(a,pvWatchEp||0):streamURL(a,pvWatchEp||1).url;
   if(fixed)document.getElementById('pvFrame').src=fixed;
 }
+// Reading the show's name out of a real address. This was inline in the paste
+// flow, which meant only a hand-pasted URL could teach the app anything — the
+// same lesson as launchURL: one parser, so every source of a real address feeds
+// the same learning.
+function slugFromURL(url,tpl){
+  let path=[]; try{path=new URL(url).pathname.split('/').filter(Boolean);}catch(e){return '';}
+  // Where does {slug} sit in the template we're using? Split as TEXT — URL()
+  // would percent-encode the braces and never match.
+  const tSegs=String(tpl||'').replace(/^https?:\/\/[^/]+/i,'').split('?')[0].split('/').filter(Boolean);
+  let idx=-1;
+  for(let i=0;i<tSegs.length;i++)if(/\{(slug|slug_)\}/i.test(decodeURIComponent(tSegs[i]))){idx=i;break;}
+  let out='';
+  if(idx>=0&&path[idx])out=path[idx];
+  else{
+    // Shape doesn't line up — take the segment that isn't structural or an episode.
+    const STRUCT=/^(watch|anime|series|video|tv|show|title|play|stream|v|w|en|sub|dub)$/i;
+    for(const seg of path){ if(STRUCT.test(seg)||/^(ep|episode|e)[-_]?\d+$/i.test(seg)||/^\d+$/.test(seg))continue; out=seg; }
+  }
+  return out?out.replace(/[_-]?(ep|episode)[-_]?\d+$/i,''):'';
+}
+// A site spells a show its own way, and the guess was one fixed recipe: hyphens,
+// whichever title we happen to hold. A site that uses underscores, or romaji
+// where we hold the English name, earned a 404 on the first try every time —
+// while the answer sat in the slugs already learned for that same site. So read
+// the house style off those and guess in it.
+function siteSlugStyle(host){
+  const m=slugMap()[String(host||'').toLowerCase()]||{};
+  const ids=Object.keys(m);
+  if(!ids.length)return null;
+  const flat=s=>String(s||'').toLowerCase().replace(/[^a-z0-9]/g,'');
+  let usc=0,tot=0; const score={title:0,titleEn:0,titleRo:0};
+  ids.forEach(id=>{
+    const slug=m[id]; if(!slug)return; tot++;
+    if(slug.indexOf('_')>=0&&slug.indexOf('-')<0)usc++;
+    const a=anime.find(x=>String(x.aniId)===id); if(!a)return;
+    const f=flat(slug); if(!f)return;
+    if(flat(a.title)===f)score.title++;
+    if(flat(a.titleEn)===f)score.titleEn++;
+    if(flat(a.titleRo)===f)score.titleRo++;
+  });
+  if(!tot)return null;
+  const best=Object.keys(score).reduce((x,y)=>score[y]>score[x]?y:x,'title');
+  return {sep:usc>tot/2?'_':'-', which:score[best]>0?best:''};
+}
 function pvSetFromURL(){
   const a=anime.find(x=>x.id===pvReturnId); if(!a)return;
   const raw=((document.getElementById('pvSetIn')||{}).value||'').trim();
   if(!raw){toast('Paste the address of the page you’re on');return;}
   const url=normSrc(raw);
-  let path=[]; try{path=new URL(url).pathname.split('/').filter(Boolean);}catch{toast('That doesn’t look like a web address');return;}
+  try{new URL(url);}catch{toast('That doesn’t look like a web address');return;}
   const tplNow=effectiveSource(a)||'';
-  // Where does {slug} sit in the template we're using? Split as TEXT — URL()
-  // would percent-encode the braces and never match.
-  const tSegs=String(tplNow).replace(/^https?:\/\/[^/]+/i,'').split('?')[0].split('/').filter(Boolean);
-  let idx=-1;
-  for(let i=0;i<tSegs.length;i++)if(/\{(slug|slug_)\}/i.test(decodeURIComponent(tSegs[i]))){idx=i;break;}
-  let learnedSlug='';
-  if(idx>=0&&path[idx])learnedSlug=path[idx];
-  else{
-    // Shape doesn't line up — take the segment that isn't structural or an episode.
-    const STRUCT=/^(watch|anime|series|video|tv|show|title|play|stream|v|w|en|sub|dub)$/i;
-    for(const seg of path){ if(STRUCT.test(seg)||/^(ep|episode|e)[-_]?\d+$/i.test(seg)||/^\d+$/.test(seg))continue; learnedSlug=seg; }
-  }
+  const learnedSlug=slugFromURL(url,tplNow);
   if(!learnedSlug){toast('Couldn’t read a show name from that address');return;}
-  a.srcSlug=learnedSlug.replace(/[_-]?(ep|episode)[-_]?\d+$/i,'');
+  a.srcSlug=learnedSlug;
   setLearnedSlug(a,a.srcSlug,tplNow);        // keyed by site, so it can be synced and shared
   // If the address spells the show differently from the title we hold, the
   // address is the one that's demonstrably right — it's the page that loaded.
@@ -10020,9 +10066,35 @@ function canResumeHere(a){
 const RP_FRESH_MS=45000;                 // no report in this long → assume it stopped
 const RP_DONE=0.85;                      // 85% of runtime = watched; clears credits
 function realPlaybackLive(){return !!_rp.at&&(Date.now()-_rp.at)<RP_FRESH_MS;}
+// The one address we can be certain about: the page that is playing the episode
+// you are watching right now. Everything else the app knows about a site's naming
+// had to be typed in. This is free, and it is the site's own spelling — so the
+// next episode, and every show after it, builds a link that works.
+//
+// Only from the source's own host. The probe runs in every frame by design, ads
+// included, and an ad frame reporting its own address must not rename anything.
+// The address comes from the shell's frameInfo rather than the page, so a frame
+// can lie about a lot but not about where it is.
+function noteLiveURL(u){
+  try{
+    if(!u)return;
+    const a=anime.find(x=>x.id===pvReturnId); if(!a||kindOf(a)==='read')return;
+    const tpl=effectiveSource(a); const want=srcHost(tpl); if(!want)return;
+    const got=new URL(u).hostname.replace(/^www\./,'').toLowerCase();
+    if(got!==want&&!got.endsWith('.'+want))return;
+    const slug=slugFromURL(u,tpl);
+    // Learn the name only. Adopting a whole new template, or renaming the show
+    // the way the paste flow does, are things that should happen because someone
+    // chose them — not silently, mid-episode, off a page we didn't look at.
+    if(!slug||slug===a.srcSlug)return;
+    a.srcSlug=slug; setLearnedSlug(a,slug,tpl);
+    try{save();}catch(e){}
+  }catch(e){}
+}
 window.wlNativePlayback=function(info){
   try{
     if(!info)return;
+    if(info.frame)noteLiveURL(info.frame);
     const t=+info.t, d=+info.d;
     if(!isFinite(t)||!isFinite(d)||d<=60)return;   // adverts and preview clips aren't episodes
     // Several frames can report at once — a pre-roll in one, the episode in

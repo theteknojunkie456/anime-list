@@ -3179,6 +3179,16 @@ const DEFAULT_DATA=[];   // new users start with their own empty list, not a dem
 // ─── STATE ─────────────────────────────────────────────────────────────────
 let anime=[],sortMode='recent',filterStatus='all',detailId=null,editingId=null,curStatus='plan',deleteId=null,importItems=[],curAITab='rec',curTheme='default',viewKind='watch',curKind='watch';
 function kindOf(a){return (a&&a.kind)==='read'?'read':'watch';}
+// The detail sheet had its own local stLabel(), so anything OUTSIDE that function
+// referencing it threw ReferenceError — which is exactly what silently killed the
+// selection menu: every entry in it is built from a status label, so the whole
+// menu failed to render and right-click appeared to do nothing at all. One
+// definition, in scope everywhere, next to the data it labels.
+function statusLabel(st,read){
+  return read
+    ? (st==='plan'?'To read':st==='watching'?'Reading':st==='finished'?'Read':'Dropped')
+    : (st==='plan'?'Plan':st==='watching'?'Watch':st==='finished'?'Done':'Drop');
+}
 const STATUS_META={
   watching:{label:'Watching',tag:'Watching',icon:icon('play'),color:'var(--wat)'},
   plan:{label:'Plan to Watch',tag:'Plan',icon:icon('clipboard'),color:'var(--pln)'},
@@ -6391,9 +6401,7 @@ function renderDetail(){
   const bannerHTML=art?`<div class="dt-banner"><img class="dt-banner-img" src="${escH(art)}" loading="lazy" alt="" onerror="this.closest('.dt-banner').remove()"><div class="dt-banner-scrim"></div></div>`:'';
   // Watch/Plan/Done/Drop reads wrong on a manga. Same four states, said the way
   // that kind of thing is actually talked about.
-  const stLabel=st=>read
-    ? (st==='plan'?'To read':st==='watching'?'Reading':st==='finished'?'Read':'Dropped')
-    : (st==='plan'?'Plan':st==='watching'?'Watch':st==='finished'?'Done':'Drop');
+  const stLabel=st=>statusLabel(st,read);
   const statusBtns=Object.keys(STATUS_META).map(s=>
     `<button class="dpick${a.status===s?' on-'+s:''}" onclick="setDetailStatus('${s}')">${STATUS_META[s].icon} ${stLabel(s)}</button>`).join('');
   const p=prog(a);
@@ -12459,7 +12467,8 @@ function bulkSetStatus(st){
   if(!ids.length)return;
   let n=0;
   ids.forEach(id=>{const a=anime.find(x=>x.id===id);if(a&&a.status!==st){a.status=st;touch(a);n++;}});
-  _menuDone(n,ids.length===1?`Moved to ${stLabel(st)}`:`${n} moved to ${stLabel(st)}`);
+  const _lbl=statusLabel(st,viewKind==='read');
+  _menuDone(n,ids.length===1?`Moved to ${_lbl}`:`${n} moved to ${_lbl}`);
 }
 // One menu, two ways in: right-click on a desktop, long-press on a phone. Both
 // are the gesture people already use for "do something to this", and neither
@@ -12483,7 +12492,7 @@ function openBulkMenu(x,y,singleId){
   const el=document.createElement('div');
   el.id='bulkMenu';el.className='bulk-menu';
   el.innerHTML=`<div class="bulk-menu-h">${one?schEsc(one.title).slice(0,42):n+' selected'}</div>`
-    +Object.keys(STATUS_META).map(st=>`<button class="bulk-mi" onclick="bulkSetStatus('${st}')">${STATUS_META[st].icon}<span>Move to ${stLabel(st)}</span></button>`).join('')
+    +Object.keys(STATUS_META).map(st=>`<button class="bulk-mi" onclick="bulkSetStatus('${st}')">${STATUS_META[st].icon}<span>Move to ${statusLabel(st,viewKind==='read')}</span></button>`).join('')
     +`<div class="bulk-menu-d"></div>`
     +`<button class="bulk-mi" onclick="bulkFav(true)">${icon('heart')}<span>Favourite</span></button>`
     +`<button class="bulk-mi" onclick="bulkFav(false)">${icon('heart')}<span>Remove favourite</span></button>`
@@ -12545,7 +12554,7 @@ function bulkBarHTML(){
   if(!bulkOn())return '';
   return `<div class="bulk-bar">
     <span class="bulk-n">${bulkSel.size} selected</span>
-    ${Object.keys(STATUS_META).map(st=>`<button class="bulk-b" onclick="bulkSetStatus('${st}')">${STATUS_META[st].icon} ${stLabel(st)}</button>`).join('')}
+    ${Object.keys(STATUS_META).map(st=>`<button class="bulk-b" onclick="bulkSetStatus('${st}')">${STATUS_META[st].icon} ${statusLabel(st,viewKind==='read')}</button>`).join('')}
     <button class="bulk-x" onclick="bulkClear()" aria-label="Clear selection">${icon('x')}</button>
   </div>`;
 }

@@ -2253,6 +2253,22 @@ body.recsel .pcard{position:relative;}
    the thing you are selecting stays fully visible while you select it. */
 .pcard.bulk .pcard-wrap{outline:2.5px solid var(--a);outline-offset:2px;border-radius:15px;}
 .pcard.bulk .pcard-img,.pcard.bulk .pcard-ph{opacity:.72;}
+.bulk-menu{position:fixed;z-index:120;min-width:210px;padding:6px;border-radius:16px;
+  background:var(--bg2);border:1px solid var(--b3);box-shadow:0 22px 60px -14px rgba(0,0,0,.8);
+  animation:sortIn .14s ease;}
+.bulk-menu-h{padding:7px 11px 8px;font-size:10.5px;font-weight:800;letter-spacing:.07em;
+  text-transform:uppercase;color:var(--t3);}
+.bulk-menu-d{height:1px;background:var(--bn2);margin:5px 6px;}
+.bulk-mi{display:flex;align-items:center;gap:10px;width:100%;padding:9px 11px;border:0;border-radius:10px;
+  background:none;color:var(--t1);font-family:inherit;font-size:13px;font-weight:600;text-align:left;cursor:pointer;}
+.bulk-mi:hover{background:var(--bg3);}
+.bulk-mi .ico{width:15px;height:15px;color:var(--t3);flex:none;}
+.bulk-rate{display:flex;gap:2px;padding:4px 7px 6px;}
+.bulk-star{flex:1;padding:6px 0;border:0;background:none;color:var(--t3);cursor:pointer;transition:color .12s;}
+.bulk-star:hover,.bulk-star:hover~.bulk-star{color:var(--t3);}
+.bulk-rate:hover .bulk-star{color:#ffd85e;}
+.bulk-star:hover~.bulk-star{color:var(--t3);}
+.bulk-star .ico{width:17px;height:17px;}
 .bulk-bar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--safe-b) + 96px);z-index:61;
   display:flex;align-items:center;gap:8px;padding:9px 10px 9px 14px;border-radius:99px;
   background:color-mix(in srgb,var(--bg3) 92%,transparent);border:1px solid var(--bn2);
@@ -5944,7 +5960,8 @@ function posterCard(a,nSeas){
   const _nx=nextUpOf(a);
   const durBits=[twMins?fmtWatch(twMins):'',_nx?(_nx.soon?'S2 soon':'S2 out'):''].filter(Boolean);
   const durLine=durBits.length?`<div class="pcard-sub">${durBits.join(' \u00b7 ')}</div>`:'';
-  return`<div class="pcard${recSel&&recSel.has(a.id)?' sel':''}${bulkSel&&bulkSel.has(a.id)?' bulk':''}" onclick="pcTap('${a.id}',event)">
+  return`<div class="pcard${recSel&&recSel.has(a.id)?' sel':''}${bulkSel&&bulkSel.has(a.id)?' bulk':''}" onclick="pcTap('${a.id}',event)"
+    oncontextmenu="pcMenu('${a.id}',event)" ontouchstart="pcHoldStart('${a.id}',event)" ontouchmove="pcHoldMove(event)" ontouchend="pcHoldEnd()" ontouchcancel="pcHoldEnd()">
     <div class="pcard-wrap">
       ${img}
       <span class="pcard-badge b-${a.status}">${statusTag(a)}</span>
@@ -12447,6 +12464,70 @@ function bulkSetStatus(st){
   render();
   toast(n?`${n} moved to ${label}`:'Already there');
 }
+// One menu, two ways in: right-click on a desktop, long-press on a phone. Both
+// are the gesture people already use for "do something to this", and neither
+// needs a mode to be entered first. If a selection is running it acts on all of
+// it; if not, it acts on the card you touched.
+let _bulkMenuOn=false;
+function openBulkMenu(x,y){
+  closeBulkMenu();
+  if(!bulkOn())return;
+  const n=bulkSel.size;
+  const el=document.createElement('div');
+  el.id='bulkMenu';el.className='bulk-menu';
+  el.innerHTML=`<div class="bulk-menu-h">${n} selected</div>`
+    +Object.keys(STATUS_META).map(st=>`<button class="bulk-mi" onclick="bulkSetStatus('${st}')">${STATUS_META[st].icon}<span>Move to ${stLabel(st)}</span></button>`).join('')
+    +`<div class="bulk-menu-d"></div>`
+    +`<button class="bulk-mi" onclick="bulkFav(true)">${icon('heart')}<span>Favourite</span></button>`
+    +`<button class="bulk-mi" onclick="bulkFav(false)">${icon('heart')}<span>Remove favourite</span></button>`
+    +`<div class="bulk-menu-d"></div>`
+    +`<div class="bulk-rate">${[1,2,3,4,5].map(r=>`<button class="bulk-star" onclick="bulkRate(${r})" aria-label="Rate ${r}">${icon('star')}</button>`).join('')}</div>`;
+  document.body.appendChild(el);
+  // Placed where you clicked, then pulled back inside the window — a menu that
+  // opens half off-screen is worse than one that opens somewhere predictable.
+  const r=el.getBoundingClientRect();
+  const px=Math.min(Math.max(8,(x||innerWidth/2)-r.width/2),innerWidth-r.width-8);
+  const py=Math.min(Math.max(8,(y||innerHeight/2)),innerHeight-r.height-8);
+  el.style.left=px+'px';el.style.top=py+'px';
+  _bulkMenuOn=true;
+  setTimeout(()=>document.addEventListener('pointerdown',_bulkMenuAway,{once:true}),0);
+}
+function _bulkMenuAway(ev){const m=document.getElementById('bulkMenu');if(m&&m.contains(ev.target)){document.addEventListener('pointerdown',_bulkMenuAway,{once:true});return;}closeBulkMenu();}
+function closeBulkMenu(){const m=document.getElementById('bulkMenu');if(m)m.remove();_bulkMenuOn=false;}
+function bulkFav(on){
+  if(!bulkOn())return;let n=0;
+  bulkSel.forEach(id=>{const a=anime.find(x=>x.id===id);if(a&&!!a.fav!==on){a.fav=on;touch(a);n++;}});
+  closeBulkMenu();bulkSel=null;_bulkAnchor=-1;
+  try{save();}catch(e){}render();
+  toast(n?`${n} ${on?'favourited':'unfavourited'}`:'Already there');
+}
+function bulkRate(r){
+  if(!bulkOn())return;let n=0;
+  bulkSel.forEach(id=>{const a=anime.find(x=>x.id===id);if(a&&a.rating!==r){a.rating=r;touch(a);n++;}});
+  closeBulkMenu();bulkSel=null;_bulkAnchor=-1;
+  try{save();}catch(e){}render();
+  toast(n?`${n} rated ${r}★`:'Already rated');
+}
+// Long-press is the phone's right-click. It starts a selection with the card you
+// held and opens the same menu, so nothing about the feature is desktop-only.
+let _lpT=0,_lpX=0,_lpY=0;
+function pcHoldStart(id,ev){
+  try{
+    const t=ev.touches&&ev.touches[0];if(!t)return;
+    _lpX=t.clientX;_lpY=t.clientY;
+    clearTimeout(_lpT);
+    _lpT=setTimeout(()=>{
+      if(!bulkSel||!bulkSel.has(id)){if(!bulkSel)bulkSel=new Set();bulkSel.add(id);_bulkAnchor=_cardIds().indexOf(id);render();}
+      try{if(navigator.vibrate)navigator.vibrate(12);}catch(e){}
+      openBulkMenu(_lpX,_lpY);
+    },480);
+  }catch(e){}
+}
+function pcHoldMove(ev){
+  const t=ev.touches&&ev.touches[0];if(!t)return;
+  if(Math.abs(t.clientX-_lpX)>10||Math.abs(t.clientY-_lpY)>10)clearTimeout(_lpT);   // it's a scroll
+}
+function pcHoldEnd(){clearTimeout(_lpT);}
 function bulkBarHTML(){
   if(!bulkOn())return '';
   return `<div class="bulk-bar">
@@ -12454,6 +12535,12 @@ function bulkBarHTML(){
     ${Object.keys(STATUS_META).map(st=>`<button class="bulk-b" onclick="bulkSetStatus('${st}')">${STATUS_META[st].icon} ${stLabel(st)}</button>`).join('')}
     <button class="bulk-x" onclick="bulkClear()" aria-label="Clear selection">${icon('x')}</button>
   </div>`;
+}
+function pcMenu(id,ev){
+  try{ev.preventDefault();}catch(e){}
+  if(!bulkSel||!bulkSel.has(id)){if(!bulkSel)bulkSel=new Set();bulkSel.add(id);_bulkAnchor=_cardIds().indexOf(id);render();}
+  openBulkMenu(ev.clientX,ev.clientY);
+  return false;
 }
 function pcTap(id,ev){
   if(recSel){if(recSel.has(id))recSel.delete(id);else recSel.add(id);const el=ev&&ev.currentTarget;if(el)el.classList.toggle('sel',recSel.has(id));updateRecSelBar();return;}
@@ -14750,10 +14837,11 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-11.13',
+  v:'2026-08-11.14',
   title:'A cleaner app, and progress that keeps itself',
   push:'Progress that marks itself \u2014 and a lot of polish.',
   notes:[
+    'Pick several shows at once and move them together. On a desktop: click, shift-click or shift+arrow for a run, space for scattered ones, right-click for the menu. On a phone: press and hold. Then move them to a list, favourite them or rate them in one go.',
     'Progress keeps itself. Use the site\u2019s own next-episode link and WatchList follows along; in the iPhone app it reads the actual playback position, so what you watched is what gets marked \u2014 down to the minute you stopped.',
     'Air times are the Japanese broadcast, and your source gets it later. The countdown now says the episode aired and shows how long the wait usually is \u2014 measured from your own watching, per site. Episode alerts wait too.',
     'Cards say what\u2019s waiting: a show you\u2019re behind on wears a \u201c7 new\u201d tag, so the grid answers what to put on tonight instead of only what you own.',
@@ -14929,9 +15017,33 @@ function _kbFocus(i){
   try{cards[_kbIdx].scrollIntoView({block:'nearest',behavior:_scrollBehavior()});}catch(e){}
 }
 function _kbClear(){document.querySelectorAll('.pcard.kbfocus').forEach(c=>c.classList.remove('kbfocus'));_kbIdx=-1;}
-function _kbMove(d){const cards=_kbCards();if(!cards.length)return;_kbFocus(_kbIdx<0?0:_kbIdx+d);}
-function _kbMoveRow(dir){const cards=_kbCards();if(!cards.length)return;_kbFocus(_kbIdx<0?0:_kbIdx+dir*_kbCols(cards));}
-const KB_HELP=[['/','Search'],['a','Add a title'],['h l ← →','Move between cards'],['j k ↑ ↓','Move a whole row'],['Enter','Open the focused card'],['Esc','Close / clear'],['?','This help']];
+// Holding shift while moving extends the selection instead of replacing it —
+// the same contract as a file list or a spreadsheet, which is where the reflex
+// comes from. The card you started on is the anchor; everything between it and
+// where you are now is selected, so backing up unselects rather than piling on.
+function _kbSelectTo(i){
+  const ids=_cardIds();if(!ids.length)return;
+  if(_bulkAnchor<0)_bulkAnchor=_kbIdx<0?i:_kbIdx;
+  const [a,b]=_bulkAnchor<i?[_bulkAnchor,i]:[i,_bulkAnchor];
+  bulkSel=new Set();
+  for(let j=a;j<=b;j++)if(ids[j])bulkSel.add(ids[j]);
+  render();
+  // render() rebuilds the grid, so the focus ring has to be put back on.
+  setTimeout(()=>_kbFocus(i),0);
+}
+function _kbMove(d,extend){
+  const cards=_kbCards();if(!cards.length)return;
+  const i=Math.max(0,Math.min((_kbIdx<0?0:_kbIdx)+d,cards.length-1));
+  if(extend)return _kbSelectTo(i);
+  _kbFocus(i);
+}
+function _kbMoveRow(dir,extend){
+  const cards=_kbCards();if(!cards.length)return;
+  const i=Math.max(0,Math.min((_kbIdx<0?0:_kbIdx)+dir*_kbCols(cards),cards.length-1));
+  if(extend)return _kbSelectTo(i);
+  _kbFocus(i);
+}
+const KB_HELP=[['/','Search'],['a','Add a title'],['h l ← →','Move between cards'],['j k ↑ ↓','Move a whole row'],['⇧ + ←→↑↓','Select a run of cards'],['Space','Add one card to the selection'],['Enter','Open, or act on the selection'],['Right-click','Act on a card'],['Esc','Clear selection / close'],['?','This help']];
 function toggleKbHelp(){
   let el=document.getElementById('kbHelp');
   if(!el){
@@ -14944,7 +15056,9 @@ function toggleKbHelp(){
 }
 function closeKbHelp(){const el=document.getElementById('kbHelp');if(el)el.classList.remove('on');}
 document.addEventListener('keydown',e=>{
-  if(e.key==='Escape'){closeKbHelp();closeAll();closeConfirm();closeYT();if(_kbTyping()&&document.activeElement.blur)document.activeElement.blur();_kbClear();return;}
+  if(e.key==='Escape'){
+    if(bulkOn()){bulkClear();return;}      // clear the selection before closing anything else
+    closeKbHelp();closeAll();closeConfirm();closeYT();if(_kbTyping()&&document.activeElement.blur)document.activeElement.blur();_kbClear();return;}
   if(e.metaKey||e.ctrlKey||e.altKey)return;   // leave OS/browser combos (Cmd+L, Ctrl+A…) alone
   if(e.key==='/'&&!_kbTyping()){e.preventDefault();
     // In an open party, "/" jumps to the chat so you can talk; otherwise it focuses search.
@@ -14956,11 +15070,20 @@ document.addEventListener('keydown',e=>{
   if(_kbTyping()||_kbBlocked())return;
   switch(e.key){
     case 'a':e.preventDefault();try{openSheet_add();}catch(_){}break;
-    case 'ArrowRight':case 'l':e.preventDefault();_kbMove(1);break;
-    case 'ArrowLeft':case 'h':e.preventDefault();_kbMove(-1);break;
-    case 'ArrowDown':case 'j':e.preventDefault();_kbMoveRow(1);break;
-    case 'ArrowUp':case 'k':e.preventDefault();_kbMoveRow(-1);break;
-    case 'Enter':{const cards=_kbCards();if(_kbIdx>=0&&cards[_kbIdx]){e.preventDefault();cards[_kbIdx].click();}break;}
+    case 'ArrowRight':case 'l':e.preventDefault();_kbMove(1,e.shiftKey);break;
+    case 'ArrowLeft':case 'h':e.preventDefault();_kbMove(-1,e.shiftKey);break;
+    case 'ArrowDown':case 'j':e.preventDefault();_kbMoveRow(1,e.shiftKey);break;
+    case 'ArrowUp':case 'k':e.preventDefault();_kbMoveRow(-1,e.shiftKey);break;
+    // Space toggles the focused card, so a selection can be built out of ones
+    // that aren't next to each other — shift gives you a run, space gives you
+    // a handful.
+    case ' ':{const ids=_cardIds();if(_kbIdx>=0&&ids[_kbIdx]){e.preventDefault();bulkToggle(ids[_kbIdx],false);setTimeout(()=>_kbFocus(_kbIdx),0);}break;}
+    case 'Enter':{
+      // With a selection running, Enter is about the selection, not the card
+      // the ring happens to be on — otherwise it would open a sheet over the
+      // work in progress.
+      if(bulkOn()){e.preventDefault();openBulkMenu();break;}
+      const cards=_kbCards();if(_kbIdx>=0&&cards[_kbIdx]){e.preventDefault();cards[_kbIdx].click();}break;}
   }
 });
 

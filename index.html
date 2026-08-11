@@ -5102,12 +5102,67 @@ function airedToday(a){
 // watchable here — a simulcast is subtitled after the episode airs, usually
 // inside the hour. Flipping straight to "out now" sent you to a source that
 // genuinely didn't have it yet, so the first stretch past zero says so.
-const SUB_LAG_MS=60*60000;
-function airStage(sec){                       // 'wait' | 'sub' | 'out'
+// An hour is the simulcast average and nothing's average. One source mirrors
+// within minutes, another is reliably three hours behind, and the only source
+// that matters is the one you actually open — so each host earns its own number
+// the same way hosts already earn a framing verdict: from what happened.
+//
+// Two kinds of evidence, and they bracket the answer from opposite sides. An
+// episode that PLAYED at +40m proves it existed by then — an upper bound, never
+// a measurement, because you opened it when you opened it, not the moment it
+// landed. An episode opened at +25m that never played is the other half: weak
+// on its own, but a repeated one says the source isn't ready that early.
+const SUBLAG_KEY='sub_lag';
+const SUB_LAG_DEF=60, SUB_LAG_MIN=5, SUB_LAG_MAX=360;   // minutes
+function subLagLog(){try{const v=JSON.parse(localStorage.getItem(SUBLAG_KEY)||'{}');return (v&&typeof v==='object')?v:{};}catch{return{};}}
+function saveSubLagLog(m){try{localStorage.setItem(SUBLAG_KEY,JSON.stringify(m));}catch{}}
+function noteSubLag(host,mins,ok){
+  host=String(host||'').toLowerCase();
+  if(!host||!(mins>0)||mins>SUB_LAG_MAX)return;
+  const m=subLagLog(), e=m[host]||{hit:[],miss:[]};
+  const arr=ok?(e.hit=e.hit||[]):(e.miss=e.miss||[]);
+  arr.push(Math.round(mins));
+  if(arr.length>12)arr.shift();          // a source that speeds up shouldn't be judged on last year
+  m[host]=e; saveSubLagLog(m);
+}
+function subLagMins(host){
+  const e=subLagLog()[String(host||'').toLowerCase()];
+  if(!e)return SUB_LAG_DEF;
+  const hit=(e.hit||[]).slice().sort((a,b)=>a-b), miss=(e.miss||[]).slice().sort((a,b)=>a-b);
+  if(hit.length<3)return SUB_LAG_DEF;    // two lucky opens is a coincidence, not a pattern
+  // A low percentile, not the median: every hit is an upper bound, so the middle
+  // of them measures your viewing habits rather than the source. The earliest
+  // the source has repeatedly been ready is the closest thing to the truth here.
+  let est=hit[Math.floor(hit.length*0.2)];
+  // A bail-out only tells us anything if it happened EARLIER than the source has
+  // ever been proven to have something. Later than that and it contradicts a real
+  // play, which means it was a wrong episode or a changed mind, not an absence —
+  // guesswork must never outrank proof. Second-earliest, so one bad night is not
+  // evidence on its own.
+  const early=miss.filter(v=>v<hit[0]);
+  if(early.length>=2)est=Math.max(est,early[1]+10);
+  return Math.min(SUB_LAG_MAX,Math.max(SUB_LAG_MIN,est));
+}
+// Turn one watch session into evidence about its source's timing. Strictly the
+// episode that just aired: any other one and the gap measures your backlog, not
+// the source. Watching episode 3 of a finished show would otherwise teach the
+// app that the site is four years slow.
+function noteSubLagSession(id,ep,ok){
+  try{
+    const a=anime.find(x=>x.id===id);
+    if(!a||kindOf(a)!=='watch'||!a.airAt||!ep||ep!==a.airEp)return;
+    const mins=(Date.now()-a.airAt*1000)/60000;
+    if(mins>0)noteSubLag(itemHost(a),mins,ok);
+  }catch(e){}
+}
+function subLagLearned(host){const e=subLagLog()[String(host||'').toLowerCase()];return !!(e&&(e.hit||[]).length>=3);}
+function itemHost(a){try{return a?srcHost(effectiveSource(a)||''):'';}catch(e){return '';}}
+function subLagMs(a){return subLagMins(itemHost(a))*60000;}
+function airStage(sec,lagMs){                 // 'wait' | 'sub' | 'out'
   if(!sec)return 'wait';
   const d=sec*1000-Date.now();
   if(d>0)return 'wait';
-  return -d<SUB_LAG_MS?'sub':'out';
+  return -d<(lagMs||SUB_LAG_DEF*60000)?'sub':'out';
 }
 function airingInfo(a){
   if(kindOf(a)!=='watch'||!a.airAt)return null;
@@ -5115,7 +5170,7 @@ function airingInfo(a){
   if(ms<Date.now()){
     if(!airedToday(a))return null;   // properly in the past — refreshed by fetchCovers
     const t=new Date(ms).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
-    const sub=airStage(a.airAt)==='sub';
+    const sub=airStage(a.airAt,subLagMs(a))==='sub';
     return{ep:a.airEp||0,soon:true,out:true,sub,day:'',time:t,date:'',when:sub?'Subs soon':'Out now'};
   }
   const d=new Date(ms);
@@ -5427,8 +5482,9 @@ function bbCountdown(a){
   const ms=a.airAt*1000-Date.now();
   if(ms<=0){
     if(!airedToday(a))return '';
-    return airStage(a.airAt)==='sub'
-      ?`<div class="bb-cd">${icon('clock')} Ep ${a.airEp||''} aired · subs soon</div>`
+    const lag=subLagMs(a), left=a.airAt*1000+lag-Date.now();
+    return airStage(a.airAt,lag)==='sub'
+      ?`<div class="bb-cd">${icon('clock')} Ep ${a.airEp||''} aired · subs ~${untilStr(left)}</div>`
       :`<div class="bb-cd is-out">${icon('play')} Ep ${a.airEp||''} out now</div>`;
   }
   return `<div class="bb-cd">${icon('clock')} Ep ${a.airEp||''} \u00b7 ${untilStr(ms)}</div>`;
@@ -5445,8 +5501,15 @@ function epNextHTML(a){
     +', '+d.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
   if(ms<=0){
     if(!airedToday(a))return '';
-    if(airStage(a.airAt)==='sub')
-      return `<div class="dt-ep-next">${icon('clock')} <b>Episode ${a.airEp||''}</b> aired \u00b7 subs usually within the hour</div>`;
+    const lag=subLagMs(a);
+    if(airStage(a.airAt,lag)==='sub'){
+      const left=a.airAt*1000+lag-Date.now(), h=itemHost(a);
+      const when=`~${untilStr(left)}`;
+      // Name the source once it's earned its own number \u2014 "expect it on X" is a
+      // different, checkable claim from a generic "subs are coming".
+      const line=(h&&subLagLearned(h))?`expect it on ${schEsc(h)} in ${when}`:`subs expected in ${when}`;
+      return `<div class="dt-ep-next">${icon('clock')} <b>Episode ${a.airEp||''}</b> aired \u00b7 ${line}</div>`;
+    }
     return `<div class="dt-ep-next is-out">${icon('play')} <b>Episode ${a.airEp||''}</b> is out \u00b7 <span>${schEsc(stamp)}</span></div>`;
   }
   return `<div class="dt-ep-next">${icon('clock')} <b>Episode ${a.airEp||''}</b> in ${untilStr(ms)} \u00b7 <span>${schEsc(stamp)}</span></div>`;
@@ -7262,12 +7325,14 @@ function nativeNotifyCode(){if(!IS_NATIVE)return;try{window.webkit.messageHandle
 function nativeScheduleNotifs(){
   if(!IS_NATIVE)return;
   try{
-    // The shell delays each one by the simulcast lag, so something that aired in
-    // the last hour still has a notification ahead of it — don't drop it here.
-    const now=Date.now()/1000-SUB_LAG_MS/1000;
+    // Each item carries its own source's lag, so the phone buzzes when that
+    // source has it rather than when Tokyo aired it. Anything that aired within
+    // the longest lag we'd ever apply still has a notification ahead of it, so
+    // it can't be filtered out here.
+    const now=Date.now()/1000-SUB_LAG_MAX*60;
     const _list=anime.filter(a=>kindOf(a)==='watch'&&(a.status==='watching'||a.status==='plan'||a.status==='finished')&&a.airAt&&a.airAt>now)
-      .map(a=>({title:a.title,at:a.airAt,ep:a.airEp||0}));
-    upcomingRelated().forEach(r=>{if(r.airAt&&r.airAt>now)_list.push({title:r.title,at:r.airAt,ep:r.airEp||0});});
+      .map(a=>({title:a.title,at:a.airAt,ep:a.airEp||0,lag:subLagMins(itemHost(a))*60}));
+    upcomingRelated().forEach(r=>{if(r.airAt&&r.airAt>now)_list.push({title:r.title,at:r.airAt,ep:r.airEp||0,lag:subLagMins(itemHost(r))*60});});
     const items=_list.sort((x,y)=>x.at-y.at).slice(0,60);
     window.webkit.messageHandlers.wl.postMessage({type:'notify',items});
   }catch(e){}
@@ -9952,7 +10017,7 @@ window.wlNativePlayback=function(info){
       const box=document.getElementById('pvBlocked');
       if(box&&box.classList.contains('on'))box.classList.remove('on');
       clearTimeout(_pvBlockT);
-      if(!_rp.proved){_rp.proved=1;const h=currentWatchHost();if(h)noteFrame(h,true);}
+      if(!_rp.proved){_rp.proved=1;const h=currentWatchHost();if(h)noteFrame(h,true);noteSubLagSession(pvReturnId,pvWatchEp,true);}
     }catch(e){}
     if(!pvReturnId||!pvWatchEp)return;
     const a=anime.find(x=>x.id===pvReturnId);
@@ -10468,6 +10533,22 @@ function noteFrame(host,ok,sure){
 // is a good default and a bad thing to be stuck with: a site that was down for a
 // day, or a run of bad luck, would keep opening in the browser forever with no
 // way to see why or say otherwise. So it's visible, and one tap forgets it.
+// The estimate steers a countdown and a notification, so it shouldn't be a
+// number only the app can see. One line per source it's worked out, and one tap
+// to throw the record away if a site changes how fast it is.
+function subLagHTML(){
+  const m=subLagLog();
+  const hosts=Object.keys(m).filter(h=>subLagLearned(h));
+  if(!hosts.length)return '';
+  return `<div class="dt-label" style="margin-top:18px">How far behind each site runs</div>
+    <p class="ai-desc">Measured from your own watching — how long after an episode airs in Japan that site has actually had it. Countdowns and episode alerts wait this long instead of firing on the broadcast.</p>
+    <div class="src-picks">${hosts.map(h=>`<button class="src-chip" onclick="forgetSubLag('${escH(h)}')">${escH(h)} · ~${subLagMins(h)}m · forget</button>`).join('')}</div>`;
+}
+function forgetSubLag(host){
+  const m=subLagLog(); delete m[String(host||'').toLowerCase()]; saveSubLagLog(m);
+  toast(`${host} timing forgotten`);
+  try{renderSource();}catch(e){}
+}
 function frameBlockedHTML(){
   const m=frameLog();
   const off=Object.keys(m).filter(h=>frameRefuses(h));
@@ -11897,6 +11978,7 @@ function renderSource(){
       </div>
       <p class="ai-desc" id="srcExNote" style="margin-top:8px;font-size:11px">${srcExNoteHTML()}</p>
       ${frameBlockedHTML()}
+      ${subLagHTML()}
 
       ${IS_NATIVE?`
       <div class="dt-label" style="margin-top:20px">${icon('film')} Services you pay for</div>
@@ -11976,6 +12058,11 @@ function closePlayer(){
     const it=anime.find(x=>x.id===id);
     const blocked=document.getElementById('pvBlocked');
     if(it&&elapsed>20000&&!(blocked&&blocked.classList.contains('on')))noteFrame(srcHost(effectiveSource(it)),true);
+    // A full sitting is proof the episode was there. Opening a just-aired episode
+    // and leaving inside two minutes is the opposite — not proof of anything on
+    // its own, which is why it takes a repeated one to move the estimate.
+    if(elapsed>=AUTO_MARK_MS||realPlaybackLive())noteSubLagSession(id,ep,true);
+    else if(elapsed<PEEK_MS)noteSubLagSession(id,ep,false);
   }catch(e){}
   const from=_pvReadFrom;
   pvReturnId=null; pvWatchEp=null; pvOpenTime=0; _pvReadFrom=null;
@@ -13403,10 +13490,14 @@ function schedGo(dir){if(dir==='today')schedOffset=0;else schedOffset+=dir;rende
 // from AniList so the countdown is exact to the minute; a chapter only ever has
 // a date (no platform publishes a time for one), so it counts whole days and
 // says so rather than implying a precision that doesn't exist.
-function schedCountdown(sec,dayOnly){
+function schedCountdown(sec,dayOnly,lagMin){
   const d=sec*1000-Date.now();
   // dayOnly is a chapter, which has no broadcast/sub split to speak of.
-  if(d<=0)return (!dayOnly&&airStage(sec)==='sub')?'subs soon':'out now';
+  if(d<=0){
+    const lag=(lagMin||SUB_LAG_DEF)*60000;
+    if(dayOnly||airStage(sec,lag)!=='sub')return 'out now';
+    return 'subs ~'+untilStr(sec*1000+lag-Date.now());
+  }
   if(dayOnly){
     // Calendar days, not 24-hour blocks — something landing tomorrow morning is
     // "tomorrow" even when it's less than a day away.
@@ -13426,7 +13517,7 @@ function schedTick(){
   if(!els.length){clearInterval(schedTickT);schedTickT=null;return;}
   els.forEach(el=>{
     const at=Number(el.getAttribute('data-at'))||0;
-    if(at)el.textContent=schedCountdown(at,el.getAttribute('data-day')==='1');
+    if(at)el.textContent=schedCountdown(at,el.getAttribute('data-day')==='1',Number(el.getAttribute('data-lag'))||0);
   });
 }
 function schedTickStart(){
@@ -13554,7 +13645,7 @@ async function loadSchedWeek(ws){
   renderSchedDays(ws,eps.concat(schedReadEntries(startSec,endSec)).sort((x,y)=>x.airingAt-y.airingAt));
 }
 function schedFallback(startSec,endSec){
-  const out=[];schedWatchItems().forEach(a=>{if(a.airAt&&a.airAt>=startSec&&a.airAt<endSec)out.push({id:a.id,title:a.title,img:a.img,episode:a.airEp||0,airingAt:a.airAt,aniId:a.aniId});});
+  const out=[];schedWatchItems().forEach(a=>{if(a.airAt&&a.airAt>=startSec&&a.airAt<endSec)out.push({id:a.id,title:a.title,img:a.img,episode:a.airEp||0,airingAt:a.airAt,aniId:a.aniId,lag:subLagMins(itemHost(a))});});
   return out.sort((x,y)=>x.airingAt-y.airingAt);
 }
 async function fetchSchedEpisodes(startSec,endSec){
@@ -13569,11 +13660,11 @@ async function fetchSchedEpisodes(startSec,endSec){
       const r=await fetch('https://graphql.anilist.co',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({query:q})});
       if(r.status===429){await pause(1500);i-=50;continue;}
       const j=await r.json();const arr=(j&&j.data&&j.data.Page&&j.data.Page.airingSchedules)||[];
-      arr.forEach(s=>{const a=byAni[s.mediaId];if(!a)return;const k=s.mediaId+':'+s.episode;if(seen.has(k))return;seen.add(k);out.push({id:a.id,title:a.title,img:a.img,episode:s.episode,airingAt:s.airingAt,aniId:s.mediaId});});
+      arr.forEach(s=>{const a=byAni[s.mediaId];if(!a)return;const k=s.mediaId+':'+s.episode;if(seen.has(k))return;seen.add(k);out.push({id:a.id,title:a.title,img:a.img,episode:s.episode,airingAt:s.airingAt,aniId:s.mediaId,lag:subLagMins(itemHost(a))});});
     }catch(e){/* network hiccup — remaining chunks + airAt fallback still populate */}
     if(i+50<ids.length)await pause(700);
   }
-  watch.forEach(a=>{if(!a.airAt||a.airAt<startSec||a.airAt>=endSec)return;const k=(a.aniId||a.id)+':'+(a.airEp||0);if(seen.has(k))return;seen.add(k);out.push({id:a.id,title:a.title,img:a.img,episode:a.airEp||0,airingAt:a.airAt,aniId:a.aniId});});
+  watch.forEach(a=>{if(!a.airAt||a.airAt<startSec||a.airAt>=endSec)return;const k=(a.aniId||a.id)+':'+(a.airEp||0);if(seen.has(k))return;seen.add(k);out.push({id:a.id,title:a.title,img:a.img,episode:a.airEp||0,airingAt:a.airAt,aniId:a.aniId,lag:subLagMins(itemHost(a))});});
   return out.sort((x,y)=>x.airingAt-y.airingAt);
 }
 function renderSchedDays(ws,eps){
@@ -13598,7 +13689,7 @@ function renderSchedDays(ws,eps){
         const nset=e.read?notifSetR:notifSet;
         const bell=nset&&e.aniId&&nset.has(e.aniId)?'<span class="sched-bell" title="Notifications on">'+icon('bell')+'</span>':'';
         var _isRel=e.id&&(''+e.id).indexOf('rel:')===0;var _click=_isRel?("addRelatedSched('"+e.aniId+"')"):("openDetail('"+e.id+"')");var _newt=_isRel?'<span class="sched-new">NEW</span>':'';
-        var _cd='<span class="sched-cd" data-at="'+e.airingAt+'"'+(e.read?' data-day="1"':'')+'>'+schedCountdown(e.airingAt,!!e.read)+'</span>';
+        var _cd='<span class="sched-cd" data-at="'+e.airingAt+'" data-lag="'+(e.lag||0)+'"'+(e.read?' data-day="1"':'')+'>'+schedCountdown(e.airingAt,!!e.read,e.lag)+'</span>';
         var _sub=(e.read?('New chapter \u00b7 expected'):('Ep '+(e.episode||'?')+' \u00b7 '+t))+' \u00b7 '+_cd;
         rows+='<div class="sched-row'+(e.read?' is-read':'')+'" onclick="'+_click+'">'+thumb+'<div class="sched-row-main"><div class="sched-row-title">'+schEsc(e.title)+_newt+bell+'</div><div class="sched-row-sub">'+_sub+'</div></div></div>';
       });
@@ -13770,11 +13861,11 @@ function _updBusy(){
 // you'd explain it to a friend — what they can now do, not what the code does.
 // No version numbers or jargon in the notes; the date IS the version.
 const RELEASE={
-  v:'2026-08-10.1',
+  v:'2026-08-10.2',
   title:'Seasons, specials, and progress that keeps itself',
   push:'Every film and special on the show it belongs to \u2014 and progress that marks itself.',
   notes:[
-    'Air times are the Japanese broadcast, and subtitles follow it by about an hour \u2014 so the countdown no longer jumps straight to \u201cout now\u201d and send you to a source that hasn\u2019t got it. It says the episode aired and subs are coming, then flips once they normally have. The phone waits too.',
+    'Air times are the Japanese broadcast, and your source gets it later \u2014 so the countdown no longer jumps straight to \u201cout now\u201d and sends you somewhere that hasn\u2019t got it yet. It says the episode aired and shows how long the wait usually is, then flips. How long is measured from your own watching, per site, so a fast mirror and a slow one aren\u2019t treated the same. Episode alerts wait too. Settings \u2192 Sources shows what it worked out.',
     'Every show now carries its films, OVAs and specials alongside its seasons, and tapping any of them adds it and opens it. No searching for the next season by name.',
     'Finished something with more to come? It says so on the cover and on the show itself, and stays there until you act on it \u2014 instead of one pop-up you had four seconds to catch.',
     'Progress keeps itself. Use the site\u2019s own next-episode link and WatchList follows along; in the iPhone app it now reads the actual playback position, so what you watched is what gets marked.',

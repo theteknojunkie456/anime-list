@@ -439,7 +439,7 @@ body.first-paint .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards
 .bb-slide .hero-bg-img{animation:none;will-change:auto;}
 .bb-slide.bb-live .hero-bg-img{animation:kenburns 24s ease-in-out infinite alternate;will-change:transform;}
 @media(prefers-reduced-motion:reduce){.bb-slide.bb-live .hero-bg-img{animation:none;will-change:auto;}}
-.bb-cd{position:absolute;top:12px;left:14px;z-index:4;display:inline-flex;align-items:center;gap:6px;
+.bb-cd{position:absolute;top:12px;left:14px;z-index:4;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;max-width:calc(100% - 28px);
   padding:6px 11px;border-radius:99px;font-size:11.5px;font-weight:700;letter-spacing:.01em;color:#fff;
   background:rgba(8,8,11,.62);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
   border:1px solid rgba(255,255,255,.13);font-variant-numeric:tabular-nums;}
@@ -685,7 +685,8 @@ body.first-paint .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards
 .dt-meta{font-size:11.5px;color:var(--t2);font-weight:600;margin-top:6px;line-height:1.5;}
 .dt-fav{align-self:flex-start;margin-top:auto;font-size:13px;font-weight:800;padding:8px 14px;border-radius:99px;background:var(--bg4);border:1px solid var(--b2);color:var(--t2);}
 .dt-fav.on{background:var(--ag);border-color:var(--a);color:var(--a2);}
-.dt-label{font-family:var(--fd);font-size:12.5px;font-weight:600;color:var(--t3);margin:18px 0 8px;display:flex;align-items:center;gap:7px;}
+.dt-label{font-family:var(--fd);font-size:12.5px;font-weight:600;color:var(--t3);margin:18px 0 8px;display:flex;align-items:center;gap:7px;flex-wrap:wrap;row-gap:6px;min-width:0;}
+.dt-label>*{min-width:0;}
 .dt-label::after{content:'';flex:1;height:1px;background:var(--bn2);}
 .dt-status{display:flex;gap:6px;}
 .dpick{flex:1;padding:9px 0;border-radius:11px;font-size:11px;font-weight:800;background:var(--bg4);border:1px solid var(--b2);color:var(--t3);transition:background-color .13s,border-color .13s,color .13s;}
@@ -812,6 +813,18 @@ body.first-paint .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards
 .dt-next{display:flex;align-items:center;gap:9px;margin:12px 18px 0;padding:9px 10px 9px 13px;border-radius:13px;
   background:var(--bg3);border:1px solid var(--bn2);}
 .dt-next-k{flex:0 0 auto;font-size:11px;font-weight:700;color:var(--t3);white-space:nowrap;}
+/* On a phone there isn't room for a label, a title, a button and a dismiss on one
+   line — the title was losing, down to 99px and ellipsised, which is the one part
+   you actually need to read. The row stacks instead: label and title get the full
+   width, the controls sit under them. */
+@media(max-width:430px){
+  .dt-next{flex-wrap:wrap;row-gap:9px;}
+  .dt-next-k{flex:1 0 100%;order:1;}
+  .dt-next-t{flex:1 0 calc(100% - 30px);order:2;white-space:normal;overflow:visible;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+  .dt-next-x{order:3;}
+  .dt-next-go{order:4;flex:1 0 100%;text-align:center;padding:9px 13px;}
+}
 .dt-next-t{flex:1;min-width:0;font-size:12.5px;font-weight:600;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .dt-next-go{flex:0 0 auto;padding:7px 13px;border-radius:99px;background:var(--a);color:var(--aFg);font-size:11.5px;font-weight:800;}
 .dt-next-x{flex:0 0 auto;display:flex;color:var(--t3);padding:3px;}

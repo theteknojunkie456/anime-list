@@ -192,12 +192,23 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
   background:var(--bg3);border:1px solid var(--bn2);
   box-shadow:0 12px 30px -16px rgba(0,0,0,.8);
 }
+/* Same trap as the + button: WebKit clips descendants to the border box of any
+   element with backdrop-filter, and the sort menu is a descendant of this one.
+   The blur goes on a layer behind, so the menu can hang below the bar. */
 @supports ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
-  .topbar{background:color-mix(in srgb,var(--bg3) 74%,transparent);
-    backdrop-filter:blur(22px) saturate(1.3);-webkit-backdrop-filter:blur(22px) saturate(1.3);}
+  .topbar{background:transparent;border-color:transparent;box-shadow:none;}
+  .topbar::before{
+    content:'';position:absolute;inset:0;border-radius:inherit;z-index:-1;
+    background:color-mix(in srgb,var(--bg3) 74%,transparent);
+    border:1px solid var(--bn2);box-shadow:0 12px 30px -16px rgba(0,0,0,.8);
+    backdrop-filter:blur(22px) saturate(1.3);-webkit-backdrop-filter:blur(22px) saturate(1.3);
+  }
 }
 .topbar .search-row,.topbar .ctrl-row{padding:0;}
-.topbar .ctrl-row{border-top:1px solid var(--bn2);padding-top:9px;}
+/* Two bars, not one panel with a divider: search is one job, filtering is
+   another, and stacking them behind a single edge made them read as one
+   compound control. */
+.topbar-ctrl{margin-top:8px;}
 .topbar .ctrl-row::after{display:none;}          /* the panel already draws the edge */
 .topbar .search-in{background:transparent;border-color:transparent;box-shadow:none;padding-top:8px;padding-bottom:8px;}
 .topbar .search-in:focus{background:color-mix(in srgb,var(--bg2) 60%,transparent);border-color:color-mix(in srgb,var(--a) 55%,transparent);box-shadow:0 0 0 3px var(--ag);}
@@ -275,27 +286,35 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
      sliced in half by the scroller's edge — a segmented control that cannot show
      all its segments is not one. It fills the row and the segments share the
      space instead. */
-  display:flex;gap:2px;width:auto;max-width:100%;min-width:0;padding:3px;border-radius:99px;
+  display:flex;gap:0;width:auto;max-width:100%;min-width:0;padding:3px;border-radius:99px;
   background:color-mix(in srgb,var(--bg3) 74%,transparent);
   border:1px solid rgba(255,255,255,.10);
   box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 4px 14px -8px rgba(0,0,0,.6);
 }
+/* What read as cheap: a pill inside a pill inside a pill. The count wore its own
+   little capsule, inside a chip, inside a track — three nested rounded shapes at
+   three sizes, which is the visual signature of a control assembled rather than
+   designed. The count is now just a number, set smaller and lighter beside the
+   label, and the only rounded shape left is the segment itself. */
 .filt-row .fchip{
-  background:none;border:1px solid transparent;box-shadow:none;padding:6px 11px;
+  background:none;border:0;box-shadow:none;padding:7px 13px;height:34px;
   flex:0 1 auto;min-width:0;justify-content:center;overflow:hidden;
+  font-size:12.5px;font-weight:700;letter-spacing:-.01em;gap:7px;
 }
 .filt-row .fchip>span.fn{flex:none;}
 .filt-row .fchip:not(.on):not([class*="on-"]):hover{color:var(--t1);}
-/* The filled segment gets the depth the track used to hand to everybody. */
+/* The selected one is a solid surface, not a wash: an opaque plate with a top
+   highlight and a shadow under it, so it reads as physically raised out of the
+   track rather than tinted inside it. */
 .filt-row .fchip.on,.filt-row .fchip[class*="on-"]{
-  box-shadow:0 2px 8px -3px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.10);
+  box-shadow:0 1px 0 rgba(255,255,255,.10) inset,0 3px 10px -3px rgba(0,0,0,.7);
 }
-/* Counts are data, so they get to look like data rather than trailing text. */
 .filt-row .fn{
-  padding:1px 6px;border-radius:99px;background:rgba(255,255,255,.07);opacity:1;
-  color:inherit;min-width:17px;text-align:center;
+  padding:0;background:none;border-radius:0;opacity:1;min-width:0;
+  font-size:11px;font-weight:700;font-variant-numeric:tabular-nums;
+  color:var(--t3);
 }
-.filt-row .fchip:not(.on):not([class*="on-"]) .fn{color:var(--t3);}
+.filt-row .fchip.on .fn,.filt-row .fchip[class*="on-"] .fn{color:inherit;opacity:.72;}
 /* Its own row, full width. It lived in the filter row and made that
    horizontally-scrolling row wide enough to push "All" off the left edge — an
    alert shouldn't cost you a filter, and a wider tap target is the point. */
@@ -2104,8 +2123,7 @@ body.recsel .pcard{position:relative;}
   .search-in{padding-left:34px;font-size:13px;}
   .kseg{width:36px;height:36px;}
   .sort-row,.qp-chips,.row-scroll,.rz-scroll{padding-left:14px;padding-right:14px;}
-  .filt-row .fchip{padding:6px 8px;font-size:11px;}
-  .filt-row .fn{padding:1px 5px;}
+  .filt-row .fchip{padding:7px 9px;font-size:11.5px;gap:5px;}
   .sort-btn{padding:8px 10px;}
   .row-head,.row-div,.dt-label{padding-left:14px;padding-right:14px;}
   .billboard,.rz-sec>.rz-head{margin-left:0;}
@@ -2184,6 +2202,8 @@ body.recsel .pcard{position:relative;}
       </div>
       <div class="kind-seg" id="kindSeg"></div>
     </div>
+  </div>
+  <div class="topbar topbar-ctrl">
     <div class="ctrl-row">
       <div class="filt-scroll"><div class="filt-row" id="filtRow"></div></div>
       <div class="sort-wrap">

@@ -321,9 +321,19 @@ async function hostFrames(host) {
     const csp = (r.headers.get('content-security-policy') || '').toLowerCase();
     const fa = (csp.match(/frame-ancestors([^;]*)/) || [])[1] || '';
     const challenged = !!r.headers.get('cf-mitigated') || r.status === 403;
-    let verdict = 'ok';
-    if (xfo === 'deny' || xfo === 'sameorigin' || /'none'|'self'/.test(fa)) verdict = 'blocked';
-    if (challenged) verdict = 'unknown';         // headers belong to the challenge, not the site
+    const refuses = xfo === 'deny' || xfo === 'sameorigin' || /'none'|'self'/.test(fa);
+    let verdict = refuses ? 'blocked' : 'ok';
+    // A bot challenge means the BODY isn't the site's, so "ok" can't be trusted
+    // from one — that's why this downgrades to unknown. But a refusal on a
+    // challenged response is still a refusal, and throwing it away is what let
+    // miruro.tv be framed into "refused to connect" with no explanation: it
+    // answers 403 behind Cloudflare AND sends x-frame-options: sameorigin, so
+    // the evidence was measured, recorded in `xfo`, and then discarded.
+    //
+    // Either reading gives the same answer. If the header is the site's, it
+    // refuses framing. If it belongs to the challenge, then the challenge is
+    // what an iframe would load, and challenges don't render in one either.
+    if (challenged && !refuses) verdict = 'unknown';
     return { frames: verdict, xfo: xfo || null, challenged, at: new Date().toISOString() };
   } catch (e) { return null; }
 }

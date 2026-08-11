@@ -9434,10 +9434,16 @@ function pvWatchBlocked(f){
   // A slow site can paint after the deadline. Whenever the frame really loads,
   // the panel goes away again — it used to stay up over a page you could see.
   const painted=()=>{
-    // A load event proves nothing about whether the SITE rendered (a blocked
-    // frame fires it too), so this no longer claims a verdict either way. It
-    // only clears the timer, and the published header verdict decides.
-    clearTimeout(_pvBlockT); box.classList.remove('on');
+    // A load event proves nothing about whether the SITE rendered — a refused
+    // frame fires one too, because the browser's own "refused to connect" page
+    // is a load. Clearing the timer on it is what left that error sitting there
+    // with no way out: the panel that offers the browser never got to appear.
+    //
+    // So a load only stands the panel down for a host known to frame. Anywhere
+    // else the deadline keeps running, and if the site really did paint, the
+    // panel is one tap to dismiss — far better than a dead end with no exit.
+    const v=host?framesVerdict(host):'unknown';
+    if(v==='ok'){clearTimeout(_pvBlockT);box.classList.remove('on');}
   };
   // One listener, not one per episode. These used to stack up across a binge;
   // now that the handler writes to the ledger, stale copies would count a single

@@ -417,6 +417,11 @@ enum Notifier {
     static func requestAuth() {
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { _, _ in }
     }
+    // `at` is the Japanese broadcast slot. Firing on it buzzes the phone an hour
+    // before anything subtitled exists — the notification pulls you into the app
+    // for an episode no source has yet, which is worse than arriving late. Wait
+    // out the simulcast lag, then the body text is actually true when it lands.
+    static let subLag: TimeInterval = 3600
     static func schedule(_ items: [[String: Any]]) {
         let c = UNUserNotificationCenter.current()
         c.removeAllPendingNotificationRequests()
@@ -424,7 +429,8 @@ enum Notifier {
         var scheduled = 0
         for it in items {
             guard let title = it["title"] as? String else { continue }
-            let at = (it["at"] as? Double) ?? (it["at"] as? NSNumber)?.doubleValue ?? 0
+            let raw = (it["at"] as? Double) ?? (it["at"] as? NSNumber)?.doubleValue ?? 0
+            let at = raw > 0 ? raw + subLag : 0
             if at <= now + 60 || scheduled >= 60 { continue }   // future only; iOS caps ~64 pending
             let ep = (it["ep"] as? Int) ?? (it["ep"] as? NSNumber)?.intValue ?? 0
             let content = UNMutableNotificationContent()

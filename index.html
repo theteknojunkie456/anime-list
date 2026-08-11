@@ -5098,13 +5098,25 @@ function airedToday(a){
   const d=new Date();d.setHours(0,0,0,0);
   return ms>=d.getTime();
 }
+// airAt is the Japanese broadcast slot, which is not the moment anything is
+// watchable here — a simulcast is subtitled after the episode airs, usually
+// inside the hour. Flipping straight to "out now" sent you to a source that
+// genuinely didn't have it yet, so the first stretch past zero says so.
+const SUB_LAG_MS=60*60000;
+function airStage(sec){                       // 'wait' | 'sub' | 'out'
+  if(!sec)return 'wait';
+  const d=sec*1000-Date.now();
+  if(d>0)return 'wait';
+  return -d<SUB_LAG_MS?'sub':'out';
+}
 function airingInfo(a){
   if(kindOf(a)!=='watch'||!a.airAt)return null;
   const ms=a.airAt*1000;
   if(ms<Date.now()){
     if(!airedToday(a))return null;   // properly in the past — refreshed by fetchCovers
     const t=new Date(ms).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
-    return{ep:a.airEp||0,soon:true,out:true,day:'',time:t,date:'',when:'Out now'};
+    const sub=airStage(a.airAt)==='sub';
+    return{ep:a.airEp||0,soon:true,out:true,sub,day:'',time:t,date:'',when:sub?'Subs soon':'Out now'};
   }
   const d=new Date(ms);
   // Within a week → weekday + time ("Wed 4:00 PM"); further out → the actual date
@@ -5413,7 +5425,12 @@ function untilStr(ms){
 function bbCountdown(a){
   if(kindOf(a)!=='watch'||!a.airAt)return '';
   const ms=a.airAt*1000-Date.now();
-  if(ms<=0)return airedToday(a)?`<div class="bb-cd is-out">${icon('play')} Ep ${a.airEp||''} out now</div>`:'';
+  if(ms<=0){
+    if(!airedToday(a))return '';
+    return airStage(a.airAt)==='sub'
+      ?`<div class="bb-cd">${icon('clock')} Ep ${a.airEp||''} aired · subs soon</div>`
+      :`<div class="bb-cd is-out">${icon('play')} Ep ${a.airEp||''} out now</div>`;
+  }
   return `<div class="bb-cd">${icon('clock')} Ep ${a.airEp||''} \u00b7 ${untilStr(ms)}</div>`;
 }
 // The same fact at the foot of the episode list, where you look when you've just
@@ -5428,6 +5445,8 @@ function epNextHTML(a){
     +', '+d.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
   if(ms<=0){
     if(!airedToday(a))return '';
+    if(airStage(a.airAt)==='sub')
+      return `<div class="dt-ep-next">${icon('clock')} <b>Episode ${a.airEp||''}</b> aired \u00b7 subs usually within the hour</div>`;
     return `<div class="dt-ep-next is-out">${icon('play')} <b>Episode ${a.airEp||''}</b> is out \u00b7 <span>${schEsc(stamp)}</span></div>`;
   }
   return `<div class="dt-ep-next">${icon('clock')} <b>Episode ${a.airEp||''}</b> in ${untilStr(ms)} \u00b7 <span>${schEsc(stamp)}</span></div>`;
@@ -5829,7 +5848,7 @@ function renderDetail(){
         <div class="dt-title">${schEsc(a.title)}</div>
         <div class="dt-meta">${[a.eps, kindOf(a)==='read'?a.time:''].filter(Boolean).join(' · ')}</div>
         ${(()=>{if(kindOf(a)!=='watch')return '';const tw=totalWatchMins(a),fm=filmMins(a);if(!tw)return '';return `<div class="dt-runtime">${icon('clock')} <b>${fmtWatch(tw)}</b> to watch${a.epTotal?` all ${a.epTotal} episodes`:''}${fm?`<span class="dt-runtime-films"> + ${fmtWatch(fm)} of films</span>`:''}</div>`;})()}
-        ${(()=>{const air=airingInfo(a);return air?`<div class="dt-air">${icon('calendar')} Ep ${air.ep} · ${air.out?'out now':'airs '+air.when}</div>`:'';})()}
+        ${(()=>{const air=airingInfo(a);return air?`<div class="dt-air">${icon('calendar')} Ep ${air.ep} · ${air.out?(air.sub?'aired · subs soon':'out now'):'airs '+air.when}</div>`:'';})()}
         <button class="dt-fav${a.fav?' on':''}" onclick="toggleFav()">${a.fav?icon('heart','fill')+' Favorited':icon('heart')+' Favorite'}</button>
       </div>
     </div>
@@ -7243,7 +7262,9 @@ function nativeNotifyCode(){if(!IS_NATIVE)return;try{window.webkit.messageHandle
 function nativeScheduleNotifs(){
   if(!IS_NATIVE)return;
   try{
-    const now=Date.now()/1000;
+    // The shell delays each one by the simulcast lag, so something that aired in
+    // the last hour still has a notification ahead of it — don't drop it here.
+    const now=Date.now()/1000-SUB_LAG_MS/1000;
     const _list=anime.filter(a=>kindOf(a)==='watch'&&(a.status==='watching'||a.status==='plan'||a.status==='finished')&&a.airAt&&a.airAt>now)
       .map(a=>({title:a.title,at:a.airAt,ep:a.airEp||0}));
     upcomingRelated().forEach(r=>{if(r.airAt&&r.airAt>now)_list.push({title:r.title,at:r.airAt,ep:r.airEp||0});});
@@ -13384,7 +13405,8 @@ function schedGo(dir){if(dir==='today')schedOffset=0;else schedOffset+=dir;rende
 // says so rather than implying a precision that doesn't exist.
 function schedCountdown(sec,dayOnly){
   const d=sec*1000-Date.now();
-  if(d<=0)return 'out now';
+  // dayOnly is a chapter, which has no broadcast/sub split to speak of.
+  if(d<=0)return (!dayOnly&&airStage(sec)==='sub')?'subs soon':'out now';
   if(dayOnly){
     // Calendar days, not 24-hour blocks — something landing tomorrow morning is
     // "tomorrow" even when it's less than a day away.
@@ -13748,10 +13770,11 @@ function _updBusy(){
 // you'd explain it to a friend — what they can now do, not what the code does.
 // No version numbers or jargon in the notes; the date IS the version.
 const RELEASE={
-  v:'2026-08-08.1',
+  v:'2026-08-10.1',
   title:'Seasons, specials, and progress that keeps itself',
   push:'Every film and special on the show it belongs to \u2014 and progress that marks itself.',
   notes:[
+    'Air times are the Japanese broadcast, and subtitles follow it by about an hour \u2014 so the countdown no longer jumps straight to \u201cout now\u201d and send you to a source that hasn\u2019t got it. It says the episode aired and subs are coming, then flips once they normally have. The phone waits too.',
     'Every show now carries its films, OVAs and specials alongside its seasons, and tapping any of them adds it and opens it. No searching for the next season by name.',
     'Finished something with more to come? It says so on the cover and on the show itself, and stays there until you act on it \u2014 instead of one pop-up you had four seconds to catch.',
     'Progress keeps itself. Use the site\u2019s own next-episode link and WatchList follows along; in the iPhone app it now reads the actual playback position, so what you watched is what gets marked.',

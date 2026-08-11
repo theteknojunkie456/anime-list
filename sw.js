@@ -6,7 +6,7 @@
 // current, but an installed iOS app that has been offline or backgrounded can
 // hold an old bundle for a long time — and "the fix didn't work" has looked
 // exactly like that more than once.
-const CACHE = 'animelist-v10';
+const CACHE = 'animelist-v11';
 const ASSETS = ['./index.html', './friends.html', './manifest.json'];
 
 self.addEventListener('install', e => {

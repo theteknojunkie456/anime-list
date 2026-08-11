@@ -209,7 +209,7 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 }
 :root.pg-scrolled .ctrl-row::after{opacity:1;}
 /* filters scroll on their own; a soft fade at the right edge instead of a hard cut-off */
-.filt-scroll{flex:0 1 auto;min-width:0;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;}
+.filt-scroll{flex:1 1 auto;min-width:0;}
 .filt-scroll::-webkit-scrollbar{display:none;}
 /* sort is a pinned button + dropdown — always visible, never scrolled past */
 .sort-wrap{position:relative;flex-shrink:0;}
@@ -247,14 +247,20 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
    colour — so the row tells you which list you're in at a glance, not just
    which button is lit. */
 .filt-row{
-  display:flex;gap:2px;flex-shrink:0;padding:3px;border-radius:99px;
+  /* It scrolled inside a fixed-width strip, so on a phone the last segment got
+     sliced in half by the scroller's edge — a segmented control that cannot show
+     all its segments is not one. It fills the row and the segments share the
+     space instead. */
+  display:flex;gap:2px;width:auto;max-width:100%;min-width:0;padding:3px;border-radius:99px;
   background:color-mix(in srgb,var(--bg3) 74%,transparent);
   border:1px solid rgba(255,255,255,.10);
   box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 4px 14px -8px rgba(0,0,0,.6);
 }
 .filt-row .fchip{
-  background:none;border:1px solid transparent;box-shadow:none;padding:6px 12px;
+  background:none;border:1px solid transparent;box-shadow:none;padding:6px 11px;
+  flex:0 1 auto;min-width:0;justify-content:center;overflow:hidden;
 }
+.filt-row .fchip>span.fn{flex:none;}
 .filt-row .fchip:not(.on):not([class*="on-"]):hover{color:var(--t1);}
 /* The filled segment gets the depth the track used to hand to everybody. */
 .filt-row .fchip.on,.filt-row .fchip[class*="on-"]{
@@ -662,12 +668,14 @@ body.first-paint .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards
    work of saying where you are, and at 9px it wasn't enough. */
 .nbtn.on{color:var(--a2);background:color-mix(in srgb,var(--a) 16%,transparent);}
 .nbtn.add{
-  width:52px;height:52px;border-radius:50%;background:linear-gradient(180deg,var(--a2),var(--a));color:var(--aFg);font-size:25px;
-  /* The lift is relative, not a negative margin: a margin gets absorbed into the
-     grid row's own sizing (it collapsed to 3px when the bar became a grid), and
-     it must not touch `transform`, which the press animation owns. */
-  justify-content:center;position:relative;top:-18px;padding:0;box-shadow:0 10px 26px -4px var(--glow),0 3px 10px rgba(0,0,0,0.4);
-  border:1.5px solid rgba(255,255,255,0.14);
+  /* It used to break the top edge of the bar. That silhouette never sat right —
+     a circle half-in and half-out of a pill reads as a mistake however it is
+     aligned, and it was the third time it came back looking wrong. So it sits
+     INSIDE the bar with everything else, and earns its place by being filled and
+     accented rather than by sticking out. One line, five targets, no bulge. */
+  width:44px;height:44px;border-radius:50%;background:linear-gradient(180deg,var(--a2),var(--a));color:var(--aFg);font-size:22px;
+  justify-content:center;padding:0;box-shadow:0 6px 16px -5px var(--glow);
+  border:1px solid rgba(255,255,255,0.16);
 }
 .nbtn.add:active{transform:scale(0.9) rotate(90deg);}
 .nbtn.add.on{background:linear-gradient(180deg,var(--a2),var(--a));}
@@ -797,19 +805,43 @@ body.first-paint .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards
    the "squished" and the "inconsistent" in one. They live in .dt-strip now, at
    full sheet width, and the column holds the title alone. */
 .dt-info{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;gap:5px;}
-/* One row of facts, one shape, wrapping predictably. Uniform height and padding
-   across all three, so nothing reads as an odd one out. */
-.dt-strip{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 18px;}
-.dt-strip>*{
-  display:inline-flex;align-items:center;gap:7px;min-width:0;max-width:100%;
-  height:34px;padding:0 13px;border-radius:99px;
-  font-size:12px;font-weight:700;line-height:1;white-space:nowrap;
-  overflow:hidden;text-overflow:ellipsis;
+/* The facts, as a column of label/value pairs. Pills of different widths made
+   the same fact land somewhere different on every show; a label column does not
+   move. Tabular figures so the numbers line up down the page. */
+.dt-facts{
+  display:grid;grid-template-columns:auto 1fr;gap:9px 18px;align-items:baseline;
+  margin:2px 0 18px;padding:14px 16px;border-radius:16px;
+  background:color-mix(in srgb,var(--bg2) 70%,transparent);
+  border:1px solid var(--bn2);
 }
-.dt-strip .ico{width:14px;height:14px;}
+.dt-fk{
+  font-size:9.5px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--t3);white-space:nowrap;
+}
+.dt-fv{
+  font-family:var(--fd);font-size:14px;font-weight:800;color:var(--t1);
+  font-variant-numeric:tabular-nums;letter-spacing:-.01em;min-width:0;
+}
+.dt-fv em{font-style:normal;font-family:var(--fb);font-size:12px;font-weight:600;color:var(--t2);}
+
+/* Everything you press, in one panel, low enough to reach. Scattered across the
+   sheet these read as unrelated controls; grouped, they read as the thing you
+   came here to do. */
+.dt-deck{
+  margin:0 0 20px;padding:15px;border-radius:20px;
+  background:color-mix(in srgb,var(--bg2) 82%,transparent);
+  border:1px solid var(--bn2);
+  box-shadow:0 12px 34px -18px rgba(0,0,0,.9);
+}
+.dt-deck .dt-watch{margin-top:0;}
+.dt-deck .prog-row{margin:12px 0 0;}
+.dt-deck .dt-status{margin-top:12px;}
+.dt-deck .dt-fav{margin-top:12px;width:100%;justify-content:center;height:38px;
+  display:inline-flex;align-items:center;gap:7px;border-radius:12px;font-size:12px;font-weight:700;}
 .dt-title{font-size:19px;font-weight:900;letter-spacing:-0.3px;line-height:1.18;text-wrap:balance;}
 .dt-meta{font-size:11.5px;color:var(--t2);font-weight:600;margin-top:6px;line-height:1.5;}
 .dt-fav{background:var(--bg4);border:1px solid var(--b2);color:var(--t2);cursor:pointer;transition:background-color .15s,color .15s,border-color .15s;}
+.dt-fav .ico{width:14px;height:14px;}
 .dt-fav.on{background:var(--ag);border-color:var(--a);color:var(--a2);}
 .dt-label{font-family:var(--fd);font-size:12.5px;font-weight:600;color:var(--t3);margin:18px 0 8px;display:flex;align-items:center;gap:7px;flex-wrap:wrap;row-gap:6px;min-width:0;}
 .dt-label>*{min-width:0;}
@@ -1783,8 +1815,8 @@ body.recsel .pcard{position:relative;}
 /* ── AIRING SCHEDULE ── */
 .pcard-air{font-size:9.5px;font-weight:700;color:var(--wat);margin-top:4px;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .hero-air{display:inline-flex;align-items:center;gap:5px;margin-top:9px;font-size:11px;font-weight:700;color:#ffd9a0;background:rgba(245,166,35,0.18);border:1px solid rgba(245,166,35,0.34);padding:5px 11px;border-radius:99px;}
-.dt-air{color:var(--wat);background:var(--watbg);border:1px solid var(--wat);}
-.dt-runtime{color:var(--t1);background:color-mix(in srgb,var(--a) 12%,transparent);border:1px solid color-mix(in srgb,var(--a) 40%,transparent);}
+
+
 .dt-runtime .ico{color:var(--a2);}
 .dt-runtime b{color:var(--a2);}
 .dt-runtime-films{color:var(--t2);font-weight:600;}
@@ -2038,13 +2070,16 @@ body.recsel .pcard{position:relative;}
   .search-row{padding-left:14px;padding-right:14px;gap:6px;}
   .search-in{padding-left:34px;font-size:13px;}
   .kseg{width:36px;height:36px;}
-  .filt-row,.sort-row,.qp-chips,.row-scroll,.rz-scroll{padding-left:14px;padding-right:14px;}
+  .sort-row,.qp-chips,.row-scroll,.rz-scroll{padding-left:14px;padding-right:14px;}
+  .filt-row .fchip{padding:6px 8px;font-size:11px;}
+  .filt-row .fn{padding:1px 5px;}
+  .sort-btn{padding:8px 10px;}
   .row-head,.row-div,.dt-label{padding-left:14px;padding-right:14px;}
   .billboard,.rz-sec>.rz-head{margin-left:0;}
   /* 5 targets across 292px of usable width — shrink the chrome, never the labels. */
   .nav{left:10px;right:10px;padding:8px 5px;}
   .nbtn{min-width:44px;padding:6px 6px;}
-  .nbtn.add{width:48px;height:48px;margin-top:-17px;}
+  .nbtn.add{width:42px;height:42px;}
 }
 
 </style>
@@ -6105,24 +6140,30 @@ function renderDetail(){
         <div class="dt-meta">${[a.eps, kindOf(a)==='read'?a.time:''].filter(Boolean).join(' · ')}</div>
       </div>
     </div>
-    <div class="dt-strip">
-      ${(()=>{
-        if(kindOf(a)!=='watch')return '';
-        const tw=totalWatchMins(a),fm=filmMins(a);if(!tw)return '';
-        // "~59h to watch all 148 episodes" is only true if you have watched none
-        // of it. Sitting on a show you have finished, it is simply wrong — and
-        // the number anyone actually wants is how much is LEFT. Derive it.
-        const done=Math.min(a.ep||0,a.epTotal||0), left=a.epTotal?Math.max(0,a.epTotal-done):0;
-        if(a.epTotal&&done>=a.epTotal)
-          return `<span class="dt-runtime is-done">${icon('check')}Finished · ${fmtWatch(tw)} watched</span>`;
-        if(a.epTotal&&done>0)
-          return `<span class="dt-runtime">${icon('clock')}<b>${fmtWatch(Math.round(tw*left/a.epTotal))}</b> left · ${left} eps</span>`;
-        return `<span class="dt-runtime">${icon('clock')}<b>${fmtWatch(tw)}</b>${a.epTotal?` · all ${a.epTotal} eps`:''}${fm?`<span class="dt-runtime-films"> +${fmtWatch(fm)} films</span>`:''}</span>`;
-      })()}
-      ${(()=>{const air=airingInfo(a);return air?`<span class="dt-air">${icon('calendar')} Ep ${air.ep} · ${air.out?(air.sub?'aired · subs soon':'out now'):'airs '+air.when}</span>`:'';})()}
-      <button class="dt-fav${a.fav?' on':''}" onclick="toggleFav()">${a.fav?icon('heart','fill')+' Favorited':icon('heart')+' Favorite'}</button>
-    </div>
-    ${progHTML}
+    ${(()=>{
+      // The facts, aligned in a column instead of scattered as pills of different
+      // widths. A label and a value, tabular figures, so the eye runs straight
+      // down them and two shows put the same fact in the same place.
+      const rows=[];
+      const done=Math.min(a.ep||0,a.epTotal||0), tw=totalWatchMins(a);
+      if(a.epTotal)rows.push(['Progress',`${done} / ${a.epTotal} <em>· ${Math.round(prog(a)*100)}%</em>`]);
+      if(kindOf(a)==='watch'&&tw){
+        const left=a.epTotal?Math.max(0,a.epTotal-done):0;
+        // "~59h to watch all 148 episodes" is only true before you start. On a
+        // show you finished it is simply wrong, and the number anyone wants is
+        // what is LEFT — so derive it from where you actually are.
+        if(a.epTotal&&done>=a.epTotal)rows.push(['Remaining',`<em>Finished · ${fmtWatch(tw)} watched</em>`]);
+        else if(a.epTotal&&done>0)rows.push(['Remaining',`${fmtWatch(Math.round(tw*left/a.epTotal))} <em>· ${left} eps</em>`]);
+        else rows.push(['Remaining',`${fmtWatch(tw)} <em>· all ${a.epTotal||'?'} eps</em>`]);
+      }
+      if(a.dur)rows.push(['Episode',`${a.dur} min`]);
+      const air=airingInfo(a);
+      if(air)rows.push(['Airs',`Ep ${air.ep} <em>· ${air.out?(air.sub?'aired, subs soon':'out now'):air.when}</em>`]);
+      if(a.aniScore)rows.push(['Rated',`${a.aniScore}% <em>· AniList</em>`]);
+      if(!rows.length)return '';
+      return `<div class="dt-facts">${rows.map(([k,v])=>
+        `<span class="dt-fk">${k}</span><span class="dt-fv">${v}</span>`).join('')}</div>`;
+    })()}
     ${(()=>{const n=nextUpOf(a);if(!n)return'';
       // Beside the poster this had about 140px to work with, so "Next season"
       // wrapped and the title clipped to "Ove…". Full width, one line, below the
@@ -6134,8 +6175,10 @@ function renderDetail(){
         <button class="dt-next-x" onclick="clearNextUp('${escH(a.id)}',event)" aria-label="Not interested">${icon('x')}</button>
       </div>`;})()}
     ${friendRecBadge(a)}
+    <div class="dt-deck">
     ${(kindOf(a)==='watch'&&a.aniId)?`
     <button class="dt-watch" onclick="watchAnime('${a.id}')">${icon('play')} ${(_res&&canResumeHere(a))?`Resume Ep ${a.posEp} at ${fmtPos(_res)}`:((a.ep||0)>0?'Continue Watching':'Start Watching')}</button>
+    ${progHTML}
     ${titleWatchPickerHTML(a)}
     <button class="dt-pin-toggle" onclick="togglePin()">${icon('external')} ${a.srcUrl?'Advanced: edit the direct link':'Advanced: paste a direct episode link'}</button>
     <div id="dtPin" style="display:none">
@@ -6147,9 +6190,10 @@ function renderDetail(){
       </div>
       <div id="dtPinOut" style="display:none;margin-top:8px;padding:9px 11px;border-radius:9px;background:var(--bg2);color:var(--t2);font:12px/1.45 ui-monospace,Menlo,monospace;word-break:break-all;white-space:pre-wrap"></div>
       <p class="ai-desc" style="margin-top:8px;font-size:11px">Set once for this show — Watch goes straight here. Put <code>{ep}</code> where the episode number goes; Next/Prev then auto-advance.</p>
-    </div></details>`:''}
-    <div class="dt-label">Status</div>
+    </div></details>`:progHTML}
     <div class="dt-status">${statusBtns}</div>
+    <button class="dt-fav${a.fav?' on':''}" onclick="toggleFav()">${a.fav?icon('heart','fill')+' Favorited':icon('heart')+' Favorite'}</button>
+    </div>
     <div id="dtRich" class="dt-rich"></div>
     ${read?`<div id="dtChapters"></div>`:''}
     ${stars}
@@ -14181,10 +14225,12 @@ function _updBusy(){
 // you'd explain it to a friend — what they can now do, not what the code does.
 // No version numbers or jargon in the notes; the date IS the version.
 const RELEASE={
-  v:'2026-08-11.3',
+  v:'2026-08-11.4',
   title:'Seasons, specials, and progress that keeps itself',
   push:'Every film and special on the show it belongs to \u2014 and progress that marks itself.',
   notes:[
+    'The title screen takes the best of four designs at once: the poster fills with your colour as you watch, the facts sit in one aligned column so the same fact is always in the same place, and everything you actually press \u2014 Continue, the counter, the status, Favourite \u2014 is grouped in one panel instead of scattered down the page.',
+    'The + on the bottom bar sits inside the bar now rather than breaking its edge, and All / Watching / Plan can no longer clip a word on a narrow phone.',
     'The poster now shows how far into a show you are: your accent colour fills the artwork up to where you\u2019ve got to, with a bright line at the surface \u2014 and no line once you\u2019ve finished it. The counter sits right under it, and the “Episode progress” heading is gone; three things were naming the same fact.',
     'The time pill tells you what\u2019s LEFT. “~59h to watch all 148 episodes” is only true before you start \u2014 now it counts down as you watch, and says Finished when you\u2019re done.',
     'A show\u2019s facts \u2014 how long it takes, when the next episode lands, whether it\u2019s a favourite \u2014 sat in a narrow column beside the poster, so long titles squashed to three lines and the pills changed size and position from show to show. They now run full width in one row, all the same shape, in the same place every time.',

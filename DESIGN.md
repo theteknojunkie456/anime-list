@@ -60,6 +60,17 @@ body is what stopped the UI reading flat when everything was one family at
   there used to be three on one screen.
 - **Cover card** — artwork, one corner-tab status badge, title, then a quiet
   sub-line (`~10h · S2 out`). Extra facts join that line rather than adding rows.
+- **Detail hero** — the poster is a progress medallion: a wash of the title's own
+  accent rises from the bottom to how far in you are (`.dt-level`), with a bright
+  waterline where it stops and none at all when finished. Its height comes from
+  the same `prog()` the bar uses, so the two cannot disagree. Beneath it, one
+  `.dt-strip` of uniform 34px pills, then the counter. The old "Episode progress"
+  heading is gone — the poster, the pill and the counter were three things
+  naming one fact.
+- **Derived, not stored** — the runtime pill says what's *left*, not the total.
+  "~59h to watch all 148 episodes" is only true if you've watched none of it; on
+  a finished show it is simply wrong. Prefer the number the person is actually
+  asking for.
 - **Player** — full-screen overlay, sandboxed cross-origin iframe. Its chrome is
   the only place a countdown chip or overlay sits on artwork.
 - **Sheets** — bottom sheets for everything modal. No nested cards.

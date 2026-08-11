@@ -345,6 +345,7 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 .fixbar.on{display:flex;align-items:center;gap:9px;margin:9px 18px 0;padding:8px 10px 8px 12px;
   border-radius:12px;background:color-mix(in srgb,#ff6b6b 12%,var(--bg2));
   border:1px solid color-mix(in srgb,#ff6b6b 34%,transparent);}
+.fixbar.on{touch-action:pan-y;will-change:transform;}
 .fixbar-i{display:flex;flex:0 0 auto;color:#ff8b8b;}
 .fixbar-i svg{width:15px;height:15px;}
 .fixbar-t{flex:1 1 auto;min-width:0;font-size:12.5px;font-weight:700;color:#ff8b8b;
@@ -893,6 +894,21 @@ body.first-paint .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards
 .dt-meta{font-size:11.5px;color:var(--t2);font-weight:600;margin-top:6px;line-height:1.5;}
 .dt-fav{background:var(--bg4);border:1px solid var(--b2);color:var(--t2);cursor:pointer;transition:background-color .15s,color .15s,border-color .15s;}
 .dt-fav .ico{width:14px;height:14px;}
+/* Resume card — artwork, where you're going back to, one thing to press. */
+.resume-card{display:flex;align-items:center;gap:13px;width:calc(100% - 36px);margin:12px 18px 0;padding:10px;
+  border-radius:18px;text-align:left;background:color-mix(in srgb,var(--a) 11%,var(--bg2));
+  border:1px solid color-mix(in srgb,var(--a) 32%,transparent);cursor:pointer;transition:transform .12s;}
+.resume-card:active{transform:scale(.985);}
+.resume-art,.resume-ph{width:52px;height:52px;border-radius:13px;object-fit:cover;flex:none;background:var(--bg4);}
+.resume-ph{display:flex;align-items:center;justify-content:center;font-family:var(--fd);font-size:20px;font-weight:800;color:var(--t3);}
+.resume-body{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1;}
+.resume-k{font-size:9.5px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:var(--a2);}
+.resume-t{font-family:var(--fd);font-size:15px;font-weight:800;color:var(--t1);letter-spacing:-.02em;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.resume-s{font-size:11.5px;font-weight:600;color:var(--t2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.resume-go{display:flex;align-items:center;justify-content:center;width:40px;height:40px;flex:none;
+  border-radius:50%;background:var(--a);color:var(--aFg);box-shadow:0 6px 16px -6px var(--glow);}
+.resume-go .ico{width:17px;height:17px;}
 .dt-fav.on{background:var(--ag);border-color:var(--a);color:var(--a2);}
 .dt-label{font-family:var(--fd);font-size:12.5px;font-weight:600;color:var(--t3);margin:18px 0 8px;display:flex;align-items:center;gap:7px;flex-wrap:wrap;row-gap:6px;min-width:0;}
 .dt-label>*{min-width:0;}
@@ -977,6 +993,13 @@ body.first-paint .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards
 .yt-x .ico{width:18px;height:18px;}
 .yt-frame{position:relative;width:100%;aspect-ratio:16/9;border-radius:16px;overflow:hidden;background:#000;box-shadow:0 26px 70px -14px rgba(0,0,0,.75);}
 .yt-frame iframe{position:absolute;inset:0;width:100%;height:100%;border:0;}
+/* Sits behind the frame until the frame proves it works. */
+.yt-wait{position:absolute;inset:0;z-index:2;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:14px;padding:26px;text-align:center;background:#0b0b0f;color:var(--t2);font-size:13.5px;line-height:1.5;}
+.yt-wait.loaded{display:none;}
+.yt-wait.failed{color:var(--t1);}
+.yt-out{padding:11px 18px;border-radius:12px;border:1px solid var(--a);background:var(--ag);color:var(--a2);
+  font-family:var(--fd);font-weight:800;font-size:13.5px;cursor:pointer;}
 @media(prefers-reduced-motion:reduce){.yt-overlay{animation:none;}}
 .dt-ep-t{margin-top:6px;font:600 12px/1.35 var(--fb,system-ui);color:var(--t2);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
 .dt-ep:active{transform:scale(.97);}
@@ -5497,6 +5520,7 @@ function needsFix(kind){
 }
 function renderFixBar(){
   const bar=document.getElementById('fixBar'); if(!bar)return;
+  if(typeof _fixHidden==='undefined')_fixHidden=-1;
   const {unmatched,mistitled}=needsFix(viewKind);
   const n=unmatched.length+mistitled.length;
   if(!n){bar.className='fixbar';bar.innerHTML='';return;}
@@ -5505,10 +5529,45 @@ function renderFixBar(){
   const bits=[];
   if(mistitled.length)bits.push(mistitled.length+' with messy names');
   if(unmatched.length)bits.push(unmatched.length+' not linked');
+  // Dismissed for this run? Stay gone until something changes or the app reopens.
+  if(_fixHidden===n){bar.className='fixbar';bar.innerHTML='';return;}
   bar.className='fixbar on';
   bar.innerHTML=`<span class="fixbar-i">${icon('refresh')}</span>`
     +`<span class="fixbar-t">${bits.join(' \u00b7 ')}</span>`
     +`<button class="fixbar-b" onclick="fixAll()">Fix all</button>`;
+  armFixSwipe(bar,n);
+}
+// Swipe it away to the left. It follows your finger, fades as it goes, and snaps
+// back if you change your mind — a banner that can only be satisfied and never
+// dismissed is a banner you learn to ignore.
+let _fixHidden=-1;
+function armFixSwipe(bar,n){
+  if(bar._swiped)return; bar._swiped=1;
+  let x0=0,dx=0,live=false;
+  const end=()=>{
+    if(!live)return; live=false;
+    bar.style.transition='transform .22s cubic-bezier(.32,.72,.28,1),opacity .22s';
+    if(dx<-70){
+      // Past the threshold: finish the motion it was already making, then go.
+      bar.style.transform='translateX(-110%)';bar.style.opacity='0';
+      _fixHidden=n;
+      setTimeout(()=>{try{renderFixBar();}catch(e){}},210);
+    }else{bar.style.transform='';bar.style.opacity='';}
+    dx=0;
+  };
+  bar.addEventListener('touchstart',e=>{
+    if(e.touches.length!==1)return;
+    x0=e.touches[0].clientX;live=true;dx=0;bar.style.transition='none';
+  },{passive:true});
+  bar.addEventListener('touchmove',e=>{
+    if(!live)return;
+    dx=e.touches[0].clientX-x0;
+    if(dx>0)dx=0;                                   // leftward only
+    bar.style.transform='translateX('+dx+'px)';
+    bar.style.opacity=String(Math.max(0,1+dx/220));
+  },{passive:true});
+  bar.addEventListener('touchend',end,{passive:true});
+  bar.addEventListener('touchcancel',end,{passive:true});
 }
 // One tap, and the instant part really is instant: the messy names are fixed
 // from data already on the device, with no network at all. Only the genuinely
@@ -6390,12 +6449,26 @@ function playYouTube(videoId,forId,ep){
   try{if(forId)savePvSession(forId,ep||0,'yt:'+videoId);}catch(e){}
   const ov=document.createElement('div');ov.id='ytOverlay';ov.className='yt-overlay';
   ov.onclick=function(e){if(e.target===ov)closeYouTube();};
-  ov.innerHTML='<div class="yt-box"><div class="yt-bar"><span class="yt-lbl">'+icon('play')+' Playing on YouTube</span><button class="yt-x" onclick="closeYouTube()" aria-label="Close">'+icon('x')+'</button></div><div class="yt-frame"><iframe src="https://www.youtube.com/embed/'+encodeURIComponent(videoId)+'?autoplay=1&rel=0&modestbranding=1&playsinline=1" title="YouTube player" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe></div></div>';
+  ov.innerHTML='<div class="yt-box"><div class="yt-bar"><span class="yt-lbl">'+icon('play')+' Playing on YouTube</span><button class="yt-x" onclick="closeYouTube()" aria-label="Close">'+icon('x')+'</button></div><div class="yt-frame"><div class="yt-wait" id="ytWait">Loading trailer\u2026</div><iframe id="ytFrame" src="https://www.youtube.com/embed/'+encodeURIComponent(videoId)+'?autoplay=1&rel=0&modestbranding=1&playsinline=1" title="YouTube player" referrerpolicy="strict-origin-when-cross-origin" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe></div></div>';
   document.body.appendChild(ov);document.body.classList.add('yt-open');
+  // Plenty of official anime trailers have embedding switched off by the channel
+  // that owns them. The iframe still "loads" — it loads YouTube's refusal — so
+  // there is nothing to listen for and it just sits there looking broken. After a
+  // few seconds, stop pretending and offer the thing that always works.
+  const wait=ov.querySelector('#ytWait'), fr=ov.querySelector('#ytFrame');
+  if(fr)fr.addEventListener('load',()=>{if(wait)wait.classList.add('loaded');},{once:true});
+  ov._t=setTimeout(()=>{
+    if(!wait||!ov.isConnected)return;
+    wait.classList.remove('loaded');
+    wait.innerHTML='This trailer can\u2019t play inside an app \u2014 the channel that owns it has embedding switched off.'
+      +'<button class="yt-out" onclick="openExternal(\'https://www.youtube.com/watch?v='+encodeURIComponent(videoId)+'\');closeYouTube();">Open on YouTube</button>';
+    wait.classList.add('failed');
+    try{logProblem('trailer','embed did not start',videoId);}catch(e){}
+  },6000);
   ov._esc=function(e){if(e.key==='Escape')closeYouTube();};document.addEventListener('keydown',ov._esc);
 }
 function closeYouTube(){try{const p=JSON.parse(localStorage.getItem(PV_ACTIVE)||'null');if(p&&String(p.kind||'').indexOf('yt:')===0)clearPvSession();}catch(e){}
-const ov=document.getElementById('ytOverlay');if(!ov)return;if(ov._esc)document.removeEventListener('keydown',ov._esc);ov.remove();document.body.classList.remove('yt-open');}
+const ov=document.getElementById('ytOverlay');if(!ov)return;if(ov._t)clearTimeout(ov._t);if(ov._esc)document.removeEventListener('keydown',ov._esc);ov.remove();document.body.classList.remove('yt-open');}
 function richDetailHTML(d,forId){
   const _it=forId?anime.find(x=>x.id===forId):null;const _hasSrc=!!(_it&&effectiveSource(_it));   // user set their own source → episodes route to it
   const cap=s=>String(s||'').replace(/_/g,' ').toLowerCase().replace(/\b\w/g,c=>c.toUpperCase());
@@ -9290,10 +9363,23 @@ function behindHTML(){
   const items=behindItems(); if(!items.length) return '';
   const {a,behind}=items[0];
   const more=items.length>1?` · +${items.length-1} more show${items.length>2?'s':''}`:'';
-  return`<div class="nudge behind" style="${accentVars(a)}">${icon('play')}
-    <div class="nudge-t"><b>${schEsc(a.title)}</b> — ${behind} new episode${behind!==1?'s':''} since you last watched${more}</div>
-    <button class="nudge-go" onclick="resumeWatch('${a.id}')">Resume</button>
-  </div>`;
+  // It was a sentence with a button on the end, and the sentence got longer the
+  // further behind you were — "ONE PIECE — 1081 new episodes since you last
+  // watched · +4 more shows" wrapped to three lines and told you nothing you
+  // could act on. It is a card now: the artwork you recognise, the episode you
+  // are going back to, and one thing to press.
+  const art=titleBg(a)||a.img;
+  const ch=((a.title||'?').trim()[0]||'?').toUpperCase().replace(/['"<&]/g,'?');
+  const next=(a.ep||0)+1;
+  return`<button class="resume-card" style="${accentVars(a)}" onclick="resumeWatch('${a.id}')">
+    ${art?`<img class="resume-art" src="${escH(art)}" alt="" loading="lazy" onerror="this.remove()">`:`<span class="resume-ph">${ch}</span>`}
+    <span class="resume-body">
+      <span class="resume-k">Pick up where you left off</span>
+      <span class="resume-t">${schEsc(a.title)}</span>
+      <span class="resume-s">Episode ${next} · ${behind} waiting${more}</span>
+    </span>
+    <span class="resume-go">${icon('play')}</span>
+  </button>`;
 }
 
 // ─── STATS ──────────────────────────────────────────────────────────────────

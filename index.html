@@ -665,7 +665,7 @@ body.first-paint .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards
   /* The + is the tallest thing in here, so the bar's padding is what guarantees
      it has room. overflow is spelled out because this button has been clipped
      more than once. */
-  padding:10px 8px;border-radius:28px;overflow:visible;
+  padding:11px 8px;border-radius:30px;overflow:visible;
   background:var(--bg3);border:1px solid var(--bn2);
   box-shadow:0 14px 34px -10px rgba(0,0,0,.62),0 3px 10px rgba(0,0,0,.34);
 }
@@ -703,7 +703,7 @@ body.first-paint .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards
   /* min-width:52px on .nbtn was beating width:44px, so this was 52 wide by 44
      tall — a circle stretched into an ellipse. A round button has to opt out of
      the shared sizing, not inherit half of it. */
-  width:52px;height:52px;min-width:0;flex:none;align-self:center;border-radius:50%;background:linear-gradient(180deg,var(--a2),var(--a));color:var(--aFg);font-size:26px;line-height:1;
+  width:60px;height:60px;min-width:0;flex:none;align-self:center;border-radius:50%;background:linear-gradient(180deg,var(--a2),var(--a));color:var(--aFg);font-size:30px;line-height:1;
   justify-content:center;padding:0;box-shadow:0 6px 18px -5px var(--glow);
   border:1px solid rgba(255,255,255,0.16);
 }
@@ -838,21 +838,23 @@ body.first-paint .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards
 /* The facts, as a column of label/value pairs. Pills of different widths made
    the same fact land somewhere different on every show; a label column does not
    move. Tabular figures so the numbers line up down the page. */
+/* Quieter. These are reference facts you glance at, not the point of the screen
+   — a bordered panel in display type gave them the same weight as the thing you
+   came here to press. Now: no box, no display face, just an aligned list. */
 .dt-facts{
-  display:grid;grid-template-columns:auto 1fr;gap:9px 18px;align-items:baseline;
-  margin:2px 0 18px;padding:14px 16px;border-radius:16px;
-  background:color-mix(in srgb,var(--bg2) 70%,transparent);
-  border:1px solid var(--bn2);
+  display:grid;grid-template-columns:auto 1fr;gap:7px 16px;align-items:baseline;
+  margin:4px 0 16px;
 }
 .dt-fk{
-  font-size:9.5px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;
+  font-size:9.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
   color:var(--t3);white-space:nowrap;
 }
 .dt-fv{
-  font-family:var(--fd);font-size:14px;font-weight:800;color:var(--t1);
-  font-variant-numeric:tabular-nums;letter-spacing:-.01em;min-width:0;
+  font-size:12.5px;font-weight:600;color:var(--t2);
+  font-variant-numeric:tabular-nums;min-width:0;
 }
-.dt-fv em{font-style:normal;font-family:var(--fb);font-size:12px;font-weight:600;color:var(--t2);}
+.dt-fv b{font-weight:700;color:var(--t1);}
+.dt-fv em{font-style:normal;color:var(--t3);}
 
 /* Everything you press, in one panel, low enough to reach. Scattered across the
    sheet these read as unrelated controls; grouped, they read as the thing you
@@ -2110,7 +2112,7 @@ body.recsel .pcard{position:relative;}
   /* 5 targets across 292px of usable width — shrink the chrome, never the labels. */
   .nav{left:10px;right:10px;padding:8px 5px;}
   .nbtn{min-width:44px;padding:6px 6px;}
-  .nbtn.add{width:48px;height:48px;min-width:0;font-size:24px;}
+  .nbtn.add{width:54px;height:54px;min-width:0;font-size:27px;}
 }
 
 </style>
@@ -6117,7 +6119,6 @@ function renderDetail(){
       <button class="prog-btn" onclick="bumpEp(-1)">−</button>
       <div class="prog-mid">
         <div class="prog-num">${a.ep||0}${a.epTotal?` <span>/ ${a.epTotal}</span>`:''}</div>
-        ${a.epTotal?`<div class="pbar"><div class="pfill" style="width:${Math.round(p*100)}%"></div></div>`:''}
       </div>
       <button class="prog-btn" onclick="bumpEp(1)">＋</button>
     </div>`;
@@ -6171,6 +6172,7 @@ function renderDetail(){
       <div class="dt-info">
         <div class="dt-title">${schEsc(a.title)}</div>
         <div class="dt-meta">${[a.eps, kindOf(a)==='read'?a.time:''].filter(Boolean).join(' · ')}</div>
+        <button class="dt-fav${a.fav?' on':''}" onclick="toggleFav()">${a.fav?icon('heart','fill')+' Favorited':icon('heart')+' Favorite'}</button>
       </div>
     </div>
     ${(()=>{
@@ -6179,20 +6181,18 @@ function renderDetail(){
       // down them and two shows put the same fact in the same place.
       const rows=[];
       const done=Math.min(a.ep||0,a.epTotal||0), tw=totalWatchMins(a);
-      if(a.epTotal)rows.push(['Progress',`${done} / ${a.epTotal} <em>· ${Math.round(prog(a)*100)}%</em>`]);
       if(kindOf(a)==='watch'&&tw){
         const left=a.epTotal?Math.max(0,a.epTotal-done):0;
         // "~59h to watch all 148 episodes" is only true before you start. On a
         // show you finished it is simply wrong, and the number anyone wants is
         // what is LEFT — so derive it from where you actually are.
         if(a.epTotal&&done>=a.epTotal)rows.push(['Remaining',`<em>Finished · ${fmtWatch(tw)} watched</em>`]);
-        else if(a.epTotal&&done>0)rows.push(['Remaining',`${fmtWatch(Math.round(tw*left/a.epTotal))} <em>· ${left} eps</em>`]);
-        else rows.push(['Remaining',`${fmtWatch(tw)} <em>· all ${a.epTotal||'?'} eps</em>`]);
+        else if(a.epTotal&&done>0)rows.push(['Remaining',`<b>${fmtWatch(Math.round(tw*left/a.epTotal))}</b> <em>· ${left} eps</em>`]);
+        else rows.push(['Remaining',`<b>${fmtWatch(tw)}</b> <em>· all ${a.epTotal||'?'} eps</em>`]);
       }
       if(a.dur)rows.push(['Episode',`${a.dur} min`]);
       const air=airingInfo(a);
-      if(air)rows.push(['Airs',`Ep ${air.ep} <em>· ${air.out?(air.sub?'aired, subs soon':'out now'):air.when}</em>`]);
-      if(a.aniScore)rows.push(['Rated',`${a.aniScore}% <em>· AniList</em>`]);
+      if(air)rows.push(['Airs',`<b>Ep ${air.ep}</b> <em>· ${air.out?(air.sub?'aired, subs soon':'out now'):air.when}</em>`]);
       if(!rows.length)return '';
       return `<div class="dt-facts">${rows.map(([k,v])=>
         `<span class="dt-fk">${k}</span><span class="dt-fv">${v}</span>`).join('')}</div>`;
@@ -6225,7 +6225,6 @@ function renderDetail(){
       <p class="ai-desc" style="margin-top:8px;font-size:11px">Set once for this show — Watch goes straight here. Put <code>{ep}</code> where the episode number goes; Next/Prev then auto-advance.</p>
     </div></details>`:progHTML}
     <div class="dt-status">${statusBtns}</div>
-    <button class="dt-fav${a.fav?' on':''}" onclick="toggleFav()">${a.fav?icon('heart','fill')+' Favorited':icon('heart')+' Favorite'}</button>
     </div>
     <div id="dtRich" class="dt-rich"></div>
     ${read?`<div id="dtChapters"></div>`:''}
@@ -6439,6 +6438,15 @@ function richDetailHTML(d,forId){
       onchange="dtJumpEp(this.value)">`:'';
     epsHTML=`<div class="dt-label" style="margin-top:16px">${icon('play')} Episodes<span class="dt-eps-tag">${tag}</span>${jump}</div><div class="dt-eps">${cells.join('')}</div>`
       +(hidden>0?`<button class="dt-pin-toggle" onclick="dtShowAllEps()">${icon('layers')} Show ${Math.min(N,ALL_CAP)===N?`all ${N}`:`the first ${ALL_CAP}`} episodes${N>ALL_CAP?` \u00b7 type a number for the rest`:''}</button>`:'')
+      +(()=>{
+        // The bar belongs where the episodes are — that is the thing it measures.
+        // Up in the deck it was a second drawing of the counter sitting right
+        // beside it; here it reads as a position in the list you are looking at.
+        if(!_it||!_it.epTotal)return '';
+        const done=Math.min(_it.ep||0,_it.epTotal);
+        return `<div class="dt-epbar"><div class="pbar"><div class="pfill" style="width:${Math.round(prog(_it)*100)}%"></div></div>
+          <span>${done} of ${_it.epTotal} watched</span></div>`;
+      })()
       +epNextHTML(_it);
   }
   const desc=_stripHtml(d.description);

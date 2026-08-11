@@ -16,6 +16,11 @@
 <link rel="icon" href="icons/icon-192.png" type="image/png">
 <title>WatchList</title>
 <!-- friends.html is auto-generated from index.html by the pre-commit hook — do not edit it by hand -->
+<!-- Two origins are involved before a single glyph arrives: the CSS from
+     googleapis, the font files from gstatic. Warming both connections while the
+     rest of the head parses removes a DNS+TLS round trip from every cold start. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Manrope:wght@400..800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 <style>
@@ -84,15 +89,22 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 }
 @media(prefers-reduced-motion:reduce){*{animation-duration:.001ms!important;transition-duration:.001ms!important;}}
 
-/* ── NARROW PHONES (≤360px) ────────────────────────────────────────────────
-   Measured at 320, where an iPhone SE lives. The header put a wordmark and five
-   round buttons on one row and the wordmark lost its breathing room; the search
-   field shared its row with two toggles and clipped its own placeholder. These
-   shrink the chrome, never the content — artwork, titles and controls keep
-   their size, because the thing to lose on a small screen is padding. */
-
 /* ── SHELL ── */
 @property --amb{syntax:'<color>';inherits:true;initial-value:transparent;}
+/* The glow behind everything was a fixed pair of radials — the right idea, sat
+   perfectly still. One soft blob of the artwork's own colour now drifts across
+   it on a very long cycle, so the background reads as lit rather than painted.
+   Transform only: the gradient is rasterised once and moved on the GPU, so this
+   costs nothing per frame and never re-renders the blur. */
+.ambient::before{
+  content:'';position:absolute;left:-25%;top:-16%;width:150%;height:86%;pointer-events:none;
+  background:radial-gradient(closest-side,color-mix(in srgb,var(--amb) 24%,transparent),transparent 76%);
+  will-change:transform;animation:ambDrift 42s ease-in-out infinite alternate;
+}
+@keyframes ambDrift{
+  from{transform:translate3d(-4%,-2%,0) scale(1.02);}
+  to{transform:translate3d(6%,4%,0) scale(1.14);}
+}
 .glow-modes{display:flex;flex-wrap:wrap;gap:18px;}
 .glow-mode,.glow-col{background:none;border:none;padding:0;cursor:pointer;-webkit-tap-highlight-color:transparent;}
 .glow-mode{display:flex;flex-direction:column;align-items:center;gap:7px;}
@@ -186,7 +198,16 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
    edge under them — and that edge is what makes the row read as part of the app
    rather than a banner pasted on top of it. The list starts below the row again,
    so its top edge draws the line and the pills sit on the page's own shading. */
-.ctrl-row{display:flex;align-items:center;gap:10px;padding:10px 18px 0;}
+.ctrl-row{display:flex;align-items:center;gap:10px;padding:10px 18px 0;position:relative;}
+/* The chrome sits ABOVE the scroller rather than over it, so the cue that
+   there's more above isn't a blur — it's an edge, and it only exists once
+   you've actually moved. Nothing to see on a list you haven't scrolled. */
+.ctrl-row::after{
+  content:'';position:absolute;left:0;right:0;bottom:-11px;height:1px;
+  background:linear-gradient(90deg,transparent,var(--bn2) 12%,var(--bn2) 88%,transparent);
+  opacity:0;transition:opacity .22s;pointer-events:none;
+}
+:root.pg-scrolled .ctrl-row::after{opacity:1;}
 /* filters scroll on their own; a soft fade at the right edge instead of a hard cut-off */
 .filt-scroll{flex:0 1 auto;min-width:0;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;}
 .filt-scroll::-webkit-scrollbar{display:none;}
@@ -512,6 +533,16 @@ body.first-paint .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards
 .row-scroll{display:flex;gap:10px;overflow-x:auto;padding:2px 18px 6px;scroll-padding:18px;}
 .pcard{flex:0 0 104px;cursor:pointer;transition:transform .18s cubic-bezier(.32,.72,.28,1);}
 .pcard:active{transform:scale(0.94);}
+/* Artwork is the one thing in here with real colour, so let it throw a little of
+   its own light when you reach for it. Pointer devices only — there is no hover
+   on a phone, and a touch already has the press scale. */
+@media (hover:hover){
+  .pcard:hover{transform:translateY(-4px);}
+  .pcard:hover .pcard-img{
+    border-color:color-mix(in srgb,var(--a) 45%,transparent);
+    box-shadow:0 16px 30px -12px rgba(0,0,0,.62),0 0 0 1px color-mix(in srgb,var(--a) 22%,transparent),0 8px 26px -10px var(--glow);
+  }
+}
 .pcard-img{
   width:104px;height:148px;border-radius:15px;object-fit:cover;display:block;
   background:var(--bg4);border:1px solid var(--b2);box-shadow:0 6px 18px rgba(0,0,0,0.35);
@@ -1908,7 +1939,12 @@ body.recsel .pcard{position:relative;}
 
 
 
-/* ── NARROW PHONES ───────────────────────────────────────────────────────
+/* ── NARROW PHONES (≤360px) ───────────────────────────────────────────────
+   Measured at 320, where an iPhone SE lives: the header put a wordmark and five
+   round buttons on one row, and the search field clipped its own placeholder.
+   Shrink the chrome, never the content — artwork, titles and controls keep
+   their size, because padding is the thing to lose on a small screen.
+
    Must stay LAST in this stylesheet. These override base rules at the same
    specificity, so source order is the only thing deciding the winner — placed
    above them (where this block had drifted back to) every declaration here is
@@ -5056,6 +5092,7 @@ function onPageScroll(){
   if(_ambRAF)return;
   _ambRAF=requestAnimationFrame(()=>{
     _ambRAF=0;const pg=document.getElementById('pageEl');if(!pg)return;
+    try{document.documentElement.classList.toggle('pg-scrolled',pg.scrollTop>6);}catch(e){}
     if(pg.scrollTop<50){if(heroAmb)setAmbient(heroAmb);return;}
     const ptop=pg.getBoundingClientRect().top;let col='',best=-1e9;
     pg.querySelectorAll('.row-sec[data-amb]').forEach(s=>{const amb=s.getAttribute('data-amb');if(!amb)return;const t=s.getBoundingClientRect().top-ptop;if(t<=130&&t>best){best=t;col=amb;}});
@@ -5065,6 +5102,45 @@ function onPageScroll(){
 // scoped CSS-var override string that tints a title's own detail/hero accents without touching global chrome
 function accentVars(a){const ac=conditionAccent(titleAccent(a));if(!ac)return'';try{return`--a:${ac};--a2:${mix(ac,'#ffffff',0.28)};--ag:${rgba(ac,0.15)};--glow:${rgba(ac,0.26)};`;}catch{return'';}}
 function query(){return document.getElementById('searchIn').value.toLowerCase().trim();}
+// Searching your own list is the thing you do most, and it was a substring test
+// against title+genre+notes. So "aot" found nothing. "shingeki" found nothing,
+// even though it's the same show under the name half the internet uses. One
+// dropped letter found nothing. Every one of those is a search for something you
+// already know is in there — the worst kind of miss.
+function srchInitials(s){return String(s||'').split(/[^a-z0-9]+/i).filter(Boolean).map(w=>w[0]).join('').toLowerCase();}
+// Every letter present, in order: survives a typo, a dropped vowel, or a space
+// someone didn't type. Only used as the last resort, and never for 1–2 letters,
+// where it would match nearly everything.
+function srchSubseq(hay,needle){
+  let i=0;
+  for(let j=0;j<hay.length&&i<needle.length;j++)if(hay[j]===needle[i])i++;
+  return i===needle.length;
+}
+function searchScore(a,q){
+  if(!q)return 1;
+  const t=(a.title||'').toLowerCase();
+  // The romaji/English/native names, and the title it had before a site renamed
+  // it — all of them are things a person legitimately types.
+  const alts=[a.titleEn,a.titleRo,a.titleNa,a.titleAlt].filter(Boolean).map(s=>String(s).toLowerCase());
+  if(t===q)return 100;
+  if(t.startsWith(q))return 90;
+  if(t.includes(q))return 80;
+  for(const s of alts){if(s===q)return 75;if(s.startsWith(q))return 70;if(s.includes(q))return 65;}
+  const ini=srchInitials(a.title);
+  if(ini===q)return 60;                       // "aot"
+  if(q.length>=2&&ini.startsWith(q))return 55;
+  for(const s of alts){const si=srchInitials(s);if(si===q)return 52;if(q.length>=2&&si.startsWith(q))return 50;}
+  const fq=q.replace(/[^a-z0-9]/g,'');
+  if(fq){
+    const flat=t.replace(/[^a-z0-9]/g,'');
+    if(flat.includes(fq))return 45;            // "onepiece", "attackontitan"
+    for(const s of alts)if(s.replace(/[^a-z0-9]/g,'').includes(fq))return 40;
+    if(fq.length>=3&&srchSubseq(flat,fq))return 30;
+  }
+  const meta=((a.genre||'')+' '+(a.notes||'')).toLowerCase();
+  if(meta.includes(q))return 20;
+  return 0;
+}
 
 // Rebuilding the home list costs 40–90ms of main thread on a 108-title list
 // (measured in Chrome; several times that on a phone) and it sits behind a
@@ -5673,8 +5749,14 @@ function renderHome(){
   if(q||filterStatus!=='all'){
     let list=pool;
     if(filterStatus!=='all')list=list.filter(a=>a.status===filterStatus);
-    if(q)list=list.filter(a=>(a.title+' '+(a.genre||'')+' '+(a.notes||'')).toLowerCase().includes(q));
-    const hits=sorted(list);
+    // Sort normally FIRST, then order by relevance. Array.sort is stable, so two
+    // titles that match equally well keep the order the list is meant to be in
+    // rather than whatever order they happened to be stored in.
+    list=sorted(list);
+    if(q){
+      list=list.map(a=>[a,searchScore(a,q)]).filter(x=>x[1]>0).sort((x,y)=>y[1]-x[1]).map(x=>x[0]);
+    }
+    const hits=list;
     if(hits.length){el.innerHTML=`<div class="grid">${hits.map(posterCard).join('')}</div>`;return;}
     const stLbl=filterStatus==='watching'?(isRead?'Reading':'Watching'):(STATUS_META[filterStatus]?STATUS_META[filterStatus].label:filterStatus);
     const msg=q
@@ -13992,10 +14074,13 @@ function _updBusy(){
 // you'd explain it to a friend — what they can now do, not what the code does.
 // No version numbers or jargon in the notes; the date IS the version.
 const RELEASE={
-  v:'2026-08-10.3',
+  v:'2026-08-10.4',
   title:'Seasons, specials, and progress that keeps itself',
   push:'Every film and special on the show it belongs to \u2014 and progress that marks itself.',
   notes:[
+    'Search finds what you mean. “aot” finds Attack on Titan, the Japanese name finds the English one, a doubled-letter shorthand like “jjk” works, and one wrong letter no longer means no results \u2014 with the closest match first.',
+    'A new look that\u2019s the same look: the background glow now drifts instead of sitting still, the bottom bar floats as a pill with the current tab lit inside it, an edge appears under the controls once you\u2019ve scrolled, and artwork lifts under the pointer on desktop.',
+    'The app\u2019s typefaces are now stored on the device, so it opens in its own type instantly and still looks right with no connection at all.',
     'Fixed: opening a show in the browser built its address a different way than opening it in the app, so a site set up with anything beyond the basic tokens went to a broken link \u2014 and the recovery from that link always opened episode 1, whatever you were on. Both paths now build the same address, and an address that can\u2019t be completed opens the site instead of a dead page.',
     'Air times are the Japanese broadcast, and your source gets it later \u2014 so the countdown no longer jumps straight to \u201cout now\u201d and sends you somewhere that hasn\u2019t got it yet. It says the episode aired and shows how long the wait usually is, then flips. How long is measured from your own watching, per site, so a fast mirror and a slow one aren\u2019t treated the same. Episode alerts wait too. Settings \u2192 Sources shows what it worked out.',
     'Every show now carries its films, OVAs and specials alongside its seasons, and tapping any of them adds it and opens it. No searching for the next season by name.',

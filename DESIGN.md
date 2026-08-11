@@ -63,6 +63,13 @@ body is what stopped the UI reading flat when everything was one family at
 - **Player** — full-screen overlay, sandboxed cross-origin iframe. Its chrome is
   the only place a countdown chip or overlay sits on artwork.
 - **Sheets** — bottom sheets for everything modal. No nested cards.
+- **Bottom nav** — a floating pill, inset 14px, its own border and shadow, blur
+  behind. Not a bar welded to the edge: the list scrolls *under* it. The active
+  item is a filled pill inside it, because at 9px colour alone can't carry
+  "where you are". Centered and capped at ~450px on desktop.
+- **Scroll edge** — chrome sits above the scroller rather than over it, so the
+  cue that there's content above is a hairline under `.ctrl-row`, faded in only
+  once `pageEl` has actually moved (`:root.pg-scrolled`).
 
 ## Mobile
 
@@ -93,9 +100,29 @@ Learned from a real "it looks AI generated" round, all previously present:
   release notes and a colour tool.
 - **No emoji in chrome** (see PRODUCT.md for the two intended exceptions).
 
+## Search
+
+Searching your own list is scored, not filtered (`searchScore`). Exact title,
+prefix, substring, then the AniList English/romaji/native names, then initials
+("aot"), then punctuation-stripped, then a subsequence match for typos and
+doubled-letter acronyms ("jjk"), and last the genre/notes. Results sort by score
+over the normal sort, and `Array.sort` is stable so equal matches keep list
+order. A weak match ranking below a strong one is fine; finding nothing is not.
+
 ## Motion
 
-Reduced-motion is respected globally. Rotation freezes transitions briefly to
+Reduced-motion is respected globally (one `*` rule collapses every duration).
+
+**Ambient.** The background glow is the title's own colour (`--amb`, an
+`@property` so it can transition). A soft blob of it drifts on a 42s alternating
+cycle — transform only, so the gradient rasterises once and the GPU moves it;
+never animate the gradient itself. Keep it around 24%: it stacks on the two
+static radials already there, and the point is that the background reads as lit,
+not that it's more saturated.
+
+**Hover.** Pointer devices only (`@media (hover:hover)`) — posters lift 4px and
+pick up their own accent in the shadow. There is no hover on a phone, and touch
+already has the press scale. Rotation freezes transitions briefly to
 stop the player tearing, and the player's frame is hidden during rotation —
 except in native fullscreen, where hiding it caused iOS to exit fullscreen.
 Any new motion near the player must check `nativeFullscreen()` first.

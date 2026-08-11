@@ -6,7 +6,19 @@
 // current, but an installed iOS app that has been offline or backgrounded can
 // hold an old bundle for a long time — and "the fix didn't work" has looked
 // exactly like that more than once.
-const CACHE = 'animelist-v15';
+const CACHE = 'animelist-v16';
+// The typeface lives on a THIRD-PARTY origin, and the fetch handler below only
+// ever touched same-origin requests — so it was never stored. Two consequences,
+// both real: an installed app that goes offline renders in system fonts, losing
+// the brand entirely, and every cold start pays a DNS + TLS round trip to
+// fonts.gstatic.com before text can paint in the right face. Google's font URLs
+// are versioned and immutable, which makes cache-first exactly right for them.
+//
+// Kept in its OWN cache, deliberately: the app cache is wiped on every version
+// bump to force a fresh bundle, and wiping the fonts with it would re-download
+// them on every release for no reason.
+const FONT_CACHE = 'animelist-fonts-v1';
+const FONT_HOSTS = ['fonts.googleapis.com', 'fonts.gstatic.com'];
 const ASSETS = ['./index.html', './friends.html', './manifest.json'];
 
 self.addEventListener('install', e => {
@@ -16,7 +28,7 @@ self.addEventListener('install', e => {
 
 self.addEventListener('activate', e => {
   e.waitUntil(caches.keys().then(keys =>
-    Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
+    Promise.all(keys.filter(k => k !== CACHE && k !== FONT_CACHE).map(k => caches.delete(k)))
   ));
   self.clients.claim();
 });
@@ -93,8 +105,28 @@ function cacheKey(request) {
   return u.origin + u.pathname;
 }
 self.addEventListener('fetch', e => {
+  const u = new URL(e.request.url);
   // Only handle same-origin requests; API calls (Jikan, TVMaze, Anthropic…) go straight to the network
-  if (new URL(e.request.url).origin !== self.location.origin) return;
+  if (u.origin !== self.location.origin) {
+    // …except the fonts, which ARE the app's appearance. Cache-first: immutable
+    // URLs, so a hit is always correct, and it makes the second launch and every
+    // offline launch look right instantly.
+    if (e.request.method === 'GET' && FONT_HOSTS.indexOf(u.hostname) >= 0) {
+      e.respondWith(
+        caches.match(e.request).then(hit => hit || fetch(e.request).then(res => {
+          // Font files are served cross-origin without CORS unless asked, so the
+          // response can be opaque. An opaque response still renders and still
+          // caches; it just can't be inspected. Store it either way.
+          if (res && (res.ok || res.type === 'opaque')) {
+            const copy = res.clone();
+            caches.open(FONT_CACHE).then(c => c.put(e.request, copy)).catch(() => {});
+          }
+          return res;
+        }).catch(() => caches.match(e.request)))
+      );
+    }
+    return;
+  }
   // Network-first so updates show up without clearing Safari data; cache is the offline fallback
   e.respondWith(
     fetch(e.request).then(res => {

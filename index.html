@@ -213,7 +213,7 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 .filt-scroll::-webkit-scrollbar{display:none;}
 /* sort is a pinned button + dropdown — always visible, never scrolled past */
 .sort-wrap{position:relative;flex-shrink:0;}
-.sort-btn{display:inline-flex;align-items:center;gap:5px;padding:7px 11px;border-radius:99px;font-size:11.5px;font-weight:700;background:var(--bg3);border:1px solid transparent;color:var(--t2);white-space:nowrap;transition:color .15s;}
+.sort-btn{display:inline-flex;align-items:center;gap:5px;padding:8px 13px;border-radius:99px;font-size:11.5px;font-weight:700;background:var(--bg3);border:1px solid transparent;color:var(--t2);white-space:nowrap;transition:color .15s,background-color .15s;}
 .sort-btn.on,.sort-btn.filt-on{background:color-mix(in srgb,var(--a) 20%,var(--bg3));color:var(--a2);}
 .sort-btn .ico{width:13px;height:13px;}
 .sort-btn .ico:last-child{width:12px;height:12px;opacity:.7;}
@@ -236,7 +236,33 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
   background:var(--bg3);border:1px solid transparent;color:var(--t2);transition:background-color .15s,color .15s,box-shadow .15s;
 }
 .schip.on{background:color-mix(in srgb,var(--a) 20%,var(--bg3));border-color:transparent;color:var(--a2);box-shadow:0 3px 12px -5px var(--glow);}
-.filt-row{display:flex;gap:6px;flex-shrink:0;}
+/* One segmented track instead of three separate chips floating in a row. Three
+   pills each carrying their own border and shadow read as three unrelated
+   buttons; All / Watching / Plan are one choice with three answers, and a
+   segmented control is the shape that says so. The track holds the border, the
+   selected segment is the only thing filled, and it keeps that status's own
+   colour — so the row tells you which list you're in at a glance, not just
+   which button is lit. */
+.filt-row{
+  display:flex;gap:2px;flex-shrink:0;padding:3px;border-radius:99px;
+  background:color-mix(in srgb,var(--bg3) 74%,transparent);
+  border:1px solid rgba(255,255,255,.10);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 4px 14px -8px rgba(0,0,0,.6);
+}
+.filt-row .fchip{
+  background:none;border:1px solid transparent;box-shadow:none;padding:6px 12px;
+}
+.filt-row .fchip:not(.on):not([class*="on-"]):hover{color:var(--t1);}
+/* The filled segment gets the depth the track used to hand to everybody. */
+.filt-row .fchip.on,.filt-row .fchip[class*="on-"]{
+  box-shadow:0 2px 8px -3px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.10);
+}
+/* Counts are data, so they get to look like data rather than trailing text. */
+.filt-row .fn{
+  padding:1px 6px;border-radius:99px;background:rgba(255,255,255,.07);opacity:1;
+  color:inherit;min-width:17px;text-align:center;
+}
+.filt-row .fchip:not(.on):not([class*="on-"]) .fn{color:var(--t3);}
 /* Its own row, full width. It lived in the filter row and made that
    horizontally-scrolling row wide enough to push "All" off the left edge — an
    alert shouldn't cost you a filter, and a wider tap target is the point. */
@@ -598,7 +624,11 @@ body.first-paint .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards
    hairline on top reads as a shelf the content stops at. */
 .nav{
   position:fixed;left:14px;right:14px;bottom:calc(var(--safe-b) + 12px);z-index:60;
-  display:flex;align-items:center;justify-content:space-around;
+  /* Equal columns, not space-around. Distributing the leftover space meant the
+     two wider labels ("Settings", "Sources") pushed their neighbours: measured
+     centre-to-centre gaps of 88.3 / 88.3 / 91.5 / 94.5, and the + landed 6.2px
+     left of the bar's own centre. Five identical tracks put it exactly on it. */
+  display:grid;grid-template-columns:repeat(5,1fr);align-items:center;
   padding:9px 8px;border-radius:26px;
   background:var(--bg3);border:1px solid var(--bn2);
   box-shadow:0 14px 34px -10px rgba(0,0,0,.62),0 3px 10px rgba(0,0,0,.34);
@@ -607,7 +637,7 @@ body.first-paint .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards
   .nav{background:color-mix(in srgb,var(--bg3) 76%,transparent);backdrop-filter:blur(22px) saturate(1.3);-webkit-backdrop-filter:blur(22px) saturate(1.3);}
 }
 .nbtn{
-  display:flex;flex-direction:column;align-items:center;gap:3px;
+  display:flex;flex-direction:column;align-items:center;gap:3px;justify-self:center;
   font-size:18px;color:var(--t2);min-width:52px;padding:6px 10px;border-radius:16px;
   transition:transform .12s,background-color .16s,color .16s;
 }
@@ -1859,7 +1889,7 @@ body.recsel .pcard{position:relative;}
   }
   .confirm-box{max-width:440px;margin-left:auto;margin-right:auto;}
   /* Stretched edge to edge on a desktop the pill stops reading as a pill. */
-  .nav{left:50%;right:auto;transform:translateX(-50%);justify-content:center;gap:34px;padding-left:18px;padding-right:18px;}
+  .nav{left:50%;right:auto;transform:translateX(-50%);width:min(460px,calc(100% - 36px));padding-left:14px;padding-right:14px;}
   .grid,.row-scroll{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));}
   .hero{min-height:264px;}
   .hero-title{font-size:27px;}
@@ -14074,10 +14104,12 @@ function _updBusy(){
 // you'd explain it to a friend — what they can now do, not what the code does.
 // No version numbers or jargon in the notes; the date IS the version.
 const RELEASE={
-  v:'2026-08-10.4',
+  v:'2026-08-11.1',
   title:'Seasons, specials, and progress that keeps itself',
   push:'Every film and special on the show it belongs to \u2014 and progress that marks itself.',
   notes:[
+    'All / Watching / Plan is one segmented control now instead of three loose buttons \u2014 one track, and only the list you\u2019re actually in is filled, in that list\u2019s own colour. The counts read as counts.',
+    'The bottom bar\u2019s five slots are now equal, so the + sits exactly in the middle and the spacing is even. It was drifting a few pixels off centre.',
     'Search finds what you mean. “aot” finds Attack on Titan, the Japanese name finds the English one, a doubled-letter shorthand like “jjk” works, and one wrong letter no longer means no results \u2014 with the closest match first.',
     'A new look that\u2019s the same look: the background glow now drifts instead of sitting still, the bottom bar floats as a pill with the current tab lit inside it, an edge appears under the controls once you\u2019ve scrolled, and artwork lifts under the pointer on desktop.',
     'The app\u2019s typefaces are now stored on the device, so it opens in its own type instantly and still looks right with no connection at all.',

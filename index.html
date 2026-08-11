@@ -1022,6 +1022,11 @@ body.first-paint .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards
 .yt-x .ico{width:18px;height:18px;}
 .yt-frame{position:relative;width:100%;aspect-ratio:16/9;border-radius:16px;overflow:hidden;background:#000;box-shadow:0 26px 70px -14px rgba(0,0,0,.75);}
 .yt-frame iframe{position:absolute;inset:0;width:100%;height:100%;border:0;}
+/* body.yt-open was being set and cleared all along with no rule behind it. What
+   it was for is plain: while a trailer is up, the page underneath must not
+   scroll — otherwise a drag on the overlay's backdrop moves the list behind it
+   and you come back to a different scroll position than you left. */
+body.yt-open{overflow:hidden;touch-action:none;}
 /* Sits behind the frame until the frame proves it works. */
 .yt-wait{position:absolute;inset:0;z-index:2;display:flex;flex-direction:column;align-items:center;justify-content:center;
   gap:14px;padding:26px;text-align:center;background:#0b0b0f;color:var(--t2);font-size:13.5px;line-height:1.5;}
@@ -2961,7 +2966,7 @@ body.recsel .pcard{position:relative;}
   <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--b1);">
     <div class="flabel" style="margin-bottom:4px">Background glow</div>
     <p class="ai-desc" style="font-size:11.5px;margin:0 0 14px">Follows what you’re browsing — or lock it to your theme, a color, or off.</p>
-    <div class="glow-row" id="glowRow"></div>
+    <div class="glow-modes" id="glowRow"></div>
   </div>
 </div>
 
@@ -12504,7 +12509,7 @@ function readQuickSetup(){
   let site='your site';try{site=new URL(url).hostname.replace(/^www\./,'');}catch(e){}
   out.dataset.tpl=tpl;
   const deep=/\{(ch|ch2|ch3|chapter)\}/i.test(tpl);
-  out.innerHTML=`<div class="src-quick-good">${icon('check')} Got it — <b>${escH(site)}</b>.<br>
+  out.innerHTML=`<div class="src-quick-ok">${icon('check')} Got it — <b>${escH(site)}</b>.<br>
     <span style="font-family:ui-monospace,Menlo,monospace;font-size:11.5px;word-break:break-all;opacity:.8">${escH(tpl)}</span></div>
     ${deep?'':`<p class="ai-desc" style="margin:8px 0 0;font-size:11.5px">That address points at the <b>series</b>, so Read will open its chapter list. Paste <b>a chapter's</b> address instead and every chapter becomes one tap.</p>`}
     <button class="parse-btn" style="margin-top:9px" onclick="readQuickUse()">Use this for everything I read</button>`;

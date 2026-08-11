@@ -128,6 +128,19 @@ doubled-letter acronyms ("jjk"), and last the genre/notes. Results sort by score
 over the normal sort, and `Array.sort` is stable so equal matches keep list
 order. A weak match ranking below a strong one is fine; finding nothing is not.
 
+## Checking it
+
+`node scripts/orphan-classes.mjs index.html` — every class the markup uses,
+against every class the stylesheet defines. It exists because the same failure
+shipped four times: an element is moved, renamed or added, its rule is left
+behind or never written, and nothing throws. The result is a control with a
+border and no padding, or a picker with no layout. The only other detector is
+someone opening the app and screenshotting it.
+
+Exits non-zero on anything unstyled. Containers that genuinely carry no styling
+are listed in `INTENTIONAL` inside the script, so the next one is a real signal
+rather than one more line of noise.
+
 ## Motion
 
 Reduced-motion is respected globally (one `*` rule collapses every duration).

@@ -82,6 +82,12 @@ body is what stopped the UI reading flat when everything was one family at
   list rather than smeared over it), and the active item as a filled pill,
   because at 9px colour alone can't carry "where you are". Capped at 520px and
   centred on desktop. Takes the full safe area as its own bottom padding.
+- **Desktop layout** — at ≥900px `#app` becomes the grid and carries the 1180px
+  measure, so every child is centred by one rule instead of four (the fix bar
+  was once left out of that list and ran full-width while everything else sat in
+  a column). Search and the filters share row 2 rather than stacking: the phone's
+  vertical stack cost 251px before the first poster while several hundred pixels
+  of horizontal room sat unused. Now 179px.
 - **Top bar** (`.topbar`) — search and the filters in one floating panel that
   mirrors the nav exactly: same material, same blur, **same left/right inset at
   every width** (verified 10px at ≤360, 14px above). That shared inset is what

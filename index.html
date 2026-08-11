@@ -2127,13 +2127,22 @@ body.recsel .pcard{position:relative;}
      width (a narrow ~300px column floating in the middle of the screen) and max-width
      never engages. width:100% restores the stretch → they fill up to the 1180 cap,
      then the auto margins center that. */
-  /* Everything in the column is centred on the same 1180px measure — the fix bar
-     was left out of this list, so it ran the full width of the window while the
-     header, the bars and the grid sat inside a centred column. One element out
-     of alignment reads as a mistake in all of them. */
-  .hdr,.topbar,.fixbar.on,.page{
-    width:100%;max-width:1180px;margin-left:auto;margin-right:auto;
+  /* Stacked, the chrome cost 251px before the first poster — a third of a laptop
+     screen spent on a header, two bars and a notice, while several hundred pixels
+     of horizontal room sat unused either side of them. On a phone that stack is
+     right; on a desktop it is just tall.
+     #app becomes the grid and carries the measure, so every child is centred by
+     one rule rather than four, and search and filters share a row. */
+  #app{
+    display:grid;grid-template-columns:minmax(0,1fr) auto;
+    grid-template-rows:auto auto auto minmax(0,1fr);
+    column-gap:10px;width:100%;max-width:1180px;margin-left:auto;margin-right:auto;
   }
+  .hdr{grid-column:1/-1;grid-row:1;padding-top:calc(var(--safe-t) + 10px);}
+  .topbar{grid-column:1;grid-row:2;margin-left:0;margin-right:0;}
+  .topbar-ctrl{grid-column:2;grid-row:2;margin-top:10px;}   /* same row, not under it */
+  .fixbar.on{grid-column:1/-1;grid-row:3;margin-left:0;margin-right:0;}
+  .page{grid-column:1/-1;grid-row:4;min-height:0;}
   .confirm-box{max-width:440px;margin-left:auto;margin-right:auto;}
   /* Stretched edge to edge on a desktop the pill stops reading as a pill. */
   /* A 520px bar under 1180px of content reads as a phone control someone left
@@ -14566,10 +14575,11 @@ function _updBusy(){
 // you'd explain it to a friend — what they can now do, not what the code does.
 // No version numbers or jargon in the notes; the date IS the version.
 const RELEASE={
-  v:'2026-08-11.12',
+  v:'2026-08-11.13',
   title:'Seasons, specials, and progress that keeps itself',
   push:'Every film and special on the show it belongs to \u2014 and progress that marks itself.',
   notes:[
+    'Desktop is less top-heavy: search and the filters share one row instead of stacking, so the first poster sits about 70px higher and you see a row more of your list.',
     'Desktop: the \u201cnot linked\u201d bar ran the full width of the window while everything else sat in a centred column, and the bottom bar was a narrow phone control stranded under a wide page. Both now line up with the same column as the rest.',
     'The bottom bar is attached to the bottom of the screen again, keeping the rounded top, the blur and the round + \u2014 the list now runs underneath it instead of stopping short of a floating strip.',
     'Fixed the Favourite button, which had lost its shape when the facts moved, and the progress bar under the episode list, which was full-width and louder than the artwork above it.',

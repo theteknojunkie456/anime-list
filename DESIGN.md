@@ -140,6 +140,18 @@ order. A weak match ranking below a strong one is fine; finding nothing is not.
 
 ## Checking it
 
+`node scripts/smoke.mjs` — boots the real app and checks it works: no errors on
+load, home renders, **every inline `onclick="fn("` name resolves** (268 of them,
+and an out-of-scope one is invisible until someone clicks it), core helpers are
+in scope, search finds `aot` / `shingeki` / a typo, right-click opens the menu on
+one card, shift-click selects a range, the detail sheet opens carrying its deck
+and facts. Exits non-zero on any failure.
+
+It exists because a feature shipped whose every path threw `ReferenceError` on
+line one. The logic had been tested in isolation and was right; what was never
+tested was whether the code runs inside the app. Reintroducing that exact bug
+now fails five checks, so the test is known to have teeth rather than assumed to.
+
 `node scripts/preview.mjs 390x844 out.png` — renders the REAL app headlessly at
 any width, with a list seeded in. It serves a copy with `NETWORK_GATE` flipped
 off, because the invite gate holds the screen before `render()` ever runs, which

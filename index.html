@@ -818,17 +818,15 @@ body.first-paint .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards
 .dt-next-go{flex:0 0 auto;padding:7px 13px;border-radius:99px;background:var(--a);color:var(--aFg);font-size:11.5px;font-weight:800;}
 .dt-next-x{flex:0 0 auto;display:flex;color:var(--t3);padding:3px;}
 .dt-next-x .ico{width:14px;height:14px;}
-/* On a phone there isn't room for a label, a title, a button and a dismiss on one
-   line — the title was losing, down to 99px and ellipsised, which is the one part
-   you actually need to read. The row stacks instead: label and title get the full
-   width, the controls sit under them. */
+/* Stacking this fixed the clipping and made a one-line hint 130px tall, which is
+   its own kind of wrong. The label is the expendable part — you're on the show's
+   own page and the button says what it does — so on a phone it goes and the
+   title takes the space it was using. One row, nothing clipped, 49px. */
 @media(max-width:430px){
-  .dt-next{flex-wrap:wrap;row-gap:9px;}
-  .dt-next-k{flex:1 0 100%;order:1;}
-  .dt-next-t{flex:1 0 calc(100% - 30px);order:2;white-space:normal;overflow:visible;
-    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
-  .dt-next-x{order:3;}
-  .dt-next-go{order:4;flex:1 0 100%;text-align:center;padding:9px 13px;}
+  .dt-next{gap:8px;padding:9px 9px 9px 12px;}
+  .dt-next-k{display:none;}
+  .dt-next-go{padding:7px 11px;font-size:11px;}
+}
 
 .dt-season-here{font-size:11px;font-weight:800;color:var(--a2);flex-shrink:0;}
 /* Marks a row that will put itself on your list when tapped, so the difference

@@ -2127,12 +2127,23 @@ body.recsel .pcard{position:relative;}
      width (a narrow ~300px column floating in the middle of the screen) and max-width
      never engages. width:100% restores the stretch → they fill up to the 1180 cap,
      then the auto margins center that. */
-  .hdr,.topbar,.page{
+  /* Everything in the column is centred on the same 1180px measure — the fix bar
+     was left out of this list, so it ran the full width of the window while the
+     header, the bars and the grid sat inside a centred column. One element out
+     of alignment reads as a mistake in all of them. */
+  .hdr,.topbar,.fixbar.on,.page{
     width:100%;max-width:1180px;margin-left:auto;margin-right:auto;
   }
   .confirm-box{max-width:440px;margin-left:auto;margin-right:auto;}
   /* Stretched edge to edge on a desktop the pill stops reading as a pill. */
-  .nav{left:50%;right:auto;transform:translateX(-50%);width:min(520px,100%);padding-left:16px;padding-right:16px;}
+  /* A 520px bar under 1180px of content reads as a phone control someone left
+     on a desktop. It matches the column instead, and the five targets spread
+     across it rather than huddling in the middle. */
+  .nav{left:50%;right:auto;transform:translateX(-50%);width:min(1180px,100%);
+       padding-left:24px;padding-right:24px;border-radius:22px 22px 0 0;}
+  .nbtn{min-width:78px;}
+  /* On a pointer, the whole target lights up rather than only its label. */
+  .nbtn:hover:not(.add){background:rgba(255,255,255,.05);}
   .grid,.row-scroll{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));}
   .hero{min-height:264px;}
   .hero-title{font-size:27px;}
@@ -14555,10 +14566,11 @@ function _updBusy(){
 // you'd explain it to a friend — what they can now do, not what the code does.
 // No version numbers or jargon in the notes; the date IS the version.
 const RELEASE={
-  v:'2026-08-11.11',
+  v:'2026-08-11.12',
   title:'Seasons, specials, and progress that keeps itself',
   push:'Every film and special on the show it belongs to \u2014 and progress that marks itself.',
   notes:[
+    'Desktop: the \u201cnot linked\u201d bar ran the full width of the window while everything else sat in a centred column, and the bottom bar was a narrow phone control stranded under a wide page. Both now line up with the same column as the rest.',
     'The bottom bar is attached to the bottom of the screen again, keeping the rounded top, the blur and the round + \u2014 the list now runs underneath it instead of stopping short of a floating strip.',
     'Fixed the Favourite button, which had lost its shape when the facts moved, and the progress bar under the episode list, which was full-width and louder than the artwork above it.',
     'A member showing as \u201c(existing)\u201d now reads as unnamed and can be tapped to name \u2014 it was never a name, just what old devices were filed under before one was required.',

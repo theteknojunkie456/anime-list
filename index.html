@@ -1094,7 +1094,14 @@ body.yt-open{overflow:hidden;touch-action:none;}
 .dt-next-k{flex:0 0 auto;font-size:11px;font-weight:700;color:var(--t3);white-space:nowrap;}
 }
 .dt-next-t{flex:1;min-width:0;font-size:12.5px;font-weight:600;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.dt-next-go{flex:0 0 auto;padding:7px 13px;border-radius:99px;background:var(--a);color:var(--aFg);font-size:11.5px;font-weight:800;}
+/* Filled in the accent, this was a second primary button sitting directly above
+   the real one — two solid calls to action, four lines apart, and the louder of
+   the two was the smaller job. It states its offer quietly now and lets Start
+   Watching be the thing you press. */
+.dt-next-go{flex:0 0 auto;padding:5px 11px;border-radius:99px;background:transparent;
+  border:1px solid color-mix(in srgb,var(--a) 55%,transparent);color:var(--a2);
+  font-size:11px;font-weight:700;transition:background-color .15s;}
+.dt-next-go:active{background:var(--ag);}
 .dt-next-x{flex:0 0 auto;display:flex;color:var(--t3);padding:3px;}
 .dt-next-x .ico{width:14px;height:14px;}
 /* Stacking this fixed the clipping and made a one-line hint 130px tall, which is
@@ -1172,7 +1179,13 @@ html.rotating .pv-frame:fullscreen,html.rotating .pv-frame:-webkit-full-screen{o
    `none` is the identity, so the slide-in still animates from translateY(100%)
    but nothing is left composited once it's open. */
 .playerview.on{transform:none;}
-.pv-top{flex-shrink:0;display:flex;align-items:center;gap:9px;padding:calc(var(--safe-t) + 12px) 14px 12px;background:linear-gradient(180deg,#161618 0%,#0a0a0c 100%);border-bottom:1px solid rgba(255,255,255,.06);}
+.pv-top{flex-shrink:0;display:flex;align-items:center;gap:9px;
+  /* #app takes the left/right safe area in landscape, but the player is a fixed
+     overlay OUTSIDE #app, so it never did — which is why the back button, the
+     title and the episode controls ran into the rounded corners and the notch
+     the moment you turned the phone. The chrome insets; the video still fills
+     the screen edge to edge, which is the point of turning it. */
+  padding:calc(var(--safe-t) + 12px) max(14px,env(safe-area-inset-right)) 12px max(14px,env(safe-area-inset-left));background:linear-gradient(180deg,#161618 0%,#0a0a0c 100%);border-bottom:1px solid rgba(255,255,255,.06);}
 /* on the player's black surface the back button joins the glass button set (scoped so the share view's back is untouched) */
 .playerview .sv-back{width:40px;height:40px;border-radius:12px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);color:#fff;transition:background .15s,transform .12s;}
 .playerview .sv-back:active{transform:scale(.9);background:rgba(255,255,255,.15);}
@@ -1198,7 +1211,7 @@ html.rotating .pv-frame:fullscreen,html.rotating .pv-frame:-webkit-full-screen{o
 .pv-host-chat{width:50px;height:48px;flex-shrink:0;border-radius:14px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);color:#fff;display:flex;align-items:center;justify-content:center;}
 .pv-host-main:active,.pv-host-next:active,.pv-host-chat:active{transform:scale(.96);}
 .pv-host-chat .ico{width:19px;height:19px;}
-.pv-nav{flex-shrink:0;display:flex;align-items:center;gap:9px;padding:12px 14px calc(var(--safe-b) + 12px);background:linear-gradient(0deg,#161618 0%,#0a0a0c 100%);border-top:1px solid rgba(255,255,255,.06);}
+.pv-nav{flex-shrink:0;display:flex;align-items:center;gap:9px;padding:12px max(14px,env(safe-area-inset-right)) calc(var(--safe-b) + 12px) max(14px,env(safe-area-inset-left));background:linear-gradient(0deg,#161618 0%,#0a0a0c 100%);border-top:1px solid rgba(255,255,255,.06);}
 .pv-nav-arrow{width:50px;height:48px;flex-shrink:0;border-radius:14px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);color:#fff;display:flex;align-items:center;justify-content:center;transition:opacity .15s,transform .12s,background .15s;}
 .pv-nav-arrow .ico{width:22px;height:22px;}
 .pv-nav-arrow:active{transform:scale(.93);background:rgba(255,255,255,.15);}
@@ -6682,7 +6695,12 @@ function richDetailHTML(d,forId){
   const charsHTML=chars.length?`<div class="dt-label" style="margin-top:18px">Characters</div><div class="dt-chars">${chars.map(e=>{const n=e.node||{};const img=safeImg(((n.image||{}).medium)||'');const nm=((n.name||{}).full)||'';return `<div class="dt-char"><div class="dt-char-img"${img?` style="background-image:url('${img}')"`:''}></div><div class="dt-char-n">${schEsc(nm)}</div><div class="dt-char-r">${schEsc((e.role||'').toLowerCase())}</div></div>`;}).join('')}</div>`:'';
   const recs=(((d.recommendations||{}).nodes)||[]).map(n=>n&&n.mediaRecommendation).filter(x=>x&&!isAdultMedia(x));
   const recsHTML=recs.length?`<div class="dt-label" style="margin-top:18px">More like this</div><div class="dt-recs">${recs.map(m=>{const t=(m.title.english||m.title.romaji||'').replace(/'/g,'&#39;');const img=safeImg(((m.coverImage||{}).large)||'');return `<button class="dt-rec" onclick="addPopular(${m.id},'${t.replace(/"/g,'&quot;')}','${img}',${m.episodes||0})"><div class="dt-rec-img"${img?` style="background-image:url('${img}')"`:''}></div><div class="dt-rec-t">${schEsc(m.title.english||m.title.romaji||'')}</div></button>`;}).join('')}</div>`:'';
-  return metaHTML+linksHTML+epsHTML+synHTML+trailerHTML+charsHTML+recsHTML;
+  // Order by what you came for. "Also streaming on" sat between the tags and the
+  // episode list, so seven service buttons — none of which is the source you
+  // actually use — pushed the episodes most of a screen down the page. It is a
+  // fallback, not a destination: episodes, then what the show is, then where
+  // else it exists.
+  return metaHTML+epsHTML+synHTML+linksHTML+trailerHTML+charsHTML+recsHTML;
 }
 // ─── FRANCHISE (every season of a title, on-list or not) ────────────────────
 // Seasons come from TWO independent sources so a gap in one can't hide a season:

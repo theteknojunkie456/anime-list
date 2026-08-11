@@ -12455,27 +12455,34 @@ function bulkToggle(id,range){
 }
 function bulkClear(){bulkSel=null;_bulkAnchor=-1;render();}
 function bulkSetStatus(st){
-  if(!bulkOn())return;
+  const ids=menuTargets().length?menuTargets():(bulkOn()?[...bulkSel]:[]);
+  if(!ids.length)return;
   let n=0;
-  bulkSel.forEach(id=>{const a=anime.find(x=>x.id===id);if(a&&a.status!==st){a.status=st;touch(a);n++;}});
-  const label=stLabel(st);
-  bulkSel=null;_bulkAnchor=-1;
-  try{save();}catch(e){}
-  render();
-  toast(n?`${n} moved to ${label}`:'Already there');
+  ids.forEach(id=>{const a=anime.find(x=>x.id===id);if(a&&a.status!==st){a.status=st;touch(a);n++;}});
+  _menuDone(n,ids.length===1?`Moved to ${stLabel(st)}`:`${n} moved to ${stLabel(st)}`);
 }
 // One menu, two ways in: right-click on a desktop, long-press on a phone. Both
 // are the gesture people already use for "do something to this", and neither
 // needs a mode to be entered first. If a selection is running it acts on all of
 // it; if not, it acts on the card you touched.
-let _bulkMenuOn=false;
-function openBulkMenu(x,y){
+// The two gestures do different jobs and must not bleed into each other:
+//   shift / space  — build a selection of several
+//   right-click, two-finger tap, long-press — act on ONE, right now
+// So the menu carries its own target. Opened on a card that is part of a running
+// selection it acts on all of them; opened on anything else it acts on that card
+// alone and does NOT drag it into a selection — otherwise editing one show would
+// leave you in a mode you never asked to enter.
+let _bulkMenuOn=false,_menuIds=null;
+function menuTargets(){return _menuIds&&_menuIds.length?_menuIds:(bulkOn()?[...bulkSel]:[]);}
+function openBulkMenu(x,y,singleId){
   closeBulkMenu();
-  if(!bulkOn())return;
-  const n=bulkSel.size;
+  _menuIds=singleId?[singleId]:(bulkOn()?[...bulkSel]:null);
+  if(!menuTargets().length)return;
+  const n=menuTargets().length;
+  const one=n===1?anime.find(a=>a.id===menuTargets()[0]):null;
   const el=document.createElement('div');
   el.id='bulkMenu';el.className='bulk-menu';
-  el.innerHTML=`<div class="bulk-menu-h">${n} selected</div>`
+  el.innerHTML=`<div class="bulk-menu-h">${one?schEsc(one.title).slice(0,42):n+' selected'}</div>`
     +Object.keys(STATUS_META).map(st=>`<button class="bulk-mi" onclick="bulkSetStatus('${st}')">${STATUS_META[st].icon}<span>Move to ${stLabel(st)}</span></button>`).join('')
     +`<div class="bulk-menu-d"></div>`
     +`<button class="bulk-mi" onclick="bulkFav(true)">${icon('heart')}<span>Favourite</span></button>`
@@ -12493,33 +12500,38 @@ function openBulkMenu(x,y){
   setTimeout(()=>document.addEventListener('pointerdown',_bulkMenuAway,{once:true}),0);
 }
 function _bulkMenuAway(ev){const m=document.getElementById('bulkMenu');if(m&&m.contains(ev.target)){document.addEventListener('pointerdown',_bulkMenuAway,{once:true});return;}closeBulkMenu();}
-function closeBulkMenu(){const m=document.getElementById('bulkMenu');if(m)m.remove();_bulkMenuOn=false;}
-function bulkFav(on){
-  if(!bulkOn())return;let n=0;
-  bulkSel.forEach(id=>{const a=anime.find(x=>x.id===id);if(a&&!!a.fav!==on){a.fav=on;touch(a);n++;}});
-  closeBulkMenu();bulkSel=null;_bulkAnchor=-1;
+function closeBulkMenu(){const m=document.getElementById('bulkMenu');if(m)m.remove();_bulkMenuOn=false;_menuIds=null;}
+// After acting, only clear a selection if the menu was acting ON one. Editing a
+// single show should leave whatever you had picked exactly as it was.
+function _menuDone(n,msg){
+  const wasSelection=!_menuIds||_menuIds.length!==1||bulkOn()&&bulkSel.size===_menuIds.length;
+  closeBulkMenu();
+  if(wasSelection){bulkSel=null;_bulkAnchor=-1;}
   try{save();}catch(e){}render();
-  toast(n?`${n} ${on?'favourited':'unfavourited'}`:'Already there');
+  toast(n?msg:'Already there');
+}
+function bulkFav(on){
+  const ids=menuTargets();if(!ids.length)return;let n=0;
+  ids.forEach(id=>{const a=anime.find(x=>x.id===id);if(a&&!!a.fav!==on){a.fav=on;touch(a);n++;}});
+  _menuDone(n,`${n} ${on?'favourited':'unfavourited'}`);
 }
 function bulkRate(r){
-  if(!bulkOn())return;let n=0;
-  bulkSel.forEach(id=>{const a=anime.find(x=>x.id===id);if(a&&a.rating!==r){a.rating=r;touch(a);n++;}});
-  closeBulkMenu();bulkSel=null;_bulkAnchor=-1;
-  try{save();}catch(e){}render();
-  toast(n?`${n} rated ${r}★`:'Already rated');
+  const ids=menuTargets();if(!ids.length)return;let n=0;
+  ids.forEach(id=>{const a=anime.find(x=>x.id===id);if(a&&a.rating!==r){a.rating=r;touch(a);n++;}});
+  _menuDone(n,`${n} rated ${r}\u2605`);
 }
 // Long-press is the phone's right-click. It starts a selection with the card you
 // held and opens the same menu, so nothing about the feature is desktop-only.
-let _lpT=0,_lpX=0,_lpY=0;
+let _lpT=0,_lpX=0,_lpY=0,_lpFired=false;
 function pcHoldStart(id,ev){
   try{
     const t=ev.touches&&ev.touches[0];if(!t)return;
     _lpX=t.clientX;_lpY=t.clientY;
     clearTimeout(_lpT);
     _lpT=setTimeout(()=>{
-      if(!bulkSel||!bulkSel.has(id)){if(!bulkSel)bulkSel=new Set();bulkSel.add(id);_bulkAnchor=_cardIds().indexOf(id);render();}
       try{if(navigator.vibrate)navigator.vibrate(12);}catch(e){}
-      openBulkMenu(_lpX,_lpY);
+      openBulkMenu(_lpX,_lpY,(bulkSel&&bulkSel.has(id))?null:id);
+      _lpFired=true;
     },480);
   }catch(e){}
 }
@@ -12528,6 +12540,7 @@ function pcHoldMove(ev){
   if(Math.abs(t.clientX-_lpX)>10||Math.abs(t.clientY-_lpY)>10)clearTimeout(_lpT);   // it's a scroll
 }
 function pcHoldEnd(){clearTimeout(_lpT);}
+function pcHoldConsumed(){if(_lpFired){_lpFired=false;return true;}return false;}
 function bulkBarHTML(){
   if(!bulkOn())return '';
   return `<div class="bulk-bar">
@@ -12538,11 +12551,13 @@ function bulkBarHTML(){
 }
 function pcMenu(id,ev){
   try{ev.preventDefault();}catch(e){}
-  if(!bulkSel||!bulkSel.has(id)){if(!bulkSel)bulkSel=new Set();bulkSel.add(id);_bulkAnchor=_cardIds().indexOf(id);render();}
-  openBulkMenu(ev.clientX,ev.clientY);
+  // Part of what you already picked → act on all of it. Otherwise → just this
+  // one, and no selection is started.
+  openBulkMenu(ev.clientX,ev.clientY,(bulkSel&&bulkSel.has(id))?null:id);
   return false;
 }
 function pcTap(id,ev){
+  if(pcHoldConsumed())return;                 // the long-press already handled this
   if(recSel){if(recSel.has(id))recSel.delete(id);else recSel.add(id);const el=ev&&ev.currentTarget;if(el)el.classList.toggle('sel',recSel.has(id));updateRecSelBar();return;}
   // Shift or meta starts a selection; once one is running, a plain click keeps
   // adding to it rather than opening a sheet over the top of what you're doing.

@@ -483,6 +483,16 @@ body.first-paint .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards
 .rz-meta{position:absolute;left:13px;right:13px;bottom:12px;}
 .rz-title{font-family:var(--fd);font-size:14px;font-weight:800;color:#fff;line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-shadow:0 1px 6px rgba(0,0,0,.65);}
 .rz-sub{font-size:11.5px;font-weight:600;color:rgba(255,255,255,.82);margin-top:2px;text-shadow:0 1px 4px rgba(0,0,0,.6);}
+.rz-ep{position:absolute;left:9px;bottom:calc(4px + 9px);z-index:3;padding:3px 7px;border-radius:6px;
+  font-size:10px;font-weight:800;letter-spacing:.05em;color:#fff;background:rgba(8,8,11,.78);
+  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);}
+.rz-at{position:absolute;right:9px;bottom:calc(4px + 9px);z-index:3;padding:3px 7px;border-radius:6px;
+  font-size:10px;font-weight:700;color:#fff;background:rgba(8,8,11,.78);font-variant-numeric:tabular-nums;
+  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);}
+.rz-at span{opacity:.6;}
+/* The bar means position INSIDE the episode when we know it — which is what a bar
+   across the bottom of a still means everywhere else — and falls back to progress
+   through the series when we don't. */
 .rz-bar{position:absolute;left:0;right:0;bottom:0;height:4px;background:rgba(0,0,0,.4);}
 .rz-fill{height:100%;background:var(--a2);}
 /* ── ROWS ── */
@@ -760,6 +770,11 @@ body.first-paint .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards
 @media(prefers-reduced-motion:reduce){.yt-overlay{animation:none;}}
 .dt-ep-t{margin-top:6px;font:600 12px/1.35 var(--fb,system-ui);color:var(--t2);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
 .dt-ep:active{transform:scale(.97);}
+.dt-ep-jump{margin-left:auto;width:76px;flex:0 0 auto;background:var(--bg3);border:1px solid var(--b2);
+  border-radius:8px;color:var(--t1);font-family:inherit;font-size:11.5px;padding:5px 8px;text-align:center;
+  text-transform:none;letter-spacing:0;-moz-appearance:textfield;}
+.dt-ep-jump::-webkit-outer-spin-button,.dt-ep-jump::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
+.dt-ep.focus .dt-ep-img{outline:2px solid var(--a2);outline-offset:2px;}
 .dt-eps-tag{margin-left:8px;font-size:10px;font-weight:700;letter-spacing:.3px;color:var(--t3);border:1px solid var(--b2);border-radius:99px;padding:2px 7px;vertical-align:middle;text-transform:uppercase;}
 .dt-epgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(46px,1fr));gap:8px;margin-top:6px;}
 .dt-epn{height:42px;border-radius:11px;border:1px solid var(--b2);background:var(--bg3);color:var(--t2);font-family:var(--fd);font-weight:800;font-size:14px;cursor:pointer;transition:transform .1s;}
@@ -4838,6 +4853,10 @@ function resumeRailHTML(items,isRead){
     // Chapters are open-ended: a running series has no total, so "chapter 132 of
     // ?" can't be a progress bar. Show the next number, skip the bar.
     const known=isRead?((a.ep||0)>0):!!a.epTotal;
+    // The number and the position belong ON the still — that's where every video
+    // UI puts them, and it frees the line underneath for the title alone instead
+    // of "Episode 6 · 12:04 in" competing with it.
+    const res=isRead?0:resumeAt(a);
     const next=isRead?((a.ep||0)+1):(known?Math.min((a.ep||0)+1,a.epTotal):0);
     const p=(!isRead&&known)?Math.round(prog(a)*100):0;
     const showBar=!isRead&&known;
@@ -4847,8 +4866,11 @@ function resumeRailHTML(items,isRead){
     return `<button class="rz-card" onclick="${isRead?`readManga('${a.id}',${next})`:`resumeWatch('${a.id}')`}">
       ${bg}<div class="rz-scrim"></div>
       <div class="rz-play">${icon(isRead?'book':'play')}</div>
-      <div class="rz-meta"><div class="rz-title">${schEsc(a.title)}</div>${known?`<div class="rz-sub">${isRead?'Chapter':'Episode'} ${next}${(!isRead&&resumeAt(a))?` \u00b7 ${fmtPos(resumeAt(a))} in`:''}</div>`:''}</div>
-      ${showBar?`<div class="rz-bar"><div class="rz-fill" style="width:${p}%"></div></div>`:''}
+      ${known?`<div class="rz-ep">${isRead?'CH':'EP'} ${next}</div>`:''}
+      ${res?`<div class="rz-at">${fmtPos(res)}<span>/${fmtPos(a.posOf||0)}</span></div>`:''}
+      <div class="rz-meta"><div class="rz-title">${schEsc(a.title)}</div></div>
+      ${res?`<div class="rz-bar"><div class="rz-fill" style="width:${Math.round(res/(a.posOf||1)*100)}%"></div></div>`
+           :(showBar?`<div class="rz-bar"><div class="rz-fill" style="width:${p}%"></div></div>`:'')}
     </button>`;
   };
   // Loop the row when there's enough to overflow: render the set twice so it can
@@ -5648,7 +5670,7 @@ function openDetail(id){
   return _openDetailReal(id);
 }
 function _openDetailReal(id){
-  if(detailId!==id)_epsAll=0;   // a new show starts with the windowed strip
+  if(detailId!==id){_epsAll=0;_epsFocus=0;}   // a new show starts with the windowed strip
   if(recSel){if(recSel.has(id))recSel.delete(id);else recSel.add(id);updateRecSelBar();render();return;}   // selection mode: tap toggles
   detailId=id;
   const it=anime.find(a=>a.id===id);setAmbient(it?titleAccent(it):'');
@@ -5879,7 +5901,17 @@ let _chAll={};
 // so clicking an anime shows everything about it, in the WatchList theme.
 let _richCache={};
 function _stripHtml(s){return String(s||'').replace(/<br\s*\/?>(\s*)/gi,'\n').replace(/<[^>]+>/g,'').replace(/\n{3,}/g,'\n\n').trim();}
-let _epsAll=0,_richLast=null;
+let _epsAll=0,_epsFocus=0,_richLast=null;
+// A thousand-episode show can't be reached by scrolling. Type a number and the
+// window moves there — the same job the filter box does on sites that carry long
+// runs, without loading a thousand buttons to do it.
+function dtJumpEp(v){
+  const n=parseInt(v,10);
+  if(!n||n<1)return;
+  _epsFocus=n;_epsAll=0;
+  try{renderDetail();}catch(e){}
+  setTimeout(()=>{try{const el=document.querySelector('.dt-eps .dt-ep.focus');if(el)el.scrollIntoView({inline:'center',block:'nearest'});}catch(e){}},60);
+}
 // Expanding the episode strip is a repaint, not a refetch — the data is already
 // in _richCache, and the network shouldn't be touched to reveal what we have.
 function dtShowAllEps(){
@@ -5956,16 +5988,24 @@ function richDetailHTML(d,forId){
     // A 100-episode show used to put 100 buttons in the DOM and the tab order.
     // Show the stretch around where you are; the rest is one tap away.
     const WIN=8;
-    const lo=_epsAll?1:Math.max(1,cur-2), hi=_epsAll?N:Math.min(N,Math.max(cur+WIN,WIN));
+    // The window centres on wherever you jumped to, or on where you actually are.
+    const anchor=_epsFocus?Math.min(_epsFocus,N):cur;
+    const lo=_epsAll?1:Math.max(1,(_epsFocus?anchor-2:Math.max(1,cur-2)));
+    const hi=_epsAll?N:Math.min(N,Math.max(anchor+WIN,WIN));
     const cells=[];
     for(let n=lo;n<=hi;n++){
-      const cls=n<=cur?' seen':(n===cur+1?' next':'');
+      const cls=(n<=cur?' seen':(n===cur+1?' next':''))+(n===_epsFocus?' focus':'');
       const a2=art[n], img=(a2&&a2.img)||fallbackImg;
       cells.push(`<button class="dt-ep${cls}${a2&&a2.img?'':' generic'}" onclick="watchAnime('${forId}',${n})"><div class="dt-ep-img"${img?` style="background-image:url('${img}')"`:''}>${a2&&a2.img?'':`<span class="dt-ep-n">${n}</span>`}</div><div class="dt-ep-t">${a2?schEsc(a2.title):('Episode '+n)}</div></button>`);
     }
     const tag=_hasSrc?'your source':(epTotalN?`${epTotalN} total`:`${N} so far`);
     const hidden=N-cells.length;
-    epsHTML=`<div class="dt-label" style="margin-top:16px">${icon('play')} Episodes<span class="dt-eps-tag">${tag}</span></div><div class="dt-eps">${cells.join('')}</div>`
+    // Only worth offering once the list is long enough that scrolling has failed.
+    const jump=N>40?`<input class="dt-ep-jump" type="number" min="1" max="${N}" inputmode="numeric"
+      placeholder="Ep #" value="${_epsFocus||''}" aria-label="Jump to episode"
+      onkeydown="if(event.key==='Enter'){event.preventDefault();dtJumpEp(this.value);}"
+      onchange="dtJumpEp(this.value)">`:'';
+    epsHTML=`<div class="dt-label" style="margin-top:16px">${icon('play')} Episodes<span class="dt-eps-tag">${tag}</span>${jump}</div><div class="dt-eps">${cells.join('')}</div>`
       +(hidden>0?`<button class="dt-pin-toggle" onclick="dtShowAllEps()">${icon('layers')} Show all ${N} episodes</button>`:'');
   }
   const desc=_stripHtml(d.description);

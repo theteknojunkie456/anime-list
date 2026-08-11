@@ -159,6 +159,22 @@ struct WatchListShell: UIViewRepresentable {
         weak var ucc: WKUserContentController?
         var pendingResume: Double = 0
 
+        /// A full-screen web view inside the app, sharing the main view's
+        /// configuration so injected scripts and cookies come with it.
+        func presentInApp(_ url: URL) {
+            guard let cfg = web?.configuration,
+                  let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                  let root = scene.keyWindow?.rootViewController else {
+                UIApplication.shared.open(url, options: [:], completionHandler: nil)   // last resort
+                return
+            }
+            var top = root
+            while let p = top.presentedViewController { top = p }
+            let vc = InAppWebController(url: url, configuration: cfg)
+            vc.modalPresentationStyle = .fullScreen
+            top.present(vc, animated: true)
+        }
+
         func observeLifecycle() {
             let nc = NotificationCenter.default
             for n in [UIApplication.willResignActiveNotification,
@@ -307,19 +323,29 @@ struct WatchListShell: UIViewRepresentable {
                 if let pw = body["pw"] as? String, !pw.isEmpty { PWStore.save(pw); NSLog("WatchList: password saved to Keychain (Face ID armed for next launch)") }
             case "faceid":
                 DispatchQueue.main.async { self.triggerFaceID() }
-            case "openurl":   // these sites refuse framing — open in Safari
+            case "openurl":
+                // These sites refuse to be FRAMED — that's all X-Frame-Options and
+                // frame-ancestors say. Neither restricts a top-level load, so a site
+                // that can't be an iframe opens perfectly well as the main document
+                // of a second web view. Handing it to Safari was throwing the app
+                // away for a restriction that never applied to this case.
+                //
+                // It's built from the same configuration as the main view, so the
+                // playback probe is injected there too and progress keeps tracking on
+                // sites that can't be framed — which is most of the ones worth
+                // opening this way.
                 if let s = body["url"] as? String {
                     // fall back to percent-encoding if the raw string won't parse
                     let url = URL(string: s)
                         ?? s.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed).flatMap { URL(string: $0) }
-                    // Independent trust boundary: only ever hand http(s) links to iOS.
+                    // Independent trust boundary: only ever hand http(s) links onward.
                     // The web app's openExternal already blocks other schemes, but this
                     // handler must enforce the same policy itself — a custom/tel/mailto
-                    // scheme reaching UIApplication.open could trigger unintended actions.
+                    // scheme could otherwise trigger unintended actions.
                     let scheme = url?.scheme?.lowercased()
                     if let url = url, scheme == "http" || scheme == "https" {
-                        NSLog("WatchList: openurl → %@", url.absoluteString)
-                        DispatchQueue.main.async { UIApplication.shared.open(url, options: [:], completionHandler: nil) }
+                        NSLog("WatchList: openurl (in-app) → %@", url.absoluteString)
+                        DispatchQueue.main.async { [weak self] in self?.presentInApp(url) }
                     } else {
                         NSLog("WatchList: openurl REFUSED (non-http scheme or unparseable): %@", s)
                     }
@@ -430,4 +456,54 @@ final class BroadcastController: ObservableObject {
         }
         button(in: picker)?.sendActions(for: .touchUpInside)
     }
+}
+
+/// The in-app browser used for sites that refuse to be framed. Deliberately a
+/// WKWebView rather than SFSafariViewController: Safari's controller runs in
+/// another process, so the playback probe can't be injected and progress would
+/// stop being tracked the moment a site couldn't be framed.
+final class InAppWebController: UIViewController {
+    private let url: URL
+    private let configuration: WKWebViewConfiguration
+    private var web: WKWebView!
+
+    init(url: URL, configuration: WKWebViewConfiguration) {
+        self.url = url
+        self.configuration = configuration
+        super.init(nibName: nil, bundle: nil)
+    }
+    required init?(coder: NSCoder) { fatalError("not used") }
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        view.backgroundColor = UIColor(red: 0x0a/255.0, green: 0x0a/255.0, blue: 0x0c/255.0, alpha: 1)
+
+        web = WKWebView(frame: .zero, configuration: configuration)
+        web.allowsBackForwardNavigationGestures = true
+        web.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(web)
+
+        let close = UIButton(type: .system)
+        close.setTitle("Done", for: .normal)
+        close.titleLabel?.font = .systemFont(ofSize: 16, weight: .semibold)
+        close.tintColor = .white
+        close.backgroundColor = UIColor(white: 0, alpha: 0.55)
+        close.layer.cornerRadius = 16
+        close.contentEdgeInsets = UIEdgeInsets(top: 6, left: 14, bottom: 6, right: 14)
+        close.addTarget(self, action: #selector(done), for: .touchUpInside)
+        close.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(close)
+
+        NSLayoutConstraint.activate([
+            web.topAnchor.constraint(equalTo: view.topAnchor),
+            web.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            web.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            web.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            close.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 8),
+            close.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -12),
+        ])
+        web.load(URLRequest(url: url))
+    }
+
+    @objc private func done() { dismiss(animated: true) }
 }

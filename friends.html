@@ -2462,7 +2462,7 @@ body.recsel .pcard{position:relative;}
       <button class="dact danger" type="button" id="coverRemoveBtn" onclick="clearCover()" style="display:none;padding:10px 14px">Remove</button>
       <input type="file" id="coverFile" accept="image/*" style="display:none" onchange="coverFileChosen(this)">
     </div>
-    <div class="field-hint">Any picture works — it's centred and cut to the tall poster shape the cards use, so you don't have to match a size.</div>
+    <div class="field-hint">Any picture works — <b>no size to match</b>. It's centred and cut to the tall poster shape every card uses.</div>
   </div>
   <div class="fgroup" id="bgPrev">
     <label class="flabel">Background photo</label>
@@ -2472,7 +2472,7 @@ body.recsel .pcard{position:relative;}
       <button class="dact danger" type="button" id="bgRemoveBtn" onclick="clearBg()" style="display:none;padding:10px 14px">Remove</button>
       <input type="file" id="bgFile" accept="image/*" style="display:none" onchange="bgFileChosen(this)">
     </div>
-    <div class="field-hint">Backdrop for this title's hero and detail view — overrides the auto banner, and the colours tint from it. Kept whole, not cropped: it's shown very wide on a desktop and squarer on a phone, so a landscape picture with the subject near the middle survives both best.</div>
+    <div class="field-hint">Backdrop for the hero and detail view — overrides the auto banner, and the colours tint from it. <b>Landscape, at least 1600&times;900.</b> It isn't cropped, because it's shown very wide on a desktop and squarer on a phone — so keep the subject near the middle and it survives both.</div>
   </div>
   <div class="fgroup">
     <label class="flabel">Status</label>
@@ -7161,6 +7161,12 @@ function bgFileChosen(inp){
       URL.revokeObjectURL(img.src);
       const url=c.toDataURL('image/jpeg',0.8);
       if(Math.round(url.length*0.75)>2600000)toast('Photo is large — cloud sync may reject it. Try a smaller image.');
+      // Telling someone the requirement is only half of it; the other half is
+      // saying whether what they picked met it. A 700px-wide photo is fine on a
+      // phone and visibly soft across a 1184px desktop banner, and there is no
+      // way for them to know that from looking at it on the phone.
+      else if(img.width<1200)toast(`Added — but it's ${img.width}px wide, so it'll look soft on a big screen`);
+      else if(img.width<img.height)toast('Added — it\u2019s a tall photo, so the wide views will crop it hard');
       pendingBg=url;setBgPreview(url);
       dominantColor(url,hex=>{pendingBgAccent=hex||'';}); // derive accent from the uploaded image
       toast('Background added');

@@ -9295,14 +9295,38 @@ function fillSourceTokens(template,a,ep){
 function streamURL(a,epOverride){
   const ep=(epOverride>0?epOverride:watchEpisode(a)), src=effectiveSource(a);
   if(!src) return {url:'', ep};
-  if(SRC_TOKEN_RE.test(src)) return {url:fillSourceTokens(src,a,ep), ep};
+  if(SRC_TOKEN_RE.test(src)){
+    const u=fillSourceTokens(src,a,ep);
+    // A hole in the path means we're addressing an episode we can't actually
+    // name. Landing on the site's search for the right show beats landing on a
+    // 404 for the wrong URL, and it's one tap from there.
+    if(srcURLBroken(u))return {url:findUrl(a), ep:null};
+    return {url:u, ep};
+  }
   return {url:src, ep:null}; // plain custom URL — open it as-is
 }
 // The site's search for this exact title — the recovery when a deep-link 404s.
+// An address is only worth opening if every token actually resolved. Two ways it
+// silently doesn't: an id we never fetched fills in as empty and leaves a hole in
+// the path (/watch//one-piece), and a token the builder doesn't know is left
+// alone on purpose, braces and all. Both are a guaranteed 404, and both used to
+// be handed to the browser as though they were a real link. One check, and the
+// caller falls back to the site's own search instead of a dead page.
+function srcURLBroken(u){
+  if(!u)return true;
+  if(/\{[a-z0-9_]+\}/i.test(u))return true;
+  try{return /\/\//.test(new URL(u).pathname);}catch(e){return true;}
+}
 function findUrl(a){
   const src=effectiveSource(a);
   if(!src) return 'about:blank';   // no source to search
-  if(SRC_SEARCH_RE.test(src)) return fillSourceTokens(src,a,1);
+  // Episode 1 was hardcoded here, so the recovery from a bad deep link on a show
+  // you're 214 episodes into opened episode 1 of it. If the template addresses an
+  // episode at all, it should address the one you're actually on.
+  if(SRC_SEARCH_RE.test(src)){
+    const u=fillSourceTokens(src,a,watchEpisode(a)||1);
+    if(!srcURLBroken(u))return u;
+  }
   try{return new URL(src.replace(/\{[^}]+\}/g,'x')).origin;}catch{return src;}   // {ep}-only/plain → the site's homepage, so its own search is at hand
 }
 // Preview what the current source template resolves to — so you can see (and fix) a
@@ -11723,12 +11747,23 @@ function openExternal(url){
   if(typeof IS_NATIVE!=='undefined'&&IS_NATIVE){try{window.webkit.messageHandlers.wl.postMessage({type:'openurl',url});return;}catch(e){}}
   try{window.open(url,'_blank','noopener');}catch(e){location.href=url;}
 }
+// This used to be a second, weaker copy of fillSourceTokens that understood
+// three tokens out of eighteen. A template using {slug_}, {anilistid}, {ep2} or
+// any title variant came out of the in-app player correctly and out of THIS path
+// broken — same show, same template, different address — and this is the path
+// that hands a URL to the browser. It also derived the slug from the title
+// instead of using the one learned from the site itself, so the site's own
+// spelling was thrown away at exactly the moment it mattered.
 function launchURL(a,epOverride){
   // a._rt = the real title when an admin has renamed what they see. Links must
   // follow the real one or the show simply doesn't open.
   const real=a._rt||a.title;
-  const src=streamSource()||(freeDefault()||{}).url||'', slug=streamSlug(real);
-  return src.replace(/\{title\}/g,encodeURIComponent(real)).replace(/\{slug\}/g,slug).replace(/\{ep\}/g,String((epOverride>0?epOverride:watchEpisode(a))||1));
+  const src=streamSource()||(freeDefault()||{}).url||'';
+  if(!src)return '';
+  const ep=(epOverride>0?epOverride:watchEpisode(a))||1;
+  if(!SRC_TOKEN_RE.test(src))return src;
+  const built=fillSourceTokens(src,Object.assign({},a,{title:real}),ep);
+  return srcURLBroken(built)?findUrl(a):built;
 }
 function sourceName(){
   const s=streamSource(); if(!s)return (freeDefault()||{}).name||'your own site';
@@ -13188,8 +13223,8 @@ async function fetchCovers(){
         // being fetched for the detail sheet and thrown away; storing it is what
         // lets anything in the app rank by "is this actually good".
         const fields=read
-          ?'id title{romaji english native} coverImage{large extraLarge color} bannerImage chapters volumes genres isAdult averageScore'
-          :'id title{romaji english native} coverImage{large extraLarge color} bannerImage episodes duration genres isAdult averageScore nextAiringEpisode{airingAt episode}';
+          ?'id idMal title{romaji english native} coverImage{large extraLarge color} bannerImage chapters volumes genres isAdult averageScore'
+          :'id idMal title{romaji english native} coverImage{large extraLarge color} bannerImage episodes duration genres isAdult averageScore nextAiringEpisode{airingAt episode}';
         // Known season? Refresh that EXACT media by id — a title search would drift to
         // whatever AniList ranks first (often a different, currently-airing season),
         // pinning the wrong air date. Only unknown items fall back to a title search.
@@ -13262,6 +13297,11 @@ async function fetchCovers(){
           // is why nothing on a reading list could be tracked: chapter alerts and
           // the chapter list are both keyed by it, and manga simply never had one.
           if(m.id)a.aniId=m.id;
+          // A {malid} template built an address with a hole in it for every title on
+          // the list, because this pass never asked for the id — it only arrived via
+          // a season lookup most titles never get. It's a scalar field and costs
+          // nothing against the complexity cap.
+          if(m.idMal)a.malId=m.idMal;
           if(!read){ // record (or clear) the upcoming-episode air time
             const na=m.nextAiringEpisode;
             if(na&&na.airingAt){a.airAt=na.airingAt;a.airEp=na.episode;}
@@ -13861,10 +13901,11 @@ function _updBusy(){
 // you'd explain it to a friend — what they can now do, not what the code does.
 // No version numbers or jargon in the notes; the date IS the version.
 const RELEASE={
-  v:'2026-08-10.2',
+  v:'2026-08-10.3',
   title:'Seasons, specials, and progress that keeps itself',
   push:'Every film and special on the show it belongs to \u2014 and progress that marks itself.',
   notes:[
+    'Fixed: opening a show in the browser built its address a different way than opening it in the app, so a site set up with anything beyond the basic tokens went to a broken link \u2014 and the recovery from that link always opened episode 1, whatever you were on. Both paths now build the same address, and an address that can\u2019t be completed opens the site instead of a dead page.',
     'Air times are the Japanese broadcast, and your source gets it later \u2014 so the countdown no longer jumps straight to \u201cout now\u201d and sends you somewhere that hasn\u2019t got it yet. It says the episode aired and shows how long the wait usually is, then flips. How long is measured from your own watching, per site, so a fast mirror and a slow one aren\u2019t treated the same. Episode alerts wait too. Settings \u2192 Sources shows what it worked out.',
     'Every show now carries its films, OVAs and specials alongside its seasons, and tapping any of them adds it and opens it. No searching for the next season by name.',
     'Finished something with more to come? It says so on the cover and on the show itself, and stays there until you act on it \u2014 instead of one pop-up you had four seconds to catch.',

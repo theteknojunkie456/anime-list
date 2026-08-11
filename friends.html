@@ -14574,44 +14574,24 @@ function _updBusy(){
 // EDIT THIS on every user-visible change: bump `v` and write `notes` the way
 // you'd explain it to a friend — what they can now do, not what the code does.
 // No version numbers or jargon in the notes; the date IS the version.
+// What's new, on first open after an update. Kept SHORT on purpose: a note was
+// being prepended here with every change and never taken away, so this had grown
+// to 33 cards — a changelog wearing the clothes of an announcement. Nobody taps
+// Next thirty-two times, so the effect of adding the thirty-third note was to
+// bury the first. Highlights only, newest release, six or seven at most; the
+// full history lives in git where it belongs.
 const RELEASE={
   v:'2026-08-11.13',
-  title:'Seasons, specials, and progress that keeps itself',
-  push:'Every film and special on the show it belongs to \u2014 and progress that marks itself.',
+  title:'A cleaner app, and progress that keeps itself',
+  push:'Progress that marks itself \u2014 and a lot of polish.',
   notes:[
-    'Desktop is less top-heavy: search and the filters share one row instead of stacking, so the first poster sits about 70px higher and you see a row more of your list.',
-    'Desktop: the \u201cnot linked\u201d bar ran the full width of the window while everything else sat in a centred column, and the bottom bar was a narrow phone control stranded under a wide page. Both now line up with the same column as the rest.',
-    'The bottom bar is attached to the bottom of the screen again, keeping the rounded top, the blur and the round + \u2014 the list now runs underneath it instead of stopping short of a floating strip.',
-    'Fixed the Favourite button, which had lost its shape when the facts moved, and the progress bar under the episode list, which was full-width and louder than the artwork above it.',
-    'A member showing as \u201c(existing)\u201d now reads as unnamed and can be tapped to name \u2014 it was never a name, just what old devices were filed under before one was required.',
-    'The watch party screen is two clear choices instead of a form: start one, or type a friend\u2019s code \u2014 and the code field is now spaced out and monospaced so it can be read aloud without spelling it twice.',
-    'Watch parties can now stay in sync on real streaming sites, not just YouTube \u2014 in the iPhone app, everyone follows the host\u2019s position automatically, and only nudges when you\u2019ve drifted more than a few seconds.',
-    'A party survives a tunnel: it keeps trying to reconnect for about a minute instead of giving up after fifteen seconds.',
-    'Cards now say how much is waiting. A show you\u2019re behind on wears a \u201c7 new\u201d tag on its artwork, so the grid answers what to put on tonight instead of only what you own.',
-    'A cover that fails to load now leaves the title\u2019s initial in its place instead of an empty gap. That\u2019s why a few unmatched shows made a whole row look broken \u2014 the card wasn\u2019t showing a placeholder, it was showing nothing.',
-    'The trailer button no longer just sits there when a channel has embedding turned off \u2014 it says so, and offers to open it on YouTube.',
-    'The \u201cnot linked\u201d bar can be swiped away to the left.',
-    'Search and the filters now float in one panel at the top, matching the bar at the bottom \u2014 same inset, same material, so both ends of the screen belong to each other. Everything inside it went flat so it doesn\u2019t read as boxes inside boxes.',
-    'The title screen takes the best of four designs at once: the poster fills with your colour as you watch, the facts sit in one aligned column so the same fact is always in the same place, and everything you actually press \u2014 Continue, the counter, the status, Favourite \u2014 is grouped in one panel instead of scattered down the page.',
-    'The + on the bottom bar sits inside the bar now rather than breaking its edge, and All / Watching / Plan can no longer clip a word on a narrow phone.',
-    'The poster now shows how far into a show you are: your accent colour fills the artwork up to where you\u2019ve got to, with a bright line at the surface \u2014 and no line once you\u2019ve finished it. The counter sits right under it, and the “Episode progress” heading is gone; three things were naming the same fact.',
-    'The time pill tells you what\u2019s LEFT. “~59h to watch all 148 episodes” is only true before you start \u2014 now it counts down as you watch, and says Finished when you\u2019re done.',
-    'A show\u2019s facts \u2014 how long it takes, when the next episode lands, whether it\u2019s a favourite \u2014 sat in a narrow column beside the poster, so long titles squashed to three lines and the pills changed size and position from show to show. They now run full width in one row, all the same shape, in the same place every time.',
-    'Favorites is a filter now: it\u2019s in the sort menu with a count, so you can see only the ones you picked.',
-    'The + on the bottom bar was having its top sliced off on iPhone. Fixed, and it sits properly proud of the bar again.',
-    'All / Watching / Plan is one segmented control now instead of three loose buttons \u2014 one track, and only the list you\u2019re actually in is filled, in that list\u2019s own colour. The counts read as counts.',
-    'The bottom bar\u2019s five slots are now equal, so the + sits exactly in the middle and the spacing is even. It was drifting a few pixels off centre.',
-    'Search finds what you mean. “aot” finds Attack on Titan, the Japanese name finds the English one, a doubled-letter shorthand like “jjk” works, and one wrong letter no longer means no results \u2014 with the closest match first.',
-    'A new look that\u2019s the same look: the background glow now drifts instead of sitting still, the bottom bar floats as a pill with the current tab lit inside it, an edge appears under the controls once you\u2019ve scrolled, and artwork lifts under the pointer on desktop.',
-    'The app\u2019s typefaces are now stored on the device, so it opens in its own type instantly and still looks right with no connection at all.',
-    'Fixed: opening a show in the browser built its address a different way than opening it in the app, so a site set up with anything beyond the basic tokens went to a broken link \u2014 and the recovery from that link always opened episode 1, whatever you were on. Both paths now build the same address, and an address that can\u2019t be completed opens the site instead of a dead page.',
-    'Air times are the Japanese broadcast, and your source gets it later \u2014 so the countdown no longer jumps straight to \u201cout now\u201d and sends you somewhere that hasn\u2019t got it yet. It says the episode aired and shows how long the wait usually is, then flips. How long is measured from your own watching, per site, so a fast mirror and a slow one aren\u2019t treated the same. Episode alerts wait too. Settings \u2192 Sources shows what it worked out.',
-    'Every show now carries its films, OVAs and specials alongside its seasons, and tapping any of them adds it and opens it. No searching for the next season by name.',
-    'Finished something with more to come? It says so on the cover and on the show itself, and stays there until you act on it \u2014 instead of one pop-up you had four seconds to catch.',
-    'Progress keeps itself. Use the site\u2019s own next-episode link and WatchList follows along; in the iPhone app it now reads the actual playback position, so what you watched is what gets marked.',
-    'Your list is backed up automatically, and if a backup ever fails the app says so instead of quietly claiming everything is fine. There\u2019s also a second copy kept on the device itself.',
-    'Anything you paste an address into now wraps, so you can read the whole thing on a phone.',
-    'Security: accepting a shared setup link could previously hand the sender access to your list, your backup code and your keys. That\u2019s closed, and a matching hole in the iPhone app is closed too.',
+    'Progress keeps itself. Use the site\u2019s own next-episode link and WatchList follows along; in the iPhone app it reads the actual playback position, so what you watched is what gets marked \u2014 down to the minute you stopped.',
+    'Air times are the Japanese broadcast, and your source gets it later. The countdown now says the episode aired and shows how long the wait usually is \u2014 measured from your own watching, per site. Episode alerts wait too.',
+    'Cards say what\u2019s waiting: a show you\u2019re behind on wears a \u201c7 new\u201d tag, so the grid answers what to put on tonight instead of only what you own.',
+    'The title screen rebuilt: the poster fills with your colour as you watch, the facts sit in one aligned column, and everything you press \u2014 Continue, the counter, the status \u2014 is grouped in one panel.',
+    'Search finds what you mean. \u201Caot\u201D finds Attack on Titan, the Japanese name finds the English one, \u201Cjjk\u201D works, and one wrong letter no longer means no results.',
+    'Watch parties stay in sync on real streaming sites in the app, not just YouTube \u2014 and a party now survives a tunnel instead of giving up after fifteen seconds.',
+    'A new look throughout: floating search and filters, a docked bottom bar, a background glow that drifts, and the app\u2019s own typefaces stored on the device so it opens right even offline.',
   ],
 };
 // The rows animate in once, on the first paint of a session. render() runs on

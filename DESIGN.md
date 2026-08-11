@@ -140,6 +140,15 @@ order. A weak match ranking below a strong one is fine; finding nothing is not.
 
 ## Checking it
 
+`node scripts/preview.mjs 390x844 out.png` — renders the REAL app headlessly at
+any width, with a list seeded in. It serves a copy with `NETWORK_GATE` flipped
+off, because the invite gate holds the screen before `render()` ever runs, which
+is why every visual check before this one was done on a harness page borrowing
+the stylesheet. Below 520px it renders inside an iframe of the true width:
+Chrome clamps a headless window to 500px, so asking for 390 gives a 500px
+viewport cropped to 390 — which looks exactly like the app overflowing, and has
+already cost one wrong diagnosis.
+
 `node scripts/orphan-classes.mjs index.html` — every class the markup uses,
 against every class the stylesheet defines. It exists because the same failure
 shipped four times: an element is moved, renamed or added, its rule is left

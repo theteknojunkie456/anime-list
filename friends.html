@@ -2243,6 +2243,27 @@ body.recsel .pcard{position:relative;}
 /* ── DESKTOP KEYBOARD LAYER — focus ring + shortcuts overlay (only ever visible
    once a key is pressed, so touch/phone use is completely unaffected) ── */
 .pcard.kbfocus{outline:2.5px solid var(--a);outline-offset:3px;border-radius:15px;}
+/* Bulk selection — pointer devices, where click/shift-click is already muscle
+   memory. The bar docks above the nav rather than floating over the grid, so
+   the thing you are selecting stays fully visible while you select it. */
+.pcard.bulk .pcard-wrap{outline:2.5px solid var(--a);outline-offset:2px;border-radius:15px;}
+.pcard.bulk .pcard-img,.pcard.bulk .pcard-ph{opacity:.72;}
+.bulk-bar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--safe-b) + 96px);z-index:61;
+  display:flex;align-items:center;gap:8px;padding:9px 10px 9px 14px;border-radius:99px;
+  background:color-mix(in srgb,var(--bg3) 92%,transparent);border:1px solid var(--bn2);
+  box-shadow:0 16px 40px -12px rgba(0,0,0,.85);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  max-width:calc(100vw - 28px);overflow-x:auto;scrollbar-width:none;}
+.bulk-bar::-webkit-scrollbar{display:none;}
+.bulk-n{flex:none;font-size:12px;font-weight:800;color:var(--t1);font-variant-numeric:tabular-nums;}
+.bulk-b{flex:none;display:inline-flex;align-items:center;gap:5px;height:32px;padding:0 12px;border-radius:99px;
+  background:var(--bg4);border:1px solid var(--bn2);color:var(--t2);font-size:11.5px;font-weight:700;cursor:pointer;
+  transition:background-color .14s,color .14s;}
+.bulk-b:hover{background:var(--ag);color:var(--a2);border-color:color-mix(in srgb,var(--a) 45%,transparent);}
+.bulk-b .ico{width:13px;height:13px;}
+.bulk-x{flex:none;display:flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;
+  background:none;border:0;color:var(--t3);cursor:pointer;}
+.bulk-x:hover{color:var(--t1);}
+.bulk-x .ico{width:14px;height:14px;}
 .pcard.kbfocus .pcard-wrap{box-shadow:0 0 0 1px var(--a),0 12px 30px -8px var(--glow);}
 .kbhelp{position:fixed;inset:0;z-index:400;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.55);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);}
 .kbhelp.on{display:flex;animation:fadeUp .2s ease both;}
@@ -2436,6 +2457,7 @@ body.recsel .pcard{position:relative;}
       <button class="dact danger" type="button" id="coverRemoveBtn" onclick="clearCover()" style="display:none;padding:10px 14px">Remove</button>
       <input type="file" id="coverFile" accept="image/*" style="display:none" onchange="coverFileChosen(this)">
     </div>
+    <div class="field-hint">Any picture works — it's centred and cut to the tall poster shape the cards use, so you don't have to match a size.</div>
   </div>
   <div class="fgroup" id="bgPrev">
     <label class="flabel">Background photo</label>
@@ -2445,7 +2467,7 @@ body.recsel .pcard{position:relative;}
       <button class="dact danger" type="button" id="bgRemoveBtn" onclick="clearBg()" style="display:none;padding:10px 14px">Remove</button>
       <input type="file" id="bgFile" accept="image/*" style="display:none" onchange="bgFileChosen(this)">
     </div>
-    <div class="field-hint">Sets a custom backdrop for this title's hero &amp; detail view — overrides the auto banner. Colors tint from it too.</div>
+    <div class="field-hint">Backdrop for this title's hero and detail view — overrides the auto banner, and the colours tint from it. Centred and cut to a wide 16:9, so any picture fits.</div>
   </div>
   <div class="fgroup">
     <label class="flabel">Status</label>
@@ -5917,7 +5939,7 @@ function posterCard(a,nSeas){
   const _nx=nextUpOf(a);
   const durBits=[twMins?fmtWatch(twMins):'',_nx?(_nx.soon?'S2 soon':'S2 out'):''].filter(Boolean);
   const durLine=durBits.length?`<div class="pcard-sub">${durBits.join(' \u00b7 ')}</div>`:'';
-  return`<div class="pcard${recSel&&recSel.has(a.id)?' sel':''}" onclick="pcTap('${a.id}',event)">
+  return`<div class="pcard${recSel&&recSel.has(a.id)?' sel':''}${bulkSel&&bulkSel.has(a.id)?' bulk':''}" onclick="pcTap('${a.id}',event)">
     <div class="pcard-wrap">
       ${img}
       <span class="pcard-badge b-${a.status}">${statusTag(a)}</span>
@@ -6149,7 +6171,7 @@ function renderHome(){
       list=list.map(a=>[a,searchScore(a,q)]).filter(x=>x[1]>0).sort((x,y)=>y[1]-x[1]).map(x=>x[0]);
     }
     const hits=list;
-    if(hits.length){el.innerHTML=`<div class="grid">${hits.map(posterCard).join('')}</div>`;return;}
+    if(hits.length){el.innerHTML=`<div class="grid">${hits.map(posterCard).join('')}</div>`+bulkBarHTML();return;}
     const stLbl=filterStatus==='fav'?'Favorites':filterStatus==='watching'?(isRead?'Reading':'Watching'):(STATUS_META[filterStatus]?STATUS_META[filterStatus].label:filterStatus);
     const msg=q
       ?`No matches for “${schEsc(q)}”${filterStatus!=='all'?` in ${stLbl}`:` in your ${isRead?'reading':'watch'} list`}`
@@ -6225,7 +6247,7 @@ function renderHome(){
         <div class="row-scroll">${gc.map(s=>posterCard(s.a,s.n)).join('')}</div></div>`;
     }
   }
-  el.innerHTML=html;bbSetup(spotlight);try{rzLoop();}catch{}if(beg)loadPopularShelf();
+  el.innerHTML=html+bulkBarHTML();bbSetup(spotlight);try{rzLoop();}catch{}if(beg)loadPopularShelf();
 }
 
 // ─── DETAIL ─────────────────────────────────────────────────────────────────
@@ -7090,6 +7112,29 @@ function setBgPreview(url){
   else{img.style.display='none';rm.style.display='none';}
 }
 function clearBg(){pendingBg='';pendingBgAccent='';setBgPreview('');}
+// Nobody uploading a picture knows that a cover is displayed at 104x148 and a
+// backdrop at roughly 16:9 — and they shouldn't have to. Left alone, the app
+// stored whatever shape arrived and let object-fit crop it at display time, so a
+// square photo lost its top and bottom on the card, a different amount of it on
+// the wide rail, and a different amount again behind the detail sheet. Same
+// picture, three crops, none of them chosen.
+//
+// So crop ONCE, here, to the shape it will actually be shown in: centre the
+// source in the target ratio, take the largest rectangle that fits, and store
+// that. Whatever anyone picks then looks deliberate everywhere it appears.
+function cropToRatio(img,tw,th){
+  const c=document.createElement('canvas');
+  c.width=tw;c.height=th;
+  const want=tw/th, have=img.width/img.height;
+  // The dimension that overflows is the one we take less of.
+  let sw=img.width, sh=img.height, sx=0, sy=0;
+  if(have>want){sw=Math.round(img.height*want);sx=Math.round((img.width-sw)/2);}
+  else{sh=Math.round(img.width/want);sy=Math.round((img.height-sh)/2);}
+  const g=c.getContext('2d');
+  g.imageSmoothingQuality='high';
+  g.drawImage(img,sx,sy,sw,sh,0,0,tw,th);
+  return c;
+}
 function bgFileChosen(inp){
   const f=inp.files&&inp.files[0];inp.value='';
   if(!f)return;
@@ -7097,10 +7142,8 @@ function bgFileChosen(inp){
   img.onload=()=>{
     try{
       // compress+resize: max ~1280px long edge, JPEG q0.8 → data URL (raw photos would blow past localStorage / the 20MB sync cap)
-      const sc=Math.min(1280/img.width,1280/img.height,1);
-      const c=document.createElement('canvas');
-      c.width=Math.max(1,Math.round(img.width*sc));c.height=Math.max(1,Math.round(img.height*sc));
-      c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+      // 16:9 — the shape of the hero band and the wide continue-watching card.
+      const c=cropToRatio(img,1280,720);
       URL.revokeObjectURL(img.src);
       const url=c.toDataURL('image/jpeg',0.8);
       if(Math.round(url.length*0.75)>2600000)toast('Photo is large — cloud sync may reject it. Try a smaller image.');
@@ -7117,10 +7160,8 @@ function coverFileChosen(inp){
   if(!f)return;
   const img=new Image();
   img.onload=()=>{
-    const sc=Math.min(240/img.width,340/img.height,1);
-    const c=document.createElement('canvas');
-    c.width=Math.round(img.width*sc);c.height=Math.round(img.height*sc);
-    c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+    // 2:3 — the poster shape every card in the app is cut to.
+    const c=cropToRatio(img,480,680);
     URL.revokeObjectURL(img.src);
     setCoverPreview(c.toDataURL('image/jpeg',0.82));
     toast('Cover added');
@@ -12349,8 +12390,54 @@ function renderRecPick(){
 }
 // "Pick right on your list" — leave the sheets, tap posters in the home rows.
 function pickFromList(){recSel=new Set(recPickShows);closeAll();render();document.body.classList.add('recsel');updateRecSelBar();toast('Tap shows to recommend, then Done');}
+// ─── BULK SELECT (pointer devices) ──────────────────────────────────────────
+// Moving fifteen shows out of Plan meant fifteen round trips through the detail
+// sheet. On a desktop the gesture for "these ones" already exists in everyone's
+// hands — click, shift-click — and it costs nothing to honour it: shift picks
+// the range between the last card you touched and this one, in the order they
+// are on screen, which is the order you are reading them in.
+let bulkSel=null,_bulkAnchor=-1;
+function bulkOn(){return !!(bulkSel&&bulkSel.size);}
+function _cardIds(){return Array.prototype.slice.call(document.querySelectorAll('#pageEl .pcard')).map(c=>{
+  const m=/pcTap\('([^']+)'/.exec(c.getAttribute('onclick')||'');return m?m[1]:'';});}
+function bulkToggle(id,range){
+  const ids=_cardIds(), i=ids.indexOf(id);
+  if(!bulkSel)bulkSel=new Set();
+  if(range&&_bulkAnchor>=0&&i>=0){
+    const [a,b]=_bulkAnchor<i?[_bulkAnchor,i]:[i,_bulkAnchor];
+    for(let j=a;j<=b;j++)if(ids[j])bulkSel.add(ids[j]);
+  }else{
+    if(bulkSel.has(id))bulkSel.delete(id);else bulkSel.add(id);
+    _bulkAnchor=i;
+  }
+  if(!bulkSel.size){bulkSel=null;_bulkAnchor=-1;}
+  render();
+}
+function bulkClear(){bulkSel=null;_bulkAnchor=-1;render();}
+function bulkSetStatus(st){
+  if(!bulkOn())return;
+  let n=0;
+  bulkSel.forEach(id=>{const a=anime.find(x=>x.id===id);if(a&&a.status!==st){a.status=st;touch(a);n++;}});
+  const label=stLabel(st);
+  bulkSel=null;_bulkAnchor=-1;
+  try{save();}catch(e){}
+  render();
+  toast(n?`${n} moved to ${label}`:'Already there');
+}
+function bulkBarHTML(){
+  if(!bulkOn())return '';
+  return `<div class="bulk-bar">
+    <span class="bulk-n">${bulkSel.size} selected</span>
+    ${Object.keys(STATUS_META).map(st=>`<button class="bulk-b" onclick="bulkSetStatus('${st}')">${STATUS_META[st].icon} ${stLabel(st)}</button>`).join('')}
+    <button class="bulk-x" onclick="bulkClear()" aria-label="Clear selection">${icon('x')}</button>
+  </div>`;
+}
 function pcTap(id,ev){
   if(recSel){if(recSel.has(id))recSel.delete(id);else recSel.add(id);const el=ev&&ev.currentTarget;if(el)el.classList.toggle('sel',recSel.has(id));updateRecSelBar();return;}
+  // Shift or meta starts a selection; once one is running, a plain click keeps
+  // adding to it rather than opening a sheet over the top of what you're doing.
+  if(ev&&(ev.shiftKey||ev.metaKey||ev.ctrlKey)){ev.preventDefault();bulkToggle(id,ev.shiftKey);return;}
+  if(bulkOn()){bulkToggle(id,false);return;}
   openDetail(id);
 }
 function updateRecSelBar(){const el=document.getElementById('recSelCount');if(el&&recSel)el.textContent=recSel.size+(recSel.size===1?' show':' shows');}

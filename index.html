@@ -2180,6 +2180,11 @@ body.recsel .pcard{position:relative;}
   /* On a pointer, the whole target lights up rather than only its label. */
   .nbtn:hover:not(.add){background:rgba(255,255,255,.05);}
   .grid,.row-scroll{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));}
+  /* At 1400 the hero was 4.76:1 and the detail banner 7.89:1 — letterbox slits
+     that no uploaded picture can fill without being reduced to a strip. Height
+     scales with the extra width instead. */
+  .billboard,.bb-slide{min-height:340px;}
+  .dt-banner{height:230px;}
   .hero{min-height:264px;}
   .hero-title{font-size:27px;}
 }
@@ -2467,7 +2472,7 @@ body.recsel .pcard{position:relative;}
       <button class="dact danger" type="button" id="bgRemoveBtn" onclick="clearBg()" style="display:none;padding:10px 14px">Remove</button>
       <input type="file" id="bgFile" accept="image/*" style="display:none" onchange="bgFileChosen(this)">
     </div>
-    <div class="field-hint">Backdrop for this title's hero and detail view — overrides the auto banner, and the colours tint from it. Centred and cut to a wide 16:9, so any picture fits.</div>
+    <div class="field-hint">Backdrop for this title's hero and detail view — overrides the auto banner, and the colours tint from it. Kept whole, not cropped: it's shown very wide on a desktop and squarer on a phone, so a landscape picture with the subject near the middle survives both best.</div>
   </div>
   <div class="fgroup">
     <label class="flabel">Status</label>
@@ -7142,8 +7147,17 @@ function bgFileChosen(inp){
   img.onload=()=>{
     try{
       // compress+resize: max ~1280px long edge, JPEG q0.8 → data URL (raw photos would blow past localStorage / the 20MB sync cap)
-      // 16:9 — the shape of the hero band and the wide continue-watching card.
-      const c=cropToRatio(img,1280,720);
+      // NOT cropped to a ratio, deliberately. Measured, a backdrop is shown at
+      // 1.47 on a phone billboard, 1.78 on the continue card, 2.60 on the phone
+      // detail banner and 7.89 on a desktop one. There is no single crop that
+      // serves that spread: cutting to 16:9 would throw away exactly the height
+      // the wide surfaces then have to stretch for, leaving a sliver. Keep the
+      // whole picture, cap the size, and let each surface take what it needs.
+      const sc=Math.min(1600/img.width,1600/img.height,1);
+      const c=document.createElement('canvas');
+      c.width=Math.max(1,Math.round(img.width*sc));c.height=Math.max(1,Math.round(img.height*sc));
+      const g=c.getContext('2d');g.imageSmoothingQuality='high';
+      g.drawImage(img,0,0,c.width,c.height);
       URL.revokeObjectURL(img.src);
       const url=c.toDataURL('image/jpeg',0.8);
       if(Math.round(url.length*0.75)>2600000)toast('Photo is large — cloud sync may reject it. Try a smaller image.');
@@ -7160,7 +7174,10 @@ function coverFileChosen(inp){
   if(!f)return;
   const img=new Image();
   img.onload=()=>{
-    // 2:3 — the poster shape every card in the app is cut to.
+    // 2:3, and this one IS safe to bake in: measured, a poster is 0.703 on the
+    // grid and 0.703 on a rail, on a phone and on a desktop alike. One shape
+    // everywhere means cropping once here is strictly better than three
+    // different object-fit crops later.
     const c=cropToRatio(img,480,680);
     URL.revokeObjectURL(img.src);
     setCoverPreview(c.toDataURL('image/jpeg',0.82));

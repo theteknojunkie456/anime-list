@@ -7769,16 +7769,20 @@ function partyConnect(code,create){
     if(m.t==='state')applyRoom(m.room);
     else if(m.t==='react')processReacts(m.r?[m.r]:m.reacts);   // lightweight: float the emoji, no full-state churn
     else if(m.t==='ytsync')applyYtSync(m);                      // follow the host's player, hands-free
+    else if(m.t==='psync')applyPlaybackSync(m);                 // …and on real sites, in the app
     else if(m.t==='typing')partyShowTyping(m.name,m.uid);
     else if(m.t==='signal')handleSignalMsg(m);
     else if(m.t==='error'){toast(m.msg||'Party error');partyEnd(true);}
   };
   ws.onclose=()=>{ if(partyWS!==ws)return;   // a newer socket superseded this one
-    if(partyCode&&partyReconn<6){
-      // resilient reconnect — surface it so a dropped party doesn't just look frozen
+    if(partyCode&&partyReconn<14){
+      // Six tries at 700ms steps gave up after about 15 seconds, which is shorter
+      // than a lift, a tunnel, or the pause between Wi-Fi dropping and cellular
+      // taking over — and "leave and rejoin" is a poor answer to a blip. Backoff
+      // now stretches to a 5s ceiling and keeps going for about a minute.
       if(!partyReconnecting){partyReconnecting=true;toast('Connection lost — reconnecting…');updatePartyPill();}
-      partyReconn++;setTimeout(()=>{if(partyCode)partyConnect(partyCode,false);},700*partyReconn);
-    }else if(partyCode){                       // gave up after several tries
+      partyReconn++;setTimeout(()=>{if(partyCode)partyConnect(partyCode,false);},Math.min(5000,600*partyReconn));
+    }else if(partyCode){
       partyReconnecting=false;updatePartyPill();toast('Couldn’t reconnect — leave and rejoin the party');
     }
   };
@@ -8088,6 +8092,46 @@ function startYtSync(){
 function stopYtSync(){clearInterval(_ytPollT);_ytPollT=0;}
 // Viewer: match the host, allowing for the hop between us. Only correct on real
 // drift — nudging constantly would stutter the picture for no benefit.
+// ── WATCHING TOGETHER, ON THE SITES PEOPLE ACTUALLY USE ─────────────────────
+// Party sync has only ever worked for YouTube, because a page cannot read — let
+// alone move — a <video> on another origin. In the app it can: the shell already
+// injects a probe into every frame to measure progress, so the host's real
+// position is known, and the same channel can move a viewer's video to match.
+//
+// Rules, all of them there to make it feel like nothing is happening:
+//   · only in the app, only in a party, only while the player is open
+//   · only when you are on the SAME episode as the host
+//   · only when you have drifted more than 4 seconds, so ordinary jitter and a
+//     deliberate pause are left alone
+//   · a correction at most every 6 seconds, so a slow buffer isn't fought
+const PSYNC_DRIFT=4, PSYNC_GAP=6000;
+let _psyncAt=0, _psyncOut=0;
+function applyPlaybackSync(m){
+  try{
+    if(!IS_NATIVE||!partyActive()||partyIsHost)return;
+    if(!m||!(m.t2>=0))return;
+    if(!pvReturnId||!realPlaybackLive())return;                 // not watching anything
+    if(m.ep&&pvWatchEp&&m.ep!==pvWatchEp)return;                // different episode entirely
+    const now=Date.now();
+    if(now-_psyncAt<PSYNC_GAP)return;
+    // Where the host would be NOW, allowing for the hop across the network.
+    const target=m.t2+(m.paused?0:Math.max(0,(now-(m.sent||now))/1000));
+    if(Math.abs((_rp.t||0)-target)<PSYNC_DRIFT)return;
+    _psyncAt=now;
+    window.webkit.messageHandlers.wl.postMessage({type:'seekto',t:Math.max(0,target)});
+  }catch(e){}
+}
+// The host publishes where it is. Rate-limited to one message every few seconds:
+// the probe reports every five, and a party is not a control surface.
+function publishPlaybackSync(t,paused){
+  try{
+    if(!IS_NATIVE||!partyActive()||!partyIsHost)return;
+    const now=Date.now();
+    if(now-_psyncOut<5000)return;
+    _psyncOut=now;
+    wsSend({t:'psync',t2:Math.round(t),ep:pvWatchEp||0,paused:!!paused,sent:now});
+  }catch(e){}
+}
 function applyYtSync(m){
   if(partyIsHost||_ytApplying)return;
   const frames=ytFrames(); if(!frames.length)return;
@@ -10523,6 +10567,7 @@ window.wlNativePlayback=function(info){
     if(_rp.ep===pvWatchEp&&_rp.d&&Math.abs(d-_rp.d)>_rp.d*0.25){ if(d<_rp.d)return; }
     if(_rp.ep!==pvWatchEp){_rp={at:0,t:0,d:0,paused:true,ep:pvWatchEp||0};}   // new episode, new clock
     _rp.at=Date.now();_rp.t=t;_rp.d=d;_rp.paused=!!info.paused;
+    publishPlaybackSync(t,info.paused);
     // A frame that is playing a 20-minute video has rendered, is not blocked, and
     // is not a verification gate. The blank-frame panel is driven by a timer and
     // a load event, and the code already notes a load event "proves nothing about
@@ -14406,10 +14451,12 @@ function _updBusy(){
 // you'd explain it to a friend — what they can now do, not what the code does.
 // No version numbers or jargon in the notes; the date IS the version.
 const RELEASE={
-  v:'2026-08-11.7',
+  v:'2026-08-11.8',
   title:'Seasons, specials, and progress that keeps itself',
   push:'Every film and special on the show it belongs to \u2014 and progress that marks itself.',
   notes:[
+    'Watch parties can now stay in sync on real streaming sites, not just YouTube \u2014 in the iPhone app, everyone follows the host\u2019s position automatically, and only nudges when you\u2019ve drifted more than a few seconds.',
+    'A party survives a tunnel: it keeps trying to reconnect for about a minute instead of giving up after fifteen seconds.',
     'Cards now say how much is waiting. A show you\u2019re behind on wears a \u201c7 new\u201d tag on its artwork, so the grid answers what to put on tonight instead of only what you own.',
     'A cover that fails to load now leaves the title\u2019s initial in its place instead of an empty gap. That\u2019s why a few unmatched shows made a whole row look broken \u2014 the card wasn\u2019t showing a placeholder, it was showing nothing.',
     'The trailer button no longer just sits there when a channel has embedding turned off \u2014 it says so, and offers to open it on YouTube.',

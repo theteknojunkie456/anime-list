@@ -158,6 +158,7 @@ struct WatchListShell: UIViewRepresentable {
         weak var web: WKWebView?
         weak var ucc: WKUserContentController?
         var pendingResume: Double = 0
+        var playingFrame: WKFrameInfo?
 
         /// A full-screen web view inside the app, sharing the main view's
         /// configuration so injected scripts and cookies come with it.
@@ -291,6 +292,11 @@ struct WatchListShell: UIViewRepresentable {
                 // calls a show — and it costs the viewer nothing to say it. Taken
                 // from frameInfo, never from the page: a script in an ad frame can
                 // post any body it likes, but it cannot forge where it is running.
+                // The frame that reports playback is the one holding the <video>.
+                // Keep it: a resume point can only be delivered to a NEW frame (the
+                // injected script carries it at load), so live seeking — which is
+                // what watching together needs — has to talk to this one directly.
+                playingFrame = msg.frameInfo
                 var frameJS = "''"
                 if let u = msg.frameInfo.request.url?.absoluteString, !u.isEmpty,
                    let enc = try? JSONSerialization.data(withJSONObject: [u]),
@@ -303,6 +309,23 @@ struct WatchListShell: UIViewRepresentable {
                 DispatchQueue.main.async { [weak self] in
                     self?.web?.evaluateJavaScript(js, in: nil,
                                                   in: .page, completionHandler: nil)
+                }
+                return
+            }
+            // Live seek, for watching together. Everything else about resuming
+            // works by injecting a position into the next page load; a party has
+            // to move a video that is already running, in a frame we do not own
+            // and cannot reach across origins from JS. We can reach it from here,
+            // because WKWebView will evaluate script in a specific frame.
+            if kind == "seekto" {
+                let t = (body["t"] as? Double) ?? -1
+                guard t >= 0, let f = playingFrame else { return }
+                let js = "(function(){try{var b=null,a=0,v=document.querySelectorAll('video');"
+                       + "for(var i=0;i<v.length;i++){var e=v[i];if(!isFinite(e.duration)||e.duration<=60)continue;"
+                       + "var s=(e.clientWidth||0)*(e.clientHeight||0);if(s>=a){a=s;b=e;}}"
+                       + "if(b&&Math.abs(b.currentTime-\(t))>2.5)b.currentTime=\(t);}catch(e){}})();"
+                DispatchQueue.main.async { [weak self] in
+                    self?.web?.evaluateJavaScript(js, in: f, in: .page, completionHandler: nil)
                 }
                 return
             }

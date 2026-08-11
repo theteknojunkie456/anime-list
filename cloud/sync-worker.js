@@ -546,6 +546,17 @@ export class PartyRoom {
         this.broadcastRaw({ t: 'ytsync', at, playing, vid: String(msg.vid || '').slice(0, 24), sentAt: Date.now() }, uid);
         return;
       }
+      // The same idea as ytsync, but for a real streaming site. Only the app can
+      // produce or act on this — it comes from a probe inside the playing frame —
+      // so the room just relays it. Host only, bounded, and it carries a position
+      // and a timestamp, never media and never a URL.
+      case 'psync': {
+        if (!isHost) return;
+        const t2 = Math.max(0, Math.min(86400, Number(msg.t2) || 0));
+        const ep = Math.max(0, Math.min(100000, Number(msg.ep) || 0));
+        this.broadcastRaw({ t: 'psync', t2, ep, paused: !!msg.paused, sent: Date.now() }, uid);
+        return;
+      }
       case 'resync': {
         if (!isHost) return;
         room.paused = false;

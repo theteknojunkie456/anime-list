@@ -5978,7 +5978,12 @@ function richDetailHTML(d,forId){
     // one continuous list — so ep 12 looks like ep 11 even when only the first
     // few carry art. Watched ones dim, the next one is lit. Every tap goes
     // through watchAnime, so it obeys Sources exactly like Watch does.
-    const cur=(_it&&_it.ep)||0,N=Math.min(epCount,600);
+    // The cap used to apply to the whole strip, which quietly made episodes past
+    // 600 unreachable — on a 1,173-episode show that's the back half of the
+    // series. It only ever existed to stop "show all" building a thousand
+    // buttons, so it belongs on that expansion alone. The window renders about
+    // eleven cells wherever it sits, so it can address the real total.
+    const cur=(_it&&_it.ep)||0,N=epCount,ALL_CAP=600;
     const art={};
     eps.forEach((e,i)=>{const en=(String(e.title).match(/\d+/)||[])[0];const n=en?+en:(i+1);if(!art[n])art[n]={img:safeImg(e.thumbnail||''),title:e.title};});
     // Every cell carries art: AniList's own episode still where it published one,
@@ -5991,7 +5996,7 @@ function richDetailHTML(d,forId){
     // The window centres on wherever you jumped to, or on where you actually are.
     const anchor=_epsFocus?Math.min(_epsFocus,N):cur;
     const lo=_epsAll?1:Math.max(1,(_epsFocus?anchor-2:Math.max(1,cur-2)));
-    const hi=_epsAll?N:Math.min(N,Math.max(anchor+WIN,WIN));
+    const hi=_epsAll?Math.min(N,ALL_CAP):Math.min(N,Math.max(anchor+WIN,WIN));
     const cells=[];
     for(let n=lo;n<=hi;n++){
       const cls=(n<=cur?' seen':(n===cur+1?' next':''))+(n===_epsFocus?' focus':'');
@@ -6006,7 +6011,7 @@ function richDetailHTML(d,forId){
       onkeydown="if(event.key==='Enter'){event.preventDefault();dtJumpEp(this.value);}"
       onchange="dtJumpEp(this.value)">`:'';
     epsHTML=`<div class="dt-label" style="margin-top:16px">${icon('play')} Episodes<span class="dt-eps-tag">${tag}</span>${jump}</div><div class="dt-eps">${cells.join('')}</div>`
-      +(hidden>0?`<button class="dt-pin-toggle" onclick="dtShowAllEps()">${icon('layers')} Show all ${N} episodes</button>`:'');
+      +(hidden>0?`<button class="dt-pin-toggle" onclick="dtShowAllEps()">${icon('layers')} Show ${Math.min(N,ALL_CAP)===N?`all ${N}`:`the first ${ALL_CAP}`} episodes${N>ALL_CAP?` \u00b7 type a number for the rest`:''}</button>`:'');
   }
   const desc=_stripHtml(d.description);
   const synHTML=desc?`<div class="dt-label" style="margin-top:16px">Synopsis</div><p class="dt-synopsis" onclick="this.classList.toggle('open')">${schEsc(desc)}</p>`:'';

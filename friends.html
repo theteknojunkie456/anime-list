@@ -158,7 +158,7 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
    the CONTENT (a mask, not a painted scrim) means posters dissolve into whatever
    is behind them — which is a per-title ambient gradient, so a solid scrim would
    have been a visible band of the wrong colour. */
-.page{flex:1;overflow-y:auto;overscroll-behavior:none;padding-bottom:calc(var(--safe-b) + 104px);}
+.page{flex:1;overflow-y:auto;overscroll-behavior:none;padding-bottom:calc(var(--safe-b) + 96px);}
 
 /* ── HEADER ── */
 .hdr{padding:calc(var(--safe-t) + 12px) 18px 0;display:flex;align-items:center;justify-content:space-between;}
@@ -686,18 +686,23 @@ body.first-paint .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards
    and past it, which is the point of the blur — an edge-to-edge slab with a
    hairline on top reads as a shelf the content stops at. */
 .nav{
-  position:fixed;left:14px;right:14px;bottom:calc(var(--safe-b) + 12px);z-index:60;
+  /* Docked, not floating. A detached pill leaves a strip of page under it that
+     does nothing, and on a phone that strip is exactly where your thumb rests.
+     Attached to the edge it gets the full safe area, the corners it keeps are
+     the two that face the content, and the list runs underneath it rather than
+     stopping short. */
+  position:fixed;left:0;right:0;bottom:0;z-index:60;
   /* Equal columns, not space-around. Distributing the leftover space meant the
      two wider labels ("Settings", "Sources") pushed their neighbours: measured
      centre-to-centre gaps of 88.3 / 88.3 / 91.5 / 94.5, and the + landed 6.2px
      left of the bar's own centre. Five identical tracks put it exactly on it. */
   display:grid;grid-template-columns:repeat(5,1fr);align-items:center;
-  /* The + is the tallest thing in here, so the bar's padding is what guarantees
-     it has room. overflow is spelled out because this button has been clipped
-     more than once. */
-  padding:11px 8px;border-radius:30px;overflow:visible;
-  background:var(--bg3);border:1px solid var(--bn2);
-  box-shadow:0 14px 34px -10px rgba(0,0,0,.62),0 3px 10px rgba(0,0,0,.34);
+  /* The + is the tallest thing in here, so the padding is what guarantees it has
+     room. overflow is spelled out because this button has been clipped before. */
+  padding:11px 10px calc(var(--safe-b) + 11px);
+  border-radius:26px 26px 0 0;overflow:visible;
+  background:var(--bg3);border-top:1px solid var(--bn2);
+  box-shadow:0 -10px 30px -14px rgba(0,0,0,.8);
 }
 /* The + overhangs the top of the bar on purpose, and on iPhone its top was being
    sliced off flat. WebKit clips descendants to the border box of any element
@@ -708,10 +713,18 @@ body.first-paint .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards
   .nav{background:transparent;border-color:transparent;box-shadow:none;}
   .nav::before{
     content:'';position:absolute;inset:0;border-radius:inherit;z-index:-1;
-    background:color-mix(in srgb,var(--bg3) 76%,transparent);
-    border:1px solid var(--bn2);
-    box-shadow:0 14px 34px -10px rgba(0,0,0,.62),0 3px 10px rgba(0,0,0,.34);
-    backdrop-filter:blur(22px) saturate(1.3);-webkit-backdrop-filter:blur(22px) saturate(1.3);
+    background:color-mix(in srgb,var(--bg3) 74%,transparent);
+    border-top:1px solid var(--bn2);
+    box-shadow:0 -10px 30px -14px rgba(0,0,0,.8);
+    backdrop-filter:blur(24px) saturate(1.35);-webkit-backdrop-filter:blur(24px) saturate(1.35);
+  }
+  /* A single hairline of light along the top lip. It is what stops a blurred
+     bar reading as a smudge over the list — the edge is the only thing telling
+     you the panel is in front. */
+  .nav::after{
+    content:'';position:absolute;left:0;right:0;top:0;height:1px;z-index:-1;
+    border-radius:inherit;pointer-events:none;
+    background:linear-gradient(90deg,transparent,rgba(255,255,255,.16) 22%,rgba(255,255,255,.16) 78%,transparent);
   }
 }
 .nbtn{
@@ -2119,7 +2132,7 @@ body.recsel .pcard{position:relative;}
   }
   .confirm-box{max-width:440px;margin-left:auto;margin-right:auto;}
   /* Stretched edge to edge on a desktop the pill stops reading as a pill. */
-  .nav{left:50%;right:auto;transform:translateX(-50%);width:min(460px,calc(100% - 36px));padding-left:14px;padding-right:14px;}
+  .nav{left:50%;right:auto;transform:translateX(-50%);width:min(520px,100%);padding-left:16px;padding-right:16px;}
   .grid,.row-scroll{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));}
   .hero{min-height:264px;}
   .hero-title{font-size:27px;}
@@ -2225,7 +2238,7 @@ body.recsel .pcard{position:relative;}
   .row-head,.row-div,.dt-label{padding-left:14px;padding-right:14px;}
   .billboard,.rz-sec>.rz-head{margin-left:0;}
   /* 5 targets across 292px of usable width — shrink the chrome, never the labels. */
-  .nav{left:10px;right:10px;padding:8px 5px;}
+  .nav{padding:9px 6px calc(var(--safe-b) + 9px);border-radius:22px 22px 0 0;}
   .nbtn{min-width:44px;padding:6px 6px;}
   .nbtn.add{width:54px;height:54px;min-width:0;font-size:27px;}
 }
@@ -14542,10 +14555,11 @@ function _updBusy(){
 // you'd explain it to a friend — what they can now do, not what the code does.
 // No version numbers or jargon in the notes; the date IS the version.
 const RELEASE={
-  v:'2026-08-11.10',
+  v:'2026-08-11.11',
   title:'Seasons, specials, and progress that keeps itself',
   push:'Every film and special on the show it belongs to \u2014 and progress that marks itself.',
   notes:[
+    'The bottom bar is attached to the bottom of the screen again, keeping the rounded top, the blur and the round + \u2014 the list now runs underneath it instead of stopping short of a floating strip.',
     'Fixed the Favourite button, which had lost its shape when the facts moved, and the progress bar under the episode list, which was full-width and louder than the artwork above it.',
     'A member showing as \u201c(existing)\u201d now reads as unnamed and can be tapped to name \u2014 it was never a name, just what old devices were filed under before one was required.',
     'The watch party screen is two clear choices instead of a form: start one, or type a friend\u2019s code \u2014 and the code field is now spaced out and monospaced so it can be read aloud without spelling it twice.',

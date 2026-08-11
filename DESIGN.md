@@ -74,10 +74,14 @@ body is what stopped the UI reading flat when everything was one family at
 - **Player** — full-screen overlay, sandboxed cross-origin iframe. Its chrome is
   the only place a countdown chip or overlay sits on artwork.
 - **Sheets** — bottom sheets for everything modal. No nested cards.
-- **Bottom nav** — a floating pill, inset 14px, its own border and shadow, blur
-  behind. Not a bar welded to the edge: the list scrolls *under* it. The active
-  item is a filled pill inside it, because at 9px colour alone can't carry
-  "where you are". Centered and capped at ~450px on desktop.
+- **Bottom nav** — docked to the bottom edge, full width, rounded on the two
+  corners that face the content only. A detached pill left a strip of page under
+  it that did nothing, and on a phone that strip is where your thumb rests.
+  It keeps the pill's material: blur behind, a hairline of light along the top
+  lip (that edge is the only thing telling you the panel is in front of the
+  list rather than smeared over it), and the active item as a filled pill,
+  because at 9px colour alone can't carry "where you are". Capped at 520px and
+  centred on desktop. Takes the full safe area as its own bottom padding.
 - **Top bar** (`.topbar`) — search and the filters in one floating panel that
   mirrors the nav exactly: same material, same blur, **same left/right inset at
   every width** (verified 10px at ≤360, 14px above). That shared inset is what

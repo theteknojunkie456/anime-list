@@ -439,6 +439,17 @@ body.first-paint .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards
 .bb-slide .hero-bg-img{animation:none;will-change:auto;}
 .bb-slide.bb-live .hero-bg-img{animation:kenburns 24s ease-in-out infinite alternate;will-change:transform;}
 @media(prefers-reduced-motion:reduce){.bb-slide.bb-live .hero-bg-img{animation:none;will-change:auto;}}
+.bb-cd{position:absolute;top:12px;left:14px;z-index:4;display:inline-flex;align-items:center;gap:6px;
+  padding:6px 11px;border-radius:99px;font-size:11.5px;font-weight:700;letter-spacing:.01em;color:#fff;
+  background:rgba(8,8,11,.62);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  border:1px solid rgba(255,255,255,.13);font-variant-numeric:tabular-nums;}
+.bb-cd .ico{width:12px;height:12px;}
+.bb-cd.is-out{color:var(--a2);border-color:color-mix(in srgb,var(--a) 55%,transparent);}
+.bb-count{position:absolute;bottom:15px;right:16px;z-index:4;padding:4px 10px;border-radius:99px;
+  font-size:11.5px;font-weight:700;color:#fff;background:rgba(8,8,11,.62);
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  border:1px solid rgba(255,255,255,.13);font-variant-numeric:tabular-nums;}
+.bb-count span{opacity:.6;font-weight:600;}
 .bb-dots{position:absolute;bottom:15px;right:16px;z-index:4;display:flex;gap:6px;}
 .bb-dot{width:7px;height:7px;border-radius:99px;background:rgba(255,255,255,0.42);transition:width .35s cubic-bezier(.2,1,.3,1),background-color .35s cubic-bezier(.2,1,.3,1),opacity .35s;cursor:pointer;}
 .bb-dot.on{background:#fff;width:20px;}
@@ -5328,16 +5339,29 @@ function collapseSeries(items){
   return out;
 }
 let bbItems=[],bbIdx=0,bbTimer=0,bbP=1;   // bbP = physical slide index (clones at 0 and N+1)
+// "airs Wed 4:00 PM" makes you do the arithmetic. A countdown doesn't, which is
+// why every site that shows one puts it where your eye already is — on the
+// artwork, not in the text block underneath.
+function bbCountdown(a){
+  if(kindOf(a)!=='watch'||!a.airAt)return '';
+  const ms=a.airAt*1000-Date.now();
+  if(ms<=0)return airedToday(a)?`<div class="bb-cd is-out">${icon('play')} Ep ${a.airEp||''} out now</div>`:'';
+  const mins=Math.floor(ms/60000), h=Math.floor(mins/60), d=Math.floor(h/24);
+  const left=d>0?`${d}d ${h%24}h`:h>0?`${h}h ${mins%60}m`:`${mins}m`;
+  return `<div class="bb-cd">${icon('clock')} Ep ${a.airEp||''} \u00b7 ${left}</div>`;
+}
 function bbSlideHTML(a){
   const art=titleBg(a);
   let bg=`<div class="hero-bg" style="background:linear-gradient(135deg,var(--bg4),var(--bg2))"></div>`;
   if(art)bg+=`<img class="hero-bg-img" src="${escH(art)}" loading="lazy" alt="" onerror="this.remove()">`;
   else if(safeImg(a.img))bg=`<div class="hero-bg" style="background-image:url('${safeImg(a.img)}')"></div>`;
   const av=accentVars(a),p=prog(a),air=airingInfo(a);
-  const airHTML=air?`<div class="hero-air">${icon('calendar')} Ep ${air.ep} · airs ${air.when}</div>`:'';
+  const cd=bbCountdown(a);
+  const airHTML=cd?'':(air?`<div class="hero-air">${icon('calendar')} Ep ${air.ep} · airs ${air.when}</div>`:'');
   const kicker=a.status==='watching'?(kindOf(a)==='read'?'Continue reading':'Continue watching'):(a.fav?'One of your favorites':'In your spotlight');
   return`<div class="bb-slide"${av?` style="${av}"`:''} onclick="openDetail('${a.id}')">
     ${bg}<div class="hero-shade"></div>
+    ${cd}
     <div class="hero-body">
       <div class="hero-kicker">${kicker}</div>
       <div class="hero-title">${schEsc(a.title)}</div>
@@ -5356,8 +5380,11 @@ function billboardHTML(items){
   const real=items.map(a=>bbSlideHTML(a)).join('');
   const head=loop?bbSlideHTML(items[items.length-1]):'';   // clone of last, at the front
   const tail=loop?bbSlideHTML(items[0]):'';                // clone of first, at the back
+  // Dots stop being countable past about five. A number is exact at any length,
+  // so it shows up only once the dots have lost the argument.
+  const count=items.length>5?`<div class="bb-count" id="bbCount">1<span>/${items.length}</span></div>`:'';
   const dots=loop?`<div class="bb-dots">${items.map((a,i)=>`<div class="bb-dot${i===0?' on':''}" onclick="event.stopPropagation();bbGo(${i+1})"></div>`).join('')}</div>`:'';
-  return`<div class="billboard" id="billboard"><div class="bb-track">${head}${real}${tail}</div>${dots}</div>`;
+  return`<div class="billboard" id="billboard"><div class="bb-track">${head}${real}${tail}</div>${count}${items.length>5?'':dots}</div>`;
 }
 function bbReal(){const N=bbItems.length;return N?((bbP-1)%N+N)%N:0;}   // physical → logical index
 function bbSetup(items){
@@ -5405,6 +5432,8 @@ function bbGo(p){
   if(track){track.classList.remove('dragging');track.style.transform='translateX('+(-bbP*w)+'px)';}
   bbIdx=bbReal();
   bb.querySelectorAll('.bb-dot').forEach((d,j)=>d.classList.toggle('on',j===bbIdx));
+  const cnt=document.getElementById('bbCount');
+  if(cnt)cnt.innerHTML=(bbIdx+1)+'<span>/'+bbItems.length+'</span>';
   bbLive(bb);
   const pg=document.getElementById('pageEl');
   if(pg&&pg.scrollTop<60){heroAmb=bbItems[bbIdx].amb;setAmbient(heroAmb);}

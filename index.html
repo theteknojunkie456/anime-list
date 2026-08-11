@@ -5753,7 +5753,7 @@ function posterCard(a,nSeas){
   const multi=nSeas>1;
   const title=multi?seasonBase(a.title):a.title;
   const img=a.img
-    ?`<img class="pcard-img" src="${escH(a.img)}" loading="lazy" alt="" onerror="this.remove()">`
+    ?`<img class="pcard-img" src="${escH(a.img)}" loading="lazy" alt="" onerror="artFallback(this,${JSON.stringify(String(title||a.title||'?')).replace(/"/g,'&quot;')},'pcard-ph')">`
     :`<div class="pcard-ph">${((title||'?').trim()[0]||'?').toUpperCase().replace(/['"<&]/g,'?')}</div>`;
   const p=prog(a);
   const bar=(a.status==='watching'&&a.epTotal)?`<div class="pbar"><div class="pfill" style="width:${Math.round(p*100)}%"></div></div>`:'';
@@ -6176,7 +6176,7 @@ function renderDetail(){
   const _pw=Math.max(0,Math.min(1,prog(a)));
   const _lvl=(a.epTotal&&_pw>0)?`<div class="dt-level${_pw>=1?' full':''}" style="height:${(_pw*100).toFixed(1)}%"></div>`:'';
   const cover=`<div class="dt-cover-wrap">`+(a.img
-    ?`<img loading="lazy" class="dt-cover" src="${escH(a.img)}" alt="" onerror="this.remove()">`
+    ?`<img loading="lazy" class="dt-cover" src="${escH(a.img)}" alt="" onerror="artFallback(this,${JSON.stringify(String(a.title||'?')).replace(/"/g,'&quot;')},'dt-cover-ph')">`
     :`<div class="dt-cover-ph">${((a.title||'?').trim()[0]||'?').toUpperCase().replace(/['"<&]/g,'?')}</div>`)+_lvl+`</div>`;
   // per-title banner header + accent tint (scoped to this sheet only, never the global chrome)
   const art=titleBg(a);
@@ -9372,7 +9372,7 @@ function behindHTML(){
   const ch=((a.title||'?').trim()[0]||'?').toUpperCase().replace(/['"<&]/g,'?');
   const next=(a.ep||0)+1;
   return`<button class="resume-card" style="${accentVars(a)}" onclick="resumeWatch('${a.id}')">
-    ${art?`<img class="resume-art" src="${escH(art)}" alt="" loading="lazy" onerror="this.remove()">`:`<span class="resume-ph">${ch}</span>`}
+    ${art?`<img class="resume-art" src="${escH(art)}" alt="" loading="lazy" onerror="artFallback(this,${JSON.stringify(String(a.title||'?')).replace(/"/g,'&quot;')},'resume-ph')">`:`<span class="resume-ph">${ch}</span>`}
     <span class="resume-body">
       <span class="resume-k">Pick up where you left off</span>
       <span class="resume-t">${schEsc(a.title)}</span>
@@ -10724,6 +10724,20 @@ function escH(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;',
 // Image URLs can arrive from OTHER people (friend recs, party queue/now-playing). If one
 // is dropped into src="${...}" or url('${...}') raw, a value like  x" onerror="…  breaks
 // out and runs script in your browser. Allow only real image URLs with no breakout chars.
+// A cover URL that 404s used to be DELETED from the page, which leaves a hole
+// exactly the size of a poster. That is why a library with a few unmatched
+// titles reads as broken rather than incomplete — the card is not showing a
+// placeholder, it is showing nothing at all. Swap in the same initial-letter
+// tile the no-image path already uses, so a missing cover looks like a decision.
+function artFallback(el,title,cls){
+  try{
+    if(!el||!el.parentNode)return;
+    const d=document.createElement('div');
+    d.className=cls||'pcard-ph';
+    d.textContent=(String(title||'?').trim()[0]||'?').toUpperCase();
+    el.replaceWith(d);
+  }catch(e){try{el.remove();}catch(e2){}}
+}
 function safeImg(u){u=String(u==null?'':u);return(/^(https?:\/\/|data:image\/|blob:)/i.test(u)&&!/["'<>\\\s]/.test(u))?u:'';}
 function safeCode(c){return String(c==null?'':c).replace(/[^A-Za-z0-9]/g,'').slice(0,64);}
 function safeId(x){return String(x==null?'':x).replace(/[^A-Za-z0-9._:-]/g,'').slice(0,80);}
@@ -11860,7 +11874,7 @@ function friendRecRowHTML(){
 }
 function recCard(k,rec){
   const it=rec.item,s0=rec.senders[0],col=friendColor(s0.code);
-  const img=it.img?`<img class="pcard-img" src="${escH(it.img)}" loading="lazy" alt="" onerror="this.remove()">`:`<div class="pcard-ph">${escH(((it.title||'?').trim()[0]||'?').toUpperCase())}</div>`;
+  const img=it.img?`<img class="pcard-img" src="${escH(it.img)}" loading="lazy" alt="" onerror="artFallback(this,${JSON.stringify(String(it.title||'?')).replace(/"/g,'&quot;')},'pcard-ph')">`:`<div class="pcard-ph">${escH(((it.title||'?').trim()[0]||'?').toUpperCase())}</div>`;
   const more=rec.senders.length>1?` +${rec.senders.length-1}`:'';
   return `<div class="pcard rec-card" style="--fc:${col}" onclick="openRecDetail('${encodeURIComponent(k)}')">
     <div class="pcard-wrap rec-wrap">${img}<span class="rec-flag" style="background:${col}">${icon('users')}</span></div>
@@ -11883,7 +11897,7 @@ function renderRecDetail(){
   const rec=recByAni()[recDetailKey];
   if(!rec){box.innerHTML='<p class="ai-desc">This recommendation is no longer available.</p>';return;}
   const it=rec.item;
-  const cover=it.img?`<img loading="lazy" class="dt-cover" src="${escH(it.img)}" alt="" onerror="this.remove()">`:`<div class="dt-cover-ph">${escH(((it.title||'?').trim()[0]||'?').toUpperCase())}</div>`;
+  const cover=it.img?`<img loading="lazy" class="dt-cover" src="${escH(it.img)}" alt="" onerror="artFallback(this,${JSON.stringify(String(it.title||'?')).replace(/"/g,'&quot;')},'dt-cover-ph')">`:`<div class="dt-cover-ph">${escH(((it.title||'?').trim()[0]||'?').toUpperCase())}</div>`;
   const chips=(it.genre||'').split(',').map(g=>g.trim()).filter(Boolean).map(g=>`<span class="chip">${escH(g)}</span>`).join('');
   box.innerHTML=`
     <div class="dt-top">${cover}<div class="dt-info"><div class="dt-title">${escH(it.title)}</div><div class="dt-meta">${it.kind==='read'?'Manga / manhwa':'Anime'}</div></div></div>
@@ -12104,7 +12118,7 @@ function renderRecSend(){
   if(!shows.length){box.innerHTML='<p class="ai-desc">No shows selected.</p>';return;}
   const fr=friendsList();
   const noteRows=shows.map(a=>`<div class="rc-note">
-    ${a.img?`<img class="rc-note-img" src="${escH(a.img)}" alt="" onerror="this.remove()">`:`<div class="rc-note-ph">${escH(((a.title||'?')[0]||'?').toUpperCase())}</div>`}
+    ${a.img?`<img class="rc-note-img" src="${escH(a.img)}" alt="" onerror="artFallback(this,${JSON.stringify(String(a.title||'?')).replace(/"/g,'&quot;')},'rc-note-ph')">`:`<div class="rc-note-ph">${escH(((a.title||'?')[0]||'?').toUpperCase())}</div>`}
     <div class="rc-note-main"><div class="rc-note-t">${escH(a.title)}</div>
     <input class="ai-prompt-in rc-note-in" placeholder="Note for this one (optional)" maxlength="300" value="${escH(recItemNotes[a.id]||'')}" oninput="setItemNote('${a.id}',this.value)"></div>
     <button class="rc-note-x" onclick="removeRecShow('${a.id}')" aria-label="Remove this show">${icon('x')}</button>
@@ -14372,10 +14386,13 @@ function _updBusy(){
 // you'd explain it to a friend — what they can now do, not what the code does.
 // No version numbers or jargon in the notes; the date IS the version.
 const RELEASE={
-  v:'2026-08-11.5',
+  v:'2026-08-11.6',
   title:'Seasons, specials, and progress that keeps itself',
   push:'Every film and special on the show it belongs to \u2014 and progress that marks itself.',
   notes:[
+    'A cover that fails to load now leaves the title\u2019s initial in its place instead of an empty gap. That\u2019s why a few unmatched shows made a whole row look broken \u2014 the card wasn\u2019t showing a placeholder, it was showing nothing.',
+    'The trailer button no longer just sits there when a channel has embedding turned off \u2014 it says so, and offers to open it on YouTube.',
+    'The \u201cnot linked\u201d bar can be swiped away to the left.',
     'Search and the filters now float in one panel at the top, matching the bar at the bottom \u2014 same inset, same material, so both ends of the screen belong to each other. Everything inside it went flat so it doesn\u2019t read as boxes inside boxes.',
     'The title screen takes the best of four designs at once: the poster fills with your colour as you watch, the facts sit in one aligned column so the same fact is always in the same place, and everything you actually press \u2014 Continue, the counter, the status, Favourite \u2014 is grouped in one panel instead of scattered down the page.',
     'The + on the bottom bar sits inside the bar now rather than breaking its edge, and All / Watching / Plan can no longer clip a word on a narrow phone.',

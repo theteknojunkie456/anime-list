@@ -78,9 +78,17 @@ body is what stopped the UI reading flat when everything was one family at
   behind. Not a bar welded to the edge: the list scrolls *under* it. The active
   item is a filled pill inside it, because at 9px colour alone can't carry
   "where you are". Centered and capped at ~450px on desktop.
-- **Scroll edge** — chrome sits above the scroller rather than over it, so the
-  cue that there's content above is a hairline under `.ctrl-row`, faded in only
-  once `pageEl` has actually moved (`:root.pg-scrolled`).
+- **Top bar** (`.topbar`) — search and the filters in one floating panel that
+  mirrors the nav exactly: same material, same blur, **same left/right inset at
+  every width** (verified 10px at ≤360, 14px above). That shared inset is what
+  makes the two ends read as one language rather than two.
+- **Flat inside a panel** — anything inside `.topbar` loses its own border and
+  fill: a bordered field inside a bordered track inside a bordered panel is
+  three boxes deep. The panel owns the edge; the parts are divided by a hairline.
+  Notices (the "not linked" bar) stay *outside* it — a notice is not a control,
+  and nesting it would put a bordered box inside a bordered box.
+- **Scroll edge** — the hairline under `.ctrl-row` fades in once `pageEl` has
+  moved (`:root.pg-scrolled`). Suppressed inside `.topbar`, which draws its own.
 
 ## Mobile
 

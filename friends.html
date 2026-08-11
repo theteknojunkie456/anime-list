@@ -180,6 +180,30 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 .hbtn:active{transform:scale(0.9);}
 .hbtn.bell-on{background:color-mix(in srgb,var(--a) 22%,var(--bg3));border-color:transparent;color:var(--a2);box-shadow:0 4px 14px -6px var(--glow);}
 .hdr-actions{display:flex;align-items:center;gap:7px;}
+/* The bottom bar floats and the top chrome was a flat slab pinned to the screen
+   edges, so the two halves of the app spoke different languages. Same material,
+   same inset, same radius: one panel holding search and the filters.
+   Everything inside it goes FLAT — a bordered field and a bordered track inside
+   a bordered panel is three boxes deep, which is what "weird looking" means in
+   practice. The panel holds the edge; the parts inside are divided by a hairline. */
+.topbar{
+  position:relative;z-index:5;margin:10px 14px 0;padding:9px;border-radius:24px;
+  display:flex;flex-direction:column;gap:9px;
+  background:var(--bg3);border:1px solid var(--bn2);
+  box-shadow:0 12px 30px -16px rgba(0,0,0,.8);
+}
+@supports ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  .topbar{background:color-mix(in srgb,var(--bg3) 74%,transparent);
+    backdrop-filter:blur(22px) saturate(1.3);-webkit-backdrop-filter:blur(22px) saturate(1.3);}
+}
+.topbar .search-row,.topbar .ctrl-row{padding:0;}
+.topbar .ctrl-row{border-top:1px solid var(--bn2);padding-top:9px;}
+.topbar .ctrl-row::after{display:none;}          /* the panel already draws the edge */
+.topbar .search-in{background:transparent;border-color:transparent;box-shadow:none;padding-top:8px;padding-bottom:8px;}
+.topbar .search-in:focus{background:color-mix(in srgb,var(--bg2) 60%,transparent);border-color:color-mix(in srgb,var(--a) 55%,transparent);box-shadow:0 0 0 3px var(--ag);}
+.topbar .filt-row{background:rgba(255,255,255,.045);border-color:transparent;box-shadow:none;}
+.topbar .sort-btn{background:rgba(255,255,255,.045);}
+.topbar .kind-seg{background:rgba(255,255,255,.045);border-color:transparent;}
 .search-row{padding:10px 18px 0;display:flex;align-items:center;gap:8px;}
 .search-wrap{position:relative;flex:1;min-width:0;}
 .search-ico{position:absolute;left:13px;top:50%;transform:translateY(-50%);font-size:13px;opacity:0.5;}
@@ -1966,7 +1990,7 @@ body.recsel .pcard{position:relative;}
      width (a narrow ~300px column floating in the middle of the screen) and max-width
      never engages. width:100% restores the stretch → they fill up to the 1180 cap,
      then the auto margins center that. */
-  .hdr,.search-row,.ctrl-row,.page{
+  .hdr,.topbar,.page{
     width:100%;max-width:1180px;margin-left:auto;margin-right:auto;
   }
   .confirm-box{max-width:440px;margin-left:auto;margin-right:auto;}
@@ -2067,6 +2091,7 @@ body.recsel .pcard{position:relative;}
   .hbtn{width:34px;height:34px;border-radius:11px;}
   .hbtn .ico{width:16px;height:16px;}
   .hdr-title{font-size:19px;}
+  .topbar{margin-left:10px;margin-right:10px;padding:8px;border-radius:20px;}
   .search-row{padding-left:14px;padding-right:14px;gap:6px;}
   .search-in{padding-left:34px;font-size:13px;}
   .kseg{width:36px;height:36px;}
@@ -2143,21 +2168,23 @@ body.recsel .pcard{position:relative;}
       <button class="hbtn" onclick="openSheet('themeSheet')" title="Theme"><i data-ic="palette"></i></button>
     </div>
   </div>
-  <div class="search-row">
-    <div class="search-wrap">
-      <span class="search-ico"><i data-ic="search"></i></span>
-      <input class="search-in" type="search" id="searchIn" placeholder="Search titles, genres…" oninput="onSearchInput()">
+  <div class="topbar">
+    <div class="search-row">
+      <div class="search-wrap">
+        <span class="search-ico"><i data-ic="search"></i></span>
+        <input class="search-in" type="search" id="searchIn" placeholder="Search titles, genres…" oninput="onSearchInput()">
+      </div>
+      <div class="kind-seg" id="kindSeg"></div>
     </div>
-    <div class="kind-seg" id="kindSeg"></div>
+    <div class="ctrl-row">
+      <div class="filt-scroll"><div class="filt-row" id="filtRow"></div></div>
+      <div class="sort-wrap">
+        <button class="sort-btn" id="sortBtn" onclick="openSortMenu(event)"></button>
+        <div class="sort-menu" id="sortMenu"></div>
+      </div>
+    </div>
   </div>
   <div class="fixbar" id="fixBar"></div>
-  <div class="ctrl-row">
-    <div class="filt-scroll"><div class="filt-row" id="filtRow"></div></div>
-    <div class="sort-wrap">
-      <button class="sort-btn" id="sortBtn" onclick="openSortMenu(event)"></button>
-      <div class="sort-menu" id="sortMenu"></div>
-    </div>
-  </div>
   <div class="page" id="pageEl"></div>
 </div>
 
@@ -14225,10 +14252,11 @@ function _updBusy(){
 // you'd explain it to a friend — what they can now do, not what the code does.
 // No version numbers or jargon in the notes; the date IS the version.
 const RELEASE={
-  v:'2026-08-11.4',
+  v:'2026-08-11.5',
   title:'Seasons, specials, and progress that keeps itself',
   push:'Every film and special on the show it belongs to \u2014 and progress that marks itself.',
   notes:[
+    'Search and the filters now float in one panel at the top, matching the bar at the bottom \u2014 same inset, same material, so both ends of the screen belong to each other. Everything inside it went flat so it doesn\u2019t read as boxes inside boxes.',
     'The title screen takes the best of four designs at once: the poster fills with your colour as you watch, the facts sit in one aligned column so the same fact is always in the same place, and everything you actually press \u2014 Continue, the counter, the status, Favourite \u2014 is grouped in one panel instead of scattered down the page.',
     'The + on the bottom bar sits inside the bar now rather than breaking its edge, and All / Watching / Plan can no longer clip a word on a narrow phone.',
     'The poster now shows how far into a show you are: your accent colour fills the artwork up to where you\u2019ve got to, with a bright line at the surface \u2014 and no line once you\u2019ve finished it. The counter sits right under it, and the “Episode progress” heading is gone; three things were naming the same fact.',

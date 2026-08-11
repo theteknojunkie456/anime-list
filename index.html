@@ -84,6 +84,27 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 }
 @media(prefers-reduced-motion:reduce){*{animation-duration:.001ms!important;transition-duration:.001ms!important;}}
 
+/* ── NARROW PHONES (≤360px) ────────────────────────────────────────────────
+   Measured at 320, where an iPhone SE lives. The header put a wordmark and five
+   round buttons on one row and the wordmark lost its breathing room; the search
+   field shared its row with two toggles and clipped its own placeholder. These
+   shrink the chrome, never the content — artwork, titles and controls keep
+   their size, because the thing to lose on a small screen is padding. */
+@media(max-width:360px){
+  .hdr{padding-left:14px;padding-right:14px;}
+  .hdr-actions{gap:5px;}
+  .hbtn{width:34px;height:34px;border-radius:11px;}
+  .hbtn .ico{width:16px;height:16px;}
+  .hdr-title{font-size:19px;}
+  .search-row{padding-left:14px;padding-right:14px;gap:6px;}
+  .search-in{padding-left:34px;font-size:13px;}
+  .kseg{width:36px;height:36px;}
+  .filt-row,.sort-row,.qp-chips,.row-scroll,.rz-scroll{padding-left:14px;padding-right:14px;}
+  .row-head,.row-div,.dt-label{padding-left:14px;padding-right:14px;}
+  .billboard,.rz-sec>.rz-head{margin-left:0;}
+}
+
+
 /* ── SHELL ── */
 @property --amb{syntax:'<color>';inherits:true;initial-value:transparent;}
 .glow-modes{display:flex;flex-wrap:wrap;gap:18px;}

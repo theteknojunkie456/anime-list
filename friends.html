@@ -753,6 +753,30 @@ body.first-paint .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards
 .nbtn.add:active{transform:scale(0.9) rotate(90deg);}
 .nbtn.add.on{background:linear-gradient(180deg,var(--a2),var(--a));}
 
+/* ── HOME LAYOUT ── */
+.hl-row{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--bn2);}
+.hl-row:last-of-type{border-bottom:0;}
+.hl-row.off .hl-h,.hl-row.off .hl-p{opacity:.45;}
+.hl-move{display:flex;flex-direction:column;gap:2px;flex:none;}
+.hl-arrow{width:26px;height:20px;display:flex;align-items:center;justify-content:center;border:0;border-radius:6px;
+  background:var(--bg3);color:var(--t2);cursor:pointer;transition:background-color .14s,color .14s;}
+.hl-arrow:hover:not(:disabled){background:var(--ag);color:var(--a2);}
+.hl-arrow:disabled{opacity:.25;pointer-events:none;}
+.hl-arrow .ico{width:13px;height:13px;}
+.hl-txt{flex:1;min-width:0;}
+.hl-h{font-family:var(--fd);font-size:14px;font-weight:800;color:var(--t1);letter-spacing:-.01em;}
+.hl-p{font-size:11.5px;color:var(--t3);margin-top:2px;}
+/* A switch, because this is on/off and a checkbox would read as a form. */
+.hl-sw{flex:none;width:44px;height:26px;border-radius:99px;border:1px solid var(--bn2);background:var(--bg3);
+  position:relative;cursor:pointer;transition:background-color .18s,border-color .18s;}
+.hl-sw span{position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:var(--t3);
+  transition:transform .18s cubic-bezier(.32,.72,.28,1),background-color .18s;}
+.hl-sw.on{background:color-mix(in srgb,var(--a) 32%,transparent);border-color:color-mix(in srgb,var(--a) 55%,transparent);}
+.hl-sw.on span{transform:translateX(18px);background:var(--a2);}
+.hl-reset{margin-top:16px;width:100%;padding:11px;border-radius:12px;border:1px solid var(--bn2);
+  background:none;color:var(--t2);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;}
+.hl-reset:hover{color:var(--t1);background:var(--bg3);}
+
 /* ── SHEETS ── */
 .overlay{
   position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:70;
@@ -3036,6 +3060,17 @@ body.recsel .pcard{position:relative;}
 </div>
 
 <!-- THEME SHEET -->
+<div class="sheet" id="homeLayoutSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <div class="sheet-title"><i data-ic="layers"></i> Home screen</div>
+    <button class="sheet-cancel" onclick="closeAll()">Done</button>
+  </div>
+  <div class="sheet-body">
+    <p class="ai-desc">Turn off the bands you never use, and put the ones you do at the top. Your lists themselves always show.</p>
+    <div id="homeLayoutBox"></div>
+  </div>
+</div>
 <div class="sheet" id="themeSheet">
   <div class="sheet-handle"></div>
   <div class="sheet-header">
@@ -6186,6 +6221,68 @@ function airingRailHTML(items){
   return `<div class="rz-sec"><div class="rz-head">${icon('calendar')} Airing this week</div>
     <div class="rz-scroll">${items.map(card).join('')}</div></div>`;
 }
+// ─── WHAT THE HOME SCREEN SHOWS ─────────────────────────────────────────────
+// Order and visibility live in one list. Anything not named here still renders
+// (the status rows, which are the list itself), so a bad or half-written
+// preference can never hide someone's library.
+const HOME_SECTIONS=[
+  ['spotlight','Spotlight','The big rotating hero at the top'],
+  ['resume','Continue watching','Pick up where you left off'],
+  ['airing','Airing this week','What lands in the next 7 days'],
+  ['quickpick','Not sure what to watch?','A short list when you can\u2019t decide'],
+  ['friendrecs','From friends','Shows people sent you'],
+  ['favorites','Favourites','Your starred row'],
+  ['genres','Browse by genre','Rows built from your own genres'],
+];
+const HOME_KEY='home_layout';
+function homeLayout(){
+  try{const v=JSON.parse(localStorage.getItem(HOME_KEY)||'null');if(v&&typeof v==='object')return v;}catch(e){}
+  return {order:HOME_SECTIONS.map(s=>s[0]),off:[]};
+}
+function saveHomeLayout(v){try{localStorage.setItem(HOME_KEY,JSON.stringify(v));}catch(e){}}
+function homeOrder(){
+  const known=HOME_SECTIONS.map(s=>s[0]);
+  const saved=(homeLayout().order||[]).filter(k=>known.indexOf(k)>=0);
+  // Anything added to the app after someone saved a layout appends rather than
+  // vanishing — a new section must never be invisible because of an old setting.
+  return saved.concat(known.filter(k=>saved.indexOf(k)<0));
+}
+function homeOn(key){return (homeLayout().off||[]).indexOf(key)<0;}
+function toggleHomeSection(key){
+  const l=homeLayout(), off=new Set(l.off||[]);
+  off.has(key)?off.delete(key):off.add(key);
+  l.off=[...off]; l.order=homeOrder(); saveHomeLayout(l);
+  renderHomeLayoutUI(); try{render();}catch(e){}
+}
+function moveHomeSection(key,dir){
+  const order=homeOrder(), i=order.indexOf(key), j=i+dir;
+  if(i<0||j<0||j>=order.length)return;
+  order.splice(j,0,order.splice(i,1)[0]);
+  const l=homeLayout(); l.order=order; saveHomeLayout(l);
+  renderHomeLayoutUI(); try{render();}catch(e){}
+}
+function resetHomeLayout(){saveHomeLayout({order:HOME_SECTIONS.map(s=>s[0]),off:[]});renderHomeLayoutUI();try{render();}catch(e){}toast('Home reset');}
+function openHomeLayout(){renderHomeLayoutUI();openSheet('homeLayoutSheet');}
+function homeLayoutLine(){
+  const off=(homeLayout().off||[]).length;
+  return off?`${HOME_SECTIONS.length-off} of ${HOME_SECTIONS.length} sections shown`:'All sections, default order';
+}
+function renderHomeLayoutUI(){
+  const box=document.getElementById('homeLayoutBox'); if(!box)return;
+  const order=homeOrder();
+  box.innerHTML=order.map((key,i)=>{
+    const meta=HOME_SECTIONS.find(s=>s[0]===key)||[key,key,''];
+    const on=homeOn(key);
+    return `<div class="hl-row${on?'':' off'}">
+      <div class="hl-move">
+        <button class="hl-arrow" onclick="moveHomeSection('${key}',-1)" ${i===0?'disabled':''} aria-label="Move up">${icon('chevron-up')}</button>
+        <button class="hl-arrow" onclick="moveHomeSection('${key}',1)" ${i===order.length-1?'disabled':''} aria-label="Move down">${icon('chevron-down')}</button>
+      </div>
+      <div class="hl-txt"><div class="hl-h">${schEsc(meta[1])}</div><div class="hl-p">${schEsc(meta[2])}</div></div>
+      <button class="hl-sw${on?' on':''}" onclick="toggleHomeSection('${key}')" aria-label="${on?'Hide':'Show'} ${schEsc(meta[1])}"><span></span></button>
+    </div>`;
+  }).join('')+`<button class="hl-reset" onclick="resetHomeLayout()">Reset to default</button>`;
+}
 function renderHome(){
   const el=document.getElementById('pageEl');
   clearInterval(bbTimer);bbTimer=0;   // stop any rotation; the main path re-arms it
@@ -6242,7 +6339,19 @@ function renderHome(){
   // A brand-new user who's started adding still sees the beginner shelf (up top) so
   // they can keep stacking titles — it rides above their small list until dismissed.
   const beg=beginnerShelfActive(isRead);
-  let html=topBanner+(beg?beginnerShelfHTML():'')+(spotlight.length?billboardHTML(spotlight):'')+resumeRailHTML(railItems,isRead)+(isRead?'':airingRailHTML(airingThisWeek()))+quickPickStripHTML(pool,isRead)+friendRecRowHTML();
+  // The home screen was a fixed sequence, which is fine until you never use one
+  // of the bands and scroll past it every single day. Each is a named section
+  // now, ordered and switched by preference — the app still decides whether a
+  // section has anything to say, you decide whether you want to be told.
+  const SECT={
+    spotlight:()=>spotlight.length?billboardHTML(spotlight):'',
+    resume:()=>resumeRailHTML(railItems,isRead),
+    airing:()=>isRead?'':airingRailHTML(airingThisWeek()),
+    quickpick:()=>quickPickStripHTML(pool,isRead),
+    friendrecs:()=>friendRecRowHTML(),
+  };
+  let html=topBanner+(beg?beginnerShelfHTML():'');
+  for(const key of homeOrder())if(homeOn(key)&&SECT[key])html+=SECT[key]();
   // each section wears its own status colour (STATUS_META) rather than the one
   // theme accent — the palette already exists, it was just unused outside chips
   // Watch list: no "Watching" row — it's merged into the Continue-watching rail
@@ -6260,12 +6369,12 @@ function renderHome(){
     html+=`<div class="row-sec" data-amb="${items[0]?titleAccent(items[0]):''}"><div class="row-head"><div class="row-title" style="--rc:${rc}">${label}</div><div class="row-count">${cells.length}</div></div>
       <div class="row-scroll">${cells.map(s=>posterCard(s.a,s.n)).join('')}</div></div>`;
   }
-  const favs=S.filter(a=>a.fav);
+  const favs=homeOn('favorites')?S.filter(a=>a.fav):[];
   if(favs.length){const fc=collapseSeries(favs);html+=`<div class="row-sec" data-amb="${favs[0]?titleAccent(favs[0]):''}"><div class="row-head"><div class="row-title" style="--rc:var(--a2)">Favorites</div><div class="row-count">${fc.length}</div></div>
     <div class="row-scroll">${fc.map(s=>posterCard(s.a,s.n)).join('')}</div></div>`;}
   // genre collections — browse your list by its most-common genres (Netflix-style lens)
   // Build from S (already sorted) so each genre bucket is in sort order — no re-sort.
-  const gmap={};S.forEach(a=>(a.genre||'').split(',').map(g=>g.trim()).filter(Boolean).forEach(g=>{(gmap[g]=gmap[g]||[]).push(a);}));
+  const gmap={};if(homeOn('genres'))S.forEach(a=>(a.genre||'').split(',').map(g=>g.trim()).filter(Boolean).forEach(g=>{(gmap[g]=gmap[g]||[]).push(a);}));
   // Four was a guess made when a list was small. On a real library it means
   // Action, Adventure, Comedy, Drama and nothing else — the broadest genres in
   // the medium, which is precisely the set that tells you least. Ten reaches
@@ -9611,6 +9720,7 @@ function renderSettings(){
     {ic:'refresh',  h:'AniList sync',        p:alConnected()?'On — '+alUser()+' · progress syncs both ways':'Off — connect to sync progress everywhere', go:"openSheet('anilistSheet')"},
     {ic:'clipboard',h:'Import / Export',     p:'Paste a list in, or copy yours out', go:"openSheet('importSheet')"},
     {ic:'palette',  h:'Theme',               p:'Colours, or build your own', go:"openSheet('themeSheet')"},
+    {ic:'layers',   h:'Home screen',          p:homeLayoutLine(), go:"openHomeLayout()"},
   ];
   // Admin row appears only on the device where your admin token is stored — so it
   // shows for you and no one else. ?admin=1 is the one-time way to set it up.
@@ -14861,10 +14971,11 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-11.14',
+  v:'2026-08-11.15',
   title:'A cleaner app, and progress that keeps itself',
   push:'Progress that marks itself \u2014 and a lot of polish.',
   notes:[
+    'You choose what the home screen shows. Settings \u2192 Home screen turns any band off \u2014 the spotlight, Airing this week, Not sure what to watch, favourites, genre rows \u2014 and reorders the rest. Your lists themselves always show.',
     'Pick several shows at once and move them together. On a desktop: click, shift-click or shift+arrow for a run, space for scattered ones, right-click for the menu. On a phone: press and hold. Then move them to a list, favourite them or rate them in one go.',
     'Progress keeps itself. Use the site\u2019s own next-episode link and WatchList follows along; in the iPhone app it reads the actual playback position, so what you watched is what gets marked \u2014 down to the minute you stopped.',
     'Air times are the Japanese broadcast, and your source gets it later. The countdown now says the episode aired and shows how long the wait usually is \u2014 measured from your own watching, per site. Episode alerts wait too.',

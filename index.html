@@ -8702,6 +8702,11 @@ async function startShare(){
   if(!partyIsHost){toast('Only the host can share');return;}
   let s;try{s=await navigator.mediaDevices.getDisplayMedia({video:{frameRate:30},audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false},systemAudio:'include'});}catch{toast('Screen share cancelled');return;}
   localStream=s;
+  // Tell the encoder what it is looking at. Without a hint it assumes a talking
+  // head and trades resolution away to keep the frame rate up, which is the
+  // right call for a face and the wrong one for a screen — subtitles and UI text
+  // are the first things to go. 'detail' asks it to hold resolution instead.
+  try{const vt=s.getVideoTracks()[0];if('contentHint' in vt)vt.contentHint='detail';}catch(e){}
   s.getVideoTracks()[0].onended=()=>stopShare();   // browser's own "Stop sharing" bar
   // Audio rides along only if the OS/browser captured it. On macOS that means sharing a
   // Chrome TAB with "Also share tab audio" ticked — whole-screen/window audio isn't captured.
@@ -9142,12 +9147,40 @@ function openEmbedCall(){
         userInfo:{displayName:partyName()||'Guest'},
         // prejoinPageEnabled was renamed; current builds read prejoinConfig, so the old
 // flag alone left the "Join meeting" screen sitting inside our panel.
-        configOverwrite:{startWithVideoMuted:true,prejoinPageEnabled:false,prejoinConfig:{enabled:false},disableDeepLinking:true,disableInviteFunctions:true,requireDisplayName:false,startWithAudioMuted:false},
+        // channelLastN is the whole reason a shared screen vanished the moment the
+        // presenter stopped talking. Jitsi's default is to forward video only for
+        // the dominant speaker and the last N people who spoke — sensible for a
+        // meeting of talking heads, and exactly wrong for a watch party, where
+        // the one video that must never stop belongs to whoever is silent
+        // because they are watching. -1 means "everyone, always".
+        //
+        // Layer suspension is the same failure one level down: it drops a video
+        // track that Jitsi thinks nobody is looking at. In a party the shared
+        // screen IS what everybody is looking at.
+        configOverwrite:{
+          channelLastN:-1,
+          enableLayerSuspension:false,
+          startWithVideoMuted:true,prejoinPageEnabled:false,prejoinConfig:{enabled:false},
+          disableDeepLinking:true,disableInviteFunctions:true,requireDisplayName:false,startWithAudioMuted:false
+        },
         // Our bar drives the call, so Jitsi's toolbar is redundant chrome in a
         // panel this small — keep tile view only, and drop the branding.
         interfaceConfigOverwrite:{TOOLBAR_BUTTONS:[],MOBILE_APP_PROMO:false,SHOW_JITSI_WATERMARK:false,SHOW_WATERMARK_FOR_GUESTS:false,SHOW_CHROME_EXTENSION_BANNER:false,DISABLE_JOIN_LEAVE_NOTIFICATIONS:true,HIDE_INVITE_MORE_HEADER:true,DEFAULT_BACKGROUND:'#0d0d0f',DISABLE_VIDEO_BACKGROUND:true,TILE_VIEW_MAX_COLUMNS:3}
       });
       _jitsiApi.addEventListener('readyToClose',leaveJitsi);
+      // And make the shared screen the big video, rather than whoever spoke last.
+      // Without this the layout still follows the talking, so the screen is
+      // present but relegated to a thumbnail the moment someone says something.
+      try{
+        _jitsiApi.addEventListener('contentSharingParticipantsChanged',e=>{
+          const ids=(e&&(e.data||e.participants))||[];
+          const id=Array.isArray(ids)?ids[0]:ids;
+          if(!id)return;
+          try{_jitsiApi.pinParticipant(id);}catch(_){}
+          try{_jitsiApi.setLargeVideoParticipant(id);}catch(_){}
+          try{_jitsiApi.executeCommand('setTileView',false);}catch(_){}
+        });
+      }catch(e){}
       // Presence and speaking state, so our own bar can say something useful.
       try{
         _callNames={};_callSpeaker='';renderCallStatus();

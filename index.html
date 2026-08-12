@@ -8741,7 +8741,13 @@ async function startShare(){
   // Chrome TAB with "Also share tab audio" ticked — whole-screen/window audio isn't captured.
   if(!s.getAudioTracks().length)toast('Sharing video — for sound, share a Chrome tab and tick “Also share tab audio”');
   wsSend({t:'share',on:true});
-  renderParty();toast('Sharing — friends will connect in a moment');
+  renderParty();
+  // Sharing the whole screen shares WHATEVER IS ON IT — and at the moment you
+  // press the button, what is on it is WatchList, full screen, because that is
+  // where the button lives. Everyone then reports that the party could only see
+  // WatchList, which is true and is not a bug: it is what was on the screen.
+  // So say the next step out loud rather than leaving it to be discovered.
+  toast('Sharing your screen — switch to what you want everyone to watch',7000);
 }
 function stopShare(){
   if(localStream){localStream.getTracks().forEach(t=>t.stop());localStream=null;}
@@ -8750,20 +8756,25 @@ function stopShare(){
   renderParty();
 }
 function pcClose(uid){const pc=pcs[uid];if(pc){try{pc.close();}catch{}delete pcs[uid];}}
-// Cap what the encoder sends. Without this it chases the source bitrate (screen video
-// can spike past 4–5 Mbps), and on a limited uplink that just piles into a buffer —
-// which is felt as growing lag, not better quality. 2 Mbps is plenty for 720p video;
-// degradationPreference:'balanced' means it eases off resolution/framerate under
-// pressure instead of stalling.
+// The ONE place the sender's limits are decided. There were briefly two, set to
+// different values, and the later one silently won — which is its own lesson:
+// two functions tuning the same object is not redundancy, it is a coin toss.
+//
+// 2 Mbps and 'balanced' were chosen for a webcam-shaped stream. For a screen
+// they are wrong in a specific way: 'balanced' sheds resolution under pressure,
+// and shedding resolution on text is how a share becomes unreadable while the
+// frame rate stays admirably high. Hold the resolution, drop frames instead —
+// nobody notices 20fps on a video; everybody notices blurred subtitles.
 async function tuneSender(pc){
   try{
     const sender=pc.getSenders().find(s=>s.track&&s.track.kind==='video');
     if(!sender)return;
     const p=sender.getParameters();
     if(!p.encodings||!p.encodings.length)p.encodings=[{}];
-    p.encodings[0].maxBitrate=2000000;
+    p.encodings[0].maxBitrate=6000000;
     p.encodings[0].maxFramerate=30;
-    try{p.degradationPreference='balanced';}catch(e){}
+    delete p.encodings[0].scaleResolutionDownBy;
+    try{p.degradationPreference='maintain-resolution';}catch(e){}
     await sender.setParameters(p);
   }catch(e){}
 }
@@ -8773,21 +8784,6 @@ async function pcConnectToViewer(vid){                 // HOST → each viewer
   if(pcs[vid]||!localStream)return;
   const pc=new RTCPeerConnection(await getRtcConfig());pcs[vid]=pc;
   localStream.getTracks().forEach(tr=>pc.addTrack(tr,localStream));
-  // WebRTC's default video ceiling is built for a webcam and is far too low for
-  // a screen: the encoder hits it, and the only way to stay under it is to throw
-  // away resolution — which reads as blur, then as lag when it also drops frames.
-  // Raise the ceiling and tell it to give up frame rate before sharpness, which
-  // is the right trade for a screen and the wrong one for a face.
-  try{
-    const sender=pc.getSenders().find(x=>x.track&&x.track.kind==='video');
-    if(sender){
-      const prm=sender.getParameters()||{};
-      prm.degradationPreference='maintain-resolution';
-      prm.encodings=(prm.encodings&&prm.encodings.length?prm.encodings:[{}]).map(e=>
-        Object.assign({},e,{maxBitrate:6000000,maxFramerate:30,scaleResolutionDownBy:1}));
-      sender.setParameters(prm).catch(()=>{});
-    }
-  }catch(e){}
   tuneSender(pc);
   pc.onconnectionstatechange=()=>{const st=pc.connectionState;if(['failed','closed','disconnected'].includes(st))pcClose(vid);
     try{_schedulePartyRender();}catch(e){}};   // refresh the host's "N of M connected" as links come and go

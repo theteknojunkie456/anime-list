@@ -2535,7 +2535,7 @@ body.recsel .pcard{position:relative;}
       <button class="dact danger" type="button" id="coverRemoveBtn" onclick="clearCover()" style="display:none;padding:10px 14px">Remove</button>
       <input type="file" id="coverFile" accept="image/*" style="display:none" onchange="coverFileChosen(this)">
     </div>
-    <div class="field-hint">Any picture works — <b>no size to match</b>. It's centred and cut to the tall poster shape every card uses.</div>
+    <div class="field-hint"><b>Tall 2:3 — 480&times;680 or larger.</b> Any picture works though: anything else is centred and cut to that shape, so the number is for when you want to prepare one, not a requirement.</div>
   </div>
   <div class="fgroup" id="bgPrev">
     <label class="flabel">Background photo</label>
@@ -7382,7 +7382,11 @@ function coverFileChosen(inp){
     const c=cropToRatio(img,480,680);
     URL.revokeObjectURL(img.src);
     setCoverPreview(c.toDataURL('image/jpeg',0.82));
-    toast('Cover added');
+    // The crop is silent by design, so the toast is the only place it can be
+    // mentioned — and a source that was smaller than the target is the one case
+    // where the result will actually look worse than the file they picked.
+    if(img.width<480||img.height<680)toast(`Cover added — ${img.width}\u00d7${img.height} is under 480\u00d7680, so it may look soft`);
+    else toast('Cover added');
   };
   img.onerror=()=>{URL.revokeObjectURL(img.src);toast('Could not read that image');};
   img.src=URL.createObjectURL(f);

@@ -82,6 +82,16 @@ body is what stopped the UI reading flat when everything was one family at
   list rather than smeared over it), and the active item as a filled pill,
   because at 9px colour alone can't carry "where you are". Capped at 520px and
   centred on desktop. Takes the full safe area as its own bottom padding.
+- **The measure** — `--measure: clamp(1180px, 88vw, 2600px)` on `:root` at
+  ≥900px. Continuous, not stepped: a 27-inch and a 34-inch ultrawide each get a
+  layout suited to them rather than the nearest preset. It lives on `:root`
+  because the bottom bar is a *sibling* of `#app` and a variable defined there
+  is invisible to it. The poster grid is `auto-fill`, so every extra pixel of
+  measure becomes another column with no per-breakpoint counts to maintain:
+  6 columns at 1024, 10 at 1920, 15 at 3440.
+  Hero heights are a fraction of the **measure**, never of `vw` — tied to the
+  viewport they keep their own pace and the hero drifts back to a letterbox on
+  an ultrawide. As a fraction of the container it holds ~3.5:1 everywhere.
 - **Desktop layout** — at ≥900px `#app` becomes the grid and carries the 1180px
   measure, so every child is centred by one rule instead of four (the fix bar
   was once left out of that list and ran full-width while everything else sat in

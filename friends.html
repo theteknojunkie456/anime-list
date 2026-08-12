@@ -2216,10 +2216,28 @@ body.recsel .pcard{position:relative;}
      right; on a desktop it is just tall.
      #app becomes the grid and carries the measure, so every child is centred by
      one rule rather than four, and search and filters share a row. */
+  /* One measure, and it grows with the screen. 1180 fixed is right on a laptop
+     and absurd on an ultrawide, where it leaves a column of app in the middle of
+     a desert. It steps rather than being pure vw, because content that tracks
+     the viewport exactly never settles — you want the same layout at 1500 and
+     1600, not a slightly different one at every pixel. */
+  /* On :root, not on #app. The bottom bar is a SIBLING of #app, so a variable
+     defined there is invisible to it — which is how the bar stayed 1180 wide
+     under a 2253px page and looked like a different app's control. */
+  :root{
+    /* Continuous, not stepped: the measure is a fraction of whatever screen you
+       have, so a 27-inch and a 34-inch ultrawide each get a layout suited to
+       them rather than the nearest of five presets. The floor keeps a small
+       laptop from squeezing (width:100% still bounds it, so it can never
+       overflow), and the ceiling is where the limit stops being the screen and
+       becomes the eye — a poster row wider than this is one you scan by turning
+       your head. */
+    --measure:clamp(1180px,88vw,2600px);
+  }
   #app{
     display:grid;grid-template-columns:minmax(0,1fr) auto;
     grid-template-rows:auto auto auto minmax(0,1fr);
-    column-gap:10px;width:100%;max-width:1180px;margin-left:auto;margin-right:auto;
+    column-gap:10px;width:100%;max-width:var(--measure);margin-left:auto;margin-right:auto;
   }
   .hdr{grid-column:1/-1;grid-row:1;padding-top:calc(var(--safe-t) + 10px);}
   .topbar{grid-column:1;grid-row:2;margin-left:0;margin-right:0;}
@@ -2231,7 +2249,7 @@ body.recsel .pcard{position:relative;}
   /* A 520px bar under 1180px of content reads as a phone control someone left
      on a desktop. It matches the column instead, and the five targets spread
      across it rather than huddling in the middle. */
-  .nav{left:50%;right:auto;transform:translateX(-50%);width:min(1180px,100%);
+  .nav{left:50%;right:auto;transform:translateX(-50%);width:min(var(--measure,1180px),100%);
        padding-left:24px;padding-right:24px;border-radius:22px 22px 0 0;}
   .nbtn{min-width:78px;}
   /* On a pointer, the whole target lights up rather than only its label. */
@@ -2240,8 +2258,14 @@ body.recsel .pcard{position:relative;}
   /* At 1400 the hero was 4.76:1 and the detail banner 7.89:1 — letterbox slits
      that no uploaded picture can fill without being reduced to a strip. Height
      scales with the extra width instead. */
-  .billboard,.bb-slide{min-height:340px;}
-  .dt-banner{height:230px;}
+  /* The hero gets wider with the measure, so its height has to move with it or
+     the ratio runs away again — 4.76:1 was the letterbox that started this. */
+  /* Height off the MEASURE, not the viewport. Tied to vw it kept its own pace
+     and the hero drifted back to 4.93:1 on an ultrawide — the letterbox this
+     was meant to fix. As a fraction of the container it holds ~3.5:1 at every
+     width, which is the shape the art was cropped for. */
+  .billboard,.bb-slide{min-height:clamp(340px,calc(var(--measure) * 0.28),720px);}
+  .dt-banner{height:clamp(230px,calc(var(--measure) * 0.17),430px);}
   .hero{min-height:264px;}
   .hero-title{font-size:27px;}
 }

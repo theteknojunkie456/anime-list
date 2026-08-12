@@ -147,6 +147,27 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 [data-ui=round] .dt-watch,[data-ui=round] .pt-go,[data-ui=round] .prog-btn,
 [data-ui=round] .dpick,[data-ui=round] .hbtn,[data-ui=round] .kseg,[data-ui=round] .nbtn{border-radius:99px;}
 
+/* Saved looks, and the four status colours. */
+.looks-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;}
+.look-chip{display:inline-flex;align-items:center;gap:7px;padding:7px 9px 7px 11px;border-radius:99px;
+  background:var(--bg3);border:1px solid var(--bn2);color:var(--t1);font-size:12px;font-weight:700;cursor:pointer;}
+.look-chip:hover{border-color:var(--b3);}
+.look-dot{width:11px;height:11px;border-radius:50%;flex:none;}
+.look-n{max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.look-x{display:inline-flex;color:var(--t3);padding:2px;border-radius:50%;}
+.look-x:hover{color:var(--t1);}
+.look-x .ico{width:11px;height:11px;}
+.look-save{display:inline-flex;align-items:center;gap:6px;padding:8px 13px;border-radius:99px;
+  background:var(--ag);border:1px solid color-mix(in srgb,var(--a) 45%,transparent);color:var(--a2);
+  font-size:12px;font-weight:800;cursor:pointer;}
+.look-save .ico{width:13px;height:13px;}
+.stc-row{display:flex;flex-wrap:wrap;gap:8px;}
+.stc{position:relative;display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border-radius:12px;
+  background:var(--bg3);border:1px solid var(--bn2);cursor:pointer;}
+.stc-sw{width:15px;height:15px;border-radius:5px;flex:none;box-shadow:0 0 0 1px rgba(0,0,0,.35) inset;}
+.stc-n{font-size:12px;font-weight:700;color:var(--t2);}
+.stc input{position:absolute;inset:0;opacity:0;cursor:pointer;}
+
 /* Accent swatches. Round, because a colour has no shape of its own and a circle
    is the least opinionated frame to put one in. */
 .acc-row{display:flex;flex-wrap:wrap;gap:9px;align-items:center;}
@@ -3217,6 +3238,16 @@ body.recsel .pcard{position:relative;}
     </div>
   </div>
   <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--b1);">
+    <div class="flabel" style="margin-bottom:4px">Your looks</div>
+    <p class="ai-desc" style="font-size:11.5px;margin:0 0 12px">Everything below — theme, accent, tint, shape, size, artwork, glow — saved as one thing you can come back to.</p>
+    <div class="looks-row" id="looksRow"></div>
+  </div>
+  <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--b1);">
+    <div class="flabel" style="margin-bottom:4px">Status colours</div>
+    <p class="ai-desc" style="font-size:11.5px;margin:0 0 12px">The four colours on every badge, filter and status button.</p>
+    <div class="stc-row" id="statusColorRow"></div>
+  </div>
+  <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--b1);">
     <div class="flabel" style="margin-bottom:4px">Look</div>
     <p class="ai-desc" style="font-size:11.5px;margin:0 0 12px">The shape of everything — cards, bars, buttons and sheets.</p>
     <div class="art-seg" id="uiRow"></div>
@@ -4677,6 +4708,7 @@ function applyExtra(x){
   try{if(typeof applyDensity==='function')applyDensity();}catch(e){}
   try{if(typeof applyUiStyle==='function')applyUiStyle();}catch(e){}
   try{if(typeof applyTint==='function')applyTint();}catch(e){}
+  try{if(typeof applyStatusColors==='function')applyStatusColors();}catch(e){}
   try{if(typeof applyAmbient==='function')applyAmbient();}catch(e){}
   try{if(typeof renderThemeGrid==='function')renderThemeGrid();}catch(e){}
   try{if(typeof renderFriends==='function')renderFriends();}catch(e){}
@@ -5304,6 +5336,101 @@ function setAccent(hex){
   try{hex?localStorage.setItem(ACCENT_KEY,hex):localStorage.removeItem(ACCENT_KEY);}catch(e){}
   applyAccent();renderAccentRow();try{applyAmbient();}catch(e){}
 }
+// ─── STATUS COLOURS ─────────────────────────────────────────────────────────
+// Watching, Plan, Done, Dropped are on every card badge, every filter segment
+// and every status button — four colours doing a lot of work, fixed per theme.
+// They mean something personal (one person's "Dropped" is another's "paused
+// forever"), so they were the obvious last thing to hand over.
+const STATUS_KEY='status_colors';
+const STATUS_VARS={watching:['--wat','--watbg'],plan:['--pln','--plnbg'],finished:['--fin','--finbg'],dropped:['--drp','--drpbg']};
+function statusColors(){try{const v=JSON.parse(localStorage.getItem(STATUS_KEY)||'{}');return (v&&typeof v==='object')?v:{};}catch(e){return{};}}
+function applyStatusColors(){
+  const el=document.documentElement, m=statusColors();
+  Object.values(STATUS_VARS).flat().forEach(v=>el.style.removeProperty(v));
+  Object.keys(STATUS_VARS).forEach(k=>{
+    const hex=m[k]; if(!hex)return;
+    const [r,g,b]=_hex2rgb(hex);
+    el.style.setProperty(STATUS_VARS[k][0],hex);
+    el.style.setProperty(STATUS_VARS[k][1],`rgba(${r},${g},${b},0.12)`);
+  });
+}
+function setStatusColor(k,hex){
+  const m=statusColors();
+  if(hex)m[k]=hex;else delete m[k];
+  try{localStorage.setItem(STATUS_KEY,JSON.stringify(m));}catch(e){}
+  applyStatusColors();renderStatusColorRow();try{render();}catch(e){}
+}
+function renderStatusColorRow(){
+  const row=document.getElementById('statusColorRow'); if(!row)return;
+  const m=statusColors();
+  row.innerHTML=Object.keys(STATUS_VARS).map(k=>{
+    const cur=m[k]||'';
+    const lbl=statusLabel(k,viewKind==='read');
+    return `<label class="stc" title="${escH(lbl)}">
+      <span class="stc-sw" style="background:${cur||`var(${STATUS_VARS[k][0]})`}"></span>
+      <span class="stc-n">${escH(lbl)}</span>
+      <input type="color" value="${cur||'#888888'}" oninput="setStatusColor('${k}',this.value)">
+    </label>`;}).join('')
+    +`<button class="hl-reset" style="margin-top:10px" onclick="setStatusColor('watching','');setStatusColor('plan','');setStatusColor('finished','');setStatusColor('dropped','')">Reset status colours</button>`;
+}
+
+// ─── SAVE WHAT YOU MADE ─────────────────────────────────────────────────────
+// Every knob in this sheet was a live setting: change theme and your accent
+// survived, but there was no way to keep two looks and move between them, and
+// nothing to hand a friend. A look is the whole set — theme, accent, tint,
+// shape, density, artwork, glow — so it saves as one thing, appears in the grid
+// with the others, and applies in a tap.
+//
+// Stored beside the built-in themes rather than in a scheme of its own, because
+// "the thing I made" and "the thing that shipped" are the same kind of object as
+// far as anyone choosing one is concerned.
+const LOOKS_KEY='saved_looks';
+function savedLooks(){try{const v=JSON.parse(localStorage.getItem(LOOKS_KEY)||'[]');return Array.isArray(v)?v:[];}catch(e){return[];}}
+function setSavedLooks(l){try{localStorage.setItem(LOOKS_KEY,JSON.stringify(l.slice(0,24)));}catch(e){}}
+function currentLook(){
+  return {theme:curTheme||'default',accent:accentOverride(),tint:surfaceTint(),
+          ui:uiStyle(),density:density(),art:artMode(),status:statusColors(),
+          glow:(()=>{try{return localStorage.getItem('glow_mode')||'';}catch(e){return '';}})()};
+}
+function saveLook(){
+  const name=(prompt('Name this look')||'').trim().slice(0,28);
+  if(!name)return;
+  const list=savedLooks().filter(l=>l.name.toLowerCase()!==name.toLowerCase());
+  list.unshift(Object.assign({name,id:'look'+Date.now().toString(36)},currentLook()));
+  setSavedLooks(list);renderLooksRow();
+  toast(`Saved “${name}”`);
+}
+function applyLook(id){
+  const l=savedLooks().find(x=>x.id===id); if(!l)return;
+  try{applyTheme(l.theme||'default');}catch(e){}
+  try{localStorage.setItem(ACCENT_KEY,l.accent||'');if(!l.accent)localStorage.removeItem(ACCENT_KEY);}catch(e){}
+  try{localStorage.setItem(TINT_KEY,l.tint||'');if(!l.tint)localStorage.removeItem(TINT_KEY);}catch(e){}
+  try{localStorage.setItem(UI_KEY,l.ui||'soft');}catch(e){}
+  try{localStorage.setItem(DENSITY_KEY,l.density||'comfy');}catch(e){}
+  try{localStorage.setItem(ART_KEY,l.art||'natural');}catch(e){}
+  if(l.glow){try{localStorage.setItem('glow_mode',l.glow);}catch(e){}}
+  try{localStorage.setItem(STATUS_KEY,JSON.stringify(l.status||{}));}catch(e){}
+  applyAccent();applyTint();applyUiStyle();applyDensity();applyArtMode();applyStatusColors();
+  try{applyGlow();}catch(e){}
+  try{render();}catch(e){}
+  renderThemeGrid();
+  toast(`“${l.name}” applied`);
+}
+function deleteLook(id,ev){
+  try{ev.stopPropagation();}catch(e){}
+  setSavedLooks(savedLooks().filter(x=>x.id!==id));renderLooksRow();
+}
+function renderLooksRow(){
+  const row=document.getElementById('looksRow'); if(!row)return;
+  const list=savedLooks();
+  row.innerHTML=list.map(l=>`<button class="look-chip" onclick="applyLook('${l.id}')" title="Apply ${escH(l.name)}">
+      <span class="look-dot" style="background:${escH(l.accent||'var(--a)')}"></span>
+      <span class="look-n">${escH(l.name)}</span>
+      <span class="look-x" onclick="deleteLook('${l.id}',event)" aria-label="Delete">${icon('x')}</span>
+    </button>`).join('')
+    +`<button class="look-save" onclick="saveLook()">${icon('check')} Save this look</button>`;
+}
+
 // ─── SURFACE TINT ───────────────────────────────────────────────────────────
 // The accent colours what you press. This colours what you press it ON — every
 // panel, card, sheet and bar — which is most of the screen and, until now, the
@@ -5613,6 +5740,8 @@ function renderThemeGrid(){
   try{renderDensityRow();}catch(e){}
   try{renderUiRow();}catch(e){}
   try{renderTintRow();}catch(e){}
+  try{renderLooksRow();}catch(e){}
+  try{renderStatusColorRow();}catch(e){}
   const bs=document.getElementById('brightSlider');if(bs)bs.value=bgBright();
   try{renderGlowRow();}catch(e){}
   const g=document.getElementById('themeGrid');if(!g)return;
@@ -15560,10 +15689,12 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-12.2',
+  v:'2026-08-12.3',
   title:'Yours to arrange, and artwork left alone',
   push:'Pick your accent, size the cards, and see covers as they really are.',
   notes:[
+    'Save a look. Theme, accent, tint, shape, card size, artwork and glow all keep together under a name you choose, so you can build two and switch between them in a tap.',
+    'The four status colours \u2014 Watching, Plan, Done, Dropped \u2014 are yours to set now. They\u2019re on every badge, filter and status button.',
     'Three looks to choose from in Theme \u2014 Soft, Sharp or Round \u2014 which change the shape of every card, bar, button and sheet.',
     'Surface tint: colour the panels and cards themselves, mixed into whichever theme you\u2019re on rather than replacing it.',
     'Pick your own accent colour and keep any theme\u2019s background \u2014 eight presets or any colour you like. The text on top is chosen automatically so it always stays readable.',

@@ -2780,6 +2780,8 @@ body.recsel .pcard{position:relative;}
       <button class="party-call-x" id="callCamBtn" onclick="callToggleCam()" aria-label="Camera" title="Camera"><i data-ic="camera"></i></button>
       <button class="party-call-x" id="callShareBtn" onclick="callToggleShare()" aria-label="Share screen" title="Share your screen"><i data-ic="upload"></i></button>
       <button class="party-call-x" id="callMirrorBtn" onclick="callToggleMirror()" aria-label="Mirror my video" title="Mirror my own video"><i data-ic="refresh"></i></button>
+      <button class="party-call-x" id="callHandBtn" onclick="callToggleHand()" aria-label="Raise hand" title="Raise your hand"><i data-ic="users"></i></button>
+      <button class="party-call-x" id="callBlurBtn" onclick="callToggleBlur()" aria-label="Blur background" title="Blur your background"><i data-ic="image"></i></button>
       <button class="party-call-x" id="callGridBtn" onclick="callToggleGrid()" aria-label="Grid or speaker view" title="Grid / speaker view"><i data-ic="layers"></i></button>
       <button class="party-call-x" id="callFsBtn" onclick="toggleCallFull()" aria-label="Full screen" title="Full screen"><i data-ic="maximize"></i></button>
       <button class="party-call-x danger" onclick="leaveJitsi()" aria-label="Leave call" title="Leave the call"><i data-ic="x"></i></button></div>
@@ -9215,6 +9217,15 @@ function openEmbedCall(){
         interfaceConfigOverwrite:{TOOLBAR_BUTTONS:[],MOBILE_APP_PROMO:false,SHOW_JITSI_WATERMARK:false,SHOW_WATERMARK_FOR_GUESTS:false,SHOW_CHROME_EXTENSION_BANNER:false,DISABLE_JOIN_LEAVE_NOTIFICATIONS:true,HIDE_INVITE_MORE_HEADER:true,DEFAULT_BACKGROUND:'#0d0d0f',DISABLE_VIDEO_BACKGROUND:true,TILE_VIEW_MAX_COLUMNS:3}
       });
       _jitsiApi.addEventListener('readyToClose',leaveJitsi);
+      // A raised hand nobody else can see is just a button. Say it out loud once,
+      // for everyone, which is the whole reason to raise one.
+      try{
+        _jitsiApi.addEventListener('raiseHandUpdated',e=>{
+          try{
+            if(e&&e.handRaised&&e.id&&e.id!==_jitsiMyId)toast('Someone raised their hand',4000);
+          }catch(_){}
+        });
+      }catch(e){}
       // And make the shared screen the big video, rather than whoever spoke last.
       // Without this the layout still follows the talking, so the screen is
       // present but relegated to a thumbnail the moment someone says something.
@@ -9234,7 +9245,9 @@ function openEmbedCall(){
         _jitsiApi.addEventListener('participantJoined',e=>{_callNames[e.id]=e.displayName||'Someone';renderCallStatus();});
         _jitsiApi.addEventListener('participantLeft',e=>{delete _callNames[e.id];if(_callSpeaker===e.id)_callSpeaker='';renderCallStatus();});
         _jitsiApi.addEventListener('dominantSpeakerChanged',e=>{_callSpeaker=e.id||'';renderCallStatus();});
-        _jitsiApi.addEventListener('videoConferenceJoined',()=>{_callMic=true;_callCam=false;_callShare=false;syncShareBtn();renderCallStatus();});
+        // Keep our own id: raiseHandUpdated fires for everyone including us, and
+        // announcing your own raised hand back to you is noise.
+        _jitsiApi.addEventListener('videoConferenceJoined',e=>{_jitsiMyId=(e&&e.id)||'';_callMic=true;_callCam=false;_callShare=false;_handUp=false;syncShareBtn();renderCallStatus();});
         _jitsiApi.addEventListener('audioMuteStatusChanged',e=>{_callMic=!e.muted;const b=document.getElementById('callMicBtn');if(b){b.innerHTML=icon(_callMic?'mic':'mic-off');b.classList.toggle('off',!_callMic);}});
         _jitsiApi.addEventListener('videoMuteStatusChanged',e=>{_callCam=!e.muted;_callBtn('callCamBtn',_callCam);});
         _jitsiApi.addEventListener('screenSharingStatusChanged',e=>{_callShare=!!e.on;_callBtn('callShareBtn',_callShare);});
@@ -9489,6 +9502,25 @@ function switchToEmbedCall(){
   _natTried=true;                     // this call stays on the embed
   toast('Reconnecting on the classic call…');
   setTimeout(()=>{try{openEmbedCall();}catch(e){}},250);
+}
+// Raise hand. In a watch party the point isn't etiquette, it's not talking over
+// the thing everyone is watching — a hand says "pause, I have something" without
+// putting your voice into the room to say it.
+let _handUp=false,_jitsiMyId='';
+function callToggleHand(){
+  if(!_jitsiApi){toast('Join the call first');return;}
+  _handUp=!_handUp;
+  try{_jitsiApi.executeCommand('toggleRaiseHand');}catch(e){}
+  const b=document.getElementById('callHandBtn'); if(b)b.classList.toggle('on',_handUp);
+  toast(_handUp?'Hand raised':'Hand lowered');
+}
+// Background blur. Jitsi owns the picker because it owns the video pipeline;
+// doing it ourselves would mean running a segmentation model on every frame in
+// the main thread, which is a lot of battery to spend on hiding a room.
+function callToggleBlur(){
+  if(!_jitsiApi){toast('Join the call first');return;}
+  try{_jitsiApi.executeCommand('toggleVirtualBackgroundDialog');}
+  catch(e){toast('This call server doesn\u2019t offer background blur');}
 }
 function callToggleGrid(){
   if(nativeCallOn()){_callGrid=!_callGrid;_callBtn('callGridBtn',_callGrid);renderNativeTiles();return;}

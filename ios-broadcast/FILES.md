@@ -28,3 +28,30 @@ When you drag a file into Xcode, click it and check the right box under
 - App only: `WatchListBroadcastApp`, `ContentView`
 - Both: `AppGroup`
 - BroadcastExt only: `PartySignaling`, `WebRTCBroadcaster`, `BroadcastAudioDevice`, `SampleHandler`
+
+## This app does not update itself
+
+The web app does: it is served from GitHub Pages, the service worker is
+network-first, and a change is on every device within a reload. **The native
+shell is a compiled binary.** Nothing in `ios-broadcast/` reaches a phone until
+the project is rebuilt in Xcode and reinstalled.
+
+That distinction is easy to lose, because most changes are web changes and they
+appear by themselves. It has already cost one wrong diagnosis: a site opening in
+Safari instead of an in-app view looked like a bug in the routing, and was
+actually `presentInApp` — added 10 Aug 2026 — not being on the device.
+
+**Native-only work is in the shell, so it needs a rebuild:**
+
+| what | landed |
+|---|---|
+| Real playback position from every frame (progress becomes a measurement) | 8 Aug |
+| Resume at the minute, and sessions that end by being swiped away | 8 Aug |
+| Subframe message gate (`isMainFrame`) | 8 Aug |
+| Sites that can't be framed open **in the app**, not Safari (`presentInApp`) | 10 Aug |
+| Frame URL reported up, so the app learns what each site calls a show | 10 Aug |
+| Episode alerts wait for the simulcast lag instead of the broadcast | 10 Aug |
+| Watch-party live seek on real streaming sites (`seekto`) | 11 Aug |
+
+Verified building clean against the iOS simulator SDK as of 12 Aug 2026:
+`xcodebuild -project WatchListParty.xcodeproj -scheme WatchListParty -sdk iphonesimulator build` → BUILD SUCCEEDED.

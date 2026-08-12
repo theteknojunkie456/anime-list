@@ -246,6 +246,23 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 [data-view=cinema] .grid .pcard-new{z-index:4;bottom:auto;top:12px;left:auto;right:12px;}
 @media (min-width:900px){ [data-view=cinema] .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));} }
 
+/* Ready-made looks. Two swatches — accent and surface — because those two are
+   what actually distinguishes one from another at a glance. */
+.th-lead{margin:18px 0 11px;font-size:13px;color:var(--t2);}
+.pre-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:9px;}
+.pre-card{display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:12px 13px;border-radius:16px;
+  background:var(--bg3);border:1px solid var(--bn2);cursor:pointer;text-align:left;
+  transition:border-color .15s,background-color .15s,transform .12s;}
+.pre-card:hover{transform:translateY(-2px);border-color:var(--b3);}
+.pre-card.on{border-color:color-mix(in srgb,var(--a) 60%,transparent);background:var(--ag);}
+.pre-swatch{display:flex;gap:4px;margin-bottom:7px;}
+.pre-swatch i{width:16px;height:16px;border-radius:5px;display:block;box-shadow:0 0 0 1px rgba(0,0,0,.35) inset;}
+.pre-t{font-family:var(--fd);font-size:14px;font-weight:800;color:var(--t1);letter-spacing:-.01em;}
+.pre-s{font-size:11px;color:var(--t3);}
+.pre-card.on .pre-t{color:var(--a2);}
+.th-deep{margin-top:16px;}
+.th-rule{height:1px;background:var(--bn2);margin:18px 0 4px;}
+
 /* ── THEME SHEET STRUCTURE ──
    Groups, not a stack. Every section used to be an identical .flabel with a
    hairline above it, so nine of them read as one long undifferentiated form and
@@ -3337,12 +3354,12 @@ body.recsel .pcard{position:relative;}
     <button class="sheet-cancel" onclick="closeAll()">Done</button>
   </div>
   <div class="theme-grid" id="themeGrid"></div>
-  <!-- Nine stacked sections with identical headings was a wall. Three groups,
-       each named for what you'd be looking for: the colours, the shape of
-       things, and the pictures. Colour is open because it is what people come
-       here to change; the other two fold away. -->
-  <div class="th-group">
-    <div class="th-g-h">Colour</div>
+  <div class="th-lead">Pick one and you're done. Everything below is optional.</div>
+  <div class="pre-row" id="presetRow"></div>
+
+  <details class="th-fold th-deep">
+    <summary><span>Make your own</span><span class="th-hint">Colour, shape, layout</span></summary>
+
     <div class="th-sub">Accent</div>
     <div class="acc-row" id="accentRow"></div>
     <div class="th-sub">Surface tint <em>the panels themselves</em></div>
@@ -3351,10 +3368,9 @@ body.recsel .pcard{position:relative;}
     <div class="stc-row" id="statusColorRow"></div>
     <div class="th-sub">Background glow</div>
     <div class="glow-modes" id="glowRow"></div>
-  </div>
 
-  <details class="th-fold">
-    <summary><span>Shape &amp; size</span><span class="th-hint">Corners, card size</span></summary>
+    <div class="th-rule"></div>
+
     <div class="th-sub">Edition <em>how the app is arranged</em></div>
     <div class="art-seg th-wrap" id="editionRow"></div>
     <div class="th-sub">Layout <em>how a title is shown</em></div>
@@ -3363,19 +3379,14 @@ body.recsel .pcard{position:relative;}
     <div class="art-seg" id="uiRow"></div>
     <div class="th-sub">Card size</div>
     <div class="art-seg" id="densityRow"></div>
-  </details>
-
-  <details class="th-fold">
-    <summary><span>Artwork</span><span class="th-hint">How covers are shown</span></summary>
-    <div class="th-sub">Treatment</div>
+    <div class="th-sub">Artwork</div>
     <div class="art-seg" id="artRow"></div>
-  </details>
 
-  <div class="th-group th-looks">
-    <div class="th-g-h">Your looks</div>
-    <p class="ai-desc" style="font-size:11.5px;margin:0 0 11px">Everything above — theme, colours, shape, size, artwork, glow — kept together under a name.</p>
+    <div class="th-rule"></div>
+
+    <div class="th-sub">Save this as your own</div>
     <div class="looks-row" id="looksRow"></div>
-  </div>
+  </details>
 </div>
 <div class="sheet" id="notifySheet">
   <div class="sheet-handle"></div>
@@ -5483,6 +5494,57 @@ function renderStatusColorRow(){
     +`<button class="hl-reset" style="margin-top:10px" onclick="setStatusColor('watching','');setStatusColor('plan','');setStatusColor('finished','');setStatusColor('dropped','')">Reset status colours</button>`;
 }
 
+// ─── READY-MADE ─────────────────────────────────────────────────────────────
+// Eleven controls is a workshop. Most people do not want to set eleven
+// variables; they want the app to look nice and to stop asking. So the page
+// leads with finished combinations — one tap sets every one of those eleven —
+// and the controls themselves move behind a single door for the people who
+// actually want them.
+//
+// Nothing is removed. The difference is only what you meet first, which is the
+// difference between a page that feels considered and one that feels like a
+// form someone forgot to finish.
+const PRESETS=[
+  {id:'as-designed',name:'As designed',sub:'The default',
+   v:{theme:'default',accent:'',tint:'',ui:'soft',view:'grid',ed:'standard',density:'comfy',art:'natural'}},
+  {id:'midnight',name:'Midnight',sub:'Deep blue, big artwork',
+   v:{theme:'sasuke',accent:'#5a7fd4',tint:'#1f2b4a',ui:'soft',view:'cinema',ed:'standard',density:'comfy',art:'cinematic'}},
+  {id:'ledger',name:'Ledger',sub:'Everything at once, no frills',
+   v:{theme:'default',accent:'#8a8f9c',tint:'',ui:'sharp',view:'list',ed:'focus',density:'compact',art:'natural'}},
+  {id:'ember',name:'Ember',sub:'Warm, soft, unhurried',
+   v:{theme:'sanji',accent:'#e0873f',tint:'#3a2418',ui:'round',view:'grid',ed:'standard',density:'large',art:'natural'}},
+  {id:'lean-back',name:'Lean back',sub:'Large type, made to be seen',
+   v:{theme:'default',accent:'#5ed47a',tint:'#12281c',ui:'round',view:'cinema',ed:'tv',density:'large',art:'cinematic'}},
+  {id:'desk',name:'Desk',sub:'Tight, nav on top',
+   v:{theme:'default',accent:'#4f7fd4',tint:'',ui:'sharp',view:'list',ed:'pro',density:'compact',art:'natural'}},
+];
+function applyPreset(id){
+  const p=PRESETS.find(x=>x.id===id); if(!p)return;
+  const v=p.v;
+  try{applyTheme(v.theme||'default');}catch(e){}
+  const put=(k,val)=>{try{val?localStorage.setItem(k,val):localStorage.removeItem(k);}catch(e){}};
+  put(ACCENT_KEY,v.accent);put(TINT_KEY,v.tint);
+  put(UI_KEY,v.ui);put(VIEW_KEY,v.view);put(ED_KEY,v.ed);put(DENSITY_KEY,v.density);put(ART_KEY,v.art);
+  try{localStorage.setItem(STATUS_KEY,'{}');}catch(e){}
+  applyAccent();applyTint();applyUiStyle();applyLayoutView();applyEdition();applyDensity();applyArtMode();applyStatusColors();
+  try{render();}catch(e){}
+  renderThemeGrid();
+  toast(`${p.name}`);
+}
+function renderPresetRow(){
+  const row=document.getElementById('presetRow'); if(!row)return;
+  // "Current" is whichever preset every one of its values still matches — so it
+  // stops claiming one the moment you change anything, which is honest and also
+  // how you can tell you have wandered off into your own thing.
+  const now={theme:curTheme||'default',accent:accentOverride(),tint:surfaceTint(),ui:uiStyle(),
+             view:layoutView(),ed:edition(),density:density(),art:artMode()};
+  const active=PRESETS.find(p=>Object.keys(p.v).every(k=>(p.v[k]||'')===(now[k]||'')));
+  row.innerHTML=PRESETS.map(p=>`<button class="pre-card${active&&active.id===p.id?' on':''}" onclick="applyPreset('${p.id}')">
+      <span class="pre-swatch"><i style="background:${p.v.accent||'var(--a)'}"></i><i style="background:${p.v.tint||'var(--bg3)'}"></i></span>
+      <span class="pre-t">${escH(p.name)}</span><span class="pre-s">${escH(p.sub)}</span>
+    </button>`).join('');
+}
+
 // ─── SAVE WHAT YOU MADE ─────────────────────────────────────────────────────
 // Every knob in this sheet was a live setting: change theme and your accent
 // survived, but there was no way to keep two looks and move between them, and
@@ -5895,6 +5957,7 @@ function renderThemeGrid(){
   try{renderLooksRow();}catch(e){}
   try{renderViewRow();}catch(e){}
   try{renderEditionRow();}catch(e){}
+  try{renderPresetRow();}catch(e){}
   try{renderStatusColorRow();}catch(e){}
   const bs=document.getElementById('brightSlider');if(bs)bs.value=bgBright();
   try{renderGlowRow();}catch(e){}
@@ -15843,24 +15906,17 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-12.6',
-  title:'Yours to arrange, and artwork left alone',
-  push:'Pick your accent, size the cards, and see covers as they really are.',
+  v:'2026-08-12.7',
+  title:'Six looks, and one door for everything else',
+  push:'Pick a look. Everything else is optional.',
   notes:[
-    'Editions: four ways the whole app can be arranged, not just styled. Standard as it is; Focus strips the hero and the rails so it\u2019s only your list; Big makes every target and every letter larger; Desktop moves navigation to the top and tightens everything up.',
-    'Three layouts, not just three shapes: Posters as it is, List for a dense readable rundown of everything at once, and Cinema for big wide artwork with the title over it. Same list, genuinely different screens.',
-    'The Theme page is organised now: Colour together, shape and size folded away, artwork folded away, your saved looks at the bottom \u2014 instead of nine identical headings in a row. And the colour picker no longer shuts the moment you drag it.',
-    'Save a look. Theme, accent, tint, shape, card size, artwork and glow all keep together under a name you choose, so you can build two and switch between them in a tap.',
-    'The four status colours \u2014 Watching, Plan, Done, Dropped \u2014 are yours to set now. They\u2019re on every badge, filter and status button.',
-    'Three looks to choose from in Theme \u2014 Soft, Sharp or Round \u2014 which change the shape of every card, bar, button and sheet.',
-    'Surface tint: colour the panels and cards themselves, mixed into whichever theme you\u2019re on rather than replacing it.',
-    'Pick your own accent colour and keep any theme\u2019s background \u2014 eight presets or any colour you like. The text on top is chosen automatically so it always stays readable.',
-    'Card size: compact, comfortable or large. You decide how much of your list fits on screen, on a phone or a 34-inch monitor.',
-    'Artwork is shown as it is. Covers and banners were being quietly saturated and shaded; now they aren\u2019t, and backgrounds crop around the subject instead of a fixed guess \u2014 fewer characters with their heads cut off.',
-    'The home screen is yours to arrange: turn off any band you don\u2019t use and reorder the rest, in Settings \u2192 Home screen.',
-    'Pick several shows at once \u2014 shift-click or shift+arrow on a desktop, press and hold on a phone \u2014 then move, favourite or rate them together.',
-    'Watch parties: a shared screen no longer disappears when the presenter stops talking, it\u2019s sharper, it fills your screen properly, and you can raise a hand or blur your background.',
-    'On a desktop the layout follows your screen instead of stopping at a fixed width, up to fifteen posters a row on an ultrawide.',
+    'Theme now leads with six ready-made looks \u2014 As designed, Midnight, Ledger, Ember, Lean back, Desk. One tap sets the colours, the layout, the shape and the size together. Everything else folds away under “Make your own”.',
+    'If you do want the controls: your own accent, a surface tint for the panels, the four status colours, three layouts (Posters, List, Cinema), four editions (Standard, Focus, Big, Desktop), card size and artwork treatment \u2014 all saveable under a name.',
+    'Artwork is shown as it is \u2014 no quiet saturation or heavy shading \u2014 and backgrounds crop around the subject instead of a fixed guess.',
+    'Progress keeps itself: the app follows the site\u2019s own next-episode link, and in the iPhone app it reads real playback position down to the minute you stopped.',
+    'Countdowns know your source is behind the Japanese broadcast, and learn by how much.',
+    'Pick several shows at once \u2014 shift-click on a desktop, press and hold on a phone \u2014 then move, favourite or rate them together.',
+    'Watch parties: a shared screen no longer vanishes when the presenter stops talking, it\u2019s sharper, it fills your screen, and you can raise a hand or blur your background.',
   ],
 };
 // The rows animate in once, on the first paint of a session. render() runs on

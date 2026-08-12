@@ -10348,11 +10348,17 @@ async function watchAnime(id,epArg){
   // (a blocked frame is indistinguishable from a loaded one). 'unknown' is not
   // a refusal — those get framed like anything else.
   const _vh=srcHost(src);
-  const _refuses=_own&&framesVerdict(_vh)==='blocked'&&!embedTarget(streamURL(a,ep0).url||src);
+  const _refuses=(_own&&framesVerdict(_vh)==='blocked'||challengeHost(_vh))&&!embedTarget(streamURL(a,ep0).url||src);
   if(_refuses){
     armExternalWatch(a,ep0||1);
     openExternal(streamURL(a,ep0).url||launchURL(a,ep0));
-    toast(`${sourceName()} won't play inside the app — opening it`);
+    // Name the reason. "Won't play inside the app" reads as the app failing at
+    // something it should manage; a bot check that refuses to run in a frame is
+    // a decision the site made, and knowing that is the difference between a
+    // fault you keep retrying and a fact you stop fighting.
+    toast(challengeHost(_vh)
+      ? `${sourceName()} runs a bot check that can't work inside another site — opening it`
+      : `${sourceName()} won't play inside the app — opening it`);
     return;
   }
   if(!_own&&!embedTarget(streamURL(a,ep0).url||src)){
@@ -11670,18 +11676,35 @@ function forgetSubLag(host){
 }
 function frameBlockedHTML(){
   const m=frameLog();
-  const off=Object.keys(m).filter(h=>frameRefuses(h));
-  if(!off.length)return '';
+  const off=Object.keys(m).filter(h=>frameRefuses(h)&&!challengeHost(h));
+  const known=CHALLENGE_HOSTS.filter(h=>Object.keys(m).indexOf(h)>=0||srcHost(streamSource())===h);
+  if(!off.length&&!known.length)return '';
   return `<div class="dt-label" style="margin-top:18px">Opens in the browser</div>
-    <p class="ai-desc">These wouldn't play inside the app when tried, so Watch sends them straight out instead of showing you a blank screen. Tap one to give it another go.</p>
-    <div class="src-picks">${off.map(h=>`<button class="src-chip" onclick="forgetFrameVerdict('${escH(h)}')">${escH(h)} · try again</button>`).join('')}</div>`;
+    ${known.length?`<p class="ai-desc">${known.map(escH).join(', ')} run a bot check that has to load before the site does, and it refuses to run inside another page — so these always open in a tab. Nothing to fix; it isn't the app.</p>`:''}
+    ${off.length?`<p class="ai-desc">These wouldn't play inside the app when tried, so Watch sends them straight out instead of showing you a blank screen. Tap one to give it another go.</p>
+    <div class="src-picks">${off.map(h=>`<button class="src-chip" onclick="forgetFrameVerdict('${escH(h)}')">${escH(h)} · try again</button>`).join('')}</div>`:''}`;
 }
 function forgetFrameVerdict(host){
   const m=frameLog(); delete m[String(host||'').toLowerCase()]; saveFrameLog(m);
   toast(`${host} will be tried in the app again`);
   try{renderSource();}catch(e){}
 }
+// Hosts that sit behind a Cloudflare-style interstitial. Measured, not assumed:
+// miruro answers 403 with cf-mitigated:challenge and x-frame-options:SAMEORIGIN.
+// The header belongs to the challenge page rather than the site, but that is a
+// distinction without a difference — the check has to run before the site loads,
+// and it refuses to run in a frame, so the site can never appear in one.
+//
+// Knowing this up front matters: without it the app has to fail twice on your
+// device before it learns, which is two dead rectangles per person per host, and
+// it re-learns from scratch on every new device.
+const CHALLENGE_HOSTS=['miruro.tv','miruro.online','miruro.to'];
+function challengeHost(h){
+  h=String(h||'').toLowerCase().replace(/^www\./,'');
+  return CHALLENGE_HOSTS.some(x=>h===x||h.endsWith('.'+x));
+}
 function frameRefuses(host){
+  if(challengeHost(host))return true;
   const e=frameLog()[String(host||'').toLowerCase()];
   return !!(e&&!e.ok&&e.bad>=2);
 }

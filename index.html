@@ -147,6 +147,27 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 [data-ui=round] .dt-watch,[data-ui=round] .pt-go,[data-ui=round] .prog-btn,
 [data-ui=round] .dpick,[data-ui=round] .hbtn,[data-ui=round] .kseg,[data-ui=round] .nbtn{border-radius:99px;}
 
+/* ── THEME SHEET STRUCTURE ──
+   Groups, not a stack. Every section used to be an identical .flabel with a
+   hairline above it, so nine of them read as one long undifferentiated form and
+   the thing you wanted was found by scrolling and hoping. */
+.th-group{margin-top:22px;padding:16px;border-radius:18px;background:color-mix(in srgb,var(--bg2) 60%,transparent);border:1px solid var(--bn2);}
+.th-g-h{font-family:var(--fd);font-size:15px;font-weight:800;letter-spacing:-.02em;color:var(--t1);margin-bottom:4px;}
+.th-sub{font-size:10.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--t3);margin:16px 0 9px;}
+.th-sub:first-of-type{margin-top:12px;}
+.th-sub em{font-style:normal;text-transform:none;letter-spacing:0;font-weight:600;color:var(--t3);opacity:.75;margin-left:6px;}
+.th-fold{margin-top:12px;border-radius:18px;background:color-mix(in srgb,var(--bg2) 60%,transparent);border:1px solid var(--bn2);overflow:hidden;}
+.th-fold>summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:15px 16px;font-family:var(--fd);font-size:15px;font-weight:800;letter-spacing:-.02em;color:var(--t1);}
+.th-fold>summary::-webkit-details-marker{display:none;}
+.th-fold>summary::after{content:'';width:8px;height:8px;border-right:2px solid var(--t3);border-bottom:2px solid var(--t3);
+  transform:rotate(45deg);margin-right:4px;transition:transform .2s;flex:none;}
+.th-fold[open]>summary::after{transform:rotate(-135deg);}
+.th-hint{font-family:var(--fb);font-size:11.5px;font-weight:600;color:var(--t3);margin-left:auto;margin-right:6px;}
+.th-fold>*:not(summary){padding-left:16px;padding-right:16px;}
+.th-fold>*:last-child{padding-bottom:16px;}
+.th-looks{margin-top:12px;}
+
 /* Saved looks, and the four status colours. */
 .looks-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;}
 .look-chip{display:inline-flex;align-items:center;gap:7px;padding:7px 9px 7px 11px;border-radius:99px;
@@ -3215,71 +3236,42 @@ body.recsel .pcard{position:relative;}
     <button class="sheet-cancel" onclick="closeAll()">Done</button>
   </div>
   <div class="theme-grid" id="themeGrid"></div>
-  <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--b1);">
-    <div class="flabel" style="margin-bottom:10px">Make your own</div>
-    <div style="display:flex;gap:8px;margin-bottom:12px;">
-      <input class="finput" id="ctName" placeholder="Theme name…" maxlength="14" style="flex:1" autocomplete="off">
-      <input class="finput" id="ctEmoji" placeholder="✨" maxlength="2" style="width:56px;text-align:center" autocomplete="off">
-    </div>
-    <label class="ct-dk">Darken background<span class="ct-tgl"><input type="checkbox" id="ctDarken" checked><span class="ct-tgl-track"></span></span></label>
-    <div style="display:flex;gap:16px;align-items:flex-end;">
-      <label class="cpick-lbl">Accent<input type="color" class="cpick" id="ctAccent" value="#e03d55"></label>
-      <label class="cpick-lbl">Background<input type="color" class="cpick" id="ctBg" value="#111114"></label>
-      <button class="ai-run-btn" style="flex:1" onclick="saveCustomTheme()">Save theme</button>
-    </div>
-    <button class="src-chip" id="harmonizeBtn" style="width:100%;margin-top:10px;justify-content:center" onclick="harmonizeTheme()"><i data-ic="palette"></i> Harmonize</button>
-  </div>
-  <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--b1);">
-    <div class="flabel" style="margin-bottom:10px">Background brightness</div>
-    <div class="bright-row">
-      <span class="bright-ico" style="opacity:.5"><i data-ic="bulb"></i></span>
-      <input type="range" class="bright-slider" id="brightSlider" min="0" max="100" value="0" step="1" oninput="setBgBright(this.value)" aria-label="Background brightness">
-      <span class="bright-ico"><i data-ic="bulb"></i></span>
-    </div>
-  </div>
-  <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--b1);">
-    <div class="flabel" style="margin-bottom:4px">Your looks</div>
-    <p class="ai-desc" style="font-size:11.5px;margin:0 0 12px">Everything below — theme, accent, tint, shape, size, artwork, glow — saved as one thing you can come back to.</p>
-    <div class="looks-row" id="looksRow"></div>
-  </div>
-  <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--b1);">
-    <div class="flabel" style="margin-bottom:4px">Status colours</div>
-    <p class="ai-desc" style="font-size:11.5px;margin:0 0 12px">The four colours on every badge, filter and status button.</p>
-    <div class="stc-row" id="statusColorRow"></div>
-  </div>
-  <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--b1);">
-    <div class="flabel" style="margin-bottom:4px">Look</div>
-    <p class="ai-desc" style="font-size:11.5px;margin:0 0 12px">The shape of everything — cards, bars, buttons and sheets.</p>
-    <div class="art-seg" id="uiRow"></div>
-  </div>
-  <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--b1);">
-    <div class="flabel" style="margin-bottom:4px">Surface tint</div>
-    <p class="ai-desc" style="font-size:11.5px;margin:0 0 12px">Colours the panels and cards themselves, mixed into whichever theme you're on rather than replacing it.</p>
-    <div class="acc-row" id="tintRow"></div>
-  </div>
-  <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--b1);">
-    <div class="flabel" style="margin-bottom:4px">Accent</div>
-    <p class="ai-desc" style="font-size:11.5px;margin:0 0 12px">Keep any theme's background and give it your own colour. Text on top is picked automatically so it stays readable.</p>
+  <!-- Nine stacked sections with identical headings was a wall. Three groups,
+       each named for what you'd be looking for: the colours, the shape of
+       things, and the pictures. Colour is open because it is what people come
+       here to change; the other two fold away. -->
+  <div class="th-group">
+    <div class="th-g-h">Colour</div>
+    <div class="th-sub">Accent</div>
     <div class="acc-row" id="accentRow"></div>
-  </div>
-  <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--b1);">
-    <div class="flabel" style="margin-bottom:4px">Card size</div>
-    <p class="ai-desc" style="font-size:11.5px;margin:0 0 12px">How much of your list fits on screen at once.</p>
-    <div class="art-seg" id="densityRow"></div>
-  </div>
-  <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--b1);">
-    <div class="flabel" style="margin-bottom:4px">Artwork</div>
-    <p class="ai-desc" style="font-size:11.5px;margin:0 0 12px">Natural leaves covers and banners exactly as they are. Cinematic boosts the colour a little and shades further up the image, so titles read over busier art.</p>
-    <div class="art-seg" id="artRow"></div>
-  </div>
-  <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--b1);">
-    <div class="flabel" style="margin-bottom:4px">Background glow</div>
-    <p class="ai-desc" style="font-size:11.5px;margin:0 0 14px">Follows what you’re browsing — or lock it to your theme, a color, or off.</p>
+    <div class="th-sub">Surface tint <em>the panels themselves</em></div>
+    <div class="acc-row" id="tintRow"></div>
+    <div class="th-sub">Status colours</div>
+    <div class="stc-row" id="statusColorRow"></div>
+    <div class="th-sub">Background glow</div>
     <div class="glow-modes" id="glowRow"></div>
   </div>
-</div>
 
-<!-- NOTIFICATIONS SHEET -->
+  <details class="th-fold">
+    <summary><span>Shape &amp; size</span><span class="th-hint">Corners, card size</span></summary>
+    <div class="th-sub">Look</div>
+    <div class="art-seg" id="uiRow"></div>
+    <div class="th-sub">Card size</div>
+    <div class="art-seg" id="densityRow"></div>
+  </details>
+
+  <details class="th-fold">
+    <summary><span>Artwork</span><span class="th-hint">How covers are shown</span></summary>
+    <div class="th-sub">Treatment</div>
+    <div class="art-seg" id="artRow"></div>
+  </details>
+
+  <div class="th-group th-looks">
+    <div class="th-g-h">Your looks</div>
+    <p class="ai-desc" style="font-size:11.5px;margin:0 0 11px">Everything above — theme, colours, shape, size, artwork, glow — kept together under a name.</p>
+    <div class="looks-row" id="looksRow"></div>
+  </div>
+</div>
 <div class="sheet" id="notifySheet">
   <div class="sheet-handle"></div>
   <div class="sheet-header">
@@ -5332,9 +5324,17 @@ function applyAccent(){
   el.style.setProperty('--glow',`rgba(${r},${g},${b},0.26)`);
   el.style.setProperty('--aFg',_contrast('#111014',hex)>=_contrast('#ffffff',hex)?'#111014':'#ffffff');
 }
-function setAccent(hex){
+// `redraw` is the whole difference between a colour picker that works and one
+// that shuts in your face. While the native picker is OPEN it fires input on
+// every drag; re-rendering the row there replaces the very <input> the picker is
+// attached to, and iOS closes it. So: apply live, redraw only when the picker
+// closes. The glow picker already carried this fix — I wrote three more pickers
+// without it.
+function setAccent(hex,redraw){
   try{hex?localStorage.setItem(ACCENT_KEY,hex):localStorage.removeItem(ACCENT_KEY);}catch(e){}
-  applyAccent();renderAccentRow();try{applyAmbient();}catch(e){}
+  applyAccent();try{applyAmbient();}catch(e){}
+  if(redraw!==false)renderAccentRow();
+  else{const sw=document.querySelector('#accentRow .acc-custom');if(sw)sw.style.setProperty('--sw',hex||'#888');}
 }
 // ─── STATUS COLOURS ─────────────────────────────────────────────────────────
 // Watching, Plan, Done, Dropped are on every card badge, every filter segment
@@ -5354,11 +5354,13 @@ function applyStatusColors(){
     el.style.setProperty(STATUS_VARS[k][1],`rgba(${r},${g},${b},0.12)`);
   });
 }
-function setStatusColor(k,hex){
+function setStatusColor(k,hex,redraw){
   const m=statusColors();
   if(hex)m[k]=hex;else delete m[k];
   try{localStorage.setItem(STATUS_KEY,JSON.stringify(m));}catch(e){}
-  applyStatusColors();renderStatusColorRow();try{render();}catch(e){}
+  applyStatusColors();
+  if(redraw!==false){renderStatusColorRow();try{render();}catch(e){}}
+  else{const sw=document.querySelector(`#statusColorRow .stc[data-k="${k}"] .stc-sw`);if(sw)sw.style.background=hex||'';}
 }
 function renderStatusColorRow(){
   const row=document.getElementById('statusColorRow'); if(!row)return;
@@ -5366,10 +5368,10 @@ function renderStatusColorRow(){
   row.innerHTML=Object.keys(STATUS_VARS).map(k=>{
     const cur=m[k]||'';
     const lbl=statusLabel(k,viewKind==='read');
-    return `<label class="stc" title="${escH(lbl)}">
+    return `<label class="stc" data-k="${k}" title="${escH(lbl)}">
       <span class="stc-sw" style="background:${cur||`var(${STATUS_VARS[k][0]})`}"></span>
       <span class="stc-n">${escH(lbl)}</span>
-      <input type="color" value="${cur||'#888888'}" oninput="setStatusColor('${k}',this.value)">
+      <input type="color" value="${cur||'#888888'}" oninput="setStatusColor('${k}',this.value,false)" onchange="setStatusColor('${k}',this.value)">
     </label>`;}).join('')
     +`<button class="hl-reset" style="margin-top:10px" onclick="setStatusColor('watching','');setStatusColor('plan','');setStatusColor('finished','');setStatusColor('dropped','')">Reset status colours</button>`;
 }
@@ -5457,9 +5459,11 @@ function applyTint(){
     try{el.style.setProperty(k,mix(base,hex,amounts[i]));}catch(e){}
   });
 }
-function setTint(hex){
+function setTint(hex,redraw){
   try{hex?localStorage.setItem(TINT_KEY,hex):localStorage.removeItem(TINT_KEY);}catch(e){}
-  applyTint();renderTintRow();
+  applyTint();
+  if(redraw!==false)renderTintRow();
+  else{const sw=document.querySelector('#tintRow .acc-custom');if(sw)sw.style.setProperty('--sw',hex||'#888');}
 }
 function renderTintRow(){
   const row=document.getElementById('tintRow'); if(!row)return;
@@ -5468,7 +5472,7 @@ function renderTintRow(){
   row.innerHTML=`<button class="acc-sw acc-none${cur?'':' on'}" onclick="setTint('')" title="No tint"><span>None</span></button>`
     +PICKS.map(c=>`<button class="acc-sw${cur.toLowerCase()===c?' on':''}" style="--sw:${c}" onclick="setTint('${c}')" aria-label="Tint ${c}"></button>`).join('')
     +`<label class="acc-sw acc-custom${cur&&PICKS.indexOf(cur.toLowerCase())<0?' on':''}" style="--sw:${cur||'#888'}" title="Any colour">
-        <input type="color" value="${cur||'#3a2b5e'}" oninput="setTint(this.value)"></label>`;
+        <input type="color" value="${cur||'#3a2b5e'}" oninput="setTint(this.value,false)" onchange="setTint(this.value)"></label>`;
 }
 
 // ─── UI STYLE ───────────────────────────────────────────────────────────────
@@ -5526,7 +5530,7 @@ function renderAccentRow(){
   row.innerHTML=`<button class="acc-sw acc-none${cur?'':' on'}" onclick="setAccent('')" title="Use the theme's own accent"><span>Theme</span></button>`
     +PICKS.map(c=>`<button class="acc-sw${cur.toLowerCase()===c?' on':''}" style="--sw:${c}" onclick="setAccent('${c}')" aria-label="Accent ${c}"></button>`).join('')
     +`<label class="acc-sw acc-custom${cur&&PICKS.indexOf(cur.toLowerCase())<0?' on':''}" style="--sw:${cur||'#888'}" title="Any colour">
-        <input type="color" value="${cur||'#da374f'}" oninput="setAccent(this.value)"></label>`;
+        <input type="color" value="${cur||'#da374f'}" oninput="setAccent(this.value,false)" onchange="setAccent(this.value)"></label>`;
 }
 // ─── HARMONIZE ──────────────────────────────────────────────────────────────
 // A hand-picked accent and background almost never land: the accent is muddy or
@@ -15689,10 +15693,11 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-12.3',
+  v:'2026-08-12.4',
   title:'Yours to arrange, and artwork left alone',
   push:'Pick your accent, size the cards, and see covers as they really are.',
   notes:[
+    'The Theme page is organised now: Colour together, shape and size folded away, artwork folded away, your saved looks at the bottom \u2014 instead of nine identical headings in a row. And the colour picker no longer shuts the moment you drag it.',
     'Save a look. Theme, accent, tint, shape, card size, artwork and glow all keep together under a name you choose, so you can build two and switch between them in a tap.',
     'The four status colours \u2014 Watching, Plan, Done, Dropped \u2014 are yours to set now. They\u2019re on every badge, filter and status button.',
     'Three looks to choose from in Theme \u2014 Soft, Sharp or Round \u2014 which change the shape of every card, bar, button and sheet.',

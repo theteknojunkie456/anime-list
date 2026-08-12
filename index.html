@@ -8700,7 +8700,15 @@ function iceComplete(pc){return new Promise(res=>{if(pc.iceGatheringState==='com
 async function startShare(){
   if(!canScreenShare()){toast('Screen sharing needs a computer — iPhones can’t share a screen');return;}
   if(!partyIsHost){toast('Only the host can share');return;}
-  let s;try{s=await navigator.mediaDevices.getDisplayMedia({video:{frameRate:30},audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false},systemAudio:'include'});}catch{toast('Screen share cancelled');return;}
+  // Ask for something worth watching. With only frameRate:30 the browser picks
+  // its own resolution, and its own is conservative — a 1080p screen can arrive
+  // as 640-wide, which is why text turns to porridge. displaySurface:'monitor'
+  // puts "Entire Screen" first in the picker rather than the current tab.
+  let s;try{s=await navigator.mediaDevices.getDisplayMedia({
+    video:{frameRate:{ideal:30,max:60},width:{ideal:1920,max:2560},height:{ideal:1080,max:1440},displaySurface:'monitor'},
+    audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false},
+    systemAudio:'include'
+  });}catch{toast('Screen share cancelled');return;}
   localStream=s;
   // Tell the encoder what it is looking at. Without a hint it assumes a talking
   // head and trades resolution away to keep the frame rate up, which is the
@@ -8744,6 +8752,21 @@ async function pcConnectToViewer(vid){                 // HOST → each viewer
   if(pcs[vid]||!localStream)return;
   const pc=new RTCPeerConnection(await getRtcConfig());pcs[vid]=pc;
   localStream.getTracks().forEach(tr=>pc.addTrack(tr,localStream));
+  // WebRTC's default video ceiling is built for a webcam and is far too low for
+  // a screen: the encoder hits it, and the only way to stay under it is to throw
+  // away resolution — which reads as blur, then as lag when it also drops frames.
+  // Raise the ceiling and tell it to give up frame rate before sharpness, which
+  // is the right trade for a screen and the wrong one for a face.
+  try{
+    const sender=pc.getSenders().find(x=>x.track&&x.track.kind==='video');
+    if(sender){
+      const prm=sender.getParameters()||{};
+      prm.degradationPreference='maintain-resolution';
+      prm.encodings=(prm.encodings&&prm.encodings.length?prm.encodings:[{}]).map(e=>
+        Object.assign({},e,{maxBitrate:6000000,maxFramerate:30,scaleResolutionDownBy:1}));
+      sender.setParameters(prm).catch(()=>{});
+    }
+  }catch(e){}
   tuneSender(pc);
   pc.onconnectionstatechange=()=>{const st=pc.connectionState;if(['failed','closed','disconnected'].includes(st))pcClose(vid);
     try{_schedulePartyRender();}catch(e){}};   // refresh the host's "N of M connected" as links come and go
@@ -9160,6 +9183,13 @@ function openEmbedCall(){
         configOverwrite:{
           channelLastN:-1,
           enableLayerSuspension:false,
+          // Jitsi's defaults are tuned for faces in a grid. A shared screen wants
+          // resolution held and a lower frame rate, not the reverse.
+          resolution:1080,
+          constraints:{video:{height:{ideal:1080,max:1440,min:540}}},
+          desktopSharingFrameRate:{min:15,max:30},
+          videoQuality:{maxBitratesVideo:{low:300000,standard:1500000,high:5000000}},
+          disableSimulcast:true,
           startWithVideoMuted:true,prejoinPageEnabled:false,prejoinConfig:{enabled:false},
           disableDeepLinking:true,disableInviteFunctions:true,requireDisplayName:false,startWithAudioMuted:false
         },

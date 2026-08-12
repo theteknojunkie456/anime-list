@@ -9733,8 +9733,10 @@ function finishOnb(){ const v=document.getElementById('onb'); if(v)v.classList.r
 const ERR_KEY='wl_errs';
 function logProblem(kind,msg,extra){
   try{
-    const list=recentProblems();
-    const e={t:Date.now(),k:kind,m:String(msg||'').slice(0,300)};
+    const list=allProblems();
+    // Stamp the build. An error from a version that no longer exists is history,
+    // not a fault — and without this there is no way to tell the two apart.
+    const e={t:Date.now(),k:kind,m:String(msg||'').slice(0,300),v:(typeof RELEASE!=='undefined'&&RELEASE&&RELEASE.v)||''};
     if(extra)e.x=String(extra).slice(0,200);
     // Identical error repeating (a loop) shouldn't push everything else out.
     const last=list[list.length-1];
@@ -9743,8 +9745,18 @@ function logProblem(kind,msg,extra){
     localStorage.setItem(ERR_KEY,JSON.stringify(list.slice(-25)));
   }catch(e){}
 }
-function recentProblems(){
+// What's wrong NOW. Anything recorded by an older build is dropped: shipping a
+// fix does not clear the log, so a bug that was fixed a week ago goes on being
+// reported as though it were live — which is how "7 x stLabel is not defined"
+// survived its own fix and made the app look broken when it wasn't. Anything
+// older than a fortnight goes too, fixed or not.
+const ERR_MAX_AGE=14*86400000;
+function allProblems(){
   try{const v=JSON.parse(localStorage.getItem(ERR_KEY)||'[]');return Array.isArray(v)?v:[];}catch(e){return [];}
+}
+function recentProblems(){
+  const now=Date.now(), ver=(typeof RELEASE!=='undefined'&&RELEASE&&RELEASE.v)||'';
+  return allProblems().filter(e=>e&&(now-(e.t||0))<ERR_MAX_AGE&&(!ver||!e.v||e.v===ver));
 }
 try{
   window.addEventListener('error',ev=>{
@@ -9801,9 +9813,17 @@ function renderSettings(){
   // it does is tell them their app is broken and offer them nothing. Everyone
   // still RECORDS problems; it's the alarming, unusable row that's owner-only.
   const probs=adminToken()?recentProblems():[];
-  if(probs.length)rows.push({ic:'clipboard',h:'Something went wrong',
-    p:probs.length+(probs.length===1?' problem recorded':' problems recorded')+' — tap to copy the details',
-    go:'copyProblems()',warn:true});
+  if(probs.length){
+    // "3 problems recorded" told you a number and nothing else. What is worth
+    // knowing is whether it is still happening: when it last did, and on this
+    // build — because anything from an older one has already been dropped.
+    const last=probs[probs.length-1];
+    const mins=Math.round((Date.now()-(last.t||0))/60000);
+    const when=mins<2?'just now':mins<60?`${mins} min ago`:mins<1440?`${Math.round(mins/60)}h ago`:`${Math.round(mins/1440)}d ago`;
+    rows.push({ic:'clipboard',h:'Something went wrong',
+      p:`${probs.length} on this build · last ${when} — tap to copy`,
+      go:'copyProblems()',warn:true});
+  }
   el.innerHTML=rows.map(r=>
     `<button class="set-row${r.warn?' warn':''}" onclick="${r.go}">
       <div class="set-ico">${icon(r.ic)}</div>

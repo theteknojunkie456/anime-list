@@ -147,6 +147,36 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 [data-ui=round] .dt-watch,[data-ui=round] .pt-go,[data-ui=round] .prog-btn,
 [data-ui=round] .dpick,[data-ui=round] .hbtn,[data-ui=round] .kseg,[data-ui=round] .nbtn{border-radius:99px;}
 
+/* ── TWO PANES ──────────────────────────────────────────────────────────────
+   A bottom sheet is right on a phone: it comes from the thumb, it covers a
+   screen too small to show two things, and it goes away with a swipe. On a
+   1600px desktop the same gesture throws a curtain over a page with several
+   hundred pixels doing nothing on either side — and worse, it hides the list you
+   were choosing FROM at the exact moment you are comparing one title against it.
+   So above 1200px the detail is a column beside the list, not a sheet over it,
+   and the list stays live: keep clicking titles and the panel keeps up.
+
+   Only the detail sheet. Everything else modal — settings, theme, sources — is
+   genuinely a takeover and should stay one. */
+@media (min-width:1200px){
+  :root.two-pane #detailSheet{
+    top:0;bottom:0;left:auto;right:0;width:min(520px,42vw);max-height:none;
+    border-radius:0;border-top:0;border-left:1px solid var(--b3);
+    transform:translateX(100%);transition:transform .34s cubic-bezier(.2,1,.28,1);
+    padding-top:calc(var(--safe-t) + 18px);
+    box-shadow:-24px 0 60px -24px rgba(0,0,0,.75);
+  }
+  :root.two-pane #detailSheet.on{transform:translateX(0);}
+  :root.two-pane #detailSheet .sheet-handle{display:none;}
+  /* The list gives up the width rather than sliding under the panel, so nothing
+     you were looking at is behind it. */
+  :root.two-pane #app{padding-right:min(520px,42vw);transition:padding-right .34s cubic-bezier(.2,1,.28,1);}
+  :root.two-pane .nav{width:min(var(--measure,1180px),calc(100% - min(520px,42vw)));}
+  /* The backdrop is what makes a sheet modal. With the list still usable there
+     is nothing to dismiss, so it goes. */
+  :root.two-pane .overlay{opacity:0!important;pointer-events:none!important;}
+}
+
 /* ── EDITIONS ───────────────────────────────────────────────────────────────
    Not a skin. Each of these moves the furniture: where navigation lives, whether
    there is a hero at all, how big the type is, how much chrome sits between you
@@ -7120,6 +7150,10 @@ function repaintTitles(){
 }
 setTimeout(()=>{try{pollAdmin();}catch(e){}},2600);
 setInterval(()=>{if(watchingNow())return;try{pollAdmin();}catch(e){}},120000);
+// Wide enough for both? Then the detail is a pane, not a takeover — and the
+// class has to go on before the sheet opens, so the list narrows in the same
+// frame the panel slides in rather than jumping afterwards.
+function twoPaneOK(){try{return matchMedia('(min-width:1200px)').matches;}catch(e){return false;}}
 function openDetail(id){
   return _openDetailReal(id);
 }
@@ -7858,6 +7892,10 @@ function openSheet(id){
   // no way in — the entry buttons are hidden (body.no-party) and this is the backstop.
   /* party sheet works on web now — browser can join + watch a broadcast */
   closeAll();
+  // AFTER closeAll, never before: closeAll clears the two-pane state, so setting
+  // it in openDetail() meant openSheet immediately undid it. The class belongs
+  // where the sheet is actually shown.
+  try{document.documentElement.classList.toggle('two-pane',id==='detailSheet'&&twoPaneOK());}catch(e){}
   document.getElementById('overlay').classList.add('on');
   document.getElementById(id).classList.add('on');
   try{sheetFocusGuard(id,true);}catch(e){}
@@ -7880,6 +7918,7 @@ function openSheet(id){
   try{updatePartyPill();}catch{}
 }
 function closeAll(){
+  try{document.documentElement.classList.remove('two-pane');}catch(e){}
   try{sheetFocusGuard(null,false);}catch(e){}
   try{if(schedTickT){clearInterval(schedTickT);schedTickT=null;}}catch(e){}
   document.querySelectorAll('.sheet').forEach(s=>s.classList.remove('on'));
@@ -9431,7 +9470,15 @@ function fitShare(){
   }
 }
 try{
-  window.addEventListener('resize',()=>{try{fitShare();}catch(e){}});
+  window.addEventListener('resize',()=>{
+    try{fitShare();}catch(e){}
+    // Drag a window narrower with the pane open and it becomes a sheet; the
+    // padding that made room for it has to go with it.
+    try{
+      const open=document.getElementById('detailSheet').classList.contains('on');
+      document.documentElement.classList.toggle('two-pane',open&&twoPaneOK());
+    }catch(e){}
+  });
   window.addEventListener('orientationchange',()=>{setTimeout(()=>{try{fitShare();}catch(e){}},350);});
 }catch(e){}
 function hideShareView(){const v=document.getElementById('shareVideo');if(v)v.srcObject=null;const sw=document.getElementById('shareWait');if(sw)sw.classList.remove('gone');document.getElementById('shareView').classList.remove('on');}
@@ -15906,10 +15953,11 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-12.7',
+  v:'2026-08-12.8',
   title:'Six looks, and one door for everything else',
   push:'Pick a look. Everything else is optional.',
   notes:[
+    'On a wide screen, opening a title puts it beside your list instead of over it \u2014 the list stays live, so you can keep clicking through and the panel keeps up. Below 1200px it\u2019s the same sheet as before.',
     'Theme now leads with six ready-made looks \u2014 As designed, Midnight, Ledger, Ember, Lean back, Desk. One tap sets the colours, the layout, the shape and the size together. Everything else folds away under “Make your own”.',
     'If you do want the controls: your own accent, a surface tint for the panels, the four status colours, three layouts (Posters, List, Cinema), four editions (Standard, Focus, Big, Desktop), card size and artwork treatment \u2014 all saveable under a name.',
     'Artwork is shown as it is \u2014 no quiet saturation or heavy shading \u2014 and backgrounds crop around the subject instead of a fixed guess.',

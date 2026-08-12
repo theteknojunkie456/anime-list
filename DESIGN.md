@@ -31,6 +31,17 @@ The text ramp was rebuilt once already: `--t2` was failing at 3.9:1 on `--bg5`
 and `--t3` was 2.0:1 on `--bg`. Nudging one collapsed it into another, so all
 three are tuned together. **Don't lighten any of them "for elegance".**
 
+**Two panes** (≥1200px, `:root.two-pane`). A bottom sheet is right on a phone —
+it comes from the thumb, it covers a screen too small for two things, it goes
+with a swipe. On a desktop the same gesture throws a curtain over a page with
+room to spare, and hides the list you were choosing *from* at the moment you're
+comparing against it. Above 1200px the detail is a 520px column beside the list,
+the list is padded clear of it rather than sliding under, and the backdrop is
+suppressed so the list stays live — click another title and the panel keeps up.
+Scoped to `#detailSheet` only: settings, theme and sources are genuinely modal.
+The class is set in `openSheet`, **after** `closeAll()` — setting it in
+`openDetail` meant `closeAll` immediately undid it.
+
 **Edition** (`data-ed`: `standard` | `focus` | `tv` | `pro`). Where the furniture
 goes, not what colour it is — navigation position, whether a hero exists at all,
 type scale, chrome density. `pro` is the one that genuinely *relocates* a region:

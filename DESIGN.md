@@ -31,6 +31,20 @@ The text ramp was rebuilt once already: `--t2` was failing at 3.9:1 on `--bg5`
 and `--t3` was 2.0:1 on `--bg`. Nudging one collapsed it into another, so all
 three are tuned together. **Don't lighten any of them "for elegance".**
 
+**UI style** (`data-ui`: `soft` | `sharp` | `round`). Radius is *not* tokenised in
+this file — 163 hardcoded values against zero uses of `--r` — so a style that
+rewrote everything would be a refactor pretending to be a feature. Each style
+overrides only the surfaces that carry the character: cards, sheets, bars,
+buttons, chips, nav. Change those and the whole thing changes; change the other
+140 and nobody can tell. If radii are ever tokenised, these collapse to three
+values.
+
+**Surface tint** mixes into the *active theme's* greys rather than replacing
+them, so the relationship between the five surface steps survives and a tinted
+Naruto still reads as Naruto. Strength rises with the step (5% → 21%): the
+deepest ground barely moves, since that's what keeps the app dark. Re-mixes on
+theme change, because the values it mixes into have changed.
+
 **Your own accent.** `accent_override` writes `--a`, `--a2`, `--ag`, `--glow`
 and `--aFg` on `:root`, over whatever theme is active — so a theme's ground and
 its accent are no longer a package deal. `--aFg` is **computed, never chosen**:

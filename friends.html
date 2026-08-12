@@ -116,6 +116,37 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
   from{transform:translate3d(-4%,-2%,0) scale(1.02);}
   to{transform:translate3d(6%,4%,0) scale(1.14);}
 }
+/* ── UI STYLES ──
+   Sharp: right angles where the app is soft. Editorial rather than app-like —
+   the shape language of a printed page, which suits a screen that is mostly a
+   grid of artwork. */
+[data-ui=sharp] .pcard-img,[data-ui=sharp] .pcard-ph,[data-ui=sharp] .pcard-wrap,
+[data-ui=sharp] .dt-cover-wrap,[data-ui=sharp] .dt-cover,[data-ui=sharp] .rz-card,
+[data-ui=sharp] .fy-wrap,[data-ui=sharp] .fy-img,[data-ui=sharp] .fy-ph{border-radius:5px;}
+[data-ui=sharp] .topbar,[data-ui=sharp] .dt-deck,[data-ui=sharp] .billboard,
+[data-ui=sharp] .resume-card,[data-ui=sharp] .pt-start,[data-ui=sharp] .pt-join,
+[data-ui=sharp] .fixbar.on,[data-ui=sharp] .party-call{border-radius:8px;}
+[data-ui=sharp] .nav{border-radius:0;}
+[data-ui=sharp] .sheet{border-radius:10px 10px 0 0;}
+[data-ui=sharp] .dt-watch,[data-ui=sharp] .pt-go,[data-ui=sharp] .prog-btn,
+[data-ui=sharp] .dpick,[data-ui=sharp] .hbtn,[data-ui=sharp] .kseg{border-radius:6px;}
+[data-ui=sharp] .fchip,[data-ui=sharp] .sort-btn,[data-ui=sharp] .filt-row,
+[data-ui=sharp] .chip,[data-ui=sharp] .src-chip,[data-ui=sharp] .dt-fav,
+[data-ui=sharp] .pcard-badge,[data-ui=sharp] .pcard-new{border-radius:4px;}
+[data-ui=sharp] .nbtn{border-radius:6px;}
+[data-ui=sharp] .nbtn.add{border-radius:8px;}
+/* Round: everything a capsule. Softer and friendlier, and it makes the artwork
+   the only straight-edged thing on screen, which is its own kind of emphasis. */
+[data-ui=round] .pcard-img,[data-ui=round] .pcard-ph,[data-ui=round] .pcard-wrap,
+[data-ui=round] .dt-cover-wrap,[data-ui=round] .dt-cover,[data-ui=round] .rz-card{border-radius:22px;}
+[data-ui=round] .topbar,[data-ui=round] .dt-deck,[data-ui=round] .billboard,
+[data-ui=round] .resume-card,[data-ui=round] .pt-start,[data-ui=round] .pt-join,
+[data-ui=round] .fixbar.on,[data-ui=round] .party-call{border-radius:26px;}
+[data-ui=round] .nav{border-radius:34px 34px 0 0;}
+[data-ui=round] .sheet{border-radius:34px 34px 0 0;}
+[data-ui=round] .dt-watch,[data-ui=round] .pt-go,[data-ui=round] .prog-btn,
+[data-ui=round] .dpick,[data-ui=round] .hbtn,[data-ui=round] .kseg,[data-ui=round] .nbtn{border-radius:99px;}
+
 /* Accent swatches. Round, because a colour has no shape of its own and a circle
    is the least opinionated frame to put one in. */
 .acc-row{display:flex;flex-wrap:wrap;gap:9px;align-items:center;}
@@ -3186,6 +3217,16 @@ body.recsel .pcard{position:relative;}
     </div>
   </div>
   <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--b1);">
+    <div class="flabel" style="margin-bottom:4px">Look</div>
+    <p class="ai-desc" style="font-size:11.5px;margin:0 0 12px">The shape of everything — cards, bars, buttons and sheets.</p>
+    <div class="art-seg" id="uiRow"></div>
+  </div>
+  <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--b1);">
+    <div class="flabel" style="margin-bottom:4px">Surface tint</div>
+    <p class="ai-desc" style="font-size:11.5px;margin:0 0 12px">Colours the panels and cards themselves, mixed into whichever theme you're on rather than replacing it.</p>
+    <div class="acc-row" id="tintRow"></div>
+  </div>
+  <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--b1);">
     <div class="flabel" style="margin-bottom:4px">Accent</div>
     <p class="ai-desc" style="font-size:11.5px;margin:0 0 12px">Keep any theme's background and give it your own colour. Text on top is picked automatically so it stays readable.</p>
     <div class="acc-row" id="accentRow"></div>
@@ -4634,6 +4675,8 @@ function applyExtra(x){
   try{if(typeof applyArtMode==='function')applyArtMode();}catch(e){}
   try{if(typeof applyAccent==='function')applyAccent();}catch(e){}
   try{if(typeof applyDensity==='function')applyDensity();}catch(e){}
+  try{if(typeof applyUiStyle==='function')applyUiStyle();}catch(e){}
+  try{if(typeof applyTint==='function')applyTint();}catch(e){}
   try{if(typeof applyAmbient==='function')applyAmbient();}catch(e){}
   try{if(typeof renderThemeGrid==='function')renderThemeGrid();}catch(e){}
   try{if(typeof renderFriends==='function')renderFriends();}catch(e){}
@@ -5223,6 +5266,7 @@ function applyTheme(id,persist=true){
   if(t.custom)applyCustomVars(t);
   if(persist){try{const s=store();if(s)s.setItem('animetheme',t.id);}catch{}}
   try{applyAccent();}catch(e){}      // a chosen accent survives a theme change
+  try{applyTint();}catch(e){}        // and the tint re-mixes into the new theme's greys
   try{applyAmbient();}catch(e){}
   renderThemeGrid();
 }
@@ -5260,6 +5304,70 @@ function setAccent(hex){
   try{hex?localStorage.setItem(ACCENT_KEY,hex):localStorage.removeItem(ACCENT_KEY);}catch(e){}
   applyAccent();renderAccentRow();try{applyAmbient();}catch(e){}
 }
+// ─── SURFACE TINT ───────────────────────────────────────────────────────────
+// The accent colours what you press. This colours what you press it ON — every
+// panel, card, sheet and bar — which is most of the screen and, until now, the
+// one part no theme let you touch without adopting its accent too.
+//
+// It mixes into the ACTIVE theme's own greys rather than replacing them, so the
+// relationship between the five surface steps survives and a tinted Naruto still
+// reads as Naruto. Read the computed values, mix, write back: CSS can't reference
+// a variable it's in the middle of redefining.
+const TINT_KEY='surface_tint';
+function surfaceTint(){try{return localStorage.getItem(TINT_KEY)||'';}catch(e){return '';}}
+function applyTint(){
+  const el=document.documentElement, hex=surfaceTint();
+  const keys=['--bg','--bg2','--bg3','--bg4','--bg5'];
+  keys.forEach(k=>el.style.removeProperty(k));
+  if(!hex)return;
+  // Strength rises with the step: the deepest ground barely moves (it's what
+  // keeps the app dark) while raised panels take enough to read as coloured.
+  const amounts=[0.05,0.09,0.13,0.17,0.21];
+  const cs=getComputedStyle(el);
+  keys.forEach((k,i)=>{
+    const base=(cs.getPropertyValue(k)||'').trim();
+    if(!/^#/.test(base))return;
+    try{el.style.setProperty(k,mix(base,hex,amounts[i]));}catch(e){}
+  });
+}
+function setTint(hex){
+  try{hex?localStorage.setItem(TINT_KEY,hex):localStorage.removeItem(TINT_KEY);}catch(e){}
+  applyTint();renderTintRow();
+}
+function renderTintRow(){
+  const row=document.getElementById('tintRow'); if(!row)return;
+  const cur=surfaceTint();
+  const PICKS=['#3a2b5e','#1f3d5c','#123f3a','#4a2b2b','#3d2f1c','#2b2b33'];
+  row.innerHTML=`<button class="acc-sw acc-none${cur?'':' on'}" onclick="setTint('')" title="No tint"><span>None</span></button>`
+    +PICKS.map(c=>`<button class="acc-sw${cur.toLowerCase()===c?' on':''}" style="--sw:${c}" onclick="setTint('${c}')" aria-label="Tint ${c}"></button>`).join('')
+    +`<label class="acc-sw acc-custom${cur&&PICKS.indexOf(cur.toLowerCase())<0?' on':''}" style="--sw:${cur||'#888'}" title="Any colour">
+        <input type="color" value="${cur||'#3a2b5e'}" oninput="setTint(this.value)"></label>`;
+}
+
+// ─── UI STYLE ───────────────────────────────────────────────────────────────
+// Same app, different build. Radius is not tokenised in this file — 163 hardcoded
+// values against zero uses of --r — so a style sheet that rewrote everything
+// would be a refactor pretending to be a feature. These override the surfaces
+// that actually carry the character: cards, sheets, bars, buttons, chips, the
+// nav. Change those and the whole thing changes; change the other 140 and nobody
+// can tell.
+const UI_KEY='ui_style';
+const UI_STYLES={soft:'Soft',sharp:'Sharp',round:'Round'};
+function uiStyle(){try{const v=localStorage.getItem(UI_KEY);return UI_STYLES[v]?v:'soft';}catch(e){return 'soft';}}
+function applyUiStyle(){try{document.documentElement.setAttribute('data-ui',uiStyle());}catch(e){}}
+function setUiStyle(v){
+  try{localStorage.setItem(UI_KEY,UI_STYLES[v]?v:'soft');}catch(e){}
+  applyUiStyle();renderUiRow();
+}
+function renderUiRow(){
+  const row=document.getElementById('uiRow'); if(!row)return;
+  const cur=uiStyle();
+  const SUB={soft:'Rounded, the default',sharp:'Crisp and editorial',round:'Very rounded'};
+  row.innerHTML=Object.keys(UI_STYLES).map(k=>`<button class="art-opt${cur===k?' on':''}" onclick="setUiStyle('${k}')">
+    <span class="art-lb">${UI_STYLES[k]}</span><span class="art-sub">${SUB[k]}</span></button>`).join('');
+}
+try{applyUiStyle();}catch(e){}
+
 // ─── HOW MUCH FITS ──────────────────────────────────────────────────────────
 // One person wants to see their whole library at a glance and another wants the
 // artwork big enough to enjoy. Both are right, and the grid is already auto-fill
@@ -5503,6 +5611,8 @@ function renderThemeGrid(){
   try{renderArtRow();}catch(e){}
   try{renderAccentRow();}catch(e){}
   try{renderDensityRow();}catch(e){}
+  try{renderUiRow();}catch(e){}
+  try{renderTintRow();}catch(e){}
   const bs=document.getElementById('brightSlider');if(bs)bs.value=bgBright();
   try{renderGlowRow();}catch(e){}
   const g=document.getElementById('themeGrid');if(!g)return;
@@ -15450,10 +15560,12 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-12.1',
+  v:'2026-08-12.2',
   title:'Yours to arrange, and artwork left alone',
   push:'Pick your accent, size the cards, and see covers as they really are.',
   notes:[
+    'Three looks to choose from in Theme \u2014 Soft, Sharp or Round \u2014 which change the shape of every card, bar, button and sheet.',
+    'Surface tint: colour the panels and cards themselves, mixed into whichever theme you\u2019re on rather than replacing it.',
     'Pick your own accent colour and keep any theme\u2019s background \u2014 eight presets or any colour you like. The text on top is chosen automatically so it always stays readable.',
     'Card size: compact, comfortable or large. You decide how much of your list fits on screen, on a phone or a 34-inch monitor.',
     'Artwork is shown as it is. Covers and banners were being quietly saturated and shaded; now they aren\u2019t, and backgrounds crop around the subject instead of a fixed guess \u2014 fewer characters with their heads cut off.',

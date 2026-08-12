@@ -59,13 +59,15 @@
 /* Sanji, rebuilt from the reference: the wine suit is the accent and the ground
    is plum-black to sit under it, where before this was a cool navy with a
    mustard accent — the one colour in the picture that isn't really there.
-   The blonde isn't lost: it becomes the Watching status, so both of the
-   character's colours are present and the brighter one lands on the state you
-   look for most. --aFg flips to white, because the accent went from a light
-   mustard to a dark wine and near-black on it would be unreadable.
-   Contrast measured against every surface: worst body pair 8.31, dimmest label
-   4.97, white on the accent 6.34. */
-[data-theme=sanji]{--aFg:#ffffff;--bg:#0a0609;--bg2:#120b10;--bg3:#191119;--bg4:#221722;--bg5:#2b1e2b;--b1:rgba(176,42,86,0.07);--b2:rgba(176,42,86,0.15);--b3:rgba(176,42,86,0.26);--t1:#f8f0ea;--t2:#cbb6c0;--t3:#a08a96;--a:#b02a56;--a2:#e8618d;--ag:rgba(176,42,86,0.13);--glow:rgba(176,42,86,0.24);--fin:#5ed47a;--finbg:rgba(94,212,122,0.11);--wat:#f2d13c;--watbg:rgba(242,209,60,0.12);--pln:#7aa6e0;--plnbg:rgba(122,166,224,0.11);--topgrad:linear-gradient(180deg,#2a0a1a 0%,#0a0609 100%);}
+   Second pass, after "needs more yellow": the blonde takes the accent and the
+   wine becomes the ground it sits against — which is the contrast the picture
+   actually has, a bright head of hair against a dark suit. Yellow now carries
+   every button, every active state and every progress bar, and the suit marks
+   Watching so both colours stay in play.
+   --aFg is near-black again (with a plum cast) because the accent is light.
+   Measured on every surface: worst body pair 8.48, dimmest label 4.99,
+   near-black on the accent 11.78, the wine status 5.31. */
+[data-theme=sanji]{--aFg:#1a0d14;--bg:#0d070b;--bg2:#170d14;--bg3:#20131b;--bg4:#2a1a24;--bg5:#35222e;--b1:rgba(240,201,46,0.07);--b2:rgba(240,201,46,0.15);--b3:rgba(240,201,46,0.28);--t1:#fbf3e4;--t2:#d3c0bc;--t3:#a89094;--a:#f0c92e;--a2:#ffdc5c;--ag:rgba(240,201,46,0.13);--glow:rgba(240,201,46,0.26);--fin:#5ed47a;--finbg:rgba(94,212,122,0.11);--wat:#e0568a;--watbg:rgba(224,86,138,0.13);--pln:#7aa6e0;--plnbg:rgba(122,166,224,0.11);--topgrad:linear-gradient(180deg,#3a0f24 0%,#0d070b 100%);}
 [data-theme=zoro]{--aFg:#140b06;--bg:#050e07;--bg2:#0a140c;--bg3:#0f1c12;--bg4:#142418;--bg5:#192c1e;--b1:rgba(38,158,64,0.07);--b2:rgba(38,158,64,0.14);--b3:rgba(38,158,64,0.26);--t1:#e6f4e8;--t2:#99c2a0;--t3:#579d65;--a:#26a040;--a2:#46c860;--ag:rgba(38,160,64,0.13);--glow:rgba(38,160,64,0.22);--fin:#4ecb82;--finbg:rgba(78,203,130,0.11);--wat:#e85050;--watbg:rgba(232,80,80,0.11);--pln:#5b9cf6;--plnbg:rgba(91,156,246,0.11);--topgrad:linear-gradient(180deg,#020e04 0%,#050e07 100%);}
 [data-theme=chopper]{--aFg:#140b06;--bg:#0c080f;--bg2:#150f1c;--bg3:#1c1428;--bg4:#231934;--bg5:#2a1e40;--b1:rgba(214,72,114,0.07);--b2:rgba(214,72,114,0.14);--b3:rgba(214,72,114,0.26);--t1:#fceef6;--t2:#d1a7c1;--t3:#ad7ba2;--a:#d84872;--a2:#f87098;--ag:rgba(216,72,114,0.13);--glow:rgba(216,72,114,0.24);--fin:#60d4a0;--finbg:rgba(96,212,160,0.11);--wat:#f5a040;--watbg:rgba(245,160,64,0.11);--pln:#7ab4f5;--plnbg:rgba(122,180,245,0.11);--topgrad:linear-gradient(180deg,#1a0610 0%,#0c080f 100%);}
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
@@ -114,6 +116,14 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
   from{transform:translate3d(-4%,-2%,0) scale(1.02);}
   to{transform:translate3d(6%,4%,0) scale(1.14);}
 }
+.art-seg{display:flex;gap:8px;}
+.art-opt{flex:1;display:flex;flex-direction:column;gap:2px;padding:11px 12px;border-radius:14px;
+  background:var(--bg3);border:1px solid var(--bn2);color:var(--t2);cursor:pointer;text-align:left;
+  transition:background-color .15s,border-color .15s,color .15s;}
+.art-opt.on{background:var(--ag);border-color:color-mix(in srgb,var(--a) 55%,transparent);color:var(--a2);}
+.art-lb{font-family:var(--fd);font-size:13.5px;font-weight:800;}
+.art-sub{font-size:11px;color:var(--t3);}
+.art-opt.on .art-sub{color:inherit;opacity:.8;}
 .glow-modes{display:flex;flex-wrap:wrap;gap:18px;}
 .glow-mode,.glow-col{background:none;border:none;padding:0;cursor:pointer;-webkit-tap-highlight-color:transparent;}
 .glow-mode{display:flex;flex-direction:column;align-items:center;gap:7px;}
@@ -402,9 +412,12 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 }
 .hero:active{transform:scale(0.985);}
 .hero-cta{transition:transform .16s,box-shadow .16s;}
-.hero-bg{position:absolute;inset:0;background-size:cover;background-position:center 22%;filter:saturate(1.05);}
+/* No filter. Boosting saturation by 5-8% "for punch" is repainting artwork that
+   somebody drew — subtle enough to look like a house style and wrong enough that
+   the colours are not the ones in the picture. */
+.hero-bg{position:absolute;inset:0;background-size:cover;background-position:center 22%;}
 /* per-title banner art rendered as an <img> so it lazy-loads + can gracefully drop on error (falls back to the gradient .hero-bg beneath it) */
-.hero-bg-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 30%;filter:saturate(1.08);animation:kenburns 28s ease-in-out infinite alternate;}
+.hero-bg-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 30%;animation:kenburns 28s ease-in-out infinite alternate;}
 @keyframes kenburns{from{transform:scale(1.06) translate(0,0);}to{transform:scale(1.18) translate(-2.5%,-3%);}}
 /* Phase-2 motion: staggered reveals + tactile press */
 body.first-paint .pcard{animation:cardIn .42s cubic-bezier(.2,1,.3,1) backwards;}
@@ -526,7 +539,13 @@ body.first-paint .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards
 .sv-drill.on{display:flex;animation:fadeUp .3s ease both;}
 .sv-chip{font-size:11.5px;font-weight:600;padding:6px 11px;border-radius:99px;background:var(--bg4);border:1px solid var(--b2);color:var(--t2);display:inline-flex;align-items:center;gap:4px;}
 .sv-chip .ico{width:11px;height:11px;fill:currentColor;color:var(--a2);}
-.hero-shade{position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,0.05) 0%,rgba(8,8,10,0.6) 55%,rgba(8,8,10,0.93) 100%);}
+/* A scrim is there to make text readable, not to set a mood. This one started
+   dimming at the very top and reached 0.93 — so most of the picture was under
+   shade to protect a title sitting in the bottom third. It now stays clear until
+   the text does, and the title carries a shadow of its own for the rest. */
+.hero-shade{position:absolute;inset:0;background:linear-gradient(180deg,transparent 0%,transparent 42%,rgba(8,8,10,0.55) 74%,rgba(8,8,10,0.88) 100%);}
+[data-art=cinematic] .hero-shade{background:linear-gradient(180deg,rgba(0,0,0,0.05) 0%,rgba(8,8,10,0.6) 55%,rgba(8,8,10,0.93) 100%);}
+[data-art=cinematic] .hero-bg-img,[data-art=cinematic] .hero-bg{filter:saturate(1.08);}
 .hero-body{position:relative;padding:16px 18px;width:100%;}
 .hero-kicker{font-size:10px;font-weight:800;letter-spacing:0.14em;text-transform:uppercase;color:var(--a2);margin-bottom:6px;}
 .hero-title{font-size:21px;font-weight:900;letter-spacing:-0.4px;line-height:1.15;text-shadow:0 2px 12px rgba(0,0,0,0.5);}
@@ -592,7 +611,9 @@ body.first-paint .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards
 .rz-card:active{transform:scale(.98);}
 .rz-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
 .rz-ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--fd);font-size:40px;font-weight:900;color:var(--t3);background:linear-gradient(135deg,var(--bg4),var(--bg2));}
-.rz-scrim{position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.82) 0%,rgba(0,0,0,.34) 40%,rgba(0,0,0,0) 66%);}
+.rz-scrim{position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.78) 0%,rgba(0,0,0,.16) 34%,rgba(0,0,0,0) 52%);}
+[data-art=cinematic] .rz-scrim{background:linear-gradient(to top,rgba(0,0,0,.82) 0%,rgba(0,0,0,.34) 40%,rgba(0,0,0,0) 66%);}
+.rz-title,.hero-title,.hero-kicker,.rz-sub,.hero-meta{text-shadow:0 1px 8px rgba(0,0,0,.85);}
 .rz-play{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:46px;height:46px;border-radius:50%;background:rgba(255,255,255,.22);border:1.5px solid rgba(255,255,255,.66);color:#fff;display:flex;align-items:center;justify-content:center;transition:transform .15s,background-color .15s;}
 .rz-play .ico{width:20px;height:20px;fill:currentColor;margin-left:2px;}
 .rz-card:active .rz-play{transform:translate(-50%,-50%) scale(1.1);background:rgba(255,255,255,.28);}
@@ -895,9 +916,12 @@ body.first-paint .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards
    comes from the same prog() the bar uses, so the two can never disagree. */
 .dt-level{
   position:absolute;left:0;right:0;bottom:0;pointer-events:none;
-  background:linear-gradient(to top,color-mix(in srgb,var(--a) 46%,transparent),color-mix(in srgb,var(--a) 8%,transparent));
+  /* The line is the information. The wash under it was tinting half the cover in
+     the theme's accent, which is exactly the "true colours aren't shown" problem
+     — so it drops to a hint, and the edge does the work. */
+  background:linear-gradient(to top,color-mix(in srgb,var(--a) 20%,transparent),transparent 62%);
   border-top:2px solid var(--a2);
-  box-shadow:0 -8px 22px -6px var(--glow);
+  box-shadow:0 -6px 16px -8px var(--glow);
   transition:height .55s cubic-bezier(.32,.72,.28,1);
 }
 /* Finished: there is no waterline left to draw. */
@@ -3110,6 +3134,11 @@ body.recsel .pcard{position:relative;}
     </div>
   </div>
   <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--b1);">
+    <div class="flabel" style="margin-bottom:4px">Artwork</div>
+    <p class="ai-desc" style="font-size:11.5px;margin:0 0 12px">Natural leaves covers and banners exactly as they are. Cinematic boosts the colour a little and shades further up the image, so titles read over busier art.</p>
+    <div class="art-seg" id="artRow"></div>
+  </div>
+  <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--b1);">
     <div class="flabel" style="margin-bottom:4px">Background glow</div>
     <p class="ai-desc" style="font-size:11.5px;margin:0 0 14px">Follows what you’re browsing — or lock it to your theme, a color, or off.</p>
     <div class="glow-modes" id="glowRow"></div>
@@ -4540,6 +4569,7 @@ function applyExtra(x){
   // repaint everything the synced state drives
   try{const at=localStorage.getItem('animetheme');if(at&&typeof applyTheme==='function')applyTheme(at);}catch(e){}
   try{if(typeof applyGlow==='function')applyGlow();}catch(e){}
+  try{if(typeof applyArtMode==='function')applyArtMode();}catch(e){}
   try{if(typeof applyAmbient==='function')applyAmbient();}catch(e){}
   try{if(typeof renderThemeGrid==='function')renderThemeGrid();}catch(e){}
   try{if(typeof renderFriends==='function')renderFriends();}catch(e){}
@@ -4996,7 +5026,7 @@ const THEMES=[
   {id:'naruto',  name:'Naruto',  emoji:'🍥', bg:'#0e0f18', accent:'#f57800'},
   {id:'sasuke',  name:'Sasuke',  emoji:'⚡', bg:'#0b0b18', accent:'#7730e8'},
   {id:'luffy',   name:'Luffy',   emoji:'🏴‍☠️',bg:'#0b1420', accent:'#d03838'},
-  {id:'sanji',   name:'Sanji',   emoji:'🔥', bg:'#120b10', accent:'#b02a56'},
+  {id:'sanji',   name:'Sanji',   emoji:'🔥', bg:'#170d14', accent:'#f0c92e'},
   {id:'zoro',    name:'Zoro',    emoji:'⚔️', bg:'#0a140c', accent:'#26a040'},
   {id:'chopper', name:'Chopper', emoji:'🦌', bg:'#150f1c', accent:'#d84872'},
 ];
@@ -5336,7 +5366,9 @@ function deleteCustomTheme(id){
   if(curTheme===id)applyTheme('default');else renderThemeGrid();
   toast('Theme deleted');
 }
+function renderArtRowSafe(){try{renderArtRow();}catch(e){}}
 function renderThemeGrid(){
+  try{renderArtRow();}catch(e){}
   const bs=document.getElementById('brightSlider');if(bs)bs.value=bgBright();
   try{renderGlowRow();}catch(e){}
   const g=document.getElementById('themeGrid');if(!g)return;
@@ -5512,6 +5544,26 @@ function glowColorLive(m){
   try{var sw=document.querySelector('.glow-cpick');if(sw)sw.style.background=m;}catch(e){}
 }
 const GLOW_SWATCHES=['#8b5cff','#3b9eff','#1fc2b0','#33c65a','#f5a623','#ff5f8f','#e0445c','#e8e8f0'];
+// Artwork treatment. The app used to boost saturation and shade most of a
+// picture by default, which is a house style imposed on somebody else's drawing —
+// so Natural is the default and the old look is a choice, not the condition.
+const ART_KEY='art_mode';
+// Applied at parse time too: waiting for a render would flash the other treatment.
+function artMode(){try{return localStorage.getItem(ART_KEY)==='cinematic'?'cinematic':'natural';}catch(e){return 'natural';}}
+function applyArtMode(){try{document.documentElement.setAttribute('data-art',artMode());}catch(e){}}
+function setArtMode(m){
+  try{localStorage.setItem(ART_KEY,m==='cinematic'?'cinematic':'natural');}catch(e){}
+  applyArtMode();renderArtRow();
+  toast(m==='cinematic'?'Cinematic artwork':'Artwork shown as-is');
+}
+try{applyArtMode();}catch(e){}
+function renderArtRow(){
+  const row=document.getElementById('artRow'); if(!row)return;
+  const m=artMode();
+  row.innerHTML=[['natural','Natural','True colours'],['cinematic','Cinematic','Richer, shaded']]
+    .map(([id,lb,sub])=>`<button class="art-opt${m===id?' on':''}" onclick="setArtMode('${id}')">
+      <span class="art-lb">${lb}</span><span class="art-sub">${sub}</span></button>`).join('');
+}
 function renderGlowRow(){
   const row=document.getElementById('glowRow');if(!row)return;
   const m=glowMode();
@@ -7217,7 +7269,7 @@ function openSheet(id){
   document.getElementById('overlay').classList.add('on');
   document.getElementById(id).classList.add('on');
   try{sheetFocusGuard(id,true);}catch(e){}
-  if(id==='themeSheet')renderThemeGrid();
+  if(id==='themeSheet'){renderThemeGrid();try{renderArtRow();}catch(e){}}
   if(id==='statsSheet')renderStatsSheet();
   if(id==='settingsSheet')renderSettings();
   if(id==='backupSheet')renderSyncUI();
@@ -14980,10 +15032,11 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-11.15',
+  v:'2026-08-11.16',
   title:'A cleaner app, and progress that keeps itself',
   push:'Progress that marks itself \u2014 and a lot of polish.',
   notes:[
+    'Artwork is shown as it is. The app was quietly boosting saturation on banners and shading most of the picture to protect a title sitting in the bottom third \u2014 so covers never quite looked like themselves. Filters are gone, the shade only covers what the text needs, and Theme \u2192 Artwork keeps the old richer look if you want it.',
     'You choose what the home screen shows. Settings \u2192 Home screen turns any band off \u2014 the spotlight, Airing this week, Not sure what to watch, favourites, genre rows \u2014 and reorders the rest. Your lists themselves always show.',
     'Pick several shows at once and move them together. On a desktop: click, shift-click or shift+arrow for a run, space for scattered ones, right-click for the menu. On a phone: press and hold. Then move them to a list, favourite them or rate them in one go.',
     'Progress keeps itself. Use the site\u2019s own next-episode link and WatchList follows along; in the iPhone app it reads the actual playback position, so what you watched is what gets marked \u2014 down to the minute you stopped.',

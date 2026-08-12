@@ -31,6 +31,17 @@ The text ramp was rebuilt once already: `--t2` was failing at 3.9:1 on `--bg5`
 and `--t3` was 2.0:1 on `--bg`. Nudging one collapsed it into another, so all
 three are tuned together. **Don't lighten any of them "for elegance".**
 
+**Your own accent.** `accent_override` writes `--a`, `--a2`, `--ag`, `--glow`
+and `--aFg` on `:root`, over whatever theme is active — so a theme's ground and
+its accent are no longer a package deal. `--aFg` is **computed, never chosen**:
+text sitting on the accent is unreadable rather than merely ugly when it's wrong,
+so it's picked by measured contrast (near-black vs white, whichever wins). Every
+preset lands ≥4.19:1, most far above.
+
+**Card size.** `--card-min` feeds the grid's `minmax()`. The grid is `auto-fill`,
+so changing one number changes the column count at every screen width with no
+per-breakpoint maths.
+
 **Themes.** Seven named (`default`, `naruto`, `sasuke`, `luffy`, `sanji`, `zoro`,
 `chopper`) plus user-built ones via Harmonize. Each redefines the full token set,
 so any new component must be built from tokens only — a literal colour breaks six

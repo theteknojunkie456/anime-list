@@ -116,6 +116,18 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
   from{transform:translate3d(-4%,-2%,0) scale(1.02);}
   to{transform:translate3d(6%,4%,0) scale(1.14);}
 }
+/* Accent swatches. Round, because a colour has no shape of its own and a circle
+   is the least opinionated frame to put one in. */
+.acc-row{display:flex;flex-wrap:wrap;gap:9px;align-items:center;}
+.acc-sw{width:34px;height:34px;border-radius:50%;border:2px solid transparent;background:var(--sw,var(--bg3));
+  cursor:pointer;padding:0;position:relative;transition:transform .12s,border-color .15s;}
+.acc-sw:hover{transform:scale(1.08);}
+.acc-sw.on{border-color:var(--t1);box-shadow:0 0 0 3px color-mix(in srgb,var(--t1) 18%,transparent);}
+.acc-none{width:auto;padding:0 13px;border-radius:99px;background:var(--bg3);border:1px solid var(--bn2);
+  color:var(--t2);font-size:11.5px;font-weight:700;}
+.acc-none.on{border-color:var(--t1);color:var(--t1);}
+.acc-custom{display:inline-flex;align-items:center;justify-content:center;overflow:hidden;}
+.acc-custom input{opacity:0;width:100%;height:100%;cursor:pointer;border:0;padding:0;}
 .art-seg{display:flex;gap:8px;}
 .art-opt{flex:1;display:flex;flex-direction:column;gap:2px;padding:11px 12px;border-radius:14px;
   background:var(--bg3);border:1px solid var(--bn2);color:var(--t2);cursor:pointer;text-align:left;
@@ -2270,7 +2282,7 @@ body.recsel .pcard{position:relative;}
   .nbtn{min-width:78px;}
   /* On a pointer, the whole target lights up rather than only its label. */
   .nbtn:hover:not(.add){background:rgba(255,255,255,.05);}
-  .grid,.row-scroll{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));}
+  .grid,.row-scroll{grid-template-columns:repeat(auto-fill,minmax(var(--card-min,150px),1fr));}
   /* At 1400 the hero was 4.76:1 and the detail banner 7.89:1 — letterbox slits
      that no uploaded picture can fill without being reduced to a strip. Height
      scales with the extra width instead. */
@@ -3172,6 +3184,16 @@ body.recsel .pcard{position:relative;}
       <input type="range" class="bright-slider" id="brightSlider" min="0" max="100" value="0" step="1" oninput="setBgBright(this.value)" aria-label="Background brightness">
       <span class="bright-ico"><i data-ic="bulb"></i></span>
     </div>
+  </div>
+  <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--b1);">
+    <div class="flabel" style="margin-bottom:4px">Accent</div>
+    <p class="ai-desc" style="font-size:11.5px;margin:0 0 12px">Keep any theme's background and give it your own colour. Text on top is picked automatically so it stays readable.</p>
+    <div class="acc-row" id="accentRow"></div>
+  </div>
+  <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--b1);">
+    <div class="flabel" style="margin-bottom:4px">Card size</div>
+    <p class="ai-desc" style="font-size:11.5px;margin:0 0 12px">How much of your list fits on screen at once.</p>
+    <div class="art-seg" id="densityRow"></div>
   </div>
   <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--b1);">
     <div class="flabel" style="margin-bottom:4px">Artwork</div>
@@ -4610,6 +4632,8 @@ function applyExtra(x){
   try{const at=localStorage.getItem('animetheme');if(at&&typeof applyTheme==='function')applyTheme(at);}catch(e){}
   try{if(typeof applyGlow==='function')applyGlow();}catch(e){}
   try{if(typeof applyArtMode==='function')applyArtMode();}catch(e){}
+  try{if(typeof applyAccent==='function')applyAccent();}catch(e){}
+  try{if(typeof applyDensity==='function')applyDensity();}catch(e){}
   try{if(typeof applyAmbient==='function')applyAmbient();}catch(e){}
   try{if(typeof renderThemeGrid==='function')renderThemeGrid();}catch(e){}
   try{if(typeof renderFriends==='function')renderFriends();}catch(e){}
@@ -5198,8 +5222,76 @@ function applyTheme(id,persist=true){
   document.documentElement.setAttribute('data-theme',(t.custom||t.id==='default')?'':t.id);
   if(t.custom)applyCustomVars(t);
   if(persist){try{const s=store();if(s)s.setItem('animetheme',t.id);}catch{}}
+  try{applyAccent();}catch(e){}      // a chosen accent survives a theme change
   try{applyAmbient();}catch(e){}
   renderThemeGrid();
+}
+// ─── YOUR OWN ACCENT ────────────────────────────────────────────────────────
+// A theme bundles a ground and an accent, so liking one has always meant taking
+// the other. This unpicks them: keep any theme's surfaces and give it whatever
+// accent you want. It writes the same four tokens a theme does, so every button,
+// chip, bar and glow follows without a single component knowing about it.
+//
+// --aFg is computed, not chosen. It is the text that sits ON the accent, and
+// getting it wrong is unreadable rather than ugly — so it is picked by contrast:
+// near-black on a light accent, white on a dark one, whichever wins by measure.
+const ACCENT_KEY='accent_override';
+function accentOverride(){try{return localStorage.getItem(ACCENT_KEY)||'';}catch(e){return '';}}
+function _hex2rgb(h){h=String(h||'').replace('#','');if(h.length===3)h=h.split('').map(c=>c+c).join('');
+  return [0,2,4].map(i=>parseInt(h.slice(i,i+2),16)||0);}
+function _rel(c){c/=255;return c<=0.03928?c/12.92:Math.pow((c+0.055)/1.055,2.4);}
+function _lum(hex){const[r,g,b]=_hex2rgb(hex);return 0.2126*_rel(r)+0.7152*_rel(g)+0.0722*_rel(b);}
+function _contrast(a,b){const x=_lum(a),y=_lum(b);return (Math.max(x,y)+0.05)/(Math.min(x,y)+0.05);}
+function _lighten(hex,amt){const[r,g,b]=_hex2rgb(hex);
+  const f=v=>Math.round(v+(255-v)*amt);
+  return '#'+[f(r),f(g),f(b)].map(v=>v.toString(16).padStart(2,'0')).join('');}
+function applyAccent(){
+  const el=document.documentElement, hex=accentOverride();
+  ['--a','--a2','--ag','--glow','--aFg'].forEach(k=>el.style.removeProperty(k));
+  if(!hex)return;
+  const [r,g,b]=_hex2rgb(hex);
+  el.style.setProperty('--a',hex);
+  el.style.setProperty('--a2',_lighten(hex,0.28));
+  el.style.setProperty('--ag',`rgba(${r},${g},${b},0.14)`);
+  el.style.setProperty('--glow',`rgba(${r},${g},${b},0.26)`);
+  el.style.setProperty('--aFg',_contrast('#111014',hex)>=_contrast('#ffffff',hex)?'#111014':'#ffffff');
+}
+function setAccent(hex){
+  try{hex?localStorage.setItem(ACCENT_KEY,hex):localStorage.removeItem(ACCENT_KEY);}catch(e){}
+  applyAccent();renderAccentRow();try{applyAmbient();}catch(e){}
+}
+// ─── HOW MUCH FITS ──────────────────────────────────────────────────────────
+// One person wants to see their whole library at a glance and another wants the
+// artwork big enough to enjoy. Both are right, and the grid is already auto-fill
+// — so the only thing that has to change is the minimum a poster may be, and the
+// column count follows on every screen size by itself.
+const DENSITY_KEY='card_density';
+const DENSITIES={compact:{min:104,label:'Compact',sub:'More per row'},
+                 comfy:{min:150,label:'Comfortable',sub:'The default'},
+                 large:{min:200,label:'Large',sub:'Bigger artwork'}};
+function density(){try{const v=localStorage.getItem(DENSITY_KEY);return DENSITIES[v]?v:'comfy';}catch(e){return 'comfy';}}
+function applyDensity(){
+  try{document.documentElement.style.setProperty('--card-min',DENSITIES[density()].min+'px');}catch(e){}
+}
+function setDensity(d){
+  try{localStorage.setItem(DENSITY_KEY,DENSITIES[d]?d:'comfy');}catch(e){}
+  applyDensity();renderDensityRow();try{render();}catch(e){}
+}
+function renderDensityRow(){
+  const row=document.getElementById('densityRow'); if(!row)return;
+  const cur=density();
+  row.innerHTML=Object.keys(DENSITIES).map(k=>`<button class="art-opt${cur===k?' on':''}" onclick="setDensity('${k}')">
+    <span class="art-lb">${DENSITIES[k].label}</span><span class="art-sub">${DENSITIES[k].sub}</span></button>`).join('');
+}
+try{applyDensity();}catch(e){}
+function renderAccentRow(){
+  const row=document.getElementById('accentRow'); if(!row)return;
+  const cur=accentOverride();
+  const PICKS=['#da374f','#e0873f','#f0c92e','#5ed47a','#3fb6c9','#4f7fd4','#8b6fd4','#e0568a'];
+  row.innerHTML=`<button class="acc-sw acc-none${cur?'':' on'}" onclick="setAccent('')" title="Use the theme's own accent"><span>Theme</span></button>`
+    +PICKS.map(c=>`<button class="acc-sw${cur.toLowerCase()===c?' on':''}" style="--sw:${c}" onclick="setAccent('${c}')" aria-label="Accent ${c}"></button>`).join('')
+    +`<label class="acc-sw acc-custom${cur&&PICKS.indexOf(cur.toLowerCase())<0?' on':''}" style="--sw:${cur||'#888'}" title="Any colour">
+        <input type="color" value="${cur||'#da374f'}" oninput="setAccent(this.value)"></label>`;
 }
 // ─── HARMONIZE ──────────────────────────────────────────────────────────────
 // A hand-picked accent and background almost never land: the accent is muddy or
@@ -5409,6 +5501,8 @@ function deleteCustomTheme(id){
 function renderArtRowSafe(){try{renderArtRow();}catch(e){}}
 function renderThemeGrid(){
   try{renderArtRow();}catch(e){}
+  try{renderAccentRow();}catch(e){}
+  try{renderDensityRow();}catch(e){}
   const bs=document.getElementById('brightSlider');if(bs)bs.value=bgBright();
   try{renderGlowRow();}catch(e){}
   const g=document.getElementById('themeGrid');if(!g)return;

@@ -31,6 +31,17 @@ The text ramp was rebuilt once already: `--t2` was failing at 3.9:1 on `--bg5`
 and `--t3` was 2.0:1 on `--bg`. Nudging one collapsed it into another, so all
 three are tuned together. **Don't lighten any of them "for elegance".**
 
+**Layout** (`data-view`: `grid` | `list` | `cinema`). Three genuinely different
+screens from *one* set of markup — no JS branch, so the data path can't diverge
+between them. A card already carries artwork, status tag, title, sub-line,
+progress bar and a "N new" tag; what changes is which the eye meets first and
+how many titles fit. List is the only view where two shows can be compared
+without scrolling; Cinema is for choosing, the others for finding.
+Constraint worth knowing: the badge, the "new" tag and the bar live *inside*
+`.pcard-wrap`, so in List they cannot move to the text column — they belong to
+the thumbnail. List leans into that (the tag becomes a dot, since the word is
+unreadable at 56px and the colour already says it) rather than fighting it.
+
 **UI style** (`data-ui`: `soft` | `sharp` | `round`). Radius is *not* tokenised in
 this file — 163 hardcoded values against zero uses of `--r` — so a style that
 rewrote everything would be a refactor pretending to be a feature. Each style

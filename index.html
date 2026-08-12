@@ -1801,8 +1801,24 @@ body.call-full{overflow:hidden;}
 .yt-frame{width:100%;aspect-ratio:16/9;max-height:100%;}
 .yt-frame iframe{width:100%;height:100%;border:0;display:block;}
 .sh-stage{position:absolute;inset:0;background:#000;display:flex;align-items:center;justify-content:center;}
-.sh-video{width:100%;height:100%;object-fit:contain;background:#000;}
+.sh-video{width:100%;height:100%;object-fit:contain;background:#000;transition:transform .3s cubic-bezier(.2,1,.28,1);}
 .sh-video.fill{object-fit:cover;}   /* tap to go edge-to-edge (crops a little) */
+/* A landscape share on a portrait phone is the worst case in the whole feature:
+   contain is correct and leaves the picture occupying about a third of the
+   screen, with black above and below. Turning it a quarter turn swaps the axes,
+   so the stream's width runs down the long side of the phone — the same picture,
+   roughly three times the area, nothing cropped. The stage is the reference for
+   the size, so the numbers are the viewer's own screen. */
+.sh-video.sh-rot{
+  width:var(--rot-w);height:var(--rot-h);
+  transform:rotate(90deg);
+  position:absolute;left:50%;top:50%;margin-left:calc(var(--rot-w) / -2);margin-top:calc(var(--rot-h) / -2);
+}
+.sh-rot-hint{position:absolute;top:calc(var(--safe-t,0px) + 62px);left:50%;transform:translateX(-50%);z-index:4;
+  display:inline-flex;align-items:center;gap:7px;padding:7px 13px;border-radius:99px;
+  background:rgba(0,0,0,.55);color:#fff;font-size:11.5px;font-weight:700;border:1px solid rgba(255,255,255,.16);
+  cursor:pointer;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);}
+.sh-rot-hint .ico{width:13px;height:13px;}
 .sh-retry{margin-top:15px;padding:11px 22px;border:none;border-radius:12px;background:var(--a);color:#fff;font-family:var(--fd);font-weight:800;font-size:14px;cursor:pointer;transition:transform .1s;}
 .sh-retry:active{transform:scale(.96);}
 .shareview .pv-top{position:absolute;top:0;left:0;right:0;z-index:3;background:linear-gradient(to bottom,rgba(0,0,0,.6),rgba(0,0,0,0));padding-bottom:26px;}
@@ -3123,10 +3139,8 @@ body.recsel .pcard{position:relative;}
     <div class="sheet-title"><i data-ic="layers"></i> Home screen</div>
     <button class="sheet-cancel" onclick="closeAll()">Done</button>
   </div>
-  <div class="sheet-body">
-    <p class="ai-desc">Turn off the bands you never use, and put the ones you do at the top. Your lists themselves always show.</p>
-    <div id="homeLayoutBox"></div>
-  </div>
+  <p class="ai-desc">Turn off the bands you never use, and put the ones you do at the top. Your lists themselves always show.</p>
+  <div id="homeLayoutBox"></div>
 </div>
 <div class="sheet" id="themeSheet">
   <div class="sheet-handle"></div>
@@ -8771,11 +8785,58 @@ function showShareView(stream){
     tryPlay();
     // iOS blocks autoplay (esp. with audio) → the first tap anywhere starts it
     sv.addEventListener('click',tryPlay);
-    v.addEventListener('loadedmetadata',()=>{document.getElementById('shareWait').classList.add('gone');tryPlay();},{once:true});
+    v.addEventListener('loadedmetadata',()=>{document.getElementById('shareWait').classList.add('gone');tryPlay();try{fitShare();}catch(e){}},{once:true});
     v.addEventListener('playing',()=>{document.getElementById('shareWait').classList.add('gone');},{once:true});
   }
   const hint=document.getElementById('shFitHint');if(hint){hint.textContent='Black screen? Tap once. Tap again to fill.';hint.style.opacity='1';setTimeout(()=>{hint.style.opacity='0';},6000);}
+  try{fitShare();}catch(e){}
 }
+// Make the presenter's screen as large as the VIEWER's screen allows.
+//
+// contain already uses every pixel it honestly can — but when a landscape stream
+// meets a portrait phone, "honestly" means about a third of the display and two
+// black bands. Rotating a quarter turn swaps which axis the stream's width runs
+// along, and the same picture covers roughly three times the area with nothing
+// cropped. Only when it genuinely helps: a big gain, both orientations, and the
+// viewer can turn it off, because a rotated picture is a trade and not everyone
+// wants it.
+let _shRotOff=false;
+function shareGain(){
+  const v=document.getElementById('shareVideo'),st=document.querySelector('#shareView .sh-stage');
+  if(!v||!st||!v.videoWidth||!v.videoHeight)return null;
+  const sw=st.clientWidth,sh=st.clientHeight; if(!sw||!sh)return null;
+  const ar=v.videoWidth/v.videoHeight;
+  // Area the picture actually occupies when fitted into a box, normally versus
+  // with the box's axes swapped. Comparing areas is the honest measure of "does
+  // turning it help" — comparing widths or heights alone gets it wrong.
+  const fit=(bw,bh)=>{const s=Math.min(bw/ar,bh);return (s*ar)*s;};
+  const normal=fit(sw,sh), rotated=fit(sh,sw);
+  return {ar,normal,rotated,gain:normal>0?rotated/normal:1,sw,sh};
+}
+function fitShare(){
+  const v=document.getElementById('shareVideo'); if(!v)return;
+  const g=shareGain();
+  const wrap=document.querySelector('#shareView .sh-stage');
+  let btn=document.getElementById('shRotBtn');
+  if(!g||_shRotOff||g.gain<1.35){
+    v.classList.remove('sh-rot'); if(btn)btn.remove(); return;
+  }
+  // Rotated, the video's box is the stage with its axes swapped.
+  v.style.setProperty('--rot-w',g.sh+'px');
+  v.style.setProperty('--rot-h',g.sw+'px');
+  v.classList.add('sh-rot');
+  if(!btn&&wrap){
+    btn=document.createElement('button');btn.id='shRotBtn';btn.className='sh-rot-hint';
+    btn.innerHTML=icon('refresh')+'<span>Turned to fill your screen · tap to undo</span>';
+    btn.onclick=ev=>{ev.stopPropagation();_shRotOff=true;fitShare();};
+    wrap.appendChild(btn);
+    setTimeout(()=>{try{btn.style.opacity='0';btn.style.pointerEvents='none';}catch(e){}},7000);
+  }
+}
+try{
+  window.addEventListener('resize',()=>{try{fitShare();}catch(e){}});
+  window.addEventListener('orientationchange',()=>{setTimeout(()=>{try{fitShare();}catch(e){}},350);});
+}catch(e){}
 function hideShareView(){const v=document.getElementById('shareVideo');if(v)v.srcObject=null;const sw=document.getElementById('shareWait');if(sw)sw.classList.remove('gone');document.getElementById('shareView').classList.remove('on');}
 function leaveShareView(){document.getElementById('shareView').classList.remove('on');}   // hide but keep the stream
 function reopenShareView(){

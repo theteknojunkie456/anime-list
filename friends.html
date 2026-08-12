@@ -147,6 +147,56 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 [data-ui=round] .dt-watch,[data-ui=round] .pt-go,[data-ui=round] .prog-btn,
 [data-ui=round] .dpick,[data-ui=round] .hbtn,[data-ui=round] .kseg,[data-ui=round] .nbtn{border-radius:99px;}
 
+/* ── EDITIONS ───────────────────────────────────────────────────────────────
+   Not a skin. Each of these moves the furniture: where navigation lives, whether
+   there is a hero at all, how big the type is, how much chrome sits between you
+   and the list. Same app, same markup, same code path — arranged for a different
+   way of using it.
+
+   FOCUS — nothing but the list. No hero, no rails, no labels under the nav
+   icons, tighter chrome. For someone who opens the app knowing what they want.
+*/
+[data-ed=focus] .billboard,[data-ed=focus] .rz-sec,[data-ed=focus] .qp-strip{display:none!important;}
+[data-ed=focus] .nbtn small{display:none;}
+[data-ed=focus] .nav{padding-top:8px;padding-bottom:calc(var(--safe-b) + 8px);}
+[data-ed=focus] .nbtn.add{width:44px;height:44px;font-size:22px;}
+[data-ed=focus] .topbar{margin-top:6px;}
+[data-ed=focus] .hdr{padding-top:calc(var(--safe-t) + 8px);padding-bottom:2px;}
+[data-ed=focus] .hdr-title{font-size:17px;}
+[data-ed=focus] .row-head{margin-top:10px;}
+
+/* TV — arm's length. Everything larger: type, targets, artwork. The layout that
+   assumes the screen is further away than a phone held in one hand. */
+[data-ed=tv]{font-size:18px;}
+[data-ed=tv] .pcard-title{font-size:16px;}
+[data-ed=tv] .pcard-sub,[data-ed=tv] .pcard-air{font-size:13px;}
+[data-ed=tv] .row-title{font-size:20px;}
+[data-ed=tv] .hdr-title{font-size:26px;}
+[data-ed=tv] .nbtn small{font-size:11px;}
+[data-ed=tv] .nbtn{min-width:88px;padding:10px 12px;}
+[data-ed=tv] .nav{padding:16px 12px calc(var(--safe-b) + 16px);}
+[data-ed=tv] .nbtn.add{width:68px;height:68px;font-size:32px;}
+[data-ed=tv] .search-in{font-size:16px;padding-top:14px;padding-bottom:14px;}
+[data-ed=tv] .fchip{font-size:14px;height:40px;padding:0 16px;}
+[data-ed=tv] .dt-watch{height:60px;font-size:18px;}
+[data-ed=tv] .billboard,[data-ed=tv] .bb-slide{min-height:clamp(300px,42vw,560px);}
+
+/* PRO — navigation at the TOP, where a desktop expects it, and everything
+   tighter. The one edition that genuinely relocates a region rather than
+   resizing it: the bar leaves the bottom of the screen entirely. */
+[data-ed=pro] .nav{position:static;order:-1;width:auto;max-width:none;transform:none;left:auto;right:auto;
+  border-radius:0;border-top:0;border-bottom:1px solid var(--bn2);box-shadow:none;
+  padding:6px 10px;grid-template-columns:repeat(5,auto);justify-content:start;column-gap:4px;}
+[data-ed=pro] .nav::before,[data-ed=pro] .nav::after{display:none;}
+[data-ed=pro] .nbtn{flex-direction:row;gap:7px;min-width:0;padding:7px 12px;}
+[data-ed=pro] .nbtn small{font-size:12px;letter-spacing:0;}
+[data-ed=pro] .nbtn.add{width:auto;height:auto;border-radius:99px;padding:7px 14px;font-size:15px;top:0;}
+[data-ed=pro] .page{padding-bottom:calc(var(--safe-b) + 24px);}
+[data-ed=pro] .billboard{display:none;}
+[data-ed=pro] .topbar{margin-top:6px;}
+[data-ed=pro] .hdr{padding-bottom:0;}
+[data-ed=pro] .row-sec{margin-top:4px;}
+
 /* ── LAYOUTS ────────────────────────────────────────────────────────────────
    Not corner radii — genuinely different ways to show the same list, from the
    same markup. A card already carries artwork, a status tag, a title, a
@@ -251,6 +301,8 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 .acc-custom{display:inline-flex;align-items:center;justify-content:center;overflow:hidden;}
 .acc-custom input{opacity:0;width:100%;height:100%;cursor:pointer;border:0;padding:0;}
 .art-seg{display:flex;gap:8px;}
+.art-seg.th-wrap{flex-wrap:wrap;}
+.art-seg.th-wrap .art-opt{flex:1 1 44%;}
 .art-opt{flex:1;display:flex;flex-direction:column;gap:2px;padding:11px 12px;border-radius:14px;
   background:var(--bg3);border:1px solid var(--bn2);color:var(--t2);cursor:pointer;text-align:left;
   transition:background-color .15s,border-color .15s,color .15s;}
@@ -3303,6 +3355,8 @@ body.recsel .pcard{position:relative;}
 
   <details class="th-fold">
     <summary><span>Shape &amp; size</span><span class="th-hint">Corners, card size</span></summary>
+    <div class="th-sub">Edition <em>how the app is arranged</em></div>
+    <div class="art-seg th-wrap" id="editionRow"></div>
     <div class="th-sub">Layout <em>how a title is shown</em></div>
     <div class="art-seg" id="viewRow"></div>
     <div class="th-sub">Look <em>corners and edges</em></div>
@@ -4751,6 +4805,7 @@ function applyExtra(x){
   try{if(typeof applyDensity==='function')applyDensity();}catch(e){}
   try{if(typeof applyUiStyle==='function')applyUiStyle();}catch(e){}
   try{if(typeof applyLayoutView==='function')applyLayoutView();}catch(e){}
+  try{if(typeof applyEdition==='function')applyEdition();}catch(e){}
   try{if(typeof applyTint==='function')applyTint();}catch(e){}
   try{if(typeof applyStatusColors==='function')applyStatusColors();}catch(e){}
   try{if(typeof applyAmbient==='function')applyAmbient();}catch(e){}
@@ -5443,7 +5498,7 @@ function savedLooks(){try{const v=JSON.parse(localStorage.getItem(LOOKS_KEY)||'[
 function setSavedLooks(l){try{localStorage.setItem(LOOKS_KEY,JSON.stringify(l.slice(0,24)));}catch(e){}}
 function currentLook(){
   return {theme:curTheme||'default',accent:accentOverride(),tint:surfaceTint(),
-          ui:uiStyle(),view:layoutView(),density:density(),art:artMode(),status:statusColors(),
+          ui:uiStyle(),view:layoutView(),ed:edition(),density:density(),art:artMode(),status:statusColors(),
           glow:(()=>{try{return localStorage.getItem('glow_mode')||'';}catch(e){return '';}})()};
 }
 function saveLook(){
@@ -5461,11 +5516,12 @@ function applyLook(id){
   try{localStorage.setItem(TINT_KEY,l.tint||'');if(!l.tint)localStorage.removeItem(TINT_KEY);}catch(e){}
   try{localStorage.setItem(UI_KEY,l.ui||'soft');}catch(e){}
   try{localStorage.setItem(VIEW_KEY,l.view||'grid');}catch(e){}
+  try{localStorage.setItem(ED_KEY,l.ed||'standard');}catch(e){}
   try{localStorage.setItem(DENSITY_KEY,l.density||'comfy');}catch(e){}
   try{localStorage.setItem(ART_KEY,l.art||'natural');}catch(e){}
   if(l.glow){try{localStorage.setItem('glow_mode',l.glow);}catch(e){}}
   try{localStorage.setItem(STATUS_KEY,JSON.stringify(l.status||{}));}catch(e){}
-  applyAccent();applyTint();applyUiStyle();applyLayoutView();applyDensity();applyArtMode();applyStatusColors();
+  applyAccent();applyTint();applyUiStyle();applyLayoutView();applyEdition();applyDensity();applyArtMode();applyStatusColors();
   try{applyGlow();}catch(e){}
   try{render();}catch(e){}
   renderThemeGrid();
@@ -5557,6 +5613,27 @@ try{applyUiStyle();}catch(e){}
 // artwork big enough to enjoy. Both are right, and the grid is already auto-fill
 // — so the only thing that has to change is the minimum a poster may be, and the
 // column count follows on every screen size by itself.
+// Edition: how the app itself is arranged — where navigation lives, whether
+// there is a hero, how big everything is. Distinct from layout, which is about a
+// title, and from look, which is about corners. This one moves furniture.
+const ED_KEY='app_edition';
+const EDITIONS={standard:['Standard','Everything, as designed'],
+                focus:['Focus','Just the list, no extras'],
+                tv:['Big','Larger type and targets'],
+                pro:['Desktop','Navigation at the top, tighter']};
+function edition(){try{const v=localStorage.getItem(ED_KEY);return EDITIONS[v]?v:'standard';}catch(e){return 'standard';}}
+function applyEdition(){try{document.documentElement.setAttribute('data-ed',edition());}catch(e){}}
+function setEdition(v){
+  try{localStorage.setItem(ED_KEY,EDITIONS[v]?v:'standard');}catch(e){}
+  applyEdition();renderEditionRow();try{render();}catch(e){}
+}
+function renderEditionRow(){
+  const row=document.getElementById('editionRow'); if(!row)return;
+  const cur=edition();
+  row.innerHTML=Object.keys(EDITIONS).map(k=>`<button class="art-opt${cur===k?' on':''}" onclick="setEdition('${k}')">
+    <span class="art-lb">${EDITIONS[k][0]}</span><span class="art-sub">${EDITIONS[k][1]}</span></button>`).join('');
+}
+try{applyEdition();}catch(e){}
 // Layout: which of the three ways to show the list. Kept separate from density
 // because they answer different questions — this one is "what does a title look
 // like", density is "how many of them fit".
@@ -5817,6 +5894,7 @@ function renderThemeGrid(){
   try{renderTintRow();}catch(e){}
   try{renderLooksRow();}catch(e){}
   try{renderViewRow();}catch(e){}
+  try{renderEditionRow();}catch(e){}
   try{renderStatusColorRow();}catch(e){}
   const bs=document.getElementById('brightSlider');if(bs)bs.value=bgBright();
   try{renderGlowRow();}catch(e){}
@@ -15765,10 +15843,11 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-12.5',
+  v:'2026-08-12.6',
   title:'Yours to arrange, and artwork left alone',
   push:'Pick your accent, size the cards, and see covers as they really are.',
   notes:[
+    'Editions: four ways the whole app can be arranged, not just styled. Standard as it is; Focus strips the hero and the rails so it\u2019s only your list; Big makes every target and every letter larger; Desktop moves navigation to the top and tightens everything up.',
     'Three layouts, not just three shapes: Posters as it is, List for a dense readable rundown of everything at once, and Cinema for big wide artwork with the title over it. Same list, genuinely different screens.',
     'The Theme page is organised now: Colour together, shape and size folded away, artwork folded away, your saved looks at the bottom \u2014 instead of nine identical headings in a row. And the colour picker no longer shuts the moment you drag it.',
     'Save a look. Theme, accent, tint, shape, card size, artwork and glow all keep together under a name you choose, so you can build two and switch between them in a tap.',

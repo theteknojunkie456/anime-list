@@ -31,6 +31,14 @@ The text ramp was rebuilt once already: `--t2` was failing at 3.9:1 on `--bg5`
 and `--t3` was 2.0:1 on `--bg`. Nudging one collapsed it into another, so all
 three are tuned together. **Don't lighten any of them "for elegance".**
 
+**Edition** (`data-ed`: `standard` | `focus` | `tv` | `pro`). Where the furniture
+goes, not what colour it is — navigation position, whether a hero exists at all,
+type scale, chrome density. `pro` is the one that genuinely *relocates* a region:
+`.nav` drops `position:fixed` for `static; order:-1`, leaving the bottom of the
+screen entirely and sitting under the header (verified: header 0–48, nav 48–108,
+list from 108). Three axes stack and stay independent — edition arranges the
+app, layout shows a title, look sets the corners.
+
 **Layout** (`data-view`: `grid` | `list` | `cinema`). Three genuinely different
 screens from *one* set of markup — no JS branch, so the data path can't diverge
 between them. A card already carries artwork, status tag, title, sub-line,

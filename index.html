@@ -8710,6 +8710,27 @@ async function startShare(){
     systemAudio:'include'
   });}catch{toast('Screen share cancelled');return;}
   localStream=s;
+  // Read back what was ACTUALLY captured. The picker is a request, not a result:
+  // on macOS, Chrome without Screen Recording permission can only ever capture
+  // its own windows and tabs, so choosing "Entire Screen" hands back a browser
+  // surface and the party watches you use WatchList. Nothing in the API fails —
+  // you get a stream, it just is not the one you asked for. Saying so is the
+  // whole fix, because the setting that causes it is two clicks away and
+  // impossible to guess.
+  try{
+    const st=s.getVideoTracks()[0].getSettings?s.getVideoTracks()[0].getSettings():{};
+    const surface=st.displaySurface||'';
+    const dims=(st.width&&st.height)?`${st.width}\u00d7${st.height}`:'';
+    if(surface&&surface!=='monitor'){
+      const what=surface==='browser'?'a browser tab':surface==='window'?'a single window':'part of your screen';
+      toast(`Sharing ${what}, not the whole screen`+(surface==='browser'&&/Mac/i.test(navigator.platform||'')
+        ? ' \u2014 macOS blocks full-screen capture until Chrome is ticked in Privacy & Security \u203a Screen Recording'
+        : ''),9000);
+      try{logProblem('share','captured '+surface+' when monitor was requested',dims);}catch(e){}
+    }else if(st.width&&st.width<1200){
+      toast(`Sharing at ${dims} \u2014 lower than asked for, so it may look soft`);
+    }
+  }catch(e){}
   // Tell the encoder what it is looking at. Without a hint it assumes a talking
   // head and trades resolution away to keep the frame rate up, which is the
   // right call for a face and the wrong one for a screen — subtitles and UI text
@@ -15214,7 +15235,9 @@ function fyPlan(aniId,btn,kind){
   if(card){card.classList.add('leaving');setTimeout(()=>{card.parentNode&&card.remove();},300);}
 }
 
-function toast(msg){const el=document.getElementById('toast');el.textContent=msg;el.classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>el.classList.remove('on'),2400);}
+// 2.4s is right for "Saved" and far too short for a sentence that tells you
+// where a setting is. Anything that asks the reader to DO something gets longer.
+function toast(msg,ms){const el=document.getElementById('toast');el.textContent=msg;el.classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>el.classList.remove('on'),Math.max(1200,ms||2400));}
 
 // ─── SERVICE WORKER + SEAMLESS AUTO-UPDATE ───────────────────────────────────
 try{

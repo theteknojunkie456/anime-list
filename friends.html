@@ -88,6 +88,12 @@ body{
 .hdr-title,.hero-title,.sv-title,.lock-title,.sheet-title,.dt-title,.row-title,
 .pick-t,.tut-h,.set-h,.bb-slide .hero-title,.rec-title{font-family:var(--fd);letter-spacing:-0.02em;}
 input,textarea{user-select:text;-webkit-user-select:text;}
+/* Long-press on a card is this app's right-click. iOS answers a long press over
+   an image with its own Save Photo / Copy sheet, which fires first and swallows
+   the gesture — so the selection feature simply did not exist on a phone. Turn
+   the callout off everywhere a press means "select", and turn off the drag
+   ghost with it. */
+.pcard,.pcard *{-webkit-touch-callout:none;-webkit-user-drag:none;user-select:none;-webkit-user-select:none;}
 button{font-family:inherit;border:none;background:none;color:inherit;cursor:pointer;}
 img{-webkit-user-drag:none;}
 ::-webkit-scrollbar{display:none;}
@@ -209,7 +215,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 [data-ed=tv] .row-title{font-size:20px;}
 [data-ed=tv] .hdr-title{font-size:26px;}
 [data-ed=tv] .nbtn small{font-size:11px;}
-[data-ed=tv] .nbtn{min-width:88px;padding:10px 12px;}
+[data-ed=tv] .nbtn{min-width:0;padding:10px clamp(4px,2.4vw,12px);}
 [data-ed=tv] .nav{padding:16px 12px calc(var(--safe-b) + 16px);}
 [data-ed=tv] .nbtn.add{width:68px;height:68px;font-size:32px;}
 [data-ed=tv] .search-in{font-size:16px;padding-top:14px;padding-bottom:14px;}
@@ -480,7 +486,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
    A short ramp here reads as a bright stripe; keep it generous. */
 .ambient::after{content:'';position:absolute;inset:0;pointer-events:none;opacity:.022;
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");}
-.ambient{position:fixed;inset:0;z-index:-2;pointer-events:none;background:linear-gradient(to bottom,rgba(0,0,0,1.000) 0px,rgba(0,0,0,0.670) 43px,rgba(0,0,0,0.410) 87px,rgba(0,0,0,0.218) 130px,rgba(0,0,0,0.089) 173px,rgba(0,0,0,0.019) 217px,rgba(0,0,0,0.000) 260px),linear-gradient(to top,rgba(0,0,0,1.000) 0px,rgba(0,0,0,0.670) 43px,rgba(0,0,0,0.410) 87px,rgba(0,0,0,0.218) 130px,rgba(0,0,0,0.089) 173px,rgba(0,0,0,0.019) 217px,rgba(0,0,0,0.000) 260px),radial-gradient(120% 78% at 50% 18%,color-mix(in srgb,var(--amb) 48%,transparent) 0%,color-mix(in srgb,var(--amb) 16%,transparent) 46%,transparent 96%),radial-gradient(80% 62% at 84% 32%,color-mix(in srgb,var(--amb) 18%,transparent) 0%,transparent 92%),var(--topgrad);transition:--amb 1.1s ease;}
+.ambient{position:fixed;inset:0;z-index:-2;pointer-events:none;background:linear-gradient(to bottom,rgba(0,0,0,1.000) 0px,rgba(0,0,0,0.670) 43px,rgba(0,0,0,0.410) 87px,rgba(0,0,0,0.218) 130px,rgba(0,0,0,0.089) 173px,rgba(0,0,0,0.019) 217px,rgba(0,0,0,0.000) 260px),linear-gradient(to top,rgba(0,0,0,1.000) 0px,rgba(0,0,0,0.670) 43px,rgba(0,0,0,0.410) 87px,rgba(0,0,0,0.218) 130px,rgba(0,0,0,0.089) 173px,rgba(0,0,0,0.019) 217px,rgba(0,0,0,0.000) 260px),radial-gradient(115% 52% at 50% 0%,color-mix(in srgb,var(--amb) 20%,transparent) 0%,color-mix(in srgb,var(--amb) 6%,transparent) 44%,transparent 88%),radial-gradient(70% 40% at 86% 8%,color-mix(in srgb,var(--amb) 7%,transparent) 0%,transparent 88%),var(--topgrad);transition:--amb 1.1s ease;}
 /* Background brightness veil — lifts the dark backdrop toward light; the top is
    tinted with the ambient accent so the "glow" brightens right along with it. The
    amount (--bgb, 0–0.62) comes from the slider under the theme picker. */
@@ -508,7 +514,8 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 
 /* ── HEADER ── */
 .hdr{padding:calc(var(--safe-t) + 12px) 18px 0;display:flex;align-items:center;justify-content:space-between;}
-.hdr-title{font-size:21px;font-weight:800;letter-spacing:-0.6px;display:flex;align-items:baseline;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;}
+.hdr-title{font-size:21px;font-weight:800;letter-spacing:-0.6px;display:flex;align-items:baseline;
+  min-width:0;overflow:hidden;flex:0 1 auto;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;}
 .hdr-title b{font-weight:800;}
 .hdr-title i{font-style:normal;font-weight:400;color:var(--t2);letter-spacing:-0.3px;}
 .hdr-title::after{content:'';width:5px;height:5px;border-radius:50%;background:var(--a);margin-left:3px;align-self:center;box-shadow:0 0 10px var(--glow);}
@@ -525,7 +532,7 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 .hbtn:focus-visible{outline:2px solid var(--a2);outline-offset:2px;}
 .hbtn:active{transform:scale(0.9);}
 .hbtn.bell-on{background:color-mix(in srgb,var(--a) 22%,var(--bg3));border-color:transparent;color:var(--a2);box-shadow:0 4px 14px -6px var(--glow);}
-.hdr-actions{display:flex;align-items:center;gap:7px;}
+.hdr-actions{display:flex;align-items:center;gap:7px;flex:0 0 auto;}
 /* The bottom bar floats and the top chrome was a flat slab pinned to the screen
    edges, so the two halves of the app spoke different languages. Same material,
    same inset, same radius: one panel holding search and the filters.
@@ -688,16 +695,17 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 .src-now-t svg{width:15px;height:15px;vertical-align:-3px;margin-right:6px;color:var(--a);}
 .src-now-s{margin-top:5px;font-size:12px;color:var(--t3);line-height:1.45;}
 .fixbar{display:none;}
-.fixbar.on{display:flex;align-items:center;gap:9px;margin:9px 18px 0;padding:8px 10px 8px 12px;
-  border-radius:14px;background:color-mix(in srgb,#ff6b6b 12%,var(--bg2));
-  border:1px solid color-mix(in srgb,#ff6b6b 34%,transparent);}
+.fixbar.on{display:flex;align-items:center;gap:9px;margin:9px 18px 0;padding:7px 8px 7px 12px;
+  border-radius:12px;background:transparent;border:1px solid var(--b1);}
 .fixbar.on{touch-action:pan-y;will-change:transform;}
-.fixbar-i{display:flex;flex:0 0 auto;color:#ff8b8b;}
+.fixbar-i{display:flex;flex:0 0 auto;color:var(--t3);}
 .fixbar-i svg{width:15px;height:15px;}
-.fixbar-t{flex:1 1 auto;min-width:0;font-size:12.5px;font-weight:700;color:#ff8b8b;
+.fixbar-t{flex:1 1 auto;min-width:0;font-size:12.5px;font-weight:600;color:var(--t3);
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.fixbar-b{flex:0 0 auto;padding:6px 14px;border-radius:99px;border:0;cursor:pointer;
-  font-family:inherit;font-size:12px;font-weight:800;color:#1a0b0b;background:#ff8b8b;}
+.fixbar-b{flex:0 0 auto;padding:6px 13px;border-radius:99px;cursor:pointer;
+  font-family:inherit;font-size:12px;font-weight:800;color:var(--t1);
+  background:var(--bg3);border:1px solid var(--b2);}
+.fixbar-b:hover{border-color:var(--b3);}
 .fixbar-b:active{transform:scale(.96);}
 
 /* The app's established alert red (#ff6b6b — same as .dact.danger and the form
@@ -840,6 +848,7 @@ body.first-paint .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards
 .sv-heronum .v{font-size:27px;font-weight:900;letter-spacing:-1px;color:var(--a2);line-height:1;display:inline-flex;align-items:center;gap:3px;justify-content:center;}
 .sv-heronum .v .ico{width:19px;height:19px;fill:currentColor;}
 .sv-heronum .l{font-size:10.5px;font-weight:700;color:var(--t2);margin-top:5px;}
+.sv-heronum .l2{font-size:10px;font-weight:600;color:var(--t3);margin-top:2px;}
 .sv-sec{margin:20px 18px 0;}
 .sv-store{margin:14px 18px 0;background:var(--bg2);border:1px solid var(--b2);border-radius:14px;padding:13px 15px;}
 .sv-store-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;}
@@ -870,11 +879,12 @@ body.first-paint .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards
    dimming at the very top and reached 0.93 — so most of the picture was under
    shade to protect a title sitting in the bottom third. It now stays clear until
    the text does, and the title carries a shadow of its own for the rest. */
-.hero-shade{position:absolute;inset:0;background:linear-gradient(180deg,transparent 0%,transparent 42%,rgba(8,8,10,0.55) 74%,rgba(8,8,10,0.88) 100%);}
+.hero-shade{position:absolute;inset:0;background:
+  linear-gradient(to top,rgba(8,8,10,.95) 0px,rgba(8,8,10,.9) 130px,rgba(8,8,10,.55) 205px,rgba(8,8,10,.12) 275px,transparent 330px);}
 [data-art=cinematic] .hero-shade{background:linear-gradient(180deg,rgba(0,0,0,0.05) 0%,rgba(8,8,10,0.6) 55%,rgba(8,8,10,0.93) 100%);}
 [data-art=cinematic] .hero-bg-img,[data-art=cinematic] .hero-bg{filter:saturate(1.08);}
 .hero-body{position:relative;padding:16px 18px;width:100%;}
-.hero-kicker{font-size:10px;font-weight:800;letter-spacing:0.16em;text-transform:uppercase;color:var(--a2);margin-bottom:9px;opacity:.9;}
+.hero-kicker{font-size:10px;font-weight:800;letter-spacing:0.16em;text-transform:uppercase;color:rgba(255,255,255,.72);margin-bottom:9px;}
 .hero-title{font-size:clamp(24px,5.2vw,34px);font-weight:800;letter-spacing:-0.04em;line-height:1.05;
   text-wrap:balance;text-shadow:0 2px 14px rgba(0,0,0,.6);}
 .hero-meta{font-size:11.5px;color:rgba(255,255,255,0.75);font-weight:600;margin-top:5px;}
@@ -931,7 +941,7 @@ body.first-paint .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards
 .qp-chip svg{width:15px;height:15px;color:var(--a);stroke-width:2.2;}
 .rz-sec{margin-top:18px;padding:16px 0 15px;border-top:1px solid var(--b1);border-bottom:1px solid var(--b1);animation:fadeUp .4s ease both;}
 .rz-head{display:flex;align-items:center;gap:9px;padding:0 18px 12px;font-family:var(--fd);font-size:16px;font-weight:800;letter-spacing:-.3px;color:var(--t1);}
-.rz-head::before{content:'';width:6px;height:6px;flex-shrink:0;border-radius:50%;background:var(--a);}
+
 .rz-head::after{content:'';flex:1;height:1px;background:var(--bn2);}
 .rz-scroll{display:flex;gap:13px;overflow-x:auto;padding:0 18px 2px;scrollbar-width:none;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;}
 .rz-scroll::-webkit-scrollbar{display:none;}
@@ -968,7 +978,7 @@ body.first-paint .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards
    tighter, and paired with a count that recedes instead of competing — the
    contrast between them is what makes it read as a heading rather than a label. */
 .row-title{font-family:var(--fd);font-size:19px;font-weight:800;letter-spacing:-0.035em;white-space:nowrap;}
-.row-title::before{content:'';display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--rc,var(--t3));margin-right:8px;vertical-align:0.12em;}
+
 .row-count{font-size:11px;font-weight:700;color:var(--t3);font-variant-numeric:tabular-nums;opacity:.8;letter-spacing:.02em;}
 .row-head::after{content:'';flex:1;height:1px;background:var(--bn2);}
 .row-scroll{display:flex;gap:10px;overflow-x:auto;padding:2px 18px 6px;scroll-padding:18px;}
@@ -1061,7 +1071,7 @@ body.first-paint .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards
      two wider labels ("Settings", "Sources") pushed their neighbours: measured
      centre-to-centre gaps of 88.3 / 88.3 / 91.5 / 94.5, and the + landed 6.2px
      left of the bar's own centre. Five identical tracks put it exactly on it. */
-  display:grid;grid-template-columns:repeat(5,1fr);align-items:center;
+  display:grid;grid-template-columns:repeat(5,minmax(0,1fr));align-items:center;
   /* The + is the tallest thing in here, so the padding is what guarantees it has
      room. overflow is spelled out because this button has been clipped before. */
   padding:11px 10px calc(var(--safe-b) + 11px);
@@ -1094,11 +1104,12 @@ body.first-paint .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards
 }
 .nbtn{
   display:flex;flex-direction:column;align-items:center;gap:3px;justify-self:center;
-  font-size:18px;color:var(--t2);min-width:52px;padding:6px 10px;border-radius:18px;
+  font-size:18px;color:var(--t2);min-width:0;max-width:100%;overflow:hidden;padding:6px clamp(2px,1.8vw,10px);border-radius:18px;
   transition:transform .12s,background-color .16s,color .16s;
 }
 .nbtn:active{transform:scale(0.88);}
-.nbtn small{font-size:9px;font-weight:800;letter-spacing:0.04em;}
+.nbtn small{font-size:clamp(8px,2.4vw,9px);font-weight:800;letter-spacing:0.04em;
+  white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis;}
 /* The active one is its own pill inside the bar — colour alone was doing all the
    work of saying where you are, and at 9px it wasn't enough. */
 .nbtn.on{color:var(--a2);background:color-mix(in srgb,var(--a) 16%,transparent);}
@@ -1123,11 +1134,11 @@ body.first-paint .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards
 .hl-row:last-of-type{border-bottom:0;}
 .hl-row.off .hl-h,.hl-row.off .hl-p{opacity:.45;}
 .hl-move{display:flex;flex-direction:column;gap:2px;flex:none;}
-.hl-arrow{width:26px;height:20px;display:flex;align-items:center;justify-content:center;border:0;border-radius:6px;
+.hl-arrow{width:32px;height:30px;display:flex;align-items:center;justify-content:center;border:0;border-radius:8px;
   background:var(--bg3);color:var(--t2);cursor:pointer;transition:background-color .14s,color .14s;}
 .hl-arrow:hover:not(:disabled){background:var(--ag);color:var(--a2);}
 .hl-arrow:disabled{opacity:.25;pointer-events:none;}
-.hl-arrow .ico{width:13px;height:13px;}
+.hl-arrow .ico{width:15px;height:15px;}
 .hl-txt{flex:1;min-width:0;}
 .hl-h{font-family:var(--fd);font-size:14px;font-weight:800;color:var(--t1);letter-spacing:-.01em;}
 .hl-p{font-size:11.5px;color:var(--t3);margin-top:2px;}
@@ -1336,13 +1347,14 @@ body.first-paint .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards
 .resume-x:hover{color:var(--t1);}
 .resume-x .ico{width:13px;height:13px;}
 .resume-card{display:flex;align-items:center;gap:13px;flex:1;min-width:0;padding:10px;
-  border-radius:18px;text-align:left;background:color-mix(in srgb,var(--a) 11%,var(--bg2));
-  border:1px solid color-mix(in srgb,var(--a) 32%,transparent);cursor:pointer;transition:transform .12s;}
+  border-radius:18px;text-align:left;background:var(--bg2);
+  border:1px solid var(--b2);cursor:pointer;transition:transform .12s,border-color .15s;}
+.resume-card:hover{border-color:var(--b3);}
 .resume-card:active{transform:scale(.985);}
 .resume-art,.resume-ph{width:52px;height:52px;border-radius:14px;object-fit:cover;flex:none;background:var(--bg4);}
 .resume-ph{display:flex;align-items:center;justify-content:center;font-family:var(--fd);font-size:20px;font-weight:800;color:var(--t3);}
 .resume-body{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1;}
-.resume-k{font-size:9.5px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:var(--a2);}
+.resume-k{font-size:9.5px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:var(--t3);}
 .resume-t{font-family:var(--fd);font-size:15px;font-weight:800;color:var(--t1);letter-spacing:-.02em;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .resume-s{font-size:11.5px;font-weight:600;color:var(--t2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
@@ -1902,7 +1914,8 @@ textarea.ai-prompt-in{resize:none;line-height:1.45;display:block;}
 .al-num{flex-shrink:0;width:20px;height:20px;border-radius:50%;background:var(--ag);border:1px solid var(--b2);color:var(--a2);font-family:var(--fd);font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;margin-top:1px;}
 /* ── watch party ── */
 .pt-code{display:flex;align-items:center;gap:10px;background:var(--ag);border:1px solid var(--b2);border-radius:14px;padding:13px 15px;margin-bottom:12px;}
-.pt-code-val{font-family:var(--fd);font-size:24px;font-weight:900;letter-spacing:.16em;color:var(--a2);flex:1;}
+.pt-code-val{font-family:var(--fd);font-size:clamp(18px,5.4vw,24px);font-weight:900;letter-spacing:.16em;color:var(--a2);
+  flex:1 1 0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .pt-code-cta{width:44px;height:44px;flex-shrink:0;border-radius:14px;background:var(--bg3);border:1px solid var(--b2);color:var(--t1);display:flex;align-items:center;justify-content:center;}
 .pt-code-cta:active{transform:scale(.92);}
 .pt-code-cta .ico{width:17px;height:17px;}
@@ -6319,7 +6332,7 @@ function sorted(list){
   else l.sort((a,b)=>(b.upd||0)-(a.upd||0));
   return l;
 }
-function prog(a){return a.status==='finished'?1:(a.epTotal?Math.min(1,(a.ep||0)/a.epTotal):0);}
+function prog(a){return a.status==='finished'?1:(a.epTotal?Math.max(0,Math.min(1,(a.ep||0)/a.epTotal)):0);}
 // Total minutes to watch every episode. Uses the real per-episode runtime (a.dur,
 // filled from AniList) × episode count; falls back to the stored "~N hrs" string,
 // then to a 24-min TV estimate — so every title has a sortable, showable duration.
@@ -6330,6 +6343,42 @@ function totalWatchMins(a){
   if(a.epTotal)return 24*a.epTotal;
   return 0;
 }
+// ─── WHAT YOU ACTUALLY GOT THROUGH ──────────────────────────────────────────
+// Stats measured hours by reading the "~N hrs" string on a title. Most entries
+// don't have one — it's only set on some import paths — so a list with hundreds
+// of episodes behind it could report single-digit hours, and everything you
+// dropped halfway counted as nothing at all.
+//
+// These three are the shared answer, used by every count in the app: episodes
+// you got through, minutes per episode with the same fallbacks as everywhere
+// else, and the two multiplied. Reading is counted in chapters, never in hours —
+// there is no honest minutes-per-chapter number, and inventing one would put a
+// made-up figure in the middle of the one screen that is meant to be true.
+function perEpMins(a){
+  if(a&&a.dur)return a.dur;
+  const t=totalWatchMins(a);
+  if(t&&a&&a.epTotal)return t/a.epTotal;
+  return 24;
+}
+function epsDone(a){
+  if(!a)return 0;
+  if(a.status==='finished')return Math.max(0,a.epTotal||a.ep||0);   // finished means all of it
+  return Math.max(0,a.ep||0);                                        // dropped halfway still counts
+}
+function watchedMins(a){
+  if(!a||kindOf(a)==='read')return 0;
+  return Math.round(epsDone(a)*perEpMins(a));
+}
+function libraryTotals(list){
+  const L=list||anime||[];
+  let mins=0,eps=0,chaps=0;
+  L.forEach(a=>{
+    if(kindOf(a)==='read')chaps+=epsDone(a);
+    else{eps+=epsDone(a);mins+=watchedMins(a);}
+  });
+  return {mins,eps,chaps,hrs:Math.round(mins/60),days:+(mins/1440).toFixed(1)};
+}
+
 // Estimated minutes for the side films in a title's watch order (~110 min each).
 function filmMins(a){const n=(a.order||[]).filter(s=>/^movie:/i.test(s)).length;return n*110;}
 function fmtWatch(mins){
@@ -6417,7 +6466,11 @@ function onPageScroll(){
   });
 }
 // scoped CSS-var override string that tints a title's own detail/hero accents without touching global chrome
-function accentVars(a){const ac=conditionAccent(titleAccent(a));if(!ac)return'';try{return`--a:${ac};--a2:${mix(ac,'#ffffff',0.28)};--ag:${rgba(ac,0.15)};--glow:${rgba(ac,0.26)};`;}catch{return'';}}
+// The accent is the app's, not the artwork's. Deriving it per title meant a
+// brown show made brown buttons and a brown progress bar sitting on blue sky —
+// one screen never matched the next. Artwork still drives the ambient light
+// behind the page; it no longer drives anything you press.
+function accentVars(a){return '';}
 function query(){return document.getElementById('searchIn').value.toLowerCase().trim();}
 // Searching your own list is the thing you do most, and it was a substring test
 // against title+genre+notes. So "aot" found nothing. "shingeki" found nothing,
@@ -13757,6 +13810,16 @@ function bulkToggle(id,range){
   render();
 }
 function bulkClear(){bulkSel=null;_bulkAnchor=-1;render();}
+// A phone has no shift-click, so picking several had no entry point at all —
+// long-press deliberately acts on the one thing you held. This is that entry
+// point: it starts the selection with that card, and from there a plain tap
+// adds and removes, which is what the desktop selection already does.
+function startSelect(id){
+  closeBulkMenu();
+  bulkSel=new Set([id]);_bulkAnchor=_cardIds().indexOf(id);
+  render();
+  toast('Tap any others to add them',2600);
+}
 function bulkSetStatus(st){
   const ids=menuTargets().length?menuTargets():(bulkOn()?[...bulkSel]:[]);
   if(!ids.length)return;
@@ -13791,6 +13854,7 @@ function openBulkMenu(x,y,singleId){
     +`<div class="bulk-menu-d"></div>`
     +`<button class="bulk-mi" onclick="bulkFav(true)">${icon('heart')}<span>Favourite</span></button>`
     +`<button class="bulk-mi" onclick="bulkFav(false)">${icon('heart')}<span>Remove favourite</span></button>`
+    +(one?`<div class="bulk-menu-d"></div><button class="bulk-mi" onclick="startSelect('${one.id}')">${icon('check')}<span>Select more\u2026</span></button>`:'')
     +`<div class="bulk-menu-d"></div>`
     +`<div class="bulk-rate">${[1,2,3,4,5].map(r=>`<button class="bulk-star" onclick="bulkRate(${r})" aria-label="Rate ${r}">${icon('star')}</button>`).join('')}</div>`;
   document.body.appendChild(el);
@@ -14510,8 +14574,7 @@ function renderStats(){
   anime.forEach(a=>{if(counts[a.status]!==undefined)counts[a.status]++;});
   const rated=anime.filter(a=>a.rating>0);
   const avg=rated.length?(rated.reduce((s,a)=>s+a.rating,0)/rated.length).toFixed(1):'—';
-  const eps=anime.reduce((s,a)=>s+(a.status==='finished'?(a.epTotal||a.ep||0):(a.ep||0)),0);
-  const hrs=Math.round(anime.reduce((s,a)=>{const h=parseHrs(a.time);if(a.status==='finished')return s+h;if(a.epTotal&&a.ep)return s+h*(a.ep/a.epTotal);return s;},0));
+  const T=libraryTotals(anime), eps=T.eps, hrs=T.hrs;
   const maxStatus=Math.max(1,...Object.values(counts));
   const statusBars=['watching','plan','finished','dropped'].map(st=>svBar('st-'+st,(STATUS_META[st]?STATUS_META[st].label:st),(STATUS_META[st]?STATUS_META[st].color:'var(--a)'),counts[st],maxStatus,svChips(anime.filter(a=>a.status===st)))).join('');
   const gc={};anime.forEach(a=>(a.genre||'').split(',').map(g=>g.trim()).filter(Boolean).forEach(g=>gc[g]=(gc[g]||0)+1));
@@ -14522,15 +14585,22 @@ function renderStats(){
   const topRated=[...rated].sort((a,b)=>b.rating-a.rating).slice(0,8);
   body.innerHTML=
     storageBarHTML()+
-    '<div class="sv-hero"><div class="sv-heronum"><div class="v" data-to="'+hrs+'">0</div><div class="l">Hours watched</div></div>'+
-      '<div class="sv-heronum"><div class="v" data-to="'+anime.length+'">0</div><div class="l">Titles</div></div>'+
-      '<div class="sv-heronum"><div class="v" data-to="'+eps+'">0</div><div class="l">Episodes</div></div></div>'+
-    '<div class="sv-hero"><div class="sv-heronum"><div class="v">'+icon('star','fill')+' '+avg+'</div><div class="l">Avg rating ('+rated.length+')</div></div>'+
+    // Hours first, and a plain-language second line under it — "14 days" means
+    // something to a person in a way "336" never does. Chapters only appear for
+    // someone who reads; an always-there zero is just a reminder of a feature.
+    '<div class="sv-hero"><div class="sv-heronum"><div class="v" data-to="'+hrs+'">0</div><div class="l">Hours watched</div>'+
+        (T.days>=1?'<div class="l2">'+T.days+' days of it</div>':'')+'</div>'+
+      '<div class="sv-heronum"><div class="v" data-to="'+eps+'">0</div><div class="l">Episodes</div></div>'+
+      (T.chaps?'<div class="sv-heronum"><div class="v" data-to="'+T.chaps+'">0</div><div class="l">Chapters</div></div>'
+              :'<div class="sv-heronum"><div class="v" data-to="'+anime.length+'">0</div><div class="l">Titles</div></div>')+'</div>'+
+    '<div class="sv-hero">'+
+      (T.chaps?'<div class="sv-heronum"><div class="v" data-to="'+anime.length+'">0</div><div class="l">Titles</div></div>':'')+
       '<div class="sv-heronum"><div class="v" data-to="'+counts.finished+'">0</div><div class="l">Finished</div></div>'+
-      '<div class="sv-heronum"><div class="v" data-to="'+anime.filter(a=>a.fav).length+'">0</div><div class="l">Favorites</div></div></div>'+
+      '<div class="sv-heronum"><div class="v" data-to="'+anime.filter(a=>a.fav).length+'">0</div><div class="l">Favorites</div></div>'+
+      (T.chaps?'':'<div class="sv-heronum"><div class="v">'+icon('star','fill')+' '+avg+'</div><div class="l">Avg rating</div></div>')+'</div>'+
     '<div class="sv-sec"><div class="sv-h">Status — tap to reveal</div>'+statusBars+'</div>'+
     '<div class="sv-sec"><div class="sv-h">Top genres — tap to reveal</div>'+genreBars+'</div>'+
-    '<div class="sv-sec"><div class="sv-h">Ratings — tap to reveal</div>'+ratingBars+'</div>'+
+    '<div class="sv-sec"><div class="sv-h">Ratings'+(rated.length?' \u2014 '+avg+' average across '+rated.length:'')+'</div>'+ratingBars+'</div>'+
     (topRated.length?'<div class="sv-sec"><div class="sv-h">Your top rated</div><div class="sv-drill on">'+topRated.map(a=>'<span class="sv-chip">'+schEsc(a.title)+' '+icon('star','fill')+a.rating+'</span>').join('')+'</div></div>':'');
   try{_fillStoreNote();}catch(e){}
   body.querySelectorAll('.sv-heronum .v[data-to]').forEach(el=>svCountUp(el,+el.getAttribute('data-to')));
@@ -14540,13 +14610,7 @@ function renderStatsSheet(){
   anime.forEach(a=>counts[a.status]!==undefined&&counts[a.status]++);
   const rated=anime.filter(a=>a.rating>0);
   const avg=rated.length?(rated.reduce((s,a)=>s+a.rating,0)/rated.length).toFixed(1):'—';
-  const epsWatched=anime.reduce((s,a)=>s+(a.status==='finished'?(a.epTotal||a.ep||0):(a.ep||0)),0);
-  const hrs=anime.reduce((s,a)=>{
-    const h=parseHrs(a.time);
-    if(a.status==='finished')return s+h;
-    if(a.epTotal&&a.ep)return s+h*(a.ep/a.epTotal);
-    return s;
-  },0);
+  const _T=libraryTotals(anime), epsWatched=_T.eps, hrs=_T.hrs;
   const max=Math.max(1,...Object.values(counts));
   const bar=(st)=>`<div class="stat-bar-row"><div class="lbl">${STATUS_META[st].icon} ${st==='plan'?'Plan':STATUS_META[st].label}</div>
     <div class="pbar"><div class="pfill" style="width:${Math.round(counts[st]/max*100)}%;background:${STATUS_META[st].color}"></div></div>
@@ -14556,7 +14620,8 @@ function renderStatsSheet(){
       <div class="stat-card"><div class="stat-val">${anime.length}</div><div class="stat-lbl">Total titles</div></div>
       <div class="stat-card"><div class="stat-val">${counts.finished}</div><div class="stat-lbl">Finished</div></div>
       <div class="stat-card"><div class="stat-val">${epsWatched}</div><div class="stat-lbl">Episodes watched</div></div>
-      <div class="stat-card"><div class="stat-val">${hrs?'~'+Math.round(hrs):'—'}</div><div class="stat-lbl">Hours watched</div></div>
+      <div class="stat-card"><div class="stat-val">${hrs?'~'+hrs:'—'}</div><div class="stat-lbl">Hours watched</div></div>
+      ${_T.chaps?`<div class="stat-card"><div class="stat-val">${_T.chaps}</div><div class="stat-lbl">Chapters read</div></div>`:''}
       <div class="stat-card"><div class="stat-val">${icon('star','fill')} ${avg}</div><div class="stat-lbl">Avg rating (${rated.length} rated)</div></div>
       <div class="stat-card"><div class="stat-val">${anime.filter(a=>a.fav).length}</div><div class="stat-lbl">Favorites</div></div>
     </div>
@@ -16158,10 +16223,15 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-12.13',
-  title:'Theme, for someone opening it for the first time',
-  push:'One line telling you what it changes, and one button putting it all back.',
+  v:'2026-08-12.14',
+  title:'One colour, honest hours, and no sideways scroll',
+  push:'The app stopped borrowing its colours from the artwork.',
   notes:[
+    'The app no longer takes its accent from whatever you are looking at. Key art is mostly brown and ochre, so buttons, progress bars and labels were picking that up \u2014 every screen a slightly different, slightly muddier colour. One accent now, the one you chose.',
+    'Hours watched are real. They were read off a note most titles do not have, so a list with hundreds of episodes behind it could report almost nothing. They are counted from episodes watched \u00d7 the actual runtime now, anything you dropped halfway included, with reading counted in chapters.',
+    'The page no longer scrolls sideways on a small phone. The bottom bar could not shrink below its five labels, so on a 320\u2013390px screen it pushed the whole app off the edge.',
+    'Long-press to select works on iPhone. iOS was answering the press with its own photo menu and swallowing the gesture. The menu also has \u201cSelect more\u201d now \u2014 a phone has no shift-click, so there was no way to pick several at once.',
+    'Text on the big card is readable again: the shading is anchored to the words rather than to a share of the picture, so it works whether the card is short or tall.',
     'Theme now says what it is before you touch anything: it changes how the app looks, and your list, your progress and everything in it stay exactly as they are.',
     'One button puts every setting back to default. Nobody explores a screen they cannot back out of.',
     'The first screen is the seven looks, a live preview, the accent colours and drop-a-picture \u2014 nothing else. Tint, glow, corners, editions and layouts moved behind “More options”.',

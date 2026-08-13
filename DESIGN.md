@@ -4,6 +4,20 @@ Everything below is committed and in use in `index.html`. Read this before
 proposing a palette, a type pair or a component pattern: the system exists, and
 identity preservation wins over any generic default.
 
+## Shape
+
+**The radius scale.** 6 tags · 10 controls · 14 cards · 18 panels · 22/26 sheets
+and bars · 99 pills. There were **23 distinct corner values** in this file — 12,
+13, 14 and 15 all doing the same job in different places. A 1px difference is too
+small to read as a decision and just large enough to make everything feel
+slightly misaligned. Add *to* the scale, never *between* it.
+
+**Elevation: three levels.**
+`0 2px 8px -2px` raised · `0 8px 24px -8px` floating · `0 20px 48px -18px`
+overlay. Twenty-nine near-identical shadows were doing the work of three, which
+is how a UI ends up feeling assembled rather than designed — nothing is wrong,
+but nothing agrees either.
+
 ## Colour
 
 Dark ground, one accent, semantic status colours. All tokens are CSS custom

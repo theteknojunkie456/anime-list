@@ -261,7 +261,19 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
   font-family:var(--fd);font-size:12.5px;font-weight:800;border:0;}
 /* Its own scroll, so a long dock on a short phone never traps the controls
    below the fold. */
-.paint-body{max-height:46vh;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+.paint-body{max-height:38vh;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+.stc-row{display:flex;flex-wrap:wrap;gap:8px;}
+.stc{position:relative;display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border-radius:14px;
+  background:var(--bg3);border:1px solid var(--bn2);cursor:pointer;}
+.stc-sw{width:15px;height:15px;border-radius:6px;flex:none;box-shadow:0 0 0 1px rgba(0,0,0,.35) inset;}
+.stc-n{font-size:12px;font-weight:700;color:var(--t2);}
+.stc input{position:absolute;inset:0;opacity:0;cursor:pointer;}
+.paint-save{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin-top:16px;
+  padding:12px;border-radius:14px;background:var(--bg3);border:1px solid var(--b2);color:var(--t1);
+  font-family:var(--fd);font-size:13px;font-weight:800;}
+.paint-save:hover{border-color:var(--b3);}
+.paint-save .ico{width:15px;height:15px;color:var(--a2);}
+.paint-lb em{font-style:normal;font-weight:600;letter-spacing:0;text-transform:none;color:var(--t3);margin-left:6px;}
 .paint-lb{font-size:9.5px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:var(--t3);margin:12px 0 8px;}
 .paint-lb:first-child{margin-top:0;}
 /* In the dock the dropzone is a row, not a poster-sized target: every pixel it
@@ -5522,8 +5534,8 @@ function setStatusColor(k,hex,redraw){
   const m=statusColors();
   if(hex)m[k]=hex;else delete m[k];
   try{localStorage.setItem(STATUS_KEY,JSON.stringify(m));}catch(e){}
-  applyStatusColors();
-  if(redraw!==false){try{render();}catch(e){}}
+  applyStatusColors();   // --wat/--pln/--fin/--drp; the badges restyle themselves
+  if(redraw!==false){try{renderStatusColorRow();}catch(e){}}
   else{const sw=document.querySelector(`#statusColorRow .stc[data-k="${k}"] .stc-sw`);if(sw)sw.style.background=hex||'';}
 }
 // ─── A LOOK FROM A PICTURE ──────────────────────────────────────────────────
@@ -5645,6 +5657,31 @@ function renderFromImageRow(){
   dz.addEventListener('drop',e=>{const f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0];if(f)lookFromFile(f);});
 }
 
+// The dock's other two targets. These lived in the theme sheet once, where you
+// could not see what they were doing to anything; over the live list they are
+// the point rather than the clutter.
+function renderTintRow(){
+  const row=document.getElementById('tintRow'); if(!row)return;
+  const cur=surfaceTint();
+  const PICKS=['#3a2b5e','#1f3d5c','#123f3a','#4a2b2b','#3d2f1c','#2b2b33'];
+  row.innerHTML=`<button class="acc-sw acc-none${cur?'':' on'}" onclick="setTint('')" title="No tint"><span>None</span></button>`
+    +PICKS.map(c=>`<button class="acc-sw${cur.toLowerCase()===c?' on':''}" style="--sw:${c}" onclick="setTint('${c}')" aria-label="Tint ${c}"></button>`).join('')
+    +`<label class="acc-sw acc-custom${cur&&PICKS.indexOf(cur.toLowerCase())<0?' on':''}" style="--sw:${cur||'#888'}" title="Any colour">
+        <input type="color" value="${cur||'#3a2b5e'}" oninput="setTint(this.value,false)" onchange="setTint(this.value)"></label>`;
+}
+function renderStatusColorRow(){
+  const row=document.getElementById('statusColorRow'); if(!row)return;
+  const m=statusColors();
+  row.innerHTML=Object.keys(STATUS_VARS).map(k=>{
+    const cur=m[k]||'';
+    const lbl=statusLabel(k,viewKind==='read');
+    return `<label class="stc" data-k="${k}" title="${escH(lbl)}">
+      <span class="stc-sw" style="background:${cur||`var(${STATUS_VARS[k][0]})`}"></span>
+      <span class="stc-n">${escH(lbl)}</span>
+      <input type="color" value="${cur||'#888888'}" oninput="setStatusColor('${k}',this.value,false)" onchange="setStatusColor('${k}',this.value)">
+    </label>`;}).join('');
+}
+
 // ─── PAINT MODE ─────────────────────────────────────────────────────────────
 // Colour used to be chosen inside a sheet that covered the thing being coloured,
 // which is why every attempt to explain it needed a preview — a fake card
@@ -5669,14 +5706,21 @@ function startPaint(){
       <button class="paint-done" onclick="endPaint()">Done</button>
     </div>
     <div class="paint-body">
-      <div class="paint-lb">Accent</div>
+      <div class="paint-lb">Accent <em>buttons, bars, highlights</em></div>
       <div class="acc-row" id="accentRow"></div>
+      <div class="paint-lb">Background <em>the page and its panels</em></div>
+      <div class="acc-row" id="tintRow"></div>
+      <div class="paint-lb">Status colours</div>
+      <div class="stc-row" id="statusColorRow"></div>
       <div class="paint-lb">Card size</div>
       <div class="art-seg" id="densityRow"></div>
       <div id="fromImgRow"></div>
+      <button class="paint-save" onclick="saveLookAsTheme()">
+        <i data-ic="check"></i> Save this as my own theme
+      </button>
     </div>`;
   document.body.appendChild(el);
-  try{renderAccentRow();renderDensityRow();renderFromImageRow();}catch(e){}
+  try{renderAccentRow();renderTintRow();renderStatusColorRow();renderDensityRow();renderFromImageRow();}catch(e){}
   try{hydrateIcons(el);}catch(e){}
   try{navigator.vibrate&&navigator.vibrate(12);}catch(e){}
   toast('Tap a colour \u2014 your list changes as you go',2600);
@@ -5690,6 +5734,22 @@ function endPaint(){
   try{renderThemeGrid();}catch(e){}
 }
 function togglePaint(){_painting?endPaint():startPaint();}
+// What you have built by hand IS a theme — an accent and a ground — so it can be
+// kept as one and picked again later, alongside the seven that shipped.
+function saveLookAsTheme(){
+  const cs=getComputedStyle(document.documentElement);
+  const accent=(accentOverride()||cs.getPropertyValue('--a').trim()||'#da374f');
+  const bg=(surfaceTint()||cs.getPropertyValue('--bg').trim()||'#0a0a0c');
+  // No prompt(). A modal dialog to name a thing you just made by eye is a
+  // needless stop, and it blocks the page hard enough that an automated pass
+  // over the UI hangs on it forever — which is how this one was found.
+  const mine=customThemes().filter(t=>/^My theme/.test(t.name||'')).length;
+  const name='My theme'+(mine?' '+(mine+1):'');
+  const t={id:'c'+uid(),name,emoji:'\u2726',accent,bg,darken:!surfaceTint()};
+  setCustomThemes([...customThemes(),t]);
+  toast(`${name} saved \u2014 it's in Theme now`,2800);
+  try{renderThemeGrid();}catch(e){}
+}
 
 // ─── THE WAY BACK ───────────────────────────────────────────────────────────
 // A first-time visitor to this sheet reported being lost, which is what happens
@@ -5738,7 +5798,8 @@ function applyTint(){
 }
 function setTint(hex,redraw){
   try{hex?localStorage.setItem(TINT_KEY,hex):localStorage.removeItem(TINT_KEY);}catch(e){}
-  applyTint();   // tokens again — nothing to rebuild
+  applyTint();
+  if(redraw!==false){try{renderTintRow();}catch(e){}}
 }
 // ─── UI STYLE ───────────────────────────────────────────────────────────────
 // Same app, different build. Radius is not tokenised in this file — 163 hardcoded
@@ -16031,10 +16092,12 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-13.6',
-  title:'Much faster to scroll and to touch',
-  push:'395 blurred layers on a scrolling list is 393 too many.',
+  v:'2026-08-13.7',
+  title:'Build your own theme on top of your own list',
+  push:'Hold the logo: accent, background, status colours, all live.',
   notes:[
+    'Holding the logo now changes every part, not just the accent: the accent, the background and its panels, the four status colours, and card size \u2014 each one over your real list, at full size, as you touch it.',
+    'What you build can be kept. \u201cSave this as my own theme\u201d puts it in Theme beside the seven that shipped, so you can come back to it.',
     'Scrolling is far smoother. Every status badge and episode chip was blurring the artwork behind it \u2014 395 separate layers your phone re-blurred on every single frame. They are a shade more opaque now instead, which looks the same and costs nothing.',
     'Taps are instant. Changing a colour or a card size used to rebuild every card on the screen in order to set one CSS variable, and selecting a title rebuilt the whole list to tick one box.',
     'Scrolling no longer measures every section of the page sixty times a second, or asks the browser to recompute your accent on every frame.',

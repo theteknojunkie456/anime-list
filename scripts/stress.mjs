@@ -203,7 +203,9 @@ function suite() {
         seen.add(key);
         // Anything that leaves the page or wipes data is not this test's job.
         const oc = b.getAttribute('onclick') || '';
-        if (/reset|wipe|clear(All|Data)|delete|signOut|logout|export|import|share|resetTheme/i.test(oc)) continue;
+        // prompt/confirm/alert block the page forever in headless Chrome, so
+        // anything that can raise one is skipped rather than pressed.
+        if (/reset|wipe|clear(All|Data)|delete|signOut|logout|export|import|share|resetTheme|rename|alias|copy/i.test(oc)) continue;
         try { b.click(); R.clicked++; } catch (e) { err('click ' + oc.slice(0, 40), e && e.message); }
       }
       try { window.closeAll && window.closeAll(); } catch (e) { }

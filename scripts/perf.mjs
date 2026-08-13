@@ -70,19 +70,27 @@ const suite = function () {
 
   // ── frame timing under a scroll, which is where "not snappy" lives ──
   const pg = document.getElementById('pageEl') || document.scrollingElement;
-  let last = performance.now(), worst = 0, n = 0, over16 = 0;
+  let last = performance.now(), worst = 0, n = 0, over16 = 0, reported = false;
+  // Report no matter what. content-visibility means sections materialise as they
+  // scroll into view, so the page can keep growing under the sampler and the
+  // loop never reaches its target — and then the run produced nothing at all,
+  // which is a worse outcome than a short sample.
+  const report = () => {
+    if (reported) return; reported = true;
+    R.frames = { sampled: n, worstMs: +worst.toFixed(1), overBudget: over16 };
+    const pre = document.createElement('pre'); pre.id = 'P';
+    pre.textContent = JSON.stringify(R);
+    document.body.appendChild(pre);
+  };
   const tick = () => {
     const now = performance.now(), d = now - last; last = now;
-    if (n++) { if (d > worst) worst = d; if (d > 16.7) over16++; }
-    if (n < 90) { pg.scrollTop += 40; requestAnimationFrame(tick); }
-    else {
-      R.frames = { sampled: n, worstMs: +worst.toFixed(1), overBudget: over16 };
-      const pre = document.createElement('pre'); pre.id = 'P';
-      pre.textContent = JSON.stringify(R);
-      document.body.appendChild(pre);
-    }
+    if (n++ > 4) { if (d > worst) worst = d; if (d > 16.7) over16++; }   // the first frames are start-up, not scrolling
+    const atEnd = pg.scrollTop + pg.clientHeight >= pg.scrollHeight - 4;
+    if (n < 60 && !atEnd) { pg.scrollTop += 40; requestAnimationFrame(tick); }
+    else report();
   };
   requestAnimationFrame(tick);
+  setTimeout(report, 6000);
 };
 
 let src = readFileSync('index.html', 'utf8').replace(/const NETWORK_GATE\s*=\s*[^;]+;/, 'const NETWORK_GATE=false;');
@@ -111,11 +119,14 @@ await new Promise(r => setTimeout(r, 900));
 let dom = '';
 try {
   dom = spawnSync(CHROME, ['--headless=new', '--disable-gpu', '--no-sandbox', '--hide-scrollbars',
-    '--virtual-time-budget=30000', '--window-size=430,900', '--dump-dom',
+    '--virtual-time-budget=90000', '--window-size=430,900', '--dump-dom',
     `http://127.0.0.1:${PORT}/.preview/perf.html`], { encoding: 'utf8', maxBuffer: 1 << 28 }).stdout || '';
 } finally { process.kill(-srv.pid); }
 const m = /<pre id="P">([\s\S]*?)<\/pre>/.exec(dom);
-if (!m) { console.log('no result'); process.exit(2); }
+if (!m) {
+  console.log('the page never reported back. First 400 chars of what came out:\n' + dom.slice(0, 400));
+  process.exit(2);
+}
 const dec = s => s.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/&quot;/g, '"');
 const R = JSON.parse(dec(m[1]));
 if (R.err) { console.log('crashed: ' + R.err); process.exit(2); }

@@ -282,6 +282,21 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 [data-view=cinema] .grid .pcard-new{z-index:4;bottom:auto;top:12px;left:auto;right:12px;}
 @media (min-width:900px){ [data-view=cinema] .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));} }
 
+/* The one door to the deep end, and the way back. Deliberately a full-width
+   destination rather than a fold: a fold announces how much more there is, which
+   is most of what makes a page feel heavy in the first place. */
+.th-more{display:flex;align-items:center;gap:10px;width:100%;margin-top:18px;padding:15px 16px;border-radius:18px;
+  background:var(--bg3);border:1px solid var(--bn2);color:var(--t1);cursor:pointer;
+  font-family:var(--fd);font-size:14.5px;font-weight:800;letter-spacing:-.01em;text-align:left;}
+.th-more:hover{border-color:var(--b3);}
+.th-more .ico{width:17px;height:17px;color:var(--a2);flex:none;}
+.th-more-c{margin-left:auto;font-family:var(--fb);font-size:11px;font-weight:600;color:var(--t3);}
+.th-back{display:inline-flex;align-items:center;gap:6px;margin-bottom:6px;padding:8px 13px 8px 9px;border-radius:99px;
+  background:var(--bg3);border:1px solid var(--bn2);color:var(--t2);font-size:12.5px;font-weight:700;cursor:pointer;}
+.th-back:hover{color:var(--t1);}
+.th-back .ico{width:15px;height:15px;}
+.th-deepbody{display:block;}
+
 /* The live preview. Real components at a smaller size — nothing here is a
    picture of the UI, so it cannot go stale. */
 .th-prev{margin:4px 0 18px;padding:13px;border-radius:18px;
@@ -3441,7 +3456,12 @@ body.recsel .pcard{position:relative;}
        drawing of them. Every token these read is the same token the app reads,
        so it updates the instant a colour changes and it can never drift out of
        date with what it is previewing. -->
-  <div class="th-prev" id="themePrev">
+  
+  <!-- Two screens, not one page with folds. A fold still shows you that there is
+       more, and how much more, which is most of what makes a page feel heavy.
+       In Simple the depth is not collapsed — it is not here. -->
+  <div id="themeSimple">
+<div class="th-prev" id="themePrev">
     <div class="th-prev-l">Preview</div>
     <div class="th-prev-row">
       <div class="pcard th-prev-card"><div class="pcard-wrap"><div class="pcard-ph">A</div>
@@ -3459,8 +3479,16 @@ body.recsel .pcard{position:relative;}
   <div class="pre-row" id="presetRow"></div>
   <div id="fromImgRow"></div>
 
-  <details class="th-fold th-deep">
-    <summary><span>Make your own</span><span class="th-hint">Colour, shape, layout</span></summary>
+  
+    <button class="th-more" onclick="themeMode('full')">
+      <i data-ic="sliders"></i><span>Customise every part</span><span class="th-more-c">colour · shape · layout</span>
+    </button>
+  </div>
+
+  <div id="themeFull" style="display:none">
+    <button class="th-back" onclick="themeMode('simple')"><i data-ic="chevron-left"></i> Back to looks</button>
+<div class="th-deepbody">
+    
 
     <div class="th-sub">Accent</div>
     <div class="acc-row" id="accentRow"></div>
@@ -3488,7 +3516,8 @@ body.recsel .pcard{position:relative;}
 
     <div class="th-sub">Save this as your own</div>
     <div class="looks-row" id="looksRow"></div>
-  </details>
+  </div>
+  </div>
 </div>
 <div class="sheet" id="notifySheet">
   <div class="sheet-handle"></div>
@@ -6169,6 +6198,19 @@ function deleteCustomTheme(id){
   toast('Theme deleted');
 }
 function renderArtRowSafe(){try{renderArtRow();}catch(e){}}
+// Which of the two screens the theme sheet is showing. It resets to simple every
+// time the sheet opens: someone who went deep once should not be met by the deep
+// end forever after, and the way back is a single obvious button rather than
+// scrolling past everything they did not want.
+let _themeMode='simple';
+function themeMode(m){
+  _themeMode=(m==='full')?'full':'simple';
+  const a=document.getElementById('themeSimple'), b=document.getElementById('themeFull');
+  if(a)a.style.display=_themeMode==='full'?'none':'';
+  if(b)b.style.display=_themeMode==='full'?'':'none';
+  try{const sh=document.getElementById('themeSheet');if(sh)sh.scrollTop=0;}catch(e){}
+  try{hydrateIcons(document.getElementById('themeSheet'));}catch(e){}
+}
 function renderThemeGrid(){
   try{renderArtRow();}catch(e){}
   try{renderAccentRow();}catch(e){}
@@ -8091,7 +8133,7 @@ function openSheet(id){
   document.getElementById('overlay').classList.add('on');
   document.getElementById(id).classList.add('on');
   try{sheetFocusGuard(id,true);}catch(e){}
-  if(id==='themeSheet'){renderThemeGrid();try{renderArtRow();}catch(e){}}
+  if(id==='themeSheet'){try{themeMode('simple');}catch(e){}renderThemeGrid();try{renderArtRow();}catch(e){}}
   if(id==='statsSheet')renderStatsSheet();
   if(id==='settingsSheet')renderSettings();
   if(id==='backupSheet')renderSyncUI();
@@ -16145,10 +16187,11 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-12.10',
+  v:'2026-08-12.11',
   title:'Six looks, and one door for everything else',
   push:'Pick a look. Everything else is optional.',
   notes:[
+    'Theme is one screen again: a preview, six looks, and drop-a-picture. Everything else lives behind one button and comes back to this every time you open it.',
     'A live preview sits at the top of Theme \u2014 a real card, chip, button and status row that change as you do, so you can see what you\u2019re picking before you commit to it.',
     'Drop a picture into Theme and WatchList takes its colours \u2014 a cover, a screenshot, anything. It looks for the colour you\u2019d actually name if asked about the image, not the muddiest one, so a small patch of vivid colour beats a big grey background.',
     'On a wide screen, opening a title puts it beside your list instead of over it \u2014 the list stays live, so you can keep clicking through and the panel keeps up. Below 1200px it\u2019s the same sheet as before.',

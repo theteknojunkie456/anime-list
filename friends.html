@@ -330,8 +330,9 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
   box-shadow:0 1px 3px rgba(0,0,0,.4);position:relative;}
 .s-panel::after{content:'';position:absolute;left:5px;right:12px;top:7px;height:2px;border-radius:1px;
   background:var(--t1);opacity:.28;}
-.s-st{padding:4px 7px;border-radius:5px;color:#fff;}
-.s-st.sw{background:var(--wat);} .s-st.sf{background:var(--fin);}
+.s-st{display:inline-flex;align-items:center;gap:4px;padding:4px 7px;border-radius:6px;background:rgba(8,8,11,.72);}
+.s-st::before{content:'';width:5px;height:5px;border-radius:50%;background:currentColor;}
+.s-st.sw{color:var(--wat);} .s-st.sf{color:var(--fin);}
 .s-glow{width:40px;height:20px;border-radius:6px;background:var(--bg);border:1px solid var(--b1);position:relative;overflow:hidden;}
 .s-glow::after{content:'';position:absolute;left:50%;top:100%;width:34px;height:24px;transform:translate(-50%,-60%);
   border-radius:50%;background:var(--a);opacity:.5;filter:blur(6px);}
@@ -745,7 +746,6 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
   transition:transform .18s cubic-bezier(.32,.72,.28,1);
   animation:fadeUp .4s ease both;
 }
-.hero:active{transform:scale(0.985);}
 .hero-cta{transition:transform .16s,box-shadow .16s;}
 /* No filter. Boosting saturation by 5-8% "for punch" is repainting artwork that
    somebody drew — subtle enough to look like a house style and wrong enough that
@@ -757,7 +757,6 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 /* Phase-2 motion: staggered reveals + tactile press */
 body.first-paint .pcard{animation:cardIn .42s cubic-bezier(.2,1,.3,1) backwards;}
 @keyframes cardIn{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:none;}}
-.pcard:active{transform:scale(.955);}
 .row-scroll .pcard:nth-child(2),.grid .pcard:nth-child(2){animation-delay:.03s}
 .row-scroll .pcard:nth-child(3),.grid .pcard:nth-child(3){animation-delay:.06s}
 .row-scroll .pcard:nth-child(4),.grid .pcard:nth-child(4){animation-delay:.09s}
@@ -1122,12 +1121,12 @@ body.first-paint .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards
   /* min-width:52px on .nbtn was beating width:44px, so this was 52 wide by 44
      tall — a circle stretched into an ellipse. A round button has to opt out of
      the shared sizing, not inherit half of it. */
-  width:60px;height:60px;min-width:0;flex:none;align-self:center;border-radius:50%;background:linear-gradient(180deg,var(--a2),var(--a));color:var(--aFg);font-size:30px;line-height:1;
+  width:60px;height:60px;min-width:0;flex:none;align-self:center;border-radius:50%;background:var(--a);color:var(--aFg);font-size:30px;line-height:1;
   justify-content:center;padding:0;box-shadow:0 6px 18px -5px var(--glow);
   border:1px solid rgba(255,255,255,0.16);
 }
 .nbtn.add:active{transform:scale(0.9) rotate(90deg);}
-.nbtn.add.on{background:linear-gradient(180deg,var(--a2),var(--a));}
+.nbtn.add.on{background:var(--a);}
 
 /* ── HOME LAYOUT ── */
 .hl-row{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--bn2);}
@@ -1436,7 +1435,6 @@ body.first-paint .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards
 .dt-eps{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;
   margin-left:-22px;margin-right:-22px;padding:2px 22px 6px;scrollbar-width:none;}
 .dt-eps::-webkit-scrollbar{display:none;}
-.dt-eps::-webkit-scrollbar{display:none;}
 .dt-ep{flex:0 0 auto;width:150px;background:none;border:none;padding:0;cursor:pointer;text-align:left;scroll-snap-align:start;}
 .dt-ep-img{position:relative;width:150px;height:84px;border-radius:10px;background:var(--bg3) center/cover no-repeat;border:1px solid var(--b2);}
 .dt-ep-yt{position:absolute;left:8px;top:8px;width:26px;height:26px;border-radius:10px;background:var(--a);color:var(--aFg,#fff);display:flex;align-items:center;justify-content:center;box-shadow:0 2px 10px rgba(0,0,0,.45);}
@@ -1450,8 +1448,8 @@ body.first-paint .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards
 .yt-x{width:38px;height:38px;flex:0 0 auto;border:none;border-radius:14px;background:var(--bg3);color:var(--t1);display:flex;align-items:center;justify-content:center;cursor:pointer;}
 .yt-x:active{transform:scale(.94);}
 .yt-x .ico{width:18px;height:18px;}
-.yt-frame{position:relative;width:100%;aspect-ratio:16/9;border-radius:18px;overflow:hidden;background:#000;box-shadow:0 26px 70px -14px rgba(0,0,0,.75);}
-.yt-frame iframe{position:absolute;inset:0;width:100%;height:100%;border:0;}
+.yt-frame{position:relative;width:100%;aspect-ratio:16/9;max-height:100%;border-radius:18px;overflow:hidden;background:#000;box-shadow:0 26px 70px -14px rgba(0,0,0,.75);}
+.yt-frame iframe{position:absolute;inset:0;width:100%;height:100%;border:0;display:block;}
 /* body.yt-open was being set and cleared all along with no rule behind it. What
    it was for is plain: while a trailer is up, the page underneath must not
    scroll — otherwise a drag on the overlay's backdrop moves the list behind it
@@ -1665,7 +1663,7 @@ html.rotating .pv-frame:fullscreen,html.rotating .pv-frame:-webkit-full-screen{o
 }
 .submit-btn{
   width:100%;padding:16px 0;margin-top:10px;border-radius:14px;font-size:15px;font-weight:800;letter-spacing:-0.2px;
-  background:linear-gradient(180deg,var(--a2),var(--a));color:var(--aFg);box-shadow:0 8px 22px -6px var(--glow);
+  background:var(--a);color:var(--aFg);box-shadow:0 8px 22px -6px var(--glow);
 }
 .submit-btn:active{transform:scale(0.985);opacity:0.9;}
 .autofill-btn{
@@ -1776,7 +1774,6 @@ textarea.ai-prompt-in{resize:none;line-height:1.45;display:block;}
 .pv-wrong::-webkit-scrollbar{display:none;}
 .pv-wrong-t{flex:0 0 auto;}
 .pv-wrong-b{flex:0 0 auto;}
-.pv-wrong-x{flex:0 0 auto;margin-left:auto;position:sticky;right:0;background:var(--bg2);}
 .pv-wrong.on{display:flex;}
 .pv-wrong-t{font-size:12.5px;font-weight:700;color:var(--t1);}
 .pv-wrong-b{font-size:12px;font-weight:700;padding:7px 12px;border-radius:99px;background:var(--bg4);border:1px solid var(--b2);color:var(--t1);white-space:nowrap;cursor:pointer;}
@@ -2146,8 +2143,6 @@ body.call-full{overflow:hidden;}
 .ytview.on{display:block;transform:translateY(0);}
 .ytview .pv-top{position:absolute;top:0;left:0;right:0;z-index:3;background:linear-gradient(to bottom,rgba(0,0,0,.6),rgba(0,0,0,0));padding-bottom:26px;}
 .yt-stage{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;}
-.yt-frame{width:100%;aspect-ratio:16/9;max-height:100%;}
-.yt-frame iframe{width:100%;height:100%;border:0;display:block;}
 .sh-stage{position:absolute;inset:0;background:#000;display:flex;align-items:center;justify-content:center;}
 .sh-video{width:100%;height:100%;object-fit:contain;background:#000;transition:transform .3s cubic-bezier(.2,1,.28,1);}
 .sh-video.fill{object-fit:cover;}   /* tap to go edge-to-edge (crops a little) */
@@ -2227,7 +2222,6 @@ body.no-party .friend-only{display:flex;}
 /* The row's own padding lives on the button, so the two don't stack and a
    friend row measures the same as the request rows above it. */
 .fr-row.has-open{padding:0;}
-.fr-row.open{padding:0 11px 11px;}
 .fr-dot.unknown{opacity:.3;}
 .fr-hint{font-size:11.5px;color:var(--t3);margin:-2px 0 8px;line-height:1.45;}
 .fr-undo{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;background:var(--bg3);border:1px solid var(--b2);margin:6px 0;}

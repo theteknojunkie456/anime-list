@@ -323,3 +323,29 @@ screen answered no part of what you ask before touching an unfamiliar setting:
 
 Cut in the same pass, for being one more thing to read: the named presets, saved
 looks, and the per-section reset that the one global reset already covers.
+
+## Checking it, three ways
+
+`scripts/smoke.mjs` reads the source: does every inline `onclick` name a function
+that exists, is every screen still wired up. It catches the class of bug where a
+rename half-lands.
+
+`scripts/stress.mjs` runs the app. It boots with a library designed to be wrong —
+missing episode counts, negative progress, a title made of quote marks, RTL text,
+500 rows, no rows — opens every screen, presses every visible control, cycles
+every theme, layout, edition, density and artwork mode, and asserts invariants
+after each: nothing rendered the literal "undefined", nothing pushed the page
+sideways, no control is smaller than a thumb. Below 520px it runs inside an
+iframe, because Chrome will not give a headless window less than 500px and every
+narrow-layout check written before that was quietly measuring 500.
+
+`scripts/contrast.mjs` measures. Every text node against its real painted
+background — following gradients to their stops, since a gradient reports its
+background colour as transparent — in all seven themes, on all ten screens,
+against WCAG AA for the size and weight actually used.
+
+Between them they have found: a bottom bar that pushed the page off a 320px
+screen, a party code row that did the same, negative episode counts producing
+negative progress bars and subtracting from lifetime totals, white text on a
+yellow badge at 1.84:1, and a primary button whose label sat at 2.9:1 because the
+gradient's light end was never the colour the foreground was chosen against.

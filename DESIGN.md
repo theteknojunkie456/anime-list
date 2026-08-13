@@ -303,3 +303,23 @@ at once, and the panel is one more thing on a screen that was already long.
 Six named presets used to open this screen. They went, because picking between
 "Ledger" and "Ember" is a harder question than picking a colour, and it stood in
 front of everything else.
+
+## What a first-timer needs before a control
+
+Someone opened Theme for the first time and was lost. Not because any one
+control was unclear — by then each of them drew its own change — but because the
+screen answered no part of what you ask before touching an unfamiliar setting:
+
+1. **What does this change?** One line, at the top, in plain words: it changes how
+   the app looks, and your list and progress are untouched. The second half
+   matters more than the first; the fear is never "will this be ugly".
+2. **Can I get back?** One button that returns every setting to default. Nobody
+   explores a screen they can't back out of, so without it the controls may as
+   well not be there.
+3. **What do I do first?** The first screen holds only the four things most
+   people came for — a look, the preview, an accent, a picture to take colours
+   from. Everything else is behind a door labelled with what's actually behind
+   it, so passing it by is a decision rather than an oversight.
+
+Cut in the same pass, for being one more thing to read: the named presets, saved
+looks, and the per-section reset that the one global reset already covers.

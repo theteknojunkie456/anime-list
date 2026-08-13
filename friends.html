@@ -305,15 +305,30 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 .d-ed s{flex:1;background:var(--t1);opacity:.2;border-radius:1px;}
 .d-ed n{height:5px;background:var(--a);border-radius:2px;flex:none;}
 .d-big s{opacity:.26;}
+/* Orientation, and the way out. */
+.th-intro{margin:14px 0 2px;font-size:12.5px;line-height:1.5;color:var(--t2);}
+.th-intro b{color:var(--t1);font-weight:800;}
+.th-reset{display:flex;align-items:center;justify-content:center;gap:7px;width:100%;margin-top:9px;
+  padding:11px;border-radius:var(--r);background:transparent;border:1px solid var(--b2);
+  color:var(--t3);font-size:12.5px;font-weight:700;}
+.th-reset:hover{color:var(--t1);border-color:var(--b3);}
+.th-reset .ico{width:14px;height:14px;}
+.th-prev-l em{font-style:normal;font-weight:600;letter-spacing:0;text-transform:none;color:var(--t3);margin-left:6px;}
+
 /* Heading samples, for the controls whose change isn't a shape. */
 .th-smp{display:inline-flex;gap:5px;align-items:center;margin-left:6px;vertical-align:middle;}
 .th-smp b{font-weight:800;font-size:9px;letter-spacing:.04em;line-height:1;}
 .s-btn{background:var(--a);color:var(--aFg);padding:5px 8px;border-radius:var(--r2);}
 .s-chip{background:var(--ag);color:var(--a2);padding:5px 8px;border-radius:999px;}
-.s-panel{width:34px;height:18px;border-radius:6px;background:var(--bg3);border:1px solid var(--bg4);}
+.s-panel{width:40px;height:20px;border-radius:6px;background:var(--bg3);border:1px solid var(--b2);
+  box-shadow:0 1px 3px rgba(0,0,0,.4);position:relative;}
+.s-panel::after{content:'';position:absolute;left:5px;right:12px;top:7px;height:2px;border-radius:1px;
+  background:var(--t1);opacity:.28;}
 .s-st{padding:4px 7px;border-radius:5px;color:#fff;}
 .s-st.sw{background:var(--wat);} .s-st.sf{background:var(--fin);}
-.s-glow{width:34px;height:18px;border-radius:6px;background:var(--bg2);box-shadow:inset 0 0 14px 2px var(--glow);}
+.s-glow{width:40px;height:20px;border-radius:6px;background:var(--bg);border:1px solid var(--b1);position:relative;overflow:hidden;}
+.s-glow::after{content:'';position:absolute;left:50%;top:100%;width:34px;height:24px;transform:translate(-50%,-60%);
+  border-radius:50%;background:var(--a);opacity:.5;filter:blur(6px);}
 /* corners */
 .d-shape{background:var(--a)!important;opacity:.75;padding:0!important;}
 /* density: how many across */
@@ -405,19 +420,6 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 .th-looks{margin-top:12px;}
 
 /* Saved looks, and the four status colours. */
-.looks-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;}
-.look-chip{display:inline-flex;align-items:center;gap:7px;padding:7px 9px 7px 11px;border-radius:99px;
-  background:var(--bg3);border:1px solid var(--bn2);color:var(--t1);font-size:12px;font-weight:700;cursor:pointer;}
-.look-chip:hover{border-color:var(--b3);}
-.look-dot{width:11px;height:11px;border-radius:50%;flex:none;}
-.look-n{max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.look-x{display:inline-flex;color:var(--t3);padding:2px;border-radius:50%;}
-.look-x:hover{color:var(--t1);}
-.look-x .ico{width:11px;height:11px;}
-.look-save{display:inline-flex;align-items:center;gap:6px;padding:8px 13px;border-radius:99px;
-  background:var(--ag);border:1px solid color-mix(in srgb,var(--a) 45%,transparent);color:var(--a2);
-  font-size:12px;font-weight:800;cursor:pointer;}
-.look-save .ico{width:13px;height:13px;}
 .stc-row{display:flex;flex-wrap:wrap;gap:8px;}
 .stc{position:relative;display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border-radius:14px;
   background:var(--bg3);border:1px solid var(--bn2);cursor:pointer;}
@@ -427,7 +429,9 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 
 /* Accent swatches. Round, because a colour has no shape of its own and a circle
    is the least opinionated frame to put one in. */
-.acc-row{display:flex;flex-wrap:wrap;gap:9px;align-items:center;}
+/* Grid, not wrap: ten swatches wrapping leave two stranded on a second line,
+   which reads as a mistake. Five and five reads as a decision. */
+.acc-row{display:grid;grid-template-columns:repeat(5,auto);gap:9px;justify-content:start;align-items:center;}
 .acc-sw{width:34px;height:34px;border-radius:50%;border:2px solid transparent;background:var(--sw,var(--bg3));
   cursor:pointer;padding:0;position:relative;transition:transform .12s,border-color .15s;}
 .acc-sw:hover{transform:scale(1.08);}
@@ -3481,7 +3485,9 @@ body.recsel .pcard{position:relative;}
     <div class="sheet-title"><i data-ic="palette"></i> Theme</div>
     <button class="sheet-cancel" onclick="closeAll()">Done</button>
   </div>
-  <div class="theme-grid" id="themeGrid"></div>
+  <!-- Someone opening this for the first time has two questions before any
+       other: what does this change, and can I break something. Answer both in
+       one line, at the top, before they touch anything. -->
   <!-- Made of the REAL components — a card, a button, a chip, a bar — not a
        drawing of them. Every token these read is the same token the app reads,
        so it updates the instant a colour changes and it can never drift out of
@@ -3491,8 +3497,11 @@ body.recsel .pcard{position:relative;}
        more, and how much more, which is most of what makes a page feel heavy.
        In Simple the depth is not collapsed — it is not here. -->
   <div id="themeSimple">
+  <div class="th-intro">This changes how WatchList <b>looks</b>. Your list, your progress and everything in it stay exactly as they are.</div>
+  <div class="th-sub">Start with a look</div>
+  <div class="theme-grid" id="themeGrid"></div>
 <div class="th-prev" id="themePrev">
-    <div class="th-prev-l">Preview</div>
+    <div class="th-prev-l">Preview <em>the app behind this changes too</em></div>
     <div class="th-prev-row">
       <div class="pcard th-prev-card"><div class="pcard-wrap"><div class="pcard-ph">A</div>
         <span class="pcard-badge b-watching">WATCHING</span><span class="pcard-new">2 new</span>
@@ -3505,24 +3514,28 @@ body.recsel .pcard{position:relative;}
       </div>
     </div>
   </div>
+  <div class="th-sub">Accent <span class="th-smp"><b class="s-btn">Watch</b><b class="s-chip">All</b></span></div>
+  <div class="acc-row" id="accentRow"></div>
+
   <div id="fromImgRow"></div>
 
   
     <button class="th-more" onclick="themeMode('full')">
-      <i data-ic="sliders"></i><span>Customise every part</span><span class="th-more-c">colour · shape · layout</span>
+      <i data-ic="sliders"></i><span>More options</span><span class="th-more-c">tint · glow · corners · layout</span>
     </button>
+    <!-- Nobody explores a settings screen they can't back out of. -->
+    <button class="th-reset" onclick="resetTheme()"><i data-ic="refresh"></i> Put everything back to default</button>
   </div>
 
   <div id="themeFull" style="display:none">
     <button class="th-back" onclick="themeMode('simple')"><i data-ic="chevron-left"></i> Back to looks</button>
 <div class="th-deepbody">
+    <div class="th-intro">Each one changes a single part, and draws what that part is. Pick anything; nothing here is permanent.</div>
     
 
     <!-- Every heading carries a sample of the one thing that control touches:
          accent shows a button, tint shows a panel, glow shows the wash. A colour
          swatch tells you the colour; the sample tells you where it lands. -->
-    <div class="th-sub">Accent <span class="th-smp"><b class="s-btn">Watch</b><b class="s-chip">All</b></span></div>
-    <div class="acc-row" id="accentRow"></div>
     <div class="th-sub">Surface tint <em>the panels themselves</em> <span class="th-smp"><b class="s-panel"></b></span></div>
     <div class="acc-row" id="tintRow"></div>
     <div class="th-sub">Status colours <span class="th-smp"><b class="s-st sw">Watching</b><b class="s-st sf">Done</b></span></div>
@@ -3543,10 +3556,6 @@ body.recsel .pcard{position:relative;}
     <div class="th-sub">Artwork</div>
     <div class="art-seg" id="artRow"></div>
 
-    <div class="th-rule"></div>
-
-    <div class="th-sub">Save this as your own</div>
-    <div class="looks-row" id="looksRow"></div>
   </div>
   </div>
 </div>
@@ -5652,8 +5661,7 @@ function renderStatusColorRow(){
       <span class="stc-sw" style="background:${cur||`var(${STATUS_VARS[k][0]})`}"></span>
       <span class="stc-n">${escH(lbl)}</span>
       <input type="color" value="${cur||'#888888'}" oninput="setStatusColor('${k}',this.value,false)" onchange="setStatusColor('${k}',this.value)">
-    </label>`;}).join('')
-    +`<button class="hl-reset" style="margin-top:10px" onclick="setStatusColor('watching','');setStatusColor('plan','');setStatusColor('finished','');setStatusColor('dropped','')">Reset status colours</button>`;
+    </label>`;}).join('');
 }
 
 // ─── A LOOK FROM A PICTURE ──────────────────────────────────────────────────
@@ -5775,63 +5783,25 @@ function renderFromImageRow(){
   dz.addEventListener('drop',e=>{const f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0];if(f)lookFromFile(f);});
 }
 
-// ─── SAVE WHAT YOU MADE ─────────────────────────────────────────────────────
-// Every knob in this sheet was a live setting: change theme and your accent
-// survived, but there was no way to keep two looks and move between them, and
-// nothing to hand a friend. A look is the whole set — theme, accent, tint,
-// shape, density, artwork, glow — so it saves as one thing, appears in the grid
-// with the others, and applies in a tap.
-//
-// Stored beside the built-in themes rather than in a scheme of its own, because
-// "the thing I made" and "the thing that shipped" are the same kind of object as
-// far as anyone choosing one is concerned.
-const LOOKS_KEY='saved_looks';
-function savedLooks(){try{const v=JSON.parse(localStorage.getItem(LOOKS_KEY)||'[]');return Array.isArray(v)?v:[];}catch(e){return[];}}
-function setSavedLooks(l){try{localStorage.setItem(LOOKS_KEY,JSON.stringify(l.slice(0,24)));}catch(e){}}
-function currentLook(){
-  return {theme:curTheme||'default',accent:accentOverride(),tint:surfaceTint(),
-          ui:uiStyle(),view:layoutView(),ed:edition(),density:density(),art:artMode(),status:statusColors(),
-          glow:(()=>{try{return localStorage.getItem('glow_mode')||'';}catch(e){return '';}})()};
-}
-function saveLook(){
-  const name=(prompt('Name this look')||'').trim().slice(0,28);
-  if(!name)return;
-  const list=savedLooks().filter(l=>l.name.toLowerCase()!==name.toLowerCase());
-  list.unshift(Object.assign({name,id:'look'+Date.now().toString(36)},currentLook()));
-  setSavedLooks(list);renderLooksRow();
-  toast(`Saved “${name}”`);
-}
-function applyLook(id){
-  const l=savedLooks().find(x=>x.id===id); if(!l)return;
-  try{applyTheme(l.theme||'default');}catch(e){}
-  try{localStorage.setItem(ACCENT_KEY,l.accent||'');if(!l.accent)localStorage.removeItem(ACCENT_KEY);}catch(e){}
-  try{localStorage.setItem(TINT_KEY,l.tint||'');if(!l.tint)localStorage.removeItem(TINT_KEY);}catch(e){}
-  try{localStorage.setItem(UI_KEY,l.ui||'soft');}catch(e){}
-  try{localStorage.setItem(VIEW_KEY,l.view||'grid');}catch(e){}
-  try{localStorage.setItem(ED_KEY,l.ed||'standard');}catch(e){}
-  try{localStorage.setItem(DENSITY_KEY,l.density||'comfy');}catch(e){}
-  try{localStorage.setItem(ART_KEY,l.art||'natural');}catch(e){}
-  if(l.glow){try{localStorage.setItem('glow_mode',l.glow);}catch(e){}}
-  try{localStorage.setItem(STATUS_KEY,JSON.stringify(l.status||{}));}catch(e){}
-  applyAccent();applyTint();applyUiStyle();applyLayoutView();applyEdition();applyDensity();applyArtMode();applyStatusColors();
+// ─── THE WAY BACK ───────────────────────────────────────────────────────────
+// A first-time visitor to this sheet reported being lost, which is what happens
+// when a screen offers nine ways to change something and none to undo them. One
+// button that puts every one of them back, so nothing here is a commitment.
+function resetTheme(){
+  ['accent_override','surface_tint','status_colors','ui_style','app_edition',
+   'layout_view','card_density','art_mode','glow_mode']
+    .forEach(k=>{try{localStorage.removeItem(k);}catch(e){}});
+  try{applyTheme('default');}catch(e){}
+  [applyAccent,applyTint,applyStatusColors,applyUiStyle,applyEdition,applyLayoutView,
+   applyDensity,applyArtMode].forEach(f=>{try{f();}catch(e){}});
   try{applyGlow();}catch(e){}
   try{render();}catch(e){}
-  renderThemeGrid();
-  toast(`“${l.name}” applied`);
-}
-function deleteLook(id,ev){
-  try{ev.stopPropagation();}catch(e){}
-  setSavedLooks(savedLooks().filter(x=>x.id!==id));renderLooksRow();
-}
-function renderLooksRow(){
-  const row=document.getElementById('looksRow'); if(!row)return;
-  const list=savedLooks();
-  row.innerHTML=list.map(l=>`<button class="look-chip" onclick="applyLook('${l.id}')" title="Apply ${escH(l.name)}">
-      <span class="look-dot" style="background:${escH(l.accent||'var(--a)')}"></span>
-      <span class="look-n">${escH(l.name)}</span>
-      <span class="look-x" onclick="deleteLook('${l.id}',event)" aria-label="Delete">${icon('x')}</span>
-    </button>`).join('')
-    +`<button class="look-save" onclick="saveLook()">${icon('check')} Save this look</button>`;
+  try{renderThemeGrid();}catch(e){}
+  ['renderAccentRow','renderTintRow','renderStatusColorRow','renderGlowRow','renderEditionRow',
+   'renderViewRow','renderUiRow','renderDensityRow','renderArtRow']
+    .forEach(n=>{try{window[n]&&window[n]();}catch(e){}});
+  themeMode('simple');
+  toast('Back to default');
 }
 
 // ─── SURFACE TINT ───────────────────────────────────────────────────────────
@@ -6219,7 +6189,6 @@ function renderThemeGrid(){
   try{renderDensityRow();}catch(e){}
   try{renderUiRow();}catch(e){}
   try{renderTintRow();}catch(e){}
-  try{renderLooksRow();}catch(e){}
   try{renderViewRow();}catch(e){}
   try{renderEditionRow();}catch(e){}
   try{renderFromImageRow();}catch(e){}
@@ -16189,12 +16158,15 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-12.12',
-  title:'Every control shows you what it changes',
-  push:'No more guessing what a setting does \u2014 it draws it.',
+  v:'2026-08-12.13',
+  title:'Theme, for someone opening it for the first time',
+  push:'One line telling you what it changes, and one button putting it all back.',
   notes:[
-    'Every choice in Theme now draws what it does: layout shows the arrangement, edition shows where the bar sits, look shows the corner, card size shows how many fit, artwork shows the treatment. Accent, tint, status and glow carry a sample of the exact thing they colour.',
-    'The six ready-made looks are gone. Themes, a live preview and drop-a-picture are the first screen; everything else is behind one button.',
+    'Theme now says what it is before you touch anything: it changes how the app looks, and your list, your progress and everything in it stay exactly as they are.',
+    'One button puts every setting back to default. Nobody explores a screen they cannot back out of.',
+    'The first screen is the seven looks, a live preview, the accent colours and drop-a-picture \u2014 nothing else. Tint, glow, corners, editions and layouts moved behind “More options”.',
+    'Every choice in Theme draws what it does: layout shows the arrangement, edition shows where the bar sits, look shows the corner, card size shows how many fit, artwork shows the treatment. Accent, tint, status and glow carry a sample of the exact thing they colour.',
+    'Gone: the six named presets, and saving looks under a name. Both stood in front of the simple thing most people came for.',
     'A live preview sits at the top of Theme \u2014 a real card, chip, button and status row that change as you do, so you can see what you\u2019re picking before you commit to it.',
     'Drop a picture into Theme and WatchList takes its colours \u2014 a cover, a screenshot, anything. It looks for the colour you\u2019d actually name if asked about the image, not the muddiest one, so a small patch of vivid colour beats a big grey background.',
     'On a wide screen, opening a title puts it beside your list instead of over it \u2014 the list stays live, so you can keep clicking through and the panel keeps up. Below 1200px it\u2019s the same sheet as before.',

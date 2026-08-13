@@ -288,10 +288,9 @@ Any new motion near the player must check `nativeFullscreen()` first.
 
 Every option in Theme carries a small diagram of the one thing it changes, built
 from divs and the live tokens, so it re-colours with the theme and cannot drift
-from what it claims. Layout draws the arrangement, edition draws where the
-navigation bar sits and how much fits above it, look draws a square at that
-corner radius, card size draws that many cards across, artwork draws flat versus
-shaded. The colour controls are not spatial, so their headings carry a sample
+from what it claims. Edition draws where the navigation bar sits and how much fits above it, look
+draws a square at that corner radius, card size draws that many cards across,
+artwork draws flat versus shaded. The colour controls are not spatial, so their headings carry a sample
 instead: a button and a chip for accent, a panel for tint, two badges for status,
 a washed rectangle for glow.
 

@@ -239,55 +239,6 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 [data-ed=pro] .hdr{padding-bottom:0;}
 [data-ed=pro] .row-sec{margin-top:4px;}
 
-/* ── LAYOUTS ────────────────────────────────────────────────────────────────
-   Not corner radii — genuinely different ways to show the same list, from the
-   same markup. A card already carries artwork, a status tag, a title, a
-   sub-line, a progress bar and a "N new" tag; what changes between these is
-   which of those the eye meets first, and how many titles fit in a screen.
-
-   LIST — one per row, thumbnail left, everything readable at once. The densest
-   view and the only one where you can compare two shows without scrolling: the
-   sub-line and the air line sit beside the title instead of under the poster. */
-[data-view=list] .grid{display:flex;flex-direction:column;gap:0;}
-[data-view=list] .grid .pcard{display:grid;grid-template-columns:56px 1fr;gap:13px;align-items:center;
-  padding:10px 2px;border-bottom:1px solid var(--bn2);flex:none;width:100%;}
-[data-view=list] .grid .pcard:last-child{border-bottom:0;}
-/* The status tag, the "N new" tag and the bar all live INSIDE the image wrapper,
-   so in a two-column row they cannot move to the text column — they belong to
-   the thumbnail. Rather than fight that, let them stay on it: the tag becomes a
-   dot in the corner (the word is unreadable at 56px anyway and the colour says
-   it), the count sits on the artwork, and the bar underlines it. */
-[data-view=list] .grid .pcard-wrap{grid-row:span 4;position:relative;width:56px;}
-[data-view=list] .grid .pcard-img,[data-view=list] .grid .pcard-ph{width:56px;height:80px;aspect-ratio:auto;border-radius:10px;}
-[data-view=list] .grid .pcard-badge{width:9px;height:9px;padding:0;top:-3px;left:-3px;border-radius:50%;
-  font-size:0;line-height:0;overflow:hidden;border:2px solid var(--bg);}
-[data-view=list] .grid .pcard-badge::before{content:'';display:block;width:100%;height:100%;}
-[data-view=list] .grid .pcard-fav,[data-view=list] .grid .pcard-seas{display:none;}
-[data-view=list] .grid .pcard-new{left:auto;right:3px;bottom:auto;top:3px;padding:1px 5px;font-size:8.5px;}
-[data-view=list] .grid .pcard-title{font-size:14.5px;margin-top:0;-webkit-line-clamp:1;}
-[data-view=list] .grid .pcard-sub,[data-view=list] .grid .pcard-air{margin-top:2px;}
-[data-view=list] .grid .pbar{position:absolute;left:0;right:0;bottom:0;border-radius:0 0 8px 8px;height:3px;}
-[data-view=list] .grid .pcard:hover{transform:none;}
-
-/* CINEMA — one wide card per row, artwork filling it, the title over the art.
-   The fewest titles per screen and the most presence for each: this is the view
-   for choosing something, where the others are for finding something. */
-[data-view=cinema] .grid{display:flex;flex-direction:column;gap:14px;}
-[data-view=cinema] .grid .pcard{position:relative;flex:none;width:100%;border-radius:18px;overflow:hidden;}
-[data-view=cinema] .grid .pcard-wrap{width:100%;}
-[data-view=cinema] .grid .pcard-img,[data-view=cinema] .grid .pcard-ph{
-  width:100%;height:auto;aspect-ratio:16/7;object-position:center 28%;border-radius:18px;}
-[data-view=cinema] .grid .pcard-title{position:absolute;left:16px;right:16px;bottom:34px;z-index:3;
-  font-size:20px;font-weight:900;letter-spacing:-.02em;text-shadow:0 2px 14px rgba(0,0,0,.9);-webkit-line-clamp:2;}
-[data-view=cinema] .grid .pcard-sub,[data-view=cinema] .grid .pcard-air{position:absolute;left:16px;right:16px;bottom:14px;z-index:3;
-  text-shadow:0 1px 10px rgba(0,0,0,.9);}
-[data-view=cinema] .grid .pcard-wrap::after{content:'';position:absolute;inset:0;z-index:2;border-radius:18px;
-  background:linear-gradient(to top,rgba(6,6,9,.92) 0%,rgba(6,6,9,.35) 34%,transparent 62%);}
-[data-view=cinema] .grid .pbar{position:absolute;left:0;right:0;bottom:0;z-index:4;border-radius:0;}
-[data-view=cinema] .grid .pcard-badge{z-index:4;}
-[data-view=cinema] .grid .pcard-new{z-index:4;bottom:auto;top:12px;left:auto;right:12px;}
-@media (min-width:900px){ [data-view=cinema] .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));} }
-
 /* ── OPTION DIAGRAMS ──
    Each one is a drawing of what its button does, in the same accent the app is
    currently using, so the diagram is itself a preview. Built from divs because
@@ -320,18 +271,13 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 .th-reset:hover{color:var(--t1);border-color:var(--b3);}
 .th-reset .ico{width:14px;height:14px;}
 
-
 /* Heading samples, for the controls whose change isn't a shape. */
 .th-smp{display:inline-flex;gap:5px;align-items:center;margin-left:6px;vertical-align:middle;}
 .th-smp b{font-weight:800;font-size:9px;letter-spacing:.04em;line-height:1;}
 .s-btn{background:var(--a);color:var(--aFg);padding:5px 8px;border-radius:var(--r2);}
 .s-chip{background:var(--ag);color:var(--a2);padding:5px 8px;border-radius:999px;}
 
-
-
-
  
-
 
 /* corners */
 .d-shape{background:var(--a)!important;opacity:.75;padding:0!important;}
@@ -362,15 +308,6 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
    picture of the UI, so it cannot go stale. */
 .th-prev{margin:4px 0 18px;padding:13px;border-radius:18px;
   background:color-mix(in srgb,var(--bg2) 70%,transparent);border:1px solid var(--bn2);}
-
-
-
-
-
-
-
-
-
 
 /* What a picture gave us, shown beside the picture itself. */
 .fi-took{display:flex;align-items:center;gap:11px;margin-top:9px;padding:9px 11px;border-radius:14px;
@@ -428,7 +365,6 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 .stc{position:relative;display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border-radius:14px;
   background:var(--bg3);border:1px solid var(--bn2);cursor:pointer;}
 
-
 .stc input{position:absolute;inset:0;opacity:0;cursor:pointer;}
 
 /* Accent swatches. Round, because a colour has no shape of its own and a circle
@@ -455,21 +391,6 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 .art-lb{font-family:var(--fd);font-size:13.5px;font-weight:800;}
 .art-sub{font-size:11px;color:var(--t3);}
 .art-opt.on .art-sub{color:inherit;opacity:.8;}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 .ct-dk{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:13.5px;font-weight:700;color:var(--t1);margin-bottom:14px;cursor:pointer;}
 .ct-tgl{position:relative;width:46px;height:28px;flex-shrink:0;}
@@ -2415,7 +2336,6 @@ body.recsel .pcard{position:relative;}
 .pcard-air{font-size:9.5px;font-weight:700;color:var(--wat);margin-top:4px;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .hero-air{display:inline-flex;align-items:center;gap:5px;margin-top:9px;font-size:11px;font-weight:700;color:#ffd9a0;background:rgba(245,166,35,0.18);border:1px solid rgba(245,166,35,0.34);padding:5px 11px;border-radius:99px;}
 
-
 .dt-runtime .ico{color:var(--a2);}
 .dt-runtime b{color:var(--a2);}
 .dt-runtime-films{color:var(--t2);font-weight:600;}
@@ -2732,9 +2652,6 @@ body.recsel .pcard{position:relative;}
 .kbkey{min-width:22px;height:23px;padding:0 7px;border-radius:6px;background:var(--bg4);border:1px solid var(--b2);font-size:12px;font-weight:700;color:var(--t2);display:inline-flex;align-items:center;justify-content:center;font-family:ui-monospace,SFMono-Regular,monospace;}
 
 /* Video Player Overlay */
-
-
-
 
 /* ── NARROW PHONES (≤360px) ───────────────────────────────────────────────
    Measured at 320, where an iPhone SE lives: the header put a wordmark and five
@@ -3528,8 +3445,6 @@ body.recsel .pcard{position:relative;}
          swatch tells you the colour; the sample tells you where it lands. -->
     <div class="th-sub">Edition <em>how the app is arranged</em></div>
     <div class="art-seg th-wrap" id="editionRow"></div>
-    <div class="th-sub">Layout <em>how a title is shown</em></div>
-    <div class="art-seg" id="viewRow"></div>
     <div class="th-sub">Look <em>corners and edges</em></div>
     <div class="art-seg" id="uiRow"></div>
     <div class="th-sub">Card size</div>
@@ -4967,7 +4882,6 @@ function applyExtra(x){
   try{if(typeof applyAccent==='function')applyAccent();}catch(e){}
   try{if(typeof applyDensity==='function')applyDensity();}catch(e){}
   try{if(typeof applyUiStyle==='function')applyUiStyle();}catch(e){}
-  try{if(typeof applyLayoutView==='function')applyLayoutView();}catch(e){}
   try{if(typeof applyEdition==='function')applyEdition();}catch(e){}
   try{if(typeof applyTint==='function')applyTint();}catch(e){}
   try{if(typeof applyStatusColors==='function')applyStatusColors();}catch(e){}
@@ -5766,16 +5680,16 @@ function renderFromImageRow(){
 // button that puts every one of them back, so nothing here is a commitment.
 function resetTheme(){
   ['accent_override','surface_tint','status_colors','ui_style','app_edition',
-   'layout_view','card_density','art_mode','glow_mode']
+   'card_density','art_mode','glow_mode']
     .forEach(k=>{try{localStorage.removeItem(k);}catch(e){}});
   try{applyTheme('default');}catch(e){}
-  [applyAccent,applyTint,applyStatusColors,applyUiStyle,applyEdition,applyLayoutView,
+  [applyAccent,applyTint,applyStatusColors,applyUiStyle,applyEdition,
    applyDensity,applyArtMode].forEach(f=>{try{f();}catch(e){}});
   try{applyGlow();}catch(e){}
   try{render();}catch(e){}
   try{renderThemeGrid();}catch(e){}
   ['renderAccentRow','renderEditionRow',
-   'renderViewRow','renderUiRow','renderDensityRow','renderArtRow']
+   'renderUiRow','renderDensityRow','renderArtRow']
     .forEach(n=>{try{window[n]&&window[n]();}catch(e){}});
   themeMode('simple');
   toast('Back to default');
@@ -5876,30 +5790,9 @@ try{applyEdition();}catch(e){}
 // Layout: which of the three ways to show the list. Kept separate from density
 // because they answer different questions — this one is "what does a title look
 // like", density is "how many of them fit".
-const VIEW_KEY='layout_view';
-const VIEWS={grid:['Posters','Artwork in a grid'],list:['List','Dense, everything readable'],cinema:['Cinema','Big and immersive']};
-function layoutView(){try{const v=localStorage.getItem(VIEW_KEY);return VIEWS[v]?v:'grid';}catch(e){return 'grid';}}
-function applyLayoutView(){try{document.documentElement.setAttribute('data-view',layoutView());}catch(e){}}
-function setLayoutView(v){
-  try{localStorage.setItem(VIEW_KEY,VIEWS[v]?v:'grid');}catch(e){}
-  applyLayoutView();renderViewRow();try{render();}catch(e){}
-}
 // Each option draws the thing it does. A label tells you the name of a choice;
 // a diagram tells you the choice. For anything spatial — where the bar sits, how
-// many columns, how round a corner is — the drawing IS the explanation, and a
-// separate preview panel somewhere else is a worse version of it.
-const DIA={
-  grid:'<i class="d-g"><b></b><b></b><b></b><b></b><b></b><b></b></i>',
-  list:'<i class="d-l"><b></b><b></b><b></b></i>',
-  cinema:'<i class="d-c"><b></b><b></b></i>',
-};
-function renderViewRow(){
-  const row=document.getElementById('viewRow'); if(!row)return;
-  const cur=layoutView();
-  row.innerHTML=Object.keys(VIEWS).map(k=>`<button class="art-opt has-d${cur===k?' on':''}" onclick="setLayoutView('${k}')">
-    ${DIA[k]||''}<span class="art-lb">${VIEWS[k][0]}</span><span class="art-sub">${VIEWS[k][1]}</span></button>`).join('');
-}
-try{applyLayoutView();}catch(e){}
+// many fit across, how round a corner is — the drawing IS the explanation.
 const DENSITY_KEY='card_density';
 const DENSITIES={compact:{min:104,label:'Compact',sub:'More per row'},
                  comfy:{min:150,label:'Comfortable',sub:'The default'},
@@ -6154,7 +6047,6 @@ function renderThemeGrid(){
   try{renderAccentRow();}catch(e){}
   try{renderDensityRow();}catch(e){}
   try{renderUiRow();}catch(e){}
-  try{renderViewRow();}catch(e){}
   try{renderEditionRow();}catch(e){}
   try{renderFromImageRow();}catch(e){}
   const bs=document.getElementById('brightSlider');if(bs)bs.value=bgBright();
@@ -16165,11 +16057,12 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-13.2',
+  v:'2026-08-13.3',
   title:'Theme fits on one screen',
   push:'Fewer things, and the ones that are left are the ones you use.',
   notes:[
     'Theme is a look, an accent, a picture to take colours from, and one optional door \u2014 that is the whole screen now.',
+    'The three list layouts are gone. Titles are shown as artwork in a grid, which is what almost everyone left it on; card size still decides how many fit across.',
     'Gone: surface tint, status colours, the background glow modes, and the preview panel. The glow still follows what you browse, the badges still take the theme\u2019s colours, and the app behind the sheet was always the real preview.',
     'Choosing a theme now actually changes the colour. A custom accent used to outlive every theme you picked afterwards, so if you had ever set one \u2014 or taken colours from a picture \u2014 tapping Sasuke left the app red and there was no way to tell why from looking at it.',
     'The background glow stays in the theme\u2019s family. It still shifts with whatever you are browsing, but half-way towards your accent, so a warm poster can no longer put a brown wash under a purple app.',
@@ -16181,12 +16074,11 @@ const RELEASE={
     'Theme now says what it is before you touch anything: it changes how the app looks, and your list, your progress and everything in it stay exactly as they are.',
     'One button puts every setting back to default. Nobody explores a screen they cannot back out of.',
     'The first screen is the seven looks, a live preview, the accent colours and drop-a-picture \u2014 nothing else. Tint, glow, corners, editions and layouts moved behind “More options”.',
-    'Every choice in Theme draws what it does: layout shows the arrangement, edition shows where the bar sits, look shows the corner, card size shows how many fit, artwork shows the treatment. Accent, tint, status and glow carry a sample of the exact thing they colour.',
+    'Every choice in Theme draws what it does: edition shows where the bar sits, look shows the corner, card size shows how many fit, artwork shows the treatment. The accent carries a sample of the exact thing it colours.',
     'Gone: the six named presets, and saving looks under a name. Both stood in front of the simple thing most people came for.',
     'A live preview sits at the top of Theme \u2014 a real card, chip, button and status row that change as you do, so you can see what you\u2019re picking before you commit to it.',
     'Drop a picture into Theme and WatchList takes its colours \u2014 a cover, a screenshot, anything. It looks for the colour you\u2019d actually name if asked about the image, not the muddiest one, so a small patch of vivid colour beats a big grey background.',
     'On a wide screen, opening a title puts it beside your list instead of over it \u2014 the list stays live, so you can keep clicking through and the panel keeps up. Below 1200px it\u2019s the same sheet as before.',
-    'If you do want the controls: your own accent, a surface tint for the panels, the four status colours, three layouts (Posters, List, Cinema), four editions (Standard, Focus, Big, Desktop), card size and artwork treatment \u2014 all saveable under a name.',
     'Artwork is shown as it is \u2014 no quiet saturation or heavy shading \u2014 and backgrounds crop around the subject instead of a fixed guess.',
     'Progress keeps itself: the app follows the site\u2019s own next-episode link, and in the iPhone app it reads real playback position down to the minute you stopped.',
     'Countdowns know your source is behind the Japanese broadcast, and learn by how much.',

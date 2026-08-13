@@ -214,13 +214,10 @@ function suite() {
   // ── every appearance the user can choose ──
   if (!window.__QUICK) run('appearance matrix', () => {
     const themes = ['default', 'naruto', 'sasuke', 'luffy', 'sanji', 'zoro', 'chopper'];
-    const views = ['grid', 'list', 'cinema'];
     const eds = ['standard', 'focus', 'tv', 'pro'];
     const dens = ['compact', 'comfy', 'large'];
     themes.forEach(t => { window.applyTheme(t); scanDOM('theme ' + t); });
     window.applyTheme('default');
-    views.forEach(v => { window.setLayoutView(v); scanDOM('view ' + v); });
-    window.setLayoutView('grid');
     eds.forEach(e => { window.setEdition(e); scanDOM('edition ' + e); });
     window.setEdition('standard');
     dens.forEach(d => { window.setDensity(d); scanDOM('density ' + d); });
@@ -274,11 +271,10 @@ function suite() {
 
   // ── settings must survive a round trip through storage ──
   run('settings persist', () => {
-    window.setAccent('#5ed47a'); window.setDensity('large'); window.setLayoutView('list');
+    window.setAccent('#5ed47a'); window.setDensity('large');
     if (window.accentOverride().toLowerCase() !== '#5ed47a') err('persist', 'accent did not stick');
     if (window.density() !== 'large') err('persist', 'density did not stick');
-    if (window.layoutView() !== 'list') err('persist', 'layout did not stick');
-    window.setAccent(''); window.setDensity('comfy'); window.setLayoutView('grid');
+    window.setAccent(''); window.setDensity('comfy');
   });
 
   R.width = window.innerWidth;

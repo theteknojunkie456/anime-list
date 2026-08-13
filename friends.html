@@ -189,56 +189,6 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
   :root.two-pane .overlay{opacity:0!important;pointer-events:none!important;}
 }
 
-/* ── EDITIONS ───────────────────────────────────────────────────────────────
-   Not a skin. Each of these moves the furniture: where navigation lives, whether
-   there is a hero at all, how big the type is, how much chrome sits between you
-   and the list. Same app, same markup, same code path — arranged for a different
-   way of using it.
-
-   FOCUS — nothing but the list. No hero, no rails, no labels under the nav
-   icons, tighter chrome. For someone who opens the app knowing what they want.
-*/
-[data-ed=focus] .billboard,[data-ed=focus] .rz-sec,[data-ed=focus] .qp-strip{display:none!important;}
-[data-ed=focus] .nbtn small{display:none;}
-[data-ed=focus] .nav{padding-top:8px;padding-bottom:calc(var(--safe-b) + 8px);}
-[data-ed=focus] .nbtn.add{width:44px;height:44px;font-size:22px;}
-[data-ed=focus] .topbar{margin-top:6px;}
-[data-ed=focus] .hdr{padding-top:calc(var(--safe-t) + 8px);padding-bottom:2px;}
-[data-ed=focus] .hdr-title{font-size:17px;}
-[data-ed=focus] .row-head{margin-top:10px;}
-
-/* TV — arm's length. Everything larger: type, targets, artwork. The layout that
-   assumes the screen is further away than a phone held in one hand. */
-[data-ed=tv]{font-size:18px;}
-[data-ed=tv] .pcard-title{font-size:16px;}
-[data-ed=tv] .pcard-sub,[data-ed=tv] .pcard-air{font-size:13px;}
-[data-ed=tv] .row-title{font-size:20px;}
-[data-ed=tv] .hdr-title{font-size:26px;}
-[data-ed=tv] .nbtn small{font-size:11px;}
-[data-ed=tv] .nbtn{min-width:0;padding:10px clamp(4px,2.4vw,12px);}
-[data-ed=tv] .nav{padding:16px 12px calc(var(--safe-b) + 16px);}
-[data-ed=tv] .nbtn.add{width:68px;height:68px;font-size:32px;}
-[data-ed=tv] .search-in{font-size:16px;padding-top:14px;padding-bottom:14px;}
-[data-ed=tv] .fchip{font-size:14px;height:40px;padding:0 16px;}
-[data-ed=tv] .dt-watch{height:60px;font-size:18px;}
-[data-ed=tv] .billboard,[data-ed=tv] .bb-slide{min-height:clamp(300px,42vw,560px);}
-
-/* PRO — navigation at the TOP, where a desktop expects it, and everything
-   tighter. The one edition that genuinely relocates a region rather than
-   resizing it: the bar leaves the bottom of the screen entirely. */
-[data-ed=pro] .nav{position:static;order:-1;width:auto;max-width:none;transform:none;left:auto;right:auto;
-  border-radius:0;border-top:0;border-bottom:1px solid var(--bn2);box-shadow:none;
-  padding:6px 10px;grid-template-columns:repeat(5,auto);justify-content:start;column-gap:4px;}
-[data-ed=pro] .nav::before,[data-ed=pro] .nav::after{display:none;}
-[data-ed=pro] .nbtn{flex-direction:row;gap:7px;min-width:0;padding:7px 12px;}
-[data-ed=pro] .nbtn small{font-size:12px;letter-spacing:0;}
-[data-ed=pro] .nbtn.add{width:auto;height:auto;border-radius:99px;padding:7px 14px;font-size:15px;top:0;}
-[data-ed=pro] .page{padding-bottom:calc(var(--safe-b) + 24px);}
-[data-ed=pro] .billboard{display:none;}
-[data-ed=pro] .topbar{margin-top:6px;}
-[data-ed=pro] .hdr{padding-bottom:0;}
-[data-ed=pro] .row-sec{margin-top:4px;}
-
 /* ── OPTION DIAGRAMS ──
    Each one is a drawing of what its button does, in the same accent the app is
    currently using, so the diagram is itself a preview. Built from divs because
@@ -3428,7 +3378,7 @@ body.recsel .pcard{position:relative;}
 
   
     <button class="th-more" onclick="themeMode('full')">
-      <i data-ic="sliders"></i><span>Shape and layout</span><span class="th-more-c">optional</span>
+      <i data-ic="sliders"></i><span>Shape and size</span><span class="th-more-c">optional</span>
     </button>
     <!-- Nobody explores a settings screen they can't back out of. -->
     <button class="th-reset" onclick="resetTheme()"><i data-ic="refresh"></i> Put everything back to default</button>
@@ -3443,8 +3393,6 @@ body.recsel .pcard{position:relative;}
     <!-- Every heading carries a sample of the one thing that control touches:
          accent shows a button, tint shows a panel, glow shows the wash. A colour
          swatch tells you the colour; the sample tells you where it lands. -->
-    <div class="th-sub">Edition <em>how the app is arranged</em></div>
-    <div class="art-seg th-wrap" id="editionRow"></div>
     <div class="th-sub">Look <em>corners and edges</em></div>
     <div class="art-seg" id="uiRow"></div>
     <div class="th-sub">Card size</div>
@@ -4882,7 +4830,6 @@ function applyExtra(x){
   try{if(typeof applyAccent==='function')applyAccent();}catch(e){}
   try{if(typeof applyDensity==='function')applyDensity();}catch(e){}
   try{if(typeof applyUiStyle==='function')applyUiStyle();}catch(e){}
-  try{if(typeof applyEdition==='function')applyEdition();}catch(e){}
   try{if(typeof applyTint==='function')applyTint();}catch(e){}
   try{if(typeof applyStatusColors==='function')applyStatusColors();}catch(e){}
   try{if(typeof applyAmbient==='function')applyAmbient();}catch(e){}
@@ -5679,16 +5626,16 @@ function renderFromImageRow(){
 // when a screen offers nine ways to change something and none to undo them. One
 // button that puts every one of them back, so nothing here is a commitment.
 function resetTheme(){
-  ['accent_override','surface_tint','status_colors','ui_style','app_edition',
+  ['accent_override','surface_tint','status_colors','ui_style',
    'card_density','art_mode','glow_mode']
     .forEach(k=>{try{localStorage.removeItem(k);}catch(e){}});
   try{applyTheme('default');}catch(e){}
-  [applyAccent,applyTint,applyStatusColors,applyUiStyle,applyEdition,
+  [applyAccent,applyTint,applyStatusColors,applyUiStyle,
    applyDensity,applyArtMode].forEach(f=>{try{f();}catch(e){}});
   try{applyGlow();}catch(e){}
   try{render();}catch(e){}
   try{renderThemeGrid();}catch(e){}
-  ['renderAccentRow','renderEditionRow',
+  ['renderAccentRow',
    'renderUiRow','renderDensityRow','renderArtRow']
     .forEach(n=>{try{window[n]&&window[n]();}catch(e){}});
   themeMode('simple');
@@ -5759,34 +5706,6 @@ try{applyUiStyle();}catch(e){}
 // Edition: how the app itself is arranged — where navigation lives, whether
 // there is a hero, how big everything is. Distinct from layout, which is about a
 // title, and from look, which is about corners. This one moves furniture.
-const ED_KEY='app_edition';
-const EDITIONS={standard:['Standard','Everything, as designed'],
-                focus:['Focus','Just the list, no extras'],
-                tv:['Big','Larger type and targets'],
-                pro:['Desktop','Navigation at the top, tighter']};
-function edition(){try{const v=localStorage.getItem(ED_KEY);return EDITIONS[v]?v:'standard';}catch(e){return 'standard';}}
-function applyEdition(){try{document.documentElement.setAttribute('data-ed',edition());}catch(e){}}
-function setEdition(v){
-  try{localStorage.setItem(ED_KEY,EDITIONS[v]?v:'standard');}catch(e){}
-  applyEdition();renderEditionRow();try{render();}catch(e){}
-}
-function renderEditionRow(){
-  const row=document.getElementById('editionRow'); if(!row)return;
-  const cur=edition();
-  // Wireframes: header, content, and where navigation lives.
-  // Four wireframes that actually differ: what's at the top, how many rows of
-  // content fit, and where the bar lives. Three near-identical drawings would be
-  // worse than none.
-  const ED_D={
-    standard:'<i class="d-ed"><u></u><s></s><s></s><s></s><n></n></i>',
-    focus:'<i class="d-ed"><s></s><s></s><s></s><s></s><n></n></i>',
-    tv:'<i class="d-ed d-big"><u></u><s></s><s></s><n></n></i>',
-    pro:'<i class="d-ed"><n></n><s></s><s></s><s></s></i>',
-  };
-  row.innerHTML=Object.keys(EDITIONS).map(k=>`<button class="art-opt has-d${cur===k?' on':''}" onclick="setEdition('${k}')">
-    ${ED_D[k]||''}<span class="art-lb">${EDITIONS[k][0]}</span><span class="art-sub">${EDITIONS[k][1]}</span></button>`).join('');
-}
-try{applyEdition();}catch(e){}
 // Layout: which of the three ways to show the list. Kept separate from density
 // because they answer different questions — this one is "what does a title look
 // like", density is "how many of them fit".
@@ -16057,12 +15976,12 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-13.3',
+  v:'2026-08-13.4',
   title:'Theme fits on one screen',
   push:'Fewer things, and the ones that are left are the ones you use.',
   notes:[
     'Theme is a look, an accent, a picture to take colours from, and one optional door \u2014 that is the whole screen now.',
-    'The three list layouts are gone. Titles are shown as artwork in a grid, which is what almost everyone left it on; card size still decides how many fit across.',
+    'The three list layouts and the four editions are gone. Titles are artwork in a grid; card size still decides how many fit across.',
     'Gone: surface tint, status colours, the background glow modes, and the preview panel. The glow still follows what you browse, the badges still take the theme\u2019s colours, and the app behind the sheet was always the real preview.',
     'Choosing a theme now actually changes the colour. A custom accent used to outlive every theme you picked afterwards, so if you had ever set one \u2014 or taken colours from a picture \u2014 tapping Sasuke left the app red and there was no way to tell why from looking at it.',
     'The background glow stays in the theme\u2019s family. It still shifts with whatever you are browsing, but half-way towards your accent, so a warm poster can no longer put a brown wash under a purple app.',
@@ -16074,7 +15993,7 @@ const RELEASE={
     'Theme now says what it is before you touch anything: it changes how the app looks, and your list, your progress and everything in it stay exactly as they are.',
     'One button puts every setting back to default. Nobody explores a screen they cannot back out of.',
     'The first screen is the seven looks, a live preview, the accent colours and drop-a-picture \u2014 nothing else. Tint, glow, corners, editions and layouts moved behind “More options”.',
-    'Every choice in Theme draws what it does: edition shows where the bar sits, look shows the corner, card size shows how many fit, artwork shows the treatment. The accent carries a sample of the exact thing it colours.',
+    'Every choice in Theme draws what it does: look shows the corner, card size shows how many fit, artwork shows the treatment. The accent carries a sample of the exact thing it colours.',
     'Gone: the six named presets, and saving looks under a name. Both stood in front of the simple thing most people came for.',
     'A live preview sits at the top of Theme \u2014 a real card, chip, button and status row that change as you do, so you can see what you\u2019re picking before you commit to it.',
     'Drop a picture into Theme and WatchList takes its colours \u2014 a cover, a screenshot, anything. It looks for the colour you\u2019d actually name if asked about the image, not the muddiest one, so a small patch of vivid colour beats a big grey background.',

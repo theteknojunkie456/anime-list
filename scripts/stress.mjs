@@ -214,12 +214,9 @@ function suite() {
   // ── every appearance the user can choose ──
   if (!window.__QUICK) run('appearance matrix', () => {
     const themes = ['default', 'naruto', 'sasuke', 'luffy', 'sanji', 'zoro', 'chopper'];
-    const eds = ['standard', 'focus', 'tv', 'pro'];
     const dens = ['compact', 'comfy', 'large'];
     themes.forEach(t => { window.applyTheme(t); scanDOM('theme ' + t); });
     window.applyTheme('default');
-    eds.forEach(e => { window.setEdition(e); scanDOM('edition ' + e); });
-    window.setEdition('standard');
     dens.forEach(d => { window.setDensity(d); scanDOM('density ' + d); });
     window.setDensity('comfy');
     ['soft', 'sharp', 'round'].forEach(u => { window.setUiStyle(u); scanDOM('ui ' + u); });

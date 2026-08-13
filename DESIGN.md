@@ -56,24 +56,14 @@ Scoped to `#detailSheet` only: settings, theme and sources are genuinely modal.
 The class is set in `openSheet`, **after** `closeAll()` — setting it in
 `openDetail` meant `closeAll` immediately undid it.
 
-**Edition** (`data-ed`: `standard` | `focus` | `tv` | `pro`). Where the furniture
-goes, not what colour it is — navigation position, whether a hero exists at all,
-type scale, chrome density. `pro` is the one that genuinely *relocates* a region:
-`.nav` drops `position:fixed` for `static; order:-1`, leaving the bottom of the
-screen entirely and sitting under the header (verified: header 0–48, nav 48–108,
-list from 108). Three axes stack and stay independent — edition arranges the
-app, layout shows a title, look sets the corners.
-
-**Layout** (`data-view`: `grid` | `list` | `cinema`). Three genuinely different
-screens from *one* set of markup — no JS branch, so the data path can't diverge
-between them. A card already carries artwork, status tag, title, sub-line,
-progress bar and a "N new" tag; what changes is which the eye meets first and
-how many titles fit. List is the only view where two shows can be compared
-without scrolling; Cinema is for choosing, the others for finding.
-Constraint worth knowing: the badge, the "new" tag and the bar live *inside*
-`.pcard-wrap`, so in List they cannot move to the text column — they belong to
-the thumbnail. List leans into that (the tag becomes a dot, since the word is
-unreadable at 56px and the colour already says it) rather than fighting it.
+**What went, and why.** Edition (`data-ed`) and Layout (`data-view`) were both
+removed. Between them they offered twelve arrangements of the same list from one
+set of markup, which was a satisfying thing to build and a third and fourth
+heading on a screen the owner called too much four times running. Card size
+covers the part of that choice anyone reached for: how many titles fit across.
+The lesson is not that configurability is bad — it is that every axis is a
+question the reader has to answer before they can use the thing, and a question
+nobody asked is a cost with no matching benefit.
 
 **UI style** (`data-ui`: `soft` | `sharp` | `round`). Radius is *not* tokenised in
 this file — 163 hardcoded values against zero uses of `--r` — so a style that
@@ -288,8 +278,7 @@ Any new motion near the player must check `nativeFullscreen()` first.
 
 Every option in Theme carries a small diagram of the one thing it changes, built
 from divs and the live tokens, so it re-colours with the theme and cannot drift
-from what it claims. Edition draws where the navigation bar sits and how much fits above it, look
-draws a square at that corner radius, card size draws that many cards across,
+from what it claims. Look draws a square at that corner radius, card size draws that many cards across,
 artwork draws flat versus shaded. The colour controls are not spatial, so their headings carry a sample
 instead: a button and a chip for accent, a panel for tint, two badges for status,
 a washed rectangle for glow.
@@ -332,7 +321,7 @@ rename half-lands.
 `scripts/stress.mjs` runs the app. It boots with a library designed to be wrong —
 missing episode counts, negative progress, a title made of quote marks, RTL text,
 500 rows, no rows — opens every screen, presses every visible control, cycles
-every theme, layout, edition, density and artwork mode, and asserts invariants
+every theme, density, corner style and artwork mode, and asserts invariants
 after each: nothing rendered the literal "undefined", nothing pushed the page
 sideways, no control is smaller than a thumb. Below 520px it runs inside an
 iframe, because Chrome will not give a headless window less than 500px and every

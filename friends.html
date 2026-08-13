@@ -3968,7 +3968,7 @@ async function loadMembers(){
   const devs=r.devices||[];
   const pending=devs.filter(d=>d.status==='pending'), approved=devs.filter(d=>d.status==='approved'), denied=devs.filter(d=>d.status==='denied');
   const row=(d,actions)=>`<div class="src-opt" style="display:flex;align-items:center;gap:8px">
-    <div style="flex:1;min-width:0" onclick="adminRenameDevice('${escH(d.id)}','${escH(memberLabel(d))}')"><div class="src-name">${presDot(d)}${escH(memberLabel(d)||'Unnamed \u00b7 tap to name')}${d.alias&&realMemberName(d.name)&&d.alias!==d.name?` <span class="src-tag">${escH(d.name)}</span>`:''}</div><div class="src-sub">${presText(d)}${d.joinedAt?' · '+when(d.joinedAt):''}${d.devices>1?` · ${d.devices} sign-ins`:''}${d.source?' · heard: '+escH(d.source):''}${d.invite?' · invite':''}</div></div>${actions}</div>`;
+    <div style="flex:1;min-width:0" onclick="adminRenameDevice('${jsq(d.id)}','${jsq(memberLabel(d))}')"><div class="src-name">${presDot(d)}${escH(memberLabel(d)||'Unnamed \u00b7 tap to name')}${d.alias&&realMemberName(d.name)&&d.alias!==d.name?` <span class="src-tag">${escH(d.name)}</span>`:''}</div><div class="src-sub">${presText(d)}${d.joinedAt?' · '+when(d.joinedAt):''}${d.devices>1?` · ${d.devices} sign-ins`:''}${d.source?' · heard: '+escH(d.source):''}${d.invite?' · invite':''}</div></div>${actions}</div>`;
   const ap=d=>`<button class="src-chip on" onclick="adminDecide('${d.id}','approve')">Approve</button>`;
   const dn=d=>`<button class="src-chip" onclick="adminDecide('${d.id}','deny')">Deny</button>`;
   const rm=d=>`<button class="src-chip fr-danger" onclick="adminForget('${d.id}')">Remove</button>`;
@@ -7677,7 +7677,7 @@ function richDetailHTML(d,forId){
   const chars=((d.characters||{}).edges)||[];
   const charsHTML=chars.length?`<div class="dt-label" style="margin-top:18px">Characters</div><div class="dt-chars">${chars.map(e=>{const n=e.node||{};const img=safeImg(((n.image||{}).medium)||'');const nm=((n.name||{}).full)||'';return `<div class="dt-char"><div class="dt-char-img"${img?` style="background-image:url('${img}')"`:''}></div><div class="dt-char-n">${schEsc(nm)}</div><div class="dt-char-r">${schEsc((e.role||'').toLowerCase())}</div></div>`;}).join('')}</div>`:'';
   const recs=(((d.recommendations||{}).nodes)||[]).map(n=>n&&n.mediaRecommendation).filter(x=>x&&!isAdultMedia(x));
-  const recsHTML=recs.length?`<div class="dt-label" style="margin-top:18px">More like this</div><div class="dt-recs">${recs.map(m=>{const t=(m.title.english||m.title.romaji||'').replace(/'/g,'&#39;');const img=safeImg(((m.coverImage||{}).large)||'');return `<button class="dt-rec" onclick="addPopular(${m.id},'${t.replace(/"/g,'&quot;')}','${img}',${m.episodes||0})"><div class="dt-rec-img"${img?` style="background-image:url('${img}')"`:''}></div><div class="dt-rec-t">${schEsc(m.title.english||m.title.romaji||'')}</div></button>`;}).join('')}</div>`:'';
+  const recsHTML=recs.length?`<div class="dt-label" style="margin-top:18px">More like this</div><div class="dt-recs">${recs.map(m=>{const t=(m.title.english||m.title.romaji||'').replace(/'/g,'&#39;');const img=safeImg(((m.coverImage||{}).large)||'');return `<button class="dt-rec" onclick="addPopular(${m.id},'${jsq(t)}','${img}',${m.episodes||0})"><div class="dt-rec-img"${img?` style="background-image:url('${img}')"`:''}></div><div class="dt-rec-t">${schEsc(m.title.english||m.title.romaji||'')}</div></button>`;}).join('')}</div>`:'';
   // Order by what you came for. "Also streaming on" sat between the tags and the
   // episode list, so seven service buttons — none of which is the source you
   // actually use — pushed the episodes most of a screen down the page. It is a
@@ -8483,7 +8483,7 @@ async function loadPopularShelf(){
       const t=(m.title.english||m.title.romaji||'').replace(/'/g,'&#39;');
       const img=safeImg((m.coverImage||{}).large||'');   // sanitized: lands in url('…') and a JS-string onclick arg
       const have=anime.some(a=>a.aniId===m.id);   // already on the list → show it checked, not tappable
-      return `<button class="pop-card${have?' added':''}"${have?' disabled':''} onclick="addPopular(${m.id},'${t.replace(/"/g,'&quot;')}','${img}',${m.episodes||0},this)">
+      return `<button class="pop-card${have?' added':''}"${have?' disabled':''} onclick="addPopular(${m.id},'${jsq(t)}','${img}',${m.episodes||0},this)">
         <div class="pop-cover" style="background-image:url('${img}')"></div>
         <div class="pop-name">${escH(m.title.english||m.title.romaji||'')}</div></button>`;
     }).join('');
@@ -12262,6 +12262,19 @@ function artFallback(el,title,cls){
 }
 function safeImg(u){u=String(u==null?'':u);return(/^(https?:\/\/|data:image\/|blob:)/i.test(u)&&!/["'<>\\\s]/.test(u))?u:'';}
 function safeCode(c){return String(c==null?'':c).replace(/[^A-Za-z0-9]/g,'').slice(0,64);}
+// A string going into a SINGLE-QUOTED JS argument inside an HTML attribute has
+// to survive two parsers: the HTML one reading the attribute, then the JS one
+// reading the call. escH handles the first and leaves the apostrophe alone, so
+//   onclick="addPopular(1,'JoJo's Bizarre Adventure')"
+// ends the JS string early and throws SyntaxError: Unexpected identifier — which
+// is exactly what the error log reported, twice, from the discover list.
+function jsq(s){
+  return String(s==null?'':s)
+    .replace(/\\/g,'\\\\')
+    .replace(/'/g,"\\'")
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')
+    .replace(/\r?\n/g,' ');
+}
 function safeId(x){return String(x==null?'':x).replace(/[^A-Za-z0-9._:-]/g,'').slice(0,80);}
 function safeText(s){return String(s==null?'':s).replace(/[<>]/g,'').slice(0,4000);}
 function myServices(){try{return JSON.parse(localStorage.getItem('my_services')||'[]');}catch{return[];}}
@@ -12704,8 +12717,8 @@ function showShareLink(link,pack){
       <div class="src-quick-sub">Whoever opens it gets ${packSummary(pack)} — once they tap Accept.</div>
       <div class="src-quick-url">${escH(link)}</div>
       <div style="display:flex;gap:8px;margin-top:10px">
-        <button class="parse-btn" style="flex:1" onclick="copyShareLink('${escH(link)}')">Copy link</button>
-        ${navigator.share?`<button class="parse-btn" style="flex:0 0 auto;width:auto;padding:0 16px" onclick="sendShareLink('${escH(link)}')">Send…</button>`:''}
+        <button class="parse-btn" style="flex:1" onclick="copyShareLink('${jsq(link)}')">Copy link</button>
+        ${navigator.share?`<button class="parse-btn" style="flex:0 0 auto;width:auto;padding:0 16px" onclick="sendShareLink('${jsq(link)}')">Send…</button>`:''}
       </div>
     </div>`;
   }
@@ -12716,7 +12729,10 @@ function copyShareLink(link){
   catch(e){toast('Copy it from the box above');}
 }
 function sendShareLink(link){
-  try{navigator.share({title:'My WatchList setup',text:'Use my streaming setup in WatchList',url:link});}catch(e){copyShareLink(link);}
+  try{
+    const p=navigator.share({title:'My WatchList setup',text:'Use my streaming setup in WatchList',url:link});
+    if(p&&p.catch)p.catch(()=>{});   // cancelling the share sheet rejects; that is not a fault
+  }catch(e){copyShareLink(link);}
 }
 // Opening ?setup=CODE fetches that published setup and offers it — the same
 // Accept screen either way, so there's only one thing to understand.
@@ -14120,7 +14136,7 @@ function renderSource(){
   // Yours first. The built-in list is fixed and findable; the sites you added are
   // the ones you actually reach for, and they were sitting after eight presets.
   const chips=customServices().filter(s=>!isHiddenSrc(s.name)).map(s=>`<button class="src-chip yours${custom===s.url?' on':''}" onclick="setSourceById('${s.id}')">${escH(s.name)}</button>`).join('')
-    +WATCH_PRESETS.filter(p=>!isHiddenSrc(p.name)).map(p=>`<button class="src-chip${custom===p.url?' on':''}" onclick="setSource('${p.url}')">${escH(p.name)}</button>`).join('');
+    +WATCH_PRESETS.filter(p=>!isHiddenSrc(p.name)).map(p=>`<button class="src-chip${custom===p.url?' on':''}" onclick="setSource('${jsq(p.url)}')">${escH(p.name)}</button>`).join('');
   const myCount=customServices().length, hiddenCount=hiddenSrc().length;
   const tab=srcTab();
   const tabs=`<div class="src-tabs">
@@ -14168,16 +14184,16 @@ function renderSource(){
       <label class="ct-dk">Only the sites I added<span class="ct-tgl"><input type="checkbox" id="onlyMineTgl" ${onlyMine()?'checked':''} onchange="setOnlyMine(this.checked)"><span class="ct-tgl-track"></span></span></label>
       <p class="ai-desc" style="margin-top:7px">Tap a name to rename it, or Hide the ones you never want to see${hiddenCount?` — <b>${hiddenCount}</b> hidden right now`:''}.</p>
       ${allKnownSources().map(s=>{const off=isHiddenSrc(s.name),q=escH(s.name).replace(/'/g,"\\'");
-        return `<div class="src-opt" style="display:flex;align-items:center;gap:10px${off?';opacity:.45':''}" onclick="renameSrcPrompt('${q}')">
+        return `<div class="src-opt" style="display:flex;align-items:center;gap:10px${off?';opacity:.45':''}" onclick="renameSrcPrompt('${jsq(q)}')">
           <div style="flex:1;min-width:0"><div class="src-name">${escH(srcLabel(s.name))}</div><div class="src-sub">${escH(host(s.url||''))}</div></div>
-          <button class="src-chip${off?' on':''}" onclick="event.stopPropagation();toggleHiddenSrc('${q}')">${off?'Unhide':'Hide'}</button>
+          <button class="src-chip${off?' on':''}" onclick="event.stopPropagation();toggleHiddenSrc('${jsq(q)}')">${off?'Unhide':'Hide'}</button>
         </div>`;}).join('')}
 
       <div class="dt-label" style="margin-top:20px">Add one yourself</div>
       <p class="ai-desc">Only if the paste box above didn't suit — a service you subscribe to, or an address you want to write out.</p>
       ${onlyMine()?'':`<div class="src-picks">${REGIONAL_SERVICES
         .filter(s=>!customServices().some(c=>c.name.toLowerCase()===s.name.toLowerCase()))
-        .map(s=>`<button class="src-chip" onclick="addRegional('${escH(s.name)}')">${escH(s.name)} <span style="opacity:.55">${escH(s.region)}</span></button>`).join('')}</div>`}
+        .map(s=>`<button class="src-chip" onclick="addRegional('${jsq(s.name)}')">${escH(s.name)} <span style="opacity:.55">${escH(s.region)}</span></button>`).join('')}</div>`}
       <textarea class="ai-prompt-in urlin" rows="2" id="srcCustom" placeholder="https://site.com/watch/{slug}/ep-{ep}" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url" style="margin-top:10px" oninput="csHintName()" onkeydown="if(event.key==='Enter')event.preventDefault();">${custom&&!WATCH_PRESETS.some(p=>p.url===custom)&&!customServices().some(s=>s.url===custom)?escH(custom):''}</textarea>
       <input class="ai-prompt-in" id="csName" placeholder="name (auto-filled)" value="" autocomplete="off" spellcheck="false" style="margin-top:8px">
       <div style="display:flex;gap:8px;margin-top:8px">
@@ -16092,10 +16108,12 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-13.7',
-  title:'Build your own theme on top of your own list',
-  push:'Hold the logo: accent, background, status colours, all live.',
+  v:'2026-08-13.8',
+  title:'Titles with apostrophes in them work again',
+  push:'JoJo\u2019s Bizarre Adventure was breaking the discover list.',
   notes:[
+    'Adding a show whose title contains an apostrophe from the discover list threw an error instead of adding it. Only the double quote was being escaped, so the apostrophe in a name like JoJo\u2019s ended the code early. Every place a name, link or source can reach a button now escapes properly, and a check fails the build if a new one appears.',
+    'Cancelling the share sheet no longer files itself as a fault.',
     'Holding the logo now changes every part, not just the accent: the accent, the background and its panels, the four status colours, and card size \u2014 each one over your real list, at full size, as you touch it.',
     'What you build can be kept. \u201cSave this as my own theme\u201d puts it in Theme beside the seven that shipped, so you can come back to it.',
     'Scrolling is far smoother. Every status badge and episode chip was blurring the artwork behind it \u2014 395 separate layers your phone re-blurred on every single frame. They are a shade more opaque now instead, which looks the same and costs nothing.',

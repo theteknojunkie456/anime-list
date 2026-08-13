@@ -388,3 +388,25 @@ which makes the engine resolve style before it can answer. The bands are cached
 until the page is rebuilt, the accent is remembered until a theme changes, and
 the scan runs a few times a second rather than sixty — the colour crossfades over
 a second regardless.
+
+## Two parsers, one string
+
+An error log said `SyntaxError: Unexpected identifier 's'` at `index.html:1`,
+twice, with no stack. It was this, in the discover list:
+
+    onclick="addPopular(1,'JoJo's Bizarre Adventure')"
+
+A value going into a single-quoted argument inside an HTML attribute has to
+survive the HTML parser reading the attribute and then the JS parser reading the
+call. `escH` handles the first and deliberately leaves the apostrophe alone, so
+the second one broke — on one of the most-added shows there is. Nothing caught
+it because it only fires for a title that happens to contain an apostrophe, and
+the placeholder data never had one.
+
+`jsq()` escapes for both. The codebase had already fixed this by hand in four
+places (`openExternal`, `playYouTube`, `renameOpen`) which is the tell that it
+needed a helper rather than vigilance. `smoke.mjs` now reads the source and
+fails on any interpolation into a single-quoted argument that does not go
+through an escaper, with an explicit allowlist for values that cannot contain a
+quote by construction — ids the app mints, friend codes, a hostname, hexes from
+a hardcoded array.

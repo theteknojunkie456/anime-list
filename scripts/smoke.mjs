@@ -148,6 +148,41 @@ try {
   results.push({ n: 'manifest.json parses', ok: false, d: e.message });
 }
 
+// A source-level check, because the bug it catches never reaches the DOM in a
+// test: it only fires for a title that happens to contain an apostrophe.
+//
+//   onclick="addPopular(1,'JoJo's Bizarre Adventure')"
+//
+// The HTML parser is happy — the attribute is double-quoted — and then the JS
+// parser hits the apostrophe and throws "Unexpected identifier". It shipped
+// twice from the discover list before an error log surfaced it. Any value going
+// into a single-quoted argument must pass through a helper that escapes for
+// BOTH parsers.
+{
+  const SAFE = /jsq\(|safeId\(|safeUrl\(|encodeURIComponent\(|replace\(\/'/;
+  // Allowed because the value cannot contain a quote by construction: ids the
+  // app mints itself (uid()), friend codes (alphanumeric), a hostname, and a
+  // single character that has already had quotes stripped. Anything a person can
+  // type is NOT on this list.
+  const IDS = /^(escH\()?((\w+\.)?(id|code|key)|ch|h|forId|aniId|st|k|x|i|f|s|t|m|q|e)\)?$/;
+  const bad2 = [];
+  const raw = readFileSync('index.html', 'utf8');
+  for (const mm of raw.matchAll(/on[a-z]+="[^"]*?'\$\{([^}]*)\}'/g)) {
+    const expr = mm[1].trim();
+    if (SAFE.test(expr)) continue;
+    if (IDS.test(expr)) continue;
+    // Values that come from hardcoded arrays in this file, not from anybody's
+    // typing: the accent/tint swatch hexes and the onboarding sheet ids.
+    if (expr === 'c' || expr === 'c.cta.sheet') continue;
+    bad2.push(expr);
+  }
+  results.push({
+    n: 'no user text lands raw in a JS argument',
+    ok: bad2.length === 0,
+    d: bad2.length ? [...new Set(bad2)].join(' · ') : 'all interpolations escaped or generated',
+  });
+}
+
 let bad = 0;
 for (const r of results) {
   if (!r.ok) bad++;

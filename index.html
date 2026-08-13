@@ -282,6 +282,19 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 [data-view=cinema] .grid .pcard-new{z-index:4;bottom:auto;top:12px;left:auto;right:12px;}
 @media (min-width:900px){ [data-view=cinema] .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));} }
 
+/* Drop a picture in. Deliberately the width of the page and sitting right under
+   the presets, because it is the same offer — a finished look, one action — and
+   it is a far more interesting one. */
+.fi-drop{position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;margin-top:9px;
+  padding:18px 16px;border-radius:18px;text-align:center;cursor:pointer;
+  border:1.5px dashed var(--bn2);background:color-mix(in srgb,var(--bg2) 55%,transparent);
+  transition:border-color .16s,background-color .16s;}
+.fi-drop:hover,.fi-drop.over{border-color:color-mix(in srgb,var(--a) 60%,transparent);background:var(--ag);}
+.fi-drop .ico{width:20px;height:20px;color:var(--a2);margin-bottom:4px;}
+.fi-t{font-family:var(--fd);font-size:14px;font-weight:800;color:var(--t1);}
+.fi-s{font-size:11.5px;color:var(--t3);}
+.fi-drop input{position:absolute;inset:0;opacity:0;cursor:pointer;}
+
 /* Ready-made looks. Two swatches — accent and surface — because those two are
    what actually distinguishes one from another at a glance. */
 .th-lead{margin:18px 0 11px;font-size:13px;color:var(--t2);}
@@ -3400,6 +3413,7 @@ body.recsel .pcard{position:relative;}
   <div class="theme-grid" id="themeGrid"></div>
   <div class="th-lead">Pick one and you're done. Everything below is optional.</div>
   <div class="pre-row" id="presetRow"></div>
+  <div id="fromImgRow"></div>
 
   <details class="th-fold th-deep">
     <summary><span>Make your own</span><span class="th-hint">Colour, shape, layout</span></summary>
@@ -5538,6 +5552,99 @@ function renderStatusColorRow(){
     +`<button class="hl-reset" style="margin-top:10px" onclick="setStatusColor('watching','');setStatusColor('plan','');setStatusColor('finished','');setStatusColor('dropped','')">Reset status colours</button>`;
 }
 
+// ─── A LOOK FROM A PICTURE ──────────────────────────────────────────────────
+// Drop in an image and take the app's colours from it. The pieces were all here
+// already — a canvas reader for focal points, mix(), relLum(), a contrast check,
+// an accent override and a surface tint — so this is mostly a matter of asking
+// the right question of the pixels.
+//
+// The question is NOT "what colour appears most". That is almost always a muddy
+// mid-grey from the background, which makes every picture produce the same
+// disappointing beige. What you want is the colour a person would NAME if you
+// asked them about the image: vivid, present in quantity, and not the paper it
+// is printed on. So each pixel is scored by how saturated it is, and the winner
+// is the best-scoring bucket rather than the biggest one.
+function _rgb2hsl(r,g,b){
+  r/=255;g/=255;b/=255;
+  const mx=Math.max(r,g,b),mn=Math.min(r,g,b),d=mx-mn;
+  let h=0;
+  if(d){ h = mx===r ? ((g-b)/d+(g<b?6:0)) : mx===g ? ((b-r)/d+2) : ((r-g)/d+4); h*=60; }
+  const l=(mx+mn)/2, sat=d? d/(1-Math.abs(2*l-1)) : 0;
+  return [h,sat,l];
+}
+function _hsl2hex(h,s,l){
+  const c=(1-Math.abs(2*l-1))*s, x=c*(1-Math.abs(((h/60)%2)-1)), m=l-c/2;
+  let r=0,g=0,b=0;
+  if(h<60){r=c;g=x;} else if(h<120){r=x;g=c;} else if(h<180){g=c;b=x;}
+  else if(h<240){g=x;b=c;} else if(h<300){r=x;b=c;} else {r=c;b=x;}
+  return '#'+[r,g,b].map(v=>Math.round((v+m)*255).toString(16).padStart(2,'0')).join('');
+}
+function paletteFromImage(img){
+  const W=96,H=Math.max(24,Math.round(96*img.height/img.width));
+  const c=document.createElement('canvas');c.width=W;c.height=H;
+  const g=c.getContext('2d',{willReadFrequently:true});
+  g.drawImage(img,0,0,W,H);
+  const d=g.getImageData(0,0,W,H).data;
+  // 24 hue buckets. Finer than that and a gradient splits its own vote.
+  const N=24, score=new Float64Array(N), sumS=new Float64Array(N), sumL=new Float64Array(N), cnt=new Float64Array(N);
+  let dark=0,darkN=0;
+  for(let i=0;i<d.length;i+=4){
+    const [h,sat,l]=_rgb2hsl(d[i],d[i+1],d[i+2]);
+    if(l<0.16){dark+=l;darkN++;}
+    if(sat<0.18||l<0.12||l>0.93)continue;      // grey, shadow, or blown highlight
+    const k=Math.min(N-1,Math.floor(h/(360/N)));
+    // Saturation squared: a small area of real colour beats a large wash of nearly-grey.
+    const w=sat*sat;
+    score[k]+=w; sumS[k]+=sat*w; sumL[k]+=l*w; cnt[k]+=w;
+  }
+  let best=-1,bi=0;
+  for(let k=0;k<N;k++)if(score[k]>best){best=score[k];bi=k;}
+  if(best<=0)return null;                       // a genuinely colourless picture
+  const hue=(bi+0.5)*(360/N);
+  const sat=Math.min(0.9,Math.max(0.45,sumS[bi]/cnt[bi]));
+  const lum=Math.min(0.68,Math.max(0.42,sumL[bi]/cnt[bi]));
+  const accent=_hsl2hex(hue,sat,lum);
+  // The tint is the same hue taken down to something that can sit under text —
+  // the picture's colour, at the app's brightness, not the other way round.
+  const tint=_hsl2hex(hue,Math.min(0.55,sat*0.8),0.13);
+  // A second hue was computed here and thrown away: on test images it returned
+  // the same value for a blue scene and a green one, because at the edges of a
+  // shape the anti-aliasing invents hues that were never in the picture. A
+  // number that is noise is worse than no number, so it does not ship.
+  return {accent,tint};
+}
+function lookFromFile(file){
+  if(!file)return;
+  const img=new Image();
+  img.onload=()=>{
+    let pal=null;
+    try{pal=paletteFromImage(img);}catch(e){}
+    URL.revokeObjectURL(img.src);
+    if(!pal){toast('That picture has no colour to take — try one with more in it',5000);return;}
+    setAccent(pal.accent);
+    setTint(pal.tint);
+    try{renderThemeGrid();}catch(e){}
+    // Say what it took, and give the obvious next action rather than leaving
+    // them to find the Save button under a fold.
+    toast('Colours taken from your picture — Save this look to keep it',6000);
+  };
+  img.onerror=()=>{URL.revokeObjectURL(img.src);toast('Could not read that image');};
+  img.src=URL.createObjectURL(file);
+}
+function renderFromImageRow(){
+  const row=document.getElementById('fromImgRow'); if(!row)return;
+  row.innerHTML=`<label class="fi-drop" id="fiDrop">
+      ${icon('image')}
+      <span class="fi-t">Take the colours from a picture</span>
+      <span class="fi-s">A cover, a screenshot, anything — drop it here or tap to choose</span>
+      <input type="file" accept="image/*" onchange="lookFromFile(this.files&&this.files[0]);this.value='';">
+    </label>`;
+  const dz=document.getElementById('fiDrop'); if(!dz)return;
+  ['dragenter','dragover'].forEach(t=>dz.addEventListener(t,e=>{e.preventDefault();dz.classList.add('over');}));
+  ['dragleave','drop'].forEach(t=>dz.addEventListener(t,e=>{e.preventDefault();dz.classList.remove('over');}));
+  dz.addEventListener('drop',e=>{const f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0];if(f)lookFromFile(f);});
+}
+
 // ─── READY-MADE ─────────────────────────────────────────────────────────────
 // Eleven controls is a workshop. Most people do not want to set eleven
 // variables; they want the app to look nice and to stop asking. So the page
@@ -6002,6 +6109,7 @@ function renderThemeGrid(){
   try{renderViewRow();}catch(e){}
   try{renderEditionRow();}catch(e){}
   try{renderPresetRow();}catch(e){}
+  try{renderFromImageRow();}catch(e){}
   try{renderStatusColorRow();}catch(e){}
   const bs=document.getElementById('brightSlider');if(bs)bs.value=bgBright();
   try{renderGlowRow();}catch(e){}
@@ -15967,10 +16075,11 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-12.8',
+  v:'2026-08-12.9',
   title:'Six looks, and one door for everything else',
   push:'Pick a look. Everything else is optional.',
   notes:[
+    'Drop a picture into Theme and WatchList takes its colours \u2014 a cover, a screenshot, anything. It looks for the colour you\u2019d actually name if asked about the image, not the muddiest one, so a small patch of vivid colour beats a big grey background.',
     'On a wide screen, opening a title puts it beside your list instead of over it \u2014 the list stays live, so you can keep clicking through and the panel keeps up. Below 1200px it\u2019s the same sheet as before.',
     'Theme now leads with six ready-made looks \u2014 As designed, Midnight, Ledger, Ember, Lean back, Desk. One tap sets the colours, the layout, the shape and the size together. Everything else folds away under “Make your own”.',
     'If you do want the controls: your own accent, a surface tint for the panels, the four status colours, three layouts (Posters, List, Cinema), four editions (Standard, Focus, Big, Desktop), card size and artwork treatment \u2014 all saveable under a name.',

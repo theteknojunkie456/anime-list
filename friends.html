@@ -282,6 +282,32 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 [data-view=cinema] .grid .pcard-new{z-index:4;bottom:auto;top:12px;left:auto;right:12px;}
 @media (min-width:900px){ [data-view=cinema] .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));} }
 
+/* The live preview. Real components at a smaller size — nothing here is a
+   picture of the UI, so it cannot go stale. */
+.th-prev{margin:4px 0 18px;padding:13px;border-radius:18px;
+  background:color-mix(in srgb,var(--bg2) 70%,transparent);border:1px solid var(--bn2);}
+.th-prev-l{font-size:9.5px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:var(--t3);margin-bottom:11px;}
+.th-prev-row{display:flex;gap:13px;align-items:flex-start;}
+.th-prev-card{flex:0 0 88px;pointer-events:none;}
+.th-prev-card .pcard-img,.th-prev-card .pcard-ph{width:88px;height:125px;}
+.th-prev-card .pcard-title{font-size:12px;}
+.th-prev-side{flex:1;min-width:0;display:flex;flex-direction:column;gap:9px;pointer-events:none;}
+.th-prev-cta{margin-top:0;padding:11px;font-size:13px;}
+.th-prev .filt-row{width:100%;}
+.th-prev .dpick{padding:7px 0;font-size:10px;}
+
+/* What a picture gave us, shown beside the picture itself. */
+.fi-took{display:flex;align-items:center;gap:11px;margin-top:9px;padding:9px 11px;border-radius:14px;
+  background:var(--bg3);border:1px solid var(--bn2);}
+.fi-took img{width:44px;height:44px;border-radius:10px;object-fit:cover;flex:none;}
+.fi-took-b{flex:1;min-width:0;}
+.fi-took-t{font-size:11.5px;font-weight:700;color:var(--t2);}
+.fi-took-sw{display:flex;gap:5px;margin-top:5px;}
+.fi-took-sw i{width:20px;height:20px;border-radius:6px;display:block;box-shadow:0 0 0 1px rgba(0,0,0,.35) inset;}
+.fi-undo{flex:none;padding:6px 12px;border-radius:99px;background:none;border:1px solid var(--bn2);
+  color:var(--t2);font-size:11.5px;font-weight:700;cursor:pointer;}
+.fi-undo:hover{color:var(--t1);border-color:var(--b3);}
+
 /* Drop a picture in. Deliberately the width of the page and sitting right under
    the presets, because it is the same offer — a finished look, one action — and
    it is a far more interesting one. */
@@ -3411,6 +3437,24 @@ body.recsel .pcard{position:relative;}
     <button class="sheet-cancel" onclick="closeAll()">Done</button>
   </div>
   <div class="theme-grid" id="themeGrid"></div>
+  <!-- Made of the REAL components — a card, a button, a chip, a bar — not a
+       drawing of them. Every token these read is the same token the app reads,
+       so it updates the instant a colour changes and it can never drift out of
+       date with what it is previewing. -->
+  <div class="th-prev" id="themePrev">
+    <div class="th-prev-l">Preview</div>
+    <div class="th-prev-row">
+      <div class="pcard th-prev-card"><div class="pcard-wrap"><div class="pcard-ph">A</div>
+        <span class="pcard-badge b-watching">WATCHING</span><span class="pcard-new">2 new</span>
+        <div class="pbar"><div class="pfill" style="width:58%"></div></div></div>
+        <div class="pcard-title">Attack on Titan</div><div class="pcard-sub">~10h · S2 out</div></div>
+      <div class="th-prev-side">
+        <div class="filt-row"><button class="fchip on" type="button">All<span class="fn">142</span></button><button class="fchip" type="button">Plan<span class="fn">63</span></button></div>
+        <button class="dt-watch th-prev-cta" type="button">▶ Continue Watching</button>
+        <div class="dt-status"><button class="dpick on-watching" type="button">Watch</button><button class="dpick on-finished" type="button">Done</button><button class="dpick" type="button">Drop</button></div>
+      </div>
+    </div>
+  </div>
   <div class="th-lead">Pick one and you're done. Everything below is optional.</div>
   <div class="pre-row" id="presetRow"></div>
   <div id="fromImgRow"></div>
@@ -5583,15 +5627,22 @@ function paletteFromImage(img){
   const W=96,H=Math.max(24,Math.round(96*img.height/img.width));
   const c=document.createElement('canvas');c.width=W;c.height=H;
   const g=c.getContext('2d',{willReadFrequently:true});
+  // Composite onto solid grey FIRST. A transparent PNG or WebP leaves the canvas
+  // empty where the artwork isn't, and the antialiased edge of every shape then
+  // fades toward transparent black — inventing hues that were never in the
+  // picture and letting a thin outline outvote the subject. On grey, those edges
+  // fade to grey and get discarded as the non-colours they are.
+  g.fillStyle='#808080';g.fillRect(0,0,W,H);
   g.drawImage(img,0,0,W,H);
   const d=g.getImageData(0,0,W,H).data;
   // 24 hue buckets. Finer than that and a gradient splits its own vote.
   const N=24, score=new Float64Array(N), sumS=new Float64Array(N), sumL=new Float64Array(N), cnt=new Float64Array(N);
   let dark=0,darkN=0;
   for(let i=0;i<d.length;i+=4){
+    if(d[i+3]<250)continue;                    // anything not fully opaque is an edge
     const [h,sat,l]=_rgb2hsl(d[i],d[i+1],d[i+2]);
     if(l<0.16){dark+=l;darkN++;}
-    if(sat<0.18||l<0.12||l>0.93)continue;      // grey, shadow, or blown highlight
+    if(sat<0.22||l<0.12||l>0.93)continue;      // grey, shadow, or blown highlight
     const k=Math.min(N-1,Math.floor(h/(360/N)));
     // Saturation squared: a small area of real colour beats a large wash of nearly-grey.
     const w=sat*sat;
@@ -5624,8 +5675,27 @@ function lookFromFile(file){
     setAccent(pal.accent);
     setTint(pal.tint);
     try{renderThemeGrid();}catch(e){}
-    // Say what it took, and give the obvious next action rather than leaving
-    // them to find the Save button under a fold.
+    // Show the picture next to what was taken from it. An extractor is a guess,
+    // and a guess you cannot see is one you cannot disagree with — this is the
+    // difference between "it went green for some reason" and "it picked that".
+    try{
+      const row=document.getElementById('fromImgRow');
+      if(row){
+        const c=document.createElement('canvas');c.width=64;c.height=64;
+        const g=c.getContext('2d');
+        const sc=Math.max(64/img.width,64/img.height);
+        const w=img.width*sc,h=img.height*sc;
+        g.drawImage(img,(64-w)/2,(64-h)/2,w,h);
+        const prev=document.createElement('div');
+        prev.className='fi-took';
+        prev.innerHTML=`<img src="${c.toDataURL('image/jpeg',0.8)}" alt="">
+          <div class="fi-took-b"><div class="fi-took-t">Taken from this</div>
+            <div class="fi-took-sw"><i style="background:${pal.accent}"></i><i style="background:${pal.tint}"></i></div></div>
+          <button class="fi-undo" onclick="setAccent('');setTint('');this.closest('.fi-took').remove();">Undo</button>`;
+        row.querySelectorAll('.fi-took').forEach(n=>n.remove());
+        row.appendChild(prev);
+      }
+    }catch(e){}
     toast('Colours taken from your picture — Save this look to keep it',6000);
   };
   img.onerror=()=>{URL.revokeObjectURL(img.src);toast('Could not read that image');};
@@ -16075,10 +16145,11 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-12.9',
+  v:'2026-08-12.10',
   title:'Six looks, and one door for everything else',
   push:'Pick a look. Everything else is optional.',
   notes:[
+    'A live preview sits at the top of Theme \u2014 a real card, chip, button and status row that change as you do, so you can see what you\u2019re picking before you commit to it.',
     'Drop a picture into Theme and WatchList takes its colours \u2014 a cover, a screenshot, anything. It looks for the colour you\u2019d actually name if asked about the image, not the muddiest one, so a small patch of vivid colour beats a big grey background.',
     'On a wide screen, opening a title puts it beside your list instead of over it \u2014 the list stays live, so you can keep clicking through and the panel keeps up. Below 1200px it\u2019s the same sheet as before.',
     'Theme now leads with six ready-made looks \u2014 As designed, Midnight, Ledger, Ember, Lean back, Desk. One tap sets the colours, the layout, the shape and the size together. Everything else folds away under “Make your own”.',

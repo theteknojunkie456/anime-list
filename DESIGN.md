@@ -283,3 +283,23 @@ already has the press scale. Rotation freezes transitions briefly to
 stop the player tearing, and the player's frame is hidden during rotation —
 except in native fullscreen, where hiding it caused iOS to exit fullscreen.
 Any new motion near the player must check `nativeFullscreen()` first.
+
+## A control that draws itself
+
+Every option in Theme carries a small diagram of the one thing it changes, built
+from divs and the live tokens, so it re-colours with the theme and cannot drift
+from what it claims. Layout draws the arrangement, edition draws where the
+navigation bar sits and how much fits above it, look draws a square at that
+corner radius, card size draws that many cards across, artwork draws flat versus
+shaded. The colour controls are not spatial, so their headings carry a sample
+instead: a button and a chip for accent, a panel for tint, two badges for status,
+a washed rectangle for glow.
+
+The rule: if the choice is spatial, draw the space; if it is a colour, show the
+component that takes the colour. A label plus a separate preview panel is a
+worse version of both — it makes you hold the name and the result in your head
+at once, and the panel is one more thing on a screen that was already long.
+
+Six named presets used to open this screen. They went, because picking between
+"Ledger" and "Ember" is a harder question than picking a colour, and it stood in
+front of everything else.

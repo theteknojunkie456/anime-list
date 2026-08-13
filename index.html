@@ -282,6 +282,48 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 [data-view=cinema] .grid .pcard-new{z-index:4;bottom:auto;top:12px;left:auto;right:12px;}
 @media (min-width:900px){ [data-view=cinema] .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));} }
 
+/* ── OPTION DIAGRAMS ──
+   Each one is a drawing of what its button does, in the same accent the app is
+   currently using, so the diagram is itself a preview. Built from divs because
+   they are tiny and must follow the theme; an icon set could not. */
+.art-opt.has-d{align-items:stretch;padding-top:10px;}
+.art-opt .d-g,.art-opt .d-l,.art-opt .d-c,.art-opt .d-ed,.art-opt .d-shape,
+.art-opt .d-dense,.art-opt .d-art{display:block;width:46px;height:34px;margin-bottom:8px;border-radius:6px;
+  background:color-mix(in srgb,var(--t1) 6%,transparent);padding:4px;}
+/* A shape sample has to be square, or the corner radius lies about itself. */
+.art-opt .d-shape{width:34px;}
+/* layout: posters, list, cinema */
+.d-g{display:grid!important;grid-template-columns:repeat(3,1fr);grid-auto-rows:1fr;gap:2px;}
+.d-g b{background:var(--a);opacity:.75;border-radius:2px;}
+.d-l{display:flex!important;flex-direction:column;gap:3px;}
+.d-l b{flex:1;background:var(--a);opacity:.75;border-radius:2px;}
+.d-c{display:flex!important;flex-direction:column;gap:3px;}
+.d-c b{flex:1;background:var(--a);opacity:.75;border-radius:3px;}
+/* edition: what's at the top, how much fits, where the bar lives */
+.d-ed{display:flex!important;flex-direction:column;gap:2px;}
+.d-ed u{height:3px;background:var(--t1);opacity:.34;border-radius:2px;flex:none;}
+.d-ed s{flex:1;background:var(--t1);opacity:.2;border-radius:1px;}
+.d-ed n{height:5px;background:var(--a);border-radius:2px;flex:none;}
+.d-big s{opacity:.26;}
+/* Heading samples, for the controls whose change isn't a shape. */
+.th-smp{display:inline-flex;gap:5px;align-items:center;margin-left:6px;vertical-align:middle;}
+.th-smp b{font-weight:800;font-size:9px;letter-spacing:.04em;line-height:1;}
+.s-btn{background:var(--a);color:var(--aFg);padding:5px 8px;border-radius:var(--r2);}
+.s-chip{background:var(--ag);color:var(--a2);padding:5px 8px;border-radius:999px;}
+.s-panel{width:34px;height:18px;border-radius:6px;background:var(--bg3);border:1px solid var(--bg4);}
+.s-st{padding:4px 7px;border-radius:5px;color:#fff;}
+.s-st.sw{background:var(--wat);} .s-st.sf{background:var(--fin);}
+.s-glow{width:34px;height:18px;border-radius:6px;background:var(--bg2);box-shadow:inset 0 0 14px 2px var(--glow);}
+/* corners */
+.d-shape{background:var(--a)!important;opacity:.75;padding:0!important;}
+/* density: how many across */
+.d-dense{display:flex!important;gap:2px;align-items:stretch;}
+.d-dense b{flex:1;background:var(--a);opacity:.75;border-radius:2px;}
+/* artwork treatment */
+.d-art{background:linear-gradient(120deg,var(--a),color-mix(in srgb,var(--a) 30%,var(--bg4)))!important;padding:0!important;}
+.d-art-c{position:relative;overflow:hidden;}
+.d-art-c::after{content:'';position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.85),transparent 65%);}
+
 /* The one door to the deep end, and the way back. Deliberately a full-width
    destination rather than a fold: a fold announces how much more there is, which
    is most of what makes a page feel heavy in the first place. */
@@ -338,18 +380,6 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 
 /* Ready-made looks. Two swatches — accent and surface — because those two are
    what actually distinguishes one from another at a glance. */
-.th-lead{margin:18px 0 11px;font-size:13px;color:var(--t2);}
-.pre-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:9px;}
-.pre-card{display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:12px 13px;border-radius:18px;
-  background:var(--bg3);border:1px solid var(--bn2);cursor:pointer;text-align:left;
-  transition:border-color .15s,background-color .15s,transform .12s;}
-.pre-card:hover{transform:translateY(-2px);border-color:var(--b3);}
-.pre-card.on{border-color:color-mix(in srgb,var(--a) 60%,transparent);background:var(--ag);}
-.pre-swatch{display:flex;gap:4px;margin-bottom:7px;}
-.pre-swatch i{width:16px;height:16px;border-radius:6px;display:block;box-shadow:0 0 0 1px rgba(0,0,0,.35) inset;}
-.pre-t{font-family:var(--fd);font-size:14px;font-weight:800;color:var(--t1);letter-spacing:-.01em;}
-.pre-s{font-size:11px;color:var(--t3);}
-.pre-card.on .pre-t{color:var(--a2);}
 .th-deep{margin-top:16px;}
 .th-rule{height:1px;background:var(--bn2);margin:18px 0 4px;}
 
@@ -3475,8 +3505,6 @@ body.recsel .pcard{position:relative;}
       </div>
     </div>
   </div>
-  <div class="th-lead">Pick one and you're done. Everything below is optional.</div>
-  <div class="pre-row" id="presetRow"></div>
   <div id="fromImgRow"></div>
 
   
@@ -3490,13 +3518,16 @@ body.recsel .pcard{position:relative;}
 <div class="th-deepbody">
     
 
-    <div class="th-sub">Accent</div>
+    <!-- Every heading carries a sample of the one thing that control touches:
+         accent shows a button, tint shows a panel, glow shows the wash. A colour
+         swatch tells you the colour; the sample tells you where it lands. -->
+    <div class="th-sub">Accent <span class="th-smp"><b class="s-btn">Watch</b><b class="s-chip">All</b></span></div>
     <div class="acc-row" id="accentRow"></div>
-    <div class="th-sub">Surface tint <em>the panels themselves</em></div>
+    <div class="th-sub">Surface tint <em>the panels themselves</em> <span class="th-smp"><b class="s-panel"></b></span></div>
     <div class="acc-row" id="tintRow"></div>
-    <div class="th-sub">Status colours</div>
+    <div class="th-sub">Status colours <span class="th-smp"><b class="s-st sw">Watching</b><b class="s-st sf">Done</b></span></div>
     <div class="stc-row" id="statusColorRow"></div>
-    <div class="th-sub">Background glow</div>
+    <div class="th-sub">Background glow <span class="th-smp"><b class="s-glow"></b></span></div>
     <div class="glow-modes" id="glowRow"></div>
 
     <div class="th-rule"></div>
@@ -5744,57 +5775,6 @@ function renderFromImageRow(){
   dz.addEventListener('drop',e=>{const f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0];if(f)lookFromFile(f);});
 }
 
-// ─── READY-MADE ─────────────────────────────────────────────────────────────
-// Eleven controls is a workshop. Most people do not want to set eleven
-// variables; they want the app to look nice and to stop asking. So the page
-// leads with finished combinations — one tap sets every one of those eleven —
-// and the controls themselves move behind a single door for the people who
-// actually want them.
-//
-// Nothing is removed. The difference is only what you meet first, which is the
-// difference between a page that feels considered and one that feels like a
-// form someone forgot to finish.
-const PRESETS=[
-  {id:'as-designed',name:'As designed',sub:'The default',
-   v:{theme:'default',accent:'',tint:'',ui:'soft',view:'grid',ed:'standard',density:'comfy',art:'natural'}},
-  {id:'midnight',name:'Midnight',sub:'Deep blue, big artwork',
-   v:{theme:'sasuke',accent:'#5a7fd4',tint:'#1f2b4a',ui:'soft',view:'cinema',ed:'standard',density:'comfy',art:'cinematic'}},
-  {id:'ledger',name:'Ledger',sub:'Everything at once, no frills',
-   v:{theme:'default',accent:'#8a8f9c',tint:'',ui:'sharp',view:'list',ed:'focus',density:'compact',art:'natural'}},
-  {id:'ember',name:'Ember',sub:'Warm, soft, unhurried',
-   v:{theme:'sanji',accent:'#e0873f',tint:'#3a2418',ui:'round',view:'grid',ed:'standard',density:'large',art:'natural'}},
-  {id:'lean-back',name:'Lean back',sub:'Large type, made to be seen',
-   v:{theme:'default',accent:'#5ed47a',tint:'#12281c',ui:'round',view:'cinema',ed:'tv',density:'large',art:'cinematic'}},
-  {id:'desk',name:'Desk',sub:'Tight, nav on top',
-   v:{theme:'default',accent:'#4f7fd4',tint:'',ui:'sharp',view:'list',ed:'pro',density:'compact',art:'natural'}},
-];
-function applyPreset(id){
-  const p=PRESETS.find(x=>x.id===id); if(!p)return;
-  const v=p.v;
-  try{applyTheme(v.theme||'default');}catch(e){}
-  const put=(k,val)=>{try{val?localStorage.setItem(k,val):localStorage.removeItem(k);}catch(e){}};
-  put(ACCENT_KEY,v.accent);put(TINT_KEY,v.tint);
-  put(UI_KEY,v.ui);put(VIEW_KEY,v.view);put(ED_KEY,v.ed);put(DENSITY_KEY,v.density);put(ART_KEY,v.art);
-  try{localStorage.setItem(STATUS_KEY,'{}');}catch(e){}
-  applyAccent();applyTint();applyUiStyle();applyLayoutView();applyEdition();applyDensity();applyArtMode();applyStatusColors();
-  try{render();}catch(e){}
-  renderThemeGrid();
-  toast(`${p.name}`);
-}
-function renderPresetRow(){
-  const row=document.getElementById('presetRow'); if(!row)return;
-  // "Current" is whichever preset every one of its values still matches — so it
-  // stops claiming one the moment you change anything, which is honest and also
-  // how you can tell you have wandered off into your own thing.
-  const now={theme:curTheme||'default',accent:accentOverride(),tint:surfaceTint(),ui:uiStyle(),
-             view:layoutView(),ed:edition(),density:density(),art:artMode()};
-  const active=PRESETS.find(p=>Object.keys(p.v).every(k=>(p.v[k]||'')===(now[k]||'')));
-  row.innerHTML=PRESETS.map(p=>`<button class="pre-card${active&&active.id===p.id?' on':''}" onclick="applyPreset('${p.id}')">
-      <span class="pre-swatch"><i style="background:${p.v.accent||'var(--a)'}"></i><i style="background:${p.v.tint||'var(--bg3)'}"></i></span>
-      <span class="pre-t">${escH(p.name)}</span><span class="pre-s">${escH(p.sub)}</span>
-    </button>`).join('');
-}
-
 // ─── SAVE WHAT YOU MADE ─────────────────────────────────────────────────────
 // Every knob in this sheet was a live setting: change theme and your accent
 // survived, but there was no way to keep two looks and move between them, and
@@ -5915,8 +5895,9 @@ function renderUiRow(){
   const row=document.getElementById('uiRow'); if(!row)return;
   const cur=uiStyle();
   const SUB={soft:'Rounded, the default',sharp:'Crisp and editorial',round:'Very rounded'};
-  row.innerHTML=Object.keys(UI_STYLES).map(k=>`<button class="art-opt${cur===k?' on':''}" onclick="setUiStyle('${k}')">
-    <span class="art-lb">${UI_STYLES[k]}</span><span class="art-sub">${SUB[k]}</span></button>`).join('');
+  const R={soft:'14px',sharp:'3px',round:'22px'};
+  row.innerHTML=Object.keys(UI_STYLES).map(k=>`<button class="art-opt has-d${cur===k?' on':''}" onclick="setUiStyle('${k}')">
+    <i class="d-shape" style="border-radius:${R[k]}"></i><span class="art-lb">${UI_STYLES[k]}</span><span class="art-sub">${SUB[k]}</span></button>`).join('');
 }
 try{applyUiStyle();}catch(e){}
 
@@ -5942,8 +5923,18 @@ function setEdition(v){
 function renderEditionRow(){
   const row=document.getElementById('editionRow'); if(!row)return;
   const cur=edition();
-  row.innerHTML=Object.keys(EDITIONS).map(k=>`<button class="art-opt${cur===k?' on':''}" onclick="setEdition('${k}')">
-    <span class="art-lb">${EDITIONS[k][0]}</span><span class="art-sub">${EDITIONS[k][1]}</span></button>`).join('');
+  // Wireframes: header, content, and where navigation lives.
+  // Four wireframes that actually differ: what's at the top, how many rows of
+  // content fit, and where the bar lives. Three near-identical drawings would be
+  // worse than none.
+  const ED_D={
+    standard:'<i class="d-ed"><u></u><s></s><s></s><s></s><n></n></i>',
+    focus:'<i class="d-ed"><s></s><s></s><s></s><s></s><n></n></i>',
+    tv:'<i class="d-ed d-big"><u></u><s></s><s></s><n></n></i>',
+    pro:'<i class="d-ed"><n></n><s></s><s></s><s></s></i>',
+  };
+  row.innerHTML=Object.keys(EDITIONS).map(k=>`<button class="art-opt has-d${cur===k?' on':''}" onclick="setEdition('${k}')">
+    ${ED_D[k]||''}<span class="art-lb">${EDITIONS[k][0]}</span><span class="art-sub">${EDITIONS[k][1]}</span></button>`).join('');
 }
 try{applyEdition();}catch(e){}
 // Layout: which of the three ways to show the list. Kept separate from density
@@ -5957,11 +5948,20 @@ function setLayoutView(v){
   try{localStorage.setItem(VIEW_KEY,VIEWS[v]?v:'grid');}catch(e){}
   applyLayoutView();renderViewRow();try{render();}catch(e){}
 }
+// Each option draws the thing it does. A label tells you the name of a choice;
+// a diagram tells you the choice. For anything spatial — where the bar sits, how
+// many columns, how round a corner is — the drawing IS the explanation, and a
+// separate preview panel somewhere else is a worse version of it.
+const DIA={
+  grid:'<i class="d-g"><b></b><b></b><b></b><b></b><b></b><b></b></i>',
+  list:'<i class="d-l"><b></b><b></b><b></b></i>',
+  cinema:'<i class="d-c"><b></b><b></b></i>',
+};
 function renderViewRow(){
   const row=document.getElementById('viewRow'); if(!row)return;
   const cur=layoutView();
-  row.innerHTML=Object.keys(VIEWS).map(k=>`<button class="art-opt${cur===k?' on':''}" onclick="setLayoutView('${k}')">
-    <span class="art-lb">${VIEWS[k][0]}</span><span class="art-sub">${VIEWS[k][1]}</span></button>`).join('');
+  row.innerHTML=Object.keys(VIEWS).map(k=>`<button class="art-opt has-d${cur===k?' on':''}" onclick="setLayoutView('${k}')">
+    ${DIA[k]||''}<span class="art-lb">${VIEWS[k][0]}</span><span class="art-sub">${VIEWS[k][1]}</span></button>`).join('');
 }
 try{applyLayoutView();}catch(e){}
 const DENSITY_KEY='card_density';
@@ -5979,7 +5979,9 @@ function setDensity(d){
 function renderDensityRow(){
   const row=document.getElementById('densityRow'); if(!row)return;
   const cur=density();
-  row.innerHTML=Object.keys(DENSITIES).map(k=>`<button class="art-opt${cur===k?' on':''}" onclick="setDensity('${k}')">
+  const N={compact:6,comfy:4,large:3};   // how many fit across, drawn to scale
+  row.innerHTML=Object.keys(DENSITIES).map(k=>`<button class="art-opt has-d${cur===k?' on':''}" onclick="setDensity('${k}')">
+    <i class="d-dense" style="--n:${N[k]}">${'<b></b>'.repeat(N[k])}</i>
     <span class="art-lb">${DENSITIES[k].label}</span><span class="art-sub">${DENSITIES[k].sub}</span></button>`).join('');
 }
 try{applyDensity();}catch(e){}
@@ -6220,7 +6222,6 @@ function renderThemeGrid(){
   try{renderLooksRow();}catch(e){}
   try{renderViewRow();}catch(e){}
   try{renderEditionRow();}catch(e){}
-  try{renderPresetRow();}catch(e){}
   try{renderFromImageRow();}catch(e){}
   try{renderStatusColorRow();}catch(e){}
   const bs=document.getElementById('brightSlider');if(bs)bs.value=bgBright();
@@ -6415,7 +6416,8 @@ function renderArtRow(){
   const row=document.getElementById('artRow'); if(!row)return;
   const m=artMode();
   row.innerHTML=[['natural','Natural','True colours'],['cinematic','Cinematic','Richer, shaded']]
-    .map(([id,lb,sub])=>`<button class="art-opt${m===id?' on':''}" onclick="setArtMode('${id}')">
+    .map(([id,lb,sub])=>`<button class="art-opt has-d${m===id?' on':''}" onclick="setArtMode('${id}')">
+      <i class="d-art ${id==='cinematic'?'d-art-c':''}"></i>
       <span class="art-lb">${lb}</span><span class="art-sub">${sub}</span></button>`).join('');
 }
 function renderGlowRow(){
@@ -16187,15 +16189,15 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-12.11',
-  title:'Six looks, and one door for everything else',
-  push:'Pick a look. Everything else is optional.',
+  v:'2026-08-12.12',
+  title:'Every control shows you what it changes',
+  push:'No more guessing what a setting does \u2014 it draws it.',
   notes:[
-    'Theme is one screen again: a preview, six looks, and drop-a-picture. Everything else lives behind one button and comes back to this every time you open it.',
+    'Every choice in Theme now draws what it does: layout shows the arrangement, edition shows where the bar sits, look shows the corner, card size shows how many fit, artwork shows the treatment. Accent, tint, status and glow carry a sample of the exact thing they colour.',
+    'The six ready-made looks are gone. Themes, a live preview and drop-a-picture are the first screen; everything else is behind one button.',
     'A live preview sits at the top of Theme \u2014 a real card, chip, button and status row that change as you do, so you can see what you\u2019re picking before you commit to it.',
     'Drop a picture into Theme and WatchList takes its colours \u2014 a cover, a screenshot, anything. It looks for the colour you\u2019d actually name if asked about the image, not the muddiest one, so a small patch of vivid colour beats a big grey background.',
     'On a wide screen, opening a title puts it beside your list instead of over it \u2014 the list stays live, so you can keep clicking through and the panel keeps up. Below 1200px it\u2019s the same sheet as before.',
-    'Theme now leads with six ready-made looks \u2014 As designed, Midnight, Ledger, Ember, Lean back, Desk. One tap sets the colours, the layout, the shape and the size together. Everything else folds away under “Make your own”.',
     'If you do want the controls: your own accent, a surface tint for the panels, the four status colours, three layouts (Posters, List, Cinema), four editions (Standard, Focus, Big, Desktop), card size and artwork treatment \u2014 all saveable under a name.',
     'Artwork is shown as it is \u2014 no quiet saturation or heavy shading \u2014 and backgrounds crop around the subject instead of a fixed guess.',
     'Progress keeps itself: the app follows the site\u2019s own next-episode link, and in the iPhone app it reads real playback position down to the minute you stopped.',

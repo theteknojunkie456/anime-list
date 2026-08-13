@@ -12,11 +12,15 @@
 // git-ignored. Everything else — every style, every code path — is the real
 // thing, which is the whole point.
 //
-//   node scripts/preview.mjs 1400x880 out.png
+// A third argument runs after boot, so a screen behind a tap — a sheet, a
+// detail view — can be photographed too.
+//
+//   node scripts/preview.mjs 1400x880 out.png "openSheet('themeSheet')"
+
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { spawnSync, spawn } from 'node:child_process';
 
-const [size = '1400x880', out = 'preview.png'] = process.argv.slice(2);
+const [size = '1400x880', out = 'preview.png', after = ''] = process.argv.slice(2);
 const [w, h] = size.split('x').map(Number);
 const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 
@@ -42,7 +46,11 @@ const list = SHOWS.map(([title, status, ep, epTotal, genre], i) => ({
 }));
 
 const seed = {
-  wl_net_status: 'approved', seen_release: '9999', seen_msg: '1',
+  // Match the current RELEASE version exactly, or the notes sheet opens over
+  // whatever screen this shot was meant to photograph.
+  wl_net_status: 'approved',
+  seen_release: (readFileSync('index.html','utf8').match(/const RELEASE=\{\s*v:'([^']+)'/)||[,'9999'])[1],
+  seen_msg: '1',
   animelist_v4: JSON.stringify(list),
   onboarded_animelist_v4: '1', tut_seen_animelist_v4: '1',
   backupoff_animelist_v4: '1', backup_nudge_animelist_v4: '1',
@@ -56,6 +64,14 @@ const inject = '<script>try{' +
   Object.entries(seed).map(([k, v]) => `localStorage.setItem(${JSON.stringify(k)},${JSON.stringify(v)});`).join('') +
   '}catch(e){}</script>';
 mkdirSync('.preview', { recursive: true });
+// index.html contains two `</body>` — the first is inside a JS string. Splice at
+// the LAST one, or the injected tag lands mid-string and kills the whole app.
+if (after) {
+  const i = src.lastIndexOf('</body>');
+  src = src.slice(0, i) +
+    `<script>addEventListener('load',()=>{setTimeout(()=>{try{${after}}catch(e){console.error(e)}},400)})<\/script>` +
+    src.slice(i);
+}
 writeFileSync('.preview/index.html', src.replace('<script', inject + '<script'));
 
 // Chrome clamps a headless window to 500px wide. Ask for 390 and you get a

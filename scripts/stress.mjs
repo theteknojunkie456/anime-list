@@ -136,7 +136,6 @@ function suite() {
     ['stats', () => window.openStats()],
     ['settings', () => window.openSheet('settingsSheet')],
     ['sources', () => window.openSheet('sourceSheet')],
-    ['theme', () => window.openSheet('themeSheet')],
     ['notifications', () => window.openSheet('notifySheet')],
     ['detail', () => window.openDetail(anime[0].id)],
     ['detail (manga)', () => window.openDetail('h6')],
@@ -187,6 +186,54 @@ function suite() {
     if (r.right > window.innerWidth + 1 || r.bottom > window.innerHeight + 1 || r.left < -1 || r.top < -1)
       err('menu', 'opened outside the window');
     window.closeBulkMenu();
+  });
+
+  // ── does pressing it actually DO anything? ──
+  // "Buttons that look real and do nothing" is the most common sign of an app
+  // that was generated rather than built. Not throwing is not the same as
+  // working, so this presses each control and watches for ANY consequence: DOM
+  // changed, storage written, a sheet opened, focus moved, the URL changed.
+  if (!window.__QUICK) run('every button does something', () => {
+    const dead = [];
+    const seen = new Set();
+    // Sweep every screen, not just whatever happens to be on top: a control that
+    // does nothing is most likely to be one nobody looks at.
+    const btns = [];
+    const push = () => document.querySelectorAll('button[onclick]').forEach(b => {
+      const r = b.getBoundingClientRect();
+      if (r.width > 0 && r.height > 0) btns.push(b);
+    });
+    SCREENS.forEach(([, open]) => { try { open(); } catch (e) { } push(); });
+    try { window.closeAll && window.closeAll(); } catch (e) { }
+    push();
+    for (const b of btns) {
+      if (!b.isConnected) continue;
+      const oc = b.getAttribute('onclick') || '';
+      if (seen.has(oc)) continue; seen.add(oc);
+      if (/reset|wipe|clear(All|Data)|delete|signOut|logout|export|import|share|rename|alias|copy|prompt/i.test(oc)) continue;
+      // Selecting the tab you are already on is meant to do nothing.
+      if (/setViewKind\('watch'\)|pickFilt\('all'\)|setAITab\('rec'\)/.test(oc)) continue;
+      // These do work — they just cannot here. A file input opens the OS picker
+      // and pasteKey reads the clipboard; headless has neither, so both look
+      // inert to this check and would otherwise be reported forever.
+      if (/File'\)\.click\(\)|pasteKey\(\)/.test(oc)) continue;
+      let touched = 0;
+      const ob = new MutationObserver(ms => { touched += ms.length; });
+      ob.observe(document.body, { childList: true, subtree: true, attributes: true });
+      const beforeLS = JSON.stringify(Object.entries(localStorage).sort());
+      const beforeFocus = document.activeElement;
+      const beforeHash = location.hash;
+      try { b.click(); } catch (e) { }
+      ob.takeRecords().forEach(() => touched++);
+      ob.disconnect();
+      const afterLS = JSON.stringify(Object.entries(localStorage).sort());
+      if (!touched && beforeLS === afterLS && document.activeElement === beforeFocus && location.hash === beforeHash) {
+        dead.push(oc.slice(0, 46));
+      }
+      try { window.closeAll && window.closeAll(); } catch (e) { }
+    }
+    if (dead.length) warn('dead controls', dead.length + ' did nothing: ' + [...new Set(dead)].slice(0, 8).join(' · '));
+    R.checks.push('pressed ' + seen.size + ' distinct controls, ' + dead.length + ' with no visible effect');
   });
 
   // ── press everything that is visible, and see if anything throws ──

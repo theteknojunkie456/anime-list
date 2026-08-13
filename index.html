@@ -281,6 +281,15 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 .paint-dock .fi-drop{flex-direction:row;align-items:center;gap:9px;padding:11px 13px;margin-top:14px;text-align:left;}
 .paint-dock .fi-drop .fi-t{font-size:13px;}
 .paint-dock .fi-drop .fi-s{display:none;}
+/* One row that scrolls sideways, not two that push the colours off screen. The
+   dock's whole job is to leave the list visible. */
+.paint-dock .theme-grid{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;
+  padding-bottom:2px;scroll-snap-type:x proximity;}
+.paint-dock .theme-grid::-webkit-scrollbar{display:none;}
+.paint-dock .topt{flex:0 0 78px;scroll-snap-align:start;}
+.paint-dock .topt .tswatch{height:42px;}
+.paint-dock .topt .tname{font-size:10px;}
+.paint-dock .th-reset{margin-top:8px;}
 .paint-dock .art-opt{padding:9px 10px;}
 .paint-dock .art-opt .d-dense{height:22px;margin-bottom:6px;}
 .paint-dock .art-sub{display:none;}
@@ -483,7 +492,7 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 .topbar .filt-row{background:rgba(255,255,255,.045);border-color:transparent;box-shadow:none;}
 .topbar .sort-btn{background:rgba(255,255,255,.045);}
 .topbar .kind-seg{background:rgba(255,255,255,.045);border-color:transparent;}
-.search-row{padding:10px 18px 0;display:flex;align-items:center;gap:8px;}
+.search-row{padding:8px 18px 0;display:flex;align-items:center;gap:8px;}
 .search-wrap{position:relative;flex:1;min-width:0;}
 .search-ico{position:absolute;left:13px;top:50%;transform:translateY(-50%);font-size:13px;opacity:0.5;}
 .search-in{
@@ -555,9 +564,8 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
      all its segments is not one. It fills the row and the segments share the
      space instead. */
   display:flex;gap:0;width:auto;max-width:100%;min-width:0;padding:3px;border-radius:99px;
-  background:color-mix(in srgb,var(--bg3) 74%,transparent);
-  border:1px solid rgba(255,255,255,.10);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 4px 14px -8px rgba(0,0,0,.6);
+  background:var(--bg2);
+  border:1px solid var(--b1);
 }
 /* What read as cheap: a pill inside a pill inside a pill. The count wore its own
    little capsule, inside a chip, inside a track — three nested rounded shapes at
@@ -610,7 +618,7 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 .src-now-t svg{width:15px;height:15px;vertical-align:-3px;margin-right:6px;color:var(--a);}
 .src-now-s{margin-top:5px;font-size:12px;color:var(--t3);line-height:1.45;}
 .fixbar{display:none;}
-.fixbar.on{display:flex;align-items:center;gap:9px;margin:9px 18px 0;padding:7px 8px 7px 12px;
+.fixbar.on{display:flex;align-items:center;gap:9px;margin:7px 18px 0;padding:6px 8px 6px 12px;
   border-radius:14px;background:transparent;border:1px solid var(--b1);}
 .fixbar.on{touch-action:pan-y;will-change:transform;}
 .fixbar-i{display:flex;flex:0 0 auto;color:var(--t3);}
@@ -1257,7 +1265,7 @@ body.first-paint .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards
 .dt-epbar span{flex:none;font-size:12px;font-weight:700;color:var(--t3);font-variant-numeric:tabular-nums;}
 
 /* Resume card — artwork, where you're going back to, one thing to press. */
-.resume-wrap{position:relative;display:flex;align-items:center;margin:12px 18px 0;}
+.resume-wrap{position:relative;display:flex;align-items:center;margin:9px 18px 0;}
 .resume-x{position:absolute;right:6px;top:6px;width:26px;height:26px;border-radius:50%;
   display:flex;align-items:center;justify-content:center;color:var(--t3);
   background:color-mix(in srgb,var(--bg) 55%,transparent);border:0;cursor:pointer;transition:color .15s;}
@@ -2742,7 +2750,7 @@ body.recsel .pcard{position:relative;}
       <button class="hbtn" onclick="openForYou()" title="For You — tailored recommendations" aria-label="For You recommendations"><i data-ic="compass"></i></button>
       <button class="hbtn" onclick="openSchedule()" title="Weekly airing schedule" aria-label="Weekly airing schedule"><i data-ic="calendar"></i></button>
       <button class="hbtn" id="notifyBell" onclick="openNotifySheet()" title="Episode notifications" aria-label="Notifications"><i data-ic="bell-off"></i></button>
-      <button class="hbtn" onclick="openSheet('themeSheet')" title="Theme"><i data-ic="palette"></i></button>
+      <button class="hbtn" onclick="togglePaint()" title="Look" aria-label="Change how it looks"><i data-ic="palette"></i></button>
     </div>
   </div>
   <div class="topbar">
@@ -3399,40 +3407,6 @@ body.recsel .pcard{position:relative;}
   </div>
   <p class="ai-desc">Turn off the bands you never use, and put the ones you do at the top. Your lists themselves always show.</p>
   <div id="homeLayoutBox"></div>
-</div>
-<div class="sheet" id="themeSheet">
-  <div class="sheet-handle"></div>
-  <div class="sheet-header">
-    <div class="sheet-title"><i data-ic="palette"></i> Theme</div>
-    <button class="sheet-cancel" onclick="closeAll()">Done</button>
-  </div>
-  <!-- Someone opening this for the first time has two questions before any
-       other: what does this change, and can I break something. Answer both in
-       one line, at the top, before they touch anything. -->
-  <!-- Made of the REAL components — a card, a button, a chip, a bar — not a
-       drawing of them. Every token these read is the same token the app reads,
-       so it updates the instant a colour changes and it can never drift out of
-       date with what it is previewing. -->
-  
-  <!-- Two screens, not one page with folds. A fold still shows you that there is
-       more, and how much more, which is most of what makes a page feel heavy.
-       In Simple the depth is not collapsed — it is not here. -->
-  <!-- One screen. No second screen, no door between them, no mode to be in.
-       A look, a colour, a picture to take one from, and how big the cards are —
-       every remaining thing is visible at once and none of it needs explaining
-       twice. -->
-  <div class="th-intro">This changes how WatchList <b>looks</b>. Your list, your progress and everything in it stay exactly as they are.</div>
-  <div class="th-sub">Start with a look</div>
-  <div class="theme-grid" id="themeGrid"></div>
-  <!-- Colour is not chosen here any more. It is chosen over your own list, where
-       you can see it. -->
-  <button class="th-paint" onclick="closeAll();setTimeout(startPaint,220)">
-    <i data-ic="palette"></i><span>Change the colours on your list</span>
-    <span class="th-paint-c">or hold the logo</span>
-  </button>
-
-  <!-- Nobody explores a settings screen they can't back out of. -->
-  <button class="th-reset" onclick="resetTheme()"><i data-ic="refresh"></i> Put everything back to default</button>
 </div>
 <div class="sheet" id="notifySheet">
   <div class="sheet-handle"></div>
@@ -5701,11 +5675,13 @@ function startPaint(){
   const el=document.createElement('div');
   el.id='paintDock';el.className='paint-dock';
   el.innerHTML=`<div class="paint-head">
-      <span class="paint-t">Colours</span>
+      <span class="paint-t">Look</span>
       <span class="paint-h">changing your list, live</span>
       <button class="paint-done" onclick="endPaint()">Done</button>
     </div>
     <div class="paint-body">
+      <div class="paint-lb">Start with a look</div>
+      <div class="theme-grid" id="themeGrid"></div>
       <div class="paint-lb">Accent <em>buttons, bars, highlights</em></div>
       <div class="acc-row" id="accentRow"></div>
       <div class="paint-lb">Background <em>the page and its panels</em></div>
@@ -5718,10 +5694,13 @@ function startPaint(){
       <button class="paint-save" onclick="saveLookAsTheme()">
         <i data-ic="check"></i> Save this as my own theme
       </button>
+      <button class="th-reset" onclick="resetTheme()"><i data-ic="refresh"></i> Put everything back to default</button>
     </div>`;
   document.body.appendChild(el);
-  try{renderAccentRow();renderTintRow();renderStatusColorRow();renderDensityRow();renderFromImageRow();}catch(e){}
+  try{renderThemeGrid();}catch(e){}
+  try{renderTintRow();renderStatusColorRow();}catch(e){}
   try{hydrateIcons(el);}catch(e){}
+  try{el.querySelector('.paint-body').scrollTop=0;}catch(e){}
   try{navigator.vibrate&&navigator.vibrate(12);}catch(e){}
   toast('Tap a colour \u2014 your list changes as you go',2600);
 }
@@ -8011,7 +7990,6 @@ function openSheet(id){
   document.getElementById('overlay').classList.add('on');
   document.getElementById(id).classList.add('on');
   try{sheetFocusGuard(id,true);}catch(e){}
-  if(id==='themeSheet')renderThemeGrid();
   if(id==='statsSheet')renderStatsSheet();
   if(id==='settingsSheet')renderSettings();
   if(id==='backupSheet')renderSyncUI();
@@ -10704,7 +10682,7 @@ function renderSettings(){
     {ic:'play',     h:'Sources', p:'Where Watch now / Read now open', go:"openSheet('sourceSheet')"},
     {ic:'refresh',  h:'AniList sync',        p:alConnected()?'On — '+alUser()+' · progress syncs both ways':'Off — connect to sync progress everywhere', go:"openSheet('anilistSheet')"},
     {ic:'clipboard',h:'Import / Export',     p:'Paste a list in, or copy yours out', go:"openSheet('importSheet')"},
-    {ic:'palette',  h:'Theme',               p:'Colours, or build your own', go:"openSheet('themeSheet')"},
+    {ic:'palette',  h:'Look',                p:'Themes and colours, over your list', go:"startPaint()"},
     {ic:'layers',   h:'Home screen',          p:homeLayoutLine(), go:"openHomeLayout()"},
   ];
   // Admin row appears only on the device where your admin token is stored — so it
@@ -14659,7 +14637,7 @@ async function aiFail(res){
 // it is not now that Gemini is, because one retirement at Google would take the
 // AI features out for everyone we sent there.
 const AI_EXTRA={
-  groq:['openai/gpt-oss-120b'],
+  groq:['llama-3.3-70b-versatile','llama-3.1-8b-instant'],
   openrouter:['meta-llama/llama-3.1-8b-instruct:free'],
   gemini:['gemini-2.5-flash-lite'],
   claude:['claude-haiku-4-5-20251001'],
@@ -15061,7 +15039,7 @@ function _streamChat(){
     renderChatThread(false);saveChat();
   });
 }
-const AI_MODELS={groq:['llama-3.3-70b-versatile','llama-3.1-8b-instant'],openrouter:['meta-llama/llama-3.3-70b-instruct:free','google/gemini-2.0-flash-exp:free'],gemini:['gemini-2.5-flash','gemini-2.5-pro'],claude:['claude-sonnet-5','claude-haiku-4-5-20251001']};
+const AI_MODELS={groq:['openai/gpt-oss-120b','openai/gpt-oss-20b'],openrouter:['meta-llama/llama-3.3-70b-instruct:free','google/gemini-2.0-flash-exp:free'],gemini:['gemini-2.5-flash','gemini-2.5-pro'],claude:['claude-sonnet-5','claude-haiku-4-5-20251001']};
 // Only sk-ant- keys are Claude — a random non-empty string is NOT a key. (The old
 // `if(k)return'claude'` sent junk to the Claude endpoint and failed cryptically.)
 function aiProvider(){const k=getKey();if(k.startsWith('gsk_'))return'groq';if(k.startsWith('sk-or-'))return'openrouter';if(k.startsWith('AIza'))return'gemini';if(k.startsWith('sk-ant-'))return'claude';return'';}
@@ -16108,10 +16086,13 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-13.9',
-  title:'Same look, tidier',
-  push:'One type ramp, one corner scale, nothing else moved.',
+  v:'2026-08-13.10',
+  title:'One place for how it looks',
+  push:'The Theme sheet is gone \u2014 it all happens over your list now.',
   notes:[
+    'There were two places to change how the app looks: a Theme sheet, and the bar you get by holding the logo. Now there is one. The palette button opens it, holding the logo opens it, and everything \u2014 the seven looks, the accent, the background, the status colours, card size, take-from-a-picture, save your own \u2014 sits over your real list.',
+    'The top of the home screen is quieter: the filter pill wore a background, a border, an inset highlight and a drop shadow all at once, and the blocks above your list have given about 30px back.',
+    'Groq keys answer faster. All three models were current, but the order was wrong on both speed and price \u2014 the fastest and cheapest is asked first now.',
     'Text is on a ramp. There were fifteen sizes crammed between 8.5 and 15px \u2014 half-pixel differences nobody can read as hierarchy, which is what made the app feel untidy rather than dense. Six steps do the same work, and nothing moved by more than a pixel.',
     'Headings match each other, weights went from six to three, and corners sit on one scale instead of nine loose values.',
     'Adding a show whose title contains an apostrophe from the discover list threw an error instead of adding it. Only the double quote was being escaped, so the apostrophe in a name like JoJo\u2019s ended the code early. Every place a name, link or source can reach a button now escapes properly, and a check fails the build if a new one appears.',

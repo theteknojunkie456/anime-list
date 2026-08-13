@@ -115,6 +115,21 @@ or muddy greys and look wrong as UI.
 `--fd` **Bricolage Grotesque** — display: titles, section heads, numbers.
 `--fb` **Manrope** — body: everything else.
 
+**Hierarchy.** A section head is the only landmark on a long scrolling page, and
+at 16px/800 it sat at the same visual weight as a card title four pixels below
+it — so nothing outranked anything and the page read flat. Heads are 19px with
+-0.035em tracking against a count that recedes; the *contrast between them* is
+what makes one read as a heading rather than a label.
+
+Card titles moved from the body face at 11.5/600 — which is a caption — to the
+display face at 13/700. A title is a name, and the artwork and its name should
+feel like one object.
+
+The hero is the one place the display face is allowed to be loud:
+`clamp(24px, 5.2vw, 34px)` at -0.04em, which is the tracking floor in the
+general rules and correct here because it's the only thing on the page set that
+large.
+
 Honest note for anyone auditing this: these are both sans, which is the pairing
 the general rules warn about. It works here because Bricolage is a variable
 display grotesque used at 700–800 with negative tracking against Manrope at

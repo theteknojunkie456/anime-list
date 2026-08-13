@@ -360,3 +360,31 @@ of the logo — the most discoverable press in the app, doing nothing at all for
 anybody except the one person with a token. Admin is a double tap on a device
 that already holds the token; the five-tap unlock stays for a device that has
 never been admin.
+
+## Why it was slow
+
+`scripts/perf.mjs` counts, against a 200-title library: how many nodes an
+interaction replaces, how many elements carry per-frame effects, and what the
+scroll path touches. Wall-clock is useless in a headless run — virtual time
+advances in jumps, so `performance.now()` deltas come back 0ms or 1000ms with no
+relation to real work — so it measures work, not time.
+
+Three findings, all structural:
+
+**395 elements with `backdrop-filter`.** Every status badge and every episode
+chip blurred the artwork behind it. Each one is a compositing layer the phone
+re-blurs every frame, and at 319 cards that is the whole scroll budget spent on
+an effect nobody can see behind a 20px label. Now: two, both large deliberate
+surfaces. The badges took a slightly more opaque background instead.
+
+**Interactions went through a full rebuild.** Changing card size or accent
+re-rendered every card to set one custom property, when the browser restyles
+from a custom property for free. Selecting a title re-rendered the list to add a
+class. Measured in nodes replaced: card size 22 → 0, select 22 → 2.
+
+**The scroll handler forced layout and style on every frame.** It measured every
+band with `getBoundingClientRect` and read `--a` back through `getComputedStyle`,
+which makes the engine resolve style before it can answer. The bands are cached
+until the page is rebuilt, the accent is remembered until a theme changes, and
+the scan runs a few times a second rather than sixty — the colour crossfades over
+a second regardless.

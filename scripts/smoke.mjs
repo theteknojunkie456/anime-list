@@ -12,7 +12,7 @@
 // name in the document is collected and asked whether it exists.
 //
 //   node scripts/smoke.mjs
-import { readFileSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, rmSync, existsSync } from 'node:fs';
 import { spawnSync, spawn } from 'node:child_process';
 
 const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
@@ -136,6 +136,18 @@ try {
 const m = /<pre id="__smoke">([\s\S]*?)<\/pre>/.exec(dom);
 if (!m) { console.error('smoke: the app did not report — it may not have booted'); process.exit(1); }
 const results = JSON.parse(m[1].replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>'));
+// A file-system check, so it lives out here rather than in the page. The manifest
+// promised a 512px icon that was not in the repo — the one icon Chrome requires
+// before it offers to install a PWA — and nothing noticed, because nothing reads
+// the manifest until an install prompt quietly fails to appear.
+try {
+  const mf = JSON.parse(readFileSync('manifest.json', 'utf8'));
+  const gone = (mf.icons || []).filter(i => !existsSync(i.src.replace(/^\.?\//, '')));
+  results.push({ n: 'every manifest icon exists', ok: gone.length === 0, d: gone.map(g => g.src).join(', ') || (mf.icons || []).length + ' icons' });
+} catch (e) {
+  results.push({ n: 'manifest.json parses', ok: false, d: e.message });
+}
+
 let bad = 0;
 for (const r of results) {
   if (!r.ok) bad++;

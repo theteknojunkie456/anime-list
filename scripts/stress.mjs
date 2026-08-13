@@ -136,13 +136,13 @@ function suite() {
     ['stats', () => window.openStats()],
     ['settings', () => window.openSheet('settingsSheet')],
     ['sources', () => window.openSheet('sourceSheet')],
-    ['theme (simple)', () => { window.openSheet('themeSheet'); window.themeMode('simple'); }],
-    ['theme (full)', () => { window.openSheet('themeSheet'); window.themeMode('full'); }],
+    ['theme', () => window.openSheet('themeSheet')],
     ['notifications', () => window.openSheet('notifySheet')],
     ['detail', () => window.openDetail(anime[0].id)],
     ['detail (manga)', () => window.openDetail('h6')],
     ['detail (nulls)', () => window.openDetail('h12')],
     ['add', () => window.openSheet('addSheet')],
+    ['paint mode', () => window.startPaint()],
     ['friends & party', () => window.openHub()],
     ['schedule', () => window.openSchedule()],
     ['for you', () => window.openForYou()],
@@ -219,13 +219,28 @@ function suite() {
     window.applyTheme('default');
     dens.forEach(d => { window.setDensity(d); scanDOM('density ' + d); });
     window.setDensity('comfy');
-    ['soft', 'sharp', 'round'].forEach(u => { window.setUiStyle(u); scanDOM('ui ' + u); });
-    window.setUiStyle('soft');
-    ['natural', 'cinematic'].forEach(a => { window.setArtMode(a); scanDOM('art ' + a); });
-    window.setArtMode('natural');
-    ['adaptive', 'theme', 'off'].forEach(g => { window.setGlow(g); });
-    window.setGlow('adaptive');
-    window.setAccent('#3fb6c9'); window.setTint('#1f2b4a'); window.setAccent(''); window.setTint('');
+    window.setAccent('#3fb6c9'); scanDOM('accent set'); window.setAccent('');
+  });
+
+  // ── colours are edited over the live list now, so that path has to work ──
+  run('paint mode', () => {
+    window.startPaint();
+    const d = document.getElementById('paintDock');
+    if (!d) return err('paint', 'the dock did not open');
+    if (!document.getElementById('accentRow')) err('paint', 'no accent row in the dock');
+    if (!document.getElementById('densityRow')) err('paint', 'no card size row in the dock');
+    // The point of the whole feature: the list must still be on screen.
+    const cards = [...document.querySelectorAll('#pageEl .pcard, .bb-slide')].filter(c => {
+      const r = c.getBoundingClientRect();
+      return r.height > 20 && r.top < d.getBoundingClientRect().top;
+    });
+    if (!cards.length) err('paint', 'the dock covers everything it is meant to be previewing');
+    window.setAccent('#5ed47a');
+    if (!document.getElementById('paintDock')) err('paint', 'picking a colour closed the dock');
+    window.setAccent('');
+    window.endPaint();
+    if (document.getElementById('paintDock')) err('paint', 'Done did not close it');
+    if (document.documentElement.classList.contains('painting')) err('paint', 'painting class stuck');
   });
 
   // ── the keyboard has to be able to drive the list ──

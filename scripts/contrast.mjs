@@ -36,7 +36,7 @@ const suite=function(){
   // Only what is on screen can be measured, and most of the app lives in sheets.
   const SCREENS=[['home',()=>window.closeAll&&window.closeAll()],
     ['stats',()=>window.openStats()],['settings',()=>window.openSheet('settingsSheet')],
-    ['sources',()=>window.openSheet('sourceSheet')],['theme',()=>{window.openSheet('themeSheet');window.themeMode('full');}],
+    ['sources',()=>window.openSheet('sourceSheet')],['theme',()=>window.openSheet('themeSheet')],['paint',()=>window.startPaint()],
     ['detail',()=>window.openDetail(anime[0].id)],['add',()=>window.openSheet('addSheet')],
     ['friends',()=>window.openHub()],['schedule',()=>window.openSchedule()],['for you',()=>window.openForYou()]];
   ['default','naruto','sasuke','luffy','sanji','zoro','chopper'].forEach(t=>{

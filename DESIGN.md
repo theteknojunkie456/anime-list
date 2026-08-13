@@ -337,3 +337,26 @@ screen, a party code row that did the same, negative episode counts producing
 negative progress bars and subtracting from lifetime totals, white text on a
 yellow badge at 1.84:1, and a primary button whose label sat at 2.9:1 because the
 gradient's light end was never the colour the foreground was chosen against.
+
+## Edit it where you can see it
+
+Colour was chosen inside a sheet that covered the thing being coloured. That is
+the whole reason four separate attempts at this screen kept reaching for a
+preview: a fake card, a fake chip, a fake button, standing in for the real ones
+four inches behind the sheet. Every one of those attempts was answering a
+question the layout had created.
+
+So the controls left the sheet. Press and hold the WatchList logo and a short
+dock rises at the bottom; above it is your own library, at full size, in its own
+scroll, changing as you touch a swatch. Nothing is a stand-in because nothing
+needs to be, and the dock is deliberately short — every pixel it takes is a pixel
+of the thing you came to look at.
+
+Theme is back to what the button says: seven looks, one door through to colour,
+one way back to default.
+
+The gesture had to be taken from admin, which had been sitting on press-and-hold
+of the logo — the most discoverable press in the app, doing nothing at all for
+anybody except the one person with a token. Admin is a double tap on a device
+that already holds the token; the five-tap unlock stays for a device that has
+never been admin.

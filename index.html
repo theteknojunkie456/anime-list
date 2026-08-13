@@ -242,6 +242,40 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 /* The one door to the deep end, and the way back. Deliberately a full-width
    destination rather than a fold: a fold announces how much more there is, which
    is most of what makes a page feel heavy in the first place. */
+.th-paint{display:flex;align-items:center;gap:10px;width:100%;margin-top:18px;padding:15px 16px;border-radius:18px;
+  background:var(--bg3);border:1px solid var(--b2);color:var(--t1);
+  font-family:var(--fd);font-size:14px;font-weight:800;text-align:left;}
+.th-paint:hover{border-color:var(--b3);}
+.th-paint .ico{width:17px;height:17px;color:var(--a2);flex:none;}
+.th-paint-c{margin-left:auto;font-family:var(--fb);font-size:11px;font-weight:600;color:var(--t3);}
+.paint-dock{position:fixed;left:0;right:0;bottom:0;z-index:70;
+  background:var(--bg2);border-top:1px solid var(--b2);border-radius:22px 22px 0 0;
+  box-shadow:0 -18px 44px -16px rgba(0,0,0,.85);
+  padding:12px 18px calc(var(--safe-b) + 14px);animation:paintUp .22s cubic-bezier(.2,1,.3,1) both;}
+@keyframes paintUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+@media(prefers-reduced-motion:reduce){.paint-dock{animation:none}}
+.paint-head{display:flex;align-items:baseline;gap:9px;margin-bottom:11px;}
+.paint-t{font-family:var(--fd);font-size:15px;font-weight:800;color:var(--t1);}
+.paint-h{font-size:11px;color:var(--t3);}
+.paint-done{margin-left:auto;padding:8px 16px;border-radius:99px;background:var(--a);color:var(--aFg);
+  font-family:var(--fd);font-size:12.5px;font-weight:800;border:0;}
+/* Its own scroll, so a long dock on a short phone never traps the controls
+   below the fold. */
+.paint-body{max-height:46vh;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+.paint-lb{font-size:9.5px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:var(--t3);margin:12px 0 8px;}
+.paint-lb:first-child{margin-top:0;}
+/* In the dock the dropzone is a row, not a poster-sized target: every pixel it
+   takes is a pixel of the list you came here to look at. */
+.paint-dock .fi-drop{flex-direction:row;align-items:center;gap:9px;padding:11px 13px;margin-top:14px;text-align:left;}
+.paint-dock .fi-drop .fi-t{font-size:12.5px;}
+.paint-dock .fi-drop .fi-s{display:none;}
+.paint-dock .art-opt{padding:9px 10px;}
+.paint-dock .art-opt .d-dense{height:22px;margin-bottom:6px;}
+.paint-dock .art-sub{display:none;}
+/* The list keeps scrolling under the dock, so leave it room. */
+:root.painting #pageEl{padding-bottom:300px;}
+:root.painting .nav{display:none;}
+
 .th-more{display:flex;align-items:center;gap:10px;width:100%;margin-top:18px;padding:15px 16px;border-radius:18px;
   background:var(--bg3);border:1px solid var(--bn2);color:var(--t1);cursor:pointer;
   font-family:var(--fd);font-size:14.5px;font-weight:800;letter-spacing:-.01em;text-align:left;}
@@ -3367,41 +3401,22 @@ body.recsel .pcard{position:relative;}
   <!-- Two screens, not one page with folds. A fold still shows you that there is
        more, and how much more, which is most of what makes a page feel heavy.
        In Simple the depth is not collapsed — it is not here. -->
-  <div id="themeSimple">
+  <!-- One screen. No second screen, no door between them, no mode to be in.
+       A look, a colour, a picture to take one from, and how big the cards are —
+       every remaining thing is visible at once and none of it needs explaining
+       twice. -->
   <div class="th-intro">This changes how WatchList <b>looks</b>. Your list, your progress and everything in it stay exactly as they are.</div>
   <div class="th-sub">Start with a look</div>
   <div class="theme-grid" id="themeGrid"></div>
-  <div class="th-sub">Accent <span class="th-smp"><b class="s-btn">Watch</b><b class="s-chip">All</b></span></div>
-  <div class="acc-row" id="accentRow"></div>
+  <!-- Colour is not chosen here any more. It is chosen over your own list, where
+       you can see it. -->
+  <button class="th-paint" onclick="closeAll();setTimeout(startPaint,220)">
+    <i data-ic="palette"></i><span>Change the colours on your list</span>
+    <span class="th-paint-c">or hold the logo</span>
+  </button>
 
-  <div id="fromImgRow"></div>
-
-  
-    <button class="th-more" onclick="themeMode('full')">
-      <i data-ic="sliders"></i><span>Shape and size</span><span class="th-more-c">optional</span>
-    </button>
-    <!-- Nobody explores a settings screen they can't back out of. -->
-    <button class="th-reset" onclick="resetTheme()"><i data-ic="refresh"></i> Put everything back to default</button>
-  </div>
-
-  <div id="themeFull" style="display:none">
-    <button class="th-back" onclick="themeMode('simple')"><i data-ic="chevron-left"></i> Back to looks</button>
-<div class="th-deepbody">
-    <div class="th-intro">Each one changes a single part, and draws what that part is. Pick anything; nothing here is permanent.</div>
-    
-
-    <!-- Every heading carries a sample of the one thing that control touches:
-         accent shows a button, tint shows a panel, glow shows the wash. A colour
-         swatch tells you the colour; the sample tells you where it lands. -->
-    <div class="th-sub">Look <em>corners and edges</em></div>
-    <div class="art-seg" id="uiRow"></div>
-    <div class="th-sub">Card size</div>
-    <div class="art-seg" id="densityRow"></div>
-    <div class="th-sub">Artwork</div>
-    <div class="art-seg" id="artRow"></div>
-
-  </div>
-  </div>
+  <!-- Nobody explores a settings screen they can't back out of. -->
+  <button class="th-reset" onclick="resetTheme()"><i data-ic="refresh"></i> Put everything back to default</button>
 </div>
 <div class="sheet" id="notifySheet">
   <div class="sheet-handle"></div>
@@ -3752,6 +3767,10 @@ function openAdmin(){_msgTarget='all';renderAdmin();openSheet('adminSheet');}   
 let _adminTaps=0,_adminTapT=null;
 function adminTap(){
   clearTimeout(_adminTapT);_adminTaps++;
+  // On a device that already holds the token this is my door: two taps. Five
+  // taps stays as the one-time unlock for a device that has never been admin —
+  // invisible to anyone who is not deliberately doing it.
+  if(_adminTaps>=2&&isAdminDevice()){_adminTaps=0;openAdmin();return;}
   if(_adminTaps>=5){_adminTaps=0;openAdmin();return;}
   _adminTapT=setTimeout(()=>{_adminTaps=0;},1400);
 }
@@ -5621,24 +5640,68 @@ function renderFromImageRow(){
   dz.addEventListener('drop',e=>{const f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0];if(f)lookFromFile(f);});
 }
 
+// ─── PAINT MODE ─────────────────────────────────────────────────────────────
+// Colour used to be chosen inside a sheet that covered the thing being coloured,
+// which is why every attempt to explain it needed a preview — a fake card
+// standing in for the real one four inches behind it.
+//
+// So the controls come out of the sheet and sit over your actual list. Press and
+// hold the WatchList logo and a small dock appears at the bottom; everything
+// above it is your own library, at full size, changing as you touch a swatch.
+// Nothing is a stand-in, because nothing needs to be.
+let _painting=false;
+function paintOn(){return _painting;}
+function startPaint(){
+  if(_painting)return;
+  _painting=true;
+  document.documentElement.classList.add('painting');
+  try{closeAll();}catch(e){}
+  const el=document.createElement('div');
+  el.id='paintDock';el.className='paint-dock';
+  el.innerHTML=`<div class="paint-head">
+      <span class="paint-t">Colours</span>
+      <span class="paint-h">changing your list, live</span>
+      <button class="paint-done" onclick="endPaint()">Done</button>
+    </div>
+    <div class="paint-body">
+      <div class="paint-lb">Accent</div>
+      <div class="acc-row" id="accentRow"></div>
+      <div class="paint-lb">Card size</div>
+      <div class="art-seg" id="densityRow"></div>
+      <div id="fromImgRow"></div>
+    </div>`;
+  document.body.appendChild(el);
+  try{renderAccentRow();renderDensityRow();renderFromImageRow();}catch(e){}
+  try{hydrateIcons(el);}catch(e){}
+  try{navigator.vibrate&&navigator.vibrate(12);}catch(e){}
+  toast('Tap a colour \u2014 your list changes as you go',2600);
+}
+function endPaint(){
+  if(!_painting)return;
+  _painting=false;
+  document.documentElement.classList.remove('painting');
+  const el=document.getElementById('paintDock'); if(el)el.remove();
+  // The sheet owns these rows when it is open; hand them back.
+  try{renderThemeGrid();}catch(e){}
+}
+function togglePaint(){_painting?endPaint():startPaint();}
+
 // ─── THE WAY BACK ───────────────────────────────────────────────────────────
 // A first-time visitor to this sheet reported being lost, which is what happens
 // when a screen offers nine ways to change something and none to undo them. One
 // button that puts every one of them back, so nothing here is a commitment.
 function resetTheme(){
-  ['accent_override','surface_tint','status_colors','ui_style',
-   'card_density','art_mode','glow_mode']
+  ['accent_override','surface_tint','status_colors',
+   'card_density','glow_mode']
     .forEach(k=>{try{localStorage.removeItem(k);}catch(e){}});
   try{applyTheme('default');}catch(e){}
-  [applyAccent,applyTint,applyStatusColors,applyUiStyle,
-   applyDensity,applyArtMode].forEach(f=>{try{f();}catch(e){}});
+  [applyAccent,applyTint,applyStatusColors,applyDensity].forEach(f=>{try{f();}catch(e){}});
   try{applyGlow();}catch(e){}
   try{render();}catch(e){}
   try{renderThemeGrid();}catch(e){}
   ['renderAccentRow',
-   'renderUiRow','renderDensityRow','renderArtRow']
+   'renderDensityRow']
     .forEach(n=>{try{window[n]&&window[n]();}catch(e){}});
-  themeMode('simple');
   toast('Back to default');
 }
 
@@ -5680,23 +5743,6 @@ function setTint(hex,redraw){
 // that actually carry the character: cards, sheets, bars, buttons, chips, the
 // nav. Change those and the whole thing changes; change the other 140 and nobody
 // can tell.
-const UI_KEY='ui_style';
-const UI_STYLES={soft:'Soft',sharp:'Sharp',round:'Round'};
-function uiStyle(){try{const v=localStorage.getItem(UI_KEY);return UI_STYLES[v]?v:'soft';}catch(e){return 'soft';}}
-function applyUiStyle(){try{document.documentElement.setAttribute('data-ui',uiStyle());}catch(e){}}
-function setUiStyle(v){
-  try{localStorage.setItem(UI_KEY,UI_STYLES[v]?v:'soft');}catch(e){}
-  applyUiStyle();renderUiRow();
-}
-function renderUiRow(){
-  const row=document.getElementById('uiRow'); if(!row)return;
-  const cur=uiStyle();
-  const SUB={soft:'Rounded, the default',sharp:'Crisp and editorial',round:'Very rounded'};
-  const R={soft:'14px',sharp:'3px',round:'22px'};
-  row.innerHTML=Object.keys(UI_STYLES).map(k=>`<button class="art-opt has-d${cur===k?' on':''}" onclick="setUiStyle('${k}')">
-    <i class="d-shape" style="border-radius:${R[k]}"></i><span class="art-lb">${UI_STYLES[k]}</span><span class="art-sub">${SUB[k]}</span></button>`).join('');
-}
-try{applyUiStyle();}catch(e){}
 
 // ─── HOW MUCH FITS ──────────────────────────────────────────────────────────
 // One person wants to see their whole library at a glance and another wants the
@@ -5947,26 +5993,9 @@ function deleteCustomTheme(id){
   if(curTheme===id)applyTheme('default');else renderThemeGrid();
   toast('Theme deleted');
 }
-function renderArtRowSafe(){try{renderArtRow();}catch(e){}}
-// Which of the two screens the theme sheet is showing. It resets to simple every
-// time the sheet opens: someone who went deep once should not be met by the deep
-// end forever after, and the way back is a single obvious button rather than
-// scrolling past everything they did not want.
-let _themeMode='simple';
-function themeMode(m){
-  _themeMode=(m==='full')?'full':'simple';
-  const a=document.getElementById('themeSimple'), b=document.getElementById('themeFull');
-  if(a)a.style.display=_themeMode==='full'?'none':'';
-  if(b)b.style.display=_themeMode==='full'?'':'none';
-  try{const sh=document.getElementById('themeSheet');if(sh)sh.scrollTop=0;}catch(e){}
-  try{hydrateIcons(document.getElementById('themeSheet'));}catch(e){}
-}
 function renderThemeGrid(){
-  try{renderArtRow();}catch(e){}
   try{renderAccentRow();}catch(e){}
   try{renderDensityRow();}catch(e){}
-  try{renderUiRow();}catch(e){}
-  try{renderEditionRow();}catch(e){}
   try{renderFromImageRow();}catch(e){}
   const bs=document.getElementById('brightSlider');if(bs)bs.value=bgBright();
   const g=document.getElementById('themeGrid');if(!g)return;
@@ -6188,24 +6217,7 @@ const GLOW_SWATCHES=['#8b5cff','#3b9eff','#1fc2b0','#33c65a','#f5a623','#ff5f8f'
 // Artwork treatment. The app used to boost saturation and shade most of a
 // picture by default, which is a house style imposed on somebody else's drawing —
 // so Natural is the default and the old look is a choice, not the condition.
-const ART_KEY='art_mode';
 // Applied at parse time too: waiting for a render would flash the other treatment.
-function artMode(){try{return localStorage.getItem(ART_KEY)==='cinematic'?'cinematic':'natural';}catch(e){return 'natural';}}
-function applyArtMode(){try{document.documentElement.setAttribute('data-art',artMode());}catch(e){}}
-function setArtMode(m){
-  try{localStorage.setItem(ART_KEY,m==='cinematic'?'cinematic':'natural');}catch(e){}
-  applyArtMode();renderArtRow();
-  toast(m==='cinematic'?'Cinematic artwork':'Artwork shown as-is');
-}
-try{applyArtMode();}catch(e){}
-function renderArtRow(){
-  const row=document.getElementById('artRow'); if(!row)return;
-  const m=artMode();
-  row.innerHTML=[['natural','Natural','True colours'],['cinematic','Cinematic','Richer, shaded']]
-    .map(([id,lb,sub])=>`<button class="art-opt has-d${m===id?' on':''}" onclick="setArtMode('${id}')">
-      <i class="d-art ${id==='cinematic'?'d-art-c':''}"></i>
-      <span class="art-lb">${lb}</span><span class="art-sub">${sub}</span></button>`).join('');
-}
 let heroAmb='',_ambRAF=0;
 function onPageScroll(){
   if(_ambRAF)return;
@@ -7910,7 +7922,7 @@ function openSheet(id){
   document.getElementById('overlay').classList.add('on');
   document.getElementById(id).classList.add('on');
   try{sheetFocusGuard(id,true);}catch(e){}
-  if(id==='themeSheet'){try{themeMode('simple');}catch(e){}renderThemeGrid();try{renderArtRow();}catch(e){}}
+  if(id==='themeSheet')renderThemeGrid();
   if(id==='statsSheet')renderStatsSheet();
   if(id==='settingsSheet')renderSettings();
   if(id==='backupSheet')renderSyncUI();
@@ -15976,10 +15988,13 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-13.4',
-  title:'Theme fits on one screen',
-  push:'Fewer things, and the ones that are left are the ones you use.',
+  v:'2026-08-13.5',
+  title:'Change your colours while looking at your list',
+  push:'Hold the WatchList logo.',
   notes:[
+    'Colour is no longer picked inside a sheet that covers the thing it colours. Press and hold the WatchList logo and a small bar appears at the bottom \u2014 everything above it is your own list, at full size, changing as you touch a swatch. No preview, because nothing is standing in for anything.',
+    'Theme is back to being about looks: the seven themes, one button through to the colours, and a way back to default.',
+    'Gone with it: corners, artwork treatment, the second screen and the door between them.',
     'Theme is a look, an accent, a picture to take colours from, and one optional door \u2014 that is the whole screen now.',
     'The three list layouts and the four editions are gone. Titles are artwork in a grid; card size still decides how many fit across.',
     'Gone: surface tint, status colours, the background glow modes, and the preview panel. The glow still follows what you browse, the badges still take the theme\u2019s colours, and the app behind the sheet was always the real preview.',
@@ -16337,14 +16352,16 @@ try{setTimeout(fetchAdminSources,1600);window.addEventListener('focus',()=>{try{
 // Admin nav button appears only where your token is stored (your device only).
 try{injectAdminNav();}catch{}
 try{bindAdminKey();}catch{}
-// Unlock admin the first time: PRESS AND HOLD the WatchList logo ~0.7s. A hold is
-// far more reliable on touch than rapid taps (which mobile treats as zoom).
+// Hold the logo to paint. Admin used to live on this gesture, which meant the
+// most discoverable press in the app did nothing at all for everybody except me;
+// it moves to a double tap on a device that already holds the token, and the
+// hold becomes the way anyone changes their colours while looking at their list.
 try{(function(){
   const t=document.querySelector('.hdr-title'); if(!t)return;
   let timer=null,sx=0,sy=0;
   const pt=e=>e.touches&&e.touches[0]?e.touches[0]:e;
   const start=e=>{const p=pt(e);sx=p.clientX;sy=p.clientY;clearTimeout(timer);
-    timer=setTimeout(()=>{if(!isAdminDevice())return;try{navigator.vibrate&&navigator.vibrate(15);}catch{}openAdmin();},600);};
+    timer=setTimeout(()=>{try{startPaint();}catch(e){}},520);};
   // Only cancel on a REAL drag (>12px) — a still finger always jitters a little,
   // and cancelling on any move was killing the hold instantly.
   const move=e=>{const p=pt(e);if(Math.abs(p.clientX-sx)>12||Math.abs(p.clientY-sy)>12)clearTimeout(timer);};

@@ -183,6 +183,20 @@ try {
   });
 }
 
+// The type ramp and the radius scale, enforced. Fifteen text sizes crammed
+// between 8.5px and 15px is what "cleaner" actually meant: sizes half a pixel
+// apart cannot read as hierarchy, they read as misalignment. Six steps do the
+// same job, and this fails the moment a seventh appears.
+{
+  const src2 = readFileSync('index.html', 'utf8');
+  const SIZES = new Set(['10', '12', '13', '15', '17', '21', '24', '26', '27', '30', '34', '40', '46', '52', '120']);
+  const RADII = new Set(['2', '6', '10', '14', '18', '26', '99']);
+  const offSize = [...new Set([...src2.matchAll(/font-size:([0-9.]+)px/g)].map(m => m[1]).filter(v => !SIZES.has(v)))];
+  const offRad = [...new Set([...src2.matchAll(/border-radius:([0-9]+)px/g)].map(m => m[1]).filter(v => !RADII.has(v)))];
+  results.push({ n: 'text sizes stay on the ramp', ok: offSize.length === 0, d: offSize.length ? 'off-ramp: ' + offSize.join(', ') : SIZES.size + ' steps' });
+  results.push({ n: 'corners stay on the scale', ok: offRad.length === 0, d: offRad.length ? 'off-scale: ' + offRad.join(', ') : RADII.size + ' steps' });
+}
+
 let bad = 0;
 for (const r of results) {
   if (!r.ok) bad++;

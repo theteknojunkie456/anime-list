@@ -410,3 +410,24 @@ fails on any interpolation into a single-quoted argument that does not go
 through an escaper, with an explicit allowlist for values that cannot contain a
 quote by construction — ids the app mints, friend codes, a hostname, hexes from
 a hardcoded array.
+
+## The ramp and the scale
+
+Asked to make the whole UI cleaner without changing its look, the useful move was
+to measure what was inconsistent rather than restyle what was ugly.
+`scripts/audit-visual.mjs` renders the app and tallies every computed size,
+weight, radius, border and shadow on screen, with the class that owns each.
+
+The shapes were already disciplined — one border colour doing 49 of 60 borders,
+four shadows, radii clustered on 14px. The type was not: **fifteen** distinct
+sizes, fourteen of them between 8.5px and 15px. 11 / 11.5 / 12 / 12.5 cannot read
+as four levels of hierarchy; they read as things that failed to line up. That is
+what "eyesore" meant, and no amount of restyling individual components fixes it.
+
+Six steps now — **10 · 12 · 13 · 15 · 17 · 21** — plus display sizes above. Every
+value moved at most 1px, so nothing reflowed. Weights went 6 → 3 (600 · 700 ·
+800; the wordmark keeps 400 because that contrast is the logo). Corners went to
+**2 · 6 · 10 · 14 · 18 · 26 · 99**, snapping strays like 999px, 8px, 4px and a
+22px that sat between 18 and 26 making three large radii read as one wrong one.
+
+`smoke.mjs` fails on any size or radius off the scale, so this holds.

@@ -5578,6 +5578,15 @@ function applyBright(){
   try{const veil=document.getElementById('brightVeil');if(veil)veil.style.opacity=v.toFixed(3);}catch{}
   try{document.body.classList.toggle('bright',bgBright()>=22);}catch{}   // deepen text shadows when lifted
 }
+// Choosing a theme from the grid, as opposed to restoring one at boot. A theme
+// is a ground AND an accent, so picking one drops the accent and tint you had
+// picked over the last theme — otherwise Sasuke is red, and there is no way to
+// tell from looking at the screen why.
+function pickTheme(id){
+  try{localStorage.removeItem(ACCENT_KEY);localStorage.removeItem(TINT_KEY);}catch(e){}
+  applyTheme(id);
+  try{render();}catch(e){}
+}
 function applyTheme(id,persist=true){
   const t=allThemes().find(x=>x.id===id)||THEMES[0];
   curTheme=t.id;
@@ -6208,7 +6217,7 @@ function renderThemeGrid(){
     // otherwise a custom tile previews bright while the real theme is dark.
     const sbg=t.custom?(t.darken===false?t.bg:darkenBg(t.bg)):t.bg;
     return `
-    <button class="topt${curTheme===t.id?' on':''}" onclick="applyTheme('${t.id}')">
+    <button class="topt${curTheme===t.id?' on':''}" onclick="pickTheme('${t.id}')">
       <div class="tswatch" style="background:linear-gradient(135deg,${sbg} 0%,${sbg}dd 100%)">
         <span>${t.emoji}</span>
         <div class="taccent-bar" style="background:${t.accent}"></div>
@@ -6393,7 +6402,14 @@ function applyAmbient(){
   const m=glowMode();let col;
   if(m==='off')col='transparent';
   else if(m==='theme')col=(getComputedStyle(document.documentElement).getPropertyValue('--a')||'').trim()||'transparent';
-  else if(m==='adaptive')col=conditionAccent(_ambBase)||'transparent';
+  else if(m==='adaptive'){
+    const sampled=conditionAccent(_ambBase);
+    const acc=(getComputedStyle(document.documentElement).getPropertyValue('--a')||'').trim();
+    // Half-way to the accent: still moves with the artwork, never argues with
+    // the theme. A brown wash under a purple app reads as a bug, not as ambience.
+    const ok=/^#[0-9a-fA-F]{6}$/.test(acc);
+    col=sampled?(ok?mix(sampled,acc,0.5):sampled):(ok?acc:'transparent');
+  }
   else col=m;   // a fixed hex color
   try{document.documentElement.style.setProperty('--amb',col||'transparent');}catch{}
 }
@@ -16217,10 +16233,12 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-12.14',
-  title:'One colour, honest hours, and no sideways scroll',
-  push:'The app stopped borrowing its colours from the artwork.',
+  v:'2026-08-13.1',
+  title:'Picking a theme picks the whole theme',
+  push:'Sasuke is purple again.',
   notes:[
+    'Choosing a theme now actually changes the colour. A custom accent used to outlive every theme you picked afterwards, so if you had ever set one \u2014 or taken colours from a picture \u2014 tapping Sasuke left the app red and there was no way to tell why from looking at it.',
+    'The background glow stays in the theme\u2019s family. It still shifts with whatever you are browsing, but half-way towards your accent, so a warm poster can no longer put a brown wash under a purple app.',
     'The app no longer takes its accent from whatever you are looking at. Key art is mostly brown and ochre, so buttons, progress bars and labels were picking that up \u2014 every screen a slightly different, slightly muddier colour. One accent now, the one you chose.',
     'Hours watched are real. They were read off a note most titles do not have, so a list with hundreds of episodes behind it could report almost nothing. They are counted from episodes watched \u00d7 the actual runtime now, anything you dropped halfway included, with reading counted in chapters.',
     'The page no longer scrolls sideways on a small phone. The bottom bar could not shrink below its five labels, so on a 320\u2013390px screen it pushed the whole app off the edge.',

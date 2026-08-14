@@ -59,6 +59,22 @@
   --bn:rgba(255,255,255,0.09);--bn2:rgba(255,255,255,0.055);
   --elev1:0 1px 2px rgba(0,0,0,0.28);--elev2:0 6px 20px -8px rgba(0,0,0,0.55);
 }
+/* ── RETRO ──────────────────────────────────────────────────────────────────
+   Anime on tape: hot magenta and cyan on a deep violet black, the palette of a
+   VHS sleeve and a city-pop record. Vibrant on purpose, where every other theme
+   in here is restrained. */
+[data-theme=retro]{
+  --aFg:#180418;
+  --bg:#150a24;--bg2:#1d0f30;--bg3:#26143d;--bg4:#331c50;--bg5:#40245f;
+  --b1:rgba(255,47,142,0.16);--b2:rgba(255,47,142,0.30);--b3:rgba(255,47,142,0.52);
+  --t1:#fdf2ff;--t2:#d6b8ea;--t3:#a98ec4;
+  --a:#ff2f8e;--a2:#ff7ec0;--ag:rgba(255,47,142,0.16);--glow:rgba(255,47,142,0.34);
+  --fin:#2ff0c8;--finbg:rgba(47,240,200,0.14);
+  --wat:#ffd23f;--watbg:rgba(255,210,63,0.14);
+  --pln:#3fd0ff;--plnbg:rgba(63,208,255,0.14);
+  --drp:#b39ddb;--drpbg:rgba(179,157,219,0.16);
+  --topgrad:linear-gradient(180deg,#2b0f3f 0%,#150a24 100%);
+}
 [data-theme=naruto]{--aFg:#140b06;--bg:#08090e;--bg2:#0e0f18;--bg3:#151720;--bg4:#1c1f2a;--bg5:#232734;--b1:rgba(255,140,0,0.06);--b2:rgba(255,140,0,0.12);--b3:rgba(255,140,0,0.22);--t1:#fff6e8;--t2:#c3b697;--t3:#a08c52;--a:#f57800;--a2:#ffaa33;--ag:rgba(245,120,0,0.13);--glow:rgba(245,120,0,0.22);--fin:#5ed47a;--finbg:rgba(94,212,122,0.11);--wat:#ffcc00;--watbg:rgba(255,204,0,0.11);--pln:#4a9eff;--plnbg:rgba(74,158,255,0.11);--topgrad:linear-gradient(180deg,#1c0e00 0%,#08090e 100%);}
 [data-theme=sasuke]{--aFg:#ffffff;--bg:#06060d;--bg2:#0b0b18;--bg3:#101022;--bg4:#16162c;--bg5:#1c1c36;--b1:rgba(130,90,255,0.06);--b2:rgba(130,90,255,0.13);--b3:rgba(130,90,255,0.24);--t1:#e6e2f8;--t2:#ada9c9;--t3:#8581aa;--a:#7730e8;--a2:#a07af8;--ag:rgba(119,48,232,0.15);--glow:rgba(119,48,232,0.28);--fin:#4ecba8;--finbg:rgba(78,203,168,0.11);--wat:#c084fc;--watbg:rgba(192,132,252,0.11);--pln:#818cf8;--plnbg:rgba(129,140,248,0.11);--topgrad:linear-gradient(180deg,#0a0420 0%,#06060d 100%);}
 [data-theme=luffy]{--aFg:#ffffff;--bg:#060c16;--bg2:#0b1420;--bg3:#101c2c;--bg4:#152438;--bg5:#1a2c44;--b1:rgba(210,50,50,0.06);--b2:rgba(210,50,50,0.13);--b3:rgba(210,50,50,0.24);--t1:#eeeae4;--t2:#b4bec8;--t3:#7996ac;--a:#d03838;--a2:#ff6060;--ag:rgba(208,56,56,0.13);--glow:rgba(208,56,56,0.22);--fin:#4ecb82;--finbg:rgba(78,203,130,0.11);--wat:#f5c842;--watbg:rgba(245,200,66,0.11);--pln:#3b9eff;--plnbg:rgba(59,158,255,0.11);--topgrad:linear-gradient(180deg,#140608 0%,#060c16 100%);}
@@ -188,6 +204,61 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
      is nothing to dismiss, so it goes. */
   :root.two-pane .overlay{opacity:0!important;pointer-events:none!important;}
 }
+
+/* ── RETRO, THE SHAPE OF IT ─────────────────────────────────────────────────
+   The palette above only makes it a different colour. This makes it a different
+   thing: corners squared off, soft shadows replaced with a hard offset block the
+   way print and 8-bit did it, artwork under scanlines, numbers set in the mono
+   the era actually used. Everything here hangs off one attribute, so it is still
+   one look you turn on rather than a set of choices to make. */
+[data-theme=retro] .pcard-img,[data-theme=retro] .pcard-ph,
+[data-theme=retro] .rz-card,[data-theme=retro] .billboard,
+[data-theme=retro] .resume-card,[data-theme=retro] .resume-art,[data-theme=retro] .resume-ph{
+  border-radius:2px;
+}
+/* A hard shadow, offset, no blur. The edge stays an edge. */
+[data-theme=retro] .pcard-img,[data-theme=retro] .pcard-ph{
+  box-shadow:4px 4px 0 0 var(--a);
+}
+[data-theme=retro] .rz-card,[data-theme=retro] .billboard{
+  box-shadow:6px 6px 0 0 color-mix(in srgb,var(--a) 70%,transparent);
+}
+[data-theme=retro] .pcard:active{transform:translate(2px,2px);}
+[data-theme=retro] .pcard:active .pcard-img,[data-theme=retro] .pcard:active .pcard-ph{
+  box-shadow:2px 2px 0 0 var(--a);
+}
+/* Scanlines over the artwork, not over the text. */
+[data-theme=retro] .pcard-wrap::after,[data-theme=retro] .rz-card::before{
+  content:'';position:absolute;inset:0;pointer-events:none;z-index:2;border-radius:2px;
+  background:repeating-linear-gradient(180deg,rgba(0,0,0,.22) 0 1px,transparent 1px 3px);
+  mix-blend-mode:multiply;
+}
+/* Chrome: square, outlined, no gradients. */
+[data-theme=retro] .search-in,[data-theme=retro] .filt-row,[data-theme=retro] .sort-btn,
+[data-theme=retro] .hbtn,[data-theme=retro] .qp-chip,[data-theme=retro] .fchip,
+[data-theme=retro] .art-opt,[data-theme=retro] .stc,[data-theme=retro] .paint-dock,
+[data-theme=retro] .sheet,[data-theme=retro] .hero-cta,[data-theme=retro] .fixbar.on{
+  border-radius:2px;
+}
+[data-theme=retro] .hbtn,[data-theme=retro] .search-in{border-color:var(--b2);}
+[data-theme=retro] .fchip.on{border-radius:2px;box-shadow:2px 2px 0 0 var(--a);}
+[data-theme=retro] .nav{border-radius:2px 2px 0 0;border-top:2px solid var(--a);}
+[data-theme=retro] .nbtn.on{border-radius:2px;}
+[data-theme=retro] .nbtn.add{border-radius:2px;box-shadow:3px 3px 0 0 color-mix(in srgb,var(--a) 55%,#000);}
+/* Numbers are the era's own: monospaced, so counts and episodes line up like a
+   readout rather than like prose. */
+[data-theme=retro] .row-count,[data-theme=retro] .fn,[data-theme=retro] .rz-at,
+[data-theme=retro] .rz-ep,[data-theme=retro] .hero-prog span,[data-theme=retro] .sv-heronum .v{
+  font-family:ui-monospace,'SFMono-Regular',Menlo,monospace;letter-spacing:-.02em;
+}
+/* Progress reads as a meter with steps in it, not a smooth fill. */
+[data-theme=retro] .pbar{border-radius:2px;background:rgba(0,0,0,.55);box-shadow:inset 0 0 0 1px var(--b2);}
+[data-theme=retro] .pfill{
+  border-radius:2px;
+  background:repeating-linear-gradient(90deg,var(--a) 0 6px,color-mix(in srgb,var(--a) 55%,#000) 6px 8px);
+}
+/* The status tag becomes a corner flag with a hard edge. */
+[data-theme=retro] .pcard-badge{border-radius:2px 0 2px 0;background:rgba(10,2,18,.9);}
 
 /* ── OPTION DIAGRAMS ──
    Each one is a drawing of what its button does, in the same accent the app is
@@ -5301,6 +5372,10 @@ const THEMES=[
   {id:'sanji',   name:'Sanji',   emoji:'🔥', bg:'#170d14', accent:'#f0c92e'},
   {id:'zoro',    name:'Zoro',    emoji:'⚔️', bg:'#0a140c', accent:'#26a040'},
   {id:'chopper', name:'Chopper', emoji:'🦌', bg:'#150f1c', accent:'#d84872'},
+  // Not a palette swap. RETRO restyles the shapes, the edges, the shadows and
+  // the artwork treatment too — see the [data-theme=retro] block in the
+  // stylesheet. It is one look you can turn on, not a new axis to choose along.
+  {id:'retro',   name:'Retro',   emoji:'📼', bg:'#150a24', accent:'#ff2f8e'},
 ];
 function customThemes(){try{const s=store();return JSON.parse((s&&s.getItem('custom_themes'))||'[]');}catch{return[];}}
 function setCustomThemes(l){try{const s=store();if(s)s.setItem('custom_themes',JSON.stringify(l));}catch{}}
@@ -16111,10 +16186,11 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-13.15',
-  title:'The artwork stopped living in boxes',
-  push:'A wall of covers, not a grid of frames.',
+  v:'2026-08-14.1',
+  title:'Retro',
+  push:'Anime on tape. Hold the logo and pick it.',
   notes:[
+    'A new look called Retro, and it is not a colour swap. Hot magenta and cyan on violet black, square corners, hard shadows offset behind every cover the way print did it, scanlines across the artwork, episode counts in a monospace readout, and a progress meter with steps in it. Hold the logo and pick it.',
     'Nearly fifty things on the screen wore the same thin outline, so a poster, a warning and a button all carried the same weight and the whole app read as a pile of boxes. An outline now means you can press it. Six things have one. Everything else is artwork sitting on the page, lifted by its own shadow.',
     'Section names lead the page instead of whispering above it, and the hairline that used to trail off to the right of each one is gone. The words were already doing that job.',
     'Every message in the app was rewritten. One string in seven was built the same way \u2014 a statement, a dash, then an explanation \u2014 which is the shape machine writing takes, and once you notice it you cannot stop noticing it. They are plain sentences now.',

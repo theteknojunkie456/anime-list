@@ -39,7 +39,9 @@ const suite=function(){
     ['sources',()=>window.openSheet('sourceSheet')],['paint',()=>window.startPaint()],
     ['detail',()=>window.openDetail(anime[0].id)],['add',()=>window.openSheet('addSheet')],
     ['friends',()=>window.openHub()],['schedule',()=>window.openSchedule()],['for you',()=>window.openForYou()]];
-  ['default','naruto','sasuke','luffy','sanji','zoro','chopper'].forEach(t=>{
+  const THEMES=['default','naruto','sasuke','luffy','sanji','zoro','chopper','retro'];
+  R.themes=THEMES.length;
+  THEMES.forEach(t=>{
     window.applyTheme(t);
     SCREENS.forEach(([nm,open])=>{
     try{open()}catch(e){}
@@ -58,7 +60,7 @@ const suite=function(){
     });
   });
   window.applyTheme('default');
-  const pre=document.createElement('pre');pre.id='C';pre.textContent=JSON.stringify([...new Set(R)]);document.body.appendChild(pre);
+  const pre=document.createElement('pre');pre.id='C';pre.textContent=JSON.stringify({rows:[...new Set(R)],themes:THEMES.length});document.body.appendChild(pre);
 };
 const i=src.lastIndexOf('</body>');
 src=src.slice(0,i)+`<script>addEventListener('load',()=>setTimeout(()=>{try{(${suite.toString()})()}catch(e){const p=document.createElement('pre');p.id='C';p.textContent=JSON.stringify(['CRASH '+e.message]);document.body.appendChild(p)}},800))<\/script>`+src.slice(i);
@@ -69,6 +71,8 @@ let dom='';try{dom=spawnSync(CHROME,['--headless=new','--disable-gpu','--no-sand
 const m=/<pre id="C">([\s\S]*?)<\/pre>/.exec(dom);
 if(!m){console.log('no result');process.exit(2)}
 const dec=s=>s.replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&').replace(/&quot;/g,'"');
-const rows=JSON.parse(dec(m[1]));
-console.log(rows.length?rows.join('\n'):'every text/background pair clears WCAG AA in all 7 themes');
+const parsed=JSON.parse(dec(m[1]));
+const rows=Array.isArray(parsed)?parsed:parsed.rows;
+const nThemes=Array.isArray(parsed)?'?':parsed.themes;
+console.log(rows.length?rows.join('\n'):`every text/background pair clears WCAG AA in all ${nThemes} themes`);
 console.log('\n'+rows.length+' failing pair(s)');

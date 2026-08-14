@@ -262,7 +262,7 @@ function suite() {
 
   // ── every appearance the user can choose ──
   if (!window.__QUICK) run('appearance matrix', () => {
-    const themes = ['default', 'naruto', 'sasuke', 'luffy', 'sanji', 'zoro', 'chopper'];
+    const themes = ['default', 'naruto', 'sasuke', 'luffy', 'sanji', 'zoro', 'chopper', 'retro'];
     const dens = ['compact', 'comfy', 'large'];
     themes.forEach(t => { window.applyTheme(t); scanDOM('theme ' + t); });
     window.applyTheme('default');

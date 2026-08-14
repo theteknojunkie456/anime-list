@@ -486,7 +486,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 .paint-dock .art-opt .d-dense{height:22px;margin-bottom:6px;}
 .paint-dock .art-sub{display:none;}
 /* The list keeps scrolling under the dock, so leave it room. */
-:root.painting #pageEl{padding-bottom:300px;}
+:root.painting #pageEl{padding-bottom:58vh;}
 :root.painting .nav{display:none;}
 
 .th-more{display:flex;align-items:center;gap:10px;width:100%;margin-top:18px;padding:15px 16px;border-radius:18px;
@@ -611,7 +611,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
    A short ramp here reads as a bright stripe; keep it generous. */
 .ambient::after{content:'';position:absolute;inset:0;pointer-events:none;opacity:.022;
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");}
-.ambient{position:fixed;inset:0;z-index:-2;pointer-events:none;background:linear-gradient(to bottom,rgba(0,0,0,1.000) 0px,rgba(0,0,0,0.670) 43px,rgba(0,0,0,0.410) 87px,rgba(0,0,0,0.218) 130px,rgba(0,0,0,0.089) 173px,rgba(0,0,0,0.019) 217px,rgba(0,0,0,0.000) 260px),linear-gradient(to top,rgba(0,0,0,1.000) 0px,rgba(0,0,0,0.670) 43px,rgba(0,0,0,0.410) 87px,rgba(0,0,0,0.218) 130px,rgba(0,0,0,0.089) 173px,rgba(0,0,0,0.019) 217px,rgba(0,0,0,0.000) 260px),radial-gradient(115% 52% at 50% 0%,color-mix(in srgb,var(--amb) 20%,transparent) 0%,color-mix(in srgb,var(--amb) 6%,transparent) 44%,transparent 88%),radial-gradient(70% 40% at 86% 8%,color-mix(in srgb,var(--amb) 7%,transparent) 0%,transparent 88%),var(--topgrad);transition:--amb 1.1s ease;}
+.ambient{position:fixed;inset:0;z-index:-2;pointer-events:none;background:linear-gradient(to bottom,rgba(0,0,0,1.000) 0px,rgba(0,0,0,0.670) 43px,rgba(0,0,0,0.410) 87px,rgba(0,0,0,0.218) 130px,rgba(0,0,0,0.089) 173px,rgba(0,0,0,0.019) 217px,rgba(0,0,0,0.000) 260px),linear-gradient(to top,rgba(0,0,0,1.000) 0px,rgba(0,0,0,0.670) 43px,rgba(0,0,0,0.410) 87px,rgba(0,0,0,0.218) 130px,rgba(0,0,0,0.089) 173px,rgba(0,0,0,0.019) 217px,rgba(0,0,0,0.000) 260px),radial-gradient(120% 60% at 50% 0%,rgba(124,92,255,.10) 0%,rgba(124,92,255,.04) 45%,transparent 82%),radial-gradient(115% 52% at 50% 0%,color-mix(in srgb,var(--amb) 20%,transparent) 0%,color-mix(in srgb,var(--amb) 6%,transparent) 44%,transparent 88%),radial-gradient(70% 40% at 86% 8%,color-mix(in srgb,var(--amb) 7%,transparent) 0%,transparent 88%),var(--topgrad);transition:--amb 1.1s ease;}
 /* Background brightness veil — lifts the dark backdrop toward light; the top is
    tinted with the ambient accent so the "glow" brightens right along with it. The
    amount (--bgb, 0–0.62) comes from the slider under the theme picker. */
@@ -1118,7 +1118,7 @@ body.first-paint .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards
 .row-count{font-family:var(--fd);font-size:13px;font-weight:700;color:var(--t3);font-variant-numeric:tabular-nums;letter-spacing:0;align-self:center;}
 
 .row-scroll{display:flex;gap:10px;overflow-x:auto;padding:2px 18px 6px;scroll-padding:18px;}
-.pcard{flex:0 0 104px;cursor:pointer;transition:transform .18s cubic-bezier(.32,.72,.28,1);}
+.pcard{flex:0 0 var(--card-w,104px);cursor:pointer;transition:transform .18s cubic-bezier(.32,.72,.28,1);}
 .pcard:active{transform:scale(0.94);}
 /* Artwork is the one thing in here with real colour, so let it throw a little of
    its own light when you reach for it. Pointer devices only — there is no hover
@@ -1131,7 +1131,8 @@ body.first-paint .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards
   }
 }
 .pcard-img{
-  width:104px;height:148px;border-radius:14px;object-fit:cover;display:block;
+  /* 1:1.42, the poster ratio the covers are cropped to. */
+  width:var(--card-w,104px);height:calc(var(--card-w,104px) * 1.42);border-radius:14px;object-fit:cover;display:block;
   background:var(--bg4);box-shadow:0 10px 26px -10px rgba(0,0,0,.75);
   transition:box-shadow .18s,border-color .18s;
 }
@@ -1146,7 +1147,7 @@ body.first-paint .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards
   font-variant-numeric:tabular-nums;
 }
 .pcard-ph{
-  width:104px;height:148px;border-radius:14px;background:linear-gradient(160deg,var(--bg4),var(--bg3));
+  width:var(--card-w,104px);height:calc(var(--card-w,104px) * 1.42);border-radius:14px;background:linear-gradient(160deg,var(--bg4),var(--bg3));
   display:flex;align-items:center;justify-content:center;
   font-size:34px;font-weight:800;color:var(--t3);letter-spacing:-1px;
 }
@@ -1163,6 +1164,18 @@ body.first-paint .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards
 .pcard-sub{font-size:12px;font-weight:600;color:var(--t3);margin-top:4px;font-variant-numeric:tabular-nums;}
 .pcard-sub{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .pcard-fav{position:absolute;top:5px;right:7px;font-size:13px;text-shadow:0 1px 6px rgba(0,0,0,0.6);}
+/* Small and square, sitting in the corner of the artwork. It is a second target
+   on a card whose whole face is already a target, so it stays quiet until the
+   card is hovered — and on a touch screen, where there is no hover, it is simply
+   always there. */
+.pcard-rec{position:absolute;right:5px;bottom:5px;z-index:4;width:30px;height:30px;
+  display:flex;align-items:center;justify-content:center;border-radius:6px;
+  background:rgba(8,8,11,.82);border:1px solid rgba(255,255,255,.16);color:#fff;
+  opacity:0;transform:translateY(3px);transition:opacity .14s ease,transform .14s ease,background-color .14s;}
+.pcard-rec .ico{width:14px;height:14px;}
+.pcard:hover .pcard-rec,.pcard-rec:focus-visible{opacity:1;transform:none;}
+.pcard-rec:hover{background:var(--a);border-color:transparent;color:var(--aFg);}
+@media(hover:none){.pcard-rec{opacity:1;transform:none;}}
 .pcard-seas{position:absolute;bottom:7px;right:7px;display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:800;padding:3px 7px 3px 6px;border-radius:99px;background:rgba(10,10,14,0.82);color:#fff;box-shadow:0 2px 8px rgba(0,0,0,0.4);}
 .pcard-seas .ico{width:11px;height:11px;}
 .b-watching{color:#ffc766;}
@@ -6212,12 +6225,19 @@ function setTint(hex,redraw){
 // a diagram tells you the choice. For anything spatial — where the bar sits, how
 // many fit across, how round a corner is — the drawing IS the explanation.
 const DENSITY_KEY='card_density';
-const DENSITIES={compact:{min:104,label:'Compact',sub:'More per row'},
-                 comfy:{min:150,label:'Comfortable',sub:'The default'},
-                 large:{min:200,label:'Large',sub:'Bigger artwork'}};
+// `min` drives the desktop grid; `w` drives the phone's rows, which are a flex
+// strip of fixed-width cards rather than a grid.
+const DENSITIES={compact:{min:104,w:84,label:'Compact',sub:'More per row'},
+                 comfy:{min:150,w:104,label:'Comfortable',sub:'The default'},
+                 large:{min:200,w:132,label:'Large',sub:'Bigger artwork'}};
 function density(){try{const v=localStorage.getItem(DENSITY_KEY);return DENSITIES[v]?v:'comfy';}catch(e){return 'comfy';}}
 function applyDensity(){
-  try{document.documentElement.style.setProperty('--card-min',DENSITIES[density()].min+'px');}catch(e){}
+  try{
+    const d=DENSITIES[density()]||DENSITIES.comfy;
+    const st=document.documentElement.style;
+    st.setProperty('--card-min',d.min+'px');
+    st.setProperty('--card-w',d.w+'px');
+  }catch(e){}
 }
 function setDensity(d){
   try{localStorage.setItem(DENSITY_KEY,DENSITIES[d]?d:'comfy');}catch(e){}
@@ -7223,6 +7243,7 @@ function posterCard(a,nSeas){
         return n>=1?`<span class="pcard-new">${n} new</span>`:'';
       })()}
       ${a.fav?'<span class="pcard-fav">'+icon('heart','fill')+'</span>':''}
+      <button class="pcard-rec" onclick="recThis('${a.id}',event)" aria-label="Recommend ${escH(a.title)} to a friend" title="Recommend to a friend">${icon('send')}</button>
       ${seas}
     </div>
     ${bar}
@@ -13797,7 +13818,13 @@ function sheetFocusGuard(id,on){
   if(on){
     if(!sh||_shInert.length)return;
     _shId=id;
-    sh.setAttribute('role','dialog');sh.setAttribute('aria-modal','true');
+    // On a wide screen the detail sheet is a PANEL BESIDE the list, not a
+    // takeover: the CSS already suppresses its backdrop so you can keep clicking
+    // titles. Marking the page inert anyway made that promise false — the list
+    // was visible, unblocked, and completely dead until you pressed Back.
+    const sidePanel=(id==='detailSheet'&&twoPaneOK());
+    sh.setAttribute('role',sidePanel?'complementary':'dialog');
+    if(sidePanel)sh.removeAttribute('aria-modal');else sh.setAttribute('aria-modal','true');
     const t=sh.querySelector('.sheet-title');
     if(t&&!sh.getAttribute('aria-label'))sh.setAttribute('aria-label',(t.textContent||'').trim()||'Dialog');
     _shReturn=document.activeElement;
@@ -13805,11 +13832,11 @@ function sheetFocusGuard(id,on){
     // at body level is another overlay (the player, the wheel, the tutorial, the
     // lock screens), and some of those open on top of a sheet without closing it
     // first. Inerting those would leave a live view that can't be touched.
-    _shInert=[document.getElementById('app'),document.querySelector('.nav')].filter(el=>el&&!el.hasAttribute('inert'));
+    _shInert=sidePanel?[]:[document.getElementById('app'),document.querySelector('.nav')].filter(el=>el&&!el.hasAttribute('inert'));
     _shInert.forEach(el=>el.setAttribute('inert',''));
     // Focus the one control every sheet has. A sheet that focuses something of
     // its own does it after this runs, so it still wins.
-    const first=sh.querySelector('.sheet-cancel'); if(first)try{first.focus();}catch(e){}
+    if(!sidePanel){const first=sh.querySelector('.sheet-cancel'); if(first)try{first.focus();}catch(e){}}
   }else{
     if(!_shInert.length)return;
     _shInert.forEach(el=>el.removeAttribute('inert'));_shInert=[];
@@ -14120,6 +14147,15 @@ async function doAddFriend(){
   renderFriends();toast('Request sent. They have to accept it');
 }
 let recPickShows=new Set(),recToFriends=new Set(),recItemNotes={},recSel=null;
+// Straight from the card: the show is already chosen, so this opens on the step
+// that still needs you — the note and who it goes to. stopPropagation, or the
+// card underneath opens the title at the same time.
+function recThis(id,ev){
+  try{ev.stopPropagation();ev.preventDefault();}catch(e){}
+  const a=anime.find(x=>x.id===id); if(!a)return;
+  recPickShows=new Set([id]);recToFriends=new Set();recItemNotes={};
+  try{proceedRecommend();}catch(e){try{startRecommend();}catch(_){}}
+}
 function startRecommend(){recPickShows=new Set();recToFriends=new Set();recItemNotes={};renderRecPick();openSheet('recPickSheet');}
 // Who's picked shows up in the picker too, so a pre-chosen friend is never a surprise.
 function toggleRecPick(id){if(recPickShows.has(id))recPickShows.delete(id);else recPickShows.add(id);renderRecPick();}
@@ -16596,10 +16632,14 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-14.6',
-  title:'Retro reaches every screen',
-  push:'Stats, chat, your titles, parties. All of it.',
+  v:'2026-08-14.7',
+  title:'Card size works, the list stays live, and the dark has a colour',
+  push:'Four things that were quietly broken.',
   notes:[
+    'Card size actually changes the cards. It only ever fed a rule that lives in the desktop layout, so on a phone all three settings drew the same thing and the control looked broken.',
+    'On a desktop, opening a title no longer freezes your list. The panel slides in beside it and the list was left visible, unblocked and completely dead until you pressed Back.',
+    'The dark is a colour now. A faint violet sits under everything, so a black screen reads as deliberate rather than switched off.',
+    'The colour panel stopped covering the row behind it, and every card has a small button to recommend that show to a friend.',
     'Retro no longer stops at the home screen. Stats read as a console with lit bars and milled tiles, the chat runs in mono against a cyan rule for the app and a magenta one for you, a title\u2019s page gets the cut cover and a glowing Watch, and sheets rise with a notched top edge. A look that ends the moment you open something is a skin, and you find its edge immediately.',
     'Your settings reach your other devices. Only list edits used to send anything, so a theme, an accent, a saved look, a hidden source or your home-screen order stayed on the device you set it on unless some unrelated edit happened to push afterwards. Anything you change now travels, including settings that do not exist yet.',
     'Turning your phone sideways is worth doing again. The bars stacked exactly as they do upright and ate 234 of 390 pixels, leaving a sliver of one cover. Search and filters share a row now, the bar drops its labels, and the space goes back to your list.',

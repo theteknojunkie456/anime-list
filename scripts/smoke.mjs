@@ -213,6 +213,23 @@ try {
   });
 }
 
+// The sandbox is the only thing standing between a streaming page and the app
+// around it. A site can be given room to open tabs, per host, on purpose — but
+// allow-top-navigation is never on the table, because that one lets the page
+// replace WatchList entirely. If it ever appears in this file, that is a bug.
+{
+  // Strip comments first: both files talk ABOUT allow-top-navigation to explain
+  // why it is withheld, and matching prose would fail forever on the explanation.
+  const raw4 = readFileSync('index.html', 'utf8')
+    .replace(/<!--[\s\S]*?-->/g, '').replace(/^\s*\/\/.*$/gm, '');
+  const topNav = /allow-top-navigation/.test(raw4);
+  const frames = [...raw4.matchAll(/<iframe[^>]*>/g)].map(m => m[0])
+    .filter(f => /pvFrame|ytFrame/.test(f));
+  const unsandboxed = frames.filter(f => !/sandbox=/.test(f));
+  results.push({ n: 'player frames are sandboxed', ok: unsandboxed.length === 0 && !topNav,
+    d: topNav ? 'allow-top-navigation is present' : (unsandboxed.length ? unsandboxed.length + ' frame(s) with no sandbox' : 'sandboxed, no top-navigation') });
+}
+
 let bad = 0;
 for (const r of results) {
   if (!r.ok) bad++;

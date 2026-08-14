@@ -332,20 +332,36 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
   font-family:var(--fd);font-size:13px;font-weight:800;border:0;}
 /* Its own scroll, so a long dock on a short phone never traps the controls
    below the fold. */
-.paint-body{max-height:38vh;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+.paint-body{max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;}
 .stc-row{display:flex;flex-wrap:wrap;gap:8px;}
 .stc{position:relative;display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border-radius:14px;
   background:var(--bg3);border:1px solid var(--bn2);cursor:pointer;}
 .stc-sw{width:15px;height:15px;border-radius:6px;flex:none;box-shadow:0 0 0 1px rgba(0,0,0,.35) inset;}
 .stc-n{font-size:12px;font-weight:700;color:var(--t2);}
 .stc input{position:absolute;inset:0;opacity:0;cursor:pointer;}
+.glow-modes{display:flex;flex-wrap:wrap;gap:18px;}
+.glow-mode,.glow-col{background:none;border:none;padding:0;cursor:pointer;-webkit-tap-highlight-color:transparent;}
+.glow-mode{display:flex;flex-direction:column;align-items:center;gap:7px;}
+.glow-mode .glow-sw{width:44px;height:44px;}
+.glow-colors{display:flex;flex-wrap:wrap;gap:12px;margin-top:16px;}
+.glow-cpick{position:relative;overflow:hidden;}
+.glow-cpick input[type=color]{position:absolute;inset:0;width:100%;height:100%;opacity:0;border:none;padding:0;margin:0;cursor:pointer;}
+.glow-col{line-height:0;}
+.glow-col .glow-sw{width:32px;height:32px;}
+.glow-sw{display:block;border-radius:50%;border:2px solid var(--b3);box-shadow:inset 0 0 12px rgba(255,255,255,.14),0 2px 8px rgba(0,0,0,.42);transition:transform .14s,border-color .15s,box-shadow .15s;}
+.glow-mode:active .glow-sw,.glow-col:active .glow-sw{transform:scale(.9);}
+.glow-mode.on .glow-sw,.glow-col.on .glow-sw{border-color:var(--a2);transform:scale(1.06);box-shadow:0 0 0 3px var(--ag),0 3px 12px rgba(0,0,0,.45);}
+.glow-off{position:relative;background:var(--bg4);overflow:hidden;}
+.glow-off::after{content:'';position:absolute;top:50%;left:16%;right:16%;height:2px;background:var(--t3);transform:translateY(-1px) rotate(-45deg);}
+.glow-lb{font-size:12px;font-weight:700;color:var(--t2);letter-spacing:.2px;}
+.glow-mode.on .glow-lb{color:var(--a2);}
 .paint-save{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin-top:16px;
   padding:12px;border-radius:14px;background:var(--bg3);border:1px solid var(--b2);color:var(--t1);
   font-family:var(--fd);font-size:13px;font-weight:800;}
 .paint-save:hover{border-color:var(--b3);}
 .paint-save .ico{width:15px;height:15px;color:var(--a2);}
 .paint-lb em{font-style:normal;font-weight:600;letter-spacing:0;text-transform:none;color:var(--t3);margin-left:6px;}
-.paint-lb{font-family:var(--fd);font-size:13px;font-weight:700;color:var(--t2);margin:14px 0 8px;}
+.paint-lb{font-family:var(--fd);font-size:13px;font-weight:700;color:var(--t2);margin:18px 0 9px;}
 .paint-lb:first-child{margin-top:0;}
 /* In the dock the dropzone is a row, not a poster-sized target: every pixel it
    takes is a pixel of the list you came here to look at. */
@@ -361,6 +377,9 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 .paint-dock .topt .tswatch{height:42px;}
 .paint-dock .topt .tname{font-size:10px;}
 .paint-dock .th-reset{margin-top:8px;}
+.paint-dock .glow-modes{gap:14px;}
+.paint-dock .glow-mode .glow-sw{width:34px;height:34px;}
+.paint-dock .bright-row{margin-top:0;}
 .paint-dock .art-opt{padding:9px 10px;}
 .paint-dock .art-opt .d-dense{height:22px;margin-bottom:6px;}
 .paint-dock .art-sub{display:none;}
@@ -455,7 +474,16 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 .acc-none{width:auto;padding:0 13px;border-radius:99px;background:var(--bg3);border:1px solid var(--bn2);
   color:var(--t2);font-size:12px;font-weight:700;}
 .acc-none.on{border-color:var(--t1);color:var(--t1);}
-.acc-custom{display:inline-flex;align-items:center;justify-content:center;overflow:hidden;}
+.acc-custom{display:inline-flex;align-items:center;justify-content:center;overflow:hidden;position:relative;
+  background:conic-gradient(from 210deg,#ff5f8f,#f5a623,#33c65a,#3b9eff,#8b5cff,#ff5f8f);}
+/* A plus over the wheel: the wheel says "any colour", the plus says "yours". */
+.acc-custom::after{content:'';position:absolute;inset:0;margin:auto;width:13px;height:13px;
+  background:currentColor;color:#fff;
+  -webkit-mask:linear-gradient(#000 0 0) center/13px 3px no-repeat,linear-gradient(#000 0 0) center/3px 13px no-repeat;
+  mask:linear-gradient(#000 0 0) center/13px 3px no-repeat,linear-gradient(#000 0 0) center/3px 13px no-repeat;
+  filter:drop-shadow(0 1px 2px rgba(0,0,0,.6));pointer-events:none;}
+.acc-custom.on::after{display:none;}
+.acc-custom.on{background:var(--sw);}
 .acc-custom input{opacity:0;width:100%;height:100%;cursor:pointer;border:0;padding:0;}
 .art-seg{display:flex;gap:8px;}
 .art-seg.th-wrap{flex-wrap:wrap;}
@@ -498,6 +526,15 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
   box-shadow:0 3px 12px rgba(0,0,0,.45),inset 0 0 0 1px rgba(255,255,255,.7),inset 0 -3px 6px rgba(0,0,0,.12);}
 .bright-slider::-moz-range-thumb{width:30px;height:30px;border-radius:50%;border:none;background:rgba(255,255,255,.85);box-shadow:0 3px 12px rgba(0,0,0,.45);}
 .bright-row{display:flex;align-items:center;gap:12px;margin-top:16px;}
+/* A native range control is the one piece of chrome the browser draws in its own
+   colours, which is exactly as jarring as it sounds inside a themed app. */
+.bright-row input[type=range]{-webkit-appearance:none;appearance:none;flex:1;height:6px;border-radius:99px;
+  background:linear-gradient(90deg,var(--bg4),var(--a));outline:none;}
+.bright-row input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;
+  width:20px;height:20px;border-radius:99px;background:var(--t1);border:2px solid var(--a);
+  box-shadow:0 2px 6px rgba(0,0,0,.5);cursor:pointer;}
+.bright-row input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:99px;
+  background:var(--t1);border:2px solid var(--a);cursor:pointer;}
 .bright-ico{flex-shrink:0;color:var(--t2);display:flex;}.bright-ico .ico{width:18px;height:18px;}
 #app{height:100vh;height:100dvh;display:flex;flex-direction:column;background:transparent;}
 /* The scroll container starts right under the filter pills, so anything scrolling
@@ -3413,6 +3450,7 @@ body.recsel .pcard{position:relative;}
       <button class="pv-wrong-b" onclick="pvTrySpelling()" title="Try another spelling">Spelling</button>
       <button class="pv-wrong-b" onclick="pvSearchHere()" title="Search this site for the show">Search</button>
       <button class="pv-wrong-b prim" onclick="pvSetPrompt()" title="Set the right page">Set it</button>
+      <button class="pv-wrong-b" onclick="pvAllowMore()" title="This site refuses to run in a protected frame">Won't play</button>
       <button class="pv-wrong-x" onclick="document.getElementById('pvWrong').classList.remove('on')" aria-label="Dismiss"><i data-ic="x"></i></button>
     </div>
     <!-- Learn the site's own name for this show, from one working address. -->
@@ -5366,16 +5404,18 @@ function openNotifySheet(){openSheet('notifySheet');renderNotifyUI();}
 // ─── THEMES ────────────────────────────────────────────────────────────────
 const THEMES=[
   {id:'default', name:'Default', emoji:'🌑', bg:'#111114', accent:'#e03d55'},
+  // Second, not last. The row scrolls sideways, so an eighth tile is a tile
+  // nobody finds — and this is the one that looks least like the others.
+  // Not a palette swap either: RETRO restyles the corners, the shadows and the
+  // artwork too, in the [data-theme=retro] block in the stylesheet. One look you
+  // turn on, not a new axis to choose along.
+  {id:'retro',   name:'Retro',   emoji:'📼', bg:'#150a24', accent:'#ff2f8e'},
   {id:'naruto',  name:'Naruto',  emoji:'🍥', bg:'#0e0f18', accent:'#f57800'},
   {id:'sasuke',  name:'Sasuke',  emoji:'⚡', bg:'#0b0b18', accent:'#7730e8'},
   {id:'luffy',   name:'Luffy',   emoji:'🏴‍☠️',bg:'#0b1420', accent:'#d03838'},
   {id:'sanji',   name:'Sanji',   emoji:'🔥', bg:'#170d14', accent:'#f0c92e'},
   {id:'zoro',    name:'Zoro',    emoji:'⚔️', bg:'#0a140c', accent:'#26a040'},
   {id:'chopper', name:'Chopper', emoji:'🦌', bg:'#150f1c', accent:'#d84872'},
-  // Not a palette swap. RETRO restyles the shapes, the edges, the shadows and
-  // the artwork treatment too — see the [data-theme=retro] block in the
-  // stylesheet. It is one look you can turn on, not a new axis to choose along.
-  {id:'retro',   name:'Retro',   emoji:'📼', bg:'#150a24', accent:'#ff2f8e'},
 ];
 function customThemes(){try{const s=store();return JSON.parse((s&&s.getItem('custom_themes'))||'[]');}catch{return[];}}
 function setCustomThemes(l){try{const s=store();if(s)s.setItem('custom_themes',JSON.stringify(l));}catch{}}
@@ -5732,6 +5772,22 @@ function renderStatusColorRow(){
     </label>`;}).join('');
 }
 
+function renderGlowRow(){
+  const row=document.getElementById('glowRow');if(!row)return;
+  const m=glowMode();
+  const specials=[['adaptive','Adaptive','conic-gradient(from 210deg,#ff5f8f,#f5a623,#33c65a,#3b9eff,#8b5cff,#ff5f8f)'],['theme','Theme','var(--a)'],['off','Off','']];
+  const modes=specials.map(function(x){var id=x[0],lb=x[1],bg=x[2],off=(id==='off');
+    return '<button class="glow-mode'+(m===id?' on':'')+'" onclick="setGlow(\''+id+'\')" aria-label="'+lb+'">'
+      +'<span class="glow-sw'+(off?' glow-off':'')+'" style="background:'+(bg||'var(--bg4)')+'"></span>'
+      +'<span class="glow-lb">'+lb+'</span></button>';});
+  var isCustom=/^#[0-9a-fA-F]{3,8}$/.test(m);
+  var cur=isCustom?m:'#8b5cff';
+  var custom='<label class="glow-mode'+(isCustom?' on':'')+'" aria-label="Custom glow color">'
+    +'<span class="glow-sw glow-cpick" style="background:'+cur+'"><input type="color" value="'+cur+'" oninput="glowColorLive(this.value)"></span>'
+    +'<span class="glow-lb">Custom</span></label>';
+  row.innerHTML='<div class="glow-modes">'+modes[0]+modes[1]+custom+modes[2]+'</div>';
+}
+
 // ─── PAINT MODE ─────────────────────────────────────────────────────────────
 // Colour used to be chosen inside a sheet that covered the thing being coloured,
 // which is why every attempt to explain it needed a preview — a fake card
@@ -5764,6 +5820,13 @@ function startPaint(){
       <div class="acc-row" id="tintRow"></div>
       <div class="paint-lb">Statuses</div>
       <div class="stc-row" id="statusColorRow"></div>
+      <div class="paint-lb">Glow</div>
+      <div class="glow-modes" id="glowRow"></div>
+      <div class="paint-lb">Brightness</div>
+      <div class="bright-row">
+        <input type="range" id="brightSlider" min="0" max="100" step="1" value="0"
+               oninput="setBgBright(this.value)" aria-label="Background brightness">
+      </div>
       <div class="paint-lb">Card size</div>
       <div class="art-seg" id="densityRow"></div>
       <div id="fromImgRow"></div>
@@ -5774,7 +5837,8 @@ function startPaint(){
     </div>`;
   document.body.appendChild(el);
   try{renderThemeGrid();}catch(e){}
-  try{renderTintRow();renderStatusColorRow();}catch(e){}
+  try{renderTintRow();renderStatusColorRow();renderGlowRow();}catch(e){}
+  try{const _b=el.querySelector('#brightSlider');if(_b)_b.value=bgBright();}catch(e){}
   try{hydrateIcons(el);}catch(e){}
   try{el.querySelector('.paint-body').scrollTop=0;}catch(e){}
   try{navigator.vibrate&&navigator.vibrate(12);}catch(e){}
@@ -7649,7 +7713,7 @@ function playYouTube(videoId,forId,ep){
   try{if(forId)savePvSession(forId,ep||0,'yt:'+videoId);}catch(e){}
   const ov=document.createElement('div');ov.id='ytOverlay';ov.className='yt-overlay';
   ov.onclick=function(e){if(e.target===ov)closeYouTube();};
-  ov.innerHTML='<div class="yt-box"><div class="yt-bar"><span class="yt-lbl">'+icon('play')+' Playing on YouTube</span><button class="yt-x" onclick="closeYouTube()" aria-label="Close">'+icon('x')+'</button></div><div class="yt-frame"><div class="yt-wait" id="ytWait">Loading trailer\u2026</div><iframe id="ytFrame" src="https://www.youtube.com/embed/'+encodeURIComponent(videoId)+'?autoplay=1&rel=0&modestbranding=1&playsinline=1" title="YouTube player" referrerpolicy="strict-origin-when-cross-origin" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe></div></div>';
+  ov.innerHTML='<div class="yt-box"><div class="yt-bar"><span class="yt-lbl">'+icon('play')+' Playing on YouTube</span><button class="yt-x" onclick="closeYouTube()" aria-label="Close">'+icon('x')+'</button></div><div class="yt-frame"><div class="yt-wait" id="ytWait">Loading trailer\u2026</div><iframe id="ytFrame" src="https://www.youtube.com/embed/'+encodeURIComponent(videoId)+'?autoplay=1&rel=0&modestbranding=1&playsinline=1" title="YouTube player" sandbox="allow-scripts allow-same-origin allow-presentation" referrerpolicy="strict-origin-when-cross-origin" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe></div></div>';
   document.body.appendChild(ov);document.body.classList.add('yt-open');
   // Plenty of official anime trailers have embedding switched off by the channel
   // that owns them. The iframe still "loads" — it loads YouTube's refusal — so
@@ -9117,7 +9181,7 @@ function watchParty(title,ep,aniId){
   // Search recovery should use their own copy of the show when they have one, so
   // a corrected name is used here too.
   const own=aniId?anime.find(x=>+x.aniId===+aniId):null;
-  const ext=document.getElementById('pvExt');ext.onclick=()=>{const u=findUrl(own||{title});if(u&&u!=='about:blank')document.getElementById('pvFrame').src=u;};
+  const ext=document.getElementById('pvExt');ext.onclick=()=>{const u=findUrl(own||{title});if(u&&u!=='about:blank'){const _f=document.getElementById('pvFrame');applyFrameSandbox(_f,u);_f.src=u;}};
   const purl=partyStreamURL(title,ep,aniId);
   // srcdoc, not a data: URL — the frame's src now accepts http(s) only, and this
   // is app-authored markup rather than an address anyway.
@@ -11358,7 +11422,7 @@ async function watchAnime(id,epArg){
   // The deep-link 404s when our slug ≠ the site's (romaji, a variant, season markers)
   // and we can't detect that across the frame — so this loads the site's SEARCH for
   // the exact title IN-FRAME: one tap to the right result, no typing, no leaving.
-  ext.onclick=()=>{const f=document.getElementById('pvFrame');f.src=findUrl(a);pvCanNav=false;renderPvNav(null);};
+  ext.onclick=()=>{const f=document.getElementById('pvFrame');const _u=findUrl(a);applyFrameSandbox(f,_u);f.src=_u;pvCanNav=false;renderPvNav(null);};
   const f=document.getElementById('pvFrame');
   document.getElementById('playerView').classList.add('on');
   try{document.documentElement.classList.add('watching');}catch(e){}
@@ -11396,7 +11460,7 @@ function pvTrySpelling(){
   const real=a.title; a.title=title;
   let url=''; try{url=streamURL(a,pvWatchEp||1).url;}finally{a.title=real;}
   if(!url){pvSearchHere();return;}
-  document.getElementById('pvFrame').src=url;
+  (function(){const _f=document.getElementById('pvFrame');applyFrameSandbox(_f,url);_f.src=url;})();
   toast(`Trying “${title}”`);
 }
 // ─── "THIS IS THE RIGHT PAGE" ───────────────────────────────────────────────
@@ -11440,7 +11504,7 @@ function pvSetFromName(){
   const box=document.getElementById('pvSet'); if(box)box.classList.remove('on');
   toast(`Got it \u2014 \u201c${a.title}\u201d is \u201c${slug}\u201d here`);
   const fixed=isRead?readURL(a,pvWatchEp||0):streamURL(a,pvWatchEp||1).url;
-  if(fixed)document.getElementById('pvFrame').src=fixed;
+  if(fixed){const _f=document.getElementById('pvFrame');applyFrameSandbox(_f,fixed);_f.src=fixed;}
 }
 // Reading the show's name out of a real address. This was inline in the paste
 // flow, which meant only a hand-pasted URL could teach the app anything — the
@@ -12678,6 +12742,20 @@ function frameBlockedHTML(){
     ${off.length?`<p class="ai-desc">These wouldn't play inside the app when tried, so Watch sends them straight out instead of showing you a blank screen. Tap one to give it another go.</p>
     <div class="src-picks">${off.map(h=>`<button class="src-chip" onclick="forgetFrameVerdict('${escH(h)}')">${escH(h)} · try again</button>`).join('')}</div>`:''}`;
 }
+// A permission you granted has to be visible somewhere you can take it back, or
+// it is not a permission, it is a change you forgot you made.
+function looseFramesHTML(){
+  const hosts=Object.keys(looseFrames());
+  if(!hosts.length)return '';
+  return `<div class="dt-label" style="margin-top:18px">Allowed to open tabs</div>
+    <p class="ai-desc">These wouldn't play inside the protected frame, so you gave them room to open pop-up tabs. They still can't navigate away from your list. Tap one to put it back.</p>
+    <div class="src-picks">${hosts.map(h=>`<button class="src-chip on" onclick="unLoosen('${jsq(h)}')">${escH(h)} · put back</button>`).join('')}</div>`;
+}
+function unLoosen(host){
+  setLooseFrame(host,false);
+  toast(`${host} is back inside the protected frame`);
+  try{renderSource();}catch(e){}
+}
 function forgetFrameVerdict(host){
   const m=frameLog(); delete m[String(host||'').toLowerCase()]; saveFrameLog(m);
   toast(`${host} will be tried in the app again`);
@@ -12696,6 +12774,66 @@ const CHALLENGE_HOSTS=['miruro.tv','miruro.online','miruro.to'];
 function challengeHost(h){
   h=String(h||'').toLowerCase().replace(/^www\./,'');
   return CHALLENGE_HOSTS.some(x=>h===x||h.endsWith('.'+x));
+}
+// ─── WHEN A SITE REFUSES THE SANDBOX ────────────────────────────────────────
+// The player frame is sandboxed, and two of the things that withholds are the
+// reason it exists: a framed site cannot open pop-up tabs, and it cannot
+// navigate the whole app away. That is what stops a streaming page from
+// replacing WatchList with an ad.
+//
+// Some sites genuinely will not run inside it — their player opens its own
+// window, or they use a modal the sandbox blocks. Dropping the sandbox for
+// everyone to fix those is the wrong trade: it hands every site the ability to
+// hijack the app, to solve a problem a handful of them have.
+//
+// So it is per-site, and you choose it. Granting a host more room gives it
+// pop-ups and modals. It NEVER grants allow-top-navigation, whatever the site
+// claims to need, because that one is the whole app.
+const SANDBOX_BASE='allow-scripts allow-same-origin allow-forms allow-presentation allow-orientation-lock';
+const SANDBOX_LOOSE=SANDBOX_BASE+' allow-popups allow-popups-to-escape-sandbox allow-modals';
+const LOOSE_KEY='loose_frames';
+function looseFrames(){try{const v=JSON.parse(localStorage.getItem(LOOSE_KEY)||'{}');return (v&&typeof v==='object')?v:{};}catch(e){return{};}}
+function isLooseFrame(host){return !!looseFrames()[String(host||'').toLowerCase()];}
+function setLooseFrame(host,on){
+  const h=String(host||'').toLowerCase(); if(!h)return;
+  const m=looseFrames();
+  if(on)m[h]=1; else delete m[h];
+  try{localStorage.setItem(LOOSE_KEY,JSON.stringify(m));}catch(e){}
+}
+// The sandbox a given URL gets. Everything goes through here so the two frames
+// can never drift apart.
+function frameSandbox(url){
+  let h=''; try{h=new URL(String(url||''),location.href).hostname.replace(/^www\./,'').toLowerCase();}catch(e){}
+  return (h&&isLooseFrame(h))?SANDBOX_LOOSE:SANDBOX_BASE;
+}
+function applyFrameSandbox(el,url){
+  try{el.setAttribute('sandbox',frameSandbox(url));}catch(e){}
+}
+// Offered in the player, because that is where you find out. It states the cost
+// before it does anything: this site's ads get to open tabs. Top navigation is
+// still withheld, so the worst it can do is open a tab you can close, not
+// replace the app you are holding.
+function pvAllowMore(){
+  const f=document.getElementById('pvFrame'); if(!f)return;
+  let url=''; try{url=f.src||'';}catch(e){}
+  let host=''; try{host=new URL(url,location.href).hostname.replace(/^www\./,'').toLowerCase();}catch(e){}
+  if(!host){toast('Nothing is loaded here yet');return;}
+  if(isLooseFrame(host)){
+    setLooseFrame(host,false);
+    applyFrameSandbox(f,url); try{f.src=url;}catch(e){}
+    toast(`${host} is back inside the protected frame`,3200);
+    return;
+  }
+  askConfirm({
+    title:`Let ${host} open tabs?`,
+    msg:`WatchList plays sites inside a protected frame, which stops them opening pop-up tabs and stops them navigating away from your list. Some sites won't play inside it.\n\nGiving ${host} more room usually fixes that, and its ads will be able to open tabs. It still can't replace WatchList. Undo it in Sources.`,
+    yes:'Give it more room',
+    onYes:()=>{
+      setLooseFrame(host,true);
+      applyFrameSandbox(f,url); try{f.src=url;}catch(e){}
+      toast(`${host} can open tabs now. Undo it in Sources`,3600);
+    },
+  });
 }
 function frameRefuses(host){
   if(challengeHost(host))return true;
@@ -13109,7 +13247,7 @@ function openYT(target,label){
   // host or an archive.org page, not just YouTube, and this frame was the one
   // place a framed site could still open tabs or navigate the whole app away.
   f.innerHTML='<iframe src="'+escH(target)+'" title="'+escH(label||'Watch')+
-    '" sandbox="allow-scripts allow-same-origin allow-forms allow-presentation allow-orientation-lock"'+
+    '" sandbox="'+frameSandbox(target)+'"'+
     ' allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="no-referrer"></iframe>';
   v.classList.add('on');
   return true;
@@ -14286,6 +14424,7 @@ function renderSource(){
       </div>
       <p class="ai-desc" id="srcExNote" style="margin-top:8px;font-size:12px">${srcExNoteHTML()}</p>
       ${frameBlockedHTML()}
+      ${looseFramesHTML()}
       ${subLagHTML()}
 
       ${IS_NATIVE?`
@@ -16186,10 +16325,14 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-14.1',
-  title:'Retro',
-  push:'Anime on tape. Hold the logo and pick it.',
+  v:'2026-08-14.2',
+  title:'Retro, and the controls that went missing',
+  push:'Hold the logo. Retro is the second tile.',
   notes:[
+    'Retro sits second in the row now, next to Default, because the row scrolls sideways and an eighth tile is a tile nobody finds.',
+    'Glow and brightness are back. They went out with the old Theme sheet by mistake, and they belong here more than they did there: both change the whole page, which is the thing you can see behind this bar.',
+    'The custom colour button looks like one. It was a grey circle sitting among nine coloured circles, which is the only control you cannot guess, dressed exactly like the ones you can. It wears a colour wheel and a plus now.',
+    'The brightness slider is the app\u2019s, not the browser\u2019s, and the panel has room to breathe again.',
     'A new look called Retro, and it is not a colour swap. Hot magenta and cyan on violet black, square corners, hard shadows offset behind every cover the way print did it, scanlines across the artwork, episode counts in a monospace readout, and a progress meter with steps in it. Hold the logo and pick it.',
     'Nearly fifty things on the screen wore the same thin outline, so a poster, a warning and a button all carried the same weight and the whole app read as a pile of boxes. An outline now means you can press it. Six things have one. Everything else is artwork sitting on the page, lifted by its own shadow.',
     'Section names lead the page instead of whispering above it, and the hairline that used to trail off to the right of each one is gone. The words were already doing that job.',

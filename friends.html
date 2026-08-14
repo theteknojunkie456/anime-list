@@ -6106,7 +6106,7 @@ function resumeRailHTML(items,isRead){
       <div class="rz-play">${icon(isRead?'book':'play')}</div>
       ${known?`<div class="rz-ep">${isRead?'CH':'EP'} ${next}</div>`:''}
       ${res?`<div class="rz-at">${fmtPos(res)}<span>/${fmtPos(a.posOf||0)}</span></div>`:''}
-      <div class="rz-meta"><div class="rz-title">${schEsc(dispTitle(a.title))}</div></div>
+      <div class="rz-meta"><div class="rz-title">${schEsc(a.title)}</div></div>
       ${res?`<div class="rz-bar"><div class="rz-fill" style="width:${Math.round(res/(a.posOf||1)*100)}%"></div></div>`
            :(showBar?`<div class="rz-bar"><div class="rz-fill" style="width:${p}%"></div></div>`:'')}
     </button>`;
@@ -6508,10 +6508,31 @@ function renderFiltRow(){
 // exactly what makes the fix safe to apply without asking. A title that differs
 // by more than punctuation and case is a deliberate rename and is left alone.
 const _tnorm=t=>String(t||'').toLowerCase().replace(/[^a-z0-9]/g,'');
+// A title that differs from the show's own ONLY in capitalisation is not a
+// rename — it is the same title, spelled the way the people who made it spell
+// it. So it is adopted silently, rather than sitting in the "messy names" bar
+// waiting for permission to fix a difference nobody would call a difference.
+//
+// Anything else — a real spelling variant, different punctuation, a different
+// romanisation — still goes through Fix all, where you can see it first.
+function adoptOfficialCase(){
+  let n=0;
+  anime.forEach(a=>{
+    if(!a||!a.aniId)return;
+    const c=a.titleEn||a.titleRo||'';
+    if(!c||c===a.title)return;
+    if(String(c).toLowerCase()!==String(a.title||'').toLowerCase())return;   // not just case
+    a.title=c;n++;
+  });
+  return n;
+}
 function canonTitle(a){
   const c=a.titleEn||a.titleRo||'';
   if(!c||!a.aniId)return '';
   if(c===a.title)return '';
+  // Case-only differences are handled silently by adoptOfficialCase, so they no
+  // longer show up here as something needing a decision.
+  if(String(c).toLowerCase()===String(a.title||'').toLowerCase())return '';
   return _tnorm(c)===_tnorm(a.title)?c:'';     // same title, better spelling
 }
 // `noLink` means "I know this isn't in the database, leave it alone". Plenty of
@@ -6666,7 +6687,7 @@ async function fixPick(id,aniId){
   delete a.idTried;delete a.imgTried;delete a.detTried;delete a.bannerTried;delete a.scoreTried;delete a.nameFix;
   a.upd=Date.now();
   const row=document.getElementById('fx-'+id);
-  if(row){row.classList.add('fx-done');row.innerHTML='<div class="fx-have">'+escH(dispTitle(a.title))+'</div><span class="fx-ok">Linked</span>';}
+  if(row){row.classList.add('fx-done');row.innerHTML='<div class="fx-have">'+escH(a.title)+'</div><span class="fx-ok">Linked</span>';}
   try{save();}catch(e){}
   try{await fetchCovers();}catch(e){}
   try{save();render();}catch(e){}
@@ -6681,7 +6702,7 @@ function fixKeep(id){
   a.noLink=1; a.upd=Date.now();
   try{save();render();}catch(e){}
   const row=document.getElementById('fx-'+id);
-  if(row){row.classList.add('fx-done');row.innerHTML='<div class="fx-have">'+escH(dispTitle(a.title))+'</div><span class="fx-ok">Kept</span>';}
+  if(row){row.classList.add('fx-done');row.innerHTML='<div class="fx-have">'+escH(a.title)+'</div><span class="fx-ok">Kept</span>';}
   const {unmatched}=needsFix(kindOf(a));
   toast(unmatched.length?'Kept as is':'Kept — nothing left to fix');
 }
@@ -6876,7 +6897,7 @@ function bbSlideHTML(a){
     ${cd}
     <div class="hero-body">
       <div class="hero-kicker">${kicker}</div>
-      <div class="hero-title">${schEsc(dispTitle(a.title))}</div>
+      <div class="hero-title">${schEsc(a.title)}</div>
       <div class="hero-meta">${schEsc([a.eps,a.time,(a.genre||'').split(',')[0]].filter(Boolean).join(' · '))}</div>
       ${a.epTotal?`<div class="hero-prog"><div class="pbar"><div class="pfill" style="width:${Math.round(p*100)}%"></div></div><span>${a.ep||0} / ${a.epTotal}</span></div>`:''}
       ${airHTML}
@@ -6987,7 +7008,7 @@ function airingRailHTML(items){
     const when=inf?(inf.ep?`Ep ${inf.ep} · ${inf.when}`:inf.when):'';
     return `<button class="rz-card" onclick="openDetail('${a.id}')">
       ${bg}<div class="rz-scrim"></div>
-      <div class="rz-meta"><div class="rz-title">${schEsc(dispTitle(a.title))}</div>${when?`<div class="rz-sub">${schEsc(when)}</div>`:''}</div>
+      <div class="rz-meta"><div class="rz-title">${schEsc(a.title)}</div>${when?`<div class="rz-sub">${schEsc(when)}</div>`:''}</div>
     </button>`;
   };
   return `<div class="rz-sec"><div class="rz-head">${icon('calendar')} Airing this week</div>
@@ -7352,7 +7373,7 @@ function renderDetail(){
       ${bannerHTML}
       ${cover}
       <div class="dt-info">
-        <div class="dt-title">${schEsc(dispTitle(a.title))}</div>
+        <div class="dt-title">${schEsc(a.title)}</div>
         <div class="dt-meta">${[a.eps, kindOf(a)==='read'?a.time:''].filter(Boolean).join(' · ')}</div>
         <button class="dt-fav${a.fav?' on':''}" onclick="toggleFav()">${a.fav?icon('heart','fill')+' Favorited':icon('heart')+' Favorite'}</button>
       </div>
@@ -10396,7 +10417,7 @@ function renderParty(){
     const row=a=>{const cov=titleBg(a)||a.img,ep=Math.min((a.ep||0)+1,a.epTotal||((a.ep||0)+1)),on=r.animeId===a.id;
       return `<button class="pt-pick${on?' on':''}" onclick="partyPick('${a.id}')">
         ${cov?`<img src="${escH(cov)}" alt="">`:`<div class="ph">${escH(((a.title||'?')[0]||'?').toUpperCase())}</div>`}
-        <div class="pt-pick-info"><div class="pt-pick-t">${schEsc(dispTitle(a.title))}</div><div class="pt-pick-s">Episode ${ep}${a.epTotal?` · ${a.epTotal} eps`:''}</div></div>
+        <div class="pt-pick-info"><div class="pt-pick-t">${schEsc(a.title)}</div><div class="pt-pick-s">Episode ${ep}${a.epTotal?` · ${a.epTotal} eps`:''}</div></div>
         <span class="pt-pick-q" onclick="event.stopPropagation();partyQueueAdd('${a.id}')">+ Queue</span>
         <span class="pt-pick-go">${icon('play')}</span></button>`;};
     const picker=watchable.length
@@ -10423,7 +10444,7 @@ function renderParty(){
     if(mine.length)hostCtl+=`<div class="dt-label" style="margin-top:14px">Add to the queue</div><div class="pt-picklist">${mine.map(a=>{const cov=titleBg(a)||a.img,ep=Math.min((a.ep||0)+1,a.epTotal||((a.ep||0)+1));
       return `<button class="pt-pick" onclick="partyQueueAdd('${a.id}')">
         ${cov?`<img src="${escH(cov)}" alt="">`:`<div class="ph">${escH(((a.title||'?')[0]||'?').toUpperCase())}</div>`}
-        <div class="pt-pick-info"><div class="pt-pick-t">${schEsc(dispTitle(a.title))}</div><div class="pt-pick-s">Episode ${ep}${a.epTotal?` · ${a.epTotal} eps`:''}</div></div>
+        <div class="pt-pick-info"><div class="pt-pick-t">${schEsc(a.title)}</div><div class="pt-pick-s">Episode ${ep}${a.epTotal?` · ${a.epTotal} eps`:''}</div></div>
         <span class="pt-pick-q">+ Queue</span></button>`;}).join('')}</div>`;
   }
   const chat=r.chat.map(m=>m.sys?`<div class="pt-sys">${schEsc(m.msg)}</div>`:`<div class="pt-msg${m.uid===meUid?' me':''}"><span class="who">${schEsc(m.name)}</span>${schEsc(m.msg)}<span class="pt-time">${partyTime(m.t)}</span></div>`).join('');
@@ -10791,7 +10812,7 @@ function behindHTML(){
     ${art?`<img class="resume-art" src="${escH(art)}" alt="" loading="lazy" onerror="artFallback(this,${JSON.stringify(String(a.title||'?')).replace(/"/g,'&quot;')},'resume-ph')">`:`<span class="resume-ph">${ch}</span>`}
     <span class="resume-body">
       <span class="resume-k">Pick up where you left off</span>
-      <span class="resume-t">${schEsc(dispTitle(a.title))}</span>
+      <span class="resume-t">${schEsc(a.title)}</span>
       <span class="resume-s">Episode ${next} · ${behind} waiting${more}</span>
     </span>
     <span class="resume-go">${icon('play')}</span>
@@ -10960,7 +10981,7 @@ function paintPickCard(a,quiet){
   el.innerHTML=`
     ${a.img?`<img loading="lazy" class="pk-cover" src="${escH(safeImg(a.img))}" alt="">`:'<div class="pk-cover"></div>'}
     <div class="pk-body">
-      <div class="pk-name">${escH(dispTitle(a.title))}</div>
+      <div class="pk-name">${escH(a.title)}</div>
       <div class="pk-meta">${escH([score,eps,hrs].filter(Boolean).join(' · '))}</div>
       <div class="pk-why">${quiet?'&nbsp;':escH(pkWhy(a))}</div>
     </div>`;
@@ -11256,7 +11277,7 @@ async function watchAnime(id,epArg){
   const ep=ep0;
   pvWatchEp=ep;   // the episode we opened, so we can save progress on the way out
   pvOpenTime=Date.now();   // how long they stay is our only signal that they watched
-  document.getElementById('pvTitle').innerHTML=escH(dispTitle(a.title))+(ep?` <span class="pv-ep">Ep ${ep}</span>`:'');
+  document.getElementById('pvTitle').innerHTML=escH(a.title)+(ep?` <span class="pv-ep">Ep ${ep}</span>`:'');
   const ext=document.getElementById('pvExt');
   // The deep-link 404s when our slug ≠ the site's (romaji, a variant, season markers)
   // and we can't detect that across the frame — so this loads the site's SEARCH for
@@ -11698,7 +11719,7 @@ async function readManga(id,chArg){
   const url=readURL(a,ch);
   pvOpenTime=Date.now();                       // reading never had a clock — nothing was ever banked
   _pvReadFrom={ep:a.ep||0,status:a.status};    // where this sitting started, so one Undo covers all of it
-  document.getElementById('pvTitle').innerHTML=escH(dispTitle(a.title))+(ch?` <span class="pv-ep">Ch ${ch}</span>`:'');
+  document.getElementById('pvTitle').innerHTML=escH(a.title)+(ch?` <span class="pv-ep">Ch ${ch}</span>`:'');
   const ext=document.getElementById('pvExt');
   // Same 404 recovery as watch: load the reading site IN-FRAME so its own search is
   // one tap away, rather than kicking out to a new tab and typing the title again.
@@ -11747,7 +11768,7 @@ function pvGoTo(a,ep){
   _rp={at:0,t:0,d:0,paused:true,ep:ep};
   document.getElementById('pvFrame').src=url;
   pvOfferFix();
-  document.getElementById('pvTitle').innerHTML=escH(dispTitle(a.title))+' <span class="pv-ep">Ep '+ep+'</span>';
+  document.getElementById('pvTitle').innerHTML=escH(a.title)+' <span class="pv-ep">Ep '+ep+'</span>';
   pvOpenTime=Date.now();                 // fresh clock — each episode earns its own auto-mark
   savePvSession(pvReturnId,ep,'watch');
   renderPvNav(a);
@@ -11960,7 +11981,7 @@ window.wlNativePlayback=function(info){
     if(total&&pvWatchEp>=total){try{if(!nativeFullscreen())toast('Finished '+a.title);}catch(e){}return;}
     pvWatchEp=done+1;pvOpenTime=Date.now();_rp.ep=pvWatchEp;pvSetResume(0);
     const el=document.getElementById('pvTitle');
-    if(el)el.innerHTML=escH(dispTitle(a.title))+' <span class="pv-ep">Ep '+pvWatchEp+'</span>';
+    if(el)el.innerHTML=escH(a.title)+' <span class="pv-ep">Ep '+pvWatchEp+'</span>';
     savePvSession(pvReturnId,pvWatchEp,'watch');
     renderPvNav(a);
     try{if(!nativeFullscreen())toast('Ep '+done+' watched');}catch(e){}
@@ -12028,7 +12049,7 @@ function pvFrameNavigated(){
   pvSetResume(0);                                 // the next episode is not this one's resume point
   pvOpenTime=Date.now();                          // the next one earns its own clock
   const t=document.getElementById('pvTitle');
-  if(t)t.innerHTML=escH(dispTitle(a.title))+' <span class="pv-ep">'+(read?'Ch ':'Ep ')+pvWatchEp+'</span>';
+  if(t)t.innerHTML=escH(a.title)+' <span class="pv-ep">'+(read?'Ch ':'Ep ')+pvWatchEp+'</span>';
   savePvSession(pvReturnId,pvWatchEp,read?'read':'watch');
   renderPvNav(a);
   // Nothing here interrupts playback — no reload, no focus taken. The toast is
@@ -12954,7 +12975,7 @@ function renderWatch(){
   // Native nudge: with no services ticked, the "Open in ___" routing has nothing to
   // prefer — point them to My Services so it can open the apps they already pay for.
   const nudge=(IS_NATIVE&&!myServices().length)?`<button class="wt-nudge" onclick="closeAll();setTimeout(()=>openSheet('sourceSheet'),260)">${icon('film')}<span>Set up <b>My Services</b> — so WatchList opens shows in the apps you already pay for.</span></button>`:'';
-  box.innerHTML=`<p class="ai-desc">Where do you want to watch <b>${escH(dispTitle(a.title))}</b>? Tap one and it remembers — next time it opens there automatically.</p>`
+  box.innerHTML=`<p class="ai-desc">Where do you want to watch <b>${escH(a.title)}</b>? Tap one and it remembers — next time it opens there automatically.</p>`
     +nudge
     +sec(myShown.length?'Your services':'',myShown,0)
     +sec(recoShown.length?'Recommended':'',recoShown,myShown.length)
@@ -13411,7 +13432,7 @@ function recCard(k,rec){
   const more=rec.senders.length>1?` +${rec.senders.length-1}`:'';
   return `<div class="pcard rec-card" style="--fc:${col}" onclick="openRecDetail('${encodeURIComponent(k)}')">
     <div class="pcard-wrap rec-wrap">${img}<span class="rec-flag" style="background:${col}">${icon('users')}</span></div>
-    <div class="pcard-title">${escH(dispTitle(it.title))}</div>
+    <div class="pcard-title">${escH(it.title)}</div>
     <div class="rec-by" style="color:${col}">${escH(friendDisplay(s0.code,s0.name))}${more}</div>
   </div>`;
 }
@@ -13433,7 +13454,7 @@ function renderRecDetail(){
   const cover=it.img?`<img loading="lazy" class="dt-cover" src="${escH(it.img)}" alt="" onerror="artFallback(this,${JSON.stringify(String(it.title||'?')).replace(/"/g,'&quot;')},'dt-cover-ph')">`:`<div class="dt-cover-ph">${escH(((it.title||'?').trim()[0]||'?').toUpperCase())}</div>`;
   const chips=(it.genre||'').split(',').map(g=>g.trim()).filter(Boolean).map(g=>`<span class="chip">${escH(g)}</span>`).join('');
   box.innerHTML=`
-    <div class="dt-top">${cover}<div class="dt-info"><div class="dt-title">${escH(dispTitle(it.title))}</div><div class="dt-meta">${it.kind==='read'?'Manga / manhwa':'Anime'}</div></div></div>
+    <div class="dt-top">${cover}<div class="dt-info"><div class="dt-title">${escH(it.title)}</div><div class="dt-meta">${it.kind==='read'?'Manga / manhwa':'Anime'}</div></div></div>
     <div class="rec-badges">${recNoteRows(rec)}</div>
     ${chips?`<div class="dt-label">Genres</div><div class="chips">${chips}</div>`:''}
     <button class="dt-watch" onclick="addRecToList(false)">${icon('plus')} Add to My List</button>
@@ -13623,7 +13644,7 @@ function renderRecPick(){
   const items=anime.filter(a=>a.title).slice().sort((a,b)=>(b.upd||0)-(a.upd||0));
   const rows=items.map(a=>{const on=recPickShows.has(a.id);return `<button class="pt-pick${on?' on':''}" onclick="toggleRecPick('${a.id}')">
     ${a.img?`<img src="${escH(a.img)}" alt="">`:`<div class="ph">${escH(((a.title||'?')[0]||'?').toUpperCase())}</div>`}
-    <div class="pt-pick-info"><div class="pt-pick-t">${escH(dispTitle(a.title))}</div><div class="pt-pick-s">${escH((a.genre||'').split(',')[0]||(kindOf(a)==='read'?'Manga':'Anime'))}</div></div>
+    <div class="pt-pick-info"><div class="pt-pick-t">${escH(a.title)}</div><div class="pt-pick-s">${escH((a.genre||'').split(',')[0]||(kindOf(a)==='read'?'Manga':'Anime'))}</div></div>
     <span class="pt-pick-check">${on?icon('check'):''}</span></button>`;}).join('');
   const preset=[...(recToFriends||[])].map(c=>friendDisplay(c)).filter(Boolean);
   box.innerHTML=(preset.length?`<p class="ai-desc" style="margin:2px 0 10px">Going to <b>${escH(preset.join(', '))}</b>.</p>`:'')
@@ -13712,7 +13733,7 @@ function openBulkMenu(x,y,singleId){
   const one=n===1?anime.find(a=>a.id===menuTargets()[0]):null;
   const el=document.createElement('div');
   el.id='bulkMenu';el.className='bulk-menu';
-  el.innerHTML=`<div class="bulk-menu-h">${one?schEsc(dispTitle(one.title)).slice(0,42):n+' selected'}</div>`
+  el.innerHTML=`<div class="bulk-menu-h">${one?schEsc(one.title).slice(0,42):n+' selected'}</div>`
     +Object.keys(STATUS_META).map(st=>`<button class="bulk-mi" onclick="bulkSetStatus('${st}')">${STATUS_META[st].icon}<span>Move to ${statusLabel(st,viewKind==='read')}</span></button>`).join('')
     +`<div class="bulk-menu-d"></div>`
     +`<button class="bulk-mi" onclick="bulkFav(true)">${icon('heart')}<span>Favourite</span></button>`
@@ -13810,7 +13831,7 @@ function renderRecSend(){
   const fr=friendsList();
   const noteRows=shows.map(a=>`<div class="rc-note">
     ${a.img?`<img class="rc-note-img" src="${escH(a.img)}" alt="" onerror="artFallback(this,${JSON.stringify(String(a.title||'?')).replace(/"/g,'&quot;')},'rc-note-ph')">`:`<div class="rc-note-ph">${escH(((a.title||'?')[0]||'?').toUpperCase())}</div>`}
-    <div class="rc-note-main"><div class="rc-note-t">${escH(dispTitle(a.title))}</div>
+    <div class="rc-note-main"><div class="rc-note-t">${escH(a.title)}</div>
     <input class="ai-prompt-in rc-note-in" placeholder="Note for this one (optional)" maxlength="300" value="${escH(recItemNotes[a.id]||'')}" oninput="setItemNote('${a.id}',this.value)"></div>
     <button class="rc-note-x" onclick="removeRecShow('${a.id}')" aria-label="Remove this show">${icon('x')}</button>
   </div>`).join('');
@@ -14300,7 +14321,7 @@ function settleRead(a,ch,elapsed,from){
   if(ch>(a.ep||0)){
     if(elapsed>=PV_READ_MS) applyWatched(a.id,ch);
     else if(elapsed>=PV_READ_PEEK_MS){
-      showMWBar(`Read <b>Ch ${ch}</b> of ${schEsc(dispTitle(a.title))}?`,'Mark read',()=>{
+      showMWBar(`Read <b>Ch ${ch}</b> of ${schEsc(a.title)}?`,'Mark read',()=>{
         applyWatched(a.id,ch);toast(`Saved — up to Ch ${ch}`);
       });
       return;
@@ -14415,7 +14436,7 @@ function autoMarkWatched(id,ep){
   });
 }
 function svCountUp(el,to){if(!el)return;const dur=850,t0=performance.now();const step=now=>{const p=Math.min(1,(now-t0)/dur),e=1-Math.pow(1-p,3);el.textContent=Math.round(to*e).toLocaleString();if(p<1)requestAnimationFrame(step);};requestAnimationFrame(step);}
-function svChips(list){return list.length?list.map(a=>'<span class="sv-chip">'+schEsc(dispTitle(a.title))+(a.rating?' '+icon('star','fill')+a.rating:'')+'</span>').join(''):'<span class="sv-chip">None yet</span>';}
+function svChips(list){return list.length?list.map(a=>'<span class="sv-chip">'+schEsc(a.title)+(a.rating?' '+icon('star','fill')+a.rating:'')+'</span>').join(''):'<span class="sv-chip">None yet</span>';}
 function svBar(id,label,color,val,max,drill){return '<div class="sv-bar" onclick="svDrill(\''+id+'\',this)"><div class="lbl">'+label+'</div><div class="track"><div class="fill" style="width:'+Math.round(val/Math.max(1,max)*100)+'%;background:'+color+'"></div></div><div class="n">'+val+'</div><span class="chev">'+icon('chevron-right')+'</span></div><div class="sv-drill" id="drill-'+id+'">'+drill+'</div>';}
 function svDrill(id,el){const d=document.getElementById('drill-'+id);if(!d)return;el.classList.toggle('open',d.classList.toggle('on'));}
 // Storage meter — shows how full the ~5MB on-device localStorage is (the real
@@ -14464,7 +14485,7 @@ function renderStats(){
     '<div class="sv-sec"><div class="sv-h">Status — tap to reveal</div>'+statusBars+'</div>'+
     '<div class="sv-sec"><div class="sv-h">Top genres — tap to reveal</div>'+genreBars+'</div>'+
     '<div class="sv-sec"><div class="sv-h">Ratings'+(rated.length?' \u2014 '+avg+' average across '+rated.length:'')+'</div>'+ratingBars+'</div>'+
-    (topRated.length?'<div class="sv-sec"><div class="sv-h">Your top rated</div><div class="sv-drill on">'+topRated.map(a=>'<span class="sv-chip">'+schEsc(dispTitle(a.title))+' '+icon('star','fill')+a.rating+'</span>').join('')+'</div></div>':'');
+    (topRated.length?'<div class="sv-sec"><div class="sv-h">Your top rated</div><div class="sv-drill on">'+topRated.map(a=>'<span class="sv-chip">'+schEsc(a.title)+' '+icon('star','fill')+a.rating+'</span>').join('')+'</div></div>':'');
   try{_fillStoreNote();}catch(e){}
   body.querySelectorAll('.sv-heronum .v[data-to]').forEach(el=>svCountUp(el,+el.getAttribute('data-to')));
 }
@@ -15455,6 +15476,9 @@ async function fetchCovers(){
           if(!a.img&&!a.imgTried)a.img=(m.coverImage&&m.coverImage.large)||'';
           // AniList title variants — power the {titleEnglish}/{titleRomaji}/{titleNative} custom-source tokens
           if(m.title){if(m.title.english)a.titleEn=m.title.english;if(m.title.romaji)a.titleRo=m.title.romaji;if(m.title.native)a.titleNa=m.title.native;}
+          // Now that the official spelling is known, take its capitalisation if
+          // that is the only thing that differs from what was typed.
+          try{const _c=a.titleEn||a.titleRo||'';if(_c&&_c!==a.title&&String(_c).toLowerCase()===String(a.title||'').toLowerCase())a.title=_c;}catch(e){}
           // per-title theming: wide banner art + AniList's dominant color (kept independent of any user-set bgImage/bgAccent)
           if(m.bannerImage)a.banner=m.bannerImage;
           if(m.coverImage&&m.coverImage.color)a.aniColor=m.coverImage.color;
@@ -15689,63 +15713,6 @@ async function applyCandidate(i){
 let toastT;
 // ─── SCHEDULE (weekly airing calendar) ──────────────────────────────────────
 let schedOffset=0; const schedCache={};
-// ONE PIECE, JUJUTSU KAISEN, NANA — AniList stores the official romaji, and for
-// a lot of shows that is genuinely all caps. Sat in a list next to Attack on
-// Titan and Hunter x Hunter it reads as shouting rather than as a title, and it
-// was the loudest remaining inconsistency on the screen.
-//
-// Display only: a.title keeps the official string, because that is what search,
-// slug resolution and every sync match run against. This is what you SEE.
-//
-// Conservative on purpose. A word is left alone if it carries a digit (MOB
-// PSYCHO 100), is a roman numeral (PART III), or is two characters or fewer
-// (K-ON!). A single-word title under five letters is left alone entirely, since
-// GTO and FLCL are initialisms and Gto and Flcl would be wrong.
-const _ROMAN=/^[IVXLCDM]+$/;
-// Words a title case leaves lowercase — except as the first word, where they are
-// still the start of a sentence.
-// English minor words plus the Japanese particles that show up in romaji titles
-// (SHINGEKI NO KYOJIN, TENGEN TOPPA GURREN LAGANN). Named apart from the
-// importer's _MINOR, which does the opposite job: it RAISES lowercase input and
-// leaves anything already stylised alone.
-const _CAPS_MINOR=new Set(['a','an','and','as','at','but','by','for','from','in','into','nor','of','on','onto','or','over','the','to','vs','with',
-  // Only the particles that are unambiguous. 'na', 'ka' and 'mo' are also whole
-  // words — KIMI NO NA WA is "Kimi no Na wa", where na is the noun.
-  'no','ga','wa','ni','de','wo']);
-function deShout(t){
-  let first=true;
-  return String(t).split(/(\s+)/).map(w=>{
-    if(/\s/.test(w)||!w)return w;
-    const isFirst=first; if(w.trim())first=false;
-    if(/\d/.test(w))return w;                              // MOB PSYCHO 100
-    if(_ROMAN.test(w)&&w.length>1)return w;                 // PART III
-    // An initialism glued to the rest with a colon: ID:INVADED, FLCL:PROGRE
-    const col=w.indexOf(':');
-    if(col>0&&col<=3&&/^[A-Z]+$/.test(w.slice(0,col)))return w;
-    const lower=w.toLowerCase();
-    // The small-word rule has to run BEFORE the short-word one, or OF, ON and AS
-    // are protected as initialisms and stay shouting in the middle of a sentence.
-    if(!isFirst&&_CAPS_MINOR.has(lower.replace(/[^a-z]/g,'')))return lower;
-    // Inside a title that is entirely capitals there is no signal that a
-    // two-letter word is an initialism — NA in KIMI NO NA WA is the noun. Only
-    // single letters are preserved (the I in "That Time I Got..."), and a lone x
-    // is the collaboration x, lowercase by convention.
-    if(w.replace(/[^A-Za-z]/g,'').length===1){
-      return (!isFirst&&/^x$/i.test(w))?'x':w;
-    }
-    return lower.replace(/(^|[-\/.:'\u2019])([a-z])/g,(m,p,c)=>p+c.toUpperCase());
-  }).join('');
-}
-function dispTitle(t){
-  const s=String(t==null?'':t);
-  const letters=s.replace(/[^A-Za-z]/g,'');
-  if(letters.length<3)return s;
-  // only touch it if it is essentially all capitals
-  if(letters.replace(/[^A-Z]/g,'').length/letters.length<0.9)return s;
-  const words=s.trim().split(/\s+/);
-  if(words.length===1&&letters.length<5)return s;   // GTO, FLCL, K-ON
-  return deShout(s);
-}
 function schEsc(s){return String(s==null?'':s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
 function schPh(ch){return '<div class="sched-thumb-ph">'+ch+'</div>';}
 function openSchedule(){schedOffset=0;openSheet('scheduleSheet');renderSchedule();}
@@ -16143,12 +16110,12 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-13.12',
-  title:'ONE PIECE stopped shouting',
-  push:'Titles read as titles now.',
+  v:'2026-08-13.13',
+  title:'Titles spelled the way the show spells them',
+  push:'ONE PIECE really is ONE PIECE.',
   notes:[
-    'Titles that arrive in capitals are shown as titles. ONE PIECE is One Piece, SHINGEKI NO KYOJIN is Shingeki no Kyojin, and a list stops looking like half of it is yelling. Initialisms are safe \u2014 GTO, K-ON! and ID:INVADED are left exactly as they are, and so is PART III.',
-    'Only what you see changes. The official title is still what search, source links and every sync match run against.',
+    'Titles are shown exactly as the show writes them. The last release re-cased them to look tidier, which was wrong \u2014 ONE PIECE is genuinely ONE PIECE, and rewriting it is the same mistake as recolouring somebody\u2019s artwork to suit the app.',
+    'What does get fixed is your typing. If you typed \u201cone piece\u201d and it matched the real show, it now quietly takes the show\u2019s own capitalisation \u2014 no prompt, because that is the same title, not a rename. A genuinely different name still waits for you in Fix all.',
     'The small tracked capitals above every card and section are gone. CONTINUE WATCHING is now Continue watching \u2014 a line of text rather than a label pretending to be design. Tags that sit on artwork keep their capitals, because at that size they read better.',
     'There were two places to change how the app looks: a Theme sheet, and the bar you get by holding the logo. Now there is one. The palette button opens it, holding the logo opens it, and everything \u2014 the seven looks, the accent, the background, the status colours, card size, take-from-a-picture, save your own \u2014 sits over your real list.',
     'The top of the home screen is quieter: the filter pill wore a background, a border, an inset highlight and a drop shadow all at once, and the blocks above your list have given about 30px back.',
@@ -16509,7 +16476,9 @@ try{if(_SR&&window.isSecureContext){const m=document.getElementById('chatMic');i
 
 // ─── INIT ───────────────────────────────────────────────────────────────────
 try{hydrateIcons();}catch{}
-load();try{_hadItemsAtLoad=anime.length>0;}catch{}try{restorePos();}catch(e){}try{setTimeout(()=>{try{fetchSequels();}catch(e){}},6000);}catch{}try{setTimeout(restoreFromIDB,0);}catch{}try{setTimeout(()=>{try{ensureBackup();}catch(e){}},1200);}catch{}try{purgeAdult();}catch{}try{if(!appLocked&&dedupeAnime())writeLocal();}catch{}loadTheme();try{seedHiddenDefaults();}catch{}try{_restoreUpd();}catch{}render();try{nativeScheduleNotifs();}catch{}try{hydrateImages();}catch{}
+load();try{_hadItemsAtLoad=anime.length>0;}catch{}try{restorePos();}catch(e){}try{setTimeout(()=>{try{fetchSequels();}catch(e){}},6000);}catch{}try{setTimeout(restoreFromIDB,0);}catch{}try{setTimeout(()=>{try{ensureBackup();}catch(e){}},1200);}catch{}try{purgeAdult();}catch{}try{if(!appLocked&&dedupeAnime())writeLocal();}catch{}
+try{if(!appLocked&&adoptOfficialCase())writeLocal();}catch{}
+loadTheme();try{seedHiddenDefaults();}catch{}try{_restoreUpd();}catch{}render();try{nativeScheduleNotifs();}catch{}try{hydrateImages();}catch{}
 // After the list is up — and after the tutorial has had its chance to claim a
 // new install — tell returning users what changed in the update they just got.
 try{setTimeout(maybeShowWhatsNew,900);}catch{}

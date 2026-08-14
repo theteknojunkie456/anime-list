@@ -431,3 +431,26 @@ value moved at most 1px, so nothing reflowed. Weights went 6 → 3 (600 · 700 �
 22px that sat between 18 and 26 making three large radii read as one wrong one.
 
 `smoke.mjs` fails on any size or radius off the scale, so this holds.
+
+## Eyebrows
+
+The uppercase tracked micro-label above a card or a section is currently the most
+saturated generated-design tell there is — it shows up on most AI-made pages
+regardless of what they are for. WatchList had fourteen classes of it.
+
+The distinction that matters is not caps versus sentence case, it is **eyebrow
+versus badge**. A badge sits ON content and names its state: a status tag on a
+poster, an episode chip on a still. At 10px over artwork, capitals genuinely read
+better, and there is one per object rather than one per section. Those stayed.
+
+An eyebrow introduces the thing below it — CONTINUE WATCHING over a card, ACCENT
+over a row of swatches. It is decoration wearing the costume of structure, and
+having one above everything is grammar rather than voice. Those became ordinary
+lines of text: sentence case, no tracking, one size up, in the muted ink. Zero
+remain on the home screen; `audit-visual.mjs` counts them so that stays true.
+
+For the record, a claim made and then withdrawn during this work: the app was
+said to have "no typographic personality, one face doing every job". It does not
+— Bricolage Grotesque carries display across 90 rules against Manrope for body,
+which is a real contrast pairing. Measuring before asserting would have caught
+that.

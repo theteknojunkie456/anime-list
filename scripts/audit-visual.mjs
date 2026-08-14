@@ -23,6 +23,13 @@ const suite=function(){
     (R.weightOwners[w]=R.weightOwners[w]||new Set()).add(c);});
   Object.keys(R.weightOwners).forEach(k=>R.weightOwners[k]=[...R.weightOwners[k]].slice(0,10));
   R.weight=tally(vis.filter(e=>[...e.childNodes].some(n=>n.nodeType===3&&n.textContent.trim())).map(e=>getComputedStyle(e).fontWeight));
+  // The eyebrow count. One named kicker is brand voice; an uppercase tracked
+  // label above every section is generated-design grammar, and the only
+  // difference between the two is how many there are.
+  R.eyebrows=tally(textEls.filter(e=>{const s=getComputedStyle(e);
+    return s.textTransform==='uppercase'&&parseFloat(s.letterSpacing||'0')>0.5
+      &&[...e.childNodes].some(n=>n.nodeType===3&&n.textContent.trim().length>3);})
+    .map(e=>((e.className||'').toString().split(' ')[0]||e.tagName.toLowerCase())+'  "'+e.textContent.trim().slice(0,22)+'"'));
   R.shadow=tally(vis.map(e=>getComputedStyle(e).boxShadow).filter(v=>v&&v!=='none').map(v=>v.slice(0,46)));
   R.borders=tally(vis.map(e=>{const s=getComputedStyle(e);return s.borderTopWidth+' '+s.borderTopColor;}).filter(v=>!/^0px/.test(v)));
   // elements wearing background + border + shadow all at once
@@ -47,6 +54,7 @@ console.log('\n  text sizes, and who uses them');
 Object.entries(R.sizeOwners).sort((a,b)=>parseFloat(b[0])-parseFloat(a[0])).forEach(([z,cs])=>console.log('   '+z.padStart(7)+'  '+cs.join(', ')));
 console.log('\n  weights, and who uses them');
 Object.entries(R.weightOwners).sort((a,b)=>+b[0]-+a[0]).forEach(([w,cs])=>console.log('   '+w.padStart(7)+'  '+cs.join(', ')));
+show('uppercase tracked labels on screen',R.eyebrows,10);
 show('corner radii',R.radius);
 show('text sizes',R.size);
 show('font weights',R.weight);

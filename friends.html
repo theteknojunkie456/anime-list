@@ -274,7 +274,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 .paint-save:hover{border-color:var(--b3);}
 .paint-save .ico{width:15px;height:15px;color:var(--a2);}
 .paint-lb em{font-style:normal;font-weight:600;letter-spacing:0;text-transform:none;color:var(--t3);margin-left:6px;}
-.paint-lb{font-size:10px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:var(--t3);margin:12px 0 8px;}
+.paint-lb{font-family:var(--fd);font-size:13px;font-weight:700;color:var(--t2);margin:14px 0 8px;}
 .paint-lb:first-child{margin-top:0;}
 /* In the dock the dropzone is a row, not a poster-sized target: every pixel it
    takes is a pixel of the list you came here to look at. */
@@ -350,7 +350,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
    the thing you wanted was found by scrolling and hoping. */
 .th-group{margin-top:22px;padding:16px;border-radius:18px;background:color-mix(in srgb,var(--bg2) 60%,transparent);border:1px solid var(--bn2);}
 .th-g-h{font-family:var(--fd);font-size:15px;font-weight:800;letter-spacing:-.02em;color:var(--t1);margin-bottom:4px;}
-.th-sub{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--t3);margin:16px 0 9px;}
+.th-sub{font-family:var(--fd);font-size:13px;font-weight:700;color:var(--t2);margin:16px 0 9px;}
 .th-sub:first-of-type{margin-top:12px;}
 .th-sub em{font-style:normal;text-transform:none;letter-spacing:0;font-weight:600;color:var(--t3);opacity:.75;margin-left:6px;}
 .th-fold{margin-top:12px;border-radius:18px;background:color-mix(in srgb,var(--bg2) 60%,transparent);border:1px solid var(--bn2);overflow:hidden;}
@@ -805,7 +805,7 @@ body.first-paint .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards
 [data-art=cinematic] .hero-shade{background:linear-gradient(180deg,rgba(0,0,0,0.05) 0%,rgba(8,8,10,0.6) 55%,rgba(8,8,10,0.93) 100%);}
 [data-art=cinematic] .hero-bg-img,[data-art=cinematic] .hero-bg{filter:saturate(1.08);}
 .hero-body{position:relative;padding:16px 18px;width:100%;}
-.hero-kicker{font-size:10px;font-weight:800;letter-spacing:0.16em;text-transform:uppercase;color:rgba(255,255,255,.72);margin-bottom:9px;}
+.hero-kicker{font-size:12px;font-weight:600;color:rgba(255,255,255,.72);margin-bottom:7px;}
 .hero-title{font-size:clamp(24px,5.2vw,34px);font-weight:800;letter-spacing:-0.04em;line-height:1.05;
   text-wrap:balance;text-shadow:0 2px 14px rgba(0,0,0,.6);}
 .hero-meta{font-size:12px;color:rgba(255,255,255,0.75);font-weight:600;margin-top:5px;}
@@ -1279,7 +1279,7 @@ body.first-paint .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards
 .resume-art,.resume-ph{width:52px;height:52px;border-radius:14px;object-fit:cover;flex:none;background:var(--bg4);}
 .resume-ph{display:flex;align-items:center;justify-content:center;font-family:var(--fd);font-size:21px;font-weight:800;color:var(--t3);}
 .resume-body{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1;}
-.resume-k{font-size:10px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:var(--t3);}
+.resume-k{font-size:12px;font-weight:600;color:var(--t3);}
 .resume-t{font-family:var(--fd);font-size:15px;font-weight:800;color:var(--t1);letter-spacing:-.02em;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .resume-s{font-size:12px;font-weight:600;color:var(--t2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
@@ -1886,7 +1886,7 @@ textarea.ai-prompt-in{resize:none;line-height:1.45;display:block;}
 .pt-now img,.pt-now-ph{width:46px;height:46px;border-radius:14px;object-fit:cover;flex-shrink:0;background:var(--bg4);}
 .pt-now-ph{display:flex;align-items:center;justify-content:center;font-family:var(--fd);font-size:17px;font-weight:800;color:var(--t3);}
 .pt-now-b{min-width:0;flex:1;}
-.pt-now-k{font-size:10px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:var(--a2);}
+.pt-now-k{font-size:12px;font-weight:600;color:var(--a2);}
 .pt-now-t{font-family:var(--fd);font-size:15px;font-weight:800;color:var(--t1);letter-spacing:-.02em;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;}
 .pt-now-s{font-size:12px;color:var(--t2);font-weight:600;margin-top:1px;}
@@ -16086,10 +16086,11 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-13.10',
-  title:'One place for how it looks',
-  push:'The Theme sheet is gone \u2014 it all happens over your list now.',
+  v:'2026-08-13.11',
+  title:'It stopped shouting at you',
+  push:'The tiny uppercase labels are gone.',
   notes:[
+    'The small tracked capitals above every card and section are gone. CONTINUE WATCHING is now Continue watching \u2014 a line of text rather than a label pretending to be design. Tags that sit on artwork keep their capitals, because at that size they read better.',
     'There were two places to change how the app looks: a Theme sheet, and the bar you get by holding the logo. Now there is one. The palette button opens it, holding the logo opens it, and everything \u2014 the seven looks, the accent, the background, the status colours, card size, take-from-a-picture, save your own \u2014 sits over your real list.',
     'The top of the home screen is quieter: the filter pill wore a background, a border, an inset highlight and a drop shadow all at once, and the blocks above your list have given about 30px back.',
     'Groq keys answer faster. All three models were current, but the order was wrong on both speed and price \u2014 the fastest and cheapest is asked first now.',

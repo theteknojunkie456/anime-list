@@ -480,6 +480,67 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
   transform:scale(3);
   transform-origin:top left;
 }
+/* Every other picture in the app, same trick, different maths. Two sizing modes
+   exist here: images that fill a parent (absolute, inset:0, 100%×100%) take
+   percentages and need no margins because they are out of flow; images with a
+   fixed pixel size take the third-plus-margin form so their box does not shrink.
+   Ken Burns is switched off on the hero — it animates transform, which is the
+   same property the upscale needs, and the animation would simply win. */
+[data-theme=retro] .rz-img,[data-theme=retro] .dt-cover,[data-theme=retro] .hero-bg-img{
+  image-rendering:pixelated;
+  width:33.3333%;height:33.3333%;
+  transform:scale(3);transform-origin:top left;
+}
+[data-theme=retro] .bb-slide.bb-live .hero-bg-img,[data-theme=retro] .hero-bg-img{animation:none;}
+[data-theme=retro] .sched-thumb{
+  image-rendering:pixelated;
+  width:calc(34px / 3);height:calc(48px / 3);
+  margin-right:calc(34px / 3 * 2);margin-bottom:calc(48px / 3 * 2);
+  transform:scale(3);transform-origin:top left;
+}
+[data-theme=retro] .pop-cover{
+  image-rendering:pixelated;
+  width:calc(112px / 3);height:calc(158px / 3);
+  margin-right:calc(112px / 3 * 2);margin-bottom:calc(158px / 3 * 2);
+  transform:scale(3);transform-origin:top left;
+}
+[data-theme=retro] .pk-cover{
+  image-rendering:pixelated;
+  width:calc(104px / 3);height:calc(150px / 3);
+  margin-right:calc(104px / 3 * 2);margin-bottom:calc(150px / 3 * 2);
+  transform:scale(3);transform-origin:top left;
+}
+/* The resume thumb is 52px (40px on a narrow phone), and a third of that is a
+   17px source — past retro and into unreadable. Halved instead: still obviously
+   made of pixels, still recognisably the show you left off. The narrow-screen
+   size needs its own maths because the base size changes under a media query. */
+[data-theme=retro] .resume-art{
+  image-rendering:pixelated;
+  width:26px;height:26px;margin-right:26px;margin-bottom:26px;
+  transform:scale(2);transform-origin:top left;
+}
+@media (max-width:380px){
+  [data-theme=retro] .resume-art{width:20px;height:20px;margin-right:20px;margin-bottom:20px;}
+}
+/* A card title at 13px was asking an 8px face for a size it does not have, which
+   is why the text was soft and the truncation "…" collapsed into a bar that read
+   as an underscore. 16px is two whole pixels per pixel: the letters land on the
+   grid and the ellipsis is three separate dots again. Tracking goes to zero
+   because a pixel face is already spaced on the grid. */
+[data-theme=retro] .pcard-title{font-size:16px;letter-spacing:0;line-height:1.2;}
+/* The truncation mark had to go rather than be corrected. -webkit-line-clamp
+   inserts its own "…", which cannot be styled or given a different face, and
+   Silkscreen draws it as a single low bar that reads as an underscore at every
+   size — 16px sharpened the letters and left the bar exactly as it was. So the
+   clamp is swapped for a plain two-line clip: the title simply stops at the edge
+   of its box, which is what these interfaces did anyway, having no glyph to
+   spare for punctuation that means "there is more". */
+[data-theme=retro] .pcard-title{
+  display:block;-webkit-line-clamp:none;
+  max-height:2.4em;overflow:hidden;text-overflow:clip;
+}
+/* The hero panel keeps its 26px in a rule further down; :root settles it. */
+:root[data-theme=retro] .billboard{border-radius:2px;}
 /* Numbers as a readout. */
 /* .fn is NOT in this list. It is the count inside a filter chip, about 10px, and
    an 8px pixel face at 10px is not small type — it is broken type: "10" came out
@@ -16959,10 +17020,12 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-14.12',
+  v:'2026-08-14.13',
   title:'Retro is made of pixels now',
   push:'Covers, type and every last corner.',
   notes:[
+    'Every picture is pixels, not just the cards — the hero, the airing strip, the schedule, the detail cover, the pickers and the thumbnail on the resume strip. The small one is halved rather than thirded, because a third of a 52px thumbnail is seventeen pixels of show and you could no longer tell which one it was.',
+    'Card titles are bigger and sharper, and they stop instead of trailing off. A pixel face only lands cleanly on whole multiples of the size it was drawn at, so 13px was asking for something it did not have; 16px sits on the grid. The "…" went with it — that mark is drawn by the browser, cannot be given a different face, and in a pixel face it is a single low bar that reads as an underscore.',
     'Retro has its own type. Section heads, titles, the wordmark and every readout are set in a pixel face; anything you actually have to read — notes, times, sub-lines — stays as it was. A pixel face is only sharp at the size it was drawn for, so the small counts inside the filter chips keep the old numerals: at ten pixels the pixel face turned "10" into two smudges and "4" into something that was not a 4.',
     'Covers are pixels. Each one is drawn a third of the size and blown back up without smoothing, which is exactly what a console did to a sprite — so the artwork has visible pixels instead of a smooth photograph, and nothing moved on the page to do it.',
     'The last of the rounded corners are gone. Chips, tags, dots, toggles, the filter bar and the panel it sits in were all still lozenges next to controls that had become square keys. A round dot is a circle; a square dot is a pixel.',

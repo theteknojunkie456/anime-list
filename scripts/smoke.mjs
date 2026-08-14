@@ -197,6 +197,24 @@ try {
   results.push({ n: 'corners stay on the scale', ok: offRad.length === 0, d: offRad.length ? 'off-scale: ' + offRad.join(', ') : RADII.size + ' steps' });
 }
 
+// Title de-shouting, checked against the cases that actually bite. This is the
+// kind of function that looks right until someone owns GTO.
+{
+  const cases = [
+    ['ONE PIECE', 'One Piece'], ['SHINGEKI NO KYOJIN', 'Shingeki no Kyojin'],
+    ['KIMI NO NA WA', 'Kimi no Na wa'], ['HUNTER X HUNTER', 'Hunter x Hunter'],
+    ['MOB PSYCHO 100', 'Mob Psycho 100'], ['PART III', 'Part III'],
+    ['ID:INVADED', 'ID:INVADED'], ['GTO', 'GTO'], ['K-ON!', 'K-ON!'],
+    ['THAT TIME I GOT REINCARNATED AS A SLIME', 'That Time I Got Reincarnated as a Slime'],
+    ['Attack on Titan', 'Attack on Titan'], ["JoJo's Bizarre Adventure", "JoJo's Bizarre Adventure"],
+  ];
+  const raw2 = readFileSync('index.html', 'utf8');
+  const src3 = /const _ROMAN[\s\S]*?\nfunction schEsc/.exec(raw2)[0].replace(/\nfunction schEsc$/, '');
+  const fn = new Function(src3 + '; return dispTitle;')();
+  const wrong = cases.filter(([i, o]) => fn(i) !== o).map(([i, o]) => `${i} -> ${fn(i)} (want ${o})`);
+  results.push({ n: 'shouting titles read as titles', ok: wrong.length === 0, d: wrong.join(' · ') || cases.length + ' cases' });
+}
+
 let bad = 0;
 for (const r of results) {
   if (!r.ok) bad++;

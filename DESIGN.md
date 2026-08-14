@@ -454,3 +454,29 @@ said to have "no typographic personality, one face doing every job". It does not
 — Bricolage Grotesque carries display across 90 rules against Manrope for body,
 which is a real contrast pairing. Measuring before asserting would have caught
 that.
+
+## Titles that arrive shouting
+
+AniList stores the official romaji, and for a good number of shows that is
+genuinely all capitals — ONE PIECE, NANA, BLEACH. Sat in a list beside Attack on
+Titan and Hunter x Hunter it reads as shouting rather than as a title, and it was
+the loudest inconsistency left on the screen.
+
+`dispTitle()` fixes what you see and nothing else: `a.title` keeps the official
+string, because search, slug resolution and every sync match run against it.
+
+It only acts when a title is ≥90% capitals, and then it is deliberately timid:
+- a word with a digit is left alone — MOB PSYCHO 100
+- a roman numeral is left alone — PART III
+- an initialism glued on with a colon is left alone — ID:INVADED
+- a single-word title under five letters is left alone — GTO, FLCL, K-ON!
+- single letters survive — the I in "That Time I Got…"
+- a lone x lowercases — Hunter x Hunter
+- English minor words and the unambiguous Japanese particles lowercase unless
+  they lead — Shingeki **no** Kyojin
+
+`na`, `ka` and `mo` are NOT in that particle list, because they are also whole
+words: KIMI NO NA WA is "Kimi no Na wa", where na is the noun.
+
+Twelve cases are pinned in `smoke.mjs`. This is the kind of function that looks
+finished until somebody owns GTO.

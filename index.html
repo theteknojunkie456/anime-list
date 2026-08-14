@@ -2841,6 +2841,53 @@ body.recsel .pcard{position:relative;}
   .nbtn.add{width:54px;height:54px;min-width:0;font-size:27px;}
 }
 
+/* ── A PHONE ON ITS SIDE ────────────────────────────────────────────────────
+   390px of height, and the chrome was taking 234 of it: header, search, filter
+   row and the resume card stacked exactly as they do in portrait, leaving one
+   sliver of a cover visible above the bar. Turning a phone sideways to see MORE
+   and getting less is the whole complaint.
+
+   Height is the scarce thing here and width is suddenly plentiful, so the
+   stacked rows become one row, the chrome loses its padding, and the bottom bar
+   drops its labels — the icons have been in the same five places since the app
+   was installed. Everything given back goes to the list.
+
+   Also last in the stylesheet, for the same reason the block above it is. */
+@media(orientation:landscape) and (max-height:520px){
+  .hdr{padding-top:calc(var(--safe-t) + 6px);}
+  .hdr-title{font-size:17px;}
+  .hbtn{width:32px;height:32px;}
+  .hbtn .ico{width:15px;height:15px;}
+  /* Search and filters side by side. They are two SEPARATE bars — .topbar and
+     .topbar topbar-ctrl — so putting them on one line is a job for their common
+     parent, not for either of them. The wide-screen layout already solves this
+     with a grid; landscape is the same problem at a smaller size. */
+  #app{display:grid;grid-template-columns:minmax(0,1fr) auto;
+       grid-template-rows:auto auto auto minmax(0,1fr);column-gap:8px;}
+  .hdr{grid-column:1/-1;grid-row:1;}
+  .topbar{grid-column:1;grid-row:2;margin-right:0;padding:6px;margin-top:6px;border-radius:14px;}
+  .topbar-ctrl{grid-column:2;grid-row:2;margin-left:0;margin-top:6px;}
+  .fixbar.on{grid-column:1/-1;grid-row:3;}
+  .page{grid-column:1/-1;grid-row:4;min-height:0;}
+  .search-row{padding:0;}
+  .ctrl-row{padding:0;}
+  .search-in{padding-top:8px;padding-bottom:8px;}
+  .resume-wrap{margin-top:6px;}
+  .resume-art,.resume-ph{width:40px;height:40px;}
+  .billboard,.bb-slide{min-height:150px;}
+  .hero-title{font-size:17px;}
+  .hero-cta{margin-top:8px;padding:7px 13px;}
+  .row-head,.rz-head{padding-bottom:8px;}
+  .row-sec{margin-top:10px;}
+  /* Icons only. In portrait the label earns its 14px; lying down it costs a
+     sixth of the visible list. */
+  .nav{padding:5px 10px calc(var(--safe-b) + 5px);border-radius:14px 14px 0 0;}
+  .nbtn small{display:none;}
+  .nbtn{padding:7px 10px;}
+  .nbtn.add{width:42px;height:42px;font-size:21px;}
+  .nbtn .ico{width:21px;height:21px;}
+}
+
 </style>
 </head>
 <body>
@@ -4970,7 +5017,11 @@ function syncSkip(k){
   if(!k)return true;
   if(k===LSKEY||k===ENCFLAG||k==='anthropic_key'||k==='_t'||k==='wl_gate_test')return true;
   if(k==='party_uid'||k==='party_active')return true; // party_name (your display name) DOES sync
-  return k.indexOf('sync_')===0||k.indexOf('syncat_')===0||k.indexOf('al_')===0||k.indexOf('ai_model_')===0;
+  // ai_model_* is which model you chose, not a credential, so it travels with
+  // the rest of your settings. The KEY itself (anthropic_key) stays on the
+  // device, as do the AniList tokens: a credential in cloud storage is a
+  // credential leaked, whatever the storage promises.
+  return k.indexOf('sync_')===0||k.indexOf('syncat_')===0||k.indexOf('al_')===0;
 }
 function collectExtra(){
   const out={};
@@ -4984,7 +5035,16 @@ function applyExtra(x){
   // Tombstones are the one key that must not be overwritten: a device that has
   // deleted nothing would erase every deletion the others recorded.
   try{if(x[TOMB_KEY])mergeTombs(x[TOMB_KEY]);}catch(e){}
-  try{for(const k in x){if(syncSkip(k)||k===TOMB_KEY)continue;if(typeof x[k]==='string'){try{localStorage.setItem(k,x[k]);}catch(e){}}}}catch(e){}
+  // Writing the cloud's settings would otherwise schedule a push of the settings
+  // we just received, from every device, forever.
+  withoutPush(()=>{
+    try{for(const k in x){if(syncSkip(k)||k===TOMB_KEY)continue;if(typeof x[k]==='string'){try{localStorage.setItem(k,x[k]);}catch(e){}}}}catch(e){}
+    _applyExtraRepaint();
+  });
+}
+// Repainting re-persists some of what it applies (applyTheme writes the theme
+// back), so it has to sit inside the same guard as the writes above.
+function _applyExtraRepaint(){
   // repaint everything the synced state drives
   try{const at=localStorage.getItem('animetheme');if(at&&typeof applyTheme==='function')applyTheme(at);}catch(e){}
   try{if(typeof applyGlow==='function')applyGlow();}catch(e){}
@@ -5009,6 +5069,32 @@ function fmtBytes(n){return n<1024?n+' B':n<1048576?(n/1024).toFixed(0)+' KB':(n
 function syncPayloadSize(){try{return new Blob([JSON.stringify({v:3,list:anime,extra:collectExtra()})]).size;}catch(e){try{return JSON.stringify(anime).length;}catch(_){return 0;}}}
 function genCode(){let s='';const c='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';for(let i=0;i<20;i++)s+=c[Math.floor(Math.random()*c.length)];return s;}
 let pushT;
+// ─── EVERY SETTING REACHES THE CLOUD ────────────────────────────────────────
+// save() pushes the list. Nothing pushed when only a SETTING changed, so a
+// theme, an accent, a saved look, a hidden source or a home-screen order reached
+// the cloud only if some unrelated list edit happened to push afterwards. Pick a
+// theme on the desktop and the phone never heard about it.
+//
+// Patching each setter would have worked and then rotted: there are dozens, the
+// next one added would not know to call it, and I missed several on the first
+// attempt at exactly that. So it hangs off the one thing they all do — writing
+// to storage. Any write to a key that syncs schedules a push, which means
+// settings that do not exist yet are covered too.
+//
+// syncSkip already knows which keys are private to a device (the list itself,
+// sync bookkeeping, API keys), and schedulePush debounces to 2.5s, so a slider
+// being dragged sends once.
+let _mutePush=false;
+function pushSettings(){ if(!_mutePush){try{schedulePush();}catch(e){}} }
+// Applying the cloud's own settings must not push them straight back.
+function withoutPush(fn){ _mutePush=true; try{fn();} finally{_mutePush=false;} }
+try{
+  const _rawSet=localStorage.setItem.bind(localStorage);
+  localStorage.setItem=function(k,v){
+    _rawSet(k,v);
+    try{ if(typeof syncSkip==='function' && !syncSkip(k)) pushSettings(); }catch(e){}
+  };
+}catch(e){}
 function schedulePush(){if(!syncCode()||!SYNC_URL)return;clearTimeout(pushT);pushT=setTimeout(syncPush,2500);}
 // How many items are actually PERSISTED on this device? Encrypted storage isn't
 // an array, so it answers -1 for "can't tell" rather than 0 — the difference
@@ -16442,10 +16528,13 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-14.4',
-  title:'Your devices stopped overwriting each other',
-  push:'Phone, iPad and desktop now merge instead of fighting.',
+  v:'2026-08-14.5',
+  title:'Settings follow you, and a phone on its side works',
+  push:'Themes now reach your other devices.',
   notes:[
+    'Your settings reach your other devices. Only list edits used to send anything, so a theme, an accent, a saved look, a hidden source or your home-screen order stayed on the device you set it on unless some unrelated edit happened to push afterwards. Anything you change now travels, including settings that do not exist yet.',
+    'Turning your phone sideways is worth doing again. The bars stacked exactly as they do upright and ate 234 of 390 pixels, leaving a sliver of one cover. Search and filters share a row now, the bar drops its labels, and the space goes back to your list.',
+    'Your list, your looks, your friends, your sources and your progress all ride the same code. Your API keys and AniList sign-in stay on the device they were entered on, because a key in cloud storage is a key you have given away.',
     'Sync merges instead of replacing. It used to send the whole list and let the newest copy win, which is fine on one device and quietly loses work on three: watch an episode on your phone, mark something else on the desktop, and whichever synced second erased the other. Every title now merges on its own, newest edit per title wins, and nothing gets thrown away because it arrived second.',
     'Deleting a show sticks. A merge on its own would bring back anything you removed as soon as another device synced, so a deletion now leaves a marker that travels with your list. Re-adding something later still wins, because that is the newer decision.',
     'Retro is cyberpunk now rather than dusty. Near black ground so the neon can actually be neon, magenta and cyan arguing with each other, panels with a corner milled off at an angle the way a game HUD does it, a cyan edge light down each cover and a magenta bloom under it. The wordmark is the one thing that misregisters, because a signature you use everywhere stops being one.',

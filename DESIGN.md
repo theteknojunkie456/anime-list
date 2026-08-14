@@ -571,3 +571,31 @@ functions — concurrent edits, a delete, an add, a stale device syncing last, a
 a re-add after a deletion — and asserts nothing is lost. This is the one part of
 the app where being wrong costs somebody their list, so it is proved rather than
 reasoned about.
+
+## Everything syncs, and the two things that must not
+
+`save()` pushed the list. Nothing pushed when only a SETTING changed — so a
+theme, an accent, a saved look, a hidden source or the home-screen order reached
+the cloud only if some unrelated list edit happened to push afterwards. Pick a
+theme on the desktop and the phone never hears about it.
+
+Patching every setter would have worked and then rotted: there are dozens, the
+next one added would not know to call it, and the first attempt at exactly that
+missed several. So it hangs off the one thing they all do — writing to storage.
+`localStorage.setItem` is wrapped once; any write to a key that syncs schedules a
+push. Settings that do not exist yet are covered for free.
+
+Two traps that came with it:
+
+- **The feedback loop.** Applying the cloud's settings writes them locally, which
+  schedules a push of what we just received, from every device, forever.
+  `withoutPush()` guards it — and it has to wrap the repaint as well as the
+  writes, because `applyTheme` persists the theme it applies.
+- **The list is not a setting.** `syncSkip` already excluded it, and the list has
+  its own path with its own guards.
+
+Of 82 stored keys, 65 sync. The exclusions are credentials and per-device
+bookkeeping: `anthropic_key`, the AniList tokens (`al_*`), sync bookkeeping, and
+party identity. `ai_model_*` was in that list and should not have been — which
+model you picked is a preference, not a credential. The password-derived key
+lives in sessionStorage and is never collected at all.

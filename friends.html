@@ -248,10 +248,38 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
   content:'';position:absolute;inset:0;pointer-events:none;z-index:2;
   background:repeating-linear-gradient(180deg,rgba(0,0,0,.13) 0 1px,transparent 1px 3px);
 }
-/* The aberration is a signature, so it appears once: on the wordmark. Putting
-   it on every heading was the tell that it was a filter and not a decision. */
+/* The aberration is a signature, so it appears once: on the wordmark. Putting it
+   on every heading was the tell that it was a filter and not a decision.
+   Occasionally it slips, the way a tape does when the tracking drifts — rarely
+   enough that you are never sure you saw it. */
 [data-theme=retro] .hdr-title{
   text-shadow:-1.5px 0 rgba(34,232,255,.75),1.5px 0 rgba(255,30,142,.75);
+  animation:vhsSlip 11s steps(1,end) infinite;
+}
+@keyframes vhsSlip{
+  0%,96.5%{transform:none;text-shadow:-1.5px 0 rgba(34,232,255,.75),1.5px 0 rgba(255,30,142,.75);}
+  97%{transform:translateX(-2px) skewX(-6deg);text-shadow:-4px 0 rgba(34,232,255,.9),4px 0 rgba(255,30,142,.9);}
+  97.6%{transform:translateX(3px);text-shadow:3px 0 rgba(34,232,255,.9),-3px 0 rgba(255,30,142,.9);}
+  98.2%{transform:none;text-shadow:-1.5px 0 rgba(34,232,255,.75),1.5px 0 rgba(255,30,142,.75);}
+}
+/* A tracking line crawls up the screen every few seconds — the artefact of a
+   tape being read, not an effect a browser skin would add. It sits above the
+   page and below every control, and it cannot be clicked. */
+[data-theme=retro] .ambient::after{
+  content:'';position:fixed;left:0;right:0;height:78px;pointer-events:none;z-index:0;
+  background:linear-gradient(180deg,transparent,rgba(34,232,255,.055) 42%,rgba(255,255,255,.05) 50%,rgba(255,30,142,.05) 58%,transparent);
+  animation:vhsTrack 9s linear infinite;
+}
+@keyframes vhsTrack{
+  0%{transform:translateY(102vh);opacity:0;}
+  6%{opacity:1;}
+  70%{opacity:1;}
+  100%{transform:translateY(-90vh);opacity:0;}
+}
+/* Neither of these is worth making somebody motion-sick over. */
+@media(prefers-reduced-motion:reduce){
+  [data-theme=retro] .hdr-title{animation:none;}
+  [data-theme=retro] .ambient::after{display:none;}
 }
 /* Chrome: notched where it is a panel, lit only where it is active. */
 [data-theme=retro] .search-in,[data-theme=retro] .filt-row,[data-theme=retro] .sort-btn,
@@ -314,8 +342,25 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
   background:linear-gradient(160deg,var(--bg3),var(--bg2));
   box-shadow:inset 0 0 0 1px rgba(34,232,255,.22);
 }
-[data-theme=retro] .sv-bar .track{border-radius:2px;box-shadow:inset 0 0 0 1px rgba(34,232,255,.18);}
-[data-theme=retro] .sv-bar .fill{border-radius:2px;box-shadow:0 0 10px -2px currentColor;}
+/* Segments everywhere, not just on the cards. A meter that steps reads as
+   something being counted; a smooth fill reads as a loading bar. */
+[data-theme=retro] .sv-bar .track,[data-theme=retro] .dt-epbar,
+[data-theme=retro] .sv-store-track,[data-theme=retro] .th-prev .pbar{
+  border-radius:2px;box-shadow:inset 0 0 0 1px rgba(34,232,255,.18);
+}
+/* The status bars carry their colour in an inline style, and `background` is a
+   shorthand — setting it there wipes any background-image the stylesheet adds.
+   The segments go on an overlay instead, which inline styles cannot reach. */
+[data-theme=retro] .sv-bar .fill{border-radius:2px;box-shadow:0 0 10px -2px currentColor;position:relative;}
+[data-theme=retro] .sv-bar .fill::after{
+  content:'';position:absolute;inset:0;border-radius:2px;pointer-events:none;
+  background:repeating-linear-gradient(90deg,transparent 0 5px,rgba(3,1,8,.62) 5px 7px);
+}
+[data-theme=retro] .dt-epbar .pfill,[data-theme=retro] .sv-store-fill{
+  border-radius:2px;
+  background:repeating-linear-gradient(90deg,var(--a) 0 5px,color-mix(in srgb,var(--a) 30%,#000) 5px 7px);
+  box-shadow:0 0 10px -2px var(--a);
+}
 [data-theme=retro] .sv-chip{border-radius:2px;border-color:rgba(34,232,255,.28);}
 
 /* The chat is a terminal. The app's answers sit flush against a cyan rule, yours
@@ -667,6 +712,10 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 .hbtn:active{transform:scale(0.9);}
 .hbtn.bell-on{background:color-mix(in srgb,var(--a) 22%,var(--bg3));border-color:transparent;color:var(--a2);box-shadow:0 4px 14px -6px var(--glow);}
 .hdr-actions{display:flex;align-items:center;gap:7px;flex:0 0 auto;}
+/* Shown only where the two-finger hold is impossible. On a touch screen the
+   gesture is the way in and a sixth button is just clutter. */
+.hbtn-ai{display:none;}
+@media (hover:hover) and (pointer:fine){.hbtn-ai{display:inline-flex;}}
 /* The bottom bar floats and the top chrome was a flat slab pinned to the screen
    edges, so the two halves of the app spoke different languages. Same material,
    same inset, same radius: one panel holding search and the filters.
@@ -2409,6 +2458,16 @@ body.recsel .pcard{position:relative;}
 .rc-note-in{margin:0;}
 .rc-note-x{flex-shrink:0;width:30px;height:30px;border-radius:50%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:var(--t2);display:flex;align-items:center;justify-content:center;cursor:pointer;}
 .rc-note-x .ico{width:15px;height:15px;}
+/* Same size and corner as the recommend button on your own cards, because it is
+   the same kind of thing: a small square decision about one show. */
+.rec-x{position:absolute;right:5px;bottom:5px;z-index:4;width:30px;height:30px;
+  display:flex;align-items:center;justify-content:center;border-radius:6px;
+  background:rgba(8,8,11,.82);border:1px solid rgba(255,255,255,.16);color:#fff;
+  opacity:0;transform:translateY(3px);transition:opacity .14s ease,transform .14s ease,background-color .14s;}
+.rec-x .ico{width:14px;height:14px;}
+.rec-card:hover .rec-x,.rec-x:focus-visible{opacity:1;transform:none;}
+.rec-x:hover{background:var(--a);border-color:transparent;color:var(--aFg);}
+@media(hover:none){.rec-x{opacity:1;transform:none;}}
 .rc-note-x:active{transform:scale(.92);}
 /* keep the primary Send/Next action pinned so a long friend list never buries it */
 .rec-cta{position:sticky;bottom:8px;z-index:5;margin-top:16px;box-shadow:0 7px 22px -5px var(--glow),0 -12px 20px -6px var(--bg2);}
@@ -3023,6 +3082,7 @@ body.recsel .pcard{position:relative;}
   <div class="hdr">
     <div class="hdr-title" role="button" tabindex="0" onclick="adminTap()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();adminTap();}"><b>Watch</b><i>list</i></div>
     <div class="hdr-actions">
+      <button class="hbtn hbtn-ai" onclick="openAIChat()" title="Ask about your list" aria-label="Ask about your list"><i data-ic="sparkles"></i></button>
       <button class="hbtn" onclick="openHub()" title="Friends & Watch Party" aria-label="Friends and Watch Party"><i data-ic="users"></i></button>
       <button class="hbtn" onclick="openForYou()" title="For You — tailored recommendations" aria-label="For You recommendations"><i data-ic="compass"></i></button>
       <button class="hbtn" onclick="openSchedule()" title="Weekly airing schedule" aria-label="Weekly airing schedule"><i data-ic="calendar"></i></button>
@@ -11136,7 +11196,7 @@ function renderSettings(){
      go:"openSheet('backupSheet')", warn:!backedUp||backupFailing()},
     {ic:'lock',     h:'Password',            p:encEnabled()?'On — your list is encrypted':'Off', go:"openSheet('securitySheet')"},
     {ic:'bell',     h:'Notifications',       p:notifyOn()?'On — you\'ll be told when an episode airs':'Off', go:'openNotifySheet()'},
-    {ic:'sparkles', h:'AI & chat key',       p:getKey()?'On — '+(keyProvider(getKey())||'key')+' connected':'Off — add a free key to unlock chat', go:"openSheet('aiSheet')"},
+    {ic:'sparkles', h:'AI & chat key',       p:getKey()?'On — '+(keyProvider(getKey())||'key')+' connected':'Off — add a free key to unlock chat', go:"openAIChat()"},
     {ic:'play',     h:'Sources', p:'Where Watch now / Read now open', go:"openSheet('sourceSheet')"},
     {ic:'refresh',  h:'AniList sync',        p:alConnected()?'On — '+alUser()+' · progress syncs both ways':'Off — connect to sync progress everywhere', go:"openSheet('anilistSheet')"},
     {ic:'clipboard',h:'Import / Export',     p:'Paste a list in, or copy yours out', go:"openSheet('importSheet')"},
@@ -13938,17 +13998,32 @@ function friendRecRowHTML(){
   // once a rec is on your list it leaves this row — matched by AniList id OR title,
   // so title-only recs (no id) also drop out after you add them.
   const inList=it=>(it.aniId&&mineAni.has(it.aniId))||mineTitle.has(normTitle(it.title));
-  const keys=Object.keys(map).filter(k=>{const it=map[k].item;const kind=it.kind==='read'?'read':'watch';return kind===viewKind && !inList(it);});
+  const gone=recDismissed();
+  const keys=Object.keys(map).filter(k=>{const it=map[k].item;const kind=it.kind==='read'?'read':'watch';return kind===viewKind && !inList(it) && !gone[k];});
   if(!keys.length)return '';
   keys.sort((x,y)=>Math.max(0,...map[y].senders.map(s=>s.at))-Math.max(0,...map[x].senders.map(s=>s.at)));
   return `<div class="row-sec"><div class="row-head"><div class="row-title" style="--rc:var(--a2)">Friends recommend</div><div class="row-count">${keys.length}</div></div><div class="row-scroll">${keys.map(k=>recCard(k,map[k])).join('')}</div></div>`;
+}
+// Turning one down is an answer too. Dismissals are keyed the same way the recs
+// are, and they sync with everything else, so a shrug on the phone is a shrug on
+// the desktop.
+const RECX_KEY='recs_dismissed';
+function recDismissed(){try{const v=JSON.parse(localStorage.getItem(RECX_KEY)||'{}');return (v&&typeof v==='object')?v:{};}catch(e){return{};}}
+function dismissRec(k,ev){
+  try{ev.stopPropagation();ev.preventDefault();}catch(e){}
+  const key=decodeURIComponent(String(k||'')); if(!key)return;
+  const m=recDismissed(); m[key]=Date.now();
+  try{localStorage.setItem(RECX_KEY,JSON.stringify(m));}catch(e){}
+  try{render();}catch(e){}
+  toast('Hidden. Your friend isn\u2019t told',2600);
 }
 function recCard(k,rec){
   const it=rec.item,s0=rec.senders[0],col=friendColor(s0.code);
   const img=it.img?`<img class="pcard-img" src="${escH(it.img)}" loading="lazy" alt="" onerror="artFallback(this,${JSON.stringify(String(it.title||'?')).replace(/"/g,'&quot;')},'pcard-ph')">`:`<div class="pcard-ph">${escH(((it.title||'?').trim()[0]||'?').toUpperCase())}</div>`;
   const more=rec.senders.length>1?` +${rec.senders.length-1}`:'';
   return `<div class="pcard rec-card" style="--fc:${col}" onclick="openRecDetail('${encodeURIComponent(k)}')">
-    <div class="pcard-wrap rec-wrap">${img}<span class="rec-flag" style="background:${col}">${icon('users')}</span></div>
+    <div class="pcard-wrap rec-wrap">${img}<span class="rec-flag" style="background:${col}">${icon('users')}</span>
+      <button class="rec-x" onclick="dismissRec('${encodeURIComponent(k)}',event)" aria-label="Hide this recommendation" title="Not for me">${icon('x')}</button></div>
     <div class="pcard-title">${escH(it.title)}</div>
     <div class="rec-by" style="color:${col}">${escH(friendDisplay(s0.code,s0.name))}${more}</div>
   </div>`;
@@ -16638,10 +16713,13 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-14.8',
-  title:'A security pass',
-  push:'One real hole, closed.',
+  v:'2026-08-14.9',
+  title:'Ask about your list from a desktop, and turn a recommendation down',
+  push:'Plus Retro learned to glitch.',
   notes:[
+    'The chat has a way in on a desktop. It was summoned by holding two fingers on your list, which a mouse cannot do, so there is a button in the header now on anything with a pointer. Both routes open the chat itself rather than whichever panel you last had open.',
+    'A recommendation can be turned down. They used to leave the row only when you added the show, so anything you did not fancy sat there forever. Your friend is not told.',
+    'Retro counts in segments everywhere now, not just on the cards, and it has started behaving like a tape: a tracking line drifts up the screen every few seconds and the wordmark slips every so often. Both stop if your device asks for less motion.',
     'Watch-party sync only accepts messages from YouTube itself now. The check was a pattern rather than a list, so an address merely containing youtube.com satisfied it.',
     'Card size actually changes the cards. It only ever fed a rule that lives in the desktop layout, so on a phone all three settings drew the same thing and the control looked broken.',
     'On a desktop, opening a title no longer freezes your list. The panel slides in beside it and the list was left visible, unblocked and completely dead until you pressed Back.',
@@ -16950,6 +17028,13 @@ document.addEventListener('keydown',e=>{
 // the AI opens. Two fingers on purpose — one-finger holds collide with scrolling,
 // text selection, and poster long-press; two fingers almost never happen by
 // accident. Moving apart (a pinch/zoom) or lifting cancels it.
+// One way in, wherever you are: the two-finger hold on touch, this everywhere
+// else. Both land on the chat tab rather than whichever tab was last open —
+// asking for the chat and getting the recommendations panel is the same as not
+// finding it.
+function openAIChat(){
+  try{openSheet('aiSheet');setAITab('chat');}catch(e){}
+}
 const AI_HOLD_MS=600;
 let _aiTimer=null,_aiArmed=false,_aiStartSpread=0;
 function _spread(t){const a=t[0],b=t[1];return Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);}

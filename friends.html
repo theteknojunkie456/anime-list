@@ -288,6 +288,74 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 }
 [data-theme=retro] .pcard-badge{border-radius:2px 0 2px 0;background:rgba(3,1,8,.92);}
 
+/* ── RETRO, EVERYWHERE ELSE ─────────────────────────────────────────────────
+   A look that stops at the home screen is a skin, and you find its edge the
+   first time you open anything. Every panel the app can put in front of you gets
+   the same treatment: milled corner, cyan hairline, magenta only where something
+   is live or selected. */
+
+/* Panels. Sheets rise from the bottom edge, so they are cut on the top corners
+   only — a notch on a corner that is off-screen is just a wasted gesture. */
+[data-theme=retro] .sheet,[data-theme=retro] .paint-dock{
+  border-radius:2px;clip-path:polygon(0 var(--notch),var(--notch) 0,100% 0,100% 100%,0 100%);
+  border-top:1px solid rgba(34,232,255,.35);
+}
+[data-theme=retro] .confirm-box,[data-theme=retro] .bulk-menu,
+[data-theme=retro] .toast,[data-theme=retro] .onb-card,[data-theme=retro] .sv-store{
+  border-radius:2px;clip-path:var(--cut);
+}
+[data-theme=retro] .toast{--notch:8px;box-shadow:0 0 24px -6px var(--glow);}
+[data-theme=retro] .bulk-menu{box-shadow:0 0 0 1px rgba(34,232,255,.28),0 18px 44px -14px #000;}
+
+/* Stats read as a console: the tiles are cut, the numbers already run in mono,
+   and the bars are lit rather than filled. */
+[data-theme=retro] .sv-heronum{
+  border-radius:2px;clip-path:var(--cut);--notch:9px;
+  background:linear-gradient(160deg,var(--bg3),var(--bg2));
+  box-shadow:inset 0 0 0 1px rgba(34,232,255,.22);
+}
+[data-theme=retro] .sv-bar .track{border-radius:2px;box-shadow:inset 0 0 0 1px rgba(34,232,255,.18);}
+[data-theme=retro] .sv-bar .fill{border-radius:2px;box-shadow:0 0 10px -2px currentColor;}
+[data-theme=retro] .sv-chip{border-radius:2px;border-color:rgba(34,232,255,.28);}
+
+/* The chat is a terminal. The app's answers sit flush against a cyan rule, yours
+   are the magenta ones — the same two colours doing the same two jobs as
+   everywhere else. */
+[data-theme=retro] .chat-thread{font-variant-numeric:tabular-nums;}
+[data-theme=retro] .chat-msg{border-radius:2px;}
+[data-theme=retro] .chat-msg.me{box-shadow:inset 2px 0 0 0 var(--a);}
+[data-theme=retro] .chat-msg.ai{box-shadow:inset 2px 0 0 0 #22e8ff;}
+[data-theme=retro] .chat-pre{border-radius:2px;border-left:2px solid #22e8ff;
+  font-family:ui-monospace,'SFMono-Regular',Menlo,monospace;}
+[data-theme=retro] .chat-input-row,[data-theme=retro] .ai-prompt-in,
+[data-theme=retro] .chat-chip,[data-theme=retro] .aitab{border-radius:2px;}
+[data-theme=retro] .chat-send,[data-theme=retro] .ai-run-btn{border-radius:2px;clip-path:var(--cut);--notch:7px;}
+
+/* A title's own page. */
+[data-theme=retro] .dt-cover{border-radius:2px;clip-path:var(--cut);box-shadow:inset 1px 1px 0 0 rgba(34,232,255,.5);}
+[data-theme=retro] .dt-watch{border-radius:2px;clip-path:var(--cut);--notch:9px;box-shadow:0 0 22px -6px var(--a);}
+[data-theme=retro] .dt-epn,[data-theme=retro] .dt-fav,[data-theme=retro] .dpick,
+[data-theme=retro] .dt-ch,[data-theme=retro] .dt-note{border-radius:2px;}
+[data-theme=retro] .dt-epn.next{box-shadow:0 0 12px -3px var(--a);}
+[data-theme=retro] .dt-label{color:#22e8ff;}
+[data-theme=retro] .dt-epbar .pfill{box-shadow:0 0 8px -2px var(--a);}
+
+/* Party and player. */
+[data-theme=retro] .call-tile,[data-theme=retro] .pt-code,[data-theme=retro] .pt-pick,
+[data-theme=retro] .pv-frame-wrap,[data-theme=retro] .pt-qitem{border-radius:2px;}
+[data-theme=retro] .call-tile{box-shadow:inset 0 0 0 1px rgba(34,232,255,.28);}
+[data-theme=retro] .call-tile.speaking{box-shadow:inset 0 0 0 2px var(--a),0 0 22px -6px var(--a);}
+[data-theme=retro] .pt-code-val{font-family:ui-monospace,'SFMono-Regular',Menlo,monospace;color:#22e8ff;}
+[data-theme=retro] .pv-wrong-b,[data-theme=retro] .pv-host-main,[data-theme=retro] .pv-nav-mark{border-radius:2px;}
+
+/* Anything left that is a field or a small action. */
+[data-theme=retro] .cbtn,[data-theme=retro] .parse-btn,[data-theme=retro] .src-chip,
+[data-theme=retro] .fr-row,[data-theme=retro] .set-row,[data-theme=retro] .synccode,
+[data-theme=retro] .th-reset,[data-theme=retro] .acc-none,[data-theme=retro] .glow-mode .glow-sw{
+  border-radius:2px;
+}
+[data-theme=retro] .src-chip.on{box-shadow:0 0 12px -3px var(--a);}
+
 /* ── OPTION DIAGRAMS ──
    Each one is a drawing of what its button does, in the same accent the app is
    currently using, so the diagram is itself a preview. Built from divs because
@@ -16528,10 +16596,11 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-14.5',
-  title:'Settings follow you, and a phone on its side works',
-  push:'Themes now reach your other devices.',
+  v:'2026-08-14.6',
+  title:'Retro reaches every screen',
+  push:'Stats, chat, your titles, parties. All of it.',
   notes:[
+    'Retro no longer stops at the home screen. Stats read as a console with lit bars and milled tiles, the chat runs in mono against a cyan rule for the app and a magenta one for you, a title\u2019s page gets the cut cover and a glowing Watch, and sheets rise with a notched top edge. A look that ends the moment you open something is a skin, and you find its edge immediately.',
     'Your settings reach your other devices. Only list edits used to send anything, so a theme, an accent, a saved look, a hidden source or your home-screen order stayed on the device you set it on unless some unrelated edit happened to push afterwards. Anything you change now travels, including settings that do not exist yet.',
     'Turning your phone sideways is worth doing again. The bars stacked exactly as they do upright and ate 234 of 390 pixels, leaving a sliver of one cover. Search and filters share a row now, the bar drops its labels, and the space goes back to your list.',
     'Your list, your looks, your friends, your sources and your progress all ride the same code. Your API keys and AniList sign-in stay on the device they were entered on, because a key in cloud storage is a key you have given away.',

@@ -72,6 +72,10 @@ viewing a friend's list never touches or overwrites your personal WatchList.
 - **Read-only for friends.** Viewing a friend's list can never edit it — imports
   copy into *your* list only.
 - **Revocable.** Rotate your sync code to stop sharing the live version.
+- **Turning down a recommendation is visible to the person who sent it** — and
+  only to them. Hiding a card tells that friend you passed on that one show; it
+  shows up as a line in their *You recommended* list, never as a notification.
+  Nobody else can see it, and it says nothing about the rest of your list.
 - **Password-protected lists.** If you set a password on your list (main app → Settings → Password), the cloud copy is **encrypted**. A friend then needs *both* your sync code **and** the password to view it — `friends.html` will prompt for the password on load. Without it, the list can't be read.
 
 ---

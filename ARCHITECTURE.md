@@ -269,6 +269,13 @@ payload** (`mergeRec` / `mergeFriendMsg`) so delivery doesn't wait on KV
 propagation — that's what makes it feel instant. Client side: `connectFriendWS()`
 opens the socket; the app also pulls on focus and on network reconnect.
 
+Turning a recommendation down is an answer, so it travels back: `rec_pass` files
+a `{from,title,aniId,at}` record under `pass:<sender>`, one per friend per show,
+and `rec_pull` returns it alongside `recs`. The sender sees it as a quiet line in
+their **You recommended** list — never a push, and the `CHAN` nudge carries only
+the title, so nothing on the wire says who turned it down. `dismissRec()` sends
+it fire-and-forget: hiding a card is a local act and never waits on the network.
+
 The client never uploads the plaintext list to the friends mailboxes — only
 metadata + per-show notes.
 

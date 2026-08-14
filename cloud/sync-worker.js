@@ -279,13 +279,48 @@ export default {
       return json({ ok: true, removed: before - list.length }, 200, cors);
     }
 
+    // Your mailbox in one call: what people sent you, and what they made of what
+    // you sent them. Passes ride along on the pull the app already makes.
     if (op === 'rec_pull') {
       const code = String(body.code || '');
       if (!/^[A-Za-z0-9]{10,64}$/.test(code)) return json({ error: 'bad code' }, 400, cors);
       let list = [];
       try { const s = await env.LISTS.get('rec:' + code); if (s) list = JSON.parse(s); } catch {}
       if (!Array.isArray(list)) list = [];
-      return json({ recs: list }, 200, cors);
+      let passes = [];
+      try { const p = await env.LISTS.get('pass:' + code); if (p) passes = JSON.parse(p); } catch {}
+      if (!Array.isArray(passes)) passes = [];
+      return json({ recs: list, passes }, 200, cors);
+    }
+
+    // ── passing on a recommendation ──────────────────────────────────────────
+    // Turning one down is an answer, and the sender is the one person entitled to
+    // hear it. It files under THEIR code, carries only the show they already sent,
+    // and never pushes — it waits in their sent list until they look. A quiet
+    // answer, not a callout.
+    if (op === 'rec_pass') {
+      const to = String(body.to || '');
+      const from = (body.from && typeof body.from === 'object') ? body.from : {};
+      const fromCode = String(from.code || '');
+      const fromName = String(from.name || 'A friend').slice(0, 40);
+      if (!/^[A-Za-z0-9]{10,64}$/.test(to)) return json({ error: 'bad to' }, 400, cors);
+      if (!/^[A-Za-z0-9]{10,64}$/.test(fromCode)) return json({ error: 'bad from' }, 400, cors);
+      const title = String(body.title || '').slice(0, 200);
+      const aniId = Number(body.aniId) || 0;
+      if (!title && !aniId) return json({ error: 'no show' }, 400, cors);
+      const key = 'pass:' + to;
+      let list = [];
+      try { const s = await env.LISTS.get(key); if (s) list = JSON.parse(s); } catch {}
+      if (!Array.isArray(list)) list = [];
+      // One pass per friend per show — hiding it twice isn't two answers.
+      const same = p => p && p.from && p.from.code === fromCode &&
+        (aniId ? p.aniId === aniId : String(p.title || '').toLowerCase() === title.toLowerCase());
+      list = list.filter(p => !same(p));
+      list.push({ from: { code: fromCode, name: fromName }, title, aniId, at: Date.now() });
+      if (list.length > 200) list = list.slice(list.length - 200);
+      await env.LISTS.put(key, JSON.stringify(list));
+      ctx.waitUntil(notifyChan(env, to, 'pass', { title }));
+      return json({ ok: true }, 200, cors);
     }
 
     // ── friend requests (mutual) ─────────────────────────────────────────────

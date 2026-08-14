@@ -1954,6 +1954,9 @@ textarea.ai-prompt-in{resize:none;line-height:1.45;display:block;}
 .src-name{font-family:var(--fd);font-size:15px;font-weight:800;color:var(--t1);display:flex;align-items:center;gap:8px;}
 .src-tag{font-size:10px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--a2);background:var(--ag);border:1px solid var(--b2);border-radius:6px;padding:2px 6px;}
 .src-sub{font-size:12px;color:var(--t3);margin-top:3px;}
+/* A friend passing on what you sent — stated, not flagged. Same size as the rest
+   of the line, just held apart from it. */
+.rec-passed{color:var(--t2);opacity:.9;}
 /* What's-new pager — one card per change, swiped through, then done for good. */
 .wn-pager{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding:2px 0 4px;}
 .wn-pager::-webkit-scrollbar{display:none;}
@@ -13952,6 +13955,7 @@ function connectFriendWS(){
       let d=null; try{d=JSON.parse(e.data);}catch(err){}
       if(d&&d.kind==='rec'){ if(d.data)mergeRec(d.data); setTimeout(pullRecs,3000); }        // instant merge + reconcile once KV is consistent
       else if(d&&d.kind==='fr'){ if(d.data)mergeFriendMsg(d.data); setTimeout(pullFriendReqs,3000); }
+      else if(d&&d.kind==='pass'){ setTimeout(()=>{pullRecs().then(()=>{try{renderFriends();}catch(e){}});},3000); }   // their answer, waiting in your sent list
       else if(d&&d.kind==='party_invite'){ if(d.data)onPartyInvite(d.data); }
       else { pullRecs(); pullFriendReqs(); }   // plain-ping fallback
     };
@@ -13961,7 +13965,13 @@ function connectFriendWS(){
 }
 
 let recsIn=[];
-function loadRecsCache(){try{const a=JSON.parse(localStorage.getItem('recs_in')||'[]');recsIn=Array.isArray(a)?a:[];}catch{recsIn=[];}}
+// Passes on things YOU sent: {from:{code,name},title,aniId,at}. Cached like the
+// recs themselves so the sent list reads the same offline.
+let recsPassed=[];
+function loadRecsCache(){
+  try{const a=JSON.parse(localStorage.getItem('recs_in')||'[]');recsIn=Array.isArray(a)?a:[];}catch{recsIn=[];}
+  try{const p=JSON.parse(localStorage.getItem('recs_passed')||'[]');recsPassed=Array.isArray(p)?p:[];}catch{recsPassed=[];}
+}
 async function pullRecs(){
   // Same gate, same consequence: recommendations sent to the app went nowhere.
   const code=myFriendCode(); if(!code) return;
@@ -13971,7 +13981,9 @@ async function pullRecs(){
     const j=await r.json();
     recsIn=Array.isArray(j.recs)?j.recs:[];
     recsIn.forEach(e=>refreshFriendName(e.from&&e.from.code,e.from&&e.from.name,e.at));   // keep friend names current
+    recsPassed=Array.isArray(j.passes)?j.passes:[];
     try{localStorage.setItem('recs_in',JSON.stringify(recsIn));}catch{}
+    try{localStorage.setItem('recs_passed',JSON.stringify(recsPassed));}catch{}
     const ls=document.getElementById('lockScreen');
     if(!ls||getComputedStyle(ls).display==='none'){try{render();}catch(e){}}
   }catch(e){}
@@ -14014,8 +14026,26 @@ function dismissRec(k,ev){
   const key=decodeURIComponent(String(k||'')); if(!key)return;
   const m=recDismissed(); m[key]=Date.now();
   try{localStorage.setItem(RECX_KEY,JSON.stringify(m));}catch(e){}
+  const rec=recByAni()[key];
   try{render();}catch(e){}
-  toast('Hidden. Your friend isn\u2019t told',2600);
+  const who=tellPassed(rec);
+  toast(who?`Hidden. ${who} will see you passed`:'Hidden',2600);
+}
+// Somebody took the trouble to send it, so they get the answer \u2014 but quietly, in
+// their own sent list, never as a notification. Fire-and-forget: hiding it is a
+// local act and must not wait on, or fail with, the network.
+function tellPassed(rec){
+  if(!rec)return '';
+  const it=rec.item||{},from={code:myFriendCode(),name:myFriendName()||'A friend'};
+  if(!from.code)return '';
+  const senders=(rec.senders||[]).filter(s=>s&&s.code);
+  senders.forEach(s=>{
+    try{fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({op:'rec_pass',to:s.code,from,title:it.title||'',aniId:it.aniId||0})}).catch(()=>{});}catch(e){}
+  });
+  if(!senders.length)return '';
+  const first=friendDisplay(senders[0].code,senders[0].name);
+  return senders.length>1?`${first} +${senders.length-1}`:first;
 }
 function recCard(k,rec){
   const it=rec.item,s0=rec.senders[0],col=friendColor(s0.code);
@@ -14023,7 +14053,7 @@ function recCard(k,rec){
   const more=rec.senders.length>1?` +${rec.senders.length-1}`:'';
   return `<div class="pcard rec-card" style="--fc:${col}" onclick="openRecDetail('${encodeURIComponent(k)}')">
     <div class="pcard-wrap rec-wrap">${img}<span class="rec-flag" style="background:${col}">${icon('users')}</span>
-      <button class="rec-x" onclick="dismissRec('${encodeURIComponent(k)}',event)" aria-label="Hide this recommendation" title="Not for me">${icon('x')}</button></div>
+      <button class="rec-x" onclick="dismissRec('${encodeURIComponent(k)}',event)" aria-label="Pass on this recommendation — the friend who sent it is told" title="Not for me — they'll see you passed">${icon('x')}</button></div>
     <div class="pcard-title">${escH(it.title)}</div>
     <div class="rec-by" style="color:${col}">${escH(friendDisplay(s0.code,s0.name))}${more}</div>
   </div>`;
@@ -14499,6 +14529,21 @@ function confirmUnsendEverything(){
   if(!confirm(`Take back every recommendation you have ever sent?\n\nThis sweeps all ${n} friend${n===1?'':'s'} and removes everything filed under your code — including sends from before WatchList kept a list of them.\n\nIt cannot reach anyone you have since removed as a friend, and anything already read has been read.`))return;
   unsendEverything();
 }
+// What they made of it. Only ever names shows THIS entry actually carried, so a
+// pass on one thing can't read as a pass on everything you sent that friend.
+function passedTitles(e){
+  if(!e||!e.code||!Array.isArray(recsPassed)||!recsPassed.length)return '';
+  const sent=(e.titles||[]).map(t=>String(t||'').toLowerCase()).filter(Boolean);
+  if(!sent.length)return '';
+  const hit=[];
+  recsPassed.forEach(p=>{
+    if(!p||!p.from||p.from.code!==e.code)return;
+    const t=String(p.title||'').toLowerCase();
+    if(t&&sent.includes(t)&&!hit.includes(p.title))hit.push(p.title);
+  });
+  if(!hit.length)return '';
+  return hit.length===1?`passed on ${hit[0]}`:`passed on ${hit.length} of them`;
+}
 function sentRecsHTML(){
   const l=recsSent();
   const sweep=(friendsList().length||l.length)
@@ -14511,10 +14556,11 @@ function sentRecsHTML(){
     ${l.slice(0,12).map(e=>{
       const who=friendDisplay(e.code,'A friend');
       const when=(()=>{const d=Math.round((Date.now()-(e.at||0))/86400000);return d<=0?'today':d===1?'yesterday':d+' days ago';})();
+      const passed=passedTitles(e);
       return `<div class="src-opt" style="display:flex;align-items:center;gap:10px">
         <div style="flex:1;min-width:0">
           <div class="src-name">${escH(e.titles&&e.titles.length?e.titles.join(', '):'A recommendation')}</div>
-          <div class="src-sub">to ${escH(who)} · ${escH(when)}</div>
+          <div class="src-sub">to ${escH(who)} · ${escH(when)}${passed?` · <span class="rec-passed">${escH(passed)}</span>`:''}</div>
         </div>
         <button class="src-chip" onclick="unsendRec('${escH(e.id)}','${escH(e.code)}')">Take back</button>
       </div>`;}).join('')}${sweep}`;
@@ -16713,12 +16759,12 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-14.9',
+  v:'2026-08-14.10',
   title:'Ask about your list from a desktop, and turn a recommendation down',
   push:'Plus Retro learned to glitch.',
   notes:[
     'The chat has a way in on a desktop. It was summoned by holding two fingers on your list, which a mouse cannot do, so there is a button in the header now on anything with a pointer. Both routes open the chat itself rather than whichever panel you last had open.',
-    'A recommendation can be turned down. They used to leave the row only when you added the show, so anything you did not fancy sat there forever. Your friend is not told.',
+    'A recommendation can be turned down, and the friend who sent it finds out. Somebody went to the trouble of picking it, so a shrug now travels back to them — quietly, as a line in their own sent list, never as a notification. It names only that one show, and only they can see it.',
     'Retro counts in segments everywhere now, not just on the cards, and it has started behaving like a tape: a tracking line drifts up the screen every few seconds and the wordmark slips every so often. Both stop if your device asks for less motion.',
     'Watch-party sync only accepts messages from YouTube itself now. The check was a pattern rather than a list, so an address merely containing youtube.com satisfied it.',
     'Card size actually changes the cards. It only ever fed a rule that lives in the desktop layout, so on a phone all three settings drew the same thing and the control looked broken.',

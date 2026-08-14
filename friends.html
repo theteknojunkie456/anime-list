@@ -21,7 +21,7 @@
      rest of the head parses removes a DNS+TLS round trip from every cold start. -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Manrope:wght@400..800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Manrope:wght@400..800&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 <style>
 :root{
@@ -230,6 +230,16 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
    dark and only one or two things are lit. The first attempt glowed everything
    and misregistered every heading, which is how you get a costume instead of a
    look. */
+/* The type. A pixel face is only crisp at the size it was drawn for and whole
+   multiples of it — Silkscreen is an 8px design, so it is put on the DISPLAY role
+   only (wordmark, section heads, card titles, readouts) and the body stays
+   Manrope. That is the pairing the game-UI writing all lands on: one expressive
+   face for the furniture, one plainly readable one for anything you actually
+   have to read. Setting the whole app in pixels is the mistake that makes a
+   retro skin unusable, and this app is mostly prose — titles, notes, times. */
+[data-theme=retro]{
+  --fd:'Silkscreen','Bricolage Grotesque',-apple-system,sans-serif;
+}
 [data-theme=retro]{
   --notch:10px;
   --cut:polygon(0 0,calc(100% - var(--notch)) 0,100% var(--notch),100% 100%,var(--notch) 100%,0 calc(100% - var(--notch)));
@@ -436,10 +446,57 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 /* An active chip is stated by a hard lit edge, not a halo. */
 [data-theme=retro] .fchip.on{border-radius:2px;box-shadow:inset 0 -2px 0 0 var(--a),inset 1px 1px 0 0 rgba(34,232,255,.35);}
 [data-theme=retro] .nav{border-radius:0;border-top:1px solid rgba(34,232,255,.35);}
+/* The last of the pills. Squaring the big controls left the small ones behind,
+   and a lozenge next to a bevelled key is the one thing that still says 2026.
+   Dots included: a round dot is a circle, a square dot is a pixel. */
+[data-theme=retro] .fchip,[data-theme=retro] .chip,[data-theme=retro] .s-chip,[data-theme=retro] .src-chip,
+[data-theme=retro] .sv-chip,[data-theme=retro] .pt-chip,[data-theme=retro] .chat-chip,
+[data-theme=retro] .dt-eps-tag,[data-theme=retro] .pcard-seas,[data-theme=retro] .hero-air,
+[data-theme=retro] .bb-count,[data-theme=retro] .bb-dot,[data-theme=retro] .wn-dot,
+[data-theme=retro] .sched-today-pill,[data-theme=retro] .sched-today-btn,
+[data-theme=retro] .wt-tag,[data-theme=retro] .upd-kind,[data-theme=retro] .party-pill,
+[data-theme=retro] .pt-live,[data-theme=retro] .pt-sys,[data-theme=retro] .fy-score,
+[data-theme=retro] .th-back,[data-theme=retro] .pk-btn,[data-theme=retro] .pk-mood,
+[data-theme=retro] .dt-next-go,[data-theme=retro] .dt-seenall,[data-theme=retro] .fixbar-b,
+[data-theme=retro] .onb-next,[data-theme=retro] .onb-imp,[data-theme=retro] .bulk-b,
+[data-theme=retro] .fr-accept,[data-theme=retro] .recsel-done,[data-theme=retro] .paint-done,
+[data-theme=retro] .sheet-handle,[data-theme=retro] .ct-tgl-track,[data-theme=retro] .hl-sw,
+[data-theme=retro] .call-person,[data-theme=retro] .sv-store-track,[data-theme=retro] .sv-store-fill{
+  border-radius:2px;
+}
+/* Pixels, because that is what the art was made of. The trick is to hand the
+   browser a box a third the size and scale it back up with nearest-neighbour: it
+   rasterises small, then enlarges without smoothing, which is the same thing a
+   console did to a sprite. transform does not affect layout, so the margins put
+   back the space the scaled-up image no longer claims and nothing moves — the
+   scanline and colour overlays still line up with the artwork underneath.
+   3 is "slightly", the way a cover looked on a CRT. 4+ turns it into Lego. */
+[data-theme=retro] .pcard-img{
+  image-rendering:pixelated;
+  width:calc(var(--card-w,104px) / 3);
+  height:calc(var(--card-w,104px) * 1.42 / 3);
+  margin-right:calc(var(--card-w,104px) / 3 * 2);
+  margin-bottom:calc(var(--card-w,104px) * 1.42 / 3 * 2);
+  transform:scale(3);
+  transform-origin:top left;
+}
 /* Numbers as a readout. */
-[data-theme=retro] .row-count,[data-theme=retro] .fn,[data-theme=retro] .rz-at,
+/* .fn is NOT in this list. It is the count inside a filter chip, about 10px, and
+   an 8px pixel face at 10px is not small type — it is broken type: "10" came out
+   as two smudges and "4" as a glyph that is not a 4. Pixel faces do not degrade
+   gracefully below their design size, so anything this small keeps the mono. */
+[data-theme=retro] .row-count,[data-theme=retro] .rz-at,
 [data-theme=retro] .rz-ep,[data-theme=retro] .hero-prog span,[data-theme=retro] .sv-heronum .v{
-  font-family:ui-monospace,'SFMono-Regular',Menlo,monospace;letter-spacing:-.02em;
+  font-family:'Silkscreen',ui-monospace,'SFMono-Regular',Menlo,monospace;letter-spacing:0;
+}
+[data-theme=retro] .fn{font-family:ui-monospace,'SFMono-Regular',Menlo,monospace;letter-spacing:-.02em;}
+/* The segmented control's own shell stayed a lozenge: its 99px sits in a
+   multi-line rule further down the file and the theme's override tied with it.
+   :root wins the tie outright rather than leaving it to source order. */
+:root[data-theme=retro] .filt-row,:root[data-theme=retro] .fchip,
+:root[data-theme=retro] .search-wrap,:root[data-theme=retro] .sort-btn,
+:root[data-theme=retro] .topbar{
+  border-radius:2px;
 }
 /* Progress steps rather than slides, and the track is a cut channel. */
 [data-theme=retro] .pbar{border-radius:2px;background:rgba(0,0,0,.6);box-shadow:inset 0 0 0 1px rgba(34,232,255,.22);}
@@ -16902,10 +16959,13 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-14.11',
-  title:'Black is black now, and Retro stopped being a dark theme in costume',
-  push:'Plus your saved looks keep the colour you picked.',
+  v:'2026-08-14.12',
+  title:'Retro is made of pixels now',
+  push:'Covers, type and every last corner.',
   notes:[
+    'Retro has its own type. Section heads, titles, the wordmark and every readout are set in a pixel face; anything you actually have to read — notes, times, sub-lines — stays as it was. A pixel face is only sharp at the size it was drawn for, so the small counts inside the filter chips keep the old numerals: at ten pixels the pixel face turned "10" into two smudges and "4" into something that was not a 4.',
+    'Covers are pixels. Each one is drawn a third of the size and blown back up without smoothing, which is exactly what a console did to a sprite — so the artwork has visible pixels instead of a smooth photograph, and nothing moved on the page to do it.',
+    'The last of the rounded corners are gone. Chips, tags, dots, toggles, the filter bar and the panel it sits in were all still lozenges next to controls that had become square keys. A round dot is a circle; a square dot is a pixel.',
     'Black is black. The five greys everything is built on carried a blue cast, and a violet wash sat over the whole app that no setting could reach — not even turning the glow off. The wash is dimmer, the greys are neutral, and Glow off now actually turns it off.',
     'A look you saved comes back as the look you saved. Picking a theme deliberately drops any accent you had chosen, and that same step was wiping the accent belonging to your own theme — so returning to it handed you the default one instead. It kept its backgrounds, which is why it looked almost right and never quite.',
     'Retro is hard-edged now. Nothing in 1995 could blur, so nothing here does: artwork is sunk into its slot with a lit top-left lip and a dark bottom-right one, cards carry a hard split shadow instead of a soft bloom, and every control is square and bevelled — pressing one inverts the bevel so it physically goes in. The halos under the add key and the active chip are gone.',

@@ -462,3 +462,27 @@ wrong: ONE PIECE is how Shueisha and Toei write it. Removed. What is fixed
 instead is the user's own typing — type "one piece", match the real show, and the
 app takes the show's capitalisation silently, because that is the same title
 rather than a rename.
+
+## How the copy gave it away
+
+Asked what still made the app read as machine-made, the answer was not visual.
+It was one sentence shape, used 65 times:
+
+    Party created — share the code
+    Couldn't reach AniList — will retry
+    Link ready — send it to anyone
+
+Statement, em dash, explanation. One string in seven. It is the most
+recognisable machine-written construction in English right now, it appears
+nowhere near that often in writing by people, and no amount of visual work
+covers it. A person writing a toast writes *Party created. Share the code.*
+
+All 65 are plain sentences now, and `smoke.mjs` fails on any em dash in a string
+the user reads. Comments and commit messages are exempt, which is the honest
+place for the habit to live.
+
+The same instinct produced the second tell: **over-explanation**. Every control
+carried a gloss — "Accent · buttons, bars, highlights" — written when this lived
+in a sheet that covered the thing it changed. Over the live list, telling someone
+the accent colours buttons while they watch it colour buttons is noise. The
+glosses went; the labels are one word each.

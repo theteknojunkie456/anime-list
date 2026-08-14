@@ -2727,7 +2727,7 @@ body.recsel .pcard{position:relative;}
     <div class="lock-sub" id="joinSub">WatchList is invite-only. Send a request and Admin will let you in.</div>
     <div id="joinFields">
       <input id="joinName" class="lock-in" type="text" placeholder="Your name" autocomplete="name" required maxlength="40" enterkeyhint="send" onkeydown="if(event.key==='Enter'){event.preventDefault();requestJoin();}">
-      <div class="join-hint">So Admin knows it’s you — you can change it later.</div>
+      <div class="join-hint">So Admin knows it’s you. You can change it later.</div>
       <div class="join-hint" style="margin-top:14px;text-align:center">How did you hear about WatchList?</div>
       <div class="src-picks" id="joinSourceChips" style="justify-content:center">
         <button class="src-chip" onclick="pickSource(this,'A friend')">A friend</button>
@@ -4167,7 +4167,7 @@ async function adminInvite(mode){
   try{const r=await adminCall('/invite',{mode});
     if(r&&r.ok){const link=location.origin+location.pathname+'?invite='+r.code;
       if(out){out.style.display='block';out.textContent=link;}
-      try{await navigator.clipboard.writeText(link);toast(`${mode} link copied`);}catch{toast('Link ready — tap to copy');}
+      try{await navigator.clipboard.writeText(link);toast(`${mode} link copied`);}catch{toast('Link ready. Tap to copy');}
     }else toast((r&&r.error)||'Failed');
   }catch{toast('Failed')}
 }
@@ -4230,7 +4230,7 @@ function load(){
     try{const bak=s&&s.getItem(LSKEY+'_bak');if(bak){parseInto(bak);return;}}catch{}
     anime=migrate(JSON.parse(JSON.stringify(DEFAULT_DATA)));
     listUntrusted=true;      // sample data standing in for a real list — never publish it
-    try{setTimeout(()=>toast('Couldn’t read your saved list — a copy was kept. Restore from backup if it looks empty.'),800);}catch{}
+    try{setTimeout(()=>toast('Couldn’t read your saved list. A copy was kept, so restore from backup if this looks empty.'),800);}catch{}
   }
 }
 let saveWarned=false;let _writeChain=Promise.resolve();
@@ -4649,7 +4649,7 @@ async function tryUnlockRecovery(){                    // unlock with the recove
     envWraps={pw:env.pw,rec:env.rec,pfk:env.pfk};
     anime=migrate(JSON.parse(await decList(env,cryptoKey)));
     finishUnlock();
-    toast('Unlocked with recovery key — set a new password below');
+    toast('Unlocked. Set a new password below');
     setTimeout(()=>{try{openSheet('securitySheet');}catch{}},600);
   }catch(e){_unlockErr(i,err,'That recovery key didn’t work');}
 }
@@ -4964,7 +4964,7 @@ async function syncOnOpen(){
         // through Restore, which asks first.
         if(anime.length>=10 && arr.length < anime.length*0.4){
           try{logProblem('sync','refused a collapsed cloud copy',arr.length+' vs '+anime.length);}catch(e){}
-          toast(`Backup looked wrong (${arr.length} vs ${anime.length}) — kept this device's list`);
+          toast(`Backup looked wrong (${arr.length} vs ${anime.length}). Kept this device's list`);
           syncPush();
           return;
         }
@@ -5026,7 +5026,7 @@ async function syncRestore(){
       }}catch(_){}
     return;
   }
-  if(!/^[A-Z0-9]{10,64}$/.test(raw)){toast('That code looks off — check it');return;}
+  if(!/^[A-Z0-9]{10,64}$/.test(raw)){toast('That code looks off. Check it');return;}
   const proceed=async()=>{
     // The code used to be adopted BEFORE the pull was tried, and the failure path
     // only cleared it on a thrown error. So typing a code with nothing behind it
@@ -5050,17 +5050,17 @@ async function syncRestore(){
       }else if(inner&&Array.isArray(inner)&&inner.length){
         anime=migrate(inner);writeLocal();setSyncAt(res.updatedAt||Date.now());render();renderSyncUI();toast('Restored from cloud');
       }else if(!prevCode){ // no backup here yet — adopting an empty code is fine, seed it
-        setSyncAt(0);syncPush();renderSyncUI();toast('Code linked — this device now backs up here');
+        setSyncAt(0);syncPush();renderSyncUI();toast('Code linked. This device backs up here now');
       }else{ // there IS a working code here and the new one holds nothing — don't trade down
         restorePrev();
-        toast('Nothing is stored under that code — kept the one you had');
+        toast('Nothing is stored under that code. Kept the one you had');
       }
-    }catch{restorePrev();toast('Could not reach cloud — try again');}
+    }catch{restorePrev();toast('Couldn’t reach the cloud. Try again');}
   };
   if(anime.length)askConfirm({title:'Restore from backup?',msg:"This replaces this device's list with the backup for that code.",yes:'Replace',onYes:proceed});
   else proceed();
 }
-function syncOff(){setSyncCode('');setBackupDeclined(true);renderSyncUI();try{render();}catch(e){}toast('Backup off — data stays on this device');}
+function syncOff(){setSyncCode('');setBackupDeclined(true);renderSyncUI();try{render();}catch(e){}toast('Backup off. Your list stays on this device');}
 function copySyncCode(){const c=syncCode();if(!c)return;markCodeSeen();const done=()=>toast('Code copied');if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(c).then(done).catch(()=>fallbackCopy(c,done));else fallbackCopy(c,done);}
 function renderSyncUI(){
   const box=document.getElementById('syncBox');if(!box)return;
@@ -5133,7 +5133,7 @@ async function enableNotify(){
     if(!r.ok)throw new Error('subscribe '+r.status);
     setNotifyOn(true);
     toast(ids.length?`Notifications on · tracking ${ids.length} show${ids.length!==1?'s':''}`:'Notifications on · open your shows so covers/ids load');
-  }catch(e){toast('Could not turn on notifications — try again');}
+  }catch(e){toast('Couldn’t turn on notifications. Try again');}
   renderNotifyUI();
 }
 async function disableNotify(){
@@ -5158,13 +5158,13 @@ async function sendTestNotify(){
     toast('Sending…');
     const r=await fetch(NOTIFY_URL+'/test',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({endpoint:sub.endpoint})});
     const d=await r.json().catch(()=>({}));
-    if(r.ok&&d.ok){toast('Sent — it should arrive in a second');return;}
+    if(r.ok&&d.ok){toast('Sent. It should arrive in a second');return;}
     if(r.status===410||r.status===404){ // endpoint died (usually a reinstall) — re-subscribe
-      toast('Subscription expired — turning it back on');
+      toast('Subscription expired. Turning it back on');
       setNotifyOn(false);await enableNotify();return;
     }
     toast('Test failed'+(d.status?' ('+d.status+')':''));
-  }catch(e){toast('Test failed — check your connection');}
+  }catch(e){toast('Test failed. Check your connection');}
 }
 function scheduleNotifyUpdate(){if(!notifyOn())return;clearTimeout(notifyUpdT);notifyUpdT=setTimeout(notifyUpdate,2500);}
 // Keep the worker's tracked list current (fire-and-forget).
@@ -5587,7 +5587,7 @@ function lookFromFile(file){
     let pal=null;
     try{pal=paletteFromImage(img);}catch(e){}
     URL.revokeObjectURL(img.src);
-    if(!pal){toast('That picture has no colour to take — try one with more in it',5000);return;}
+    if(!pal){toast('No colour to take from that one. Try a busier picture',5000);return;}
     setAccent(pal.accent);
     setTint(pal.tint);
     try{renderThemeGrid();}catch(e){}
@@ -5612,7 +5612,7 @@ function lookFromFile(file){
         row.appendChild(prev);
       }
     }catch(e){}
-    toast('Colours taken from your picture — Save this look to keep it',6000);
+    toast('Colours taken. Save this look to keep it',6000);
   };
   img.onerror=()=>{URL.revokeObjectURL(img.src);toast('Could not read that image');};
   img.src=URL.createObjectURL(file);
@@ -5676,17 +5676,17 @@ function startPaint(){
   el.id='paintDock';el.className='paint-dock';
   el.innerHTML=`<div class="paint-head">
       <span class="paint-t">Look</span>
-      <span class="paint-h">changing your list, live</span>
+
       <button class="paint-done" onclick="endPaint()">Done</button>
     </div>
     <div class="paint-body">
-      <div class="paint-lb">Start with a look</div>
+      <div class="paint-lb">Looks</div>
       <div class="theme-grid" id="themeGrid"></div>
-      <div class="paint-lb">Accent <em>buttons, bars, highlights</em></div>
+      <div class="paint-lb">Accent</div>
       <div class="acc-row" id="accentRow"></div>
-      <div class="paint-lb">Background <em>the page and its panels</em></div>
+      <div class="paint-lb">Background</div>
       <div class="acc-row" id="tintRow"></div>
-      <div class="paint-lb">Status colours</div>
+      <div class="paint-lb">Statuses</div>
       <div class="stc-row" id="statusColorRow"></div>
       <div class="paint-lb">Card size</div>
       <div class="art-seg" id="densityRow"></div>
@@ -7425,7 +7425,7 @@ function renderDetail(){
         ${a.srcUrl?`<button class="parse-btn" style="flex:0 0 auto;width:auto;padding-left:16px;padding-right:16px" onclick="clearPin('${a.id}')">Clear</button>`:''}
       </div>
       <div id="dtPinOut" style="display:none;margin-top:8px;padding:9px 11px;border-radius:10px;background:var(--bg2);color:var(--t2);font:12px/1.45 ui-monospace,Menlo,monospace;word-break:break-all;white-space:pre-wrap"></div>
-      <p class="ai-desc" style="margin-top:8px;font-size:12px">Set once for this show — Watch goes straight here. Put <code>{ep}</code> where the episode number goes; Next/Prev then auto-advance.</p>
+      <p class="ai-desc" style="margin-top:8px;font-size:12px">Set once for this show, then Watch goes straight here. Put <code>{ep}</code> where the episode number goes; Next/Prev then auto-advance.</p>
     </div></details>`:progHTML}
     <div class="dt-status">${statusBtns}</div>
     </div>
@@ -7447,7 +7447,7 @@ function renderDetail(){
         ${a.srcUrl?`<button class="parse-btn" style="flex:0 0 auto;width:auto;padding-left:16px;padding-right:16px" onclick="clearPin('${a.id}')">Clear</button>`:''}
       </div>
       <div id="dtPinOut" style="display:none;margin-top:8px;padding:9px 11px;border-radius:10px;background:var(--bg2);color:var(--t2);font:12px/1.45 ui-monospace,Menlo,monospace;word-break:break-all;white-space:pre-wrap"></div>
-      <p class="ai-desc" style="margin-top:8px;font-size:12px">Set once for this title — Read goes straight here. Use <code>{slug}</code> or <code>{query}</code>.</p>
+      <p class="ai-desc" style="margin-top:8px;font-size:12px">Set once for this title, then Read goes straight here. Use <code>{slug}</code> or <code>{query}</code>.</p>
     </div>`:''}
     <div class="dt-actions">
       <button class="dact ai-act" onclick="aiCardInsight('${a.id}')">${icon('sparkles')} AI Insight</button>
@@ -8097,13 +8097,13 @@ function bgFileChosen(inp){
       g.drawImage(img,0,0,c.width,c.height);
       URL.revokeObjectURL(img.src);
       const url=c.toDataURL('image/jpeg',0.8);
-      if(Math.round(url.length*0.75)>2600000)toast('Photo is large — cloud sync may reject it. Try a smaller image.');
+      if(Math.round(url.length*0.75)>2600000)toast('That photo is large. Cloud sync may reject it, so try a smaller one.');
       // Telling someone the requirement is only half of it; the other half is
       // saying whether what they picked met it. A 700px-wide photo is fine on a
       // phone and visibly soft across a 1184px desktop banner, and there is no
       // way for them to know that from looking at it on the phone.
-      else if(img.width<1200)toast(`Added — but it's ${img.width}px wide, so it'll look soft on a big screen`);
-      else if(img.width<img.height)toast('Added — it\u2019s a tall photo, so the wide views will crop it hard');
+      else if(img.width<1200)toast(`Added. It's ${img.width}px wide, so it'll look soft on a big screen`);
+      else if(img.width<img.height)toast('Added. It\u2019s a tall photo, so the wide views will crop it hard');
       pendingBg=url;setBgPreview(url);
       dominantColor(url,hex=>{pendingBgAccent=hex||'';}); // derive accent from the uploaded image
       toast('Background added');
@@ -8127,7 +8127,7 @@ function coverFileChosen(inp){
     // The crop is silent by design, so the toast is the only place it can be
     // mentioned — and a source that was smaller than the target is the one case
     // where the result will actually look worse than the file they picked.
-    if(img.width<480||img.height<680)toast(`Cover added — ${img.width}\u00d7${img.height} is under 480\u00d7680, so it may look soft`);
+    if(img.width<480||img.height<680)toast(`Cover added. ${img.width}\u00d7${img.height} is under 480\u00d7680, so it may look soft`);
     else toast('Cover added');
   };
   img.onerror=()=>{URL.revokeObjectURL(img.src);toast('Could not read that image');};
@@ -8225,7 +8225,7 @@ async function submitForm(){
   // appears in the list. Only free-typed titles need it (autofill already excludes
   // adult). Worth the one AniList round-trip: correctness beats a few ms here.
   if(!editingId && !(pendingAni&&pendingAni.aniId) && await isAdultTitle(title,curKind)){
-    toast('That title can’t be added — WatchList doesn’t allow adult content');return;
+    toast('That title can’t be added. WatchList doesn’t allow adult content');return;
   }
   const orderRaw=document.getElementById('fOrder').value.trim();
   const epsStr=document.getElementById('fEps').value.trim();
@@ -8450,9 +8450,9 @@ ${raw.slice(0,6000)}`;
     if(!importItems.length)throw 0;
     renderPreview();
     document.getElementById('importActions').style.display='flex';
-    toast(`AI sorted ${importItems.length} — check them over`);
+    toast(`AI sorted ${importItems.length}. Check them over`);
   }catch(e){
-    toast('AI cleanup didn’t work — using the plain parse');
+    toast('AI cleanup didn’t work. Using the plain parse');
     parseImport();   // fall back to the reliable regex import
   }finally{ if(btn){btn.disabled=false;btn.innerHTML=was;} }
 }
@@ -8702,7 +8702,7 @@ function alSaveClient(){
   const v=(document.getElementById('alClientIn').value||'').trim();
   if(!/^\d+$/.test(v)){toast('The Client ID is just a number');return;}
   try{localStorage.setItem('al_client',v);}catch{}
-  toast('Client ID saved — now connect');renderAniList();
+  toast('Client ID saved. Now connect');renderAniList();
 }
 function alDisconnect(){
   try{['al_token','al_user','al_uid','al_exp','al_last'].forEach(k=>localStorage.removeItem(k));}catch{}
@@ -8731,7 +8731,7 @@ async function alBootSync(){
   try{
     if(fresh){
       const r=await alSync({importNew:true});
-      if(r.failed){toast('Couldn’t reach AniList — will retry');}
+      if(r.failed){toast('Couldn’t reach AniList. Retrying');}
       else{try{localStorage.removeItem('al_fresh');}catch{}
         toast(`AniList synced · ${r.pulled} in, ${r.pushed} out${r.added?`, ${r.added} added`:''}`);}
     }else await alAutoSync();
@@ -8837,7 +8837,7 @@ function renderAniList(){
       </div>
       <input class="ai-prompt-in" id="alClientIn" placeholder="Client ID (a number)" inputmode="numeric" autocomplete="off" style="margin-top:10px">
       <button class="parse-btn" onclick="alSaveClient()">Save Client ID</button>
-      <p class="ai-desc" style="margin-top:12px;font-size:12px">One-time setup. The Client ID isn't a secret — it just tells AniList which app is asking.</p>`;
+      <p class="ai-desc" style="margin-top:12px;font-size:12px">One-time setup. The Client ID isn't a secret; it only tells AniList which app is asking.</p>`;
     return;
   }
   const syncable=anime.filter(a=>a.aniId&&(kindOf(a)==='watch'||kindOf(a)==='read')).length;
@@ -8934,10 +8934,10 @@ function partyConnect(code,create){
       // than a lift, a tunnel, or the pause between Wi-Fi dropping and cellular
       // taking over — and "leave and rejoin" is a poor answer to a blip. Backoff
       // now stretches to a 5s ceiling and keeps going for about a minute.
-      if(!partyReconnecting){partyReconnecting=true;toast('Connection lost — reconnecting…');updatePartyPill();}
+      if(!partyReconnecting){partyReconnecting=true;toast('Connection lost. Reconnecting…');updatePartyPill();}
       partyReconn++;setTimeout(()=>{if(partyCode)partyConnect(partyCode,false);},Math.min(5000,600*partyReconn));
     }else if(partyCode){
-      partyReconnecting=false;updatePartyPill();toast('Couldn’t reconnect — leave and rejoin the party');
+      partyReconnecting=false;updatePartyPill();toast('Couldn’t reconnect. Leave and rejoin the party');
     }
   };
   ws.onerror=()=>{};
@@ -9065,7 +9065,7 @@ function partyCreate(){
   const CH='ABCDEFGHJKMNPQRSTUVWXYZ23456789';let code='';for(let i=0;i<6;i++)code+=CH[Math.floor(Math.random()*CH.length)];
   partyConnect(code,true);
   try{localStorage.setItem('party_active',code);}catch{}
-  renderParty();toast('Party created — share the code');
+  renderParty();toast('Party created. Share the code');
 }
 function partyJoin(codeArg){
   const n=(document.getElementById('ptName')?document.getElementById('ptName').value.trim():'')||partyName();
@@ -9195,7 +9195,7 @@ function partyFollowHost(room){
   _followedKey=key;
   // Only once the host has actually started it — playAt is set by the countdown.
   if(!room.playAt)return;
-  toast(`Following the host — ${room.title}${room.ep?' · Ep '+room.ep:''}`);
+  toast(`Following the host: ${room.title}${room.ep?' · Ep '+room.ep:''}`);
 }
 function partyFollow(){try{return localStorage.getItem('party_follow')!=='0';}catch{return true;}}
 function setPartyFollow(v){try{v?localStorage.removeItem('party_follow'):localStorage.setItem('party_follow','0');}catch{}renderParty();}
@@ -9400,7 +9400,7 @@ async function getRtcConfig(){
 function canScreenShare(){return !!(navigator.mediaDevices&&navigator.mediaDevices.getDisplayMedia);}
 function iceComplete(pc){return new Promise(res=>{if(pc.iceGatheringState==='complete')return res();const c=()=>{if(pc.iceGatheringState==='complete'){pc.removeEventListener('icegatheringstatechange',c);res();}};pc.addEventListener('icegatheringstatechange',c);setTimeout(res,2800);});}
 async function startShare(){
-  if(!canScreenShare()){toast('Screen sharing needs a computer — iPhones can’t share a screen');return;}
+  if(!canScreenShare()){toast('Screen sharing needs a computer. iPhones can’t share a screen');return;}
   if(!partyIsHost){toast('Only the host can share');return;}
   // Ask for something worth watching. With only frameRate:30 the browser picks
   // its own resolution, and its own is conservative — a 1080p screen can arrive
@@ -9441,7 +9441,7 @@ async function startShare(){
   s.getVideoTracks()[0].onended=()=>stopShare();   // browser's own "Stop sharing" bar
   // Audio rides along only if the OS/browser captured it. On macOS that means sharing a
   // Chrome TAB with "Also share tab audio" ticked — whole-screen/window audio isn't captured.
-  if(!s.getAudioTracks().length)toast('Sharing video — for sound, share a Chrome tab and tick “Also share tab audio”');
+  if(!s.getAudioTracks().length)toast('Sharing video. For sound, share a Chrome tab and tick “Also share tab audio”');
   wsSend({t:'share',on:true});
   renderParty();
   // Sharing the whole screen shares WHATEVER IS ON IT — and at the moment you
@@ -9449,7 +9449,7 @@ async function startShare(){
   // where the button lives. Everyone then reports that the party could only see
   // WatchList, which is true and is not a bug: it is what was on the screen.
   // So say the next step out loud rather than leaving it to be discovered.
-  toast('Sharing your screen — switch to what you want everyone to watch',7000);
+  toast('Sharing your screen. Switch to what you want everyone to watch',7000);
 }
 function stopShare(){
   if(localStream){localStream.getTracks().forEach(t=>t.stop());localStream=null;}
@@ -9625,7 +9625,7 @@ async function toggleVoice(){
   try{if(_jitsiApi)leaveJitsi();}catch(e){}   // never both voice systems at once → no echo
   if(!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia)){toast('Voice chat isn’t supported here');return;}
   let s;try{s=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true},video:false});}
-  catch{toast('Mic access denied — allow the mic to talk');return;}
+  catch{toast('Mic access denied. Allow the mic to talk');return;}
   voiceStream=s;voiceOn=true;voiceMuted=false;
   wsSend({t:'voice',on:true});
   try{if(partyRoom)vrtcTick(partyRoom);}catch(e){}
@@ -9726,7 +9726,7 @@ function loadJitsiScript(cb){
   _jitsiLoading=true;
   const s=document.createElement('script');s.src='https://'+JITSI_HOST+'/external_api.js';
   s.onload=()=>{if(window.JitsiMeetExternalAPI)cb();else toast('Couldn’t load the call');};
-  s.onerror=()=>{_jitsiLoading=false;toast('Couldn’t load the call — check your connection');};
+  s.onerror=()=>{_jitsiLoading=false;toast('Couldn’t load the call. Check your connection');};
   document.head.appendChild(s);
 }
 // ─── NATIVE CALL RENDERER ───────────────────────────────────────────────────
@@ -10425,7 +10425,7 @@ function renderParty(){
       :`<p class="ai-desc" style="margin-top:14px">Add some anime to your watch list to pick from here.</p>`;
     if(IS_NATIVE){
       // One host broadcasts their iPhone screen; everyone in the party watches it live.
-      hostCtl=`${picker}<button class="pt-share" onclick="nativeBroadcast()">${icon('users')} Broadcast your screen</button><div class="pt-hint">Streams your iPhone screen to everyone in this party — no computer needed.</div>`;
+      hostCtl=`${picker}<button class="pt-share" onclick="nativeBroadcast()">${icon('users')} Broadcast your screen</button><div class="pt-hint">Streams your iPhone screen to everyone in this party. No computer needed.</div>`;
     }else{
       hostCtl=`<button class="pt-share" onclick="startShare()">${icon('users')} Share your screen</button>`
         +(canScreenShare()?`<div class="pt-hint">Everyone watches your screen, perfectly in sync. On a Mac, share a <b>Chrome tab</b> and tick “Also share tab audio” to include sound.</div>`
@@ -10434,7 +10434,7 @@ function renderParty(){
     }
   }else if(sharing){
     hostCtl=`<button class="pt-play" onclick="reopenShareView()">${icon('play')} Watch the shared screen</button>
-      <p class="ai-desc" style="text-align:center">The host is sharing their screen — you're watching in sync.</p>`;
+      <p class="ai-desc" style="text-align:center">The host is sharing their screen. You're watching in sync.</p>`;
   }else{
     hostCtl=`<p class="ai-desc" style="text-align:center">${r.title?'Waiting for the host to start…':'Waiting for the host to pick something…'}<br><span style="opacity:.7;font-size:12px">You’re watching along — the host picks and controls playback. To host, start a party from a computer or the WatchList app.</span></p>`;
   }
@@ -10543,7 +10543,7 @@ function exportList(){
     if(a.rating)l+=` | ★${a.rating}`;
     return l;
   }).join('\n');
-  const done=()=>toast('List copied — paste it anywhere');
+  const done=()=>toast('List copied. Paste it anywhere');
   if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(lines).then(done).catch(()=>fallbackCopy(lines,done));}
   else fallbackCopy(lines,done);
 }
@@ -10595,7 +10595,7 @@ function renderOnb(){
     ${c.imp?`<span class="onb-imp">${c.imp}</span>`:''}
     <div class="onb-title">${c.title}</div>
     <div class="onb-body">${c.body}</div>
-    ${c.cta?`<button class="onb-cta" onclick="onbCTA('${c.cta.sheet}')">${c.cta.label}</button><div class="onb-note">You can change this anytime in Settings — nothing here is permanent.</div>`:''}
+    ${c.cta?`<button class="onb-cta" onclick="onbCTA('${c.cta.sheet}')">${c.cta.label}</button><div class="onb-note">You can change this anytime in Settings. Nothing here is permanent.</div>`:''}
   </div>`).join('');
   onbIdx=0;updOnbDots();
 }
@@ -10685,7 +10685,7 @@ function problemsText(){
 }
 function copyProblems(){
   const t=problemsText();
-  try{navigator.clipboard.writeText(t);toast('Copied — paste it to whoever asked');}
+  try{navigator.clipboard.writeText(t);toast('Copied. Paste it to whoever asked');}
   catch(e){try{prompt('Copy this:',t);}catch(e2){}}
 }
 function clearProblems(){try{localStorage.removeItem(ERR_KEY);}catch(e){}renderSettings();toast('Cleared');}
@@ -10759,7 +10759,7 @@ function nudgeHTML(){
   // say it once, plainly, until they've actually looked at it.
   if(syncCode()&&!codeSeen()&&anime.length)
     return`<div class="nudge">${icon('cloud')}
-      <div class="nudge-t">Your list is backed up. Save your code — it's what restores it on a new device.</div>
+      <div class="nudge-t">Your list is backed up. Save your code; it's what restores it on a new device.</div>
       <button class="nudge-go" onclick="openSheet('backupSheet');markCodeSeen()">Show code</button>
     </div>`;
   if(!shouldNudge())return'';
@@ -11433,7 +11433,7 @@ function pvSetFromURL(){
       .replace(/^./,c=>c.toUpperCase());
     a.titleAlt=a.title;                      // keep what it was, so it can be put back
     a.title=nice;
-    toast(`Renamed to “${nice}” — that's what the site calls it`);
+    toast(`Renamed to “${nice}”, which is what the site calls it`);
   }
   // If the page's shape differs from the current template, adopt the new shape
   // too — that's the same recognizer the one-paste setup uses.
@@ -11444,7 +11444,7 @@ function pvSetFromURL(){
   }
   try{save();}catch(e){}
   document.getElementById('pvSet').classList.remove('on');
-  toast(`Got it — “${a.title}” is “${a.srcSlug}” here`);
+  toast(`Got it. “${a.title}” is “${a.srcSlug}” here`);
   // Reload at the episode they were on, now using the learned name.
   const ep=pvWatchEp||1;
   const fixed=streamURL(a,ep).url;
@@ -12704,7 +12704,7 @@ async function shareMine(){
     const j=r.ok?await r.json():{};
     if(!j.ok||!j.code)throw new Error('no code');
     showShareLink(location.origin+location.pathname+'?setup='+j.code,pack);
-  }catch(e){toast('Couldn’t make a link — try again');}
+  }catch(e){toast('Couldn’t make a link. Try again');}
   finally{_shareBusy=false; if(btn){btn.disabled=false;btn.innerHTML=old;}}
 }
 function showShareLink(link,pack){
@@ -12721,7 +12721,7 @@ function showShareLink(link,pack){
       </div>
     </div>`;
   }
-  toast('Link ready — send it to anyone');
+  toast('Link ready. Send it to anyone');
 }
 function copyShareLink(link){
   try{navigator.clipboard.writeText(link).then(()=>toast('Link copied'),()=>toast('Copy it from the box above'));}
@@ -12837,7 +12837,7 @@ function quickSetup(){
       ${getKey()?`
       <input class="ai-prompt-in" id="srcQuickWant" placeholder="or tell me: which show and episode is it?" autocomplete="off" style="margin-top:9px;background:var(--bg2)">
       <button class="parse-btn" id="srcAiBtn" style="margin-top:8px" onclick="aiBuildSource()">${icon('sparkles')} Work it out for me</button>`
-      :`<p class="ai-desc" style="margin:9px 0 0">Or let AI work it out — that needs a free key first (about two minutes, no card). <b>Your link is saved</b>, so it'll still be here when you get back.</p>
+      :`<p class="ai-desc" style="margin:9px 0 0">Or let AI work it out. That needs a free key first: about two minutes, no card. <b>Your link is saved</b>, so it'll still be here when you get back.</p>
       <button class="parse-btn" style="margin-top:8px" onclick="openKeySheet()">${icon('key')} Get a free key first</button>`}
       </div>`;
     return;
@@ -12904,7 +12904,7 @@ async function aiBuildSource(){
     if(SRC_TOKEN_RE.test(mech)){
       addSrcExample(raw,note);refreshSrcExNote();
       if(document.getElementById('srcQuickIn')===site){quickShowTemplate(mech,raw);return;}
-      site.value=mech;try{csHintName();testSource();}catch(e){}toast('Pattern learned — check it, then save it');return;
+      site.value=mech;try{csHintName();testSource();}catch(e){}toast('Pattern learned. Check it, then save it');return;
     }
   }
   // 2) Trickier links, or a plain-English wish — hand it to the user's own AI.
@@ -12934,7 +12934,7 @@ https://example.com/watch/{slug}/episode-{ep}`;
       site.value=learned;
       try{csHintName();}catch(e){}
       try{testSource();}catch(e){}
-      toast('Pattern learned — check it, then save it');
+      toast('Pattern learned. Check it, then save it');
     }
   }catch(e){
     toast(e===NO_KEY?'Add your AI key first':aiReason(e));
@@ -12981,7 +12981,7 @@ function renderWatch(){
     +sec(recoShown.length?'Recommended':'',recoShown,myShown.length)
     +sec(availShown.length?'Available now — official':'',availShown,myShown.length+recoShown.length)
     +sec('Free — search',catShown,myShown.length+recoShown.length+availShown.length)
-    +(availShown.length||myShown.length||recoShown.length?'':'<p class="ai-desc" style="margin-top:10px">Nothing here yet — your services start hidden. Tap <b>Sources</b> in the bottom bar to unhide the ones you use or add your own.</p>');
+    +(availShown.length||myShown.length||recoShown.length?'':'<p class="ai-desc" style="margin-top:10px">Nothing here yet. Your services start hidden, so tap <b>Sources</b> in the bottom bar to unhide the ones you use or add your own.</p>');
 }
 // ─── IN-APP PLAYER ──────────────────────────────────────────────────────────
 // Plays inline ONLY where the host publishes an embed API and licenses it —
@@ -13182,7 +13182,7 @@ async function acceptReq(id){
   if(!friends.some(f=>f.code===c)){friends.push(newFriendObj(c,n,req.at));saveFriends(friends);}
   addFrHandled(id); friendReqs=friendReqs.filter(r=>r.id!==id); renderFriends();
   try{const from={code:myFriendCode(),name:myFriendName()||'A friend'};await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({op:'fr_accept',to:c,from})});}catch(e){}
-  toast("Friend added — you're connected");
+  toast("Friend added. You're connected");
 }
 function denyReq(id){addFrHandled(id);friendReqs=friendReqs.filter(r=>r.id!==id);renderFriends();}
 // Keep a stored friend's name current. Every message carries the sender's name AND
@@ -13633,7 +13633,7 @@ async function doAddFriend(){
   // painful to retype, and half the failures are worth a second try.
   if(err){if(e)e.textContent=err;if(ci)ci.focus();return;}
   if(ci)ci.value='';if(ni)ni.value='';
-  renderFriends();toast('Request sent — they have to accept it');
+  renderFriends();toast('Request sent. They have to accept it');
 }
 let recPickShows=new Set(),recToFriends=new Set(),recItemNotes={},recSel=null;
 function startRecommend(){recPickShows=new Set();recToFriends=new Set();recItemNotes={};renderRecPick();openSheet('recPickSheet');}
@@ -13648,7 +13648,7 @@ function renderRecPick(){
     <span class="pt-pick-check">${on?icon('check'):''}</span></button>`;}).join('');
   const preset=[...(recToFriends||[])].map(c=>friendDisplay(c)).filter(Boolean);
   box.innerHTML=(preset.length?`<p class="ai-desc" style="margin:2px 0 10px">Going to <b>${escH(preset.join(', '))}</b>.</p>`:'')
-    +`<button class="src-opt" onclick="pickFromList()"><div class="src-name">${icon('home')} Pick right on your list</div><div class="src-sub">Browse your rows and tap shows to pick — easiest way to find things</div></button>
+    +`<button class="src-opt" onclick="pickFromList()"><div class="src-name">${icon('home')} Pick right on your list</div><div class="src-sub">Browse your rows and tap shows to pick. Easiest way to find things</div></button>
     <div class="dt-label" style="margin-top:14px">Or quick-pick here</div>
     <div class="pt-picks">${rows||'<p class="ai-desc">Your list is empty.</p>'}</div>
     <button class="dt-watch rec-next rec-cta" onclick="proceedRecommend()">${icon('chevron-right')} Next — notes & friends (${recPickShows.size})</button>`;
@@ -13835,9 +13835,9 @@ function renderRecSend(){
     <input class="ai-prompt-in rc-note-in" placeholder="Note for this one (optional)" maxlength="300" value="${escH(recItemNotes[a.id]||'')}" oninput="setItemNote('${a.id}',this.value)"></div>
     <button class="rc-note-x" onclick="removeRecShow('${a.id}')" aria-label="Remove this show">${icon('x')}</button>
   </div>`).join('');
-  const friendHTML=fr.length?fr.map(f=>{const on=recToFriends.has(f.code),live=!!frOnline[f.code];return `<button class="rs-pick${on?' on':''}" onclick="toggleRecFriend('${escH(f.code)}')"><span class="fr-dot" style="background:${live?'var(--fin)':friendColor(f.code)};${live?'box-shadow:0 0 0 3px var(--finbg)':''}"></span><span class="rs-name">${escH(friendLabel(f))}${live?' <span style="color:var(--fin);font-size:12px">online</span>':''}</span><span class="pt-pick-check">${on?icon('check'):''}</span></button>`;}).join(''):`<p class="ai-desc">No accepted friends yet — <b onclick="openSheet('friendsSheet')" style="color:var(--a);cursor:pointer">add a friend</b> first (they have to accept).</p>`;
+  const friendHTML=fr.length?fr.map(f=>{const on=recToFriends.has(f.code),live=!!frOnline[f.code];return `<button class="rs-pick${on?' on':''}" onclick="toggleRecFriend('${escH(f.code)}')"><span class="fr-dot" style="background:${live?'var(--fin)':friendColor(f.code)};${live?'box-shadow:0 0 0 3px var(--finbg)':''}"></span><span class="rs-name">${escH(friendLabel(f))}${live?' <span style="color:var(--fin);font-size:12px">online</span>':''}</span><span class="pt-pick-check">${on?icon('check'):''}</span></button>`;}).join(''):`<p class="ai-desc">No accepted friends yet. <b onclick="openSheet('friendsSheet')" style="color:var(--a);cursor:pointer">add a friend</b> first (they have to accept).</p>`;
   box.innerHTML=`<div class="dt-label">${icon('edit')} A note for each show</div>
-    <p class="ai-desc">Personalise each one — a romance and a dark thriller can carry different notes.</p>
+    <p class="ai-desc">Personalise each one. A romance and a dark thriller can carry different notes.</p>
     <div class="rc-notes">${noteRows}</div>
     <div class="dt-label" style="margin-top:18px">${icon('users')} Send to</div>
     <div class="rs-list">${friendHTML}</div>
@@ -13861,7 +13861,7 @@ async function unsendRec(id,code){
     const r=await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({op:'rec_unsend',to:code,from,id})});
     const j=r.ok?await r.json():{};
     if(!j.ok)throw new Error('failed');
-  }catch(e){toast('Couldn\u2019t reach the network — try again');return;}
+  }catch(e){toast('Couldn\u2019t reach the network. Try again');return;}
   try{localStorage.setItem(RECS_SENT,JSON.stringify(recsSent().filter(x=>!(x.id===id&&x.code===code))));}catch(e){}
   renderFriends();
   toast('Taken back');
@@ -13987,7 +13987,7 @@ function readSourceHTML(rcustom){
     <div class="dt-label">${icon('book')} Where Read opens</div>
     <button class="src-opt${!rcustom?' on':''}" onclick="setReadSource('')">
       <div class="src-name">AsuraScans <span class="src-tag">Built-in</span></div>
-      <div class="src-sub">Jumps straight to the series — no setup</div>
+      <div class="src-sub">Jumps straight to the series, no setup</div>
     </button>
     ${rcustom?`<div class="src-opt on">
       <div class="src-name">${escH(host(rcustom))} <span class="src-tag">Yours</span></div>
@@ -14065,7 +14065,7 @@ function readQuickSetup(){
   let site='your site';try{site=new URL(url).hostname.replace(/^www\./,'');}catch(e){}
   out.dataset.tpl=tpl;
   const deep=/\{(ch|ch2|ch3|chapter)\}/i.test(tpl);
-  out.innerHTML=`<div class="src-quick-ok">${icon('check')} Got it — <b>${escH(site)}</b>.<br>
+  out.innerHTML=`<div class="src-quick-ok">${icon('check')} Got it. <b>${escH(site)}</b><br>
     <span style="font-family:ui-monospace,Menlo,monospace;font-size:12px;word-break:break-all;opacity:.8">${escH(tpl)}</span></div>
     ${deep?'':`<p class="ai-desc" style="margin:8px 0 0;font-size:12px">That address points at the <b>series</b>, so Read will open its chapter list. Paste <b>a chapter's</b> address instead and every chapter becomes one tap.</p>`}
     <button class="parse-btn" style="margin-top:9px" onclick="readQuickUse()">Use this for everything I read</button>`;
@@ -14252,7 +14252,7 @@ function setSource(v){
 }
 // "No source" mode — user wants nothing auto-opened; Watch prompts them to set one.
 function noSourceMode(){try{return localStorage.getItem('no_source')==='1';}catch{return false;}}
-function setNoSource(){try{localStorage.setItem('no_source','1');localStorage.removeItem('stream_src');}catch{}renderSource();toast('No source — Watch will ask you to set one');}
+function setNoSource(){try{localStorage.setItem('no_source','1');localStorage.removeItem('stream_src');}catch{}renderSource();toast('No source yet. Watch will ask you to set one');}
 function showNoSourcePrompt(){toast('Set a source first');try{openSheet('sourceSheet');}catch(e){}}
 // Select one of the user's own custom services (by id) as the active source.
 function setSourceById(id){const s=customServices().find(x=>x.id===id);if(s&&s.url)setSource(s.url);}
@@ -14322,7 +14322,7 @@ function settleRead(a,ch,elapsed,from){
     if(elapsed>=PV_READ_MS) applyWatched(a.id,ch);
     else if(elapsed>=PV_READ_PEEK_MS){
       showMWBar(`Read <b>Ch ${ch}</b> of ${schEsc(a.title)}?`,'Mark read',()=>{
-        applyWatched(a.id,ch);toast(`Saved — up to Ch ${ch}`);
+        applyWatched(a.id,ch);toast(`Saved up to Ch ${ch}`);
       });
       return;
     }
@@ -14423,7 +14423,7 @@ function showMWBar(html,btnLabel,onGo){
 function hideMarkWatched(){const bar=document.getElementById('markWatched');if(bar)bar.classList.remove('on');clearTimeout(mwT);}
 function markWatchedPrompt(id,ep,title){
   showMWBar(`Watched <b>Ep ${ep}</b> of ${schEsc(title)}?`,'Mark watched',()=>{
-    applyWatched(id,ep);toast(`Saved — up to Ep ${ep}`);
+    applyWatched(id,ep);toast(`Saved up to Ep ${ep}`);
   });
 }
 function autoMarkWatched(id,ep){
@@ -14482,8 +14482,8 @@ function renderStats(){
       '<div class="sv-heronum"><div class="v" data-to="'+counts.finished+'">0</div><div class="l">Finished</div></div>'+
       '<div class="sv-heronum"><div class="v" data-to="'+anime.filter(a=>a.fav).length+'">0</div><div class="l">Favorites</div></div>'+
       (T.chaps?'':'<div class="sv-heronum"><div class="v">'+icon('star','fill')+' '+avg+'</div><div class="l">Avg rating</div></div>')+'</div>'+
-    '<div class="sv-sec"><div class="sv-h">Status — tap to reveal</div>'+statusBars+'</div>'+
-    '<div class="sv-sec"><div class="sv-h">Top genres — tap to reveal</div>'+genreBars+'</div>'+
+    '<div class="sv-sec"><div class="sv-h">Status</div>'+statusBars+'</div>'+
+    '<div class="sv-sec"><div class="sv-h">Top genres</div>'+genreBars+'</div>'+
     '<div class="sv-sec"><div class="sv-h">Ratings'+(rated.length?' \u2014 '+avg+' average across '+rated.length:'')+'</div>'+ratingBars+'</div>'+
     (topRated.length?'<div class="sv-sec"><div class="sv-h">Your top rated</div><div class="sv-drill on">'+topRated.map(a=>'<span class="sv-chip">'+schEsc(a.title)+' '+icon('star','fill')+a.rating+'</span>').join('')+'</div></div>':'');
   try{_fillStoreNote();}catch(e){}
@@ -15079,7 +15079,7 @@ function openKeySheet(){const inp=document.getElementById('apiKeyIn');if(inp)inp
 function getFreeKey(){
   openExternal('https://aistudio.google.com/apikey');
   const d=document.querySelector('#keySheet .keyhow');if(d)d.open=true;
-  toast('Sign up, create a key, copy it — then come back and paste');
+  toast('Sign up, create a key, copy it, then come back and paste');
 }
 // Paste the key without fiddling with the keyboard's paste menu. Clipboard read
 // is permission-gated and can fail silently (older Safari, denied permission) —
@@ -15656,7 +15656,7 @@ async function aiAutofill(){
     }
   }catch{}
   btn.classList.remove('loading');formKindLabels();
-  if(!cands.length){toast('No match found — fill in manually.');return;}
+  if(!cands.length){toast('No match found. Fill it in manually.');return;}
   pickCands=cands;
   if(cands.length===1){applyCandidate(0);return;}
   renderPicker();openSheet('pickSheet');
@@ -16110,10 +16110,12 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-13.13',
-  title:'Titles spelled the way the show spells them',
-  push:'ONE PIECE really is ONE PIECE.',
+  v:'2026-08-13.14',
+  title:'It stopped writing like a machine',
+  push:'Sixty five sentences rewritten.',
   notes:[
+    'Every message in the app was rewritten. One string in seven was built the same way \u2014 a statement, a dash, then an explanation \u2014 which is the shape machine writing takes, and once you notice it you cannot stop noticing it. They are plain sentences now.',
+    'The controls stopped explaining themselves too. Accent no longer tells you it colours buttons and bars while you watch it colour buttons and bars.',
     'Titles are shown exactly as the show writes them. The last release re-cased them to look tidier, which was wrong \u2014 ONE PIECE is genuinely ONE PIECE, and rewriting it is the same mistake as recolouring somebody\u2019s artwork to suit the app.',
     'What does get fixed is your typing. If you typed \u201cone piece\u201d and it matched the real show, it now quietly takes the show\u2019s own capitalisation \u2014 no prompt, because that is the same title, not a rename. A genuinely different name still waits for you in Fix all.',
     'The small tracked capitals above every card and section are gone. CONTINUE WATCHING is now Continue watching \u2014 a line of text rather than a label pretending to be design. Tags that sit on artwork keep their capitals, because at that size they read better.',

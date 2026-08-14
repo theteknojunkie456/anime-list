@@ -197,6 +197,22 @@ try {
   results.push({ n: 'corners stay on the scale', ok: offRad.length === 0, d: offRad.length ? 'off-scale: ' + offRad.join(', ') : RADII.size + ' steps' });
 }
 
+// The em dash. "Statement — explanation" is the most recognisable machine-written
+// sentence shape in English right now, and this app had it in one string out of
+// every seven. A person writing a toast writes two short sentences.
+{
+  const raw3 = readFileSync('index.html', 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  const strings = [...raw3.matchAll(/toast\(\s*[`'"]([^`'"]{6,})/g)].map(m => m[1])
+    .concat([...raw3.matchAll(/>([A-Z][^<>{}]{8,90})</g)].map(m => m[1]));
+  const dashed = strings.filter(t => t.includes('\u2014'));
+  results.push({
+    n: 'no em dashes in what the user reads',
+    ok: dashed.length === 0,
+    d: dashed.length ? dashed.slice(0, 4).map(t => t.trim().slice(0, 44)).join(' · ') : strings.length + ' strings clean',
+  });
+}
+
 let bad = 0;
 for (const r of results) {
   if (!r.ok) bad++;

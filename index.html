@@ -25,7 +25,16 @@
 <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 <style>
 :root{
-  --bg:#0a0a0c;--bg2:#111114;--bg3:#18181c;--bg4:#202025;--bg5:#28282e;
+  /* The violet wash at the top of every screen. It used to be baked into
+     .ambient as a literal rgba, so no setting could reach it — "Glow off" left it
+     burning and a black theme was never black. Now it is a colour like any other:
+     applyAmbient() blanks it when the glow is off. */
+  --uv:#7c5cff;
+  /* Neutral, not near-neutral. These five carried a blue cast (#0a0a0c is bluer
+     than it is dark) which, under the violet wash above, made "black" read as
+     lit. Grey is grey now; the colour on screen comes from the accent and the
+     artwork, which is where colour was supposed to come from. */
+  --bg:#0a0a0a;--bg2:#111111;--bg3:#181818;--bg4:#202020;--bg5:#282828;
   --b1:rgba(255,255,255,0.05);--b2:rgba(255,255,255,0.09);--b3:rgba(255,255,255,0.16);
   /* Text ramp: three tiers that are all WCAG AA (≥4.5:1) on every surface they
      land on, and still visibly distinct from each other (t1→t2→t3 step ~1.8×).
@@ -229,13 +238,70 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 [data-theme=retro] .billboard{
   border-radius:2px;clip-path:var(--cut);
 }
-/* Edge light, not a drop shadow: one cyan hairline down the lit side, and a
-   deep magenta bloom underneath that reads as the sign it is standing near. */
+/* A soft bloom under each card was the tell that this was a dark theme wearing a
+   costume: nothing in 1993 could blur. Every edge here is hard. The two offsets
+   are cyan up-left and magenta down-right, which is a hard drop shadow and a
+   split colour channel at the same time — one effect doing both jobs, and cheaper
+   than the blur it replaces because neither shadow has a radius. */
 [data-theme=retro] .pcard-wrap{
-  filter:drop-shadow(0 6px 18px rgba(255,30,142,.28));
+  filter:drop-shadow(3px 3px 0 rgba(255,30,142,.42)) drop-shadow(-2px -2px 0 rgba(34,232,255,.30));
 }
+/* The artwork is sunk into the card the way an item sits in an inventory slot:
+   lit along the top-left lip, dark along the bottom-right. Two inset shadows, no
+   blur — that is the whole trick those interfaces used, and it still reads as
+   carved rather than drawn. Inset survives the corner cut; an outer shadow would
+   be clipped away by it. */
 [data-theme=retro] .pcard-img,[data-theme=retro] .pcard-ph{
-  box-shadow:inset 1px 1px 0 0 rgba(34,232,255,.5);
+  box-shadow:
+    inset 2px 2px 0 0 rgba(34,232,255,.42),
+    inset -2px -2px 0 0 rgba(0,0,0,.92),
+    inset 0 0 0 3px rgba(6,2,14,.55);
+}
+/* Covers used to keep their own colours, so a row of them fought the theme and
+   the list read as plain artwork in a dark app — the one screen the look never
+   reached. This drags every poster onto the same cyan-to-magenta floor while
+   leaving its LUMINANCE alone, so the picture is still the picture. Dial the
+   opacity, not the colours: .55 unifies, .3 is a hint, .8 is a duotone poster. */
+[data-theme=retro] .pcard-wrap::before{
+  content:'';position:absolute;inset:0;pointer-events:none;z-index:1;
+  clip-path:var(--cut);
+  background:linear-gradient(135deg,rgba(34,232,255,.62) 0%,rgba(104,44,150,.40) 52%,rgba(255,30,142,.62) 100%);
+  mix-blend-mode:color;opacity:.42;
+}
+/* Every other place artwork appears. The look was written for .pcard and the app
+   has nine more surfaces that show a cover — the airing strip, the schedule, the
+   detail hero, the pickers — so the theme stopped at the edge of one component
+   and the rest of the screen stayed a modern dark app with a poster in it.
+   One list, one treatment.
+
+   saturate() is the whole reason a row of covers stops fighting the theme: those
+   references all live on a tight palette, and full-strength artwork is the one
+   thing on screen that refuses to. Turning it down lets the chrome lead without
+   touching the picture's brightness, so nothing becomes hard to recognise.
+   This is the number to tune: .6 sits back, .85 barely moves, .4 is severe. */
+[data-theme=retro] .pcard-img,[data-theme=retro] .rz-img,[data-theme=retro] .pk-cover,
+[data-theme=retro] .dt-cover,[data-theme=retro] .sched-thumb,[data-theme=retro] .resume-art,
+[data-theme=retro] .pop-cover,[data-theme=retro] .pick-img,[data-theme=retro] .billboard{
+  filter:saturate(.6) contrast(1.06);
+}
+/* The carved lip, on those same surfaces. */
+[data-theme=retro] .rz-img,[data-theme=retro] .pk-cover,[data-theme=retro] .dt-cover,
+[data-theme=retro] .dt-cover-ph,[data-theme=retro] .sched-thumb,[data-theme=retro] .sched-thumb-ph,
+[data-theme=retro] .resume-art,[data-theme=retro] .pop-cover,[data-theme=retro] .pick-img{
+  border-radius:2px;
+  box-shadow:
+    inset 2px 2px 0 0 rgba(34,232,255,.42),
+    inset -2px -2px 0 0 rgba(0,0,0,.92);
+}
+/* Pointer devices only: the slot lights up as if the cursor were a torch. */
+@media (hover:hover){
+  [data-theme=retro] .pcard:hover .pcard-img,[data-theme=retro] .pcard:hover .pcard-ph{
+    box-shadow:
+      inset 2px 2px 0 0 rgba(34,232,255,.85),
+      inset -2px -2px 0 0 rgba(0,0,0,.92),
+      inset 0 0 0 3px rgba(6,2,14,.55);
+  }
+  [data-theme=retro] .pcard:hover .pcard-wrap::before{opacity:.34;}
 }
 [data-theme=retro] .billboard{
   box-shadow:inset 0 0 0 1px rgba(34,232,255,.22),0 20px 60px -20px rgba(255,30,142,.5);
@@ -281,6 +347,69 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
   [data-theme=retro] .hdr-title{animation:none;}
   [data-theme=retro] .ambient::after{display:none;}
 }
+/* ── RETRO CHROME ───────────────────────────────────────────────────────────
+   The look reached the artwork and stopped. Everything AROUND the artwork was
+   still a modern dark app — a rounded search pill, round icon buttons, a soft
+   nav — because these rules squared the INNER elements while the shape you
+   actually see belongs to their wrapper. `.search-in` was 2px the whole time;
+   `.search-wrap` is the pill drawn around it.
+
+   The grammar is the one every reference shares, and it is older than neon: a
+   control is either raised or sunk, and it says which with two hard edges — lit
+   on the top-left, shadowed on the bottom-right. Inputs sink. Buttons rise.
+   Pressing one inverts it. No blur anywhere; nothing in 1995 could blur.
+   The cyberpunk is the lip colour only — cyan on the light edge — so the screen
+   reads as a tight palette with neon edges rather than a glow with a UI in it. */
+[data-theme=retro] .search-wrap,[data-theme=retro] .hbtn,[data-theme=retro] .nbtn,
+[data-theme=retro] .resume-card,[data-theme=retro] .resume-go,[data-theme=retro] .bb-slide,
+[data-theme=retro] .nav{
+  border-radius:2px;
+}
+/* Sunk: the well you type into, and the strip you left something in. */
+[data-theme=retro] .search-wrap,[data-theme=retro] .resume-card{
+  box-shadow:
+    inset 2px 2px 0 0 rgba(0,0,0,.88),
+    inset -1px -1px 0 0 rgba(34,232,255,.30);
+}
+/* Raised: anything you press. */
+[data-theme=retro] .hbtn,[data-theme=retro] .nbtn,[data-theme=retro] .sort-btn,
+[data-theme=retro] .resume-go{
+  box-shadow:
+    inset 1px 1px 0 0 rgba(34,232,255,.42),
+    inset -2px -2px 0 0 rgba(0,0,0,.90);
+}
+/* Pressed inverts the bevel — the control physically goes in. */
+[data-theme=retro] .hbtn:active,[data-theme=retro] .nbtn:active,
+[data-theme=retro] .sort-btn:active,[data-theme=retro] .resume-go:active{
+  box-shadow:
+    inset 2px 2px 0 0 rgba(0,0,0,.90),
+    inset -1px -1px 0 0 rgba(34,232,255,.30);
+}
+/* The add key is the one saturated face on the screen, so it gets the hard
+   offset the cards get — a key standing proud of the bar, not a floating pill. */
+[data-theme=retro] .nbtn.add{
+  box-shadow:
+    inset 1px 1px 0 0 rgba(255,255,255,.34),
+    inset -2px -2px 0 0 rgba(0,0,0,.55),
+    2px 2px 0 0 rgba(34,232,255,.30);
+}
+[data-theme=retro] .nbtn.add:active{
+  box-shadow:
+    inset 2px 2px 0 0 rgba(0,0,0,.55),
+    inset -1px -1px 0 0 rgba(255,255,255,.28);
+}
+/* The bar the keys sit on: a hard lit lip along the top, no blur, no fade. */
+[data-theme=retro] .nav{
+  box-shadow:inset 0 2px 0 0 rgba(34,232,255,.28);
+}
+/* The current tab is stated, not glowed: a hard cyan underline the width of the
+   key. One bright thing per screen and it is the thing you are looking at. */
+[data-theme=retro] .nbtn.on{
+  box-shadow:
+    inset 1px 1px 0 0 rgba(34,232,255,.42),
+    inset -2px -2px 0 0 rgba(0,0,0,.90),
+    inset 0 -3px 0 0 var(--pln);
+}
 /* Chrome: notched where it is a panel, lit only where it is active. */
 [data-theme=retro] .search-in,[data-theme=retro] .filt-row,[data-theme=retro] .sort-btn,
 [data-theme=retro] .qp-chip,[data-theme=retro] .art-opt,[data-theme=retro] .stc,
@@ -289,19 +418,24 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 }
 [data-theme=retro] .nbtn.add,[data-theme=retro] .paint-save,
 [data-theme=retro] .resume-card{border-radius:2px;clip-path:var(--cut);}
-/* Not everything is notched. A HUD that mills every corner the same way is as
-   monotone as one that rounds them all — the panels are cut, the small round
-   controls stay round, and the contrast between the two is the point. */
-[data-theme=retro] .hbtn{border-radius:99px;box-shadow:inset 0 0 0 1px rgba(34,232,255,.28);}
-[data-theme=retro] .search-play,[data-theme=retro] .resume-go{border-radius:99px;}
+/* Not everything is treated the same way, and that contrast is still the point —
+   but it is no longer round-versus-cut. A round pill is the one shape none of
+   these machines could draw: panels are CUT, controls are SQUARE and bevelled,
+   and those two read as one family from the same era. The blur glows that used
+   to sit under the add key and the active chip are gone with them; a hard offset
+   says "lit" without a radius, and glow was the thing making a black screen grey.
+   One blur survives, on the focused field, because focus should be the brightest
+   event on the screen and nothing else competes with it. */
+[data-theme=retro] .hbtn{border-radius:2px;}
+[data-theme=retro] .search-play,[data-theme=retro] .resume-go{border-radius:2px;}
 [data-theme=retro] .rz-card{clip-path:none;border-radius:2px;}
-[data-theme=retro] .hero-cta{border-radius:99px;}
-[data-theme=retro] .nbtn.add{--notch:8px;box-shadow:0 0 22px -4px var(--a);}
+[data-theme=retro] .hero-cta{border-radius:2px;}
+[data-theme=retro] .nbtn.add{--notch:8px;}
 [data-theme=retro] .search-in{border-color:rgba(34,232,255,.2);}
 [data-theme=retro] .search-in:focus{border-color:var(--a);box-shadow:0 0 18px -4px var(--glow);}
-[data-theme=retro] .fchip.on{border-radius:2px;box-shadow:0 0 14px -3px var(--a);}
+/* An active chip is stated by a hard lit edge, not a halo. */
+[data-theme=retro] .fchip.on{border-radius:2px;box-shadow:inset 0 -2px 0 0 var(--a),inset 1px 1px 0 0 rgba(34,232,255,.35);}
 [data-theme=retro] .nav{border-radius:0;border-top:1px solid rgba(34,232,255,.35);}
-[data-theme=retro] .nbtn.on{border-radius:2px;box-shadow:inset 0 0 0 1px var(--a);}
 /* Numbers as a readout. */
 [data-theme=retro] .row-count,[data-theme=retro] .fn,[data-theme=retro] .rz-at,
 [data-theme=retro] .rz-ep,[data-theme=retro] .hero-prog span,[data-theme=retro] .sv-heronum .v{
@@ -656,7 +790,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
    A short ramp here reads as a bright stripe; keep it generous. */
 .ambient::after{content:'';position:absolute;inset:0;pointer-events:none;opacity:.022;
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");}
-.ambient{position:fixed;inset:0;z-index:-2;pointer-events:none;background:linear-gradient(to bottom,rgba(0,0,0,1.000) 0px,rgba(0,0,0,0.670) 43px,rgba(0,0,0,0.410) 87px,rgba(0,0,0,0.218) 130px,rgba(0,0,0,0.089) 173px,rgba(0,0,0,0.019) 217px,rgba(0,0,0,0.000) 260px),linear-gradient(to top,rgba(0,0,0,1.000) 0px,rgba(0,0,0,0.670) 43px,rgba(0,0,0,0.410) 87px,rgba(0,0,0,0.218) 130px,rgba(0,0,0,0.089) 173px,rgba(0,0,0,0.019) 217px,rgba(0,0,0,0.000) 260px),radial-gradient(120% 60% at 50% 0%,rgba(124,92,255,.10) 0%,rgba(124,92,255,.04) 45%,transparent 82%),radial-gradient(115% 52% at 50% 0%,color-mix(in srgb,var(--amb) 20%,transparent) 0%,color-mix(in srgb,var(--amb) 6%,transparent) 44%,transparent 88%),radial-gradient(70% 40% at 86% 8%,color-mix(in srgb,var(--amb) 7%,transparent) 0%,transparent 88%),var(--topgrad);transition:--amb 1.1s ease;}
+.ambient{position:fixed;inset:0;z-index:-2;pointer-events:none;background:linear-gradient(to bottom,rgba(0,0,0,1.000) 0px,rgba(0,0,0,0.670) 43px,rgba(0,0,0,0.410) 87px,rgba(0,0,0,0.218) 130px,rgba(0,0,0,0.089) 173px,rgba(0,0,0,0.019) 217px,rgba(0,0,0,0.000) 260px),linear-gradient(to top,rgba(0,0,0,1.000) 0px,rgba(0,0,0,0.670) 43px,rgba(0,0,0,0.410) 87px,rgba(0,0,0,0.218) 130px,rgba(0,0,0,0.089) 173px,rgba(0,0,0,0.019) 217px,rgba(0,0,0,0.000) 260px),radial-gradient(120% 60% at 50% 0%,color-mix(in srgb,var(--uv) 6%,transparent) 0%,color-mix(in srgb,var(--uv) 2%,transparent) 45%,transparent 82%),radial-gradient(115% 52% at 50% 0%,color-mix(in srgb,var(--amb) 20%,transparent) 0%,color-mix(in srgb,var(--amb) 6%,transparent) 44%,transparent 88%),radial-gradient(70% 40% at 86% 8%,color-mix(in srgb,var(--amb) 7%,transparent) 0%,transparent 88%),var(--topgrad);transition:--amb 1.1s ease;}
 /* Background brightness veil — lifts the dark backdrop toward light; the top is
    tinted with the ambient accent so the "glow" brightens right along with it. The
    amount (--bgb, 0–0.62) comes from the slider under the theme picker. */
@@ -5920,7 +6054,14 @@ function applyAccent(){
   forgetAccent();
   const el=document.documentElement, hex=accentOverride();
   ['--a','--a2','--ag','--glow','--aFg'].forEach(k=>el.style.removeProperty(k));
-  if(!hex)return;
+  // A custom theme carries its own accent in these same five vars, and picking a
+  // theme deliberately drops any accent override — so clearing them here handed
+  // the look back the DEFAULT accent. Saving a theme, wandering off and returning
+  // to it gave you something you never picked. Put the theme's own accent back.
+  if(!hex){
+    try{const t=allThemes().find(x=>x.id===curTheme);if(t&&t.custom)applyCustomVars(t);}catch(e){}
+    return;
+  }
   const [r,g,b]=_hex2rgb(hex);
   el.style.setProperty('--a',hex);
   el.style.setProperty('--a2',_lighten(hex,0.28));
@@ -6745,6 +6886,8 @@ function applyAmbient(){
   }
   else col=m;   // a fixed hex color
   try{document.documentElement.style.setProperty('--amb',col||'transparent');}catch{}
+  // Glow off means off: the violet wash goes with it, so a black theme is black.
+  try{document.documentElement.style.setProperty('--uv',m==='off'?'transparent':'#7c5cff');}catch{}
 }
 function setAmbient(c){if(c===_ambBase)return;_ambBase=c;applyAmbient();}
 function setGlow(m){
@@ -16759,10 +16902,14 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-14.10',
-  title:'Ask about your list from a desktop, and turn a recommendation down',
-  push:'Plus Retro learned to glitch.',
+  v:'2026-08-14.11',
+  title:'Black is black now, and Retro stopped being a dark theme in costume',
+  push:'Plus your saved looks keep the colour you picked.',
   notes:[
+    'Black is black. The five greys everything is built on carried a blue cast, and a violet wash sat over the whole app that no setting could reach — not even turning the glow off. The wash is dimmer, the greys are neutral, and Glow off now actually turns it off.',
+    'A look you saved comes back as the look you saved. Picking a theme deliberately drops any accent you had chosen, and that same step was wiping the accent belonging to your own theme — so returning to it handed you the default one instead. It kept its backgrounds, which is why it looked almost right and never quite.',
+    'Retro is hard-edged now. Nothing in 1995 could blur, so nothing here does: artwork is sunk into its slot with a lit top-left lip and a dark bottom-right one, cards carry a hard split shadow instead of a soft bloom, and every control is square and bevelled — pressing one inverts the bevel so it physically goes in. The halos under the add key and the active chip are gone.',
+    'Retro reaches the whole screen. It was written for the home cards, and the app has nine other places a cover shows up — the airing strip, the schedule, the detail hero, the pickers — so everything else stayed a modern dark app with a poster in it. Covers also sit back a little now, because a row of full-strength artwork is the one thing on screen that refuses to join a palette.',
     'The chat has a way in on a desktop. It was summoned by holding two fingers on your list, which a mouse cannot do, so there is a button in the header now on anything with a pointer. Both routes open the chat itself rather than whichever panel you last had open.',
     'A recommendation can be turned down, and the friend who sent it finds out. Somebody went to the trouble of picking it, so a shrug now travels back to them — quietly, as a line in their own sent list, never as a notification. It names only that one show, and only they can see it.',
     'Retro counts in segments everywhere now, not just on the cards, and it has started behaving like a tape: a tracking line drifts up the screen every few seconds and the wordmark slips every so often. Both stop if your device asks for less motion.',

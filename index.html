@@ -9650,8 +9650,14 @@ function ytCommand(func,args){
 function ytStartListening(){
   ytFrames().forEach(f=>{try{f.contentWindow.postMessage(JSON.stringify({event:'listening',id:1}),'*');}catch(e){}});
 }
+const YT_ORIGINS=['https://www.youtube.com','https://youtube.com',
+                  'https://www.youtube-nocookie.com','https://youtube-nocookie.com'];
 try{window.addEventListener('message',e=>{
-  if(!/youtube(-nocookie)?\.com/.test(String(e.origin||'')))return;
+  // An exact list, not a pattern. /youtube\.com/ is a SUBSTRING test, so
+  // https://youtube.com.example.net and https://evil-youtube.com both satisfied
+  // it and could feed this handler. It only moves a playback position, but an
+  // origin check that any attacker can satisfy is not an origin check.
+  if(YT_ORIGINS.indexOf(String(e.origin||''))<0)return;
   let d; try{d=typeof e.data==='string'?JSON.parse(e.data):e.data;}catch(_){return;}
   const info=d&&d.info;
   if(!info)return;
@@ -16632,10 +16638,11 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-14.7',
-  title:'Card size works, the list stays live, and the dark has a colour',
-  push:'Four things that were quietly broken.',
+  v:'2026-08-14.8',
+  title:'A security pass',
+  push:'One real hole, closed.',
   notes:[
+    'Watch-party sync only accepts messages from YouTube itself now. The check was a pattern rather than a list, so an address merely containing youtube.com satisfied it.',
     'Card size actually changes the cards. It only ever fed a rule that lives in the desktop layout, so on a phone all three settings drew the same thing and the control looked broken.',
     'On a desktop, opening a title no longer freezes your list. The panel slides in beside it and the list was left visible, unblocked and completely dead until you pressed Back.',
     'The dark is a colour now. A faint violet sits under everything, so a black screen reads as deliberate rather than switched off.',

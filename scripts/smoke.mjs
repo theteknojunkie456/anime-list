@@ -230,6 +230,18 @@ try {
     d: topNav ? 'allow-top-navigation is present' : (unsandboxed.length ? unsandboxed.length + ' frame(s) with no sandbox' : 'sandboxed, no top-navigation') });
 }
 
+// Origin checks must be exact. A regex like /youtube\.com/ is a substring test,
+// so https://youtube.com.attacker.example satisfies it — which is how the party
+// sync handler was accepting messages from anywhere that could put those
+// characters in a hostname.
+{
+  const raw5 = readFileSync('index.html', 'utf8').replace(/^\s*\/\/.*$/gm, '');
+  const loose = [...raw5.matchAll(/\.test\(\s*String\(\s*e\.origin/g)].length
+    + [...raw5.matchAll(/e\.origin\s*\.\s*(includes|indexOf|match)\s*\(/g)].length;
+  results.push({ n: 'message origins are matched exactly', ok: loose === 0,
+    d: loose ? loose + ' handler(s) test e.origin with a pattern' : 'exact comparison only' });
+}
+
 let bad = 0;
 for (const r of results) {
   if (!r.ok) bad++;

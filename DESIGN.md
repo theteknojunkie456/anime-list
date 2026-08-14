@@ -599,3 +599,37 @@ bookkeeping: `anthropic_key`, the AniList tokens (`al_*`), sync bookkeeping, and
 party identity. `ai_model_*` was in that list and should not have been — which
 model you picked is a preference, not a credential. The password-derived key
 lives in sessionStorage and is never collected at all.
+
+## Security, audited rather than assumed
+
+What was actually checked, and what it found.
+
+**Cross-user content.** Friend names, aliases, party titles and recommendation
+notes all arrive from other people. Every render site escapes them, and titles
+going into a single-quoted JS argument go through `jsq()`, which `smoke.mjs`
+enforces. `toast()` uses `textContent`, so the party title a host chooses cannot
+carry markup.
+
+**postMessage.** The party's YouTube sync handler checked
+`/youtube(-nocookie)?\.com/.test(e.origin)` — a SUBSTRING test.
+`https://youtube.com.attacker.example` and `https://evil-youtube.com` both
+satisfied it. The payload only moves a playback position, so the severity is low,
+but an origin check anyone can satisfy is not an origin check. It is an exact
+allowlist of four origins now, and `smoke.mjs` fails on any handler that tests
+`e.origin` with a pattern.
+
+**The player frame.** Sandboxed, with `allow-top-navigation` never granted, per
+site. Checked in `smoke.mjs`, which is how the trailer player's second,
+completely unsandboxed iframe was found.
+
+**Credentials.** None in the client. Worker secrets live in worker env. The
+password lock is real AES-GCM with PBKDF2 at 150k iterations, and the derived key
+lives in sessionStorage, which sync never collects. The AI key and AniList tokens
+are deliberately excluded from sync: a credential in cloud storage is a
+credential given away.
+
+**Remote images.** `safeImg()` allows only http(s)/data:image/blob and rejects
+quotes, angle brackets and whitespace, so a friend's cover URL cannot break out
+of the attribute it lands in.
+
+**Links.** Every `target="_blank"` carries `rel="noopener"`.

@@ -486,3 +486,33 @@ carried a gloss — "Accent · buttons, bars, highlights" — written when this 
 in a sheet that covered the thing it changed. Over the live list, telling someone
 the accent colours buttons while they watch it colour buttons is noise. The
 glosses went; the labels are one word each.
+
+## A wall, not a grid of frames
+
+The audit said it plainly: **49 visible elements wearing the same 1px hairline**.
+A poster, a warning row, a button and a section all carried the identical edge,
+so nothing was more important than anything else and the screen read as a pile of
+boxes. That sameness is what "looks kinda off" meant, and it is the one thing no
+amount of colour or type work reaches.
+
+The rule now: **a border means you can operate it.** Inputs, chips, segmented
+controls, buttons — those have edges, because an edge says "this is a target".
+
+Artwork is not operated, it is looked at. Posters, the billboard, the rails and
+the resume card lost their outlines entirely and are lifted off the page by
+shadow instead. A cover already has an edge: its own picture. Down from 49 to 6.
+
+Two more, same instinct:
+
+**Headings lead.** They were 17px with a hairline trailing off to the right, which
+is the section divider every template ships — it says "this is a heading" a
+second time in a weaker voice. 21px in the display face at tight tracking, no
+rule, count set as a figure beside the name.
+
+**The quick pick stopped advertising.** A question in body text next to a bordered
+pill is the shape of a banner, and it sat between two sections of the user's own
+list. One quiet line now, the action carried by the accent rather than a box.
+
+Placeholders were changed with the things they stand in for — `.pcard-ph` still
+had the frame after `.pcard-img` lost it, which is invisible in normal use and
+obvious the moment artwork fails to load.

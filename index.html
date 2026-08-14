@@ -60,20 +60,25 @@
   --elev1:0 1px 2px rgba(0,0,0,0.28);--elev2:0 6px 20px -8px rgba(0,0,0,0.55);
 }
 /* ── RETRO ──────────────────────────────────────────────────────────────────
-   Anime on tape: hot magenta and cyan on a deep violet black, the palette of a
-   VHS sleeve and a city-pop record. Vibrant on purpose, where every other theme
-   in here is restrained. */
+   Cyberpunk, not vintage. The first attempt used a dusty violet ground, which
+   is the mistake: neon does not read as neon against a lit background. It needs
+   near-black to sit on, and it needs TWO of them arguing with each other —
+   magenta and cyan, the sign-and-rain pair — where every other theme in here
+   has one accent and behaves itself.
+
+   The greys are pulled toward cyan rather than neutral, so even the quiet text
+   belongs to the same night. */
 [data-theme=retro]{
-  --aFg:#180418;
-  --bg:#150a24;--bg2:#1d0f30;--bg3:#26143d;--bg4:#331c50;--bg5:#40245f;
-  --b1:rgba(255,47,142,0.16);--b2:rgba(255,47,142,0.30);--b3:rgba(255,47,142,0.52);
-  --t1:#fdf2ff;--t2:#d6b8ea;--t3:#a98ec4;
-  --a:#ff2f8e;--a2:#ff7ec0;--ag:rgba(255,47,142,0.16);--glow:rgba(255,47,142,0.34);
-  --fin:#2ff0c8;--finbg:rgba(47,240,200,0.14);
-  --wat:#ffd23f;--watbg:rgba(255,210,63,0.14);
-  --pln:#3fd0ff;--plnbg:rgba(63,208,255,0.14);
-  --drp:#b39ddb;--drpbg:rgba(179,157,219,0.16);
-  --topgrad:linear-gradient(180deg,#2b0f3f 0%,#150a24 100%);
+  --aFg:#12000c;
+  --bg:#05030b;--bg2:#0a0616;--bg3:#110a22;--bg4:#1a1030;--bg5:#241640;
+  --b1:rgba(34,232,255,0.14);--b2:rgba(34,232,255,0.26);--b3:rgba(255,30,142,0.55);
+  --t1:#e9fbff;--t2:#93c9dc;--t3:#5f8ba3;
+  --a:#ff1e8e;--a2:#ff74c4;--ag:rgba(255,30,142,0.18);--glow:rgba(34,232,255,0.42);
+  --fin:#28ffa8;--finbg:rgba(40,255,168,0.14);
+  --wat:#ffe83d;--watbg:rgba(255,232,61,0.14);
+  --pln:#22e8ff;--plnbg:rgba(34,232,255,0.14);
+  --drp:#8f86b8;--drpbg:rgba(143,134,184,0.16);
+  --topgrad:linear-gradient(180deg,#2a0033 0%,#05030b 62%);
 }
 [data-theme=naruto]{--aFg:#140b06;--bg:#08090e;--bg2:#0e0f18;--bg3:#151720;--bg4:#1c1f2a;--bg5:#232734;--b1:rgba(255,140,0,0.06);--b2:rgba(255,140,0,0.12);--b3:rgba(255,140,0,0.22);--t1:#fff6e8;--t2:#c3b697;--t3:#a08c52;--a:#f57800;--a2:#ffaa33;--ag:rgba(245,120,0,0.13);--glow:rgba(245,120,0,0.22);--fin:#5ed47a;--finbg:rgba(94,212,122,0.11);--wat:#ffcc00;--watbg:rgba(255,204,0,0.11);--pln:#4a9eff;--plnbg:rgba(74,158,255,0.11);--topgrad:linear-gradient(180deg,#1c0e00 0%,#08090e 100%);}
 [data-theme=sasuke]{--aFg:#ffffff;--bg:#06060d;--bg2:#0b0b18;--bg3:#101022;--bg4:#16162c;--bg5:#1c1c36;--b1:rgba(130,90,255,0.06);--b2:rgba(130,90,255,0.13);--b3:rgba(130,90,255,0.24);--t1:#e6e2f8;--t2:#ada9c9;--t3:#8581aa;--a:#7730e8;--a2:#a07af8;--ag:rgba(119,48,232,0.15);--glow:rgba(119,48,232,0.28);--fin:#4ecba8;--finbg:rgba(78,203,168,0.11);--wat:#c084fc;--watbg:rgba(192,132,252,0.11);--pln:#818cf8;--plnbg:rgba(129,140,248,0.11);--topgrad:linear-gradient(180deg,#0a0420 0%,#06060d 100%);}
@@ -206,59 +211,76 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 }
 
 /* ── RETRO, THE SHAPE OF IT ─────────────────────────────────────────────────
-   The palette above only makes it a different colour. This makes it a different
-   thing: corners squared off, soft shadows replaced with a hard offset block the
-   way print and 8-bit did it, artwork under scanlines, numbers set in the mono
-   the era actually used. Everything here hangs off one attribute, so it is still
-   one look you turn on rather than a set of choices to make. */
+   Squaring every corner is a signifier, not a design: it says "not rounded"
+   and stops there. The language this look is actually borrowing from is the
+   HUD — Deus Ex, 2077, every in-game panel — and its move is the NOTCH: a
+   corner cut off at 45°, as if the panel were milled rather than drawn. That is
+   ownable in a way that border-radius:0 never is.
+
+   The other half is restraint. Neon reads as neon because most of the frame is
+   dark and only one or two things are lit. The first attempt glowed everything
+   and misregistered every heading, which is how you get a costume instead of a
+   look. */
+[data-theme=retro]{
+  --notch:10px;
+  --cut:polygon(0 0,calc(100% - var(--notch)) 0,100% var(--notch),100% 100%,var(--notch) 100%,0 calc(100% - var(--notch)));
+}
 [data-theme=retro] .pcard-img,[data-theme=retro] .pcard-ph,
-[data-theme=retro] .rz-card,[data-theme=retro] .billboard,
-[data-theme=retro] .resume-card,[data-theme=retro] .resume-art,[data-theme=retro] .resume-ph{
-  border-radius:2px;
-}
-/* A hard shadow, offset, no blur. The edge stays an edge. */
-[data-theme=retro] .pcard-img,[data-theme=retro] .pcard-ph{
-  box-shadow:4px 4px 0 0 var(--a);
-}
 [data-theme=retro] .rz-card,[data-theme=retro] .billboard{
-  box-shadow:6px 6px 0 0 color-mix(in srgb,var(--a) 70%,transparent);
+  border-radius:2px;clip-path:var(--cut);
 }
-[data-theme=retro] .pcard:active{transform:translate(2px,2px);}
-[data-theme=retro] .pcard:active .pcard-img,[data-theme=retro] .pcard:active .pcard-ph{
-  box-shadow:2px 2px 0 0 var(--a);
+/* Edge light, not a drop shadow: one cyan hairline down the lit side, and a
+   deep magenta bloom underneath that reads as the sign it is standing near. */
+[data-theme=retro] .pcard-wrap{
+  filter:drop-shadow(0 6px 18px rgba(255,30,142,.28));
 }
-/* Scanlines over the artwork, not over the text. */
+[data-theme=retro] .pcard-img,[data-theme=retro] .pcard-ph{
+  box-shadow:inset 1px 1px 0 0 rgba(34,232,255,.5);
+}
+[data-theme=retro] .billboard{
+  box-shadow:inset 0 0 0 1px rgba(34,232,255,.22),0 20px 60px -20px rgba(255,30,142,.5);
+}
+[data-theme=retro] .rz-card{box-shadow:inset 0 0 0 1px rgba(34,232,255,.18);}
+[data-theme=retro] .pcard:active{transform:translateY(2px);}
+/* Scanlines, but faint. At full strength they fight the artwork instead of
+   sitting on it. */
 [data-theme=retro] .pcard-wrap::after,[data-theme=retro] .rz-card::before{
-  content:'';position:absolute;inset:0;pointer-events:none;z-index:2;border-radius:2px;
-  background:repeating-linear-gradient(180deg,rgba(0,0,0,.22) 0 1px,transparent 1px 3px);
-  mix-blend-mode:multiply;
+  content:'';position:absolute;inset:0;pointer-events:none;z-index:2;
+  background:repeating-linear-gradient(180deg,rgba(0,0,0,.13) 0 1px,transparent 1px 3px);
 }
-/* Chrome: square, outlined, no gradients. */
+/* The aberration is a signature, so it appears once: on the wordmark. Putting
+   it on every heading was the tell that it was a filter and not a decision. */
+[data-theme=retro] .hdr-title{
+  text-shadow:-1.5px 0 rgba(34,232,255,.75),1.5px 0 rgba(255,30,142,.75);
+}
+/* Chrome: notched where it is a panel, lit only where it is active. */
 [data-theme=retro] .search-in,[data-theme=retro] .filt-row,[data-theme=retro] .sort-btn,
-[data-theme=retro] .hbtn,[data-theme=retro] .qp-chip,[data-theme=retro] .fchip,
-[data-theme=retro] .art-opt,[data-theme=retro] .stc,[data-theme=retro] .paint-dock,
-[data-theme=retro] .sheet,[data-theme=retro] .hero-cta,[data-theme=retro] .fixbar.on{
+[data-theme=retro] .qp-chip,[data-theme=retro] .art-opt,[data-theme=retro] .stc,
+[data-theme=retro] .hero-cta,[data-theme=retro] .fixbar.on,[data-theme=retro] .paint-name{
   border-radius:2px;
 }
-[data-theme=retro] .hbtn,[data-theme=retro] .search-in{border-color:var(--b2);}
-[data-theme=retro] .fchip.on{border-radius:2px;box-shadow:2px 2px 0 0 var(--a);}
-[data-theme=retro] .nav{border-radius:2px 2px 0 0;border-top:2px solid var(--a);}
-[data-theme=retro] .nbtn.on{border-radius:2px;}
-[data-theme=retro] .nbtn.add{border-radius:2px;box-shadow:3px 3px 0 0 color-mix(in srgb,var(--a) 55%,#000);}
-/* Numbers are the era's own: monospaced, so counts and episodes line up like a
-   readout rather than like prose. */
+[data-theme=retro] .hbtn,[data-theme=retro] .nbtn.add,[data-theme=retro] .paint-save,
+[data-theme=retro] .resume-card{border-radius:2px;clip-path:var(--cut);}
+[data-theme=retro] .hbtn{--notch:7px;box-shadow:inset 0 0 0 1px rgba(34,232,255,.2);}
+[data-theme=retro] .nbtn.add{--notch:8px;box-shadow:0 0 22px -4px var(--a);}
+[data-theme=retro] .search-in{border-color:rgba(34,232,255,.2);}
+[data-theme=retro] .search-in:focus{border-color:var(--a);box-shadow:0 0 18px -4px var(--glow);}
+[data-theme=retro] .fchip.on{border-radius:2px;box-shadow:0 0 14px -3px var(--a);}
+[data-theme=retro] .nav{border-radius:0;border-top:1px solid rgba(34,232,255,.35);}
+[data-theme=retro] .nbtn.on{border-radius:2px;box-shadow:inset 0 0 0 1px var(--a);}
+/* Numbers as a readout. */
 [data-theme=retro] .row-count,[data-theme=retro] .fn,[data-theme=retro] .rz-at,
 [data-theme=retro] .rz-ep,[data-theme=retro] .hero-prog span,[data-theme=retro] .sv-heronum .v{
   font-family:ui-monospace,'SFMono-Regular',Menlo,monospace;letter-spacing:-.02em;
 }
-/* Progress reads as a meter with steps in it, not a smooth fill. */
-[data-theme=retro] .pbar{border-radius:2px;background:rgba(0,0,0,.55);box-shadow:inset 0 0 0 1px var(--b2);}
+/* Progress steps rather than slides, and the track is a cut channel. */
+[data-theme=retro] .pbar{border-radius:2px;background:rgba(0,0,0,.6);box-shadow:inset 0 0 0 1px rgba(34,232,255,.22);}
 [data-theme=retro] .pfill{
   border-radius:2px;
-  background:repeating-linear-gradient(90deg,var(--a) 0 6px,color-mix(in srgb,var(--a) 55%,#000) 6px 8px);
+  background:repeating-linear-gradient(90deg,var(--a) 0 5px,transparent 5px 7px);
+  box-shadow:0 0 10px -2px var(--a);
 }
-/* The status tag becomes a corner flag with a hard edge. */
-[data-theme=retro] .pcard-badge{border-radius:2px 0 2px 0;background:rgba(10,2,18,.9);}
+[data-theme=retro] .pcard-badge{border-radius:2px 0 2px 0;background:rgba(3,1,8,.92);}
 
 /* ── OPTION DIAGRAMS ──
    Each one is a drawing of what its button does, in the same accent the app is
@@ -355,6 +377,12 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 .glow-off::after{content:'';position:absolute;top:50%;left:16%;right:16%;height:2px;background:var(--t3);transform:translateY(-1px) rotate(-45deg);}
 .glow-lb{font-size:12px;font-weight:700;color:var(--t2);letter-spacing:.2px;}
 .glow-mode.on .glow-lb{color:var(--a2);}
+.paint-savebar{display:flex;gap:8px;align-items:stretch;margin-top:16px;}
+.paint-name{flex:1;min-width:0;padding:12px 13px;border-radius:14px;background:var(--bg3);
+  border:1px solid var(--b2);color:var(--t1);font-family:var(--fb);font-size:13px;outline:none;}
+.paint-name:focus{border-color:var(--a);}
+.paint-name::placeholder{color:var(--t3);}
+.paint-savebar .paint-save{margin-top:0;width:auto;flex:0 0 auto;padding:12px 16px;}
 .paint-save{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin-top:16px;
   padding:12px;border-radius:14px;background:var(--bg3);border:1px solid var(--b2);color:var(--t1);
   font-family:var(--fd);font-size:13px;font-weight:800;}
@@ -5409,7 +5437,7 @@ const THEMES=[
   // Not a palette swap either: RETRO restyles the corners, the shadows and the
   // artwork too, in the [data-theme=retro] block in the stylesheet. One look you
   // turn on, not a new axis to choose along.
-  {id:'retro',   name:'Retro',   emoji:'📼', bg:'#150a24', accent:'#ff2f8e'},
+  {id:'retro',   name:'Retro',   emoji:'🌃', bg:'#05030b', accent:'#ff1e8e'},
   {id:'naruto',  name:'Naruto',  emoji:'🍥', bg:'#0e0f18', accent:'#f57800'},
   {id:'sasuke',  name:'Sasuke',  emoji:'⚡', bg:'#0b0b18', accent:'#7730e8'},
   {id:'luffy',   name:'Luffy',   emoji:'🏴‍☠️',bg:'#0b1420', accent:'#d03838'},
@@ -5830,9 +5858,12 @@ function startPaint(){
       <div class="paint-lb">Card size</div>
       <div class="art-seg" id="densityRow"></div>
       <div id="fromImgRow"></div>
-      <button class="paint-save" onclick="saveLookAsTheme()">
-        <i data-ic="check"></i> Save this as my own theme
-      </button>
+      <div class="paint-savebar">
+        <input class="paint-name" id="lookName" type="text" maxlength="14" autocomplete="off"
+               placeholder="Name this look" aria-label="Name for your look"
+               onkeydown="if(event.key==='Enter'){event.preventDefault();saveLookAsTheme();}">
+        <button class="paint-save" onclick="saveLookAsTheme()"><i data-ic="check"></i> Save</button>
+      </div>
       <button class="th-reset" onclick="resetTheme()"><i data-ic="refresh"></i> Put everything back to default</button>
     </div>`;
   document.body.appendChild(el);
@@ -5859,14 +5890,18 @@ function saveLookAsTheme(){
   const cs=getComputedStyle(document.documentElement);
   const accent=(accentOverride()||cs.getPropertyValue('--a').trim()||'#da374f');
   const bg=(surfaceTint()||cs.getPropertyValue('--bg').trim()||'#0a0a0c');
-  // No prompt(). A modal dialog to name a thing you just made by eye is a
-  // needless stop, and it blocks the page hard enough that an automated pass
-  // over the UI hangs on it forever — which is how this one was found.
+  // Named in the panel, not in a dialog. A modal to name a thing you just made
+  // by eye is a needless stop, and prompt() blocks the page hard enough that an
+  // automated pass over the UI hangs on it forever. Leave the field empty and it
+  // names itself, so the naming is an option rather than a toll.
+  const box=document.getElementById('lookName');
+  const typed=((box&&box.value)||'').trim().replace(/[<>"'&]/g,'').slice(0,14);
   const mine=customThemes().filter(t=>/^My theme/.test(t.name||'')).length;
-  const name='My theme'+(mine?' '+(mine+1):'');
+  const name=typed||('My theme'+(mine?' '+(mine+1):''));
   const t={id:'c'+uid(),name,emoji:'\u2726',accent,bg,darken:!surfaceTint()};
   setCustomThemes([...customThemes(),t]);
-  toast(`${name} saved \u2014 it's in Theme now`,2800);
+  if(box)box.value='';
+  toast(`${name} saved. It's in Looks now`,2800);
   try{renderThemeGrid();}catch(e){}
 }
 
@@ -16325,10 +16360,12 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-14.2',
-  title:'Retro, and the controls that went missing',
-  push:'Hold the logo. Retro is the second tile.',
+  v:'2026-08-14.3',
+  title:'Retro, done properly',
+  push:'Neon on black, notched panels, one signature glitch.',
   notes:[
+    'Retro is cyberpunk now rather than dusty. Near black ground so the neon can actually be neon, magenta and cyan arguing with each other, panels with a corner milled off at an angle the way a game HUD does it, a cyan edge light down each cover and a magenta bloom under it. The wordmark is the one thing that misregisters, because a signature you use everywhere stops being one.',
+    'You can name a look when you save it. The field sits next to the button; leave it empty and it names itself.',
     'Retro sits second in the row now, next to Default, because the row scrolls sideways and an eighth tile is a tile nobody finds.',
     'Glow and brightness are back. They went out with the old Theme sheet by mistake, and they belong here more than they did there: both change the whole page, which is the thing you can see behind this bar.',
     'The custom colour button looks like one. It was a grey circle sitting among nine coloured circles, which is the only control you cannot guess, dressed exactly like the ones you can. It wears a colour wheel and a plus now.',

@@ -516,3 +516,27 @@ list. One quiet line now, the action carried by the accent rather than a box.
 Placeholders were changed with the things they stand in for — `.pcard-ph` still
 had the frame after `.pcard-img` lost it, which is invisible in normal use and
 obvious the moment artwork fails to load.
+
+## Retro, and what a look has to do
+
+Two attempts, and the first one was wrong in an instructive way.
+
+**Squaring the corners is a signifier, not a design.** `border-radius: 0` says
+"not rounded" and stops. The language this look actually borrows from is the game
+HUD, and its move is the **notch**: a corner cut off at 45°, as if the panel were
+milled rather than drawn. That is ownable in a way an absence never is.
+
+**Neon needs darkness to be neon.** The first ground was a dusty violet
+(`#150a24`) and everything on it read as washed. Near-black (`#05030b`) with two
+neons arguing — magenta and cyan, sign and rain — is the whole effect. The greys
+are pulled toward cyan so even the quiet text belongs to the same night.
+
+**Restraint is the difference between a look and a costume.** The first pass gave
+every cover a two-colour offset shadow and misregistered every heading. Both are
+tricks, and applied everywhere a trick reads as a filter someone switched on. Now
+one cyan hairline lights each cover, one magenta bloom sits under it, and the
+chromatic aberration appears exactly once, on the wordmark.
+
+The whole thing hangs off `[data-theme=retro]`, so it stays one look you turn on
+rather than a new axis to choose along — the distinction that got layouts and
+editions deleted.

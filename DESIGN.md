@@ -540,3 +540,34 @@ chromatic aberration appears exactly once, on the wordmark.
 The whole thing hangs off `[data-theme=retro]`, so it stays one look you turn on
 rather than a new axis to choose along — the distinction that got layouts and
 editions deleted.
+
+## Three devices
+
+Sync was last-writer-wins over the whole list: pull the cloud copy, and if it is
+newer, `anime = migrate(arr)`. One device, that is correct and simple. A phone, a
+tablet and a desktop all in use, it loses work every day — mark an episode on the
+phone, mark a different one on the desktop, and whichever syncs second replaces
+the other outright. Neither existing guard fires, because both lists are the same
+length and neither is empty.
+
+Every item already carried `upd`, a millisecond stamp written on every edit, so
+the merge is per item: union by id, newest `upd` wins for anything present in
+both. Nothing is discarded for arriving second.
+
+**Deletion is the hard half.** A union resurrects whatever you removed the moment
+another device syncs, so a delete has to leave something behind. `wl_tombs` maps
+id → when, rides to the cloud inside the extras bundle (which already syncs
+arbitrary keys), and merges by max rather than being overwritten — a device that
+has deleted nothing must not erase what the others deleted. A tombstone beats any
+edit older than itself and loses to any edit newer, which is what makes *delete
+on the phone, re-add on the desktop* behave the way anyone would expect. Pruned
+at 90 days.
+
+Every removal path has to record one, or that removal comes back: manual delete,
+the AI's remove command, and the adult-content purge.
+
+`scripts/sync-merge-test.mjs` runs three simulated devices against the real
+functions — concurrent edits, a delete, an add, a stale device syncing last, and
+a re-add after a deletion — and asserts nothing is lost. This is the one part of
+the app where being wrong costs somebody their list, so it is proved rather than
+reasoned about.

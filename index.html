@@ -226,7 +226,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
   --cut:polygon(0 0,calc(100% - var(--notch)) 0,100% var(--notch),100% 100%,var(--notch) 100%,0 calc(100% - var(--notch)));
 }
 [data-theme=retro] .pcard-img,[data-theme=retro] .pcard-ph,
-[data-theme=retro] .rz-card,[data-theme=retro] .billboard{
+[data-theme=retro] .billboard{
   border-radius:2px;clip-path:var(--cut);
 }
 /* Edge light, not a drop shadow: one cyan hairline down the lit side, and a
@@ -259,9 +259,15 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 [data-theme=retro] .hero-cta,[data-theme=retro] .fixbar.on,[data-theme=retro] .paint-name{
   border-radius:2px;
 }
-[data-theme=retro] .hbtn,[data-theme=retro] .nbtn.add,[data-theme=retro] .paint-save,
+[data-theme=retro] .nbtn.add,[data-theme=retro] .paint-save,
 [data-theme=retro] .resume-card{border-radius:2px;clip-path:var(--cut);}
-[data-theme=retro] .hbtn{--notch:7px;box-shadow:inset 0 0 0 1px rgba(34,232,255,.2);}
+/* Not everything is notched. A HUD that mills every corner the same way is as
+   monotone as one that rounds them all — the panels are cut, the small round
+   controls stay round, and the contrast between the two is the point. */
+[data-theme=retro] .hbtn{border-radius:99px;box-shadow:inset 0 0 0 1px rgba(34,232,255,.28);}
+[data-theme=retro] .search-play,[data-theme=retro] .resume-go{border-radius:99px;}
+[data-theme=retro] .rz-card{clip-path:none;border-radius:2px;}
+[data-theme=retro] .hero-cta{border-radius:99px;}
 [data-theme=retro] .nbtn.add{--notch:8px;box-shadow:0 0 22px -4px var(--a);}
 [data-theme=retro] .search-in{border-color:rgba(34,232,255,.2);}
 [data-theme=retro] .search-in:focus{border-color:var(--a);box-shadow:0 0 18px -4px var(--glow);}
@@ -2660,7 +2666,13 @@ body.recsel .pcard{position:relative;}
     column-gap:10px;width:100%;max-width:var(--measure);margin-left:auto;margin-right:auto;
   }
   .hdr{grid-column:1/-1;grid-row:1;padding-top:calc(var(--safe-t) + 10px);}
-  .topbar{grid-column:1;grid-row:2;margin-left:0;margin-right:0;}
+  /* The bar holds two controls of different heights. Without this the shorter
+     one aligns to the top of the box and sits 3px high inside its own pill,
+     which is small enough to look like a mistake rather than a layout. */
+  /* .topbar is a COLUMN flex, so justify-content is its vertical axis. Reaching
+     for align-items here (the reflex) centres it horizontally instead, which
+     puts the search placeholder in the middle of its own field. */
+  .topbar{grid-column:1;grid-row:2;margin-left:0;margin-right:0;justify-content:center;}
   .topbar-ctrl{grid-column:2;grid-row:2;margin-top:10px;}   /* same row, not under it */
   .fixbar.on{grid-column:1/-1;grid-row:3;margin-left:0;margin-right:0;}
   .page{grid-column:1/-1;grid-row:4;min-height:0;}
@@ -4969,7 +4981,10 @@ function collectExtra(){
 }
 function applyExtra(x){
   if(!x||typeof x!=='object')return;
-  try{for(const k in x){if(syncSkip(k))continue;if(typeof x[k]==='string'){try{localStorage.setItem(k,x[k]);}catch(e){}}}}catch(e){}
+  // Tombstones are the one key that must not be overwritten: a device that has
+  // deleted nothing would erase every deletion the others recorded.
+  try{if(x[TOMB_KEY])mergeTombs(x[TOMB_KEY]);}catch(e){}
+  try{for(const k in x){if(syncSkip(k)||k===TOMB_KEY)continue;if(typeof x[k]==='string'){try{localStorage.setItem(k,x[k]);}catch(e){}}}}catch(e){}
   // repaint everything the synced state drives
   try{const at=localStorage.getItem('animetheme');if(at&&typeof applyTheme==='function')applyTheme(at);}catch(e){}
   try{if(typeof applyGlow==='function')applyGlow();}catch(e){}
@@ -5062,6 +5077,64 @@ function backupStatusLine(){
   if(!at)return 'On — nothing has reached the cloud yet';
   return 'On — backed up '+relTime(at);
 }
+// ─── MERGING THREE DEVICES ──────────────────────────────────────────────────
+// Sync used to be last-writer-wins over the WHOLE list: the newer copy replaced
+// the local one outright. With one device that is fine. With a phone, an iPad
+// and a desktop all in use it quietly loses work — mark an episode on the phone,
+// mark a different one on the desktop, and whichever syncs second overwrites the
+// other. Neither safety guard catches it, because both lists are the same length.
+//
+// Every item already carries `upd`, a millisecond stamp set on every edit, so
+// the merge is per item: union by id, newest edit wins for anything in both.
+//
+// Deletion is the hard half. A plain union resurrects anything you deleted, so
+// a delete has to leave something behind: a tombstone, id → when. A tombstone
+// beats any edit older than itself and loses to any edit newer, which is what
+// makes "delete on the phone, then re-add on the desktop" behave the way you'd
+// expect. They ride to the cloud inside the extras bundle, and are pruned after
+// 90 days so the map cannot grow forever.
+const TOMB_KEY='wl_tombs';
+const TOMB_TTL=90*24*3600*1000;
+function tombs(){
+  try{const v=JSON.parse(localStorage.getItem(TOMB_KEY)||'{}');return (v&&typeof v==='object')?v:{};}catch(e){return{};}
+}
+function setTombs(m){
+  const cut=Date.now()-TOMB_TTL, out={};
+  for(const k in m){if(+m[k]>cut)out[k]=+m[k];}
+  try{localStorage.setItem(TOMB_KEY,JSON.stringify(out));}catch(e){}
+  return out;
+}
+function tombstone(id){
+  if(!id)return;
+  const m=tombs(); m[String(id)]=Date.now(); setTombs(m);
+}
+// Remote tombstones merge rather than replace: the union of two devices'
+// deletions is what both of them meant.
+function mergeTombs(remoteRaw){
+  let remote={};
+  try{remote=(typeof remoteRaw==='string')?JSON.parse(remoteRaw):(remoteRaw||{});}catch(e){remote={};}
+  const m=tombs();
+  for(const k in remote){const t=+remote[k]||0;if(t>(+m[k]||0))m[k]=t;}
+  return setTombs(m);
+}
+function _upd(a){return (a&&+a.upd)||0;}
+function mergeLists(local,remote){
+  const by=new Map();
+  (local||[]).forEach(a=>{if(a&&a.id)by.set(String(a.id),a);});
+  (remote||[]).forEach(r=>{
+    if(!r||!r.id)return;
+    const id=String(r.id), l=by.get(id);
+    if(!l){by.set(id,r);return;}
+    by.set(id,_upd(r)>_upd(l)?r:l);
+  });
+  const t=tombs(), out=[];
+  by.forEach((a,id)=>{
+    const d=+t[id]||0;
+    if(d&&_upd(a)<=d)return;      // deleted after the last edit we know about
+    out.push(a);
+  });
+  return out;
+}
 async function syncPull(){
   const code=syncCode();if(!code||!SYNC_URL)return null;
   const r=await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({op:'pull',code})});
@@ -5106,7 +5179,14 @@ async function syncOnOpen(){
           syncPush();
           return;
         }
-        anime=migrate(arr);writeLocal();setSyncAt(res.updatedAt);render();renderSyncUI();toast('Synced from cloud');
+        // Merge, never replace. `arr` is the other device's view, not the truth.
+        const before=anime.length;
+        anime=migrate(mergeLists(anime,arr));
+        writeLocal();setSyncAt(res.updatedAt);render();renderSyncUI();
+        toast(anime.length>before?`Synced. ${anime.length-before} added from your other device`:'Synced');
+        // The merged list is newer than either side, so the cloud needs it too —
+        // otherwise the device that pushed last keeps overwriting this one.
+        schedulePush();
         // A real list has arrived, so whatever was standing in for it is gone
         // and publishing is safe again. Without this, one corrupt read would
         // leave the device permanently unable to back up.
@@ -8473,6 +8553,7 @@ function confirmDelete(id){
 function closeConfirm(){deleteId=null;_confirmCb=null;document.getElementById('confirmBox').classList.remove('on');}
 function doDelete(){
   if(!deleteId)return;
+  tombstone(deleteId);          // or the next sync resurrects it from another device
   anime=anime.filter(a=>a.id!==deleteId);
   if(detailId===deleteId){detailId=null;closeAll();}
   save();closeConfirm();render();toast('Removed');
@@ -15256,6 +15337,7 @@ function _aiStatus(title,status){
 }
 function _aiRemove(title){
   const a=_findShow(title); if(!a)return `I couldn’t find “${title}”.`;
+  tombstone(a.id);
   anime=anime.filter(x=>x.id!==a.id); save(); render();
   return `Removed “${a.title}” from your list.`;
 }
@@ -15768,7 +15850,7 @@ async function fetchCovers(){
         a.idTried=1;    // same for the id: a title AniList doesn't carry shouldn't be asked about forever
         a.adultChk=1;   // verified against AniList's isAdult flag (adult ones already removed above)
       });
-      if(adultIds.length){const gone=new Set(adultIds);anime=anime.filter(a=>!gone.has(a.id));adultRemoved+=adultIds.length;
+      if(adultIds.length){const gone=new Set(adultIds);gone.forEach(id=>tombstone(id));anime=anime.filter(a=>!gone.has(a.id));adultRemoved+=adultIds.length;
         if(detailId&&gone.has(detailId)){detailId=null;try{closeAll();}catch{}}}
       save();renderHome();try{nativeScheduleNotifs();}catch{}
       await pause(1000); // stay comfortably under AniList's per-minute limit
@@ -16360,10 +16442,12 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-14.3',
-  title:'Retro, done properly',
-  push:'Neon on black, notched panels, one signature glitch.',
+  v:'2026-08-14.4',
+  title:'Your devices stopped overwriting each other',
+  push:'Phone, iPad and desktop now merge instead of fighting.',
   notes:[
+    'Sync merges instead of replacing. It used to send the whole list and let the newest copy win, which is fine on one device and quietly loses work on three: watch an episode on your phone, mark something else on the desktop, and whichever synced second erased the other. Every title now merges on its own, newest edit per title wins, and nothing gets thrown away because it arrived second.',
+    'Deleting a show sticks. A merge on its own would bring back anything you removed as soon as another device synced, so a deletion now leaves a marker that travels with your list. Re-adding something later still wins, because that is the newer decision.',
     'Retro is cyberpunk now rather than dusty. Near black ground so the neon can actually be neon, magenta and cyan arguing with each other, panels with a corner milled off at an angle the way a game HUD does it, a cyan edge light down each cover and a magenta bloom under it. The wordmark is the one thing that misregisters, because a signature you use everywhere stops being one.',
     'You can name a look when you save it. The field sits next to the button; leave it empty and it names itself.',
     'Retro sits second in the row now, next to Default, because the row scrolls sideways and an eighth tile is a tile nobody finds.',

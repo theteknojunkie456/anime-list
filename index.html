@@ -80,12 +80,12 @@
 [data-theme=retro]{
   --aFg:#12000c;
   --bg:#05030b;--bg2:#0a0616;--bg3:#110a22;--bg4:#1a1030;--bg5:#241640;
-  --b1:rgba(34,232,255,0.14);--b2:rgba(34,232,255,0.26);--b3:rgba(255,30,142,0.55);
+  --b1:color-mix(in srgb,var(--edge) 14%,transparent);--b2:color-mix(in srgb,var(--edge) 26%,transparent);--b3:rgba(255,30,142,0.55);
   --t1:#e9fbff;--t2:#93c9dc;--t3:#5f8ba3;
-  --a:#ff1e8e;--a2:#ff74c4;--ag:rgba(255,30,142,0.18);--glow:rgba(34,232,255,0.42);
+  --a:#ff1e8e;--a2:#ff74c4;--ag:rgba(255,30,142,0.18);--glow:color-mix(in srgb,var(--edge) 42%,transparent);
   --fin:#28ffa8;--finbg:rgba(40,255,168,0.14);
   --wat:#ffe83d;--watbg:rgba(255,232,61,0.14);
-  --pln:#22e8ff;--plnbg:rgba(34,232,255,0.14);
+  --pln:#22e8ff;--plnbg:color-mix(in srgb,var(--edge) 14%,transparent);
   --drp:#8f86b8;--drpbg:rgba(143,134,184,0.16);
   --topgrad:linear-gradient(180deg,#2a0033 0%,#05030b 62%);
 }
@@ -240,6 +240,10 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
    retro skin unusable, and this app is mostly prose — titles, notes, times. */
 [data-theme=retro]{
   --fd:'VT323','Bricolage Grotesque',-apple-system,sans-serif;
+  /* The lit edge. Every bevel lip, hairline, caption, cursor and marching-ant in
+     this theme mixes from this ONE colour, so switching it repaints the whole
+     look rather than a handful of borders. Set on :root by setRetroEdge(). */
+  --edge:#22e8ff;
 }
 [data-theme=retro]{
   --notch:10px;
@@ -255,7 +259,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
    split colour channel at the same time — one effect doing both jobs, and cheaper
    than the blur it replaces because neither shadow has a radius. */
 [data-theme=retro] .pcard-wrap{
-  filter:drop-shadow(3px 3px 0 rgba(255,30,142,.42)) drop-shadow(-2px -2px 0 rgba(34,232,255,.30));
+  filter:drop-shadow(3px 3px 0 rgba(255,30,142,.42)) drop-shadow(-2px -2px 0 color-mix(in srgb,var(--edge) 30%,transparent));
 }
 /* The artwork is sunk into the card the way an item sits in an inventory slot:
    lit along the top-left lip, dark along the bottom-right. Two inset shadows, no
@@ -264,7 +268,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
    be clipped away by it. */
 [data-theme=retro] .pcard-img,[data-theme=retro] .pcard-ph{
   box-shadow:
-    inset 2px 2px 0 0 rgba(34,232,255,.42),
+    inset 2px 2px 0 0 color-mix(in srgb,var(--edge) 42%,transparent),
     inset -2px -2px 0 0 rgba(0,0,0,.92),
     inset 0 0 0 3px rgba(6,2,14,.55);
 }
@@ -276,7 +280,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 [data-theme=retro] .pcard-wrap::before{
   content:'';position:absolute;inset:0;pointer-events:none;z-index:1;
   clip-path:var(--cut);
-  background:linear-gradient(135deg,rgba(34,232,255,.62) 0%,rgba(104,44,150,.40) 52%,rgba(255,30,142,.62) 100%);
+  background:linear-gradient(135deg,color-mix(in srgb,var(--edge) 62%,transparent) 0%,rgba(104,44,150,.40) 52%,rgba(255,30,142,.62) 100%);
   mix-blend-mode:color;opacity:.42;
 }
 /* Every other place artwork appears. The look was written for .pcard and the app
@@ -311,23 +315,23 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 [data-theme=retro] .resume-art,[data-theme=retro] .pop-cover,[data-theme=retro] .pick-img{
   border-radius:2px;
   box-shadow:
-    inset 2px 2px 0 0 rgba(34,232,255,.42),
+    inset 2px 2px 0 0 color-mix(in srgb,var(--edge) 42%,transparent),
     inset -2px -2px 0 0 rgba(0,0,0,.92);
 }
 /* Pointer devices only: the slot lights up as if the cursor were a torch. */
 @media (hover:hover){
   [data-theme=retro] .pcard:hover .pcard-img,[data-theme=retro] .pcard:hover .pcard-ph{
     box-shadow:
-      inset 2px 2px 0 0 rgba(34,232,255,.85),
+      inset 2px 2px 0 0 color-mix(in srgb,var(--edge) 85%,transparent),
       inset -2px -2px 0 0 rgba(0,0,0,.92),
       inset 0 0 0 3px rgba(6,2,14,.55);
   }
   [data-theme=retro] .pcard:hover .pcard-wrap::before{opacity:.34;}
 }
 [data-theme=retro] .billboard{
-  box-shadow:inset 0 0 0 1px rgba(34,232,255,.22),0 20px 60px -20px rgba(255,30,142,.5);
+  box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--edge) 22%,transparent),0 20px 60px -20px rgba(255,30,142,.5);
 }
-[data-theme=retro] .rz-card{box-shadow:inset 0 0 0 1px rgba(34,232,255,.18);}
+[data-theme=retro] .rz-card{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--edge) 18%,transparent);}
 [data-theme=retro] .pcard:active{transform:translateY(2px);}
 /* Scanlines, but faint. At full strength they fight the artwork instead of
    sitting on it. */
@@ -340,21 +344,21 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
    Occasionally it slips, the way a tape does when the tracking drifts — rarely
    enough that you are never sure you saw it. */
 [data-theme=retro] .hdr-title{
-  text-shadow:-1.5px 0 rgba(34,232,255,.75),1.5px 0 rgba(255,30,142,.75);
+  text-shadow:-1.5px 0 color-mix(in srgb,var(--edge) 75%,transparent),1.5px 0 rgba(255,30,142,.75);
   animation:vhsSlip 11s steps(1,end) infinite;
 }
 @keyframes vhsSlip{
-  0%,96.5%{transform:none;text-shadow:-1.5px 0 rgba(34,232,255,.75),1.5px 0 rgba(255,30,142,.75);}
-  97%{transform:translateX(-2px) skewX(-6deg);text-shadow:-4px 0 rgba(34,232,255,.9),4px 0 rgba(255,30,142,.9);}
-  97.6%{transform:translateX(3px);text-shadow:3px 0 rgba(34,232,255,.9),-3px 0 rgba(255,30,142,.9);}
-  98.2%{transform:none;text-shadow:-1.5px 0 rgba(34,232,255,.75),1.5px 0 rgba(255,30,142,.75);}
+  0%,96.5%{transform:none;text-shadow:-1.5px 0 color-mix(in srgb,var(--edge) 75%,transparent),1.5px 0 rgba(255,30,142,.75);}
+  97%{transform:translateX(-2px) skewX(-6deg);text-shadow:-4px 0 color-mix(in srgb,var(--edge) 90%,transparent),4px 0 rgba(255,30,142,.9);}
+  97.6%{transform:translateX(3px);text-shadow:3px 0 color-mix(in srgb,var(--edge) 90%,transparent),-3px 0 rgba(255,30,142,.9);}
+  98.2%{transform:none;text-shadow:-1.5px 0 color-mix(in srgb,var(--edge) 75%,transparent),1.5px 0 rgba(255,30,142,.75);}
 }
 /* A tracking line crawls up the screen every few seconds — the artefact of a
    tape being read, not an effect a browser skin would add. It sits above the
    page and below every control, and it cannot be clicked. */
 [data-theme=retro] .ambient::after{
   content:'';position:fixed;left:0;right:0;height:78px;pointer-events:none;z-index:0;
-  background:linear-gradient(180deg,transparent,rgba(34,232,255,.055) 42%,rgba(255,255,255,.05) 50%,rgba(255,30,142,.05) 58%,transparent);
+  background:linear-gradient(180deg,transparent,color-mix(in srgb,var(--edge) 5.5%,transparent) 42%,rgba(255,255,255,.05) 50%,rgba(255,30,142,.05) 58%,transparent);
   animation:vhsTrack 9s linear infinite;
 }
 @keyframes vhsTrack{
@@ -420,13 +424,13 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 [data-theme=retro] .search-wrap,[data-theme=retro] .resume-card{
   box-shadow:
     inset 2px 2px 0 0 rgba(0,0,0,.88),
-    inset -1px -1px 0 0 rgba(34,232,255,.30);
+    inset -1px -1px 0 0 color-mix(in srgb,var(--edge) 30%,transparent);
 }
 /* Raised: anything you press. */
 [data-theme=retro] .hbtn,[data-theme=retro] .nbtn,[data-theme=retro] .sort-btn,
 [data-theme=retro] .resume-go{
   box-shadow:
-    inset 1px 1px 0 0 rgba(34,232,255,.42),
+    inset 1px 1px 0 0 color-mix(in srgb,var(--edge) 42%,transparent),
     inset -2px -2px 0 0 rgba(0,0,0,.90);
 }
 /* Pressed inverts the bevel — the control physically goes in. */
@@ -434,7 +438,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 [data-theme=retro] .sort-btn:active,[data-theme=retro] .resume-go:active{
   box-shadow:
     inset 2px 2px 0 0 rgba(0,0,0,.90),
-    inset -1px -1px 0 0 rgba(34,232,255,.30);
+    inset -1px -1px 0 0 color-mix(in srgb,var(--edge) 30%,transparent);
 }
 /* The add key is the one saturated face on the screen, so it gets the hard
    offset the cards get — a key standing proud of the bar, not a floating pill. */
@@ -442,7 +446,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
   box-shadow:
     inset 1px 1px 0 0 rgba(255,255,255,.34),
     inset -2px -2px 0 0 rgba(0,0,0,.55),
-    2px 2px 0 0 rgba(34,232,255,.30);
+    2px 2px 0 0 color-mix(in srgb,var(--edge) 30%,transparent);
 }
 [data-theme=retro] .nbtn.add:active{
   box-shadow:
@@ -451,15 +455,15 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 }
 /* The bar the keys sit on: a hard lit lip along the top, no blur, no fade. */
 [data-theme=retro] .nav{
-  box-shadow:inset 0 2px 0 0 rgba(34,232,255,.28);
+  box-shadow:inset 0 2px 0 0 color-mix(in srgb,var(--edge) 28%,transparent);
 }
 /* The current tab is stated, not glowed: a hard cyan underline the width of the
    key. One bright thing per screen and it is the thing you are looking at. */
 [data-theme=retro] .nbtn.on{
   box-shadow:
-    inset 1px 1px 0 0 rgba(34,232,255,.42),
+    inset 1px 1px 0 0 color-mix(in srgb,var(--edge) 42%,transparent),
     inset -2px -2px 0 0 rgba(0,0,0,.90),
-    inset 0 -3px 0 0 var(--pln);
+    inset 0 -3px 0 0 var(--edge);
 }
 /* Chrome: notched where it is a panel, lit only where it is active. */
 [data-theme=retro] .search-in,[data-theme=retro] .filt-row,[data-theme=retro] .sort-btn,
@@ -482,11 +486,11 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 [data-theme=retro] .rz-card{clip-path:none;border-radius:2px;}
 [data-theme=retro] .hero-cta{border-radius:2px;}
 [data-theme=retro] .nbtn.add{--notch:8px;}
-[data-theme=retro] .search-in{border-color:rgba(34,232,255,.2);}
+[data-theme=retro] .search-in{border-color:color-mix(in srgb,var(--edge) 20%,transparent);}
 [data-theme=retro] .search-in:focus{border-color:var(--a);box-shadow:0 0 18px -4px var(--glow);}
 /* An active chip is stated by a hard lit edge, not a halo. */
-[data-theme=retro] .fchip.on{border-radius:2px;box-shadow:inset 0 -2px 0 0 var(--a),inset 1px 1px 0 0 rgba(34,232,255,.35);}
-[data-theme=retro] .nav{border-radius:0;border-top:1px solid rgba(34,232,255,.35);}
+[data-theme=retro] .fchip.on{border-radius:2px;box-shadow:inset 0 -2px 0 0 var(--a),inset 1px 1px 0 0 color-mix(in srgb,var(--edge) 35%,transparent);}
+[data-theme=retro] .nav{border-radius:0;border-top:1px solid color-mix(in srgb,var(--edge) 35%,transparent);}
 /* The last of the pills. Squaring the big controls left the small ones behind,
    and a lozenge next to a bevelled key is the one thing that still says 2026.
    Dots included: a round dot is a circle, a square dot is a pixel. */
@@ -538,6 +542,22 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
   transition:transform .2s cubic-bezier(.22,1,.28,1);
 }
 [data-theme=retro] .row-scroll .pcard:last-child{margin-right:0;}
+/* Pulling the cards together does not narrow what hangs BELOW them, so each
+   title ran on under its neighbour's cover — "JUJUTSU KAISEMob Psycho 100". The
+   text is constrained to the part of the card that is actually still visible,
+   which is its width minus the overlap. */
+[data-theme=retro] .row-scroll .pcard-title,
+[data-theme=retro] .row-scroll .pcard-title ~ *{
+  width:calc(100% - 30px);
+}
+/* Anything pinned to a card's right edge is pinned to the part now tucked under
+   its neighbour, so on hover — when the card lifts above the fan — it appeared
+   to hang off the side. Both badges move in by the width of the overlap. */
+[data-theme=retro] .row-scroll .pcard-rec{right:calc(5px + 30px);border-radius:2px;}
+[data-theme=retro] .row-scroll .pcard-seas{right:calc(7px + 30px);}
+/* A selected card has to sit above its neighbours, or the card fanned on top of
+   it covers the ring that says it is selected. */
+[data-theme=retro] .row-scroll .pcard.sel{z-index:7;}
 @media (hover:hover) and (pointer:fine){
   [data-theme=retro] .row-scroll .pcard:hover{
     z-index:6;
@@ -551,8 +571,8 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
   [data-theme=retro] .row-scroll .pcard{transition:none;}
   [data-theme=retro] .row-scroll .pcard:hover ~ .pcard{transform:none;}
 }
-[data-theme=retro] .dact{border-radius:2px;box-shadow:inset 1px 1px 0 0 rgba(34,232,255,.34),inset -2px -2px 0 0 rgba(0,0,0,.9);}
-[data-theme=retro] .dact:active{box-shadow:inset 2px 2px 0 0 rgba(0,0,0,.9),inset -1px -1px 0 0 rgba(34,232,255,.28);}
+[data-theme=retro] .dact{border-radius:2px;box-shadow:inset 1px 1px 0 0 color-mix(in srgb,var(--edge) 34%,transparent),inset -2px -2px 0 0 rgba(0,0,0,.9);}
+[data-theme=retro] .dact:active{box-shadow:inset 2px 2px 0 0 rgba(0,0,0,.9),inset -1px -1px 0 0 color-mix(in srgb,var(--edge) 28%,transparent);}
 /* The controls inside the panel, squared with the rest. The stepper keys and the
    back button were the last circles in the theme — and a round key is the one
    shape a machine with square pixels never made. */
@@ -561,10 +581,10 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
   border-radius:2px;
 }
 [data-theme=retro] .dt-back,[data-theme=retro] .prog-btn{
-  box-shadow:inset 1px 1px 0 0 rgba(34,232,255,.42),inset -2px -2px 0 0 rgba(0,0,0,.9);
+  box-shadow:inset 1px 1px 0 0 color-mix(in srgb,var(--edge) 42%,transparent),inset -2px -2px 0 0 rgba(0,0,0,.9);
 }
 [data-theme=retro] .dt-back:active,[data-theme=retro] .prog-btn:active{
-  box-shadow:inset 2px 2px 0 0 rgba(0,0,0,.9),inset -1px -1px 0 0 rgba(34,232,255,.3);
+  box-shadow:inset 2px 2px 0 0 rgba(0,0,0,.9),inset -1px -1px 0 0 color-mix(in srgb,var(--edge) 30%,transparent);
 }
 /* SELECTION, in pixels. A 2px solid rounded ring is the browser's idea of focus,
    and in a theme built from hard square edges it is the one thing that still
@@ -572,16 +592,33 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
    marching ants around the thing you picked, which is what a machine with no
    antialiasing would have drawn. The offset keeps it clear of the corner cut. */
 [data-theme=retro] :focus-visible{
-  outline:2px dashed var(--pln);outline-offset:3px;border-radius:0;
+  outline:2px dashed var(--edge);outline-offset:3px;border-radius:0;
 }
 [data-theme=retro] .hbtn:focus-visible,[data-theme=retro] .dt-ch:focus-visible,
 [data-theme=retro] .src-tab:focus-visible{
-  outline:2px dashed var(--pln);outline-offset:3px;
+  outline:2px dashed var(--edge);outline-offset:3px;
 }
 /* A selected card gets the same ring, plus a hard square tick instead of a dot. */
-[data-theme=retro] .pcard.sel .pcard-wrap{
-  outline:2px dashed var(--pln);outline-offset:-2px;border-radius:0;
+/* A ring made of pixels, not a dashed outline. `dashed` is the browser's dash —
+   antialiased, rounded at the ends, and a different length in every engine. Four
+   repeating gradients give hard 3px blocks with 3px gaps: the same marching ants
+   those interfaces drew, at the same size on every screen, and it follows --edge
+   so it changes with the rest of the theme. Drawn on .pcard::before, which is
+   free — the wrap's two pseudo-elements are already the scanlines and the tint. */
+[data-theme=retro] .pcard.sel .pcard-wrap{outline:none;}
+[data-theme=retro] .pcard.sel{position:relative;}
+[data-theme=retro] .pcard.sel::before{
+  content:'';position:absolute;inset:-4px;pointer-events:none;z-index:5;
+  background-image:
+    repeating-linear-gradient(90deg,var(--edge) 0 3px,transparent 3px 6px),
+    repeating-linear-gradient(90deg,var(--edge) 0 3px,transparent 3px 6px),
+    repeating-linear-gradient(180deg,var(--edge) 0 3px,transparent 3px 6px),
+    repeating-linear-gradient(180deg,var(--edge) 0 3px,transparent 3px 6px);
+  background-size:100% 2px,100% 2px,2px 100%,2px 100%;
+  background-position:left top,left bottom,left top,right top;
+  background-repeat:repeat-x,repeat-x,repeat-y,repeat-y;
 }
+/* The tick loses its circle: a square marker with a lit top-left lip. */
 [data-theme=retro] .pcard.sel::after{border-radius:2px;box-shadow:inset 1px 1px 0 0 rgba(255,255,255,.4);}
 /* THE TITLE PANEL, as a status screen.
    Square corners and a pixel face are a costume; what those interfaces actually
@@ -590,7 +627,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
    exactly the shape of this panel's content, so it costs nothing to say it
    properly. */
 [data-theme=retro] #detailSheet{
-  border:1px solid rgba(34,232,255,.34);
+  border:1px solid color-mix(in srgb,var(--edge) 34%,transparent);
   box-shadow:inset 0 0 0 1px rgba(0,0,0,.92),0 20px 48px -18px rgba(0,0,0,.8);
 }
 /* A section head reads as a plate, not a whisper: cyan, spaced, with its rule
@@ -598,12 +635,12 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 [data-theme=retro] .dt-label{
   color:var(--pln);letter-spacing:.08em;text-transform:uppercase;font-size:12px;
 }
-[data-theme=retro] .dt-label::after{background:rgba(34,232,255,.3);}
+[data-theme=retro] .dt-label::after{background:color-mix(in srgb,var(--edge) 30%,transparent);}
 /* The facts become a readout. Dotted leaders run under every row so the eye
    crosses the gap from name to value the way it does on a character sheet, and
    the values take the display face so a number reads as a measurement. */
 [data-theme=retro] .dt-facts>*{
-  border-bottom:1px dotted rgba(34,232,255,.22);
+  border-bottom:1px dotted color-mix(in srgb,var(--edge) 22%,transparent);
   padding-bottom:6px;
 }
 [data-theme=retro] .dt-facts>*:nth-child(even){
@@ -618,7 +655,24 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
   background:repeating-linear-gradient(180deg,rgba(0,0,0,.16) 0 1px,transparent 1px 3px);
 }
 /* The hub is a window in this theme too, not a rounded card. */
-[data-theme=retro] #hubSheet{border-radius:2px;border-color:rgba(34,232,255,.34);}
+[data-theme=retro] #hubSheet{border-radius:2px;border-color:color-mix(in srgb,var(--edge) 34%,transparent);}
+/* Leaving the theme has to UNDO the theme. The mosaic is scoped to Retro, so in
+   principle it stops applying on its own — but the browser keeps the filtered
+   layer it already rasterised, and covers stayed soft after switching away.
+   Stating filter:none for every other theme forces the repaint that drops it. */
+:root:not([data-theme=retro]) .pcard-img,
+:root:not([data-theme=retro]) .rz-img,
+:root:not([data-theme=retro]) .pk-cover,
+:root:not([data-theme=retro]) .dt-cover,
+:root:not([data-theme=retro]) .sched-thumb,
+:root:not([data-theme=retro]) .resume-art,
+:root:not([data-theme=retro]) .pop-cover,
+:root:not([data-theme=retro]) .pick-img,
+:root:not([data-theme=retro]) .hero-bg-img,
+:root:not([data-theme=retro]) .rc-note-img,
+:root:not([data-theme=retro]) .billboard{
+  filter:none;
+}
 /* ── THE TITLE PANEL AS A FRAMED SCREEN ─────────────────────────────────────
    Built from tokens, not literals. The first attempt used rgba() fills with
    alpha, which is what broke it: a translucent background has no colour of its
@@ -646,7 +700,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
    every label this way left the ones with no frame — Genres was one — floating
    with brackets round them and overlapping whatever came next. :has() asks the
    question directly instead of guessing from the markup order. */
-[data-theme=retro] .dt-label{color:var(--pln);}
+[data-theme=retro] .dt-label{color:var(--edge);}
 [data-theme=retro] .dt-label:has(+ .dt-facts),
 [data-theme=retro] .dt-label:has(+ .stars),
 [data-theme=retro] .dt-label:has(+ .dt-eps),
@@ -663,7 +717,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 [data-theme=retro] .dt-label:has(+ .dt-eps)::before,
 [data-theme=retro] .dt-label:has(+ .chips)::before,
 [data-theme=retro] .dt-label:has(+ .dt-actions)::before{
-  content:'[';margin-right:5px;color:var(--pln);opacity:.7;
+  content:'[';margin-right:5px;color:var(--edge);opacity:.7;
 }
 [data-theme=retro] .dt-label:has(+ .dt-facts)::after,
 [data-theme=retro] .dt-label:has(+ .stars)::after,
@@ -671,7 +725,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 [data-theme=retro] .dt-label:has(+ .chips)::after,
 [data-theme=retro] .dt-label:has(+ .dt-actions)::after{
   content:']';flex:none;height:auto;width:auto;background:none;
-  margin-left:5px;color:var(--pln);opacity:.7;
+  margin-left:5px;color:var(--edge);opacity:.7;
 }
 /* A command cursor. In every menu of this era the option you are on is pointed
    at, not merely tinted — a tint alone does not survive a low-contrast screen,
@@ -679,7 +733,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 [data-theme=retro] .dpick{position:relative;padding-left:22px;}
 [data-theme=retro] .dpick[class*="on-"]::before{
   content:'\25B6';position:absolute;left:7px;top:50%;transform:translateY(-50%);
-  font-size:9px;color:var(--pln);
+  font-size:9px;color:var(--edge);
 }
 /* The episode block is an instrument housing: sunk, so the numbers inside read
    as a display you are looking INTO rather than a card sitting on top. Its
@@ -697,7 +751,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
   content:'';display:block;position:sticky;top:0;z-index:4;
   height:32px;margin:-10px -22px 12px;
   background:var(--bg3);
-  background-image:repeating-linear-gradient(180deg,rgba(34,232,255,.10) 0 1px,transparent 1px 3px);
+  background-image:repeating-linear-gradient(180deg,color-mix(in srgb,var(--edge) 10%,transparent) 0 1px,transparent 1px 3px);
   border-bottom:1px solid var(--b2);
   box-shadow:inset 0 1px 0 0 var(--b2),inset 0 -1px 0 0 rgba(0,0,0,.7);
 }
@@ -710,10 +764,10 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 [data-theme=retro] .dt-cover-wrap::after{
   content:'';position:absolute;inset:0;pointer-events:none;
   background:
-    radial-gradient(circle at 4px 4px,var(--pln) 0 1.4px,transparent 1.5px),
-    radial-gradient(circle at calc(100% - 4px) 4px,var(--pln) 0 1.4px,transparent 1.5px),
-    radial-gradient(circle at 4px calc(100% - 4px),var(--pln) 0 1.4px,transparent 1.5px),
-    radial-gradient(circle at calc(100% - 4px) calc(100% - 4px),var(--pln) 0 1.4px,transparent 1.5px);
+    radial-gradient(circle at 4px 4px,var(--edge) 0 1.4px,transparent 1.5px),
+    radial-gradient(circle at calc(100% - 4px) 4px,var(--edge) 0 1.4px,transparent 1.5px),
+    radial-gradient(circle at 4px calc(100% - 4px),var(--edge) 0 1.4px,transparent 1.5px),
+    radial-gradient(circle at calc(100% - 4px) calc(100% - 4px),var(--edge) 0 1.4px,transparent 1.5px);
   opacity:.55;
 }
 /* Numbers as a readout. */
@@ -735,7 +789,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
   border-radius:2px;
 }
 /* Progress steps rather than slides, and the track is a cut channel. */
-[data-theme=retro] .pbar{border-radius:2px;background:rgba(0,0,0,.6);box-shadow:inset 0 0 0 1px rgba(34,232,255,.22);}
+[data-theme=retro] .pbar{border-radius:2px;background:rgba(0,0,0,.6);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--edge) 22%,transparent);}
 [data-theme=retro] .pfill{
   border-radius:2px;
   background:repeating-linear-gradient(90deg,var(--a) 0 5px,transparent 5px 7px);
@@ -753,27 +807,27 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
    only — a notch on a corner that is off-screen is just a wasted gesture. */
 [data-theme=retro] .sheet,[data-theme=retro] .paint-dock{
   border-radius:2px;clip-path:polygon(0 var(--notch),var(--notch) 0,100% 0,100% 100%,0 100%);
-  border-top:1px solid rgba(34,232,255,.35);
+  border-top:1px solid color-mix(in srgb,var(--edge) 35%,transparent);
 }
 [data-theme=retro] .confirm-box,[data-theme=retro] .bulk-menu,
 [data-theme=retro] .toast,[data-theme=retro] .onb-card,[data-theme=retro] .sv-store{
   border-radius:2px;clip-path:var(--cut);
 }
 [data-theme=retro] .toast{--notch:8px;box-shadow:0 0 24px -6px var(--glow);}
-[data-theme=retro] .bulk-menu{box-shadow:0 0 0 1px rgba(34,232,255,.28),0 18px 44px -14px #000;}
+[data-theme=retro] .bulk-menu{box-shadow:0 0 0 1px color-mix(in srgb,var(--edge) 28%,transparent),0 18px 44px -14px #000;}
 
 /* Stats read as a console: the tiles are cut, the numbers already run in mono,
    and the bars are lit rather than filled. */
 [data-theme=retro] .sv-heronum{
   border-radius:2px;clip-path:var(--cut);--notch:9px;
   background:linear-gradient(160deg,var(--bg3),var(--bg2));
-  box-shadow:inset 0 0 0 1px rgba(34,232,255,.22);
+  box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--edge) 22%,transparent);
 }
 /* Segments everywhere, not just on the cards. A meter that steps reads as
    something being counted; a smooth fill reads as a loading bar. */
 [data-theme=retro] .sv-bar .track,[data-theme=retro] .dt-epbar,
 [data-theme=retro] .sv-store-track,[data-theme=retro] .th-prev .pbar{
-  border-radius:2px;box-shadow:inset 0 0 0 1px rgba(34,232,255,.18);
+  border-radius:2px;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--edge) 18%,transparent);
 }
 /* The status bars carry their colour in an inline style, and `background` is a
    shorthand — setting it there wipes any background-image the stylesheet adds.
@@ -788,7 +842,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
   background:repeating-linear-gradient(90deg,var(--a) 0 5px,color-mix(in srgb,var(--a) 30%,#000) 5px 7px);
   box-shadow:0 0 10px -2px var(--a);
 }
-[data-theme=retro] .sv-chip{border-radius:2px;border-color:rgba(34,232,255,.28);}
+[data-theme=retro] .sv-chip{border-radius:2px;border-color:color-mix(in srgb,var(--edge) 28%,transparent);}
 
 /* The chat is a terminal. The app's answers sit flush against a cyan rule, yours
    are the magenta ones — the same two colours doing the same two jobs as
@@ -804,7 +858,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 [data-theme=retro] .chat-send,[data-theme=retro] .ai-run-btn{border-radius:2px;clip-path:var(--cut);--notch:7px;}
 
 /* A title's own page. */
-[data-theme=retro] .dt-cover{border-radius:2px;clip-path:var(--cut);box-shadow:inset 1px 1px 0 0 rgba(34,232,255,.5);}
+[data-theme=retro] .dt-cover{border-radius:2px;clip-path:var(--cut);box-shadow:inset 1px 1px 0 0 color-mix(in srgb,var(--edge) 50%,transparent);}
 [data-theme=retro] .dt-watch{border-radius:2px;clip-path:var(--cut);--notch:9px;box-shadow:0 0 22px -6px var(--a);}
 [data-theme=retro] .dt-epn,[data-theme=retro] .dt-fav,[data-theme=retro] .dpick,
 [data-theme=retro] .dt-ch,[data-theme=retro] .dt-note{border-radius:2px;}
@@ -815,7 +869,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 /* Party and player. */
 [data-theme=retro] .call-tile,[data-theme=retro] .pt-code,[data-theme=retro] .pt-pick,
 [data-theme=retro] .pv-frame-wrap,[data-theme=retro] .pt-qitem{border-radius:2px;}
-[data-theme=retro] .call-tile{box-shadow:inset 0 0 0 1px rgba(34,232,255,.28);}
+[data-theme=retro] .call-tile{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--edge) 28%,transparent);}
 [data-theme=retro] .call-tile.speaking{box-shadow:inset 0 0 0 2px var(--a),0 0 22px -6px var(--a);}
 [data-theme=retro] .pt-code-val{font-family:ui-monospace,'SFMono-Regular',Menlo,monospace;color:#22e8ff;}
 [data-theme=retro] .pv-wrong-b,[data-theme=retro] .pv-host-main,[data-theme=retro] .pv-nav-mark{border-radius:2px;}
@@ -6364,6 +6418,7 @@ function applyTheme(id,persist=true){
   document.documentElement.setAttribute('data-theme',(t.custom||t.id==='default')?'':t.id);
   if(t.custom)applyCustomVars(t);
   if(persist){try{const s=store();if(s)s.setItem('animetheme',t.id);}catch{}}
+  try{applyRetroEdge();}catch(e){}   // the theme's lit edge, before anything reads it
   try{applyAccent();}catch(e){}      // a chosen accent survives a theme change
   try{applyTint();}catch(e){}        // and the tint re-mixes into the new theme's greys
   try{applyAmbient();}catch(e){}
@@ -6378,6 +6433,38 @@ function applyTheme(id,persist=true){
 // --aFg is computed, not chosen. It is the text that sits ON the accent, and
 // getting it wrong is unreadable rather than ugly — so it is picked by contrast:
 // near-black on a light accent, white on a dark one, whichever wins by measure.
+// ─── RETRO EDGE COLOUR ──────────────────────────────────────────────────────
+// Retro is lit along one colour: every bevel lip, hairline, caption, cursor and
+// selection ring mixes from --edge. Swapping it is therefore one write, not a
+// pass over forty rules — which is the whole reason it was made a token first.
+// Only two picks, because this is the theme's own pair; a free colour wheel here
+// would be the accent control again, and that already exists one row below.
+const EDGE_KEY='retro_edge';
+const EDGES={cyan:'#22e8ff',pink:'#ff1e8e'};
+function retroEdge(){try{return localStorage.getItem(EDGE_KEY)==='pink'?'pink':'cyan';}catch(e){return 'cyan';}}
+function applyRetroEdge(){
+  try{
+    const el=document.documentElement;
+    if(curTheme==='retro')el.style.setProperty('--edge',EDGES[retroEdge()]);
+    else el.style.removeProperty('--edge');   // never leak into another theme
+  }catch(e){}
+}
+function setRetroEdge(v){
+  try{localStorage.setItem(EDGE_KEY,v==='pink'?'pink':'cyan');}catch(e){}
+  applyRetroEdge();
+  try{renderRetroEdgeRow();}catch(e){}
+}
+function renderRetroEdgeRow(){
+  const lb=document.getElementById('edgeLb'),row=document.getElementById('edgeRow');
+  if(!lb||!row)return;
+  // The control belongs to one theme, so it is not there when that theme is not.
+  const on=curTheme==='retro';
+  lb.style.display=on?'':'none';row.style.display=on?'':'none';
+  if(!on){row.innerHTML='';return;}
+  const cur=retroEdge();
+  row.innerHTML=Object.keys(EDGES).map(k=>
+    `<button class="acc-sw${cur===k?' on':''}" style="--sw:${EDGES[k]}" onclick="setRetroEdge('${k}')" aria-label="Retro edge ${k}"></button>`).join('');
+}
 const ACCENT_KEY='accent_override';
 function accentOverride(){try{return localStorage.getItem(ACCENT_KEY)||'';}catch(e){return '';}}
 function _hex2rgb(h){h=String(h||'').replace('#','');if(h.length===3)h=h.split('').map(c=>c+c).join('');
@@ -6631,6 +6718,8 @@ function startPaint(){
     <div class="paint-body">
       <div class="paint-lb">Looks</div>
       <div class="theme-grid" id="themeGrid"></div>
+      <div class="paint-lb" id="edgeLb" style="display:none">Edge</div>
+      <div class="acc-row" id="edgeRow" style="display:none"></div>
       <div class="paint-lb">Accent</div>
       <div class="acc-row" id="accentRow"></div>
       <div class="paint-lb">Background</div>
@@ -7009,6 +7098,7 @@ function deleteCustomTheme(id){
   toast('Theme deleted');
 }
 function renderThemeGrid(){
+  try{renderRetroEdgeRow();}catch(e){}
   try{renderAccentRow();}catch(e){}
   try{renderDensityRow();}catch(e){}
   try{renderFromImageRow();}catch(e){}
@@ -17240,10 +17330,14 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-14.20',
-  title:'The title panel is a screen from a machine',
-  push:'And apostrophes in titles are apostrophes again.',
+  v:'2026-08-14.21',
+  title:'Pick the colour Retro is lit in',
+  push:'Cyan or pink, and the fan stops colliding.',
   notes:[
+    'Retro can be lit in cyan or pink. Every bevel lip, hairline, caption, cursor and selection ring in the theme mixes from one colour, so switching it repaints the whole look rather than a few borders. The control sits under Looks and only appears while Retro is the theme, because it belongs to that theme alone.',
+    'Selecting something draws a ring of actual pixels \u2014 hard blocks with hard gaps, the same size on every screen \u2014 instead of the browser\u2019s dashed outline, which is antialiased, round-ended and a different length in every browser.',
+    'The fanned rows stop colliding. Pulling the covers together did not narrow the titles underneath, so each ran on under its neighbour; the text and the badges now keep to the part of the card still visible.',
+    'Switching away from Retro clears it properly. Covers could stay soft afterwards because the browser kept the filtered layer it had already drawn.',
     'Opening a title gives you a screen rather than a page. Each section is a framed pane with its caption sitting on the frame itself \u2014 the way a labelled box is drawn when you have one line weight and nothing to layer with \u2014 and the status you are on is pointed at rather than merely tinted, because on a low-contrast screen a tint alone was never enough. The cover is bolted into its housing, and the episode block is sunk so the numbers read as a display you are looking into.',
     'Apostrophes are apostrophes. Titles like Shikimori\u2019s and Kubo Won\u2019t arrived already escaped and were then escaped a second time on the way onto the screen, so what you read was the escape code itself. They are decoded once now, where the list is loaded, so every place a title appears is fixed at once rather than one screen at a time.',
     'A stray closing bracket in the stylesheet had been silently discarding whichever rule came after it \u2014 which is why several changes made in the last few hours appeared to do nothing at all. There was a second one further down the file, from long before today, doing the same to a rule near it. Both are gone, and the styling that was being thrown away now applies: the buttons at the foot of a title are square keys like everything else.',

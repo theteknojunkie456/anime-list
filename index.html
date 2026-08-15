@@ -301,7 +301,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
      chrome instead, where it is actually authored: the type, the bevels, the
      square keys, the readouts, the frames. The art stays art, and only sits back
      a little so it joins the palette. */
-  filter:saturate(.6) contrast(1.06);
+  filter:saturate(.6) contrast(1.06) url(#wlPixel);
 }
 /* The hero panel still sits back in the palette; only its image gets the blocks. */
 [data-theme=retro] .billboard{filter:saturate(.72);}
@@ -3365,6 +3365,31 @@ body.recsel .pcard{position:relative;}
 </style>
 </head>
 <body>
+<!-- A LIGHT mosaic for Retro. Same mechanism as before — flood one dot per cell,
+     tile, mask the picture to those dots, dilate each back into a block — but at
+     a 2px cell instead of 4px, which is a texture rather than a transformation:
+     detail survives, and the artwork reads as drawn on a coarse screen rather
+     than destroyed. The gentle quantise (8 levels a channel) gives the limited
+     palette of the era without the porridge that 5 levels produced.
+     It is a PAINT effect: it touches no width or height, so nothing in the layout
+     can hijack it, and it samples in CSS pixels so the blocks hold their size at
+     1x, 2x and 3x. Applied to IMAGES ONLY — on a container it mosaics the text
+     sitting on top of the artwork too. -->
+<svg width="0" height="0" style="position:absolute;pointer-events:none" aria-hidden="true" focusable="false">
+  <filter id="wlPixel" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+    <feFlood x="1" y="1" width="1" height="1" flood-color="#fff" flood-opacity="1"/>
+    <feComposite width="2" height="2"/>
+    <feTile result="cells"/>
+    <feComposite in="SourceGraphic" in2="cells" operator="in"/>
+    <feMorphology operator="dilate" radius="1" result="blocks"/>
+    <feColorMatrix type="saturate" values="1.15"/>
+    <feComponentTransfer>
+      <feFuncR type="discrete" tableValues="0 0.14 0.28 0.42 0.57 0.71 0.85 1"/>
+      <feFuncG type="discrete" tableValues="0 0.14 0.28 0.42 0.57 0.71 0.85 1"/>
+      <feFuncB type="discrete" tableValues="0 0.14 0.28 0.42 0.57 0.71 0.85 1"/>
+    </feComponentTransfer>
+  </filter>
+</svg>
 
 <div class="ambient" aria-hidden="true"></div>
 <div id="brightVeil" aria-hidden="true"></div>
@@ -17099,10 +17124,11 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-14.17',
-  title:'The covers are sharp again, and the theme moved into the chrome',
-  push:'Where it can actually be drawn.',
+  v:'2026-08-14.18',
+  title:'A coarse screen, not a blur',
+  push:'Covers get a light pixel texture.',
   notes:[
+    'Cover art has a light pixel texture again — half the block size of the first attempt, so the picture survives it. The point is that it reads as artwork on a coarse screen rather than artwork with the detail taken out, which is what the heavier version did. Colours are gently stepped too, for the limited palette of the era without the mud.',
     'Cover art is sharp again. Blocking it out was sampling, not drawing — and what made the artwork of that era good was that somebody chose every colour and every outline so the picture read at a tiny size. Run over a photograph it just loses detail, which is the opposite of the effect. The pixel work now lives where it is genuinely drawn: the type, the bevels, the square keys, the readouts and the frames. Covers only sit back a little so they join the palette instead of fighting it.',
     'Selecting something looks like the rest of the theme. The ring around what you picked was the browser\u2019s default — a soft rounded outline in a screen made of hard square edges. It is marching ants now: hard cyan dashes, no rounding.',
     'The fanned rows are on every device, not just where there is a mouse. The overlap is the look and it needs no pointer; only the response to hovering does.',

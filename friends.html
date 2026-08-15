@@ -29,6 +29,11 @@
      from. It defaults to whatever accent the current theme carries, which is what
      lets the mode sit on ANY theme instead of dragging one palette along. */
   --edge:var(--a);
+  /* The other colour on a card. Retro lights every cover from two directions —
+     a lit lip up-left and a hard offset down-right — and those are two different
+     colours, so they are two different tokens. Both default to the theme's
+     accent; either can be pinned. */
+  --edge2:var(--a);
   /* The violet wash at the top of every screen. It used to be baked into
      .ambient as a literal rgba, so no setting could reach it — "Glow off" left it
      burning and a black theme was never black. Now it is a colour like any other:
@@ -252,7 +257,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
    split colour channel at the same time — one effect doing both jobs, and cheaper
    than the blur it replaces because neither shadow has a radius. */
 [data-retro] .pcard-wrap{
-  filter:drop-shadow(3px 3px 0 color-mix(in srgb,var(--a) 42%,transparent)) drop-shadow(-2px -2px 0 color-mix(in srgb,var(--edge) 30%,transparent));
+  filter:drop-shadow(3px 3px 0 color-mix(in srgb,var(--edge2) 42%,transparent)) drop-shadow(-2px -2px 0 color-mix(in srgb,var(--edge) 30%,transparent));
 }
 /* The artwork is sunk into the card the way an item sits in an inventory slot:
    lit along the top-left lip, dark along the bottom-right. Two inset shadows, no
@@ -298,7 +303,14 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
      chrome instead, where it is actually authored: the type, the bevels, the
      square keys, the readouts, the frames. The art stays art, and only sits back
      a little so it joins the palette. */
-  filter:saturate(.6) contrast(1.06) url(#wlPixel);
+  /* No mosaic. Third attempt, third failure mode, and this one only appears on
+     the engine that matters: in WebKit an image carrying this filter paints
+     NOTHING — a blank rectangle where the cover should be. It looked correct in
+     every Chrome render because Blink resolves the filter fine, and this app is
+     used almost entirely on iPhones. Reproduced in a real WebKit build before
+     removing it, not inferred from a screenshot.
+     Covers keep only the desaturation that lets them sit in the palette. */
+  filter:saturate(.6) contrast(1.06);
 }
 /* The hero panel still sits back in the palette; only its image gets the blocks. */
 [data-retro] .billboard{filter:saturate(.72);}
@@ -3520,31 +3532,6 @@ body.recsel .pcard{position:relative;}
 </style>
 </head>
 <body>
-<!-- A LIGHT mosaic for Retro. Same mechanism as before — flood one dot per cell,
-     tile, mask the picture to those dots, dilate each back into a block — but at
-     a 2px cell instead of 4px, which is a texture rather than a transformation:
-     detail survives, and the artwork reads as drawn on a coarse screen rather
-     than destroyed. The gentle quantise (8 levels a channel) gives the limited
-     palette of the era without the porridge that 5 levels produced.
-     It is a PAINT effect: it touches no width or height, so nothing in the layout
-     can hijack it, and it samples in CSS pixels so the blocks hold their size at
-     1x, 2x and 3x. Applied to IMAGES ONLY — on a container it mosaics the text
-     sitting on top of the artwork too. -->
-<svg width="0" height="0" style="position:absolute;pointer-events:none" aria-hidden="true" focusable="false">
-  <filter id="wlPixel" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
-    <feFlood x="1" y="1" width="1" height="1" flood-color="#fff" flood-opacity="1"/>
-    <feComposite width="2" height="2"/>
-    <feTile result="cells"/>
-    <feComposite in="SourceGraphic" in2="cells" operator="in"/>
-    <feMorphology operator="dilate" radius="1" result="blocks"/>
-    <feColorMatrix type="saturate" values="1.15"/>
-    <feComponentTransfer>
-      <feFuncR type="discrete" tableValues="0 0.14 0.28 0.42 0.57 0.71 0.85 1"/>
-      <feFuncG type="discrete" tableValues="0 0.14 0.28 0.42 0.57 0.71 0.85 1"/>
-      <feFuncB type="discrete" tableValues="0 0.14 0.28 0.42 0.57 0.71 0.85 1"/>
-    </feComponentTransfer>
-  </filter>
-</svg>
 
 <div class="ambient" aria-hidden="true"></div>
 <div id="brightVeil" aria-hidden="true"></div>
@@ -6492,8 +6479,11 @@ function retroEdge(){try{const v=localStorage.getItem(EDGE_KEY);return (v==='cya
 function applyRetroEdge(){
   try{
     const el=document.documentElement,e=retroEdge();
+    const e2=retroEdge2();
     if(retroMode()&&EDGES[e])el.style.setProperty('--edge',EDGES[e]);
-    else el.style.removeProperty('--edge');   // fall back to the theme's own accent
+    else el.style.removeProperty('--edge');    // fall back to the theme's own accent
+    if(retroMode()&&EDGES[e2])el.style.setProperty('--edge2',EDGES[e2]);
+    else el.style.removeProperty('--edge2');
   }catch(e){}
 }
 function setRetroEdge(v){
@@ -6501,14 +6491,29 @@ function setRetroEdge(v){
   applyRetroEdge();
   try{renderRetroRow();}catch(e){}
 }
+const EDGE2_KEY='retro_edge2';
+function retroEdge2(){try{const v=localStorage.getItem(EDGE2_KEY);return (v==='cyan'||v==='pink')?v:'accent';}catch(e){return 'accent';}}
+function setRetroEdge2(v){
+  try{localStorage.setItem(EDGE2_KEY,v);}catch(e){}
+  applyRetroEdge();
+  try{renderRetroRow();}catch(e){}
+}
 function renderRetroRow(){
   const lb=document.getElementById('retroLb'),row=document.getElementById('retroRow');
   if(!lb||!row)return;
   const on=retroMode(),edge=retroEdge();
+  const edge2=retroEdge2();
+  const picks=(cur,fn)=>`<button class="acc-sw${cur==='accent'?' on':''}" style="--sw:var(--a)" onclick="${fn}('accent')" aria-label="Follows the theme accent"></button>`
+    +Object.keys(EDGES).map(k=>`<button class="acc-sw${cur===k?' on':''}" style="--sw:${EDGES[k]}" onclick="${fn}('${k}')" aria-label="${k}"></button>`).join('');
   row.innerHTML=`<button class="acc-sw acc-none${on?' on':''}" onclick="setRetroMode(${on?'false':'true'})" title="Square bevels, pixel type, scanlines — on any theme"><span>${on?'On':'Off'}</span></button>`
-    +(on?`<button class="acc-sw${edge==='accent'?' on':''}" style="--sw:var(--a)" onclick="setRetroEdge('accent')" aria-label="Edge follows the theme accent"></button>`
-        +Object.keys(EDGES).map(k=>`<button class="acc-sw${edge===k?' on':''}" style="--sw:${EDGES[k]}" onclick="setRetroEdge('${k}')" aria-label="Retro edge ${k}"></button>`).join('')
-      :'');
+    +(on?picks(edge,'setRetroEdge'):'');
+  // The two colours are two rows, because they are two decisions: the lit lip
+  // and the shadow it throws. Side by side in one row they read as one palette.
+  const lb2=document.getElementById('retroLb2'),row2=document.getElementById('retroRow2');
+  if(lb2&&row2){
+    lb2.style.display=on?'':'none';row2.style.display=on?'':'none';
+    row2.innerHTML=on?picks(edge2,'setRetroEdge2'):'';
+  }
 }
 const ACCENT_KEY='accent_override';
 function accentOverride(){try{return localStorage.getItem(ACCENT_KEY)||'';}catch(e){return '';}}
@@ -6765,6 +6770,8 @@ function startPaint(){
       <div class="theme-grid" id="themeGrid"></div>
       <div class="paint-lb" id="retroLb">Retro</div>
       <div class="acc-row" id="retroRow"></div>
+      <div class="paint-lb" id="retroLb2" style="display:none">Retro shadow</div>
+      <div class="acc-row" id="retroRow2" style="display:none"></div>
       <div class="paint-lb">Accent</div>
       <div class="acc-row" id="accentRow"></div>
       <div class="paint-lb">Background</div>
@@ -17375,10 +17382,12 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-14.24',
-  title:'The Friends recommend row joins the rest',
-  push:'No more stack of pills.',
+  v:'2026-08-14.25',
+  title:'Covers are back, and both card colours are yours to pick',
+  push:'Sorry \u2014 they were invisible on iPhone.',
   notes:[
+    'Covers were blank on iPhone and I am sorry: the effect that drew them in blocks makes Safari paint nothing at all, so where the artwork should have been there was an empty rectangle. It looked perfectly fine everywhere I had been checking, which was the wrong browser. It is gone, and covers are sharp again.',
+    'Both colours around a card can be set. Retro lights a cover from two directions \u2014 a lit lip up-left and a hard shadow down-right \u2014 and those are now two separate picks under Looks. Either can follow your theme\u2019s accent or be pinned to cyan or pink.',
     'The row of things your friends sent you was the one place the look never reached. Those cards carry a ring in the sender\u2019s own colour, and it stayed a rounded lozenge \u2014 six of them overlapping read as a pile of pills rather than a row of covers. The rings are square now, along with the little sender flag and the dismiss button. The colour stays exactly as it was: it is how you tell at a glance who sent what.',
     'Retro is gone from Looks, because it is no longer one. It is a switch under Looks that puts the square bevelled controls, the pixel type, the coarse covers and the marching ants over whatever colours you already chose. Having it in both places was asking you to pick a look in order to get something that was never about colour.',
     'If you were using the Retro theme nothing is lost: the switch is already on for you, so the treatment stayed. What changed is that the violet ground underneath it is now the standard one \u2014 and you can put the treatment on any theme, or on a look of your own, which was never possible before.',

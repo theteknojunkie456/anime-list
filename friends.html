@@ -294,11 +294,14 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 [data-theme=retro] .dt-cover,[data-theme=retro] .sched-thumb,[data-theme=retro] .resume-art,
 [data-theme=retro] .pop-cover,[data-theme=retro] .pick-img,
 [data-theme=retro] .hero-bg-img,[data-theme=retro] .rc-note-img{
-  /* IMAGES ONLY. A filter applies to an element and everything inside it, so
-     putting this on .billboard — a container — mosaicked the hero's title, its
-     sub-line and the Open button along with the artwork. The placeholders are out
-     for the same reason: they draw a letter, not a picture. */
-  filter:saturate(.6) contrast(1.06) url(#wlPixel);
+  /* Covers stay sharp. A mosaic filter samples an image; it does not draw one,
+     and what made sprites of this era good was authorship — a chosen palette, a
+     hard outline, a silhouette that reads small. Averaging 183 covers into blocks
+     produced detail-blind mush with none of that. The pixel craft lives in the
+     chrome instead, where it is actually authored: the type, the bevels, the
+     square keys, the readouts, the frames. The art stays art, and only sits back
+     a little so it joins the palette. */
+  filter:saturate(.6) contrast(1.06);
 }
 /* The hero panel still sits back in the palette; only its image gets the blocks. */
 [data-theme=retro] .billboard{filter:saturate(.72);}
@@ -523,21 +526,19 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 :root[data-theme=retro] .billboard{border-radius:2px;}
 /* A fanned deck. The rows used to sit in a neat line; overlapping them turns a
    shelf into a stack of cases you flick through, which is what these rows always
-   were. Hovering pulls one to the front and lifts it, and everything after it
-   slides aside to make the room — so the card you are reading is never the one
-   half-covered by its neighbour.
-
-   Pointer devices only: on a touch screen there is no hover, so the fan would
-   just be a row of half-hidden covers you cannot uncover. There, they stay in
-   line. Motion is a transform on a positioned element — no layout animates — and
-   it steps aside entirely under reduced-motion. */
+   were. The OVERLAP is for every device — it is the look, and it does not need a
+   pointer. What needs a pointer is the response to one: hovering pulls a card to
+   the front and lifts it while everything after it slides aside, so the card you
+   are reading is never the one half-covered by its neighbour. On a touch screen
+   there is no hover to give, so the fan simply sits there and a tap opens the
+   title as it always did. */
+[data-theme=retro] .row-scroll .pcard{
+  position:relative;
+  margin-right:-30px;
+  transition:transform .2s cubic-bezier(.22,1,.28,1);
+}
+[data-theme=retro] .row-scroll .pcard:last-child{margin-right:0;}
 @media (hover:hover) and (pointer:fine){
-  [data-theme=retro] .row-scroll .pcard{
-    position:relative;
-    margin-right:-30px;
-    transition:transform .2s cubic-bezier(.22,1,.28,1);
-  }
-  [data-theme=retro] .row-scroll .pcard:last-child{margin-right:0;}
   [data-theme=retro] .row-scroll .pcard:hover{
     z-index:6;
     transform:translateY(-10px);
@@ -550,6 +551,9 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
   [data-theme=retro] .row-scroll .pcard{transition:none;}
   [data-theme=retro] .row-scroll .pcard:hover ~ .pcard{transform:none;}
 }
+}
+[data-theme=retro] .dact{border-radius:2px;box-shadow:inset 1px 1px 0 0 rgba(34,232,255,.34),inset -2px -2px 0 0 rgba(0,0,0,.9);}
+[data-theme=retro] .dact:active{box-shadow:inset 2px 2px 0 0 rgba(0,0,0,.9),inset -1px -1px 0 0 rgba(34,232,255,.28);}
 /* The controls inside the panel, squared with the rest. The stepper keys and the
    back button were the last circles in the theme — and a round key is the one
    shape a machine with square pixels never made. */
@@ -563,6 +567,23 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 [data-theme=retro] .dt-back:active,[data-theme=retro] .prog-btn:active{
   box-shadow:inset 2px 2px 0 0 rgba(0,0,0,.9),inset -1px -1px 0 0 rgba(34,232,255,.3);
 }
+/* SELECTION, in pixels. A 2px solid rounded ring is the browser's idea of focus,
+   and in a theme built from hard square edges it is the one thing that still
+   looks like 2026. A dashed outline at zero radius is a run of hard cyan dashes —
+   marching ants around the thing you picked, which is what a machine with no
+   antialiasing would have drawn. The offset keeps it clear of the corner cut. */
+[data-theme=retro] :focus-visible{
+  outline:2px dashed var(--pln);outline-offset:3px;border-radius:0;
+}
+[data-theme=retro] .hbtn:focus-visible,[data-theme=retro] .dt-ch:focus-visible,
+[data-theme=retro] .src-tab:focus-visible{
+  outline:2px dashed var(--pln);outline-offset:3px;
+}
+/* A selected card gets the same ring, plus a hard square tick instead of a dot. */
+[data-theme=retro] .pcard.sel .pcard-wrap{
+  outline:2px dashed var(--pln);outline-offset:-2px;border-radius:0;
+}
+[data-theme=retro] .pcard.sel::after{border-radius:2px;box-shadow:inset 1px 1px 0 0 rgba(255,255,255,.4);}
 /* THE TITLE PANEL, as a status screen.
    Square corners and a pixel face are a costume; what those interfaces actually
    did was present a record — a framed window, a labelled readout, values in a
@@ -3344,23 +3365,6 @@ body.recsel .pcard{position:relative;}
 </style>
 </head>
 <body>
-<!-- Mosaic filter for the Retro theme. This is a PAINT operation: it never
-     touches width, height or layout, so no other rule can hijack it the way the
-     transform-based attempt was hijacked by `.grid .pcard-img{width:100%}`. It
-     also samples in CSS pixels, so the blocks stay the same size on a 1x, 2x or
-     3x screen instead of dissolving on the dense ones.
-     How it works: flood a single dot inside each 4x4 cell, tile that across the
-     image, mask the picture down to just those dots (one sample per cell), then
-     dilate each dot back out into a solid 4x4 block. -->
-<svg width="0" height="0" style="position:absolute;pointer-events:none" aria-hidden="true" focusable="false">
-  <filter id="wlPixel" x="0" y="0" width="100%" height="100%">
-    <feFlood x="2" y="2" width="1" height="1" flood-color="#fff" flood-opacity="1"/>
-    <feComposite width="4" height="4"/>
-    <feTile result="cells"/>
-    <feComposite in="SourceGraphic" in2="cells" operator="in"/>
-    <feMorphology operator="dilate" radius="2"/>
-  </filter>
-</svg>
 
 <div class="ambient" aria-hidden="true"></div>
 <div id="brightVeil" aria-hidden="true"></div>
@@ -17095,10 +17099,13 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-14.16',
-  title:'A title panel that reads like a status screen',
-  push:'And Friends opens properly on a desktop.',
+  v:'2026-08-14.17',
+  title:'The covers are sharp again, and the theme moved into the chrome',
+  push:'Where it can actually be drawn.',
   notes:[
+    'Cover art is sharp again. Blocking it out was sampling, not drawing — and what made the artwork of that era good was that somebody chose every colour and every outline so the picture read at a tiny size. Run over a photograph it just loses detail, which is the opposite of the effect. The pixel work now lives where it is genuinely drawn: the type, the bevels, the square keys, the readouts and the frames. Covers only sit back a little so they join the palette instead of fighting it.',
+    'Selecting something looks like the rest of the theme. The ring around what you picked was the browser\u2019s default — a soft rounded outline in a screen made of hard square edges. It is marching ants now: hard cyan dashes, no rounding.',
+    'The fanned rows are on every device, not just where there is a mouse. The overlap is the look and it needs no pointer; only the response to hovering does.',
     'Opening a title gives you a record rather than a card: a framed window, section plates in cyan, and the facts set as a readout — name on the left, value on the right, a dotted leader carrying your eye across the gap. The stepper keys and the back button are square bevelled keys like everything else.',
     'Friends and Watch Party open properly on a desktop. It was a bottom sheet stretched across the whole width, which gave it a wide shallow letterbox to put a list in; above 900px it is now a centred window sized to what it holds. On a phone it stays a bottom sheet, but the controls in it are finger-sized instead of settings-sized.',
     'Every picture in Retro is drawn in blocks — covers, the hero, the airing strip, the schedule, the thumbnails. It is done as a paint effect this time rather than by resizing anything, so nothing can knock the layout about the way the first attempt did, and the blocks stay the same size on a dense screen instead of dissolving into a smooth photograph.',

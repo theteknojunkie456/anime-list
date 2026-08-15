@@ -365,6 +365,36 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
   [data-theme=retro] .hdr-title{animation:none;}
   [data-theme=retro] .ambient::after{display:none;}
 }
+/* THE FRIENDS / WATCH-PARTY HUB
+   A bottom sheet is right on a phone — it comes from the thumb and it covers a
+   screen too small to show two things. On a desktop the same sheet is a short
+   band pinned across the full width, so the content it holds (friends, party,
+   invites) gets a wide, shallow letterbox and reads as an afterthought. Above
+   900px it becomes what it actually is: a centred dialog, sized to its content
+   rather than to the width of the window.
+
+   Both show/hide states have to be redeclared, because the base .sheet animates
+   with translateY and a centred box needs translate(-50%,-50%) to stay centred —
+   inheriting one and overriding the other leaves it hanging off-centre. */
+@media (min-width:900px){
+  #hubSheet{
+    left:50%;right:auto;bottom:auto;top:50%;
+    width:min(760px,92vw);max-height:86dvh;
+    border-radius:18px;border:1px solid var(--b3);border-top:1px solid var(--b3);
+    box-shadow:0 20px 48px -18px rgba(0,0,0,.72);
+    transform:translate(-50%,calc(-50% + 26px));
+  }
+  #hubSheet.on{transform:translate(-50%,-50%);}
+  #hubSheet .sheet-handle{display:none;}
+}
+/* The controls inside it were chips built for a dense settings list, which on a
+   phone is a target you have to aim at. 44px is the size a thumb actually hits. */
+@media (max-width:899px){
+  #hubSheet .src-chip,#hubSheet .fr-accept,#hubSheet .fr-x,#hubSheet .pk-btn{
+    min-height:44px;padding-left:16px;padding-right:16px;font-size:14px;
+  }
+  #hubSheet .fr-x{min-width:44px;}
+}
 /* ── RETRO CHROME ───────────────────────────────────────────────────────────
    The look reached the artwork and stopped. Everything AROUND the artwork was
    still a modern dark app — a rounded search pill, round icon buttons, a soft
@@ -520,6 +550,55 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
   [data-theme=retro] .row-scroll .pcard{transition:none;}
   [data-theme=retro] .row-scroll .pcard:hover ~ .pcard{transform:none;}
 }
+/* The controls inside the panel, squared with the rest. The stepper keys and the
+   back button were the last circles in the theme — and a round key is the one
+   shape a machine with square pixels never made. */
+[data-theme=retro] .dt-back,[data-theme=retro] .prog-btn,[data-theme=retro] .dt-watch,
+[data-theme=retro] .dt-watchlink,[data-theme=retro] .parse-btn,[data-theme=retro] .dt-deck{
+  border-radius:2px;
+}
+[data-theme=retro] .dt-back,[data-theme=retro] .prog-btn{
+  box-shadow:inset 1px 1px 0 0 rgba(34,232,255,.42),inset -2px -2px 0 0 rgba(0,0,0,.9);
+}
+[data-theme=retro] .dt-back:active,[data-theme=retro] .prog-btn:active{
+  box-shadow:inset 2px 2px 0 0 rgba(0,0,0,.9),inset -1px -1px 0 0 rgba(34,232,255,.3);
+}
+/* THE TITLE PANEL, as a status screen.
+   Square corners and a pixel face are a costume; what those interfaces actually
+   did was present a record — a framed window, a labelled readout, values in a
+   column you could scan, leader lines carrying your eye across the gap. That is
+   exactly the shape of this panel's content, so it costs nothing to say it
+   properly. */
+[data-theme=retro] #detailSheet{
+  border:1px solid rgba(34,232,255,.34);
+  box-shadow:inset 0 0 0 1px rgba(0,0,0,.92),0 20px 48px -18px rgba(0,0,0,.8);
+}
+/* A section head reads as a plate, not a whisper: cyan, spaced, with its rule
+   running out to the edge — the app already draws that rule, it was just grey. */
+[data-theme=retro] .dt-label{
+  color:var(--pln);letter-spacing:.08em;text-transform:uppercase;font-size:12px;
+}
+[data-theme=retro] .dt-label::after{background:rgba(34,232,255,.3);}
+/* The facts become a readout. Dotted leaders run under every row so the eye
+   crosses the gap from name to value the way it does on a character sheet, and
+   the values take the display face so a number reads as a measurement. */
+[data-theme=retro] .dt-facts>*{
+  border-bottom:1px dotted rgba(34,232,255,.22);
+  padding-bottom:6px;
+}
+[data-theme=retro] .dt-facts>*:nth-child(even){
+  font-family:var(--fd);color:var(--t1);text-align:right;
+}
+[data-theme=retro] .dt-facts>*:nth-child(odd){
+  color:var(--t3);letter-spacing:.04em;text-transform:uppercase;font-size:11px;
+}
+/* Scanlines across the banner, matching the cards. */
+[data-theme=retro] .dt-banner::after{
+  content:'';position:absolute;inset:0;pointer-events:none;z-index:3;
+  background:repeating-linear-gradient(180deg,rgba(0,0,0,.16) 0 1px,transparent 1px 3px);
+}
+/* The hub is a window in this theme too, not a rounded card. */
+[data-theme=retro] #hubSheet{border-radius:2px;border-color:rgba(34,232,255,.34);}
 /* Numbers as a readout. */
 /* .fn is NOT in this list. It is the count inside a filter chip, about 10px, and
    an 8px pixel face at 10px is not small type — it is broken type: "10" came out
@@ -17016,10 +17095,12 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-14.15',
-  title:'Pixel covers, properly this time',
-  push:'Every picture, sprite-sized.',
+  v:'2026-08-14.16',
+  title:'A title panel that reads like a status screen',
+  push:'And Friends opens properly on a desktop.',
   notes:[
+    'Opening a title gives you a record rather than a card: a framed window, section plates in cyan, and the facts set as a readout — name on the left, value on the right, a dotted leader carrying your eye across the gap. The stepper keys and the back button are square bevelled keys like everything else.',
+    'Friends and Watch Party open properly on a desktop. It was a bottom sheet stretched across the whole width, which gave it a wide shallow letterbox to put a list in; above 900px it is now a centred window sized to what it holds. On a phone it stays a bottom sheet, but the controls in it are finger-sized instead of settings-sized.',
     'Every picture in Retro is drawn in blocks — covers, the hero, the airing strip, the schedule, the thumbnails. It is done as a paint effect this time rather than by resizing anything, so nothing can knock the layout about the way the first attempt did, and the blocks stay the same size on a dense screen instead of dissolving into a smooth photograph.',
     'Text stays sharp. The effect applies to pictures only: putting it on a panel mosaicked the words sitting on top of the artwork as well, which is a thing you can only find out by looking.',
     'The pixelated covers are gone, and an apology for the state of the last hour. Drawing them small and blowing them back up only works while nothing else sets their size — and on a wide screen something does, which left the enlargement applied to a full-size picture. That is why covers turned enormous and buried the page. Removed rather than patched: it was one stray rule away from doing it again.',

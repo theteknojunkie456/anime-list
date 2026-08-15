@@ -25,6 +25,10 @@
 <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 <style>
 :root{
+  /* The lit edge every Retro-mode bevel, hairline, caption and cursor mixes
+     from. It defaults to whatever accent the current theme carries, which is what
+     lets the mode sit on ANY theme instead of dragging one palette along. */
+  --edge:var(--a);
   /* The violet wash at the top of every screen. It used to be baked into
      .ambient as a literal rgba, so no setting could reach it — "Glow off" left it
      burning and a black theme was never black. Now it is a colour like any other:
@@ -79,10 +83,11 @@
    belongs to the same night. */
 [data-theme=retro]{
   --aFg:#12000c;
+  --edge:#22e8ff;
   --bg:#05030b;--bg2:#0a0616;--bg3:#110a22;--bg4:#1a1030;--bg5:#241640;
-  --b1:color-mix(in srgb,var(--edge) 14%,transparent);--b2:color-mix(in srgb,var(--edge) 26%,transparent);--b3:rgba(255,30,142,0.55);
+  --b1:color-mix(in srgb,var(--edge) 14%,transparent);--b2:color-mix(in srgb,var(--edge) 26%,transparent);--b3:color-mix(in srgb,var(--a) 55%,transparent);
   --t1:#e9fbff;--t2:#93c9dc;--t3:#5f8ba3;
-  --a:#ff1e8e;--a2:#ff74c4;--ag:rgba(255,30,142,0.18);--glow:color-mix(in srgb,var(--edge) 42%,transparent);
+  --a:#ff1e8e;--a2:#ff74c4;--ag:color-mix(in srgb,var(--a) 18%,transparent);--glow:color-mix(in srgb,var(--edge) 42%,transparent);
   --fin:#28ffa8;--finbg:rgba(40,255,168,0.14);
   --wat:#ffe83d;--watbg:rgba(255,232,61,0.14);
   --pln:#22e8ff;--plnbg:color-mix(in srgb,var(--edge) 14%,transparent);
@@ -238,19 +243,19 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
    face for the furniture, one plainly readable one for anything you actually
    have to read. Setting the whole app in pixels is the mistake that makes a
    retro skin unusable, and this app is mostly prose — titles, notes, times. */
-[data-theme=retro]{
+[data-retro]{
   --fd:'VT323','Bricolage Grotesque',-apple-system,sans-serif;
   /* The lit edge. Every bevel lip, hairline, caption, cursor and marching-ant in
      this theme mixes from this ONE colour, so switching it repaints the whole
      look rather than a handful of borders. Set on :root by setRetroEdge(). */
   --edge:#22e8ff;
 }
-[data-theme=retro]{
+[data-retro]{
   --notch:10px;
   --cut:polygon(0 0,calc(100% - var(--notch)) 0,100% var(--notch),100% 100%,var(--notch) 100%,0 calc(100% - var(--notch)));
 }
-[data-theme=retro] .pcard-img,[data-theme=retro] .pcard-ph,
-[data-theme=retro] .billboard{
+[data-retro] .pcard-img,[data-retro] .pcard-ph,
+[data-retro] .billboard{
   border-radius:2px;clip-path:var(--cut);
 }
 /* A soft bloom under each card was the tell that this was a dark theme wearing a
@@ -258,15 +263,15 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
    are cyan up-left and magenta down-right, which is a hard drop shadow and a
    split colour channel at the same time — one effect doing both jobs, and cheaper
    than the blur it replaces because neither shadow has a radius. */
-[data-theme=retro] .pcard-wrap{
-  filter:drop-shadow(3px 3px 0 rgba(255,30,142,.42)) drop-shadow(-2px -2px 0 color-mix(in srgb,var(--edge) 30%,transparent));
+[data-retro] .pcard-wrap{
+  filter:drop-shadow(3px 3px 0 color-mix(in srgb,var(--a) 42%,transparent)) drop-shadow(-2px -2px 0 color-mix(in srgb,var(--edge) 30%,transparent));
 }
 /* The artwork is sunk into the card the way an item sits in an inventory slot:
    lit along the top-left lip, dark along the bottom-right. Two inset shadows, no
    blur — that is the whole trick those interfaces used, and it still reads as
    carved rather than drawn. Inset survives the corner cut; an outer shadow would
    be clipped away by it. */
-[data-theme=retro] .pcard-img,[data-theme=retro] .pcard-ph{
+[data-retro] .pcard-img,[data-retro] .pcard-ph{
   box-shadow:
     inset 2px 2px 0 0 color-mix(in srgb,var(--edge) 42%,transparent),
     inset -2px -2px 0 0 rgba(0,0,0,.92),
@@ -277,10 +282,10 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
    reached. This drags every poster onto the same cyan-to-magenta floor while
    leaving its LUMINANCE alone, so the picture is still the picture. Dial the
    opacity, not the colours: .55 unifies, .3 is a hint, .8 is a duotone poster. */
-[data-theme=retro] .pcard-wrap::before{
+[data-retro] .pcard-wrap::before{
   content:'';position:absolute;inset:0;pointer-events:none;z-index:1;
   clip-path:var(--cut);
-  background:linear-gradient(135deg,color-mix(in srgb,var(--edge) 62%,transparent) 0%,rgba(104,44,150,.40) 52%,rgba(255,30,142,.62) 100%);
+  background:linear-gradient(135deg,color-mix(in srgb,var(--edge) 62%,transparent) 0%,rgba(104,44,150,.40) 52%,color-mix(in srgb,var(--a) 62%,transparent) 100%);
   mix-blend-mode:color;opacity:.42;
 }
 /* Every other place artwork appears. The look was written for .pcard and the app
@@ -294,10 +299,10 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
    thing on screen that refuses to. Turning it down lets the chrome lead without
    touching the picture's brightness, so nothing becomes hard to recognise.
    This is the number to tune: .6 sits back, .85 barely moves, .4 is severe. */
-[data-theme=retro] .pcard-img,[data-theme=retro] .rz-img,[data-theme=retro] .pk-cover,
-[data-theme=retro] .dt-cover,[data-theme=retro] .sched-thumb,[data-theme=retro] .resume-art,
-[data-theme=retro] .pop-cover,[data-theme=retro] .pick-img,
-[data-theme=retro] .hero-bg-img,[data-theme=retro] .rc-note-img{
+[data-retro] .pcard-img,[data-retro] .rz-img,[data-retro] .pk-cover,
+[data-retro] .dt-cover,[data-retro] .sched-thumb,[data-retro] .resume-art,
+[data-retro] .pop-cover,[data-retro] .pick-img,
+[data-retro] .hero-bg-img,[data-retro] .rc-note-img{
   /* Covers stay sharp. A mosaic filter samples an image; it does not draw one,
      and what made sprites of this era good was authorship — a chosen palette, a
      hard outline, a silhouette that reads small. Averaging 183 covers into blocks
@@ -308,11 +313,11 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
   filter:saturate(.6) contrast(1.06) url(#wlPixel);
 }
 /* The hero panel still sits back in the palette; only its image gets the blocks. */
-[data-theme=retro] .billboard{filter:saturate(.72);}
+[data-retro] .billboard{filter:saturate(.72);}
 /* The carved lip, on those same surfaces. */
-[data-theme=retro] .rz-img,[data-theme=retro] .pk-cover,[data-theme=retro] .dt-cover,
-[data-theme=retro] .dt-cover-ph,[data-theme=retro] .sched-thumb,[data-theme=retro] .sched-thumb-ph,
-[data-theme=retro] .resume-art,[data-theme=retro] .pop-cover,[data-theme=retro] .pick-img{
+[data-retro] .rz-img,[data-retro] .pk-cover,[data-retro] .dt-cover,
+[data-retro] .dt-cover-ph,[data-retro] .sched-thumb,[data-retro] .sched-thumb-ph,
+[data-retro] .resume-art,[data-retro] .pop-cover,[data-retro] .pick-img{
   border-radius:2px;
   box-shadow:
     inset 2px 2px 0 0 color-mix(in srgb,var(--edge) 42%,transparent),
@@ -320,22 +325,22 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 }
 /* Pointer devices only: the slot lights up as if the cursor were a torch. */
 @media (hover:hover){
-  [data-theme=retro] .pcard:hover .pcard-img,[data-theme=retro] .pcard:hover .pcard-ph{
+  [data-retro] .pcard:hover .pcard-img,[data-retro] .pcard:hover .pcard-ph{
     box-shadow:
       inset 2px 2px 0 0 color-mix(in srgb,var(--edge) 85%,transparent),
       inset -2px -2px 0 0 rgba(0,0,0,.92),
       inset 0 0 0 3px rgba(6,2,14,.55);
   }
-  [data-theme=retro] .pcard:hover .pcard-wrap::before{opacity:.34;}
+  [data-retro] .pcard:hover .pcard-wrap::before{opacity:.34;}
 }
-[data-theme=retro] .billboard{
-  box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--edge) 22%,transparent),0 20px 60px -20px rgba(255,30,142,.5);
+[data-retro] .billboard{
+  box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--edge) 22%,transparent),0 20px 60px -20px color-mix(in srgb,var(--a) 50%,transparent);
 }
-[data-theme=retro] .rz-card{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--edge) 18%,transparent);}
-[data-theme=retro] .pcard:active{transform:translateY(2px);}
+[data-retro] .rz-card{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--edge) 18%,transparent);}
+[data-retro] .pcard:active{transform:translateY(2px);}
 /* Scanlines, but faint. At full strength they fight the artwork instead of
    sitting on it. */
-[data-theme=retro] .pcard-wrap::after,[data-theme=retro] .rz-card::before{
+[data-retro] .pcard-wrap::after,[data-retro] .rz-card::before{
   content:'';position:absolute;inset:0;pointer-events:none;z-index:2;
   background:repeating-linear-gradient(180deg,rgba(0,0,0,.13) 0 1px,transparent 1px 3px);
 }
@@ -343,22 +348,22 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
    on every heading was the tell that it was a filter and not a decision.
    Occasionally it slips, the way a tape does when the tracking drifts — rarely
    enough that you are never sure you saw it. */
-[data-theme=retro] .hdr-title{
-  text-shadow:-1.5px 0 color-mix(in srgb,var(--edge) 75%,transparent),1.5px 0 rgba(255,30,142,.75);
+[data-retro] .hdr-title{
+  text-shadow:-1.5px 0 color-mix(in srgb,var(--edge) 75%,transparent),1.5px 0 color-mix(in srgb,var(--a) 75%,transparent);
   animation:vhsSlip 11s steps(1,end) infinite;
 }
 @keyframes vhsSlip{
-  0%,96.5%{transform:none;text-shadow:-1.5px 0 color-mix(in srgb,var(--edge) 75%,transparent),1.5px 0 rgba(255,30,142,.75);}
-  97%{transform:translateX(-2px) skewX(-6deg);text-shadow:-4px 0 color-mix(in srgb,var(--edge) 90%,transparent),4px 0 rgba(255,30,142,.9);}
-  97.6%{transform:translateX(3px);text-shadow:3px 0 color-mix(in srgb,var(--edge) 90%,transparent),-3px 0 rgba(255,30,142,.9);}
-  98.2%{transform:none;text-shadow:-1.5px 0 color-mix(in srgb,var(--edge) 75%,transparent),1.5px 0 rgba(255,30,142,.75);}
+  0%,96.5%{transform:none;text-shadow:-1.5px 0 color-mix(in srgb,var(--edge) 75%,transparent),1.5px 0 color-mix(in srgb,var(--a) 75%,transparent);}
+  97%{transform:translateX(-2px) skewX(-6deg);text-shadow:-4px 0 color-mix(in srgb,var(--edge) 90%,transparent),4px 0 color-mix(in srgb,var(--a) 90%,transparent);}
+  97.6%{transform:translateX(3px);text-shadow:3px 0 color-mix(in srgb,var(--edge) 90%,transparent),-3px 0 color-mix(in srgb,var(--a) 90%,transparent);}
+  98.2%{transform:none;text-shadow:-1.5px 0 color-mix(in srgb,var(--edge) 75%,transparent),1.5px 0 color-mix(in srgb,var(--a) 75%,transparent);}
 }
 /* A tracking line crawls up the screen every few seconds — the artefact of a
    tape being read, not an effect a browser skin would add. It sits above the
    page and below every control, and it cannot be clicked. */
-[data-theme=retro] .ambient::after{
+[data-retro] .ambient::after{
   content:'';position:fixed;left:0;right:0;height:78px;pointer-events:none;z-index:0;
-  background:linear-gradient(180deg,transparent,color-mix(in srgb,var(--edge) 5.5%,transparent) 42%,rgba(255,255,255,.05) 50%,rgba(255,30,142,.05) 58%,transparent);
+  background:linear-gradient(180deg,transparent,color-mix(in srgb,var(--edge) 5.5%,transparent) 42%,rgba(255,255,255,.05) 50%,color-mix(in srgb,var(--a) 5%,transparent) 58%,transparent);
   animation:vhsTrack 9s linear infinite;
 }
 @keyframes vhsTrack{
@@ -369,8 +374,8 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 }
 /* Neither of these is worth making somebody motion-sick over. */
 @media(prefers-reduced-motion:reduce){
-  [data-theme=retro] .hdr-title{animation:none;}
-  [data-theme=retro] .ambient::after{display:none;}
+  [data-retro] .hdr-title{animation:none;}
+  [data-retro] .ambient::after{display:none;}
 }
 /* THE FRIENDS / WATCH-PARTY HUB
    A bottom sheet is right on a phone — it comes from the thumb and it covers a
@@ -415,64 +420,64 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
    Pressing one inverts it. No blur anywhere; nothing in 1995 could blur.
    The cyberpunk is the lip colour only — cyan on the light edge — so the screen
    reads as a tight palette with neon edges rather than a glow with a UI in it. */
-[data-theme=retro] .search-wrap,[data-theme=retro] .hbtn,[data-theme=retro] .nbtn,
-[data-theme=retro] .resume-card,[data-theme=retro] .resume-go,[data-theme=retro] .bb-slide,
-[data-theme=retro] .nav{
+[data-retro] .search-wrap,[data-retro] .hbtn,[data-retro] .nbtn,
+[data-retro] .resume-card,[data-retro] .resume-go,[data-retro] .bb-slide,
+[data-retro] .nav{
   border-radius:2px;
 }
 /* Sunk: the well you type into, and the strip you left something in. */
-[data-theme=retro] .search-wrap,[data-theme=retro] .resume-card{
+[data-retro] .search-wrap,[data-retro] .resume-card{
   box-shadow:
     inset 2px 2px 0 0 rgba(0,0,0,.88),
     inset -1px -1px 0 0 color-mix(in srgb,var(--edge) 30%,transparent);
 }
 /* Raised: anything you press. */
-[data-theme=retro] .hbtn,[data-theme=retro] .nbtn,[data-theme=retro] .sort-btn,
-[data-theme=retro] .resume-go{
+[data-retro] .hbtn,[data-retro] .nbtn,[data-retro] .sort-btn,
+[data-retro] .resume-go{
   box-shadow:
     inset 1px 1px 0 0 color-mix(in srgb,var(--edge) 42%,transparent),
     inset -2px -2px 0 0 rgba(0,0,0,.90);
 }
 /* Pressed inverts the bevel — the control physically goes in. */
-[data-theme=retro] .hbtn:active,[data-theme=retro] .nbtn:active,
-[data-theme=retro] .sort-btn:active,[data-theme=retro] .resume-go:active{
+[data-retro] .hbtn:active,[data-retro] .nbtn:active,
+[data-retro] .sort-btn:active,[data-retro] .resume-go:active{
   box-shadow:
     inset 2px 2px 0 0 rgba(0,0,0,.90),
     inset -1px -1px 0 0 color-mix(in srgb,var(--edge) 30%,transparent);
 }
 /* The add key is the one saturated face on the screen, so it gets the hard
    offset the cards get — a key standing proud of the bar, not a floating pill. */
-[data-theme=retro] .nbtn.add{
+[data-retro] .nbtn.add{
   box-shadow:
     inset 1px 1px 0 0 rgba(255,255,255,.34),
     inset -2px -2px 0 0 rgba(0,0,0,.55),
     2px 2px 0 0 color-mix(in srgb,var(--edge) 30%,transparent);
 }
-[data-theme=retro] .nbtn.add:active{
+[data-retro] .nbtn.add:active{
   box-shadow:
     inset 2px 2px 0 0 rgba(0,0,0,.55),
     inset -1px -1px 0 0 rgba(255,255,255,.28);
 }
 /* The bar the keys sit on: a hard lit lip along the top, no blur, no fade. */
-[data-theme=retro] .nav{
+[data-retro] .nav{
   box-shadow:inset 0 2px 0 0 color-mix(in srgb,var(--edge) 28%,transparent);
 }
 /* The current tab is stated, not glowed: a hard cyan underline the width of the
    key. One bright thing per screen and it is the thing you are looking at. */
-[data-theme=retro] .nbtn.on{
+[data-retro] .nbtn.on{
   box-shadow:
     inset 1px 1px 0 0 color-mix(in srgb,var(--edge) 42%,transparent),
     inset -2px -2px 0 0 rgba(0,0,0,.90),
     inset 0 -3px 0 0 var(--edge);
 }
 /* Chrome: notched where it is a panel, lit only where it is active. */
-[data-theme=retro] .search-in,[data-theme=retro] .filt-row,[data-theme=retro] .sort-btn,
-[data-theme=retro] .qp-chip,[data-theme=retro] .art-opt,[data-theme=retro] .stc,
-[data-theme=retro] .hero-cta,[data-theme=retro] .fixbar.on,[data-theme=retro] .paint-name{
+[data-retro] .search-in,[data-retro] .filt-row,[data-retro] .sort-btn,
+[data-retro] .qp-chip,[data-retro] .art-opt,[data-retro] .stc,
+[data-retro] .hero-cta,[data-retro] .fixbar.on,[data-retro] .paint-name{
   border-radius:2px;
 }
-[data-theme=retro] .nbtn.add,[data-theme=retro] .paint-save,
-[data-theme=retro] .resume-card{border-radius:2px;clip-path:var(--cut);}
+[data-retro] .nbtn.add,[data-retro] .paint-save,
+[data-retro] .resume-card{border-radius:2px;clip-path:var(--cut);}
 /* Not everything is treated the same way, and that contrast is still the point —
    but it is no longer round-versus-cut. A round pill is the one shape none of
    these machines could draw: panels are CUT, controls are SQUARE and bevelled,
@@ -481,32 +486,32 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
    says "lit" without a radius, and glow was the thing making a black screen grey.
    One blur survives, on the focused field, because focus should be the brightest
    event on the screen and nothing else competes with it. */
-[data-theme=retro] .hbtn{border-radius:2px;}
-[data-theme=retro] .search-play,[data-theme=retro] .resume-go{border-radius:2px;}
-[data-theme=retro] .rz-card{clip-path:none;border-radius:2px;}
-[data-theme=retro] .hero-cta{border-radius:2px;}
-[data-theme=retro] .nbtn.add{--notch:8px;}
-[data-theme=retro] .search-in{border-color:color-mix(in srgb,var(--edge) 20%,transparent);}
-[data-theme=retro] .search-in:focus{border-color:var(--a);box-shadow:0 0 18px -4px var(--glow);}
+[data-retro] .hbtn{border-radius:2px;}
+[data-retro] .search-play,[data-retro] .resume-go{border-radius:2px;}
+[data-retro] .rz-card{clip-path:none;border-radius:2px;}
+[data-retro] .hero-cta{border-radius:2px;}
+[data-retro] .nbtn.add{--notch:8px;}
+[data-retro] .search-in{border-color:color-mix(in srgb,var(--edge) 20%,transparent);}
+[data-retro] .search-in:focus{border-color:var(--a);box-shadow:0 0 18px -4px var(--glow);}
 /* An active chip is stated by a hard lit edge, not a halo. */
-[data-theme=retro] .fchip.on{border-radius:2px;box-shadow:inset 0 -2px 0 0 var(--a),inset 1px 1px 0 0 color-mix(in srgb,var(--edge) 35%,transparent);}
-[data-theme=retro] .nav{border-radius:0;border-top:1px solid color-mix(in srgb,var(--edge) 35%,transparent);}
+[data-retro] .fchip.on{border-radius:2px;box-shadow:inset 0 -2px 0 0 var(--a),inset 1px 1px 0 0 color-mix(in srgb,var(--edge) 35%,transparent);}
+[data-retro] .nav{border-radius:0;border-top:1px solid color-mix(in srgb,var(--edge) 35%,transparent);}
 /* The last of the pills. Squaring the big controls left the small ones behind,
    and a lozenge next to a bevelled key is the one thing that still says 2026.
    Dots included: a round dot is a circle, a square dot is a pixel. */
-[data-theme=retro] .fchip,[data-theme=retro] .chip,[data-theme=retro] .s-chip,[data-theme=retro] .src-chip,
-[data-theme=retro] .sv-chip,[data-theme=retro] .pt-chip,[data-theme=retro] .chat-chip,
-[data-theme=retro] .dt-eps-tag,[data-theme=retro] .pcard-seas,[data-theme=retro] .hero-air,
-[data-theme=retro] .bb-count,[data-theme=retro] .bb-dot,[data-theme=retro] .wn-dot,
-[data-theme=retro] .sched-today-pill,[data-theme=retro] .sched-today-btn,
-[data-theme=retro] .wt-tag,[data-theme=retro] .upd-kind,[data-theme=retro] .party-pill,
-[data-theme=retro] .pt-live,[data-theme=retro] .pt-sys,[data-theme=retro] .fy-score,
-[data-theme=retro] .th-back,[data-theme=retro] .pk-btn,[data-theme=retro] .pk-mood,
-[data-theme=retro] .dt-next-go,[data-theme=retro] .dt-seenall,[data-theme=retro] .fixbar-b,
-[data-theme=retro] .onb-next,[data-theme=retro] .onb-imp,[data-theme=retro] .bulk-b,
-[data-theme=retro] .fr-accept,[data-theme=retro] .recsel-done,[data-theme=retro] .paint-done,
-[data-theme=retro] .sheet-handle,[data-theme=retro] .ct-tgl-track,[data-theme=retro] .hl-sw,
-[data-theme=retro] .call-person,[data-theme=retro] .sv-store-track,[data-theme=retro] .sv-store-fill{
+[data-retro] .fchip,[data-retro] .chip,[data-retro] .s-chip,[data-retro] .src-chip,
+[data-retro] .sv-chip,[data-retro] .pt-chip,[data-retro] .chat-chip,
+[data-retro] .dt-eps-tag,[data-retro] .pcard-seas,[data-retro] .hero-air,
+[data-retro] .bb-count,[data-retro] .bb-dot,[data-retro] .wn-dot,
+[data-retro] .sched-today-pill,[data-retro] .sched-today-btn,
+[data-retro] .wt-tag,[data-retro] .upd-kind,[data-retro] .party-pill,
+[data-retro] .pt-live,[data-retro] .pt-sys,[data-retro] .fy-score,
+[data-retro] .th-back,[data-retro] .pk-btn,[data-retro] .pk-mood,
+[data-retro] .dt-next-go,[data-retro] .dt-seenall,[data-retro] .fixbar-b,
+[data-retro] .onb-next,[data-retro] .onb-imp,[data-retro] .bulk-b,
+[data-retro] .fr-accept,[data-retro] .recsel-done,[data-retro] .paint-done,
+[data-retro] .sheet-handle,[data-retro] .ct-tgl-track,[data-retro] .hl-sw,
+[data-retro] .call-person,[data-retro] .sv-store-track,[data-retro] .sv-store-fill{
   border-radius:2px;
 }
 /* A card title at 13px was asking an 8px face for a size it does not have, which
@@ -514,7 +519,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
    as an underscore. 16px is two whole pixels per pixel: the letters land on the
    grid and the ellipsis is three separate dots again. Tracking goes to zero
    because a pixel face is already spaced on the grid. */
-[data-theme=retro] .pcard-title{font-size:16px;letter-spacing:0;line-height:1.2;}
+[data-retro] .pcard-title{font-size:16px;letter-spacing:0;line-height:1.2;}
 /* The truncation mark had to go rather than be corrected. -webkit-line-clamp
    inserts its own "…", which cannot be styled or given a different face, and
    a pixel face draws it as a single low bar that reads as an underscore at every
@@ -522,12 +527,12 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
    clamp is swapped for a plain two-line clip: the title simply stops at the edge
    of its box, which is what these interfaces did anyway, having no glyph to
    spare for punctuation that means "there is more". */
-[data-theme=retro] .pcard-title{
+[data-retro] .pcard-title{
   display:block;-webkit-line-clamp:none;
   max-height:2.4em;overflow:hidden;text-overflow:clip;
 }
 /* The hero panel keeps its 26px in a rule further down; :root settles it. */
-:root[data-theme=retro] .billboard{border-radius:2px;}
+:root[data-retro] .billboard{border-radius:2px;}
 /* A fanned deck. The rows used to sit in a neat line; overlapping them turns a
    shelf into a stack of cases you flick through, which is what these rows always
    were. The OVERLAP is for every device — it is the look, and it does not need a
@@ -536,54 +541,54 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
    are reading is never the one half-covered by its neighbour. On a touch screen
    there is no hover to give, so the fan simply sits there and a tap opens the
    title as it always did. */
-[data-theme=retro] .row-scroll .pcard{
+[data-retro] .row-scroll .pcard{
   position:relative;
   margin-right:-30px;
   transition:transform .2s cubic-bezier(.22,1,.28,1);
 }
-[data-theme=retro] .row-scroll .pcard:last-child{margin-right:0;}
+[data-retro] .row-scroll .pcard:last-child{margin-right:0;}
 /* Pulling the cards together does not narrow what hangs BELOW them, so each
    title ran on under its neighbour's cover — "JUJUTSU KAISEMob Psycho 100". The
    text is constrained to the part of the card that is actually still visible,
    which is its width minus the overlap. */
-[data-theme=retro] .row-scroll .pcard-title,
-[data-theme=retro] .row-scroll .pcard-title ~ *{
+[data-retro] .row-scroll .pcard-title,
+[data-retro] .row-scroll .pcard-title ~ *{
   width:calc(100% - 30px);
 }
 /* Anything pinned to a card's right edge is pinned to the part now tucked under
    its neighbour, so on hover — when the card lifts above the fan — it appeared
    to hang off the side. Both badges move in by the width of the overlap. */
-[data-theme=retro] .row-scroll .pcard-rec{right:calc(5px + 30px);border-radius:2px;}
-[data-theme=retro] .row-scroll .pcard-seas{right:calc(7px + 30px);}
+[data-retro] .row-scroll .pcard-rec{right:calc(5px + 30px);border-radius:2px;}
+[data-retro] .row-scroll .pcard-seas{right:calc(7px + 30px);}
 /* A selected card has to sit above its neighbours, or the card fanned on top of
    it covers the ring that says it is selected. */
-[data-theme=retro] .row-scroll .pcard.sel{z-index:7;}
+[data-retro] .row-scroll .pcard.sel{z-index:7;}
 @media (hover:hover) and (pointer:fine){
-  [data-theme=retro] .row-scroll .pcard:hover{
+  [data-retro] .row-scroll .pcard:hover{
     z-index:6;
     transform:translateY(-10px);
   }
-  [data-theme=retro] .row-scroll .pcard:hover ~ .pcard{
+  [data-retro] .row-scroll .pcard:hover ~ .pcard{
     transform:translateX(30px);
   }
 }
 @media (prefers-reduced-motion:reduce){
-  [data-theme=retro] .row-scroll .pcard{transition:none;}
-  [data-theme=retro] .row-scroll .pcard:hover ~ .pcard{transform:none;}
+  [data-retro] .row-scroll .pcard{transition:none;}
+  [data-retro] .row-scroll .pcard:hover ~ .pcard{transform:none;}
 }
-[data-theme=retro] .dact{border-radius:2px;box-shadow:inset 1px 1px 0 0 color-mix(in srgb,var(--edge) 34%,transparent),inset -2px -2px 0 0 rgba(0,0,0,.9);}
-[data-theme=retro] .dact:active{box-shadow:inset 2px 2px 0 0 rgba(0,0,0,.9),inset -1px -1px 0 0 color-mix(in srgb,var(--edge) 28%,transparent);}
+[data-retro] .dact{border-radius:2px;box-shadow:inset 1px 1px 0 0 color-mix(in srgb,var(--edge) 34%,transparent),inset -2px -2px 0 0 rgba(0,0,0,.9);}
+[data-retro] .dact:active{box-shadow:inset 2px 2px 0 0 rgba(0,0,0,.9),inset -1px -1px 0 0 color-mix(in srgb,var(--edge) 28%,transparent);}
 /* The controls inside the panel, squared with the rest. The stepper keys and the
    back button were the last circles in the theme — and a round key is the one
    shape a machine with square pixels never made. */
-[data-theme=retro] .dt-back,[data-theme=retro] .prog-btn,[data-theme=retro] .dt-watch,
-[data-theme=retro] .dt-watchlink,[data-theme=retro] .parse-btn,[data-theme=retro] .dt-deck{
+[data-retro] .dt-back,[data-retro] .prog-btn,[data-retro] .dt-watch,
+[data-retro] .dt-watchlink,[data-retro] .parse-btn,[data-retro] .dt-deck{
   border-radius:2px;
 }
-[data-theme=retro] .dt-back,[data-theme=retro] .prog-btn{
+[data-retro] .dt-back,[data-retro] .prog-btn{
   box-shadow:inset 1px 1px 0 0 color-mix(in srgb,var(--edge) 42%,transparent),inset -2px -2px 0 0 rgba(0,0,0,.9);
 }
-[data-theme=retro] .dt-back:active,[data-theme=retro] .prog-btn:active{
+[data-retro] .dt-back:active,[data-retro] .prog-btn:active{
   box-shadow:inset 2px 2px 0 0 rgba(0,0,0,.9),inset -1px -1px 0 0 color-mix(in srgb,var(--edge) 30%,transparent);
 }
 /* SELECTION, in pixels. A 2px solid rounded ring is the browser's idea of focus,
@@ -591,11 +596,11 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
    looks like 2026. A dashed outline at zero radius is a run of hard cyan dashes —
    marching ants around the thing you picked, which is what a machine with no
    antialiasing would have drawn. The offset keeps it clear of the corner cut. */
-[data-theme=retro] :focus-visible{
+[data-retro] :focus-visible{
   outline:2px dashed var(--edge);outline-offset:3px;border-radius:0;
 }
-[data-theme=retro] .hbtn:focus-visible,[data-theme=retro] .dt-ch:focus-visible,
-[data-theme=retro] .src-tab:focus-visible{
+[data-retro] .hbtn:focus-visible,[data-retro] .dt-ch:focus-visible,
+[data-retro] .src-tab:focus-visible{
   outline:2px dashed var(--edge);outline-offset:3px;
 }
 /* A selected card gets the same ring, plus a hard square tick instead of a dot. */
@@ -605,9 +610,9 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
    those interfaces drew, at the same size on every screen, and it follows --edge
    so it changes with the rest of the theme. Drawn on .pcard::before, which is
    free — the wrap's two pseudo-elements are already the scanlines and the tint. */
-[data-theme=retro] .pcard.sel .pcard-wrap{outline:none;}
-[data-theme=retro] .pcard.sel{position:relative;}
-[data-theme=retro] .pcard.sel::before{
+[data-retro] .pcard.sel .pcard-wrap{outline:none;}
+[data-retro] .pcard.sel{position:relative;}
+[data-retro] .pcard.sel::before{
   content:'';position:absolute;inset:-4px;pointer-events:none;z-index:5;
   background-image:
     repeating-linear-gradient(90deg,var(--edge) 0 3px,transparent 3px 6px),
@@ -619,58 +624,58 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
   background-repeat:repeat-x,repeat-x,repeat-y,repeat-y;
 }
 /* The tick loses its circle: a square marker with a lit top-left lip. */
-[data-theme=retro] .pcard.sel::after{border-radius:2px;box-shadow:inset 1px 1px 0 0 rgba(255,255,255,.4);}
+[data-retro] .pcard.sel::after{border-radius:2px;box-shadow:inset 1px 1px 0 0 rgba(255,255,255,.4);}
 /* THE TITLE PANEL, as a status screen.
    Square corners and a pixel face are a costume; what those interfaces actually
    did was present a record — a framed window, a labelled readout, values in a
    column you could scan, leader lines carrying your eye across the gap. That is
    exactly the shape of this panel's content, so it costs nothing to say it
    properly. */
-[data-theme=retro] #detailSheet{
+[data-retro] #detailSheet{
   border:1px solid color-mix(in srgb,var(--edge) 34%,transparent);
   box-shadow:inset 0 0 0 1px rgba(0,0,0,.92),0 20px 48px -18px rgba(0,0,0,.8);
 }
 /* A section head reads as a plate, not a whisper: cyan, spaced, with its rule
    running out to the edge — the app already draws that rule, it was just grey. */
-[data-theme=retro] .dt-label{
+[data-retro] .dt-label{
   color:var(--pln);letter-spacing:.08em;text-transform:uppercase;font-size:12px;
 }
-[data-theme=retro] .dt-label::after{background:color-mix(in srgb,var(--edge) 30%,transparent);}
+[data-retro] .dt-label::after{background:color-mix(in srgb,var(--edge) 30%,transparent);}
 /* The facts become a readout. Dotted leaders run under every row so the eye
    crosses the gap from name to value the way it does on a character sheet, and
    the values take the display face so a number reads as a measurement. */
-[data-theme=retro] .dt-facts>*{
+[data-retro] .dt-facts>*{
   border-bottom:1px dotted color-mix(in srgb,var(--edge) 22%,transparent);
   padding-bottom:6px;
 }
-[data-theme=retro] .dt-facts>*:nth-child(even){
+[data-retro] .dt-facts>*:nth-child(even){
   font-family:var(--fd);color:var(--t1);text-align:right;
 }
-[data-theme=retro] .dt-facts>*:nth-child(odd){
+[data-retro] .dt-facts>*:nth-child(odd){
   color:var(--t3);letter-spacing:.04em;text-transform:uppercase;font-size:11px;
 }
 /* Scanlines across the banner, matching the cards. */
-[data-theme=retro] .dt-banner::after{
+[data-retro] .dt-banner::after{
   content:'';position:absolute;inset:0;pointer-events:none;z-index:3;
   background:repeating-linear-gradient(180deg,rgba(0,0,0,.16) 0 1px,transparent 1px 3px);
 }
 /* The hub is a window in this theme too, not a rounded card. */
-[data-theme=retro] #hubSheet{border-radius:2px;border-color:color-mix(in srgb,var(--edge) 34%,transparent);}
+[data-retro] #hubSheet{border-radius:2px;border-color:color-mix(in srgb,var(--edge) 34%,transparent);}
 /* Leaving the theme has to UNDO the theme. The mosaic is scoped to Retro, so in
    principle it stops applying on its own — but the browser keeps the filtered
    layer it already rasterised, and covers stayed soft after switching away.
    Stating filter:none for every other theme forces the repaint that drops it. */
-:root:not([data-theme=retro]) .pcard-img,
-:root:not([data-theme=retro]) .rz-img,
-:root:not([data-theme=retro]) .pk-cover,
-:root:not([data-theme=retro]) .dt-cover,
-:root:not([data-theme=retro]) .sched-thumb,
-:root:not([data-theme=retro]) .resume-art,
-:root:not([data-theme=retro]) .pop-cover,
-:root:not([data-theme=retro]) .pick-img,
-:root:not([data-theme=retro]) .hero-bg-img,
-:root:not([data-theme=retro]) .rc-note-img,
-:root:not([data-theme=retro]) .billboard{
+:root:not([data-retro]) .pcard-img,
+:root:not([data-retro]) .rz-img,
+:root:not([data-retro]) .pk-cover,
+:root:not([data-retro]) .dt-cover,
+:root:not([data-retro]) .sched-thumb,
+:root:not([data-retro]) .resume-art,
+:root:not([data-retro]) .pop-cover,
+:root:not([data-retro]) .pick-img,
+:root:not([data-retro]) .hero-bg-img,
+:root:not([data-retro]) .rc-note-img,
+:root:not([data-retro]) .billboard{
   filter:none;
 }
 /* ── THE TITLE PANEL AS A FRAMED SCREEN ─────────────────────────────────────
@@ -682,11 +687,11 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 
    Each section's content becomes a pane. .dt-label sits immediately before its
    block, so the adjacent sibling IS the pane; no wrapper is needed. */
-[data-theme=retro] .dt-label + .dt-facts,
-[data-theme=retro] .dt-label + .stars,
-[data-theme=retro] .dt-label + .dt-eps,
-[data-theme=retro] .dt-label + .chips,
-[data-theme=retro] .dt-label + .dt-actions{
+[data-retro] .dt-label + .dt-facts,
+[data-retro] .dt-label + .stars,
+[data-retro] .dt-label + .dt-eps,
+[data-retro] .dt-label + .chips,
+[data-retro] .dt-label + .dt-actions{
   border:1px solid var(--b2);
   background:var(--bg3);
   box-shadow:inset 1px 1px 0 0 rgba(0,0,0,.5);
@@ -700,38 +705,38 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
    every label this way left the ones with no frame — Genres was one — floating
    with brackets round them and overlapping whatever came next. :has() asks the
    question directly instead of guessing from the markup order. */
-[data-theme=retro] .dt-label{color:var(--edge);}
-[data-theme=retro] .dt-label:has(+ .dt-facts),
-[data-theme=retro] .dt-label:has(+ .stars),
-[data-theme=retro] .dt-label:has(+ .dt-eps),
-[data-theme=retro] .dt-label:has(+ .chips),
-[data-theme=retro] .dt-label:has(+ .dt-actions){
+[data-retro] .dt-label{color:var(--edge);}
+[data-retro] .dt-label:has(+ .dt-facts),
+[data-retro] .dt-label:has(+ .stars),
+[data-retro] .dt-label:has(+ .dt-eps),
+[data-retro] .dt-label:has(+ .chips),
+[data-retro] .dt-label:has(+ .dt-actions){
   position:relative;z-index:1;
   width:fit-content;
   margin:18px 0 -9px 10px;
   padding:0 8px;
   background:var(--bg2);
 }
-[data-theme=retro] .dt-label:has(+ .dt-facts)::before,
-[data-theme=retro] .dt-label:has(+ .stars)::before,
-[data-theme=retro] .dt-label:has(+ .dt-eps)::before,
-[data-theme=retro] .dt-label:has(+ .chips)::before,
-[data-theme=retro] .dt-label:has(+ .dt-actions)::before{
+[data-retro] .dt-label:has(+ .dt-facts)::before,
+[data-retro] .dt-label:has(+ .stars)::before,
+[data-retro] .dt-label:has(+ .dt-eps)::before,
+[data-retro] .dt-label:has(+ .chips)::before,
+[data-retro] .dt-label:has(+ .dt-actions)::before{
   content:'[';margin-right:5px;color:var(--edge);opacity:.7;
 }
-[data-theme=retro] .dt-label:has(+ .dt-facts)::after,
-[data-theme=retro] .dt-label:has(+ .stars)::after,
-[data-theme=retro] .dt-label:has(+ .dt-eps)::after,
-[data-theme=retro] .dt-label:has(+ .chips)::after,
-[data-theme=retro] .dt-label:has(+ .dt-actions)::after{
+[data-retro] .dt-label:has(+ .dt-facts)::after,
+[data-retro] .dt-label:has(+ .stars)::after,
+[data-retro] .dt-label:has(+ .dt-eps)::after,
+[data-retro] .dt-label:has(+ .chips)::after,
+[data-retro] .dt-label:has(+ .dt-actions)::after{
   content:']';flex:none;height:auto;width:auto;background:none;
   margin-left:5px;color:var(--edge);opacity:.7;
 }
 /* A command cursor. In every menu of this era the option you are on is pointed
    at, not merely tinted — a tint alone does not survive a low-contrast screen,
    and it is the one state that must never be ambiguous. */
-[data-theme=retro] .dpick{position:relative;padding-left:22px;}
-[data-theme=retro] .dpick[class*="on-"]::before{
+[data-retro] .dpick{position:relative;padding-left:22px;}
+[data-retro] .dpick[class*="on-"]::before{
   content:'\25B6';position:absolute;left:7px;top:50%;transform:translateY(-50%);
   font-size:9px;color:var(--edge);
 }
@@ -739,7 +744,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
    as a display you are looking INTO rather than a card sitting on top. Its
    surface is the deepest ground in the ramp, which is a token, so a future theme
    moves it instead of fighting it. */
-[data-theme=retro] .dt-deck{
+[data-retro] .dt-deck{
   background:var(--bg);
   box-shadow:inset 2px 2px 0 0 rgba(0,0,0,.8),inset -1px -1px 0 0 var(--b2);
 }
@@ -747,7 +752,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
    crawlers carve it, PC-98 rules a line beneath it. Sticky, so it behaves like
    the window's edge rather than a strip that scrolls away, and ruled rather than
    flat because a flat fill is a surface these machines could not hold. */
-[data-theme=retro] #detailSheet::before{
+[data-retro] #detailSheet::before{
   content:'';display:block;position:sticky;top:0;z-index:4;
   height:32px;margin:-10px -22px 12px;
   background:var(--bg3);
@@ -757,11 +762,11 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 }
 /* The cover, bolted into its housing rather than floating on it: a carved lip
    and four rivets, all hard-edged. */
-[data-theme=retro] .dt-cover-wrap{
+[data-retro] .dt-cover-wrap{
   position:relative;padding:5px;background:var(--bg3);
   box-shadow:inset 1px 1px 0 0 var(--b2),inset -2px -2px 0 0 rgba(0,0,0,.8);
 }
-[data-theme=retro] .dt-cover-wrap::after{
+[data-retro] .dt-cover-wrap::after{
   content:'';position:absolute;inset:0;pointer-events:none;
   background:
     radial-gradient(circle at 4px 4px,var(--edge) 0 1.4px,transparent 1.5px),
@@ -775,27 +780,27 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
    an 8px pixel face at 10px is not small type — it is broken type: "10" came out
    as two smudges and "4" as a glyph that is not a 4. Pixel faces do not degrade
    gracefully below their design size, so anything this small keeps the mono. */
-[data-theme=retro] .row-count,[data-theme=retro] .rz-at,
-[data-theme=retro] .rz-ep,[data-theme=retro] .hero-prog span,[data-theme=retro] .sv-heronum .v{
+[data-retro] .row-count,[data-retro] .rz-at,
+[data-retro] .rz-ep,[data-retro] .hero-prog span,[data-retro] .sv-heronum .v{
   font-family:'VT323',ui-monospace,'SFMono-Regular',Menlo,monospace;letter-spacing:0;
 }
-[data-theme=retro] .fn{font-family:ui-monospace,'SFMono-Regular',Menlo,monospace;letter-spacing:-.02em;}
+[data-retro] .fn{font-family:ui-monospace,'SFMono-Regular',Menlo,monospace;letter-spacing:-.02em;}
 /* The segmented control's own shell stayed a lozenge: its 99px sits in a
    multi-line rule further down the file and the theme's override tied with it.
    :root wins the tie outright rather than leaving it to source order. */
-:root[data-theme=retro] .filt-row,:root[data-theme=retro] .fchip,
-:root[data-theme=retro] .search-wrap,:root[data-theme=retro] .sort-btn,
-:root[data-theme=retro] .topbar{
+:root[data-retro] .filt-row,:root[data-retro] .fchip,
+:root[data-retro] .search-wrap,:root[data-retro] .sort-btn,
+:root[data-retro] .topbar{
   border-radius:2px;
 }
 /* Progress steps rather than slides, and the track is a cut channel. */
-[data-theme=retro] .pbar{border-radius:2px;background:rgba(0,0,0,.6);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--edge) 22%,transparent);}
-[data-theme=retro] .pfill{
+[data-retro] .pbar{border-radius:2px;background:rgba(0,0,0,.6);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--edge) 22%,transparent);}
+[data-retro] .pfill{
   border-radius:2px;
   background:repeating-linear-gradient(90deg,var(--a) 0 5px,transparent 5px 7px);
   box-shadow:0 0 10px -2px var(--a);
 }
-[data-theme=retro] .pcard-badge{border-radius:2px 0 2px 0;background:rgba(3,1,8,.92);}
+[data-retro] .pcard-badge{border-radius:2px 0 2px 0;background:rgba(3,1,8,.92);}
 
 /* ── RETRO, EVERYWHERE ELSE ─────────────────────────────────────────────────
    A look that stops at the home screen is a skin, and you find its edge the
@@ -805,82 +810,82 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 
 /* Panels. Sheets rise from the bottom edge, so they are cut on the top corners
    only — a notch on a corner that is off-screen is just a wasted gesture. */
-[data-theme=retro] .sheet,[data-theme=retro] .paint-dock{
+[data-retro] .sheet,[data-retro] .paint-dock{
   border-radius:2px;clip-path:polygon(0 var(--notch),var(--notch) 0,100% 0,100% 100%,0 100%);
   border-top:1px solid color-mix(in srgb,var(--edge) 35%,transparent);
 }
-[data-theme=retro] .confirm-box,[data-theme=retro] .bulk-menu,
-[data-theme=retro] .toast,[data-theme=retro] .onb-card,[data-theme=retro] .sv-store{
+[data-retro] .confirm-box,[data-retro] .bulk-menu,
+[data-retro] .toast,[data-retro] .onb-card,[data-retro] .sv-store{
   border-radius:2px;clip-path:var(--cut);
 }
-[data-theme=retro] .toast{--notch:8px;box-shadow:0 0 24px -6px var(--glow);}
-[data-theme=retro] .bulk-menu{box-shadow:0 0 0 1px color-mix(in srgb,var(--edge) 28%,transparent),0 18px 44px -14px #000;}
+[data-retro] .toast{--notch:8px;box-shadow:0 0 24px -6px var(--glow);}
+[data-retro] .bulk-menu{box-shadow:0 0 0 1px color-mix(in srgb,var(--edge) 28%,transparent),0 18px 44px -14px #000;}
 
 /* Stats read as a console: the tiles are cut, the numbers already run in mono,
    and the bars are lit rather than filled. */
-[data-theme=retro] .sv-heronum{
+[data-retro] .sv-heronum{
   border-radius:2px;clip-path:var(--cut);--notch:9px;
   background:linear-gradient(160deg,var(--bg3),var(--bg2));
   box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--edge) 22%,transparent);
 }
 /* Segments everywhere, not just on the cards. A meter that steps reads as
    something being counted; a smooth fill reads as a loading bar. */
-[data-theme=retro] .sv-bar .track,[data-theme=retro] .dt-epbar,
-[data-theme=retro] .sv-store-track,[data-theme=retro] .th-prev .pbar{
+[data-retro] .sv-bar .track,[data-retro] .dt-epbar,
+[data-retro] .sv-store-track,[data-retro] .th-prev .pbar{
   border-radius:2px;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--edge) 18%,transparent);
 }
 /* The status bars carry their colour in an inline style, and `background` is a
    shorthand — setting it there wipes any background-image the stylesheet adds.
    The segments go on an overlay instead, which inline styles cannot reach. */
-[data-theme=retro] .sv-bar .fill{border-radius:2px;box-shadow:0 0 10px -2px currentColor;position:relative;}
-[data-theme=retro] .sv-bar .fill::after{
+[data-retro] .sv-bar .fill{border-radius:2px;box-shadow:0 0 10px -2px currentColor;position:relative;}
+[data-retro] .sv-bar .fill::after{
   content:'';position:absolute;inset:0;border-radius:2px;pointer-events:none;
   background:repeating-linear-gradient(90deg,transparent 0 5px,rgba(3,1,8,.62) 5px 7px);
 }
-[data-theme=retro] .dt-epbar .pfill,[data-theme=retro] .sv-store-fill{
+[data-retro] .dt-epbar .pfill,[data-retro] .sv-store-fill{
   border-radius:2px;
   background:repeating-linear-gradient(90deg,var(--a) 0 5px,color-mix(in srgb,var(--a) 30%,#000) 5px 7px);
   box-shadow:0 0 10px -2px var(--a);
 }
-[data-theme=retro] .sv-chip{border-radius:2px;border-color:color-mix(in srgb,var(--edge) 28%,transparent);}
+[data-retro] .sv-chip{border-radius:2px;border-color:color-mix(in srgb,var(--edge) 28%,transparent);}
 
 /* The chat is a terminal. The app's answers sit flush against a cyan rule, yours
    are the magenta ones — the same two colours doing the same two jobs as
    everywhere else. */
-[data-theme=retro] .chat-thread{font-variant-numeric:tabular-nums;}
-[data-theme=retro] .chat-msg{border-radius:2px;}
-[data-theme=retro] .chat-msg.me{box-shadow:inset 2px 0 0 0 var(--a);}
-[data-theme=retro] .chat-msg.ai{box-shadow:inset 2px 0 0 0 #22e8ff;}
-[data-theme=retro] .chat-pre{border-radius:2px;border-left:2px solid #22e8ff;
+[data-retro] .chat-thread{font-variant-numeric:tabular-nums;}
+[data-retro] .chat-msg{border-radius:2px;}
+[data-retro] .chat-msg.me{box-shadow:inset 2px 0 0 0 var(--a);}
+[data-retro] .chat-msg.ai{box-shadow:inset 2px 0 0 0 #22e8ff;}
+[data-retro] .chat-pre{border-radius:2px;border-left:2px solid #22e8ff;
   font-family:ui-monospace,'SFMono-Regular',Menlo,monospace;}
-[data-theme=retro] .chat-input-row,[data-theme=retro] .ai-prompt-in,
-[data-theme=retro] .chat-chip,[data-theme=retro] .aitab{border-radius:2px;}
-[data-theme=retro] .chat-send,[data-theme=retro] .ai-run-btn{border-radius:2px;clip-path:var(--cut);--notch:7px;}
+[data-retro] .chat-input-row,[data-retro] .ai-prompt-in,
+[data-retro] .chat-chip,[data-retro] .aitab{border-radius:2px;}
+[data-retro] .chat-send,[data-retro] .ai-run-btn{border-radius:2px;clip-path:var(--cut);--notch:7px;}
 
 /* A title's own page. */
-[data-theme=retro] .dt-cover{border-radius:2px;clip-path:var(--cut);box-shadow:inset 1px 1px 0 0 color-mix(in srgb,var(--edge) 50%,transparent);}
-[data-theme=retro] .dt-watch{border-radius:2px;clip-path:var(--cut);--notch:9px;box-shadow:0 0 22px -6px var(--a);}
-[data-theme=retro] .dt-epn,[data-theme=retro] .dt-fav,[data-theme=retro] .dpick,
-[data-theme=retro] .dt-ch,[data-theme=retro] .dt-note{border-radius:2px;}
-[data-theme=retro] .dt-epn.next{box-shadow:0 0 12px -3px var(--a);}
-[data-theme=retro] .dt-label{color:#22e8ff;}
-[data-theme=retro] .dt-epbar .pfill{box-shadow:0 0 8px -2px var(--a);}
+[data-retro] .dt-cover{border-radius:2px;clip-path:var(--cut);box-shadow:inset 1px 1px 0 0 color-mix(in srgb,var(--edge) 50%,transparent);}
+[data-retro] .dt-watch{border-radius:2px;clip-path:var(--cut);--notch:9px;box-shadow:0 0 22px -6px var(--a);}
+[data-retro] .dt-epn,[data-retro] .dt-fav,[data-retro] .dpick,
+[data-retro] .dt-ch,[data-retro] .dt-note{border-radius:2px;}
+[data-retro] .dt-epn.next{box-shadow:0 0 12px -3px var(--a);}
+[data-retro] .dt-label{color:#22e8ff;}
+[data-retro] .dt-epbar .pfill{box-shadow:0 0 8px -2px var(--a);}
 
 /* Party and player. */
-[data-theme=retro] .call-tile,[data-theme=retro] .pt-code,[data-theme=retro] .pt-pick,
-[data-theme=retro] .pv-frame-wrap,[data-theme=retro] .pt-qitem{border-radius:2px;}
-[data-theme=retro] .call-tile{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--edge) 28%,transparent);}
-[data-theme=retro] .call-tile.speaking{box-shadow:inset 0 0 0 2px var(--a),0 0 22px -6px var(--a);}
-[data-theme=retro] .pt-code-val{font-family:ui-monospace,'SFMono-Regular',Menlo,monospace;color:#22e8ff;}
-[data-theme=retro] .pv-wrong-b,[data-theme=retro] .pv-host-main,[data-theme=retro] .pv-nav-mark{border-radius:2px;}
+[data-retro] .call-tile,[data-retro] .pt-code,[data-retro] .pt-pick,
+[data-retro] .pv-frame-wrap,[data-retro] .pt-qitem{border-radius:2px;}
+[data-retro] .call-tile{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--edge) 28%,transparent);}
+[data-retro] .call-tile.speaking{box-shadow:inset 0 0 0 2px var(--a),0 0 22px -6px var(--a);}
+[data-retro] .pt-code-val{font-family:ui-monospace,'SFMono-Regular',Menlo,monospace;color:#22e8ff;}
+[data-retro] .pv-wrong-b,[data-retro] .pv-host-main,[data-retro] .pv-nav-mark{border-radius:2px;}
 
 /* Anything left that is a field or a small action. */
-[data-theme=retro] .cbtn,[data-theme=retro] .parse-btn,[data-theme=retro] .src-chip,
-[data-theme=retro] .fr-row,[data-theme=retro] .set-row,[data-theme=retro] .synccode,
-[data-theme=retro] .th-reset,[data-theme=retro] .acc-none,[data-theme=retro] .glow-mode .glow-sw{
+[data-retro] .cbtn,[data-retro] .parse-btn,[data-retro] .src-chip,
+[data-retro] .fr-row,[data-retro] .set-row,[data-retro] .synccode,
+[data-retro] .th-reset,[data-retro] .acc-none,[data-retro] .glow-mode .glow-sw{
   border-radius:2px;
 }
-[data-theme=retro] .src-chip.on{box-shadow:0 0 12px -3px var(--a);}
+[data-retro] .src-chip.on{box-shadow:0 0 12px -3px var(--a);}
 
 /* ── OPTION DIAGRAMS ──
    Each one is a drawing of what its button does, in the same accent the app is
@@ -6271,7 +6276,7 @@ const THEMES=[
   // Second, not last. The row scrolls sideways, so an eighth tile is a tile
   // nobody finds — and this is the one that looks least like the others.
   // Not a palette swap either: RETRO restyles the corners, the shadows and the
-  // artwork too, in the [data-theme=retro] block in the stylesheet. One look you
+  // artwork too, in the [data-retro] block in the stylesheet. One look you
   // turn on, not a new axis to choose along.
   {id:'retro',   name:'Retro',   emoji:'🌃', bg:'#05030b', accent:'#ff1e8e'},
   {id:'naruto',  name:'Naruto',  emoji:'🍥', bg:'#0e0f18', accent:'#f57800'},
@@ -6418,7 +6423,7 @@ function applyTheme(id,persist=true){
   document.documentElement.setAttribute('data-theme',(t.custom||t.id==='default')?'':t.id);
   if(t.custom)applyCustomVars(t);
   if(persist){try{const s=store();if(s)s.setItem('animetheme',t.id);}catch{}}
-  try{applyRetroEdge();}catch(e){}   // the theme's lit edge, before anything reads it
+  try{applyRetroMode();}catch(e){}   // the mode, and its edge, before anything reads them
   try{applyAccent();}catch(e){}      // a chosen accent survives a theme change
   try{applyTint();}catch(e){}        // and the tint re-mixes into the new theme's greys
   try{applyAmbient();}catch(e){}
@@ -6433,37 +6438,66 @@ function applyTheme(id,persist=true){
 // --aFg is computed, not chosen. It is the text that sits ON the accent, and
 // getting it wrong is unreadable rather than ugly — so it is picked by contrast:
 // near-black on a light accent, white on a dark one, whichever wins by measure.
-// ─── RETRO EDGE COLOUR ──────────────────────────────────────────────────────
-// Retro is lit along one colour: every bevel lip, hairline, caption, cursor and
-// selection ring mixes from --edge. Swapping it is therefore one write, not a
-// pass over forty rules — which is the whole reason it was made a token first.
-// Only two picks, because this is the theme's own pair; a free colour wheel here
-// would be the accent control again, and that already exists one row below.
-const EDGE_KEY='retro_edge';
-const EDGES={cyan:'#22e8ff',pink:'#ff1e8e'};
-function retroEdge(){try{return localStorage.getItem(EDGE_KEY)==='pink'?'pink':'cyan';}catch(e){return 'cyan';}}
-function applyRetroEdge(){
+// ─── RETRO MODE ─────────────────────────────────────────────────────────────
+// Retro used to be a theme, which forced a choice it had no business forcing:
+// take the treatment and lose your colours. Almost nothing that makes it Retro
+// IS colour — it is geometry (square, bevelled, raised and sunk), texture
+// (scanlines, dither, a coarse screen), type, and behaviour (marching ants, a
+// cursor that points). Those are orthogonal to a palette, so they are a mode now
+// and they sit on any theme, including one you built yourself.
+//
+// The Retro PALETTE survives as a theme, so nobody loses the violet ground they
+// picked — the two are simply no longer welded together.
+const RETRO_KEY='retro_mode';
+function retroMode(){
+  try{
+    const v=localStorage.getItem(RETRO_KEY);
+    if(v==='1')return true;
+    if(v==='0')return false;
+    // Never asked: anyone already ON the retro theme was choosing the whole look,
+    // so the mode starts on for them and nothing changes under their feet.
+    return curTheme==='retro';
+  }catch(e){return false;}
+}
+function applyRetroMode(){
   try{
     const el=document.documentElement;
-    if(curTheme==='retro')el.style.setProperty('--edge',EDGES[retroEdge()]);
-    else el.style.removeProperty('--edge');   // never leak into another theme
+    if(retroMode())el.setAttribute('data-retro','1');else el.removeAttribute('data-retro');
+  }catch(e){}
+  try{applyRetroEdge();}catch(e){}
+}
+function setRetroMode(on){
+  try{localStorage.setItem(RETRO_KEY,on?'1':'0');}catch(e){}
+  applyRetroMode();
+  try{renderRetroRow();}catch(e){}
+  try{renderThemeGrid();}catch(e){}
+}
+// The lit edge. 'accent' is the default because that is what makes the mode
+// belong to whatever theme it is sitting on; the other two are Retro's own pair,
+// kept because they were asked for and they are the look people picture.
+const EDGE_KEY='retro_edge';
+const EDGES={cyan:'#22e8ff',pink:'#ff1e8e'};
+function retroEdge(){try{const v=localStorage.getItem(EDGE_KEY);return (v==='cyan'||v==='pink')?v:'accent';}catch(e){return 'accent';}}
+function applyRetroEdge(){
+  try{
+    const el=document.documentElement,e=retroEdge();
+    if(retroMode()&&EDGES[e])el.style.setProperty('--edge',EDGES[e]);
+    else el.style.removeProperty('--edge');   // fall back to the theme's own accent
   }catch(e){}
 }
 function setRetroEdge(v){
-  try{localStorage.setItem(EDGE_KEY,v==='pink'?'pink':'cyan');}catch(e){}
+  try{localStorage.setItem(EDGE_KEY,v);}catch(e){}
   applyRetroEdge();
-  try{renderRetroEdgeRow();}catch(e){}
+  try{renderRetroRow();}catch(e){}
 }
-function renderRetroEdgeRow(){
-  const lb=document.getElementById('edgeLb'),row=document.getElementById('edgeRow');
+function renderRetroRow(){
+  const lb=document.getElementById('retroLb'),row=document.getElementById('retroRow');
   if(!lb||!row)return;
-  // The control belongs to one theme, so it is not there when that theme is not.
-  const on=curTheme==='retro';
-  lb.style.display=on?'':'none';row.style.display=on?'':'none';
-  if(!on){row.innerHTML='';return;}
-  const cur=retroEdge();
-  row.innerHTML=Object.keys(EDGES).map(k=>
-    `<button class="acc-sw${cur===k?' on':''}" style="--sw:${EDGES[k]}" onclick="setRetroEdge('${k}')" aria-label="Retro edge ${k}"></button>`).join('');
+  const on=retroMode(),edge=retroEdge();
+  row.innerHTML=`<button class="acc-sw acc-none${on?' on':''}" onclick="setRetroMode(${on?'false':'true'})" title="Square bevels, pixel type, scanlines — on any theme"><span>${on?'On':'Off'}</span></button>`
+    +(on?`<button class="acc-sw${edge==='accent'?' on':''}" style="--sw:var(--a)" onclick="setRetroEdge('accent')" aria-label="Edge follows the theme accent"></button>`
+        +Object.keys(EDGES).map(k=>`<button class="acc-sw${edge===k?' on':''}" style="--sw:${EDGES[k]}" onclick="setRetroEdge('${k}')" aria-label="Retro edge ${k}"></button>`).join('')
+      :'');
 }
 const ACCENT_KEY='accent_override';
 function accentOverride(){try{return localStorage.getItem(ACCENT_KEY)||'';}catch(e){return '';}}
@@ -6718,8 +6752,8 @@ function startPaint(){
     <div class="paint-body">
       <div class="paint-lb">Looks</div>
       <div class="theme-grid" id="themeGrid"></div>
-      <div class="paint-lb" id="edgeLb" style="display:none">Edge</div>
-      <div class="acc-row" id="edgeRow" style="display:none"></div>
+      <div class="paint-lb" id="retroLb">Retro</div>
+      <div class="acc-row" id="retroRow"></div>
       <div class="paint-lb">Accent</div>
       <div class="acc-row" id="accentRow"></div>
       <div class="paint-lb">Background</div>
@@ -7098,7 +7132,7 @@ function deleteCustomTheme(id){
   toast('Theme deleted');
 }
 function renderThemeGrid(){
-  try{renderRetroEdgeRow();}catch(e){}
+  try{renderRetroRow();}catch(e){}
   try{renderAccentRow();}catch(e){}
   try{renderDensityRow();}catch(e){}
   try{renderFromImageRow();}catch(e){}
@@ -17330,10 +17364,12 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-14.21',
-  title:'Pick the colour Retro is lit in',
-  push:'Cyan or pink, and the fan stops colliding.',
+  v:'2026-08-14.22',
+  title:'Retro is a mode now, so it works with every look',
+  push:'Keep your colours, take the treatment.',
   notes:[
+    'Retro is no longer a theme you switch TO \u2014 it is a mode you turn ON, and it sits on any look you like, including ones you built yourself. Almost nothing that makes it Retro was ever colour: it is the square bevelled controls, the pixel type, the coarse covers, the marching ants and the cursor that points. Those had no business being welded to one palette, so now Naruto, Sasuke or your own theme can wear them.',
+    'Nobody loses anything. The Retro palette is still there as a theme, and if you were already using it the mode is simply on \u2014 it looks exactly as it did. The lit edge follows whatever accent your theme carries by default, and cyan and pink are still there to pick if you want them.',
     'Retro can be lit in cyan or pink. Every bevel lip, hairline, caption, cursor and selection ring in the theme mixes from one colour, so switching it repaints the whole look rather than a few borders. The control sits under Looks and only appears while Retro is the theme, because it belongs to that theme alone.',
     'Selecting something draws a ring of actual pixels \u2014 hard blocks with hard gaps, the same size on every screen \u2014 instead of the browser\u2019s dashed outline, which is antialiased, round-ended and a different length in every browser.',
     'The fanned rows stop colliding. Pulling the covers together did not narrow the titles underneath, so each ran on under its neighbour; the text and the badges now keep to the part of the card still visible.',

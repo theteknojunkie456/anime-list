@@ -303,6 +303,14 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
    thing on screen that refuses to. Turning it down lets the chrome lead without
    touching the picture's brightness, so nothing becomes hard to recognise.
    This is the number to tune: .6 sits back, .85 barely moves, .4 is severe. */
+/* A cover drawn as REAL pixels. The canvas carries the same classes as the image
+   it stands in for, so every rule that shaped the image — the corner cut, the
+   carved lip, the scanlines — applies to it unchanged. Its backing store is
+   genuinely small, which is the whole point: nothing has to resolve a filter, no
+   width rule can hijack it, and a dense screen cannot smooth it away, because
+   the pixels are not an effect over the picture, they ARE the picture. */
+[data-retro] canvas.pxc{image-rendering:pixelated;}
+[data-retro] img.pxc-src{display:none;}
 [data-retro] .pcard-img,[data-retro] .rz-img,[data-retro] .pk-cover,
 [data-retro] .dt-cover,[data-retro] .sched-thumb,[data-retro] .resume-art,
 [data-retro] .pop-cover,[data-retro] .pick-img,
@@ -6494,6 +6502,58 @@ function applyTheme(id,persist=true){
 // --aFg is computed, not chosen. It is the text that sits ON the accent, and
 // getting it wrong is unreadable rather than ugly — so it is picked by contrast:
 // near-black on a light accent, white on a dark one, whichever wins by measure.
+// ─── COVERS AS REAL PIXELS ───────────────────────────────────────────────────
+// Three earlier attempts failed for three different reasons: resizing the image
+// let any width rule hijack it, a heavy mosaic was sampled rather than drawn, and
+// an SVG filter made WebKit paint nothing at all — invisible on every iPhone,
+// which is nearly all of them.
+//
+// A canvas has none of those failure modes. Its backing store is ACTUALLY small,
+// so there is no filter to resolve, no layout to hijack, and no device pixel
+// ratio that can smooth it back. Cross-origin art taints the canvas, which blocks
+// reading pixels back — it does not block drawing it, and drawing is all this
+// needs.
+// A FRACTION of the displayed size, not a fixed width. Drawing every cover at a
+// flat 52px made the small ones 1:1 with their own box — a 52px thumbnail drawn
+// at 52 pixels is just the thumbnail. Dividing instead keeps the block size
+// constant relative to what you see, at any size and any screen density.
+const PX_DIV=3, PX_MIN=14;
+const PX_SEL='.pcard-img,.rz-img,.pk-cover,.dt-cover,.sched-thumb,.resume-art,.pop-cover,.pick-img,.rc-note-img,.hero-bg-img,.dt-banner-img';
+function pixelateOne(img){
+  if(!img||img.dataset.pxDone==='1')return;
+  if(!img.complete||!img.naturalWidth)return;          // nothing to draw yet
+  const r=img.getBoundingClientRect(); if(r.width<4)return;
+  try{
+    const c=document.createElement('canvas');
+    const ratio=r.height/r.width || 1.42;
+    const w=Math.max(PX_MIN,Math.round(r.width/PX_DIV));
+    c.width=w; c.height=Math.max(1,Math.round(w*ratio));
+    const x=c.getContext('2d');
+    x.imageSmoothingEnabled=false;
+    x.drawImage(img,0,0,c.width,c.height);
+    c.className=img.className+' pxc';
+    c.setAttribute('aria-hidden','true');
+    img.dataset.pxDone='1';
+    img.classList.add('pxc-src');
+    img.after(c);
+  }catch(e){}                                          // a broken cover keeps the image
+}
+function pixelateCovers(){
+  if(!retroMode())return;
+  try{document.querySelectorAll(PX_SEL).forEach(img=>{
+    if(img.tagName!=='IMG'||img.dataset.pxDone==='1')return;
+    if(img.complete&&img.naturalWidth)pixelateOne(img);
+    else img.addEventListener('load',()=>pixelateOne(img),{once:true});
+  });}catch(e){}
+}
+// Leaving the mode has to put every cover back, or they stay frozen at 52px.
+function unpixelateCovers(){
+  try{
+    document.querySelectorAll('canvas.pxc').forEach(c=>c.remove());
+    document.querySelectorAll('img.pxc-src').forEach(i=>{i.classList.remove('pxc-src');delete i.dataset.pxDone;});
+  }catch(e){}
+}
+function refreshPixels(){ if(retroMode())pixelateCovers(); else unpixelateCovers(); }
 // ─── RETRO MODE ─────────────────────────────────────────────────────────────
 // Retro used to be a theme, which forced a choice it had no business forcing:
 // take the treatment and lose your colours. Almost nothing that makes it Retro
@@ -6519,6 +6579,7 @@ function applyRetroMode(){
     if(retroMode())el.setAttribute('data-retro','1');else el.removeAttribute('data-retro');
   }catch(e){}
   try{applyRetroEdge();}catch(e){}
+  try{refreshPixels();}catch(e){}
 }
 function setRetroMode(on){
   try{localStorage.setItem(RETRO_KEY,on?'1':'0');}catch(e){}
@@ -7542,6 +7603,7 @@ function render(){
   const step=fn=>{try{fn();}catch(e){try{console.error('render',e);}catch{}}};
   step(renderKindSeg);step(renderFiltRow);step(renderSortRow);step(renderHome);
   forgetAmbBands();   // the bands just moved
+  try{refreshPixels();}catch(e){}
 }
 function renderKindSeg(){
   const el=document.getElementById('kindSeg');if(!el)return;
@@ -17438,10 +17500,11 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-14.27',
-  title:'A landscape layout worth turning the phone for',
-  push:'Plus the cut-off paragraph.',
+  v:'2026-08-14.28',
+  title:'The pixels are back, and this time they are real',
+  push:'Drawn, not filtered.',
   notes:[
+    'Covers are made of pixels again \u2014 and this time they actually are pixels rather than an effect laid over the picture. Each cover is drawn small and shown large, so the blocks are the picture itself. That is why it survives where the last three attempts did not: nothing has to resize, nothing has to resolve, and a sharper screen cannot smooth it back out. Turn Retro off and the covers return to normal instantly.',
     'Turned sideways, a phone is a 393px-tall screen, and the layout was still spending that height like it had plenty: the hero alone took 240px and the bottom bar another 83, which is four fifths of the screen before a single title appeared. The hero becomes a strip, the bar keeps its icons and drops its labels, and the resume line stops reserving poster height. The rows already used the extra width; now there is something left to show in them.',
     'The paragraph at the end of a title no longer reads as cut off. That panel deliberately has no padding so the artwork can run edge to edge, which left the last line sitting flush against the bottom of the screen. It has ground under it now.',
     'The fanned rows stop fanning in landscape. Sideways the rows become a grid, and a fan is a property of a strip you scroll \u2014 on a grid it just pulled every column out of line with its own track.',

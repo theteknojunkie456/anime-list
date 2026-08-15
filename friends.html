@@ -666,6 +666,19 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 :root:not([data-retro]) .billboard{
   filter:none;
 }
+/* THE FRIENDS-RECOMMEND ROW
+   These cards are .pcard like any other, so the fan picked them up — but they
+   carry a friend-coloured ring of their own that stayed a 14px lozenge, and six
+   rounded rings overlapping each other read as a pile of pills rather than a row
+   of covers. The ring squares up, the corner controls square up, and the badge
+   with them; the ring keeps the friend's colour, which is the one thing here that
+   must not follow the theme — it is how you tell who sent what. */
+[data-retro] .rec-card .rec-wrap{
+  outline:2px solid var(--fc);outline-offset:-2px;border-radius:2px;
+}
+[data-retro] .rec-flag,[data-retro] .rec-x,[data-retro] .rec-badge{border-radius:2px;}
+/* Their send/dismiss control sits at the same edge the fan tucks away. */
+[data-retro] .row-scroll .rec-x{right:calc(5px + 30px);}
 /* ── THE TITLE PANEL AS A FRAMED SCREEN ─────────────────────────────────────
    Built from tokens, not literals. The first attempt used rgba() fills with
    alpha, which is what broke it: a translucent background has no colour of its
@@ -17362,10 +17375,11 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-14.23',
-  title:'Retro leaves the Looks row',
-  push:'It is a switch now, not a look.',
+  v:'2026-08-14.24',
+  title:'The Friends recommend row joins the rest',
+  push:'No more stack of pills.',
   notes:[
+    'The row of things your friends sent you was the one place the look never reached. Those cards carry a ring in the sender\u2019s own colour, and it stayed a rounded lozenge \u2014 six of them overlapping read as a pile of pills rather than a row of covers. The rings are square now, along with the little sender flag and the dismiss button. The colour stays exactly as it was: it is how you tell at a glance who sent what.',
     'Retro is gone from Looks, because it is no longer one. It is a switch under Looks that puts the square bevelled controls, the pixel type, the coarse covers and the marching ants over whatever colours you already chose. Having it in both places was asking you to pick a look in order to get something that was never about colour.',
     'If you were using the Retro theme nothing is lost: the switch is already on for you, so the treatment stayed. What changed is that the violet ground underneath it is now the standard one \u2014 and you can put the treatment on any theme, or on a look of your own, which was never possible before.',
     'Retro is no longer a theme you switch TO \u2014 it is a mode you turn ON, and it sits on any look you like, including ones you built yourself. Almost nothing that makes it Retro was ever colour: it is the square bevelled controls, the pixel type, the coarse covers, the marching ants and the cursor that points. Those had no business being welded to one palette, so now Naruto, Sasuke or your own theme can wear them.',

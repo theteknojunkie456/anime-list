@@ -292,9 +292,16 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
    This is the number to tune: .6 sits back, .85 barely moves, .4 is severe. */
 [data-theme=retro] .pcard-img,[data-theme=retro] .rz-img,[data-theme=retro] .pk-cover,
 [data-theme=retro] .dt-cover,[data-theme=retro] .sched-thumb,[data-theme=retro] .resume-art,
-[data-theme=retro] .pop-cover,[data-theme=retro] .pick-img,[data-theme=retro] .billboard{
-  filter:saturate(.6) contrast(1.06);
+[data-theme=retro] .pop-cover,[data-theme=retro] .pick-img,
+[data-theme=retro] .hero-bg-img,[data-theme=retro] .rc-note-img{
+  /* IMAGES ONLY. A filter applies to an element and everything inside it, so
+     putting this on .billboard — a container — mosaicked the hero's title, its
+     sub-line and the Open button along with the artwork. The placeholders are out
+     for the same reason: they draw a letter, not a picture. */
+  filter:saturate(.6) contrast(1.06) url(#wlPixel);
 }
+/* The hero panel still sits back in the palette; only its image gets the blocks. */
+[data-theme=retro] .billboard{filter:saturate(.72);}
 /* The carved lip, on those same surfaces. */
 [data-theme=retro] .rz-img,[data-theme=retro] .pk-cover,[data-theme=retro] .dt-cover,
 [data-theme=retro] .dt-cover-ph,[data-theme=retro] .sched-thumb,[data-theme=retro] .sched-thumb-ph,
@@ -3258,6 +3265,23 @@ body.recsel .pcard{position:relative;}
 </style>
 </head>
 <body>
+<!-- Mosaic filter for the Retro theme. This is a PAINT operation: it never
+     touches width, height or layout, so no other rule can hijack it the way the
+     transform-based attempt was hijacked by `.grid .pcard-img{width:100%}`. It
+     also samples in CSS pixels, so the blocks stay the same size on a 1x, 2x or
+     3x screen instead of dissolving on the dense ones.
+     How it works: flood a single dot inside each 4x4 cell, tile that across the
+     image, mask the picture down to just those dots (one sample per cell), then
+     dilate each dot back out into a solid 4x4 block. -->
+<svg width="0" height="0" style="position:absolute;pointer-events:none" aria-hidden="true" focusable="false">
+  <filter id="wlPixel" x="0" y="0" width="100%" height="100%">
+    <feFlood x="2" y="2" width="1" height="1" flood-color="#fff" flood-opacity="1"/>
+    <feComposite width="4" height="4"/>
+    <feTile result="cells"/>
+    <feComposite in="SourceGraphic" in2="cells" operator="in"/>
+    <feMorphology operator="dilate" radius="2"/>
+  </filter>
+</svg>
 
 <div class="ambient" aria-hidden="true"></div>
 <div id="brightVeil" aria-hidden="true"></div>
@@ -16992,10 +17016,12 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-14.14',
-  title:'A fix, and the rows became a deck you flick through',
-  push:'Sorry about the giant covers.',
+  v:'2026-08-14.15',
+  title:'Pixel covers, properly this time',
+  push:'Every picture, sprite-sized.',
   notes:[
+    'Every picture in Retro is drawn in blocks — covers, the hero, the airing strip, the schedule, the thumbnails. It is done as a paint effect this time rather than by resizing anything, so nothing can knock the layout about the way the first attempt did, and the blocks stay the same size on a dense screen instead of dissolving into a smooth photograph.',
+    'Text stays sharp. The effect applies to pictures only: putting it on a panel mosaicked the words sitting on top of the artwork as well, which is a thing you can only find out by looking.',
     'The pixelated covers are gone, and an apology for the state of the last hour. Drawing them small and blowing them back up only works while nothing else sets their size — and on a wide screen something does, which left the enlargement applied to a full-size picture. That is why covers turned enormous and buried the page. Removed rather than patched: it was one stray rule away from doing it again.',
     'The rows are a deck now. Covers overlap like cases on a shelf, and pointing at one pulls it to the front and lifts it while the rest slide aside to make room. On a touch screen they stay in a line, because without a pointer there is nothing to uncover them with.',
     'The pixel type is a different face — narrower, and readable at the sizes this app actually uses.',

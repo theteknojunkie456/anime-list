@@ -6517,7 +6517,12 @@ function applyTheme(id,persist=true){
 // flat 52px made the small ones 1:1 with their own box — a 52px thumbnail drawn
 // at 52 pixels is just the thumbnail. Dividing instead keeps the block size
 // constant relative to what you see, at any size and any screen density.
-const PX_DIV=3, PX_MIN=14;
+//
+// The divisor is the whole feel of it, and 3 was too much: on a 340px episode
+// thumbnail that is a 3px block, which is coarse enough to destroy a photograph
+// rather than stylise it. 2 reads as a coarse screen; 3 reads as damage. PX_MIN
+// stops a small thumbnail being reduced past recognition on the way.
+const PX_DIV=2, PX_MIN=24;
 const PX_SEL='.pcard-img,.rz-img,.pk-cover,.dt-cover,.sched-thumb,.resume-art,.pop-cover,.pick-img,.rc-note-img,.hero-bg-img,.dt-banner-img';
 function pixelateOne(img){
   if(!img||img.dataset.pxDone==='1')return;
@@ -17500,10 +17505,12 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-14.28',
-  title:'The pixels are back, and this time they are real',
+  v:'2026-08-14.29',
+  title:'The pixels are back, and gentler',
   push:'Drawn, not filtered.',
   notes:[
+    'Covers are made of pixels again \u2014 and this time they actually are pixels rather than an effect laid over the picture. Each cover is drawn small and shown large, so the blocks are the picture itself. That is why it survives where the last three attempts did not: nothing has to resize, nothing has to resolve, and a sharper screen cannot smooth it back out.',
+    'The blocks are half the size of the first pass. On a wide episode thumbnail the coarser version was destroying the photograph rather than styling it. Turn Retro off and every cover returns to normal instantly.',
     'Covers are made of pixels again \u2014 and this time they actually are pixels rather than an effect laid over the picture. Each cover is drawn small and shown large, so the blocks are the picture itself. That is why it survives where the last three attempts did not: nothing has to resize, nothing has to resolve, and a sharper screen cannot smooth it back out. Turn Retro off and the covers return to normal instantly.',
     'Turned sideways, a phone is a 393px-tall screen, and the layout was still spending that height like it had plenty: the hero alone took 240px and the bottom bar another 83, which is four fifths of the screen before a single title appeared. The hero becomes a strip, the bar keeps its icons and drops its labels, and the resume line stops reserving poster height. The rows already used the extra width; now there is something left to show in them.',
     'The paragraph at the end of a title no longer reads as cut off. That panel deliberately has no padding so the artwork can run edge to edge, which left the last line sitting flush against the bottom of the screen. It has ground under it now.',

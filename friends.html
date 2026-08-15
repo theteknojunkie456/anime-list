@@ -81,19 +81,7 @@
 
    The greys are pulled toward cyan rather than neutral, so even the quiet text
    belongs to the same night. */
-[data-theme=retro]{
-  --aFg:#12000c;
-  --edge:#22e8ff;
-  --bg:#05030b;--bg2:#0a0616;--bg3:#110a22;--bg4:#1a1030;--bg5:#241640;
-  --b1:color-mix(in srgb,var(--edge) 14%,transparent);--b2:color-mix(in srgb,var(--edge) 26%,transparent);--b3:color-mix(in srgb,var(--a) 55%,transparent);
-  --t1:#e9fbff;--t2:#93c9dc;--t3:#5f8ba3;
-  --a:#ff1e8e;--a2:#ff74c4;--ag:color-mix(in srgb,var(--a) 18%,transparent);--glow:color-mix(in srgb,var(--edge) 42%,transparent);
-  --fin:#28ffa8;--finbg:rgba(40,255,168,0.14);
-  --wat:#ffe83d;--watbg:rgba(255,232,61,0.14);
-  --pln:#22e8ff;--plnbg:color-mix(in srgb,var(--edge) 14%,transparent);
-  --drp:#8f86b8;--drpbg:rgba(143,134,184,0.16);
-  --topgrad:linear-gradient(180deg,#2a0033 0%,#05030b 62%);
-}
+
 [data-theme=naruto]{--aFg:#140b06;--bg:#08090e;--bg2:#0e0f18;--bg3:#151720;--bg4:#1c1f2a;--bg5:#232734;--b1:rgba(255,140,0,0.06);--b2:rgba(255,140,0,0.12);--b3:rgba(255,140,0,0.22);--t1:#fff6e8;--t2:#c3b697;--t3:#a08c52;--a:#f57800;--a2:#ffaa33;--ag:rgba(245,120,0,0.13);--glow:rgba(245,120,0,0.22);--fin:#5ed47a;--finbg:rgba(94,212,122,0.11);--wat:#ffcc00;--watbg:rgba(255,204,0,0.11);--pln:#4a9eff;--plnbg:rgba(74,158,255,0.11);--topgrad:linear-gradient(180deg,#1c0e00 0%,#08090e 100%);}
 [data-theme=sasuke]{--aFg:#ffffff;--bg:#06060d;--bg2:#0b0b18;--bg3:#101022;--bg4:#16162c;--bg5:#1c1c36;--b1:rgba(130,90,255,0.06);--b2:rgba(130,90,255,0.13);--b3:rgba(130,90,255,0.24);--t1:#e6e2f8;--t2:#ada9c9;--t3:#8581aa;--a:#7730e8;--a2:#a07af8;--ag:rgba(119,48,232,0.15);--glow:rgba(119,48,232,0.28);--fin:#4ecba8;--finbg:rgba(78,203,168,0.11);--wat:#c084fc;--watbg:rgba(192,132,252,0.11);--pln:#818cf8;--plnbg:rgba(129,140,248,0.11);--topgrad:linear-gradient(180deg,#0a0420 0%,#06060d 100%);}
 [data-theme=luffy]{--aFg:#ffffff;--bg:#060c16;--bg2:#0b1420;--bg3:#101c2c;--bg4:#152438;--bg5:#1a2c44;--b1:rgba(210,50,50,0.06);--b2:rgba(210,50,50,0.13);--b3:rgba(210,50,50,0.24);--t1:#eeeae4;--t2:#b4bec8;--t3:#7996ac;--a:#d03838;--a2:#ff6060;--ag:rgba(208,56,56,0.13);--glow:rgba(208,56,56,0.22);--fin:#4ecb82;--finbg:rgba(78,203,130,0.11);--wat:#f5c842;--watbg:rgba(245,200,66,0.11);--pln:#3b9eff;--plnbg:rgba(59,158,255,0.11);--topgrad:linear-gradient(180deg,#140608 0%,#060c16 100%);}
@@ -6278,7 +6266,6 @@ const THEMES=[
   // Not a palette swap either: RETRO restyles the corners, the shadows and the
   // artwork too, in the [data-retro] block in the stylesheet. One look you
   // turn on, not a new axis to choose along.
-  {id:'retro',   name:'Retro',   emoji:'🌃', bg:'#05030b', accent:'#ff1e8e'},
   {id:'naruto',  name:'Naruto',  emoji:'🍥', bg:'#0e0f18', accent:'#f57800'},
   {id:'sasuke',  name:'Sasuke',  emoji:'⚡', bg:'#0b0b18', accent:'#7730e8'},
   {id:'luffy',   name:'Luffy',   emoji:'🏴‍☠️',bg:'#0b1420', accent:'#d03838'},
@@ -6396,7 +6383,20 @@ function applyCustomVars(t){
   CUSTOM_VARS.forEach(k=>st.setProperty(k,v[k]));
 }
 function clearCustomVars(){const st=document.documentElement.style;CUSTOM_VARS.forEach(k=>st.removeProperty(k));}
-function loadTheme(){try{const s=store();curTheme=(s&&s.getItem('animetheme'))||'default';}catch{curTheme='default';}applyTheme(curTheme,false);applyBright();}
+// Retro left the Looks grid when it became a mode, so anyone standing on that
+// theme has to be carried across rather than silently dropped onto the default
+// with the treatment switched off: the mode goes on (unless they had already
+// said otherwise) and the theme falls back. Runs once — after this their stored
+// theme is no longer 'retro', so the branch never fires again.
+function migrateRetroTheme(){
+  try{
+    const s=store(); if(!s)return;
+    if(s.getItem('animetheme')!=='retro')return;
+    if(s.getItem(RETRO_KEY)==null)s.setItem(RETRO_KEY,'1');
+    s.setItem('animetheme','default');
+  }catch(e){}
+}
+function loadTheme(){try{migrateRetroTheme();}catch(e){}try{const s=store();curTheme=(s&&s.getItem('animetheme'))||'default';}catch{curTheme='default';}applyTheme(curTheme,false);applyBright();}
 // Background brightness (0–100). Lifts the dark backdrop toward light; the ambient
 // glow brightens with it (see #brightVeil). Persisted per-user.
 function bgBright(){try{const s=store();return parseInt((s&&s.getItem('bg_bright'))||'0',10)||0;}catch{return 0;}}
@@ -6454,9 +6454,7 @@ function retroMode(){
     const v=localStorage.getItem(RETRO_KEY);
     if(v==='1')return true;
     if(v==='0')return false;
-    // Never asked: anyone already ON the retro theme was choosing the whole look,
-    // so the mode starts on for them and nothing changes under their feet.
-    return curTheme==='retro';
+    return false;   // off unless asked for; migrateRetroTheme() turns it on for anyone who was using it
   }catch(e){return false;}
 }
 function applyRetroMode(){
@@ -17364,10 +17362,12 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-14.22',
-  title:'Retro is a mode now, so it works with every look',
-  push:'Keep your colours, take the treatment.',
+  v:'2026-08-14.23',
+  title:'Retro leaves the Looks row',
+  push:'It is a switch now, not a look.',
   notes:[
+    'Retro is gone from Looks, because it is no longer one. It is a switch under Looks that puts the square bevelled controls, the pixel type, the coarse covers and the marching ants over whatever colours you already chose. Having it in both places was asking you to pick a look in order to get something that was never about colour.',
+    'If you were using the Retro theme nothing is lost: the switch is already on for you, so the treatment stayed. What changed is that the violet ground underneath it is now the standard one \u2014 and you can put the treatment on any theme, or on a look of your own, which was never possible before.',
     'Retro is no longer a theme you switch TO \u2014 it is a mode you turn ON, and it sits on any look you like, including ones you built yourself. Almost nothing that makes it Retro was ever colour: it is the square bevelled controls, the pixel type, the coarse covers, the marching ants and the cursor that points. Those had no business being welded to one palette, so now Naruto, Sasuke or your own theme can wear them.',
     'Nobody loses anything. The Retro palette is still there as a theme, and if you were already using it the mode is simply on \u2014 it looks exactly as it did. The lit edge follows whatever accent your theme carries by default, and cyan and pink are still there to pick if you want them.',
     'Retro can be lit in cyan or pink. Every bevel lip, hairline, caption, cursor and selection ring in the theme mixes from one colour, so switching it repaints the whole look rather than a few borders. The control sits under Looks and only appears while Retro is the theme, because it belongs to that theme alone.',

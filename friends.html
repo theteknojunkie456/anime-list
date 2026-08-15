@@ -551,7 +551,6 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
   [data-theme=retro] .row-scroll .pcard{transition:none;}
   [data-theme=retro] .row-scroll .pcard:hover ~ .pcard{transform:none;}
 }
-}
 [data-theme=retro] .dact{border-radius:2px;box-shadow:inset 1px 1px 0 0 rgba(34,232,255,.34),inset -2px -2px 0 0 rgba(0,0,0,.9);}
 [data-theme=retro] .dact:active{box-shadow:inset 2px 2px 0 0 rgba(0,0,0,.9),inset -1px -1px 0 0 rgba(34,232,255,.28);}
 /* The controls inside the panel, squared with the rest. The stepper keys and the
@@ -2037,7 +2036,6 @@ body.yt-open{overflow:hidden;touch-action:none;}
 .dt-next{display:flex;align-items:center;gap:9px;margin:12px 18px 0;padding:9px 10px 9px 13px;border-radius:14px;
   background:var(--bg3);border:1px solid var(--bn2);}
 .dt-next-k{flex:0 0 auto;font-size:12px;font-weight:700;color:var(--t3);white-space:nowrap;}
-}
 .dt-next-t{flex:1;min-width:0;font-size:13px;font-weight:600;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 /* Filled in the accent, this was a second primary button sitting directly above
    the real one — two solid calls to action, four lines apart, and the louder of
@@ -17124,10 +17122,11 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-14.18',
-  title:'A coarse screen, not a blur',
-  push:'Covers get a light pixel texture.',
+  v:'2026-08-14.19',
+  title:'A stray bracket was quietly deleting styling',
+  push:'Retro finally shows everything it was told to.',
   notes:[
+    'A stray closing bracket in the stylesheet had been silently discarding whichever rule came after it \u2014 which is why several changes made in the last few hours appeared to do nothing at all. There was a second one further down the file, from long before today, doing the same to a rule near it. Both are gone, and the styling that was being thrown away now applies: the buttons at the foot of a title are square keys like everything else.',
     'Cover art has a light pixel texture again — half the block size of the first attempt, so the picture survives it. The point is that it reads as artwork on a coarse screen rather than artwork with the detail taken out, which is what the heavier version did. Colours are gently stepped too, for the limited palette of the era without the mud.',
     'Cover art is sharp again. Blocking it out was sampling, not drawing — and what made the artwork of that era good was that somebody chose every colour and every outline so the picture read at a tiny size. Run over a photograph it just loses detail, which is the opposite of the effect. The pixel work now lives where it is genuinely drawn: the type, the bevels, the square keys, the readouts and the frames. Covers only sit back a little so they join the palette instead of fighting it.',
     'Selecting something looks like the rest of the theme. The ring around what you picked was the browser\u2019s default — a soft rounded outline in a screen made of hard square edges. It is marching ants now: hard cyan dashes, no rounding.',

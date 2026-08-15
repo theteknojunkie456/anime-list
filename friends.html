@@ -213,6 +213,12 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
   }
   :root.two-pane #detailSheet.on{transform:translateX(0);}
   :root.two-pane #detailSheet .sheet-handle{display:none;}
+/* The sheet sets padding:0 so the banner can run edge to edge, which leaves the
+   LAST thing in it flush against the bottom of the screen — on a phone that is
+   the home indicator, and the closing paragraph read as cut off. A spacer gives
+   the end of the panel the same ground every other edge has, without giving the
+   banner a margin it must not have. */
+#detailSheet::after{content:'';display:block;height:calc(var(--safe-b) + 36px);}
   /* The list gives up the width rather than sliding under the panel, so nothing
      you were looking at is behind it. */
   :root.two-pane #app{padding-right:min(520px,42vw);transition:padding-right .34s cubic-bezier(.2,1,.28,1);}
@@ -579,6 +585,12 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 }
 @media (hover:none){
   :root{--fan:8px;}
+}
+/* Landscape and tablets turn .row-scroll into a fluid GRID. A fan is a property
+   of a strip you scroll sideways — applied to grid items the negative margin
+   just pulls every column out of alignment with its own track. No fan there. */
+@media (orientation:landscape), (min-width:760px){
+  :root{--fan:0px;}
 }
 @media (prefers-reduced-motion:reduce){
   [data-retro] .row-scroll .pcard{transition:none;}
@@ -3265,6 +3277,31 @@ body.recsel .pcard{position:relative;}
 
 /* SHORT landscape (rotated phone): reclaim vertical space so the controls
    don't dominate the tiny viewport height. */
+/* PHONE LANDSCAPE — a screen 393px tall, not a small desktop.
+   The portrait layout is built around vertical room it does not have here: the
+   billboard alone claimed 240px of it, and the nav another 83 — 82% of the
+   screen before a single title appeared. These are the two that matter; the
+   grid rules further down already use the extra width well. */
+@media (orientation:landscape) and (max-height:520px){
+  /* The hero earns its size by being the thing you came back for. At this height
+     it has to make the point in a strip rather than a poster. */
+  .billboard,.bb-track,.bb-slide{min-height:132px;}
+  .bb-slide .hero-title{font-size:clamp(18px,3.4vw,24px);}
+  .bb-slide .hero-sub,.bb-slide .hero-prog{font-size:12px;}
+  #detailSheet .dt-banner{height:min(38vh,150px);}
+  #detailSheet .dt-top.has-banner{padding-top:calc(min(38vh,150px) - 74px);}
+  /* A fifth of the screen was the bar you use to leave the screen. Labels go —
+     five icons in a row on a wide short screen are unambiguous — and the row
+     tightens to match. */
+  .nav{padding:5px 10px calc(var(--safe-b) + 5px);}
+  .nbtn{padding:4px clamp(2px,1.8vw,10px);gap:0;}
+  .nbtn small{display:none;}   /* the LABEL. The icon lives in the span. */
+  .nbtn.add{padding:6px 14px;}
+  .page{padding-bottom:calc(var(--safe-b) + 62px);}
+  /* The resume strip is a one-line reminder; it does not need poster height. */
+  .resume-card{padding:6px 8px;}
+  .resume-art,.resume-ph{width:34px;height:34px;}
+}
 @media (orientation:landscape) and (max-height:560px){
   /* The player's own two bars were eating a third of a landscape phone before
      the site's header even started. Same controls, less of them. */
@@ -17401,10 +17438,13 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-14.26',
-  title:'Three things that were wrong on a phone',
-  push:'Cards, buttons and the reader bar.',
+  v:'2026-08-14.27',
+  title:'A landscape layout worth turning the phone for',
+  push:'Plus the cut-off paragraph.',
   notes:[
+    'Turned sideways, a phone is a 393px-tall screen, and the layout was still spending that height like it had plenty: the hero alone took 240px and the bottom bar another 83, which is four fifths of the screen before a single title appeared. The hero becomes a strip, the bar keeps its icons and drops its labels, and the resume line stops reserving poster height. The rows already used the extra width; now there is something left to show in them.',
+    'The paragraph at the end of a title no longer reads as cut off. That panel deliberately has no padding so the artwork can run edge to edge, which left the last line sitting flush against the bottom of the screen. It has ground under it now.',
+    'The fanned rows stop fanning in landscape. Sideways the rows become a grid, and a fan is a property of a strip you scroll \u2014 on a grid it just pulled every column out of line with its own track.',
     'The fanned rows tuck by a quarter of what they did on a phone. Hovering is what pulls a card clear of the one in front, and a phone has no hover \u2014 so a deep fan there was not a deck, it was artwork you could not see with the titles cut to match.',
     'The status buttons fit again. Every one of them was holding space for a cursor that only ever appears on the selected one, which squeezed the row enough that To read broke onto two lines. Only the selected option reserves that space now.',
     'The reader\u2019s recovery bar wraps instead of running off the screen. It scrolled sideways with no visible scrollbar, so the last button and the dismiss X sat past the edge looking cut off \u2014 and the control that closes it was the one you could not reach.',

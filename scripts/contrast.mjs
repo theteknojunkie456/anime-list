@@ -39,10 +39,23 @@ const suite=function(){
     ['sources',()=>window.openSheet('sourceSheet')],['paint',()=>window.startPaint()],
     ['detail',()=>window.openDetail(anime[0].id)],['add',()=>window.openSheet('addSheet')],
     ['friends',()=>window.openHub()],['schedule',()=>window.openSchedule()],['for you',()=>window.openForYou()]];
-  const THEMES=['default','naruto','sasuke','luffy','sanji','zoro','chopper','retro'];
-  R.themes=THEMES.length;
+  // 'retro' was in this list as a theme and is not one any more — it was being
+  // applied as a value nothing matches, so that pass measured the default palette
+  // twice and told us nothing. It is a MODE now, which multiplies the surface
+  // rather than adding to it: the treatment recolours borders, captions and
+  // cursors from whichever theme it is sitting on, so every theme has to be
+  // checked with it off AND on.
+  const THEMES=['default','naruto','sasuke','luffy','sanji','zoro','chopper'];
+  const MODES=[false,true];
+  R.themes=THEMES.length*MODES.length;
   THEMES.forEach(t=>{
+   MODES.forEach(rm=>{
     window.applyTheme(t);
+    try{window.setRetroMode(rm);}catch(e){}
+    // A swallowed failure here would mean every theme is measured twice with the
+    // mode OFF and the run still reports success — the worst kind of green.
+    if(rm&&document.documentElement.hasAttribute('data-retro'))R.modeOn=(R.modeOn||0)+1;
+    const tag=t+(rm?'+retro':'');
     SCREENS.forEach(([nm,open])=>{
     try{open()}catch(e){}
     document.querySelectorAll('body *').forEach(el=>{
@@ -55,12 +68,14 @@ const suite=function(){
       bgs.forEach(b=>{const c=ratio(over(f,b),b); if(c<cr){cr=c;bg=b;}});
       const size=parseFloat(cs.fontSize), bold=(parseInt(cs.fontWeight)||400)>=700;
       const need=(size>=24||(size>=18.66&&bold))?3:4.5;
-      if(cr<need) R.push(t+' @'+nm+' | '+cr.toFixed(2)+'/'+need+' | '+Math.round(size)+'px | .'+(el.className||'').toString().split(' ')[0]+' | "'+txt[0].textContent.trim().slice(0,26)+'"');
+      if(cr<need) R.push(tag+' @'+nm+' | '+cr.toFixed(2)+'/'+need+' | '+Math.round(size)+'px | .'+(el.className||'').toString().split(' ')[0]+' | "'+txt[0].textContent.trim().slice(0,26)+'"');
     });
     });
+   });
   });
+  try{window.setRetroMode(false);}catch(e){}
   window.applyTheme('default');
-  const pre=document.createElement('pre');pre.id='C';pre.textContent=JSON.stringify({rows:[...new Set(R)],themes:THEMES.length});document.body.appendChild(pre);
+  const pre=document.createElement('pre');pre.id='C';pre.textContent=JSON.stringify({rows:[...new Set(R)],themes:THEMES.length*MODES.length,modeOn:R.modeOn||0});document.body.appendChild(pre);
 };
 const i=src.lastIndexOf('</body>');
 src=src.slice(0,i)+`<script>addEventListener('load',()=>setTimeout(()=>{try{(${suite.toString()})()}catch(e){const p=document.createElement('pre');p.id='C';p.textContent=JSON.stringify(['CRASH '+e.message]);document.body.appendChild(p)}},800))<\/script>`+src.slice(i);
@@ -74,5 +89,8 @@ const dec=s=>s.replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&').r
 const parsed=JSON.parse(dec(m[1]));
 const rows=Array.isArray(parsed)?parsed:parsed.rows;
 const nThemes=Array.isArray(parsed)?'?':parsed.themes;
-console.log(rows.length?rows.join('\n'):`every text/background pair clears WCAG AA in all ${nThemes} themes`);
+const modeOn=Array.isArray(parsed)?0:(parsed.modeOn||0);
+if(!modeOn)console.log('WARNING: retro mode never engaged — those passes measured nothing new');
+else console.log(`retro mode engaged in ${modeOn} passes`);
+console.log(rows.length?rows.join('\n'):`every text/background pair clears WCAG AA across ${nThemes} theme/mode combinations`);
 console.log('\n'+rows.length+' failing pair(s)');

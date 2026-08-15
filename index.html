@@ -21,7 +21,7 @@
      rest of the head parses removes a DNS+TLS round trip from every cold start. -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Manrope:wght@400..800&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Manrope:wght@400..800&family=VT323&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 <style>
 :root{
@@ -231,14 +231,15 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
    and misregistered every heading, which is how you get a costume instead of a
    look. */
 /* The type. A pixel face is only crisp at the size it was drawn for and whole
-   multiples of it — Silkscreen is an 8px design, so it is put on the DISPLAY role
+   multiples of it — VT323 is a terminal face drawn on a 16px grid, so it takes
+   the DISPLAY role
    only (wordmark, section heads, card titles, readouts) and the body stays
    Manrope. That is the pairing the game-UI writing all lands on: one expressive
    face for the furniture, one plainly readable one for anything you actually
    have to read. Setting the whole app in pixels is the mistake that makes a
    retro skin unusable, and this app is mostly prose — titles, notes, times. */
 [data-theme=retro]{
-  --fd:'Silkscreen','Bricolage Grotesque',-apple-system,sans-serif;
+  --fd:'VT323','Bricolage Grotesque',-apple-system,sans-serif;
 }
 [data-theme=retro]{
   --notch:10px;
@@ -464,64 +465,6 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 [data-theme=retro] .call-person,[data-theme=retro] .sv-store-track,[data-theme=retro] .sv-store-fill{
   border-radius:2px;
 }
-/* Pixels, because that is what the art was made of. The trick is to hand the
-   browser a box a third the size and scale it back up with nearest-neighbour: it
-   rasterises small, then enlarges without smoothing, which is the same thing a
-   console did to a sprite. transform does not affect layout, so the margins put
-   back the space the scaled-up image no longer claims and nothing moves — the
-   scanline and colour overlays still line up with the artwork underneath.
-   3 is "slightly", the way a cover looked on a CRT. 4+ turns it into Lego. */
-[data-theme=retro] .pcard-img{
-  image-rendering:pixelated;
-  width:calc(var(--card-w,104px) / 3);
-  height:calc(var(--card-w,104px) * 1.42 / 3);
-  margin-right:calc(var(--card-w,104px) / 3 * 2);
-  margin-bottom:calc(var(--card-w,104px) * 1.42 / 3 * 2);
-  transform:scale(3);
-  transform-origin:top left;
-}
-/* Every other picture in the app, same trick, different maths. Two sizing modes
-   exist here: images that fill a parent (absolute, inset:0, 100%×100%) take
-   percentages and need no margins because they are out of flow; images with a
-   fixed pixel size take the third-plus-margin form so their box does not shrink.
-   Ken Burns is switched off on the hero — it animates transform, which is the
-   same property the upscale needs, and the animation would simply win. */
-[data-theme=retro] .rz-img,[data-theme=retro] .dt-cover,[data-theme=retro] .hero-bg-img{
-  image-rendering:pixelated;
-  width:33.3333%;height:33.3333%;
-  transform:scale(3);transform-origin:top left;
-}
-[data-theme=retro] .bb-slide.bb-live .hero-bg-img,[data-theme=retro] .hero-bg-img{animation:none;}
-[data-theme=retro] .sched-thumb{
-  image-rendering:pixelated;
-  width:calc(34px / 3);height:calc(48px / 3);
-  margin-right:calc(34px / 3 * 2);margin-bottom:calc(48px / 3 * 2);
-  transform:scale(3);transform-origin:top left;
-}
-[data-theme=retro] .pop-cover{
-  image-rendering:pixelated;
-  width:calc(112px / 3);height:calc(158px / 3);
-  margin-right:calc(112px / 3 * 2);margin-bottom:calc(158px / 3 * 2);
-  transform:scale(3);transform-origin:top left;
-}
-[data-theme=retro] .pk-cover{
-  image-rendering:pixelated;
-  width:calc(104px / 3);height:calc(150px / 3);
-  margin-right:calc(104px / 3 * 2);margin-bottom:calc(150px / 3 * 2);
-  transform:scale(3);transform-origin:top left;
-}
-/* The resume thumb is 52px (40px on a narrow phone), and a third of that is a
-   17px source — past retro and into unreadable. Halved instead: still obviously
-   made of pixels, still recognisably the show you left off. The narrow-screen
-   size needs its own maths because the base size changes under a media query. */
-[data-theme=retro] .resume-art{
-  image-rendering:pixelated;
-  width:26px;height:26px;margin-right:26px;margin-bottom:26px;
-  transform:scale(2);transform-origin:top left;
-}
-@media (max-width:380px){
-  [data-theme=retro] .resume-art{width:20px;height:20px;margin-right:20px;margin-bottom:20px;}
-}
 /* A card title at 13px was asking an 8px face for a size it does not have, which
    is why the text was soft and the truncation "…" collapsed into a bar that read
    as an underscore. 16px is two whole pixels per pixel: the letters land on the
@@ -530,7 +473,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 [data-theme=retro] .pcard-title{font-size:16px;letter-spacing:0;line-height:1.2;}
 /* The truncation mark had to go rather than be corrected. -webkit-line-clamp
    inserts its own "…", which cannot be styled or given a different face, and
-   Silkscreen draws it as a single low bar that reads as an underscore at every
+   a pixel face draws it as a single low bar that reads as an underscore at every
    size — 16px sharpened the letters and left the bar exactly as it was. So the
    clamp is swapped for a plain two-line clip: the title simply stops at the edge
    of its box, which is what these interfaces did anyway, having no glyph to
@@ -541,6 +484,35 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 }
 /* The hero panel keeps its 26px in a rule further down; :root settles it. */
 :root[data-theme=retro] .billboard{border-radius:2px;}
+/* A fanned deck. The rows used to sit in a neat line; overlapping them turns a
+   shelf into a stack of cases you flick through, which is what these rows always
+   were. Hovering pulls one to the front and lifts it, and everything after it
+   slides aside to make the room — so the card you are reading is never the one
+   half-covered by its neighbour.
+
+   Pointer devices only: on a touch screen there is no hover, so the fan would
+   just be a row of half-hidden covers you cannot uncover. There, they stay in
+   line. Motion is a transform on a positioned element — no layout animates — and
+   it steps aside entirely under reduced-motion. */
+@media (hover:hover) and (pointer:fine){
+  [data-theme=retro] .row-scroll .pcard{
+    position:relative;
+    margin-right:-30px;
+    transition:transform .2s cubic-bezier(.22,1,.28,1);
+  }
+  [data-theme=retro] .row-scroll .pcard:last-child{margin-right:0;}
+  [data-theme=retro] .row-scroll .pcard:hover{
+    z-index:6;
+    transform:translateY(-10px);
+  }
+  [data-theme=retro] .row-scroll .pcard:hover ~ .pcard{
+    transform:translateX(30px);
+  }
+}
+@media (prefers-reduced-motion:reduce){
+  [data-theme=retro] .row-scroll .pcard{transition:none;}
+  [data-theme=retro] .row-scroll .pcard:hover ~ .pcard{transform:none;}
+}
 /* Numbers as a readout. */
 /* .fn is NOT in this list. It is the count inside a filter chip, about 10px, and
    an 8px pixel face at 10px is not small type — it is broken type: "10" came out
@@ -548,7 +520,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
    gracefully below their design size, so anything this small keeps the mono. */
 [data-theme=retro] .row-count,[data-theme=retro] .rz-at,
 [data-theme=retro] .rz-ep,[data-theme=retro] .hero-prog span,[data-theme=retro] .sv-heronum .v{
-  font-family:'Silkscreen',ui-monospace,'SFMono-Regular',Menlo,monospace;letter-spacing:0;
+  font-family:'VT323',ui-monospace,'SFMono-Regular',Menlo,monospace;letter-spacing:0;
 }
 [data-theme=retro] .fn{font-family:ui-monospace,'SFMono-Regular',Menlo,monospace;letter-spacing:-.02em;}
 /* The segmented control's own shell stayed a lozenge: its 99px sits in a
@@ -17020,10 +16992,13 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-14.13',
-  title:'Retro is made of pixels now',
-  push:'Covers, type and every last corner.',
+  v:'2026-08-14.14',
+  title:'A fix, and the rows became a deck you flick through',
+  push:'Sorry about the giant covers.',
   notes:[
+    'The pixelated covers are gone, and an apology for the state of the last hour. Drawing them small and blowing them back up only works while nothing else sets their size — and on a wide screen something does, which left the enlargement applied to a full-size picture. That is why covers turned enormous and buried the page. Removed rather than patched: it was one stray rule away from doing it again.',
+    'The rows are a deck now. Covers overlap like cases on a shelf, and pointing at one pulls it to the front and lifts it while the rest slide aside to make room. On a touch screen they stay in a line, because without a pointer there is nothing to uncover them with.',
+    'The pixel type is a different face — narrower, and readable at the sizes this app actually uses.',
     'Every picture is pixels, not just the cards — the hero, the airing strip, the schedule, the detail cover, the pickers and the thumbnail on the resume strip. The small one is halved rather than thirded, because a third of a 52px thumbnail is seventeen pixels of show and you could no longer tell which one it was.',
     'Card titles are bigger and sharper, and they stop instead of trailing off. A pixel face only lands cleanly on whole multiples of the size it was drawn at, so 13px was asking for something it did not have; 16px sits on the grid. The "…" went with it — that mark is drawn by the browser, cannot be given a different face, and in a pixel face it is a single low bar that reads as an underscore.',
     'Retro has its own type. Section heads, titles, the wordmark and every readout are set in a pixel face; anything you actually have to read — notes, times, sub-lines — stays as it was. A pixel face is only sharp at the size it was drawn for, so the small counts inside the filter chips keep the old numerals: at ten pixels the pixel face turned "10" into two smudges and "4" into something that was not a 4.',

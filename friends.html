@@ -619,6 +619,103 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 }
 /* The hub is a window in this theme too, not a rounded card. */
 [data-theme=retro] #hubSheet{border-radius:2px;border-color:rgba(34,232,255,.34);}
+/* ── THE TITLE PANEL AS A FRAMED SCREEN ─────────────────────────────────────
+   Built from tokens, not literals. The first attempt used rgba() fills with
+   alpha, which is what broke it: a translucent background has no colour of its
+   own until it is composited, so every check — and every theme that redefines
+   these greys — saw text on an unknown ground. Opaque tokens mean the pane is a
+   real surface in the ramp, and it follows the theme instead of pinning it.
+
+   Each section's content becomes a pane. .dt-label sits immediately before its
+   block, so the adjacent sibling IS the pane; no wrapper is needed. */
+[data-theme=retro] .dt-label + .dt-facts,
+[data-theme=retro] .dt-label + .stars,
+[data-theme=retro] .dt-label + .dt-eps,
+[data-theme=retro] .dt-label + .chips,
+[data-theme=retro] .dt-label + .dt-actions{
+  border:1px solid var(--b2);
+  background:var(--bg3);
+  box-shadow:inset 1px 1px 0 0 rgba(0,0,0,.5);
+  padding:12px;
+  margin-top:0;
+}
+/* The caption sits ON the frame: its plate is the panel's own surface, so it
+   knocks a hole in the rule behind it the way a labelled box is drawn when you
+   have one line weight and nothing to layer with. */
+/* Only a label that actually HAS a pane after it becomes a caption. Styling
+   every label this way left the ones with no frame — Genres was one — floating
+   with brackets round them and overlapping whatever came next. :has() asks the
+   question directly instead of guessing from the markup order. */
+[data-theme=retro] .dt-label{color:var(--pln);}
+[data-theme=retro] .dt-label:has(+ .dt-facts),
+[data-theme=retro] .dt-label:has(+ .stars),
+[data-theme=retro] .dt-label:has(+ .dt-eps),
+[data-theme=retro] .dt-label:has(+ .chips),
+[data-theme=retro] .dt-label:has(+ .dt-actions){
+  position:relative;z-index:1;
+  width:fit-content;
+  margin:18px 0 -9px 10px;
+  padding:0 8px;
+  background:var(--bg2);
+}
+[data-theme=retro] .dt-label:has(+ .dt-facts)::before,
+[data-theme=retro] .dt-label:has(+ .stars)::before,
+[data-theme=retro] .dt-label:has(+ .dt-eps)::before,
+[data-theme=retro] .dt-label:has(+ .chips)::before,
+[data-theme=retro] .dt-label:has(+ .dt-actions)::before{
+  content:'[';margin-right:5px;color:var(--pln);opacity:.7;
+}
+[data-theme=retro] .dt-label:has(+ .dt-facts)::after,
+[data-theme=retro] .dt-label:has(+ .stars)::after,
+[data-theme=retro] .dt-label:has(+ .dt-eps)::after,
+[data-theme=retro] .dt-label:has(+ .chips)::after,
+[data-theme=retro] .dt-label:has(+ .dt-actions)::after{
+  content:']';flex:none;height:auto;width:auto;background:none;
+  margin-left:5px;color:var(--pln);opacity:.7;
+}
+/* A command cursor. In every menu of this era the option you are on is pointed
+   at, not merely tinted — a tint alone does not survive a low-contrast screen,
+   and it is the one state that must never be ambiguous. */
+[data-theme=retro] .dpick{position:relative;padding-left:22px;}
+[data-theme=retro] .dpick[class*="on-"]::before{
+  content:'\25B6';position:absolute;left:7px;top:50%;transform:translateY(-50%);
+  font-size:9px;color:var(--pln);
+}
+/* The episode block is an instrument housing: sunk, so the numbers inside read
+   as a display you are looking INTO rather than a card sitting on top. Its
+   surface is the deepest ground in the ramp, which is a token, so a future theme
+   moves it instead of fighting it. */
+[data-theme=retro] .dt-deck{
+  background:var(--bg);
+  box-shadow:inset 2px 2px 0 0 rgba(0,0,0,.8),inset -1px -1px 0 0 var(--b2);
+}
+/* A title bar. Every reference frames its content in one — Win95 draws it, the
+   crawlers carve it, PC-98 rules a line beneath it. Sticky, so it behaves like
+   the window's edge rather than a strip that scrolls away, and ruled rather than
+   flat because a flat fill is a surface these machines could not hold. */
+[data-theme=retro] #detailSheet::before{
+  content:'';display:block;position:sticky;top:0;z-index:4;
+  height:32px;margin:-10px -22px 12px;
+  background:var(--bg3);
+  background-image:repeating-linear-gradient(180deg,rgba(34,232,255,.10) 0 1px,transparent 1px 3px);
+  border-bottom:1px solid var(--b2);
+  box-shadow:inset 0 1px 0 0 var(--b2),inset 0 -1px 0 0 rgba(0,0,0,.7);
+}
+/* The cover, bolted into its housing rather than floating on it: a carved lip
+   and four rivets, all hard-edged. */
+[data-theme=retro] .dt-cover-wrap{
+  position:relative;padding:5px;background:var(--bg3);
+  box-shadow:inset 1px 1px 0 0 var(--b2),inset -2px -2px 0 0 rgba(0,0,0,.8);
+}
+[data-theme=retro] .dt-cover-wrap::after{
+  content:'';position:absolute;inset:0;pointer-events:none;
+  background:
+    radial-gradient(circle at 4px 4px,var(--pln) 0 1.4px,transparent 1.5px),
+    radial-gradient(circle at calc(100% - 4px) 4px,var(--pln) 0 1.4px,transparent 1.5px),
+    radial-gradient(circle at 4px calc(100% - 4px),var(--pln) 0 1.4px,transparent 1.5px),
+    radial-gradient(circle at calc(100% - 4px) calc(100% - 4px),var(--pln) 0 1.4px,transparent 1.5px);
+  opacity:.55;
+}
 /* Numbers as a readout. */
 /* .fn is NOT in this list. It is the count inside a filter chip, about 10px, and
    an 8px pixel face at 10px is not small type — it is broken type: "10" came out
@@ -4889,12 +4986,33 @@ function urlBase64ToUint8Array(b64){
 }
 function store(){try{localStorage.setItem('_t','1');localStorage.removeItem('_t');return localStorage;}catch{return null;}}
 function parseEpTotal(s){const m=/(\d+)\s*(?:eps?|chapters?|ch\b)/i.exec(s||'');return m?+m[1]:0;}
+function deEnt(s){
+  if(s==null)return s;
+  let v=String(s);
+  if(v.indexOf('&')<0)return v;
+  const named={amp:'&',lt:'<',gt:'>',quot:'"',apos:"'",nbsp:' ',rsquo:'\u2019',lsquo:'\u2018',ldquo:'\u201c',rdquo:'\u201d',hellip:'\u2026',mdash:'\u2014',ndash:'\u2013'};
+  for(let i=0;i<2;i++){
+    const before=v;
+    v=v.replace(/&#(\d+);/g,(m,d)=>{const n=+d;return (n>=32&&n<=1114111)?String.fromCodePoint(n):m;})
+       .replace(/&#x([0-9a-fA-F]+);/g,(m,h)=>{const n=parseInt(h,16);return (n>=32&&n<=1114111)?String.fromCodePoint(n):m;})
+       .replace(/&([a-zA-Z]+);/g,(m,n)=>Object.prototype.hasOwnProperty.call(named,n)?named[n]:m);
+    if(v===before)break;
+  }
+  return v;
+}
 function migrate(list){
   // add `kind` to every item (existing items default to "watch"); airing cache fields start empty
   // banner/aniColor = AniList per-title art + dominant color; bgImage/bgAccent = user's own background + its extracted color
   // Defensive: drop non-object entries and guarantee id/title/status so one malformed
   // item (from a bad import, a truncated paste, a future format change) can't crash render.
   const mapped=(Array.isArray(list)?list:[]).filter(a=>a&&typeof a==='object').map(a=>({id:uid(),title:'',status:'plan',ep:0,rating:0,fav:false,upd:0,epTotal:parseEpTotal(a.eps),img:'',order:[],notes:'',genre:'',eps:'',time:'',kind:'watch',banner:'',aniColor:'',bgImage:'',bgAccent:'',bannerTried:false,...a}));
+  // Titles that arrived already HTML-escaped — "Shikimori&#39;s", "Kubo Won&#39;t"
+  // — were escaped a SECOND time on the way into the page, so the entity itself
+  // was what you read. Decoding here, at the data layer, fixes every surface at
+  // once and permanently, rather than at each of the places a title is drawn.
+  // Two passes, because some of these arrived double-encoded (&amp;#39;), and it
+  // stays safe because every one of those surfaces still runs escH on the way out.
+  mapped.forEach(a=>{a.title=deEnt(a.title);a.genre=deEnt(a.genre);a.notes=deEnt(a.notes);});
   mapped.forEach(a=>{a.img=safeImg(a.img);a.banner=safeImg(a.banner);a.bgImage=safeImg(a.bgImage);});
   return dedupeList(mapped).kept;   // never load a list with duplicates
 }
@@ -17122,10 +17240,12 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-14.19',
-  title:'A stray bracket was quietly deleting styling',
-  push:'Retro finally shows everything it was told to.',
+  v:'2026-08-14.20',
+  title:'The title panel is a screen from a machine',
+  push:'And apostrophes in titles are apostrophes again.',
   notes:[
+    'Opening a title gives you a screen rather than a page. Each section is a framed pane with its caption sitting on the frame itself \u2014 the way a labelled box is drawn when you have one line weight and nothing to layer with \u2014 and the status you are on is pointed at rather than merely tinted, because on a low-contrast screen a tint alone was never enough. The cover is bolted into its housing, and the episode block is sunk so the numbers read as a display you are looking into.',
+    'Apostrophes are apostrophes. Titles like Shikimori\u2019s and Kubo Won\u2019t arrived already escaped and were then escaped a second time on the way onto the screen, so what you read was the escape code itself. They are decoded once now, where the list is loaded, so every place a title appears is fixed at once rather than one screen at a time.',
     'A stray closing bracket in the stylesheet had been silently discarding whichever rule came after it \u2014 which is why several changes made in the last few hours appeared to do nothing at all. There was a second one further down the file, from long before today, doing the same to a rule near it. Both are gone, and the styling that was being thrown away now applies: the buttons at the foot of a title are square keys like everything else.',
     'Cover art has a light pixel texture again — half the block size of the first attempt, so the picture survives it. The point is that it reads as artwork on a coarse screen rather than artwork with the detail taken out, which is what the heavier version did. Colours are gently stepped too, for the limited palette of the era without the mud.',
     'Cover art is sharp again. Blocking it out was sampling, not drawing — and what made the artwork of that era good was that somebody chose every colour and every outline so the picture read at a tiny size. Run over a photograph it just loses detail, which is the opposite of the effect. The pixel work now lives where it is genuinely drawn: the type, the bevels, the square keys, the readouts and the frames. Covers only sit back a little so they join the palette instead of fighting it.',

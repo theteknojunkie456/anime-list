@@ -6515,7 +6515,10 @@ function applyTheme(id,persist=true){
 // work is bounded to what is actually on screen: an IntersectionObserver draws a
 // cover as it comes into view and then stops watching it. A render only has to
 // hand new images to the observer, which is cheap; the drawing is what was not.
-const PX_DIV=2.5, PX_DIV_BIG=1.3, PX_MIN=22;
+// Small cards stay chunky (that's the retro charm); big art (detail covers,
+// hero, banners) renders near 1:1 so it reads as sharp, not mushy — the retro
+// look on large images comes from the scanlines/bevels, not blocky pixels.
+const PX_DIV=2.5, PX_DIV_BIG=1.0, PX_MIN=26;
 const PX_SEL='.pcard-img,.rz-img,.pk-cover,.dt-cover,.sched-thumb,.resume-art,.pop-cover,.pick-img,.rc-note-img,.hero-bg-img,.dt-banner-img';
 let _pxIO=null;
 function pxObserver(){
@@ -6663,45 +6666,55 @@ function setRetroMode(on){
 // kept because they were asked for and they are the look people picture.
 const EDGE_KEY='retro_edge';
 const EDGES={cyan:'#22e8ff',pink:'#ff1e8e'};
-function retroEdge(){try{const v=localStorage.getItem(EDGE_KEY);return (v==='cyan'||v==='pink')?v:'accent';}catch(e){return 'accent';}}
+function retroEdge(){try{const v=localStorage.getItem(EDGE_KEY);return (v==='cyan'||v==='pink'||/^#/.test(v||''))?v:'accent';}catch(e){return 'accent';}}
+// Resolve a stored edge value to a concrete colour: a hex is itself, a named
+// preset maps through EDGES, and 'accent' returns null so it falls back to the
+// theme's own accent (the CSS default of --edge:var(--a)).
+function _edgeHex(v){return /^#/.test(v||'')?v:(EDGES[v]||null);}
 function applyRetroEdge(){
   try{
-    const el=document.documentElement,e=retroEdge();
-    const e2=retroEdge2();
-    if(retroMode()&&EDGES[e])el.style.setProperty('--edge',EDGES[e]);
-    else el.style.removeProperty('--edge');    // fall back to the theme's own accent
-    if(retroMode()&&EDGES[e2])el.style.setProperty('--edge2',EDGES[e2]);
-    else el.style.removeProperty('--edge2');
+    const el=document.documentElement;
+    const h1=retroMode()?_edgeHex(retroEdge()):null;
+    const h2=retroMode()?_edgeHex(retroEdge2()):null;
+    h1?el.style.setProperty('--edge',h1):el.style.removeProperty('--edge');    // fall back to the theme's own accent
+    h2?el.style.setProperty('--edge2',h2):el.style.removeProperty('--edge2');
   }catch(e){}
 }
-function setRetroEdge(v){
+function setRetroEdge(v,redraw){
   try{localStorage.setItem(EDGE_KEY,v);}catch(e){}
   applyRetroEdge();
-  try{renderRetroRow();}catch(e){}
+  // redraw:false keeps a live colour-picker open on iOS (see setAccent's note).
+  if(redraw!==false){try{renderRetroRow();}catch(e){}}
+  else{const sw=document.querySelector('#retroRow2 .acc-custom');if(sw)sw.style.setProperty('--sw',v);}
 }
 const EDGE2_KEY='retro_edge2';
-function retroEdge2(){try{const v=localStorage.getItem(EDGE2_KEY);return (v==='cyan'||v==='pink')?v:'accent';}catch(e){return 'accent';}}
-function setRetroEdge2(v){
+function retroEdge2(){try{const v=localStorage.getItem(EDGE2_KEY);return (v==='cyan'||v==='pink'||/^#/.test(v||''))?v:'accent';}catch(e){return 'accent';}}
+function setRetroEdge2(v,redraw){
   try{localStorage.setItem(EDGE2_KEY,v);}catch(e){}
   applyRetroEdge();
-  try{renderRetroRow();}catch(e){}
+  if(redraw!==false){try{renderRetroRow();}catch(e){}}
+  else{const sw=document.querySelector('#retroRow3 .acc-custom');if(sw)sw.style.setProperty('--sw',v);}
 }
 function renderRetroRow(){
   const lb=document.getElementById('retroLb'),row=document.getElementById('retroRow');
   if(!lb||!row)return;
-  const on=retroMode(),edge=retroEdge();
-  const edge2=retroEdge2();
-  const picks=(cur,fn)=>`<button class="acc-sw${cur==='accent'?' on':''}" style="--sw:var(--a)" onclick="${fn}('accent')" aria-label="Follows the theme accent"></button>`
-    +Object.keys(EDGES).map(k=>`<button class="acc-sw${cur===k?' on':''}" style="--sw:${EDGES[k]}" onclick="${fn}('${k}')" aria-label="${k}"></button>`).join('');
-  row.innerHTML=`<button class="acc-sw acc-none${on?' on':''}" onclick="setRetroMode(${on?'false':'true'})" title="Square bevels, pixel type, scanlines — on any theme"><span>${on?'On':'Off'}</span></button>`
-    +(on?picks(edge,'setRetroEdge'):'');
-  // The two colours are two rows, because they are two decisions: the lit lip
-  // and the shadow it throws. Side by side in one row they read as one palette.
+  const on=retroMode(),edge=retroEdge(),edge2=retroEdge2();
+  // Row one is only the On/Off switch now; the colours moved to their own
+  // labelled rows below so it reads as three plain choices.
+  row.innerHTML=`<button class="acc-sw acc-none${on?' on':''}" onclick="setRetroMode(${on?'false':'true'})" title="Square bevels, pixel type, scanlines — on any theme"><span>${on?'On':'Off'}</span></button>`;
+  // Presets (theme accent + Retro's own cyan/pink) plus a pick-any-colour swatch,
+  // matching the Background/Accent pickers.
+  const picks=(cur,fn)=>{
+    const isHex=/^#/.test(cur||'');
+    return `<button class="acc-sw${cur==='accent'?' on':''}" style="--sw:var(--a)" onclick="${fn}('accent')" aria-label="Follows the theme accent"></button>`
+      +Object.keys(EDGES).map(k=>`<button class="acc-sw${cur===k?' on':''}" style="--sw:${EDGES[k]}" onclick="${fn}('${k}')" aria-label="${k}"></button>`).join('')
+      +`<label class="acc-sw acc-custom${isHex?' on':''}" style="--sw:${isHex?cur:'#888'}" title="Any colour"><input type="color" value="${isHex?cur:'#22e8ff'}" oninput="${fn}(this.value,false)" onchange="${fn}(this.value)"></label>`;
+  };
+  // Two colours, two decisions: the lit top edge, and the shadow it drops below.
   const lb2=document.getElementById('retroLb2'),row2=document.getElementById('retroRow2');
-  if(lb2&&row2){
-    lb2.style.display=on?'':'none';row2.style.display=on?'':'none';
-    row2.innerHTML=on?picks(edge2,'setRetroEdge2'):'';
-  }
+  const lb3=document.getElementById('retroLb3'),row3=document.getElementById('retroRow3');
+  if(lb2&&row2){ lb2.style.display=on?'':'none'; row2.style.display=on?'':'none'; row2.innerHTML=on?picks(edge,'setRetroEdge'):''; }
+  if(lb3&&row3){ lb3.style.display=on?'':'none'; row3.style.display=on?'':'none'; row3.innerHTML=on?picks(edge2,'setRetroEdge2'):''; }
 }
 const ACCENT_KEY='accent_override';
 function accentOverride(){try{return localStorage.getItem(ACCENT_KEY)||'';}catch(e){return '';}}
@@ -6958,8 +6971,10 @@ function startPaint(){
       <div class="theme-grid" id="themeGrid"></div>
       <div class="paint-lb" id="retroLb">Retro</div>
       <div class="acc-row" id="retroRow"></div>
-      <div class="paint-lb" id="retroLb2" style="display:none">Retro shadow</div>
+      <div class="paint-lb" id="retroLb2" style="display:none">Top shadow color</div>
       <div class="acc-row" id="retroRow2" style="display:none"></div>
+      <div class="paint-lb" id="retroLb3" style="display:none">Bottom shadow color</div>
+      <div class="acc-row" id="retroRow3" style="display:none"></div>
       <div class="paint-lb">Accent</div>
       <div class="acc-row" id="accentRow"></div>
       <div class="paint-lb">Background</div>
@@ -7855,6 +7870,13 @@ function needsFix(kind){
 }
 function renderFixBar(){
   const bar=document.getElementById('fixBar'); if(!bar)return;
+  // The swipe leaves transform:translateX(-110%) and opacity:0 on the element as
+  // INLINE styles, and nothing cleared them. While dismissed that is invisible —
+  // the class hides it anyway — but the moment the count changes and this bar is
+  // shown again it becomes display:flex while still transparent and shifted off
+  // to the left: a full-height strip of nothing, which is the blank gap. Clear
+  // them on every render, so the element's appearance always follows its state.
+  bar.style.transform='';bar.style.opacity='';bar.style.transition='';
   if(typeof _fixHidden==='undefined')_fixHidden=-1;
   const {unmatched,mistitled}=needsFix(viewKind);
   const n=unmatched.length+mistitled.length;
@@ -17575,13 +17597,13 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-14.39',
-  title:'The cards get some room back',
-  push:'And pixels reach the title panel.',
+  v:'2026-08-14.40',
+  title:'Sharper big art, and both shadow colours are yours',
+  push:'Pick any colour for either edge.',
   notes:[
-    'The cards in each row have room again. They were tucked far enough under each other to read as crowded rather than stacked, and on a phone that left barely two pixels between covers. There is a light overlap where a pointer can pull one clear, and a plain gap where there is nothing to hover with.',
-    'Opening a title gives you its banner and cover in pixels like everything else \u2014 they had never been included, because a panel builds its own contents.',
-    'Scrolling fast no longer outruns the pixels.',
+    'Big pictures are sharp again. Covers on a title page, the banner and the hero are drawn at full detail, while the small cards stay chunky \u2014 on a large picture the blocks were destroying it rather than styling it, and the retro on those comes from the scanlines and edges instead.',
+    'Both edge colours are yours to pick, and either can be any colour rather than the three presets. They are two rows now: the lit top edge, and the shadow it drops below.',
+    'Dismissing the "not linked" bar no longer leaves a gap behind it. Swiping it away left the strip invisible but still occupying its space the next time it had something to say.',
   ],
 };
 // The rows animate in once, on the first paint of a session. render() runs on

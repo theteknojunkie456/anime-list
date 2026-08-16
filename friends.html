@@ -6523,11 +6523,18 @@ function applyTheme(id,persist=true){
 // rather than stylise it. 2 reads as a coarse screen; 3 reads as damage. PX_MIN
 // stops a small thumbnail being reduced past recognition on the way.
 const PX_DIV=2, PX_MIN=24;
+// Only SMALL artwork. This was the real fault, not the block size: a 104px poster
+// is already simplified at the size it is shown, so coarsening it reads as a
+// style. A 1700px hero or a 340px episode still is a detailed photograph, and
+// coarsening that is just noise — no divisor rescues it, which is why tuning the
+// number kept failing. Above this width the picture stays sharp.
+const PX_MAX_W=200;
 const PX_SEL='.pcard-img,.rz-img,.pk-cover,.dt-cover,.sched-thumb,.resume-art,.pop-cover,.pick-img,.rc-note-img,.hero-bg-img,.dt-banner-img';
 function pixelateOne(img){
   if(!img||img.dataset.pxDone==='1')return;
   if(!img.complete||!img.naturalWidth)return;          // nothing to draw yet
   const r=img.getBoundingClientRect(); if(r.width<4)return;
+  if(r.width>PX_MAX_W)return;                          // detailed at this size — leave it alone
   try{
     const c=document.createElement('canvas');
     const ratio=r.height/r.width || 1.42;
@@ -17505,10 +17512,11 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-14.29',
-  title:'The pixels are back, and gentler',
-  push:'Drawn, not filtered.',
+  v:'2026-08-14.30',
+  title:'Pixels on the small art only',
+  push:'The big pictures stay sharp.',
   notes:[
+    'Only the small artwork is drawn in pixels now \u2014 the covers and thumbnails. The big pictures, the hero at the top and the wide episode stills, stay sharp. Shrinking the blocks was never going to fix those: a cover is already simplified at the size it is shown, so coarsening it reads as a style, while a large detailed picture just turns to noise. Turn Retro off and everything returns to normal instantly.',
     'Covers are made of pixels again \u2014 and this time they actually are pixels rather than an effect laid over the picture. Each cover is drawn small and shown large, so the blocks are the picture itself. That is why it survives where the last three attempts did not: nothing has to resize, nothing has to resolve, and a sharper screen cannot smooth it back out.',
     'The blocks are half the size of the first pass. On a wide episode thumbnail the coarser version was destroying the photograph rather than styling it. Turn Retro off and every cover returns to normal instantly.',
     'Covers are made of pixels again \u2014 and this time they actually are pixels rather than an effect laid over the picture. Each cover is drawn small and shown large, so the blocks are the picture itself. That is why it survives where the last three attempts did not: nothing has to resize, nothing has to resolve, and a sharper screen cannot smooth it back out. Turn Retro off and the covers return to normal instantly.',

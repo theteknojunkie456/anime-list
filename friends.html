@@ -34,11 +34,12 @@
      colours, so they are two different tokens. Both default to the theme's
      accent; either can be pinned. */
   --edge2:var(--a);
-  /* How far the fanned cards tuck under each other. On a pointer device hovering
-     pulls one clear, so it can be deep. On a touch screen there is nothing to
-     uncover it with, so a deep fan is not a deck — it is just artwork you cannot
-     see, with the titles cut to match. Small enough there to read as a stack. */
-  --fan:30px;
+  /* How far the fanned cards tuck under each other. The row already sets its own
+     10px gap, so this is subtracted from that: at 30 the cards overlapped by 20px
+     and read as crowded rather than stacked, and on touch the pair left 2px
+     between covers, which is just cramped. 18 leaves a light overlap where
+     hovering can pull a card clear, and touch gets the plain gap back. */
+  --fan:18px;
   /* The violet wash at the top of every screen. It used to be baked into
      .ambient as a literal rgba, so no setting could reach it — "Glow off" left it
      burning and a black theme was never black. Now it is a colour like any other:
@@ -586,7 +587,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
   }
 }
 @media (hover:none){
-  :root{--fan:8px;}
+  :root{--fan:0px;}   /* the row's own 10px gap, and nothing tucked away */
 }
 /* Landscape and tablets turn .row-scroll into a fluid GRID. A fan is a property
    of a strip you scroll sideways — applied to grid items the negative margin
@@ -17574,13 +17575,13 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-14.38',
-  title:'Pixels keep up, and reach the title panel',
-  push:'Harder to outrun now.',
+  v:'2026-08-14.39',
+  title:'The cards get some room back',
+  push:'And pixels reach the title panel.',
   notes:[
-    'Opening a title gives you its banner and cover in pixels like everything else. They had never been included \u2014 a panel builds its own contents, which never passed the place where covers get drawn.',
-    'Scrolling fast no longer outruns it. The old trigger fired a moment after a cover arrived, so a quick flick showed the sharp picture first; it now answers within the frame you are scrolling.',
-    'The remaining/episode readout sits in a frame like the other sections. It was the one block the framing never reached.',
+    'The cards in each row have room again. They were tucked far enough under each other to read as crowded rather than stacked, and on a phone that left barely two pixels between covers. There is a light overlap where a pointer can pull one clear, and a plain gap where there is nothing to hover with.',
+    'Opening a title gives you its banner and cover in pixels like everything else \u2014 they had never been included, because a panel builds its own contents.',
+    'Scrolling fast no longer outruns the pixels.',
   ],
 };
 // The rows animate in once, on the first paint of a session. render() runs on

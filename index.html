@@ -303,6 +303,8 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
    thing on screen that refuses to. Turning it down lets the chrome lead without
    touching the picture's brightness, so nothing becomes hard to recognise.
    This is the number to tune: .6 sits back, .85 barely moves, .4 is severe. */
+[data-retro] canvas.pxc{image-rendering:pixelated;filter:saturate(1.2) contrast(1.06);}
+[data-retro] img.pxc-src{display:none;}
 [data-retro] .pcard-img,[data-retro] .rz-img,[data-retro] .pk-cover,
 [data-retro] .dt-cover,[data-retro] .sched-thumb,[data-retro] .resume-art,
 [data-retro] .pop-cover,[data-retro] .pick-img,
@@ -1662,7 +1664,10 @@ body.first-paint .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards
 .rz-meta{position:absolute;left:13px;right:13px;bottom:12px;}
 .rz-title{font-family:var(--fd);font-size:15px;font-weight:800;color:#fff;line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-shadow:0 1px 6px rgba(0,0,0,.65);}
 .rz-sub{font-size:12px;font-weight:600;color:rgba(255,255,255,.82);margin-top:2px;text-shadow:0 1px 4px rgba(0,0,0,.6);}
-.rz-ep{position:absolute;left:9px;bottom:calc(4px + 9px);z-index:3;padding:3px 7px;border-radius:6px;
+/* Top-left, not bottom-left. It shared the bottom edge with the title, so every
+   title started behind a chip and truncated that much earlier — "EP 2 ERO
+   -Starting Life in Another Worl…". The corner it moves to is empty. */
+.rz-ep{position:absolute;left:9px;top:9px;z-index:3;padding:3px 7px;border-radius:6px;
   font-size:10px;font-weight:800;letter-spacing:.05em;color:#fff;background:rgba(8,8,11,.88);}
 .rz-at{position:absolute;right:9px;bottom:calc(4px + 9px);z-index:3;padding:3px 7px;border-radius:6px;
   font-size:10px;font-weight:700;color:#fff;background:rgba(8,8,11,.88);font-variant-numeric:tabular-nums;}
@@ -6494,6 +6499,83 @@ function applyTheme(id,persist=true){
 // --aFg is computed, not chosen. It is the text that sits ON the accent, and
 // getting it wrong is unreadable rather than ugly — so it is picked by contrast:
 // near-black on a light accent, white on a dark one, whichever wins by measure.
+// ─── COVERS AS PIXELS ───────────────────────────────────────────────────────
+// Back after being pulled for speed. The cost was never one canvas — it was 185
+// of them, drawn after every render, on the main thread, while scrolling. So the
+// work is bounded to what is actually on screen: an IntersectionObserver draws a
+// cover as it comes into view and then stops watching it. A render only has to
+// hand new images to the observer, which is cheap; the drawing is what was not.
+const PX_DIV=2.5, PX_DIV_BIG=1.3, PX_MIN=22;
+const PX_SEL='.pcard-img,.rz-img,.pk-cover,.dt-cover,.sched-thumb,.resume-art,.pop-cover,.pick-img,.rc-note-img,.hero-bg-img,.dt-banner-img';
+let _pxIO=null;
+function pxObserver(){
+  if(_pxIO)return _pxIO;
+  _pxIO=new IntersectionObserver(es=>{
+    es.forEach(e=>{ if(e.isIntersecting){ pixelateOne(e.target); _pxIO.unobserve(e.target); } });
+  },{rootMargin:'300px'});     // a screen of lead time, so it is never seen swapping
+  return _pxIO;
+}
+function pixelateOne(img){
+  if(!img||img.dataset.pxDone==='1')return;
+  if(!img.complete||!img.naturalWidth){ img.addEventListener('load',()=>pixelateOne(img),{once:true}); return; }
+  const r=img.getBoundingClientRect(); if(r.width<4)return;
+  try{
+    const c=document.createElement('canvas');
+    const ratio=r.height/r.width || 1.42;
+    const div=r.width>260?PX_DIV_BIG:PX_DIV;
+    const w=Math.max(PX_MIN,Math.round(r.width/div));
+    c.width=w; c.height=Math.max(1,Math.round(w*ratio));
+    const x=c.getContext('2d');
+    x.imageSmoothingEnabled=false;
+    // object-fit:cover CROPS to fill the frame; drawing the whole source into it
+    // squashes the picture to whatever shape the box happens to be.
+    const iw=img.naturalWidth, ih=img.naturalHeight;
+    let sx=0, sy=0, sw=iw, sh=ih;
+    const tAR=c.width/c.height, sAR=iw/ih;
+    if(sAR>tAR){ sw=ih*tAR; sx=(iw-sw)/2; } else { sh=iw/tAR; sy=(ih-sh)/2; }
+    x.drawImage(img,sx,sy,sw,sh,0,0,c.width,c.height);
+    // Graded, not filtered: highlights lift, shadows sink, and a wash of the
+    // theme's colour runs through one corner. Cross-origin art taints the canvas
+    // so pixels cannot be read back — composite operations still work.
+    try{
+      const g=x.createLinearGradient(0,0,0,c.height);
+      g.addColorStop(0,'rgba(255,255,255,.24)');
+      g.addColorStop(.52,'rgba(128,128,128,0)');
+      g.addColorStop(1,'rgba(0,0,0,.30)');
+      x.globalCompositeOperation='overlay';
+      x.fillStyle=g; x.fillRect(0,0,c.width,c.height);
+      const cs=getComputedStyle(document.documentElement);
+      let tint=(cs.getPropertyValue('--edge')||'').trim();
+      if(!/^#|^rgb/.test(tint))tint=(cs.getPropertyValue('--a')||'#7c5cff').trim();
+      const rg=x.createRadialGradient(0,0,0,0,0,Math.max(c.width,c.height)*1.15);
+      rg.addColorStop(0,tint); rg.addColorStop(1,'rgba(0,0,0,0)');
+      x.globalCompositeOperation='soft-light'; x.globalAlpha=.5;
+      x.fillStyle=rg; x.fillRect(0,0,c.width,c.height);
+      x.globalAlpha=1; x.globalCompositeOperation='source-over';
+    }catch(e){}
+    c.className=img.className+' pxc';
+    c.setAttribute('aria-hidden','true');
+    img.dataset.pxDone='1';
+    img.classList.add('pxc-src');
+    img.after(c);
+  }catch(e){}
+}
+function pixelateCovers(){
+  if(!retroMode())return;
+  try{document.querySelectorAll(PX_SEL).forEach(img=>{
+    if(img.tagName!=='IMG'||img.dataset.pxDone==='1'||img.dataset.pxObs==='1')return;
+    img.dataset.pxObs='1';
+    pxObserver().observe(img);
+  });}catch(e){}
+}
+function unpixelateCovers(){
+  try{
+    if(_pxIO){_pxIO.disconnect();_pxIO=null;}
+    document.querySelectorAll('canvas.pxc').forEach(c=>c.remove());
+    document.querySelectorAll('img.pxc-src').forEach(i=>{i.classList.remove('pxc-src');delete i.dataset.pxDone;delete i.dataset.pxObs;});
+  }catch(e){}
+}
+function refreshPixels(){ if(retroMode())pixelateCovers(); else unpixelateCovers(); }
 // ─── RETRO MODE ─────────────────────────────────────────────────────────────
 // Retro used to be a theme, which forced a choice it had no business forcing:
 // take the treatment and lose your colours. Almost nothing that makes it Retro
@@ -6519,6 +6601,7 @@ function applyRetroMode(){
     if(retroMode())el.setAttribute('data-retro','1');else el.removeAttribute('data-retro');
   }catch(e){}
   try{applyRetroEdge();}catch(e){}
+  try{refreshPixels();}catch(e){}
 }
 function setRetroMode(on){
   try{localStorage.setItem(RETRO_KEY,on?'1':'0');}catch(e){}
@@ -7542,6 +7625,7 @@ function render(){
   const step=fn=>{try{fn();}catch(e){try{console.error('render',e);}catch{}}};
   step(renderKindSeg);step(renderFiltRow);step(renderSortRow);step(renderHome);
   forgetAmbBands();   // the bands just moved
+  try{refreshPixels();}catch(e){}
 }
 function renderKindSeg(){
   const el=document.getElementById('kindSeg');if(!el)return;
@@ -17438,11 +17522,12 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-14.36',
-  title:'Pixel covers are off again \u2014 they made the app slow',
-  push:'Speed first.',
+  v:'2026-08-14.37',
+  title:'Pixels are back, and only where you can see them',
+  push:'Plus the episode chip is out of the title\u2019s way.',
   notes:[
-    'The pixel covers are off. Redrawing every cover to make it out of pixels costs real work, and on a list of this size it made the app slow to use \u2014 which is not a trade worth making for a look. Some pictures were still coming out the wrong shape as well. Everything else about Retro stays: the type, the square bevelled controls, the framed panels, the marching ants.',
+    'Pixel covers are back. What made them slow was never one picture \u2014 it was redrawing all of them, every time anything on the page changed. Now a cover is drawn as it comes into view and then left alone, so the work is whatever is actually on your screen rather than your whole list.',
+    'The episode chip has moved off the title. It sat on the same line, so every title started behind it and ran out of room that much sooner.',
   ],
 };
 // The rows animate in once, on the first paint of a session. render() runs on

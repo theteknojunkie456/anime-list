@@ -722,6 +722,15 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 
    Each section's content becomes a pane. .dt-label sits immediately before its
    block, so the adjacent sibling IS the pane; no wrapper is needed. */
+/* .dt-facts is emitted on its own — no .dt-label immediately before it — so the
+   sibling rule below could never match it and the readout was the one section
+   with no pane around it. It gets one directly. */
+[data-retro] .dt-facts{
+  border:1px solid var(--b2);
+  background:var(--bg3);
+  box-shadow:inset 1px 1px 0 0 rgba(0,0,0,.5);
+  padding:12px;
+}
 [data-retro] .dt-label + .dt-facts,
 [data-retro] .dt-label + .stars,
 [data-retro] .dt-label + .dt-eps,
@@ -6512,7 +6521,7 @@ function pxObserver(){
   if(_pxIO)return _pxIO;
   _pxIO=new IntersectionObserver(es=>{
     es.forEach(e=>{ if(e.isIntersecting){ pixelateOne(e.target); _pxIO.unobserve(e.target); } });
-  },{rootMargin:'300px'});     // a screen of lead time, so it is never seen swapping
+  },{rootMargin:'1400px'});    // several screens of lead time — see the catch-up note below
   return _pxIO;
 }
 function pixelateOne(img){
@@ -6560,17 +6569,56 @@ function pixelateOne(img){
     img.after(c);
   }catch(e){}
 }
+// The observer alone was not enough. Its callback is asynchronous and batched, so
+// switching tabs or flicking the list fast outruns it: the sharp picture is on
+// screen for a moment and then pops into pixels. Two answers, together — several
+// screens of lead time so the work starts long before you arrive, and a
+// SYNCHRONOUS catch-up here for anything already close, so a tab switch has its
+// covers drawn before the frame is shown rather than one callback later.
+//
+// The batch is capped. Drawing everything synchronously is exactly the mistake
+// that made this slow the first time; the observer picks up whatever is left.
+const PX_NEAR=1400, PX_BATCH=24;
+// Everything waiting to be drawn. The scroll pass walks THIS, not the document:
+// re-querying 185 images and measuring each one on every frame is its own kind of
+// slow, and would have traded one stutter for another.
+const _pxPending=new Set();
+let _pxTick=0;
+function pxSweep(){
+  _pxTick=0;
+  if(!retroMode()||!_pxPending.size)return;
+  const vh=innerHeight||800; let drawn=0;
+  for(const img of Array.from(_pxPending)){
+    if(!img.isConnected||img.dataset.pxDone==='1'){ _pxPending.delete(img); continue; }
+    if(drawn>=PX_BATCH)break;
+    const r=img.getBoundingClientRect();
+    if(r.bottom>-PX_NEAR && r.top<vh+PX_NEAR){
+      pixelateOne(img);
+      if(img.dataset.pxDone==='1'){ _pxPending.delete(img); drawn++; try{pxObserver().unobserve(img);}catch(e){} }
+    }
+  }
+}
+// The observer's callback is asynchronous and batched, which is what a fast flick
+// outruns. A scroll listener answers within the frame instead. Capture, because
+// the list scrolls inside .page rather than the window.
+function pxOnScroll(){ if(!_pxTick)_pxTick=requestAnimationFrame(pxSweep); }
+try{addEventListener('scroll',pxOnScroll,{passive:true,capture:true});}catch(e){}
 function pixelateCovers(){
   if(!retroMode())return;
-  try{document.querySelectorAll(PX_SEL).forEach(img=>{
-    if(img.tagName!=='IMG'||img.dataset.pxDone==='1'||img.dataset.pxObs==='1')return;
-    img.dataset.pxObs='1';
-    pxObserver().observe(img);
-  });}catch(e){}
+  try{
+    document.querySelectorAll(PX_SEL).forEach(img=>{
+      if(img.tagName!=='IMG'||img.dataset.pxDone==='1'||img.dataset.pxObs==='1')return;
+      img.dataset.pxObs='1';
+      _pxPending.add(img);
+      pxObserver().observe(img);
+    });
+    pxSweep();            // draw what is already close, before the frame is shown
+  }catch(e){}
 }
 function unpixelateCovers(){
   try{
     if(_pxIO){_pxIO.disconnect();_pxIO=null;}
+    _pxPending.clear();
     document.querySelectorAll('canvas.pxc').forEach(c=>c.remove());
     document.querySelectorAll('img.pxc-src').forEach(i=>{i.classList.remove('pxc-src');delete i.dataset.pxDone;delete i.dataset.pxObs;});
   }catch(e){}
@@ -9282,6 +9330,10 @@ function openSheet(id){
   if(id==='recPickSheet')renderRecPick();
   if(id==='recSendSheet')renderRecSend();
   if(id==='recDetailSheet')renderRecDetail();
+  // A sheet builds its own markup, so its pictures never passed through render()
+  // and were never handed to the pixel pass — which is why a title's banner and
+  // cover stayed sharp while every cover behind them was pixels.
+  try{refreshPixels();}catch(e){}
   try{updatePartyPill();}catch{}
 }
 function closeAll(){
@@ -17522,12 +17574,13 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-14.37',
-  title:'Pixels are back, and only where you can see them',
-  push:'Plus the episode chip is out of the title\u2019s way.',
+  v:'2026-08-14.38',
+  title:'Pixels keep up, and reach the title panel',
+  push:'Harder to outrun now.',
   notes:[
-    'Pixel covers are back. What made them slow was never one picture \u2014 it was redrawing all of them, every time anything on the page changed. Now a cover is drawn as it comes into view and then left alone, so the work is whatever is actually on your screen rather than your whole list.',
-    'The episode chip has moved off the title. It sat on the same line, so every title started behind it and ran out of room that much sooner.',
+    'Opening a title gives you its banner and cover in pixels like everything else. They had never been included \u2014 a panel builds its own contents, which never passed the place where covers get drawn.',
+    'Scrolling fast no longer outruns it. The old trigger fired a moment after a cover arrived, so a quick flick showed the sharp picture first; it now answers within the frame you are scrolling.',
+    'The remaining/episode readout sits in a frame like the other sections. It was the one block the framing never reached.',
   ],
 };
 // The rows animate in once, on the first paint of a session. render() runs on

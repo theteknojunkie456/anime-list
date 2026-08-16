@@ -303,14 +303,6 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
    thing on screen that refuses to. Turning it down lets the chrome lead without
    touching the picture's brightness, so nothing becomes hard to recognise.
    This is the number to tune: .6 sits back, .85 barely moves, .4 is severe. */
-/* A cover drawn as REAL pixels. The canvas carries the same classes as the image
-   it stands in for, so every rule that shaped the image — the corner cut, the
-   carved lip, the scanlines — applies to it unchanged. Its backing store is
-   genuinely small, which is the whole point: nothing has to resolve a filter, no
-   width rule can hijack it, and a dense screen cannot smooth it away, because
-   the pixels are not an effect over the picture, they ARE the picture. */
-[data-retro] canvas.pxc{image-rendering:pixelated;filter:saturate(1.22) contrast(1.07);}
-[data-retro] img.pxc-src{display:none;}
 [data-retro] .pcard-img,[data-retro] .rz-img,[data-retro] .pk-cover,
 [data-retro] .dt-cover,[data-retro] .sched-thumb,[data-retro] .resume-art,
 [data-retro] .pop-cover,[data-retro] .pick-img,
@@ -6502,116 +6494,6 @@ function applyTheme(id,persist=true){
 // --aFg is computed, not chosen. It is the text that sits ON the accent, and
 // getting it wrong is unreadable rather than ugly — so it is picked by contrast:
 // near-black on a light accent, white on a dark one, whichever wins by measure.
-// ─── COVERS AS REAL PIXELS ───────────────────────────────────────────────────
-// Three earlier attempts failed for three different reasons: resizing the image
-// let any width rule hijack it, a heavy mosaic was sampled rather than drawn, and
-// an SVG filter made WebKit paint nothing at all — invisible on every iPhone,
-// which is nearly all of them.
-//
-// A canvas has none of those failure modes. Its backing store is ACTUALLY small,
-// so there is no filter to resolve, no layout to hijack, and no device pixel
-// ratio that can smooth it back. Cross-origin art taints the canvas, which blocks
-// reading pixels back — it does not block drawing it, and drawing is all this
-// needs.
-// A FRACTION of the displayed size, not a fixed width. Drawing every cover at a
-// flat 52px made the small ones 1:1 with their own box — a 52px thumbnail drawn
-// at 52 pixels is just the thumbnail. Dividing instead keeps the block size
-// constant relative to what you see, at any size and any screen density.
-//
-// The divisor was blamed twice for what the SIZE GATE below actually fixed. Once
-// only small art is in scope, 3 is the right feel: a cover reads as drawn in
-// pixels rather than merely softened, and the detailed pictures that could not
-// survive it are no longer being asked to. PX_MIN stops the smallest thumbnails
-// going past recognition.
-const PX_DIV=2.5, PX_DIV_BIG=1.3, PX_MIN=22;
-// No size gate: every picture in the app is drawn in pixels, hero included.
-// Chosen deliberately over the alternative — a large detailed picture IS noisier
-// coarsened than a cover is, and that is the trade being made for a look that
-// does not stop halfway up the page. PX_MAX_W is gone rather than set high, so
-// there is no threshold quietly deciding what counts as small.
-const PX_SEL='.pcard-img,.rz-img,.pk-cover,.dt-cover,.sched-thumb,.resume-art,.pop-cover,.pick-img,.rc-note-img,.hero-bg-img,.dt-banner-img';
-function pixelateOne(img){
-  if(!img||img.dataset.pxDone==='1')return;
-  if(!img.complete||!img.naturalWidth)return;          // nothing to draw yet
-  const r=img.getBoundingClientRect(); if(r.width<4)return;
-  try{
-    const c=document.createElement('canvas');
-    const ratio=r.height/r.width || 1.42;
-    // Blocks were a constant 3 CSS px at every size, so a wide episode still took
-    // the same coarseness as a poster — and a still is a photograph with faces
-    // where a poster is already a simplified illustration. Same blocks, very
-    // different damage. Big pictures get finer blocks so they stay readable, and
-    // everything is still visibly made of pixels.
-    const div = r.width>260 ? PX_DIV_BIG : PX_DIV;
-    const w=Math.max(PX_MIN,Math.round(r.width/div));
-    c.width=w; c.height=Math.max(1,Math.round(w*ratio));
-    const x=c.getContext('2d');
-    x.imageSmoothingEnabled=false;
-    // object-fit:cover CROPS the picture to fill its box. Drawing the whole
-    // source into the canvas instead squashed every picture to the box's shape —
-    // which is the stretching, and it was never the pixel size. Crop the same way
-    // the browser would: take the biggest centred rectangle of the source that
-    // matches the target's aspect, and draw that.
-    const iw=img.naturalWidth, ih=img.naturalHeight;
-    let sx=0, sy=0, sw=iw, sh=ih;
-    const tAR=c.width/c.height, sAR=iw/ih;
-    if(sAR>tAR){ sw=ih*tAR; sx=(iw-sw)/2; }      // source too wide → trim the sides
-    else { sh=iw/tAR; sy=(ih-sh)/2; }            // source too tall → trim top/bottom
-    x.drawImage(img,sx,sy,sw,sh,0,0,c.width,c.height);
-    // ── the retro grade ──────────────────────────────────────────────────────
-    // Cross-origin art taints this canvas, so the pixels cannot be READ back —
-    // no palette mapping, no per-pixel posterise. Composite operations still
-    // work on a tainted canvas, and they are enough: they push some parts of the
-    // picture harder than others, which is the thing that reads as "graded"
-    // rather than "filtered". Uniform saturation is what makes a filter look
-    // like a filter.
-    try{
-      // Highlights lift, shadows sink, and the middle is left alone — so the
-      // punch lands where there is already light rather than flattening
-      // everything by the same amount.
-      const g=x.createLinearGradient(0,0,0,c.height);
-      g.addColorStop(0,'rgba(255,255,255,.26)');
-      g.addColorStop(.52,'rgba(128,128,128,0)');
-      g.addColorStop(1,'rgba(0,0,0,.34)');
-      x.globalCompositeOperation='overlay';
-      x.fillStyle=g; x.fillRect(0,0,c.width,c.height);
-      // A wash of the theme's own colour, strongest at the top corner. This is
-      // what pulls a row of covers onto one palette without draining them: the
-      // era's screens tinted, they did not desaturate.
-      const cs=getComputedStyle(document.documentElement);
-      let tint=(cs.getPropertyValue('--edge')||'').trim();
-      if(!/^#|^rgb/.test(tint))tint=(cs.getPropertyValue('--a')||'#7c5cff').trim();
-      const rg=x.createRadialGradient(0,0,0,0,0,Math.max(c.width,c.height)*1.15);
-      rg.addColorStop(0,tint); rg.addColorStop(1,'rgba(0,0,0,0)');
-      x.globalCompositeOperation='soft-light';
-      x.globalAlpha=.55;
-      x.fillStyle=rg; x.fillRect(0,0,c.width,c.height);
-      x.globalAlpha=1;
-      x.globalCompositeOperation='source-over';
-    }catch(e){}
-    c.className=img.className+' pxc';
-    c.setAttribute('aria-hidden','true');
-    img.dataset.pxDone='1';
-    img.classList.add('pxc-src');
-    img.after(c);
-  }catch(e){}                                          // a broken cover keeps the image
-}
-function pixelateCovers(){
-  if(!retroMode())return;
-  try{document.querySelectorAll(PX_SEL).forEach(img=>{
-    if(img.tagName!=='IMG'||img.dataset.pxDone==='1')return;
-    if(img.complete&&img.naturalWidth)pixelateOne(img);
-    else img.addEventListener('load',()=>pixelateOne(img),{once:true});
-  });}catch(e){}
-}
-// Leaving the mode has to put every cover back, or they stay frozen at 52px.
-function unpixelateCovers(){
-  try{
-    document.querySelectorAll('canvas.pxc').forEach(c=>c.remove());
-    document.querySelectorAll('img.pxc-src').forEach(i=>{i.classList.remove('pxc-src');delete i.dataset.pxDone;});
-  }catch(e){}
-}
-function refreshPixels(){ if(retroMode())pixelateCovers(); else unpixelateCovers(); }
 // ─── RETRO MODE ─────────────────────────────────────────────────────────────
 // Retro used to be a theme, which forced a choice it had no business forcing:
 // take the treatment and lose your colours. Almost nothing that makes it Retro
@@ -6637,7 +6519,6 @@ function applyRetroMode(){
     if(retroMode())el.setAttribute('data-retro','1');else el.removeAttribute('data-retro');
   }catch(e){}
   try{applyRetroEdge();}catch(e){}
-  try{refreshPixels();}catch(e){}
 }
 function setRetroMode(on){
   try{localStorage.setItem(RETRO_KEY,on?'1':'0');}catch(e){}
@@ -7661,7 +7542,6 @@ function render(){
   const step=fn=>{try{fn();}catch(e){try{console.error('render',e);}catch{}}};
   step(renderKindSeg);step(renderFiltRow);step(renderSortRow);step(renderHome);
   forgetAmbBands();   // the bands just moved
-  try{refreshPixels();}catch(e){}
 }
 function renderKindSeg(){
   const el=document.getElementById('kindSeg');if(!el)return;
@@ -17558,13 +17438,11 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-14.35',
-  title:'The pictures were being squashed',
-  push:'Fixed, and a little less blocky.',
+  v:'2026-08-14.36',
+  title:'Pixel covers are off again \u2014 they made the app slow',
+  push:'Speed first.',
   notes:[
-    'Pictures are the right shape again. Covers are cropped to fit their frame, and the pixel pass was stretching the whole picture into that frame instead of cropping it \u2014 so everything came out squashed. That, not the size of the blocks, is what looked wrong.',
-    'The blocks are a little smaller too.',
-    'The pictures are graded rather than merely blocked out: light lifts toward one corner and sinks at the other, with a wash of your theme\u2019s own colour running through them, so a row of covers reads as one palette instead of a dozen competing ones.',
+    'The pixel covers are off. Redrawing every cover to make it out of pixels costs real work, and on a list of this size it made the app slow to use \u2014 which is not a trade worth making for a look. Some pictures were still coming out the wrong shape as well. Everything else about Retro stays: the type, the square bevelled controls, the framed panels, the marching ants.',
   ],
 };
 // The rows animate in once, on the first paint of a session. render() runs on

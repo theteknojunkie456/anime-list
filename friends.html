@@ -6523,7 +6523,7 @@ function applyTheme(id,persist=true){
 // pixels rather than merely softened, and the detailed pictures that could not
 // survive it are no longer being asked to. PX_MIN stops the smallest thumbnails
 // going past recognition.
-const PX_DIV=3, PX_DIV_BIG=1.4, PX_MIN=20;
+const PX_DIV=2.5, PX_DIV_BIG=1.3, PX_MIN=22;
 // No size gate: every picture in the app is drawn in pixels, hero included.
 // Chosen deliberately over the alternative — a large detailed picture IS noisier
 // coarsened than a cover is, and that is the trade being made for a look that
@@ -6547,7 +6547,17 @@ function pixelateOne(img){
     c.width=w; c.height=Math.max(1,Math.round(w*ratio));
     const x=c.getContext('2d');
     x.imageSmoothingEnabled=false;
-    x.drawImage(img,0,0,c.width,c.height);
+    // object-fit:cover CROPS the picture to fill its box. Drawing the whole
+    // source into the canvas instead squashed every picture to the box's shape —
+    // which is the stretching, and it was never the pixel size. Crop the same way
+    // the browser would: take the biggest centred rectangle of the source that
+    // matches the target's aspect, and draw that.
+    const iw=img.naturalWidth, ih=img.naturalHeight;
+    let sx=0, sy=0, sw=iw, sh=ih;
+    const tAR=c.width/c.height, sAR=iw/ih;
+    if(sAR>tAR){ sw=ih*tAR; sx=(iw-sw)/2; }      // source too wide → trim the sides
+    else { sh=iw/tAR; sy=(ih-sh)/2; }            // source too tall → trim top/bottom
+    x.drawImage(img,sx,sy,sw,sh,0,0,c.width,c.height);
     // ── the retro grade ──────────────────────────────────────────────────────
     // Cross-origin art taints this canvas, so the pixels cannot be READ back —
     // no palette mapping, no per-pixel posterise. Composite operations still
@@ -17548,13 +17558,13 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-14.34',
-  title:'The pictures are graded, not just pixelated',
-  push:'Colour that lands unevenly, the way it used to.',
+  v:'2026-08-14.35',
+  title:'The pictures were being squashed',
+  push:'Fixed, and a little less blocky.',
   notes:[
-    'The pictures are graded now, not merely blocked out. Light lifts toward one corner and sinks at the other, and a wash of your theme\u2019s own colour runs through them \u2014 so a row of covers reads as one palette instead of a dozen competing ones. It lands unevenly on purpose: colour pushed the same amount everywhere is what makes an effect look like a filter.',
-    'The what\u2019s-new pager was showing 113 cards \u2014 every note ever written, because each release added to the list and nothing ever came off it. It shows what changed in this release and nothing else now.',
-    'Big pictures are drawn with finer pixels than small ones. The blocks used to be the same size everywhere, which a cover survives \u2014 it is already a simplified illustration \u2014 and a wide episode still does not, being a photograph of faces.',
+    'Pictures are the right shape again. Covers are cropped to fit their frame, and the pixel pass was stretching the whole picture into that frame instead of cropping it \u2014 so everything came out squashed. That, not the size of the blocks, is what looked wrong.',
+    'The blocks are a little smaller too.',
+    'The pictures are graded rather than merely blocked out: light lifts toward one corner and sinks at the other, with a wash of your theme\u2019s own colour running through them, so a row of covers reads as one palette instead of a dozen competing ones.',
   ],
 };
 // The rows animate in once, on the first paint of a session. render() runs on

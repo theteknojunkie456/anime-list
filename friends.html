@@ -6524,18 +6524,16 @@ function applyTheme(id,persist=true){
 // survive it are no longer being asked to. PX_MIN stops the smallest thumbnails
 // going past recognition.
 const PX_DIV=3, PX_MIN=20;
-// Only SMALL artwork. This was the real fault, not the block size: a 104px poster
-// is already simplified at the size it is shown, so coarsening it reads as a
-// style. A 1700px hero or a 340px episode still is a detailed photograph, and
-// coarsening that is just noise — no divisor rescues it, which is why tuning the
-// number kept failing. Above this width the picture stays sharp.
-const PX_MAX_W=200;
+// No size gate: every picture in the app is drawn in pixels, hero included.
+// Chosen deliberately over the alternative — a large detailed picture IS noisier
+// coarsened than a cover is, and that is the trade being made for a look that
+// does not stop halfway up the page. PX_MAX_W is gone rather than set high, so
+// there is no threshold quietly deciding what counts as small.
 const PX_SEL='.pcard-img,.rz-img,.pk-cover,.dt-cover,.sched-thumb,.resume-art,.pop-cover,.pick-img,.rc-note-img,.hero-bg-img,.dt-banner-img';
 function pixelateOne(img){
   if(!img||img.dataset.pxDone==='1')return;
   if(!img.complete||!img.naturalWidth)return;          // nothing to draw yet
   const r=img.getBoundingClientRect(); if(r.width<4)return;
-  if(r.width>PX_MAX_W)return;                          // detailed at this size — leave it alone
   try{
     const c=document.createElement('canvas');
     const ratio=r.height/r.width || 1.42;
@@ -17513,10 +17511,11 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-14.31',
-  title:'Covers drawn in pixels',
-  push:'The big pictures stay sharp.',
+  v:'2026-08-14.32',
+  title:'Every picture, drawn in pixels',
+  push:'The banner too.',
   notes:[
+    'Every picture in the app is drawn in pixels now, the big banner at the top included \u2014 the look no longer stops halfway up the page. Text sitting on artwork stays sharp, because only the picture underneath is redrawn. Turn Retro off and everything returns to normal instantly.',
     'Covers are drawn in pixels \u2014 properly visible now, not merely softened. The big pictures are left out of it: the hero at the top and the wide episode stills stay sharp, because a cover is already simplified at the size it is shown while a large detailed picture just turns to noise. That distinction is what the last few attempts were missing; the size of the blocks was never the problem.',
     'Only the small artwork is drawn in pixels now \u2014 the covers and thumbnails. The big pictures, the hero at the top and the wide episode stills, stay sharp. Shrinking the blocks was never going to fix those: a cover is already simplified at the size it is shown, so coarsening it reads as a style, while a large detailed picture just turns to noise. Turn Retro off and everything returns to normal instantly.',
     'Covers are made of pixels again \u2014 and this time they actually are pixels rather than an effect laid over the picture. Each cover is drawn small and shown large, so the blocks are the picture itself. That is why it survives where the last three attempts did not: nothing has to resize, nothing has to resolve, and a sharper screen cannot smooth it back out.',

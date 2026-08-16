@@ -309,7 +309,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
    genuinely small, which is the whole point: nothing has to resolve a filter, no
    width rule can hijack it, and a dense screen cannot smooth it away, because
    the pixels are not an effect over the picture, they ARE the picture. */
-[data-retro] canvas.pxc{image-rendering:pixelated;}
+[data-retro] canvas.pxc{image-rendering:pixelated;filter:saturate(1.22) contrast(1.07);}
 [data-retro] img.pxc-src{display:none;}
 [data-retro] .pcard-img,[data-retro] .rz-img,[data-retro] .pk-cover,
 [data-retro] .dt-cover,[data-retro] .sched-thumb,[data-retro] .resume-art,
@@ -6548,6 +6548,37 @@ function pixelateOne(img){
     const x=c.getContext('2d');
     x.imageSmoothingEnabled=false;
     x.drawImage(img,0,0,c.width,c.height);
+    // ── the retro grade ──────────────────────────────────────────────────────
+    // Cross-origin art taints this canvas, so the pixels cannot be READ back —
+    // no palette mapping, no per-pixel posterise. Composite operations still
+    // work on a tainted canvas, and they are enough: they push some parts of the
+    // picture harder than others, which is the thing that reads as "graded"
+    // rather than "filtered". Uniform saturation is what makes a filter look
+    // like a filter.
+    try{
+      // Highlights lift, shadows sink, and the middle is left alone — so the
+      // punch lands where there is already light rather than flattening
+      // everything by the same amount.
+      const g=x.createLinearGradient(0,0,0,c.height);
+      g.addColorStop(0,'rgba(255,255,255,.26)');
+      g.addColorStop(.52,'rgba(128,128,128,0)');
+      g.addColorStop(1,'rgba(0,0,0,.34)');
+      x.globalCompositeOperation='overlay';
+      x.fillStyle=g; x.fillRect(0,0,c.width,c.height);
+      // A wash of the theme's own colour, strongest at the top corner. This is
+      // what pulls a row of covers onto one palette without draining them: the
+      // era's screens tinted, they did not desaturate.
+      const cs=getComputedStyle(document.documentElement);
+      let tint=(cs.getPropertyValue('--edge')||'').trim();
+      if(!/^#|^rgb/.test(tint))tint=(cs.getPropertyValue('--a')||'#7c5cff').trim();
+      const rg=x.createRadialGradient(0,0,0,0,0,Math.max(c.width,c.height)*1.15);
+      rg.addColorStop(0,tint); rg.addColorStop(1,'rgba(0,0,0,0)');
+      x.globalCompositeOperation='soft-light';
+      x.globalAlpha=.55;
+      x.fillStyle=rg; x.fillRect(0,0,c.width,c.height);
+      x.globalAlpha=1;
+      x.globalCompositeOperation='source-over';
+    }catch(e){}
     c.className=img.className+' pxc';
     c.setAttribute('aria-hidden','true');
     img.dataset.pxDone='1';
@@ -17517,12 +17548,13 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-14.33',
-  title:'Finer pixels on the big pictures',
-  push:'And the what\u2019s-new list is short again.',
+  v:'2026-08-14.34',
+  title:'The pictures are graded, not just pixelated',
+  push:'Colour that lands unevenly, the way it used to.',
   notes:[
+    'The pictures are graded now, not merely blocked out. Light lifts toward one corner and sinks at the other, and a wash of your theme\u2019s own colour runs through them \u2014 so a row of covers reads as one palette instead of a dozen competing ones. It lands unevenly on purpose: colour pushed the same amount everywhere is what makes an effect look like a filter.',
     'The what\u2019s-new pager was showing 113 cards \u2014 every note ever written, because each release added to the list and nothing ever came off it. It shows what changed in this release and nothing else now.',
-    'Big pictures are drawn with finer pixels than small ones. The blocks used to be the same size everywhere, which a cover survives \u2014 it is already a simplified illustration \u2014 and a wide episode still does not, being a photograph of faces. Everything is still made of pixels; the large ones are no longer wrecked by it.',
+    'Big pictures are drawn with finer pixels than small ones. The blocks used to be the same size everywhere, which a cover survives \u2014 it is already a simplified illustration \u2014 and a wide episode still does not, being a photograph of faces.',
   ],
 };
 // The rows animate in once, on the first paint of a session. render() runs on

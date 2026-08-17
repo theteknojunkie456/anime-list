@@ -421,6 +421,38 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
   }
   #hubSheet .fr-x{min-width:44px;}
 }
+/* NATURAL SELECTION */
+.ns-count{margin-left:auto;font-size:12px;color:var(--t3);font-variant-numeric:tabular-nums;}
+.ns-stage{position:relative;min-height:clamp(300px,46vh,420px);margin:6px 0 12px;}
+.ns-card{
+  position:relative;border-radius:18px;overflow:hidden;background:var(--bg3);
+  border:1px solid var(--bn2);box-shadow:0 8px 24px -8px rgba(0,0,0,.6);
+  will-change:transform,opacity;touch-action:pan-y;
+}
+.ns-art{width:100%;height:clamp(150px,24vh,220px);object-fit:cover;display:block;background:var(--bg4);}
+.ns-body{padding:12px 14px 14px;}
+.ns-title{font-family:var(--fd);font-size:17px;font-weight:700;line-height:1.25;color:var(--t1);}
+.ns-meta{margin-top:5px;font-size:12px;color:var(--t3);display:flex;flex-wrap:wrap;gap:4px 10px;}
+.ns-syn{margin-top:9px;font-size:13px;line-height:1.55;color:var(--t2);
+  display:-webkit-box;-webkit-line-clamp:6;-webkit-box-orient:vertical;overflow:hidden;}
+.ns-syn.open{-webkit-line-clamp:unset;}
+/* The verdict is stamped on the card as it goes, so the gesture says what it did. */
+.ns-stamp{position:absolute;top:14px;font-size:13px;font-weight:800;letter-spacing:.08em;
+  padding:6px 11px;border-radius:8px;opacity:0;pointer-events:none;text-transform:uppercase;}
+.ns-stamp.keep{left:14px;color:var(--fin);border:2px solid var(--fin);background:var(--finbg);}
+.ns-stamp.drop{right:14px;color:#ff6b6b;border:2px solid #ff6b6b;background:rgba(255,107,107,.14);}
+.ns-acts{display:flex;gap:10px;margin-top:4px;}
+.ns-act{flex:1;padding:13px;border-radius:14px;font-size:14px;font-weight:800;
+  display:flex;align-items:center;justify-content:center;gap:7px;
+  background:var(--bg4);border:1px solid var(--bn2);color:var(--t1);}
+.ns-act.keep{color:var(--fin);border-color:color-mix(in srgb,var(--fin) 45%,transparent);}
+.ns-act.drop{color:#ff6b6b;border-color:rgba(255,107,107,.45);}
+.ns-done{text-align:center;padding:18px 4px 6px;}
+.ns-list{margin:10px 0 4px;max-height:34vh;overflow-y:auto;}
+.ns-row{display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:1px solid var(--bn2);}
+.ns-row img{width:34px;height:48px;object-fit:cover;border-radius:6px;flex:none;background:var(--bg4);}
+.ns-row .t{flex:1;min-width:0;font-size:13px;color:var(--t1);}
+@media (prefers-reduced-motion:reduce){ .ns-card{transition:none!important;} }
 /* ── RETRO CHROME ───────────────────────────────────────────────────────────
    The look reached the artwork and stopped. Everything AROUND the artwork was
    still a modern dark app — a rounded search pill, round icon buttons, a soft
@@ -3933,6 +3965,18 @@ body.recsel .pcard{position:relative;}
 
 <!-- WATCH PARTY SHEET -->
 <!-- Friends & Watch Party chooser (official app: both live behind one header button) -->
+<!-- NATURAL SELECTION — thin the Plan list one show at a time.
+     A plan list grows because adding is easy and removing never comes up. This
+     asks about one show at a time, with enough in front of you to actually
+     answer: the art, what it is about, how long it would take.
+     Nothing is deleted while you swipe. Every drop is collected and shown at the
+     end for one confirmation — a gesture that removes titles the moment it lands
+     is a gesture that removes a title you meant to keep. -->
+<div class="sheet" id="nsSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-title"><i data-ic="layers"></i> Natural selection <span class="ns-count" id="nsCount"></span></div>
+  <div id="nsBody"></div>
+</div>
 <div class="sheet" id="hubSheet">
   <div class="sheet-handle"></div>
   <div class="sheet-header"><div class="sheet-title">Social</div><button class="sheet-cancel" onclick="closeAll()">Done</button></div>
@@ -6509,6 +6553,155 @@ function applyTheme(id,persist=true){
 // --aFg is computed, not chosen. It is the text that sits ON the accent, and
 // getting it wrong is unreadable rather than ugly — so it is picked by contrast:
 // near-black on a light accent, white on a dark one, whichever wins by measure.
+// ─── NATURAL SELECTION ──────────────────────────────────────────────────────
+// A plan list only ever grows: adding is one tap and removing never comes up on
+// its own. This walks it one show at a time and asks a single question, with
+// enough on screen to answer it — the art, what it is about, and what it would
+// cost you in hours.
+//
+// NOTHING IS DELETED WHILE YOU SWIPE. Drops are collected and confirmed at the
+// end. A gesture that removes a title the instant it lands is a gesture that
+// removes a title you meant to keep, and this list is the one thing in the app
+// that must not be lost. Leaving early keeps everything.
+let _nsQueue=[], _nsDrop=[], _nsIdx=0;
+function openNatural(){
+  const pool=anime.filter(a=>a.status==='plan'&&kindOf(a)===viewKind);
+  if(pool.length<2){toast('Nothing in Plan to sort through');return;}
+  _nsQueue=pool.slice(); _nsDrop=[]; _nsIdx=0;
+  openSheet('nsSheet');
+  renderNatural();
+}
+function nsMeta(a){
+  const bits=[];
+  const n=a.epTotal||0; if(n)bits.push(n+(kindOf(a)==='read'?' chapters':' eps'));
+  const mins=kindOf(a)==='watch'?totalWatchMins(a):0;
+  if(mins)bits.push('~'+Math.round(mins/60)+'h to watch');      // the cost of keeping it
+  if(a.genre)bits.push(String(a.genre).split(',').slice(0,3).map(g=>g.trim()).join(' · '));
+  return bits;
+}
+function renderNatural(){
+  const box=document.getElementById('nsBody'), cnt=document.getElementById('nsCount');
+  if(!box)return;
+  if(_nsIdx>=_nsQueue.length){ renderNaturalDone(); return; }
+  const a=_nsQueue[_nsIdx];
+  if(cnt)cnt.textContent=(_nsIdx+1)+' of '+_nsQueue.length+(_nsDrop.length?' · '+_nsDrop.length+' to drop':'');
+  const img=a.img?`<img class="ns-art" src="${escH(a.img)}" alt="" onerror="this.style.display='none'">`:'';
+  box.innerHTML=`<div class="ns-stage" id="nsStage">
+      <div class="ns-card" id="nsCard">
+        <span class="ns-stamp keep" id="nsKeepStamp">Keep</span>
+        <span class="ns-stamp drop" id="nsDropStamp">Drop</span>
+        ${img}
+        <div class="ns-body">
+          <div class="ns-title">${escH(a.title)}</div>
+          <div class="ns-meta">${nsMeta(a).map(b=>`<span>${escH(b)}</span>`).join('')}</div>
+          <p class="ns-syn" id="nsSyn" onclick="this.classList.toggle('open')">Loading what it's about…</p>
+        </div>
+      </div>
+    </div>
+    <div class="ns-acts">
+      <button class="ns-act drop" onclick="nsDecide(false)">${icon('x')} Drop</button>
+      <button class="ns-act keep" onclick="nsDecide(true)">${icon('check')} Keep</button>
+    </div>
+    <p class="ai-desc" style="margin-top:10px">Swipe the card, or use the buttons. Nothing is removed until you confirm at the end.</p>`;
+  try{hydrateIcons(document.getElementById('nsSheet'));}catch(e){}
+  nsArmSwipe();
+  nsLoadSyn(a);
+}
+// The synopsis is the reason this can be answered at all, so it is fetched per
+// card — reusing the same cache the title page fills, so anything you have
+// already opened costs nothing here.
+async function nsLoadSyn(a){
+  const el=()=>document.getElementById('nsSyn');
+  const put=t=>{const e=el(); if(e&&_nsQueue[_nsIdx]===a)e.textContent=t;};
+  if(!a.aniId){put('No description linked to this one yet.');return;}
+  const cached=(typeof _richCache!=='undefined')&&_richCache[a.aniId];
+  const strip=d=>String(d||'').replace(/<br\s*\/?>/gi,'\n').replace(/<[^>]+>/g,'').trim();
+  if(cached){put(strip(cached.description)||'No description for this one.');return;}
+  try{
+    const type=kindOf(a)==='read'?'MANGA':'ANIME';
+    const q=`query($id:Int){Media(id:$id,type:${type}){description(asHtml:false)}}`;
+    const r=await fetch('https://graphql.anilist.co',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},
+      body:JSON.stringify({query:q,variables:{id:a.aniId}})});
+    if(!r.ok)throw 0;
+    const d=((await r.json()).data||{}).Media||{};
+    try{if(typeof _richCache!=='undefined')_richCache[a.aniId]=Object.assign(_richCache[a.aniId]||{},d);}catch(e){}
+    put(strip(d.description)||'No description for this one.');
+  }catch(e){ put('Could not load the description.'); }
+}
+function nsDecide(keep,silent){
+  const a=_nsQueue[_nsIdx];
+  if(!keep&&a)_nsDrop.push(a);
+  _nsIdx++;
+  renderNatural();
+}
+function nsArmSwipe(){
+  const card=document.getElementById('nsCard'); if(!card||card._ns)return; card._ns=1;
+  let x0=0,y0=0,dx=0,dy=0,live=false;
+  const keepSt=document.getElementById('nsKeepStamp'), dropSt=document.getElementById('nsDropStamp');
+  const move=()=>{
+    card.style.transform=`translateX(${dx}px) rotate(${dx/26}deg)`;
+    if(keepSt)keepSt.style.opacity=String(Math.max(0,Math.min(1,dx/90)));
+    if(dropSt)dropSt.style.opacity=String(Math.max(0,Math.min(1,-dx/90)));
+  };
+  const end=()=>{
+    if(!live)return; live=false;
+    card.style.transition='transform .24s cubic-bezier(.32,.72,.28,1),opacity .24s';
+    if(Math.abs(dx)>90){
+      const keep=dx>0;
+      card.style.transform=`translateX(${keep?520:-520}px) rotate(${keep?18:-18}deg)`;
+      card.style.opacity='0';
+      setTimeout(()=>nsDecide(keep),180);
+    }else{ card.style.transform=''; if(keepSt)keepSt.style.opacity='0'; if(dropSt)dropSt.style.opacity='0'; }
+    dx=0;dy=0;
+  };
+  card.addEventListener('touchstart',e=>{
+    if(e.touches.length!==1)return;
+    x0=e.touches[0].clientX;y0=e.touches[0].clientY;live=true;dx=0;dy=0;card.style.transition='none';
+  },{passive:true});
+  card.addEventListener('touchmove',e=>{
+    if(!live)return;
+    dx=e.touches[0].clientX-x0; dy=e.touches[0].clientY-y0;
+    if(Math.abs(dy)>Math.abs(dx)){live=false;card.style.transform='';return;}   // let the sheet scroll
+    move();
+  },{passive:true});
+  card.addEventListener('touchend',end,{passive:true});
+  card.addEventListener('touchcancel',end,{passive:true});
+  // A pointer can drag it too, so this is not a phone-only feature.
+  card.addEventListener('pointerdown',e=>{ if(e.pointerType==='touch')return;
+    x0=e.clientX;live=true;dx=0;card.style.transition='none';card.setPointerCapture&&card.setPointerCapture(e.pointerId); });
+  card.addEventListener('pointermove',e=>{ if(!live||e.pointerType==='touch')return; dx=e.clientX-x0; move(); });
+  card.addEventListener('pointerup',e=>{ if(e.pointerType==='touch')return; end(); });
+  card.addEventListener('pointercancel',e=>{ if(e.pointerType==='touch')return; end(); });
+}
+function renderNaturalDone(){
+  const box=document.getElementById('nsBody'), cnt=document.getElementById('nsCount');
+  if(cnt)cnt.textContent='';
+  if(!box)return;
+  if(!_nsDrop.length){
+    box.innerHTML=`<div class="ns-done"><div class="ns-title">Kept everything</div>
+      <p class="ai-desc" style="margin-top:6px">You went through ${_nsQueue.length}. Nothing to remove.</p>
+      <button class="dt-watch" style="margin-top:14px" onclick="closeAll()">Done</button></div>`;
+    return;
+  }
+  box.innerHTML=`<div class="ns-done" style="text-align:left">
+      <div class="ns-title">Remove ${_nsDrop.length} ${_nsDrop.length===1?'title':'titles'}?</div>
+      <p class="ai-desc" style="margin-top:6px">Nothing has been removed yet. This is the only step that changes your list.</p>
+      <div class="ns-list">${_nsDrop.map(a=>`<div class="ns-row">${a.img?`<img src="${escH(a.img)}" alt="">`:''}<span class="t">${escH(a.title)}</span></div>`).join('')}</div>
+      <div class="ns-acts" style="margin-top:12px">
+        <button class="ns-act" onclick="closeAll()">${icon('x')} Keep all</button>
+        <button class="ns-act drop" onclick="nsApply()">${icon('trash')} Remove ${_nsDrop.length}</button>
+      </div></div>`;
+  try{hydrateIcons(document.getElementById('nsSheet'));}catch(e){}
+}
+function nsApply(){
+  const ids=new Set(_nsDrop.map(a=>a.id));
+  const n=ids.size;
+  anime=anime.filter(a=>!ids.has(a.id));
+  try{ids.forEach(id=>{try{tombstone(id);}catch(e){}});}catch(e){}
+  save();render();closeAll();
+  toast(`Removed ${n}`);
+  _nsQueue=[];_nsDrop=[];_nsIdx=0;
+}
 // ─── COVERS AS PIXELS ───────────────────────────────────────────────────────
 // Back after being pulled for speed. The cost was never one canvas — it was 185
 // of them, drawn after every render, on the main thread, while scrolling. So the
@@ -7488,7 +7681,8 @@ function quickPickStripHTML(pool,isRead){
   // One chip, not four. The moods still exist — they live inside the picker now,
   // where you can change your mind without going back to the home screen.
   return `<div class="qp-sec"><div class="qp-chips"><span class="qp-head">Not sure what to watch?</span>
-    <button class="qp-chip" onclick="decideForMe()">${icon('compass')}<span>Pick one for me</span></button></div></div>`;
+    <button class="qp-chip" onclick="decideForMe()">${icon('compass')}<span>Pick one for me</span></button>
+    ${pool.filter(a=>a.status==='plan').length>=3?`<button class="qp-chip" onclick="openNatural()">${icon('layers')}<span>Natural selection</span></button>`:''}</div></div>`;
 }
 // ─── HOME RENDER ────────────────────────────────────────────────────────────
 function sorted(list){
@@ -17616,12 +17810,13 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-14.42',
-  title:'The pixels stop lagging behind you',
-  push:'Change the sort and they are already there.',
+  v:'2026-08-14.43',
+  title:'Natural selection',
+  push:'Thin the Plan list one show at a time.',
   notes:[
-    'Covers are pixels by the time you see them, whatever you do to get there. Changing the sort or the filter rebuilds the whole list, and most covers had not been fetched again yet \u2014 an unfetched picture has nothing to copy, which is what you were outrunning. In Retro they load up front instead, so a re-sort finds them already in hand.',
-    'One consequence worth knowing: with Retro on, a list this size fetches all of its covers rather than only the ones you scroll to. After the first time they come from the cache, but the first load on a new device will pull more than it used to.',
+    'Natural selection. A plan list only ever grows \u2014 adding is one tap and removing never comes up on its own \u2014 so this walks yours one show at a time and asks a single question. Swipe right to keep, left to drop, or use the buttons. Each card carries the art, what the show is about, how many episodes it is and how many hours it would cost you, which is enough to actually decide. Under "Not sure what to watch?" once you have three or more in Plan.',
+    'Nothing is removed while you swipe. Every drop is collected and shown at the end for one confirmation, with the covers, so you can see exactly what is about to go \u2014 and leaving early keeps everything. A gesture that deletes the moment it lands is a gesture that deletes something you meant to keep.',
+    'Covers are pixels by the time you see them now, whatever you did to get there \u2014 changing the sort no longer outruns them.',
   ],
 };
 // The rows animate in once, on the first paint of a session. render() runs on

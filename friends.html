@@ -6559,6 +6559,11 @@ function applyTheme(id,persist=true){
 // enough on screen to answer it — the art, what it is about, and what it would
 // cost you in hours.
 //
+// "Remove" means REMOVE — off the list. It deliberately does not set the Dropped
+// status, which means "I started this and gave up"; nothing here was ever
+// started. The button is worded that way because the two would otherwise be read
+// as the same thing.
+//
 // NOTHING IS DELETED WHILE YOU SWIPE. Drops are collected and confirmed at the
 // end. A gesture that removes a title the instant it lands is a gesture that
 // removes a title you meant to keep, and this list is the one thing in the app
@@ -6589,7 +6594,7 @@ function renderNatural(){
   box.innerHTML=`<div class="ns-stage" id="nsStage">
       <div class="ns-card" id="nsCard">
         <span class="ns-stamp keep" id="nsKeepStamp">Keep</span>
-        <span class="ns-stamp drop" id="nsDropStamp">Drop</span>
+        <span class="ns-stamp drop" id="nsDropStamp">Remove</span>
         ${img}
         <div class="ns-body">
           <div class="ns-title">${escH(a.title)}</div>
@@ -6599,10 +6604,10 @@ function renderNatural(){
       </div>
     </div>
     <div class="ns-acts">
-      <button class="ns-act drop" onclick="nsDecide(false)">${icon('x')} Drop</button>
+      <button class="ns-act drop" onclick="nsDecide(false)">${icon('trash')} Remove</button>
       <button class="ns-act keep" onclick="nsDecide(true)">${icon('check')} Keep</button>
     </div>
-    <p class="ai-desc" style="margin-top:10px">Swipe the card, or use the buttons. Nothing is removed until you confirm at the end.</p>`;
+    <p class="ai-desc" style="margin-top:10px">Swipe the card, or use the buttons. Remove takes it off your list entirely \u2014 it does not move it to Dropped, which is for things you started. Nothing goes until you confirm at the end.</p>`;
   try{hydrateIcons(document.getElementById('nsSheet'));}catch(e){}
   nsArmSwipe();
   nsLoadSyn(a);
@@ -17810,13 +17815,13 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-14.43',
+  v:'2026-08-14.44',
   title:'Natural selection',
   push:'Thin the Plan list one show at a time.',
   notes:[
-    'Natural selection. A plan list only ever grows \u2014 adding is one tap and removing never comes up on its own \u2014 so this walks yours one show at a time and asks a single question. Swipe right to keep, left to drop, or use the buttons. Each card carries the art, what the show is about, how many episodes it is and how many hours it would cost you, which is enough to actually decide. Under "Not sure what to watch?" once you have three or more in Plan.',
-    'Nothing is removed while you swipe. Every drop is collected and shown at the end for one confirmation, with the covers, so you can see exactly what is about to go \u2014 and leaving early keeps everything. A gesture that deletes the moment it lands is a gesture that deletes something you meant to keep.',
-    'Covers are pixels by the time you see them now, whatever you did to get there \u2014 changing the sort no longer outruns them.',
+    'Natural selection. A plan list only ever grows \u2014 adding is one tap and removing never comes up on its own \u2014 so this walks yours one show at a time and asks a single question. Swipe right to keep, left to remove, or use the buttons. Each card carries the art, what the show is about, how many episodes it is and how many hours it would cost you. Under "Not sure what to watch?" once you have three or more in Plan.',
+    'Remove means off the list, not moved to Dropped \u2014 Dropped is for something you started and gave up on, and nothing sitting in Plan was ever started. The card says so, so the two are not read as the same thing.',
+    'Nothing goes while you swipe. Removals are collected and shown at the end for one confirmation, with the covers, so you can see exactly what is about to go \u2014 and leaving early keeps everything.',
   ],
 };
 // The rows animate in once, on the first paint of a session. render() runs on

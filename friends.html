@@ -6515,10 +6515,11 @@ function applyTheme(id,persist=true){
 // work is bounded to what is actually on screen: an IntersectionObserver draws a
 // cover as it comes into view and then stops watching it. A render only has to
 // hand new images to the observer, which is cheap; the drawing is what was not.
-// Small cards stay chunky (that's the retro charm); big art (detail covers,
-// hero, banners) renders near 1:1 so it reads as sharp, not mushy — the retro
-// look on large images comes from the scanlines/bevels, not blocky pixels.
-const PX_DIV=2.5, PX_DIV_BIG=1.0, PX_MIN=26;
+// Small cards stay chunky; big art (detail covers, hero, banners) is drawn much
+// closer to full resolution so detail survives. 1.0 was drawing it at exactly 1:1
+// — sharp, but with no pixels left in it at all, which is not the point. 1.2
+// keeps a visible texture on a large picture while leaving it readable.
+const PX_DIV=2.5, PX_DIV_BIG=1.2, PX_MIN=26;
 const PX_SEL='.pcard-img,.rz-img,.pk-cover,.dt-cover,.sched-thumb,.resume-art,.pop-cover,.pick-img,.rc-note-img,.hero-bg-img,.dt-banner-img';
 let _pxIO=null;
 function pxObserver(){
@@ -17597,13 +17598,13 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-14.40',
-  title:'Sharper big art, and both shadow colours are yours',
+  v:'2026-08-14.41',
+  title:'Big pictures keep some pixels after all',
   push:'Pick any colour for either edge.',
   notes:[
-    'Big pictures are sharp again. Covers on a title page, the banner and the hero are drawn at full detail, while the small cards stay chunky \u2014 on a large picture the blocks were destroying it rather than styling it, and the retro on those comes from the scanlines and edges instead.',
-    'Both edge colours are yours to pick, and either can be any colour rather than the three presets. They are two rows now: the lit top edge, and the shadow it drops below.',
-    'Dismissing the "not linked" bar no longer leaves a gap behind it. Swiping it away left the strip invisible but still occupying its space the next time it had something to say.',
+    'Big pictures have their pixels back, gently. Making them sharper had gone all the way to drawing them at full resolution, which left no pixels in them at all \u2014 they now keep a visible texture while staying readable. Small cards are unchanged.',
+    'Both edge colours are yours to pick, and either can be any colour. They are two rows: the lit top edge, and the shadow it drops below.',
+    'Dismissing the "not linked" bar no longer leaves a gap behind it.',
   ],
 };
 // The rows animate in once, on the first paint of a session. render() runs on

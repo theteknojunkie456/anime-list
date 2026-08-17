@@ -6643,7 +6643,11 @@ function arDelete(){
   _arSel=new Set(); renderArchive();
   toast(`Deleted ${n}`);
 }
-// ─── NATURAL SELECTION ──────────────────────────────────────────────────────
+// ─── NATURAL SELECTION (owner only) ─────────────────────────────────────────
+// Shown only on a device holding the admin token, the same test the Admin row
+// uses — so it follows the owner across their devices and appears for nobody
+// else on the network.
+//
 // A plan list only ever grows: adding is one tap and removing never comes up on
 // its own. This walks it one show at a time and asks a single question, with
 // enough on screen to answer it — the art, what it is about, and what it would
@@ -6660,6 +6664,9 @@ function arDelete(){
 // that must not be lost. Leaving early keeps everything.
 let _nsQueue=[], _nsDrop=[], _nsIdx=0;
 function openNatural(){
+  // Owner-only, like the Admin row: the entry chip is hidden for everyone else,
+  // and this repeats the check so the function is not a way around that.
+  if(!isAdminDevice())return;
   const pool=anime.filter(a=>a.status==='plan'&&kindOf(a)===viewKind);
   if(pool.length<2){toast('Nothing in Plan to sort through');return;}
   _nsQueue=pool.slice(); _nsDrop=[]; _nsIdx=0;
@@ -7805,7 +7812,7 @@ function quickPickStripHTML(pool,isRead){
   // where you can change your mind without going back to the home screen.
   return `<div class="qp-sec"><div class="qp-chips"><span class="qp-head">Not sure what to watch?</span>
     <button class="qp-chip" onclick="decideForMe()">${icon('compass')}<span>Pick one for me</span></button>
-    ${pool.filter(a=>a.status==='plan').length>=3?`<button class="qp-chip" onclick="openNatural()">${icon('layers')}<span>Natural selection</span></button>`:''}</div></div>`;
+    ${(isAdminDevice()&&pool.filter(a=>a.status==='plan').length>=3)?`<button class="qp-chip" onclick="openNatural()">${icon('layers')}<span>Natural selection</span></button>`:''}</div></div>`;
 }
 // ─── HOME RENDER ────────────────────────────────────────────────────────────
 function sorted(list){
@@ -17991,14 +17998,13 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-14.45',
+  v:'2026-08-14.46',
   title:'An Archive, and no more duplicate imports',
   push:'Nothing gets deleted any more.',
   notes:[
-    'Importing a list no longer leaves duplicates of things you already had. A title carrying an alternate name in brackets \u2014 "Ao Haru Ride (Blue Spring Ride)" \u2014 counted as a different show from plain "Ao Haru Ride", so it came in twice and could not be matched to anything either. Both halves now count as the same title. Brackets holding a year or a season number are left alone, since those are what tell two entries apart.',
-    'Natural selection sets titles aside in an Archive instead of deleting them. From there you can pick any of them and bring them back, or clear them out for good \u2014 that is now the only place in the app that deletes anything. Going through a hundred titles quickly means some calls will be wrong.',
-    'The synopsis is no longer cut off, and on a keyboard the arrow keys work: left sets aside, right keeps.',
-    'Hiding a friend\u2019s recommendation can be undone. The X sits where it is easy to catch by accident, and it tells that friend you passed \u2014 so the message now waits a few seconds, and undoing means nothing was ever sent.',
+    'Importing a list no longer leaves duplicates of things you already had. A title carrying an alternate name in brackets \u2014 "Ao Haru Ride (Blue Spring Ride)" \u2014 counted as a different show from plain "Ao Haru Ride", so it came in twice and could not be matched to anything either. Brackets holding a year or a season number are left alone, since those are what tell two entries apart.',
+    'Titles you set aside go to an Archive instead of being deleted, and you can bring any of them back from there.',
+    'Hiding a friend\u2019s recommendation can be undone. The X is easy to catch by accident and it tells that friend you passed \u2014 so the message waits a few seconds, and undoing means nothing was ever sent.',
   ],
 };
 // The rows animate in once, on the first paint of a session. render() runs on

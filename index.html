@@ -421,6 +421,16 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
   }
   #hubSheet .fr-x{min-width:44px;}
 }
+/* ARCHIVE */
+.ar-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--bn2);cursor:pointer;}
+.ar-row img,.ar-ph{width:36px;height:51px;object-fit:cover;border-radius:6px;flex:none;background:var(--bg4);
+  display:flex;align-items:center;justify-content:center;font-family:var(--fd);color:var(--t3);}
+.ar-t{flex:1;min-width:0;font-size:13px;color:var(--t1);}
+.ar-sub{font-size:11px;color:var(--t3);margin-top:2px;}
+.ar-tick{width:22px;height:22px;border-radius:6px;border:1px solid var(--b2);flex:none;
+  display:flex;align-items:center;justify-content:center;color:var(--aFg);}
+.ar-row.on .ar-tick{background:var(--a);border-color:var(--a);}
+.ar-bar{display:flex;gap:10px;margin-top:12px;}
 /* NATURAL SELECTION */
 .ns-count{margin-left:auto;font-size:12px;color:var(--t3);font-variant-numeric:tabular-nums;}
 .ns-stage{position:relative;min-height:clamp(300px,46vh,420px);margin:6px 0 12px;}
@@ -433,9 +443,11 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 .ns-body{padding:12px 14px 14px;}
 .ns-title{font-family:var(--fd);font-size:17px;font-weight:700;line-height:1.25;color:var(--t1);}
 .ns-meta{margin-top:5px;font-size:12px;color:var(--t3);display:flex;flex-wrap:wrap;gap:4px 10px;}
+/* Not clamped. This paragraph is the entire reason the question can be answered,
+   so cutting it off at six lines and hiding the rest behind a tap nobody knows
+   about defeats the point. Long ones scroll inside the card instead. */
 .ns-syn{margin-top:9px;font-size:13px;line-height:1.55;color:var(--t2);
-  display:-webkit-box;-webkit-line-clamp:6;-webkit-box-orient:vertical;overflow:hidden;}
-.ns-syn.open{-webkit-line-clamp:unset;}
+  max-height:min(34vh,300px);overflow-y:auto;overscroll-behavior:contain;}
 /* The verdict is stamped on the card as it goes, so the gesture says what it did. */
 .ns-stamp{position:absolute;top:14px;font-size:13px;font-weight:800;letter-spacing:.08em;
   padding:6px 11px;border-radius:8px;opacity:0;pointer-events:none;text-transform:uppercase;}
@@ -2970,6 +2982,8 @@ body.no-party .friend-only{display:flex;}
 .rec-flag{position:absolute;top:6px;left:6px;width:22px;height:22px;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#fff;box-shadow:0 2px 6px rgba(0,0,0,.35);}
 .rec-flag .ico{width:13px;height:13px;}
 .rec-by{font-size:12px;font-weight:800;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.toast-undo{margin-left:12px;padding:3px 10px;border-radius:8px;font-size:12px;font-weight:800;
+  background:color-mix(in srgb,var(--a) 22%,transparent);border:1px solid var(--a);color:var(--t1);}
 .rec-badges{margin:2px 0 6px;}
 .rec-badge{background:color-mix(in srgb,var(--fc) 15%,transparent);border:1px solid var(--fc);border-radius:14px;padding:10px 12px;margin-bottom:8px;}
 .rec-badge-who{font-weight:800;font-size:13px;color:var(--fc);display:flex;align-items:center;gap:6px;}
@@ -3924,6 +3938,17 @@ body.recsel .pcard{position:relative;}
 </div>
 
 <!-- SETTINGS HUB -->
+<!-- ARCHIVE — where Natural selection puts things, instead of deleting them.
+     Nothing here is gone: bring any of it back, or clear it out deliberately. -->
+<div class="sheet" id="archiveSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <div class="sheet-title"><i data-ic="layers"></i> Archive <span class="ns-count" id="arCount"></span></div>
+    <button class="sheet-cancel" onclick="closeAll()">Done</button>
+  </div>
+  <div id="archiveBody"></div>
+</div>
+
 <div class="sheet" id="settingsSheet">
   <div class="sheet-handle"></div>
   <div class="sheet-header">
@@ -6553,6 +6578,71 @@ function applyTheme(id,persist=true){
 // --aFg is computed, not chosen. It is the text that sits ON the accent, and
 // getting it wrong is unreadable rather than ugly — so it is picked by contrast:
 // near-black on a light accent, white on a dark one, whichever wins by measure.
+// ─── ARCHIVE ────────────────────────────────────────────────────────────────
+// Where Natural selection puts things. Removing a title outright is a decision
+// you cannot review later — and the whole point of going through 122 of them
+// quickly is that some of those calls will be wrong. So they move here, and this
+// is the only screen in the app that deletes anything for good.
+//
+// Kept in its own key rather than as a flag on the list, so nothing that reads
+// `anime` has to learn about archived items — a flag would mean auditing every
+// count, filter, row and export for a case they have never had to consider.
+const ARCHIVE_KEY='wl_archive';
+function archiveList(){try{const a=JSON.parse(localStorage.getItem(ARCHIVE_KEY)||'[]');return Array.isArray(a)?a:[];}catch(e){return [];}}
+function setArchive(l){try{localStorage.setItem(ARCHIVE_KEY,JSON.stringify(l||[]));}catch(e){}}
+let _arSel=new Set();
+function openArchive(){ _arSel=new Set(); openSheet('archiveSheet'); renderArchive(); }
+function renderArchive(){
+  const box=document.getElementById('archiveBody'), cnt=document.getElementById('arCount');
+  if(!box)return;
+  const list=archiveList();
+  if(cnt)cnt.textContent=list.length?String(list.length):'';
+  if(!list.length){
+    box.innerHTML=`<p class="ai-desc">Nothing archived. Titles you set aside in Natural selection land here, and you can bring them back or clear them out.</p>`;
+    return;
+  }
+  const sel=_arSel.size;
+  box.innerHTML=`<p class="ai-desc">Tap to select. Nothing here counts toward your list or your stats.</p>
+    ${list.map(a=>`<div class="ar-row${_arSel.has(a.id)?' on':''}" onclick="arToggle('${escH(a.id)}')">
+        ${a.img?`<img src="${escH(a.img)}" alt="">`:`<div class="ar-ph">${escH(((a.title||'?').trim()[0]||'?').toUpperCase())}</div>`}
+        <div style="flex:1;min-width:0">
+          <div class="ar-t">${escH(a.title)}</div>
+          <div class="ar-sub">${escH(a.status||'plan')}${a.epTotal?' · '+a.epTotal+' eps':''}</div>
+        </div>
+        <span class="ar-tick">${_arSel.has(a.id)?icon('check'):''}</span>
+      </div>`).join('')}
+    <div class="ar-bar">
+      <button class="ns-act" onclick="arAll()">${icon('check')} ${sel===list.length?'None':'All'}</button>
+      <button class="ns-act keep" onclick="arRestore()"${sel?'':' disabled'}>${icon('refresh')} Bring back${sel?' '+sel:''}</button>
+      <button class="ns-act drop" onclick="arDelete()"${sel?'':' disabled'}>${icon('trash')} Delete${sel?' '+sel:''}</button>
+    </div>`;
+  try{hydrateIcons(document.getElementById('archiveSheet'));}catch(e){}
+}
+function arToggle(id){ if(_arSel.has(id))_arSel.delete(id); else _arSel.add(id); renderArchive(); }
+function arAll(){ const l=archiveList(); _arSel = (_arSel.size===l.length) ? new Set() : new Set(l.map(a=>a.id)); renderArchive(); }
+function arRestore(){
+  if(!_arSel.size)return;
+  const l=archiveList(), back=l.filter(a=>_arSel.has(a.id));
+  setArchive(l.filter(a=>!_arSel.has(a.id)));
+  // A NEW id, deliberately. Archiving writes a tombstone so the title leaves your
+  // other devices, and tombstones merge as the UNION across devices — so clearing
+  // one here would simply have it come back on the next sync and delete the item
+  // again. Returning it as a fresh entry sidesteps that entirely; everything that
+  // matters (title, status, progress, rating, art) rides along unchanged.
+  back.forEach(a=>{ anime.unshift(Object.assign({},a,{id:uid(),upd:Date.now()})); });
+  try{dedupeAnime();}catch(e){}          // it may have been re-added while archived
+  _arSel=new Set();
+  save();render();renderArchive();
+  toast(`Brought back ${back.length}`);
+}
+function arDelete(){
+  if(!_arSel.size)return;
+  const n=_arSel.size;
+  if(!confirm(`Delete ${n} ${n===1?'title':'titles'} for good?\n\nThis is the one place that removes them permanently \u2014 they cannot be brought back afterwards.`))return;
+  setArchive(archiveList().filter(a=>!_arSel.has(a.id)));
+  _arSel=new Set(); renderArchive();
+  toast(`Deleted ${n}`);
+}
 // ─── NATURAL SELECTION ──────────────────────────────────────────────────────
 // A plan list only ever grows: adding is one tap and removing never comes up on
 // its own. This walks it one show at a time and asks a single question, with
@@ -6573,6 +6663,7 @@ function openNatural(){
   const pool=anime.filter(a=>a.status==='plan'&&kindOf(a)===viewKind);
   if(pool.length<2){toast('Nothing in Plan to sort through');return;}
   _nsQueue=pool.slice(); _nsDrop=[]; _nsIdx=0;
+  try{document.removeEventListener('keydown',nsKeys);document.addEventListener('keydown',nsKeys);}catch(e){}
   openSheet('nsSheet');
   renderNatural();
 }
@@ -6599,15 +6690,15 @@ function renderNatural(){
         <div class="ns-body">
           <div class="ns-title">${escH(a.title)}</div>
           <div class="ns-meta">${nsMeta(a).map(b=>`<span>${escH(b)}</span>`).join('')}</div>
-          <p class="ns-syn" id="nsSyn" onclick="this.classList.toggle('open')">Loading what it's about…</p>
+          <p class="ns-syn" id="nsSyn">Loading what it's about\u2026</p>
         </div>
       </div>
     </div>
     <div class="ns-acts">
-      <button class="ns-act drop" onclick="nsDecide(false)">${icon('trash')} Remove</button>
-      <button class="ns-act keep" onclick="nsDecide(true)">${icon('check')} Keep</button>
+      <button class="ns-act drop" onclick="nsFly(false)">${icon('trash')} Remove</button>
+      <button class="ns-act keep" onclick="nsFly(true)">${icon('check')} Keep</button>
     </div>
-    <p class="ai-desc" style="margin-top:10px">Swipe the card, or use the buttons. Remove takes it off your list entirely \u2014 it does not move it to Dropped, which is for things you started. Nothing goes until you confirm at the end.</p>`;
+    <p class="ai-desc" style="margin-top:10px">Swipe the card, use the buttons, or press \u2190 and \u2192. Remove sets it aside in the Archive \u2014 not the same as Dropped, which is for things you started, and not gone either. Nothing goes until you confirm at the end.</p>`;
   try{hydrateIcons(document.getElementById('nsSheet'));}catch(e){}
   nsArmSwipe();
   nsLoadSyn(a);
@@ -6632,6 +6723,28 @@ async function nsLoadSyn(a){
     try{if(typeof _richCache!=='undefined')_richCache[a.aniId]=Object.assign(_richCache[a.aniId]||{},d);}catch(e){}
     put(strip(d.description)||'No description for this one.');
   }catch(e){ put('Could not load the description.'); }
+}
+// A card deck on a desktop should answer to the arrow keys; reaching for the
+// mouse for each of 122 titles is the difference between doing this and not.
+// Bound while the sheet is open only, and released when it closes, so the keys
+// never act on a screen that is not in front of you.
+function nsKeys(e){
+  const sh=document.getElementById('nsSheet');
+  if(!sh||!sh.classList.contains('on'))return;
+  if(_nsIdx>=_nsQueue.length)return;                       // on the confirm step
+  if(e.key==='ArrowLeft'){e.preventDefault();nsFly(false);}
+  else if(e.key==='ArrowRight'){e.preventDefault();nsFly(true);}
+}
+// Send the card off the way a swipe would, so a keypress and a drag look alike.
+function nsFly(keep){
+  const card=document.getElementById('nsCard');
+  const st=document.getElementById(keep?'nsKeepStamp':'nsDropStamp');
+  if(!card){nsDecide(keep);return;}
+  if(st)st.style.opacity='1';
+  card.style.transition='transform .22s cubic-bezier(.32,.72,.28,1),opacity .22s';
+  card.style.transform=`translateX(${keep?520:-520}px) rotate(${keep?18:-18}deg)`;
+  card.style.opacity='0';
+  setTimeout(()=>nsDecide(keep),170);
 }
 function nsDecide(keep,silent){
   const a=_nsQueue[_nsIdx];
@@ -6689,22 +6802,27 @@ function renderNaturalDone(){
     return;
   }
   box.innerHTML=`<div class="ns-done" style="text-align:left">
-      <div class="ns-title">Remove ${_nsDrop.length} ${_nsDrop.length===1?'title':'titles'}?</div>
-      <p class="ai-desc" style="margin-top:6px">Nothing has been removed yet. This is the only step that changes your list.</p>
+      <div class="ns-title">Archive ${_nsDrop.length} ${_nsDrop.length===1?'title':'titles'}?</div>
+      <p class="ai-desc" style="margin-top:6px">They move to the Archive, not the bin \u2014 you can bring any of them back later. Nothing has moved yet.</p>
       <div class="ns-list">${_nsDrop.map(a=>`<div class="ns-row">${a.img?`<img src="${escH(a.img)}" alt="">`:''}<span class="t">${escH(a.title)}</span></div>`).join('')}</div>
       <div class="ns-acts" style="margin-top:12px">
         <button class="ns-act" onclick="closeAll()">${icon('x')} Keep all</button>
-        <button class="ns-act drop" onclick="nsApply()">${icon('trash')} Remove ${_nsDrop.length}</button>
+        <button class="ns-act drop" onclick="nsApply()">${icon('layers')} Archive ${_nsDrop.length}</button>
       </div></div>`;
   try{hydrateIcons(document.getElementById('nsSheet'));}catch(e){}
 }
 function nsApply(){
   const ids=new Set(_nsDrop.map(a=>a.id));
   const n=ids.size;
+  // Set aside, not destroyed. Going through a hundred titles quickly means some
+  // of these calls are wrong, and the Archive is where that gets corrected.
+  const moved=anime.filter(a=>ids.has(a.id));
+  setArchive(archiveList().concat(moved));
   anime=anime.filter(a=>!ids.has(a.id));
   try{ids.forEach(id=>{try{tombstone(id);}catch(e){}});}catch(e){}
   save();render();closeAll();
-  toast(`Removed ${n}`);
+  try{document.removeEventListener('keydown',nsKeys);}catch(e){}
+  toast(`Moved ${n} to Archive`);
   _nsQueue=[];_nsDrop=[];_nsIdx=0;
 }
 // ─── COVERS AS PIXELS ───────────────────────────────────────────────────────
@@ -8167,7 +8285,10 @@ async function fixAll(){
 // So repair the obvious damage before deciding a title has no match.
 function titleRepairs(t){
   const raw=String(t||'').trim(); if(!raw)return [];
-  const out=[raw];
+  // Same reason the dedupe needs them: AniList finds nothing for
+  // "Ao Haru Ride (Blue Spring Ride)" but finds either half first try, which is
+  // why an imported title like that sits unlinked with a placeholder cover.
+  const out=[...titleAliases(raw)];
   // orphan possessive: "ogre s bride" -> "ogre's bride"
   const poss=raw.replace(/\b([A-Za-z]{2,})\s+s\b/g,"$1's");
   if(poss!==raw)out.push(poss);
@@ -10118,11 +10239,31 @@ function accItem(o){
 // Every id a title can be known by — dedup collapses on ANY match, so the same
 // show from AniList (english title + id) and MAL (romaji title + its own id) is
 // caught even though the title strings differ. Falls back to normalized title.
+// Lists carry the same show under different names, and the commonest shape by far
+// is an alternate title in brackets: "Ao Haru Ride (Blue Spring Ride)" imported
+// beside a plain "Ao Haru Ride" is two entries that share no key at all, because
+// normTitle keeps every word. So a bracketed ALTERNATE TITLE also yields keys for
+// the name without it and for the alternate on its own — match either and it is
+// the same show.
+//
+// A bracket containing a DIGIT is left alone: "(1995)" and "(2017)", or
+// "(Season 2)", are what tells two entries apart, and stripping those would merge
+// genuinely different things — the one mistake that is not recoverable here.
+function titleAliases(t){
+  const raw=String(t||'').trim(); if(!raw)return [];
+  const out=[raw];
+  const m=raw.match(/^(.*?)[\(\[]([^)\]]{2,})[\)\]]\s*$/);
+  if(m){
+    const base=m[1].trim(), alt=m[2].trim();
+    if(base && alt && !/\d/.test(alt)){ out.push(base); out.push(alt); }
+  }
+  return [...new Set(out)];
+}
 function dupeKeys(a){
   const k=[]; const kind=kindOf(a);
   if(a.aniId)k.push('ani:'+a.aniId);
   if(a.malId)k.push('mal:'+a.malId+'|'+kind);
-  const nt=normTitle(a.title); if(nt)k.push('t:'+nt+'|'+kind);
+  titleAliases(a.title).forEach(t=>{const nt=normTitle(t); if(nt)k.push('t:'+nt+'|'+kind);});
   return k;
 }
 // Hard guarantee: the list never holds the same title twice, no matter how it got
@@ -12262,6 +12403,9 @@ function renderSettings(){
     {ic:'palette',  h:'Look',                p:'Themes and colours, over your list', go:"startPaint()"},
     {ic:'layers',   h:'Home screen',          p:homeLayoutLine(), go:"openHomeLayout()"},
   ];
+  // Only once there is something in it — an empty Archive is a row that explains
+  // a feature nobody has used yet, on a screen that is already long.
+  if(archiveList().length)rows.push({ic:'layers',h:'Archive',p:archiveList().length+' set aside \u00b7 bring back or delete',go:'openArchive()'});
   // Admin row appears only on the device where your admin token is stored — so it
   // shows for you and no one else. ?admin=1 is the one-time way to set it up.
   if(adminToken())rows.push({ic:'users',h:'Admin',p:'Approve members, invites, broadcast, cards',go:'openAdmin()'});
@@ -15077,19 +15221,40 @@ function friendRecRowHTML(){
 // the desktop.
 const RECX_KEY='recs_dismissed';
 function recDismissed(){try{const v=JSON.parse(localStorage.getItem(RECX_KEY)||'{}');return (v&&typeof v==='object')?v:{};}catch(e){return{};}}
+// The X sits on the card, which makes it easy to catch by accident — and since
+// dismissing now tells the sender you passed, a mis-tap sends a false signal to
+// a person. So the signal is DELAYED: the card hides at once, and the friend is
+// only told if the dismissal is still standing a few seconds later. Undo inside
+// that window and nothing was ever sent.
+let _recUndo=null;
 function dismissRec(k,ev){
   try{ev.stopPropagation();ev.preventDefault();}catch(e){}
   const key=decodeURIComponent(String(k||'')); if(!key)return;
+  const rec=recByAni()[key];
   const m=recDismissed(); m[key]=Date.now();
   try{localStorage.setItem(RECX_KEY,JSON.stringify(m));}catch(e){}
-  const rec=recByAni()[key];
   try{render();}catch(e){}
-  const who=tellPassed(rec);
-  toast(who?`Hidden. ${who} will see you passed`:'Hidden',2600);
+  const who=rec?recSenderLabel(rec):'';
+  if(_recUndo){clearTimeout(_recUndo.t);_recUndo=null;}
+  const t=setTimeout(()=>{ _recUndo=null; try{tellPassed(rec);}catch(e){} },5000);
+  _recUndo={key,t};
+  toast(who?`Hidden. ${who} will see you passed`:'Hidden',5000,()=>{
+    if(_recUndo){clearTimeout(_recUndo.t);_recUndo=null;}
+    const mm=recDismissed(); delete mm[key];
+    try{localStorage.setItem(RECX_KEY,JSON.stringify(mm));}catch(e){}
+    try{render();}catch(e){}
+    toast('Back. Nothing was sent');
+  });
 }
 // Somebody took the trouble to send it, so they get the answer \u2014 but quietly, in
 // their own sent list, never as a notification. Fire-and-forget: hiding it is a
 // local act and must not wait on, or fail with, the network.
+function recSenderLabel(rec){
+  const senders=((rec||{}).senders||[]).filter(s=>s&&s.code);
+  if(!senders.length)return '';
+  const first=friendDisplay(senders[0].code,senders[0].name);
+  return senders.length>1?`${first} +${senders.length-1}`:first;
+}
 function tellPassed(rec){
   if(!rec)return '';
   const it=rec.item||{},from={code:myFriendCode(),name:myFriendName()||'A friend'};
@@ -17724,7 +17889,18 @@ function fyPlan(aniId,btn,kind){
 
 // 2.4s is right for "Saved" and far too short for a sentence that tells you
 // where a setting is. Anything that asks the reader to DO something gets longer.
-function toast(msg,ms){const el=document.getElementById('toast');el.textContent=msg;el.classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>el.classList.remove('on'),Math.max(1200,ms||2400));}
+function toast(msg,ms,undo){
+  const el=document.getElementById('toast');
+  el.textContent=msg;
+  // An action, when the thing just done is worth taking back. textContent above
+  // still does the escaping; this only appends a button after it.
+  if(typeof undo==='function'){
+    const b=document.createElement('button');
+    b.className='toast-undo'; b.type='button'; b.textContent='Undo';
+    b.onclick=()=>{ try{undo();}catch(e){} el.classList.remove('on'); clearTimeout(toastT); };
+    el.appendChild(b);
+  }
+  el.classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>el.classList.remove('on'),ms||2200);}
 
 // ─── SERVICE WORKER + SEAMLESS AUTO-UPDATE ───────────────────────────────────
 try{
@@ -17815,13 +17991,14 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-14.44',
-  title:'Natural selection',
-  push:'Thin the Plan list one show at a time.',
+  v:'2026-08-14.45',
+  title:'An Archive, and no more duplicate imports',
+  push:'Nothing gets deleted any more.',
   notes:[
-    'Natural selection. A plan list only ever grows \u2014 adding is one tap and removing never comes up on its own \u2014 so this walks yours one show at a time and asks a single question. Swipe right to keep, left to remove, or use the buttons. Each card carries the art, what the show is about, how many episodes it is and how many hours it would cost you. Under "Not sure what to watch?" once you have three or more in Plan.',
-    'Remove means off the list, not moved to Dropped \u2014 Dropped is for something you started and gave up on, and nothing sitting in Plan was ever started. The card says so, so the two are not read as the same thing.',
-    'Nothing goes while you swipe. Removals are collected and shown at the end for one confirmation, with the covers, so you can see exactly what is about to go \u2014 and leaving early keeps everything.',
+    'Importing a list no longer leaves duplicates of things you already had. A title carrying an alternate name in brackets \u2014 "Ao Haru Ride (Blue Spring Ride)" \u2014 counted as a different show from plain "Ao Haru Ride", so it came in twice and could not be matched to anything either. Both halves now count as the same title. Brackets holding a year or a season number are left alone, since those are what tell two entries apart.',
+    'Natural selection sets titles aside in an Archive instead of deleting them. From there you can pick any of them and bring them back, or clear them out for good \u2014 that is now the only place in the app that deletes anything. Going through a hundred titles quickly means some calls will be wrong.',
+    'The synopsis is no longer cut off, and on a keyboard the arrow keys work: left sets aside, right keeps.',
+    'Hiding a friend\u2019s recommendation can be undone. The X sits where it is easy to catch by accident, and it tells that friend you passed \u2014 so the message now waits a few seconds, and undoing means nothing was ever sent.',
   ],
 };
 // The rows animate in once, on the first paint of a session. render() runs on

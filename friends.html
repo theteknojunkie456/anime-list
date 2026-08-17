@@ -6583,29 +6583,38 @@ function pixelateOne(img){
 //
 // The batch is capped. Drawing everything synchronously is exactly the mistake
 // that made this slow the first time; the observer picks up whatever is left.
-const PX_NEAR=1400, PX_BATCH=24;
-// Everything waiting to be drawn. The scroll pass walks THIS, not the document:
-// re-querying 185 images and measuring each one on every frame is its own kind of
-// slow, and would have traded one stutter for another.
+const PX_NEAR=1400, PX_BATCH=40;
+// Everything waiting to be drawn. The sweep walks THIS, not the document:
+// re-querying 185 images and measuring each one every frame is its own kind of
+// slow, and would trade one stutter for another.
 const _pxPending=new Set();
 let _pxTick=0;
+// Draw everything that CAN be drawn, not just what is near the viewport.
+// Switching sort or filter rebuilds the list, and those images are already in
+// the browser's cache — so gating them on scroll position is what made it
+// possible to outrun the effect by changing the sort. The only real limit is
+// loading="lazy": an image the browser has not fetched has no pixels to copy,
+// so those pixelate on their load event instead (see pixelateOne).
+//
+// Chunked across frames rather than done in one go. 185 canvases in a single
+// pass is the freeze this started as; a capped batch per frame keeps the list
+// responsive while still finishing in a few frames.
 function pxSweep(){
   _pxTick=0;
   if(!retroMode()||!_pxPending.size)return;
-  const vh=innerHeight||800; let drawn=0;
+  let drawn=0, more=false;
   for(const img of Array.from(_pxPending)){
     if(!img.isConnected||img.dataset.pxDone==='1'){ _pxPending.delete(img); continue; }
-    if(drawn>=PX_BATCH)break;
-    const r=img.getBoundingClientRect();
-    if(r.bottom>-PX_NEAR && r.top<vh+PX_NEAR){
-      pixelateOne(img);
-      if(img.dataset.pxDone==='1'){ _pxPending.delete(img); drawn++; try{pxObserver().unobserve(img);}catch(e){} }
-    }
+    if(drawn>=PX_BATCH){ more=true; break; }
+    if(!img.complete||!img.naturalWidth)continue;      // not fetched yet — its load event will get it
+    pixelateOne(img);
+    if(img.dataset.pxDone==='1'){ _pxPending.delete(img); drawn++; try{pxObserver().unobserve(img);}catch(e){} }
   }
+  if(more&&!_pxTick)_pxTick=requestAnimationFrame(pxSweep);   // keep going next frame
 }
-// The observer's callback is asynchronous and batched, which is what a fast flick
-// outruns. A scroll listener answers within the frame instead. Capture, because
-// the list scrolls inside .page rather than the window.
+// The observer's callback is asynchronous and batched, which is what a fast
+// flick outruns. A scroll listener answers within the frame instead. Capture,
+// because the list scrolls inside .page rather than the window.
 function pxOnScroll(){ if(!_pxTick)_pxTick=requestAnimationFrame(pxSweep); }
 try{addEventListener('scroll',pxOnScroll,{passive:true,capture:true});}catch(e){}
 function pixelateCovers(){
@@ -6614,10 +6623,19 @@ function pixelateCovers(){
     document.querySelectorAll(PX_SEL).forEach(img=>{
       if(img.tagName!=='IMG'||img.dataset.pxDone==='1'||img.dataset.pxObs==='1')return;
       img.dataset.pxObs='1';
+      // A lazy image the browser has not fetched has NO pixels to copy, which is
+      // the real reason the effect could be outrun: switching sort rebuilds the
+      // list and most covers are unfetched again. In Retro they load eagerly —
+      // after the first view they come from cache, so this costs nothing on a
+      // re-sort and only pulls forward fetches that scrolling would do anyway.
+      try{if(img.loading==='lazy')img.loading='eager';}catch(e){}
       _pxPending.add(img);
+      // Still observed, so an image that lazy-loads later is caught the moment
+      // it arrives rather than waiting for a scroll.
       pxObserver().observe(img);
+      if(!img.complete||!img.naturalWidth)img.addEventListener('load',()=>{ if(retroMode())pixelateOne(img); },{once:true});
     });
-    pxSweep();            // draw what is already close, before the frame is shown
+    pxSweep();            // start now, before the frame is shown
   }catch(e){}
 }
 function unpixelateCovers(){
@@ -17598,13 +17616,12 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-14.41',
-  title:'Big pictures keep some pixels after all',
-  push:'Pick any colour for either edge.',
+  v:'2026-08-14.42',
+  title:'The pixels stop lagging behind you',
+  push:'Change the sort and they are already there.',
   notes:[
-    'Big pictures have their pixels back, gently. Making them sharper had gone all the way to drawing them at full resolution, which left no pixels in them at all \u2014 they now keep a visible texture while staying readable. Small cards are unchanged.',
-    'Both edge colours are yours to pick, and either can be any colour. They are two rows: the lit top edge, and the shadow it drops below.',
-    'Dismissing the "not linked" bar no longer leaves a gap behind it.',
+    'Covers are pixels by the time you see them, whatever you do to get there. Changing the sort or the filter rebuilds the whole list, and most covers had not been fetched again yet \u2014 an unfetched picture has nothing to copy, which is what you were outrunning. In Retro they load up front instead, so a re-sort finds them already in hand.',
+    'One consequence worth knowing: with Retro on, a list this size fetches all of its covers rather than only the ones you scroll to. After the first time they come from the cache, but the first load on a new device will pull more than it used to.',
   ],
 };
 // The rows animate in once, on the first paint of a session. render() runs on

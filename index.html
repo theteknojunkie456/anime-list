@@ -10107,28 +10107,49 @@ async function aiCleanImport(){
   if(!getKey()){toast('Add an AI key below first');return;}
   const btn=document.getElementById('aiCleanBtn'); const was=btn?btn.innerHTML:'';
   if(btn){btn.disabled=true;btn.innerHTML=icon('loader')+' Cleaning up…';}
-  const prompt=`You are cleaning up a messy anime/manga watchlist for import. For EACH entry in the text below, output the correct official title. Fix typos and abbreviations to the real title. If one line actually contains several titles run together, split them into separate entries. Skip video games.
-Return ONLY a JSON array, no prose, each item: {"title": "Official Title", "status": "plan|watching|finished|dropped", "kind": "watch|read"}.
-Rules: kind is "read" for manga/manhwa/webtoons/light novels, else "watch". If a status isn't stated, use "plan". Keep numbers that are part of a title (e.g. 86, Mob Psycho 100).
+  // A long list used to be cut at 6000 characters and the rest silently dropped —
+  // on a list of a couple of hundred titles that is most of it, and nothing said
+  // so. Split on line boundaries and ask about each piece in turn.
+  const chunks=[]; let cur='';
+  for(const line of raw.split(/\r?\n/)){
+    if(cur.length+line.length>4500){chunks.push(cur);cur='';}
+    cur+=line+'\n';
+  }
+  if(cur.trim())chunks.push(cur);
+  const ask=async (text,i)=>{
+    if(btn&&chunks.length>1)btn.innerHTML=icon('loader')+` Cleaning up… ${i+1}/${chunks.length}`;
+    // Progress and score are asked for too. The plain parser reads "ep 12" and
+    // "★8" perfectly well, and the AI pass used to throw both away — so tidying
+    // a list cost you exactly the detail that makes it yours.
+    const prompt=`You are cleaning up a messy anime/manga watchlist for import. For EACH entry in the text below, output the correct official title. Fix typos and abbreviations.
+Return ONLY a JSON array, no prose, each item: {"title": "Official Title", "status": "plan|watching|finished|dropped", "kind": "watch|read", "ep": 0, "rating": 0}.
+Rules: kind is "read" for manga/manhwa/webtoons/light novels, else "watch". If a status isn't stated, use "plan". "ep" is the episode or chapter the person has reached, 0 if not stated. "rating" is their score out of 10, 0 if not stated — convert a /5 score by doubling it. Keep numbers that are part of a title (e.g. 86, Mob Psycho 100).
 TEXT:
-${raw.slice(0,6000)}`;
-  try{
-    let out=await callAI(prompt);
-    // pull the JSON array out of whatever wrapping the model added
+${text}`;
+    const out=await callAI(prompt);
     const m=out.match(/\[[\s\S]*\]/); if(!m)throw 0;
     const arr=JSON.parse(m[0]);
-    if(!Array.isArray(arr)||!arr.length)throw 0;
+    if(!Array.isArray(arr))throw 0;
+    return arr;
+  };
+  try{
+    let all=[];
+    for(let i=0;i<chunks.length;i++) all=all.concat(await ask(chunks[i],i));
+    if(!all.length)throw 0;
     const seen=new Set();
-    importItems=arr.map((x,i)=>{
+    importItems=all.map((x,i)=>{
       const title=String(x&&x.title||'').trim(); if(!title)return null;
       const key=normTitle(title); if(!key||seen.has(key))return null; seen.add(key);
       const status=/watch|current/i.test(x.status)?'watching':/finish|complet|done/i.test(x.status)?'finished':/drop/i.test(x.status)?'dropped':'plan';
-      return {id:i,title,status,ep:0,rating:0,kind:/read/i.test(x.kind||'')?'read':'',selected:true};
+      const ep=Math.max(0,parseInt(x.ep,10)||0);
+      let rating=Math.max(0,Math.min(10,parseFloat(x.rating)||0));
+      return {id:i,title,status,ep,rating,kind:/read/i.test(x.kind||'')?'read':'',selected:true};
     }).filter(Boolean);
     if(!importItems.length)throw 0;
     renderPreview();
     document.getElementById('importActions').style.display='flex';
-    toast(`AI sorted ${importItems.length}. Check them over`);
+    const withEp=importItems.filter(x=>x.ep||x.rating).length;
+    toast(`AI sorted ${importItems.length}${withEp?`, kept progress on ${withEp}`:''}. Check them over`);
   }catch(e){
     toast('AI cleanup didn’t work. Using the plain parse');
     parseImport();   // fall back to the reliable regex import
@@ -17998,13 +18019,14 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-14.46',
-  title:'An Archive, and no more duplicate imports',
-  push:'Nothing gets deleted any more.',
+  v:'2026-08-14.47',
+  title:'Cleaning up an import keeps your progress',
+  push:'And it stops cutting long lists short.',
   notes:[
-    'Importing a list no longer leaves duplicates of things you already had. A title carrying an alternate name in brackets \u2014 "Ao Haru Ride (Blue Spring Ride)" \u2014 counted as a different show from plain "Ao Haru Ride", so it came in twice and could not be matched to anything either. Brackets holding a year or a season number are left alone, since those are what tell two entries apart.',
-    'Titles you set aside go to an Archive instead of being deleted, and you can bring any of them back from there.',
-    'Hiding a friend\u2019s recommendation can be undone. The X is easy to catch by accident and it tells that friend you passed \u2014 so the message waits a few seconds, and undoing means nothing was ever sent.',
+    'Tidying an import with AI no longer costs you your progress. It was only ever asked for titles and statuses, so every episode count and score in the list you pasted was thrown away \u2014 the plain parser had been reading those correctly all along. It now brings them across too, and says how many it kept.',
+    'A long list is no longer cut short. Anything past about six thousand characters was silently dropped, which on a list of a couple of hundred titles is most of it. It is asked about in pieces now, with the progress shown as it goes.',
+    'Importing a list no longer leaves duplicates of things you already had, when the incoming title carries an alternate name in brackets.',
+    'Titles you set aside go to an Archive instead of being deleted, and you can bring any of them back.',
   ],
 };
 // The rows animate in once, on the first paint of a session. render() runs on

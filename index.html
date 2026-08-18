@@ -3710,6 +3710,17 @@ body.recsel .pcard{position:relative;}
     <button class="lock-btn" id="joinBtn" onclick="requestJoin()">Send request</button>
     <div class="lock-err" id="joinErr"></div>
     <a class="lock-alt" id="joinRetry" style="display:none" onclick="pollJoin(true)">Check again</a>
+    <!-- The owner should never have to wait for the owner. Clearing site data
+         mints a new device id, so every reset used to mean a fresh request and
+         somebody on the other end approving it — five times on one machine.
+         The admin token already proves who you are; this lets it do that here. -->
+    <a class="lock-alt" id="joinOwner" onclick="showOwnerUnlock()">I'm the owner</a>
+    <div id="ownerUnlock" style="display:none;margin-top:10px">
+      <input id="ownerTok" class="lock-in" type="password" placeholder="Admin token" autocomplete="off" spellcheck="false"
+             enterkeyhint="go" onkeydown="if(event.key==='Enter')ownerUnlock()">
+      <button class="lock-btn" style="margin-top:8px" onclick="ownerUnlock()">Unlock this device</button>
+      <div class="join-hint">Approves this device straight away and remembers it, so this is the last time.</div>
+    </div>
   </div>
 </div>
 <div id="app">
@@ -4644,6 +4655,31 @@ async function networkGate(){
 }
 let _joinSource='';
 function pickSource(el,val){_joinSource=val;const p=document.getElementById('joinSourceChips');if(p)p.querySelectorAll('.src-chip').forEach(c=>c.classList.remove('on'));if(el)el.classList.add('on');}
+// Self-approval for the owner. Same endpoint the Admin panel uses, with the same
+// token — this adds no new power, it just stops the one person who can approve
+// devices from being unable to approve their own.
+function showOwnerUnlock(){
+  const b=document.getElementById('ownerUnlock'), a=document.getElementById('joinOwner');
+  if(b)b.style.display='';
+  if(a)a.style.display='none';
+  const i=document.getElementById('ownerTok'); if(i)i.focus();
+}
+async function ownerUnlock(){
+  const i=document.getElementById('ownerTok'), err=document.getElementById('joinErr');
+  const tok=((i&&i.value)||'').trim();
+  if(!tok){if(err)err.textContent='Paste your admin token';return;}
+  if(err)err.textContent='Unlocking\u2026';
+  try{
+    const r=await netCall('/approve',{token:tok,deviceId:wlDevice()});
+    if(!r||r.error||r.ok===false)throw new Error((r&&r.error)||'rejected');
+    // Keep the token: this device is now an admin device, which is what makes it
+    // the LAST time — the gate check itself will pass from here on.
+    try{localStorage.setItem(ADMIN_TK,tok);bindAdminKey();}catch(e){}
+    setNetStatus('approved');
+    hideJoinGate();
+    safeReload();
+  }catch(e){ if(err)err.textContent='That token was not accepted'; }
+}
 function showJoinGate(st){
   const el=document.getElementById('joinScreen');if(!el)return;
   const t=document.getElementById('joinTitle'),s=document.getElementById('joinSub'),b=document.getElementById('joinBtn'),r=document.getElementById('joinRetry'),ic=document.getElementById('joinIco');
@@ -18252,12 +18288,12 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-14.53',
-  title:'Pixel covers, done up front with a progress bar',
-  push:'You can see how long it will take.',
+  v:'2026-08-14.54',
+  title:'Let yourself in',
+  push:'No more waiting to be approved on your own device.',
   notes:[
-    'Pixel covers work again \u2014 they had been off for two releases without anything appearing to be wrong. An edit removed a few lines the drawing code depended on, and because that code guards itself against errors it failed silently every time rather than complaining.',
-    'Turning Retro on now does the whole list up front instead of catching up as you scroll, with a bar at the bottom showing how far it has got and roughly how long is left. The estimate comes from how fast your own device is actually going, so it is honest rather than a guess, and the bar takes itself away when it finishes.',
+    'If you are the owner you can now let your own device in from the join screen \u2014 paste your admin token and it is approved on the spot, and remembered, so it is the last time that device asks. Clearing your browser data makes the app treat you as somebody new, which is why it kept happening.',
+    'Turning Retro on does the whole list up front with a progress bar at the bottom, showing how far it has got and roughly how long is left based on how fast your device is actually going.',
   ],
 };
 // The rows animate in once, on the first paint of a session. render() runs on

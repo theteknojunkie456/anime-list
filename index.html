@@ -7050,6 +7050,39 @@ function pixelateOne(img){
     }catch(e2){}
   }
 }
+// Everything below was deleted by accident in the release that moved pixels from
+// canvas elements to data URLs: that edit replaced the whole span between
+// pixelateOne and pixelateCovers, which happened to contain the pending set, the
+// sweep and the scroll listener. pixelateCovers then threw ReferenceError on
+// _pxPending every single call — inside its own try/catch, so nothing was logged
+// and nothing was drawn. Pixel covers were simply off for two releases while the
+// code still looked correct.
+const PX_NEAR=1400, PX_BATCH=40;
+const _pxPending=new Set();
+let _pxTick=0;
+// Draw everything that CAN be drawn, not just what is near the viewport:
+// switching sort or filter rebuilds the list and those images are cache-hot, so
+// gating on scroll position is what let the effect be outrun. Chunked across
+// frames rather than done in one pass, because 185 canvases in a single go is
+// the freeze this started as.
+function pxSweep(){
+  _pxTick=0;
+  if(!retroMode()||!_pxPending.size)return;
+  let drawn=0, more=false;
+  for(const img of Array.from(_pxPending)){
+    if(!img.isConnected||img.dataset.pxDone==='1'){ _pxPending.delete(img); continue; }
+    if(drawn>=PX_BATCH){ more=true; break; }
+    if(!img.complete||!img.naturalWidth)continue;   // not fetched yet — its load event will get it
+    pixelateOne(img);
+    if(img.dataset.pxDone==='1'){ _pxPending.delete(img); drawn++; try{pxObserver().unobserve(img);}catch(e){} }
+  }
+  if(more&&!_pxTick)_pxTick=requestAnimationFrame(pxSweep);
+}
+// The observer's callback is asynchronous and batched, which a fast flick
+// outruns. A scroll listener answers within the frame instead — captured,
+// because the list scrolls inside .page rather than the window.
+function pxOnScroll(){ if(!_pxTick)_pxTick=requestAnimationFrame(pxSweep); }
+try{addEventListener('scroll',pxOnScroll,{passive:true,capture:true});}catch(e){}
 function pixelateCovers(){
   if(!retroMode())return;
   try{
@@ -18161,12 +18194,12 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-14.51',
-  title:'Natural selection: head to head',
-  push:'Two at a time, and the junk comes first.',
+  v:'2026-08-14.52',
+  title:'The pixel covers are back on',
+  push:'They had been quietly off for two releases.',
   notes:[
-    'A title that arrives with junk stuck on the end \u2014 "Yu Yu Hakusho Ghostfiles Mzvfd3" \u2014 can now be matched and cleaned up by Fix all. Only a trailing scrap mixing letters and digits is ever tried, and only if the database recognises what is left, so 86, Mob Psycho 100 and Steins;Gate 0 are never touched.',
-    'Pictures are drawn at the best quality that still looks like pixels, and the bigger the picture the finer they are.',
+    'Pixel covers work again. They had been off for two releases without anything appearing to be wrong: an edit removed a few lines the drawing code depended on, and because that code guards itself against errors, it failed silently every time rather than complaining. Nothing looked broken, it just quietly did nothing.',
+    'Natural selection has a head to head mode: two titles at once, keep one, keep both, or neither.',
   ],
 };
 // The rows animate in once, on the first paint of a session. render() runs on

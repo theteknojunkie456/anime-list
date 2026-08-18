@@ -5850,11 +5850,14 @@ function applyExtra(x){
 function _applyExtraRepaint(){
   // repaint everything the synced state drives
   try{const at=localStorage.getItem('animetheme');if(at&&typeof applyTheme==='function')applyTheme(at);}catch(e){}
-  try{if(typeof applyGlow==='function')applyGlow();}catch(e){}
-  try{if(typeof applyArtMode==='function')applyArtMode();}catch(e){}
+  // applyGlow / applyArtMode / applyUiStyle were called here behind typeof
+  // guards and none of the three exists, so a glow, art or UI-style setting
+  // arriving from another device was written to storage and never painted. The
+  // guard is why it never threw and so was never noticed. applyAmbient is the
+  // real one; the other two have no implementation to call.
+  try{applyAmbient();}catch(e){}
   try{if(typeof applyAccent==='function')applyAccent();}catch(e){}
   try{if(typeof applyDensity==='function')applyDensity();}catch(e){}
-  try{if(typeof applyUiStyle==='function')applyUiStyle();}catch(e){}
   try{if(typeof applyTint==='function')applyTint();}catch(e){}
   try{if(typeof applyStatusColors==='function')applyStatusColors();}catch(e){}
   try{if(typeof applyAmbient==='function')applyAmbient();}catch(e){}
@@ -7390,7 +7393,11 @@ function resetTheme(){
     .forEach(k=>{try{localStorage.removeItem(k);}catch(e){}});
   try{applyTheme('default');}catch(e){}
   [applyAccent,applyTint,applyStatusColors,applyDensity].forEach(f=>{try{f();}catch(e){}});
-  try{applyGlow();}catch(e){}
+  // applyGlow() does not exist and never did — this call has been silently doing
+  // nothing, so resetting your appearance left the ambient glow exactly as it
+  // was, still lit in the old accent. applyAmbient() is the function that reads
+  // glow_mode, which the line above has just cleared.
+  try{applyAmbient();}catch(e){}
   try{render();}catch(e){}
   try{renderThemeGrid();}catch(e){}
   ['renderAccentRow',
@@ -18019,14 +18026,13 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-14.47',
-  title:'Cleaning up an import keeps your progress',
-  push:'And it stops cutting long lists short.',
+  v:'2026-08-14.48',
+  title:'Settings that arrive from another device now take effect',
+  push:'Plus reset really resets the glow.',
   notes:[
-    'Tidying an import with AI no longer costs you your progress. It was only ever asked for titles and statuses, so every episode count and score in the list you pasted was thrown away \u2014 the plain parser had been reading those correctly all along. It now brings them across too, and says how many it kept.',
-    'A long list is no longer cut short. Anything past about six thousand characters was silently dropped, which on a list of a couple of hundred titles is most of it. It is asked about in pieces now, with the progress shown as it goes.',
-    'Importing a list no longer leaves duplicates of things you already had, when the incoming title carries an alternate name in brackets.',
-    'Titles you set aside go to an Archive instead of being deleted, and you can bring any of them back.',
+    'Changing the glow on one device now shows up on your others. The code that repaints after settings arrive was calling three functions that do not exist \u2014 written defensively enough that nothing ever complained, so the setting was saved and simply never drawn.',
+    'Resetting your appearance now resets the glow with everything else. It used to leave it burning in the old accent.',
+    'Tidying an import with AI keeps your progress \u2014 episode counts and scores were being thrown away \u2014 and no longer cuts a long list short.',
   ],
 };
 // The rows animate in once, on the first paint of a session. render() runs on

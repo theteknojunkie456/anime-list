@@ -6001,6 +6001,29 @@ async function syncPush(){
     if(!have&&stored!==0)return;
     // A 90% collapse is the same story as the notify list: not a deletion.
     if(stored>=10&&have<stored*0.4)return;
+    // A device with NOTHING — freshly installed, or storage wiped by clearing
+    // cookies — is the one case those two can't see: `stored` is 0 as well, so
+    // pushing [] looks perfectly legitimate. It isn't. On 18 Aug a cleared
+    // desktop profile adopted a code and overwrote a full list with an empty
+    // one, and KV keeps no history to undo that. A code that already holds a
+    // list belongs to a device that HAD one; replacing it with nothing is never
+    // what the person meant. Ask the far end before writing over it, and if the
+    // answer can't be had, don't write at all — declining to back up is a
+    // recoverable mistake, and this is not.
+    if(!have){
+      let far=-1;
+      try{
+        const res=await syncPull();
+        const {inner}=unwrapSync(res&&res.data);
+        // Encrypted (v2) counts as "has something": we can't read it here, and
+        // an unreadable backup is still somebody's backup.
+        far = Array.isArray(inner) ? inner.length : (inner&&inner.v===2 ? 1 : 0);
+      }catch(e){ return; }
+      if(far!==0){
+        try{ if(typeof toast==='function')toast('Not backing up an empty list over the one already saved. Restore first'); }catch(e){}
+        return;
+      }
+    }
   }
   try{
     let list=realList();

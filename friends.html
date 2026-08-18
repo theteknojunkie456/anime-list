@@ -390,6 +390,18 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
   }
   #hubSheet .fr-x{min-width:44px;}
 }
+/* A recommendation reuses the title page's .dt-top / .dt-cover / .dt-info, but
+   without the .dt-cover-wrap that gives the cover its size there — so the cover
+   fell back to width:100%;height:100% and filled the sheet, squeezing the title
+   and the note into a clipped column a few characters wide. Here it is a
+   thumbnail beside the text, which is what the layout assumes. */
+#recDetailSheet .dt-top{display:flex;align-items:flex-start;gap:14px;}
+#recDetailSheet .dt-cover,#recDetailSheet .dt-cover-ph{
+  width:112px;height:158px;flex:0 0 auto;object-fit:cover;border-radius:10px;
+  display:flex;align-items:center;justify-content:center;
+}
+#recDetailSheet .dt-info{flex:1;min-width:0;}
+#recDetailSheet .dt-title{white-space:normal;overflow-wrap:anywhere;}
 /* ARCHIVE */
 .ar-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--bn2);cursor:pointer;}
 .ar-row img,.ar-ph{width:36px;height:51px;object-fit:cover;border-radius:6px;flex:none;background:var(--bg4);
@@ -6814,7 +6826,7 @@ function nsApply(){
 // closer to full resolution so detail survives. 1.0 was drawing it at exactly 1:1
 // — sharp, but with no pixels left in it at all, which is not the point. 1.2
 // keeps a visible texture on a large picture while leaving it readable.
-const PX_DIV=2.5, PX_DIV_BIG=1.2, PX_MIN=26;
+const PX_DIV=2.5, PX_DIV_FINE=1.1, PX_MIN=26;
 const PX_SEL='.pcard-img,.rz-img,.pk-cover,.dt-cover,.sched-thumb,.resume-art,.pop-cover,.pick-img,.rc-note-img,.hero-bg-img,.dt-banner-img';
 let _pxIO=null;
 function pxObserver(){
@@ -6824,94 +6836,109 @@ function pxObserver(){
   },{rootMargin:'1400px'});    // several screens of lead time — see the catch-up note below
   return _pxIO;
 }
+// One canvas, reused, never in the DOM. The previous version put a <canvas>
+// beside every cover: 581 of them for 200 titles, because a title appears in
+// several rows and each <img> got its own. The typical frame was fine and the
+// tail was catastrophic — measured at p95 1100-2800ms against 75-190ms with the
+// effect off.
+//
+// The cover CDN sends access-control-allow-origin for this site, so with
+// crossOrigin='anonymous' the canvas is NOT tainted and its pixels can be read
+// back. That changes everything: draw once into a single scratch canvas, take a
+// data URL, and hand it to the image as its own src. No canvas elements exist,
+// nothing extra composites, and the result is cached per source+size — so the
+// same cover in four rows is computed once instead of four times.
+//
+// If CORS is ever refused (another CDN, a user's own art) toDataURL throws and
+// this falls back to the old element-per-image path, which is slow but correct.
+const _pxCache=new Map();
+let _pxScratch=null;
+function _pxDraw(img,w,h){
+  const c=_pxScratch||(_pxScratch=document.createElement('canvas'));
+  c.width=w; c.height=h;
+  const x=c.getContext('2d');
+  x.clearRect(0,0,w,h);
+  x.imageSmoothingEnabled=false;
+  // object-fit:cover CROPS to fill the frame; drawing the whole source in
+  // squashes the picture to whatever shape the box happens to be.
+  const iw=img.naturalWidth, ih=img.naturalHeight;
+  let sx=0, sy=0, sw=iw, sh=ih;
+  const tAR=w/h, sAR=iw/ih;
+  if(sAR>tAR){ sw=ih*tAR; sx=(iw-sw)/2; } else { sh=iw/tAR; sy=(ih-sh)/2; }
+  x.drawImage(img,sx,sy,sw,sh,0,0,w,h);
+  // Graded rather than filtered: highlights lift, shadows sink, and a wash of
+  // the theme's colour runs through one corner.
+  try{
+    const g=x.createLinearGradient(0,0,0,h);
+    g.addColorStop(0,'rgba(255,255,255,.24)');
+    g.addColorStop(.52,'rgba(128,128,128,0)');
+    g.addColorStop(1,'rgba(0,0,0,.30)');
+    x.globalCompositeOperation='overlay';
+    x.fillStyle=g; x.fillRect(0,0,w,h);
+    const cs=getComputedStyle(document.documentElement);
+    let tint=(cs.getPropertyValue('--edge')||'').trim();
+    if(!/^#|^rgb/.test(tint))tint=(cs.getPropertyValue('--a')||'#7c5cff').trim();
+    const rg=x.createRadialGradient(0,0,0,0,0,Math.max(w,h)*1.15);
+    rg.addColorStop(0,tint); rg.addColorStop(1,'rgba(0,0,0,0)');
+    x.globalCompositeOperation='soft-light'; x.globalAlpha=.5;
+    x.fillStyle=rg; x.fillRect(0,0,w,h);
+    x.globalAlpha=1; x.globalCompositeOperation='source-over';
+  }catch(e){}
+  return c;
+}
+// How coarse, as a function of how big. It used to be a two-step — one value
+// under 260px and another above — which put the cover on a title page, the one
+// picture you actually stop and look at, on the coarse side of the line.
+//
+// A ramp instead: the bigger the picture, the finer the blocks, so a thumbnail
+// still reads as pixels while a banner keeps its detail. The detail cover is
+// pinned to the finest setting regardless of its measured size, because what
+// matters there is that you are studying it, not how many pixels wide it is.
+const PX_FINE_SEL='.dt-cover,.dt-cover-ph';
+function pxDivFor(img,w){
+  try{ if(img.matches(PX_FINE_SEL))return PX_DIV_FINE; }catch(e){}
+  const t=Math.max(0,Math.min(1,(w-100)/700));      // 100px -> coarse, 800px+ -> finest
+  return PX_DIV - t*(PX_DIV-PX_DIV_FINE);
+}
 function pixelateOne(img){
   if(!img||img.dataset.pxDone==='1')return;
-  if(!img.complete||!img.naturalWidth){ img.addEventListener('load',()=>pixelateOne(img),{once:true}); return; }
+  const orig=img.dataset.pxOrig||img.getAttribute('src')||'';
+  if(!orig||orig.startsWith('data:'))return;
   const r=img.getBoundingClientRect(); if(r.width<4)return;
-  try{
-    const c=document.createElement('canvas');
-    const ratio=r.height/r.width || 1.42;
-    const div=r.width>260?PX_DIV_BIG:PX_DIV;
-    const w=Math.max(PX_MIN,Math.round(r.width/div));
-    c.width=w; c.height=Math.max(1,Math.round(w*ratio));
-    const x=c.getContext('2d');
-    x.imageSmoothingEnabled=false;
-    // object-fit:cover CROPS to fill the frame; drawing the whole source into it
-    // squashes the picture to whatever shape the box happens to be.
-    const iw=img.naturalWidth, ih=img.naturalHeight;
-    let sx=0, sy=0, sw=iw, sh=ih;
-    const tAR=c.width/c.height, sAR=iw/ih;
-    if(sAR>tAR){ sw=ih*tAR; sx=(iw-sw)/2; } else { sh=iw/tAR; sy=(ih-sh)/2; }
-    x.drawImage(img,sx,sy,sw,sh,0,0,c.width,c.height);
-    // Graded, not filtered: highlights lift, shadows sink, and a wash of the
-    // theme's colour runs through one corner. Cross-origin art taints the canvas
-    // so pixels cannot be read back — composite operations still work.
-    try{
-      const g=x.createLinearGradient(0,0,0,c.height);
-      g.addColorStop(0,'rgba(255,255,255,.24)');
-      g.addColorStop(.52,'rgba(128,128,128,0)');
-      g.addColorStop(1,'rgba(0,0,0,.30)');
-      x.globalCompositeOperation='overlay';
-      x.fillStyle=g; x.fillRect(0,0,c.width,c.height);
-      const cs=getComputedStyle(document.documentElement);
-      let tint=(cs.getPropertyValue('--edge')||'').trim();
-      if(!/^#|^rgb/.test(tint))tint=(cs.getPropertyValue('--a')||'#7c5cff').trim();
-      const rg=x.createRadialGradient(0,0,0,0,0,Math.max(c.width,c.height)*1.15);
-      rg.addColorStop(0,tint); rg.addColorStop(1,'rgba(0,0,0,0)');
-      x.globalCompositeOperation='soft-light'; x.globalAlpha=.5;
-      x.fillStyle=rg; x.fillRect(0,0,c.width,c.height);
-      x.globalAlpha=1; x.globalCompositeOperation='source-over';
-    }catch(e){}
-    c.className=img.className+' pxc';
-    c.setAttribute('aria-hidden','true');
-    img.dataset.pxDone='1';
-    img.classList.add('pxc-src');
-    img.after(c);
-  }catch(e){}
-}
-// The observer alone was not enough. Its callback is asynchronous and batched, so
-// switching tabs or flicking the list fast outruns it: the sharp picture is on
-// screen for a moment and then pops into pixels. Two answers, together — several
-// screens of lead time so the work starts long before you arrive, and a
-// SYNCHRONOUS catch-up here for anything already close, so a tab switch has its
-// covers drawn before the frame is shown rather than one callback later.
-//
-// The batch is capped. Drawing everything synchronously is exactly the mistake
-// that made this slow the first time; the observer picks up whatever is left.
-const PX_NEAR=1400, PX_BATCH=40;
-// Everything waiting to be drawn. The sweep walks THIS, not the document:
-// re-querying 185 images and measuring each one every frame is its own kind of
-// slow, and would trade one stutter for another.
-const _pxPending=new Set();
-let _pxTick=0;
-// Draw everything that CAN be drawn, not just what is near the viewport.
-// Switching sort or filter rebuilds the list, and those images are already in
-// the browser's cache — so gating them on scroll position is what made it
-// possible to outrun the effect by changing the sort. The only real limit is
-// loading="lazy": an image the browser has not fetched has no pixels to copy,
-// so those pixelate on their load event instead (see pixelateOne).
-//
-// Chunked across frames rather than done in one go. 185 canvases in a single
-// pass is the freeze this started as; a capped batch per frame keeps the list
-// responsive while still finishing in a few frames.
-function pxSweep(){
-  _pxTick=0;
-  if(!retroMode()||!_pxPending.size)return;
-  let drawn=0, more=false;
-  for(const img of Array.from(_pxPending)){
-    if(!img.isConnected||img.dataset.pxDone==='1'){ _pxPending.delete(img); continue; }
-    if(drawn>=PX_BATCH){ more=true; break; }
-    if(!img.complete||!img.naturalWidth)continue;      // not fetched yet — its load event will get it
-    pixelateOne(img);
-    if(img.dataset.pxDone==='1'){ _pxPending.delete(img); drawn++; try{pxObserver().unobserve(img);}catch(e){} }
+  const div=pxDivFor(img,r.width);
+  const w=Math.max(PX_MIN,Math.round(r.width/div));
+  const h=Math.max(1,Math.round(w*((r.height/r.width)||1.42)));
+  const key=orig+'|'+w+'x'+h;
+  img.dataset.pxOrig=orig;
+  const cached=_pxCache.get(key);
+  if(cached){ img.dataset.pxDone='1'; img.src=cached; return; }
+  // crossOrigin has to be set before the bytes are fetched, so an image already
+  // loaded without it must come again — from cache, since the CDN sends a long
+  // max-age. Guarded so this happens at most once per element.
+  if(img.crossOrigin!=='anonymous'){
+    if(img.dataset.pxCors==='1')return;      // already retried; wait for onload
+    img.dataset.pxCors='1';
+    img.addEventListener('load',()=>{ if(retroMode())pixelateOne(img); },{once:true});
+    img.crossOrigin='anonymous';
+    img.src=orig;                            // re-request with CORS
+    return;
   }
-  if(more&&!_pxTick)_pxTick=requestAnimationFrame(pxSweep);   // keep going next frame
+  if(!img.complete||!img.naturalWidth)return;
+  try{
+    const url=_pxDraw(img,w,h).toDataURL('image/png');   // throws if tainted
+    if(_pxCache.size>400)_pxCache.clear();               // bounded; covers churn as lists change
+    _pxCache.set(key,url);
+    img.dataset.pxDone='1';
+    img.src=url;
+  }catch(e){
+    // Tainted after all — fall back to the element-per-image overlay.
+    try{
+      const c=_pxDraw(img,w,h);
+      c.className=img.className+' pxc'; c.setAttribute('aria-hidden','true');
+      img.dataset.pxDone='1'; img.classList.add('pxc-src'); img.after(c);
+    }catch(e2){}
+  }
 }
-// The observer's callback is asynchronous and batched, which is what a fast
-// flick outruns. A scroll listener answers within the frame instead. Capture,
-// because the list scrolls inside .page rather than the window.
-function pxOnScroll(){ if(!_pxTick)_pxTick=requestAnimationFrame(pxSweep); }
-try{addEventListener('scroll',pxOnScroll,{passive:true,capture:true});}catch(e){}
 function pixelateCovers(){
   if(!retroMode())return;
   try{
@@ -6938,7 +6965,13 @@ function unpixelateCovers(){
     if(_pxIO){_pxIO.disconnect();_pxIO=null;}
     _pxPending.clear();
     document.querySelectorAll('canvas.pxc').forEach(c=>c.remove());
-    document.querySelectorAll('img.pxc-src').forEach(i=>{i.classList.remove('pxc-src');delete i.dataset.pxDone;delete i.dataset.pxObs;});
+    document.querySelectorAll('img.pxc-src').forEach(i=>{i.classList.remove('pxc-src');});
+    // Put the real picture back. The image now CARRIES the pixel version as its
+    // src, so leaving it would keep the effect after the mode is off.
+    document.querySelectorAll('img[data-px-orig]').forEach(i=>{
+      const o=i.dataset.pxOrig; if(o&&i.getAttribute('src')!==o)i.src=o;
+      delete i.dataset.pxDone; delete i.dataset.pxObs; delete i.dataset.pxOrig; delete i.dataset.pxCors;
+    });
   }catch(e){}
 }
 function refreshPixels(){ if(retroMode())pixelateCovers(); else unpixelateCovers(); }
@@ -17995,13 +18028,13 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-14.48',
-  title:'Settings that arrive from another device now take effect',
-  push:'Plus reset really resets the glow.',
+  v:'2026-08-14.49',
+  title:'Bigger pictures, better pixels',
+  push:'And a friend\u2019s recommendation opens properly.',
   notes:[
-    'Changing the glow on one device now shows up on your others. The code that repaints after settings arrive was calling three functions that do not exist \u2014 written defensively enough that nothing ever complained, so the setting was saved and simply never drawn.',
-    'Resetting your appearance now resets the glow with everything else. It used to leave it burning in the old accent.',
-    'Tidying an import with AI keeps your progress \u2014 episode counts and scores were being thrown away \u2014 and no longer cuts a long list short.',
+    'The bigger a picture is, the finer its pixels. It used to be two settings either side of a line, which put the cover on a title page \u2014 the one picture you stop and look at \u2014 on the coarse side. It slides with size now, and that cover is always drawn at the best quality whatever size it happens to be.',
+    'Opening a recommendation from a friend shows it properly. The cover was taking the full width of the panel and squeezing the title into a strip one letter wide.',
+    'Changing the glow on one device now shows up on your others, and resetting your appearance resets the glow with everything else.',
   ],
 };
 // The rows animate in once, on the first paint of a session. render() runs on

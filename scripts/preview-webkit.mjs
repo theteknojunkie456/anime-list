@@ -41,7 +41,7 @@ try {
   await page.goto('http://127.0.0.1:8990/.preview/index.html', { waitUntil: 'load' });
   await page.waitForTimeout(2500);
   if (after) { try { await page.evaluate(after); } catch (e) { errs.push('after: ' + e.message); } }
-  await page.waitForTimeout(1200);
+  await page.waitForTimeout(Number(process.env.SETTLE||1200));
 
   // The fault that started this: a cover that occupies space but paints nothing.
   const blanks = await page.evaluate(() => {

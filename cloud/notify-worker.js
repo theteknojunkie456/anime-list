@@ -662,13 +662,24 @@ async function handleRename(body, env) {
 // been a member for weeks. That is where a roster of fourteen anonymous rows
 // comes from, not from people opening the app.
 //
-// The sync code and the friend code are the same kind of secret but survive
-// differently — they're written down, shared, and restored from a backup — so
-// they act as a stable identity. If either one already belongs to a record, this
-// device IS that person: the record moves to the new id, and nobody is notified.
+// The SYNC code only — deliberately not the friend code.
+//
+// These were treated as "the same kind of secret". They are not. The sync code is
+// private: it is the whole identity system, never shown to anyone else. The
+// FRIEND code is published on purpose — there is a copy button for it, you hand
+// it to people so they can add you, and rec_send addresses recommendations to it.
+//
+// Accepting it here made a shared identifier an authentication secret: anyone
+// holding your friend code could send it to /join and take your membership
+// record onto their device. The line below deletes the previous row, so the real
+// owner's device would lose its record and be dropped back to the invite gate by
+// someone who only ever had the code you gave them on purpose.
+//
+// Rejoining by sync code still works, which is the path that was actually
+// intended — that code is private, and losing it already means losing the list.
 const idxKey = (v) => "idn:" + String(v).replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 64);
 async function adoptByIdentity(id, body, env) {
-  const ids = [body.sync, body.fcode].filter(v => typeof v === "string" && v.length >= 10);
+  const ids = [body.sync].filter(v => typeof v === "string" && v.length >= 10);
   for (const v of ids) {
     const prevId = await env.SUBS.get(idxKey(v));
     if (!prevId || prevId === id) continue;
@@ -679,14 +690,24 @@ async function adoptByIdentity(id, body, env) {
     rec.rejoinedAt = Date.now();
     rec.devices = Math.min(50, (rec.devices || 1) + 1);   // how many times this person has been re-issued an id
     await env.SUBS.put(devKey(id), JSON.stringify(rec));
-    await env.SUBS.delete(devKey(prevId));                // one person, one row
+    // The old row STAYS. Deleting it kept the roster tidy and signed people out:
+    // one person with a phone and a laptop shares one sync code, so each device
+    // that opened the app stole the record from the other and left it with
+    // nothing — back to the invite gate, over and over. That is the "it keeps
+    // signing me out" nobody could explain.
+    //
+    // A duplicate row costs a line in a list of fourteen. Being locked out of
+    // your own account costs the account. Tidiness is not worth that trade.
     for (const v2 of ids) await env.SUBS.put(idxKey(v2), id);
     return rec;
   }
   return null;
 }
 async function rememberIdentity(id, body, env) {
-  for (const v of [body.sync, body.fcode]) {
+  // Only the sync code is indexed, for the same reason it is the only one
+  // accepted above — indexing the friend code would keep the door standing even
+  // with the lock removed.
+  for (const v of [body.sync]) {
     if (typeof v === "string" && v.length >= 10) await env.SUBS.put(idxKey(v), id);
   }
 }

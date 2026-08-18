@@ -16,7 +16,7 @@ const N = +(process.argv[2] || 200);
 const PORT = 8981;
 
 const suite = function () {
-  const R = { render: [], notes: [], counts: {}, frames: {} };
+  const R = { render: [], notes: [], counts: {} };
   // Wall-clock is a lie in here: --virtual-time-budget advances the clock in
   // jumps, so performance.now() deltas come back as 0ms or 1000ms with no
   // relation to real work. Count the work instead — how many nodes an
@@ -68,28 +68,42 @@ const suite = function () {
       (s.animationIterationCount === 'infinite' ? ' anim:' + s.animationName : '');
   });
 
-  // ── frame timing under a scroll, which is where "not snappy" lives ──
-  const pg = document.getElementById('pageEl') || document.scrollingElement;
-  let last = performance.now(), worst = 0, n = 0, over16 = 0, reported = false;
-  // Report no matter what. content-visibility means sections materialise as they
-  // scroll into view, so the page can keep growing under the sampler and the
-  // loop never reaches its target — and then the run produced nothing at all,
-  // which is a worse outcome than a short sample.
+  // ── NO FRAME TIMING HERE, DELIBERATELY ──
+  // There used to be one, reporting a "worst frame" in ms. It was measured with
+  // performance.now() deltas — the exact clock the note at the top of this file
+  // says is a lie under --virtual-time-budget, which advances time in jumps.
+  //
+  // So the number moved with nothing: the same unchanged file reported 646ms
+  // once and then 3010.1ms three times running, and consecutive commits gave
+  // 645 / 3010 / 1644 with no relation to what changed between them. Worse than
+  // useless — an A/B against it "showed" that DELETING a box-shadow made
+  // scrolling five times slower, which would have led straight to optimising the
+  // wrong thing in the wrong direction.
+  //
+  // Everything else in this file counts work (nodes replaced, elements with
+  // expensive paint) rather than timing it, which is why those numbers hold
+  // still. If frame timing is wanted, it has to run in a real-clock browser
+  // session without the virtual budget — not here.
+
+  // Emit the counts. This used to live inside the frame sampler's report(),
+  // which is why removing that sampler took the reporting with it.
   const report = () => {
-    if (reported) return; reported = true;
-    R.frames = { sampled: n, worstMs: +worst.toFixed(1), overBudget: over16 };
+    if (report.done) return; report.done = true;
     const pre = document.createElement('pre'); pre.id = 'P';
     pre.textContent = JSON.stringify(R);
     document.body.appendChild(pre);
   };
-  const tick = () => {
-    const now = performance.now(), d = now - last; last = now;
-    if (n++ > 4) { if (d > worst) worst = d; if (d > 16.7) over16++; }   // the first frames are start-up, not scrolling
+  // Scroll to the end first: content-visibility means sections only materialise
+  // as they come into view, and counting paint costs before that understates
+  // them. The scroll is for materialising, not for timing.
+  const pg = document.getElementById('pageEl') || document.scrollingElement;
+  let steps = 0;
+  const walk = () => {
     const atEnd = pg.scrollTop + pg.clientHeight >= pg.scrollHeight - 4;
-    if (n < 60 && !atEnd) { pg.scrollTop += 40; requestAnimationFrame(tick); }
+    if (steps++ < 60 && !atEnd) { pg.scrollTop += 40; requestAnimationFrame(walk); }
     else report();
   };
-  requestAnimationFrame(tick);
+  requestAnimationFrame(walk);
   setTimeout(report, 6000);
 };
 
@@ -142,6 +156,5 @@ console.log('  css filter        ' + R.counts.filter + ' visible');
 console.log('  will-change       ' + R.counts.willChange + ' visible');
 console.log('  infinite anims    ' + R.counts.animating + ' visible');
 console.log('  huge box-shadows  ' + R.counts.bigShadow + ' visible');
-console.log('  scroll frames     worst ' + R.frames.worstMs + 'ms, ' + R.frames.overBudget + '/' + R.frames.sampled + ' over 16.7ms');
 if (R.notes.length) { console.log('\n  per-frame cost sits on:'); R.notes.forEach(n => console.log('   • ' + n)); }
 console.log('');

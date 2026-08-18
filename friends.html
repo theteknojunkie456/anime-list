@@ -413,6 +413,24 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 .ar-row.on .ar-tick{background:var(--a);border-color:var(--a);}
 .ar-bar{display:flex;gap:10px;margin-top:12px;}
 /* NATURAL SELECTION */
+.ns-modes{display:flex;gap:6px;margin:2px 0 10px;}
+.ns-mode{flex:1;padding:8px;border-radius:10px;font-size:12px;font-weight:800;
+  background:var(--bg3);border:1px solid var(--bn2);color:var(--t3);}
+.ns-mode.on{color:var(--t1);border-color:var(--a);background:var(--ag);}
+/* Two side by side, even on a phone: the whole point is seeing them together,
+   so they stay in one row and the text shrinks rather than stacking. */
+.ns-vs{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:stretch;}
+.ns-vs-card{display:flex;flex-direction:column;border-radius:14px;overflow:hidden;
+  background:var(--bg3);border:1px solid var(--bn2);cursor:pointer;text-align:left;}
+.ns-vs-card:active{transform:scale(.98);}
+.ns-vs-art{width:100%;height:clamp(120px,20vh,190px);object-fit:cover;display:block;background:var(--bg4);}
+.ns-vs-body{padding:9px 10px 11px;flex:1;display:flex;flex-direction:column;}
+.ns-vs-title{font-family:var(--fd);font-size:14px;font-weight:700;line-height:1.25;color:var(--t1);}
+.ns-vs-meta{margin-top:4px;font-size:11px;color:var(--t3);}
+.ns-vs-syn{margin-top:7px;font-size:11.5px;line-height:1.5;color:var(--t2);
+  max-height:clamp(70px,14vh,130px);overflow-y:auto;overscroll-behavior:contain;}
+.ns-vs-pick{margin-top:9px;padding:9px;border-radius:10px;font-size:12px;font-weight:800;
+  background:var(--a);color:var(--aFg);text-align:center;}
 .ns-count{margin-left:auto;font-size:12px;color:var(--t3);font-variant-numeric:tabular-nums;}
 .ns-stage{position:relative;min-height:clamp(300px,46vh,420px);margin:6px 0 12px;}
 .ns-card{
@@ -3981,6 +3999,7 @@ body.recsel .pcard{position:relative;}
 <div class="sheet" id="nsSheet">
   <div class="sheet-handle"></div>
   <div class="sheet-title"><i data-ic="layers"></i> Natural selection <span class="ns-count" id="nsCount"></span></div>
+  <div class="ns-modes" id="nsModes"></div>
   <div id="nsBody"></div>
 </div>
 <div class="sheet" id="hubSheet">
@@ -6647,6 +6666,16 @@ function arDelete(){
 // removes a title you meant to keep, and this list is the one thing in the app
 // that must not be lost. Leaving early keeps everything.
 let _nsQueue=[], _nsDrop=[], _nsIdx=0;
+// Two ways through the same list. One at a time asks "do you want this?", which
+// is the honest question but a slow one on a hundred titles. Head to head asks
+// "which of these two?", which is easier to answer — a comparison needs no
+// standard, where a yes/no needs one — and it clears the list twice as fast.
+const NS_MODE_KEY='ns_mode';
+function nsMode(){try{return localStorage.getItem(NS_MODE_KEY)==='vs'?'vs':'solo';}catch(e){return 'solo';}}
+function setNsMode(m){
+  try{localStorage.setItem(NS_MODE_KEY,m==='vs'?'vs':'solo');}catch(e){}
+  renderNatural();
+}
 function openNatural(){
   // Owner-only, like the Admin row: the entry chip is hidden for everyone else,
   // and this repeats the check so the function is not a way around that.
@@ -6677,10 +6706,20 @@ function nsMeta(a){
   if(a.genre)bits.push(String(a.genre).split(',').slice(0,3).map(g=>g.trim()).join(' · '));
   return bits;
 }
+function nsPaintModes(){
+  const el=document.getElementById('nsModes'); if(!el)return;
+  const m=nsMode(), done=_nsIdx>=_nsQueue.length;
+  el.style.display=done?'none':'';
+  if(done){el.innerHTML='';return;}
+  el.innerHTML=`<button class="ns-mode${m==='solo'?' on':''}" onclick="setNsMode('solo')">One at a time</button>`
+    +`<button class="ns-mode${m==='vs'?' on':''}" onclick="setNsMode('vs')">Head to head</button>`;
+}
 function renderNatural(){
   const box=document.getElementById('nsBody'), cnt=document.getElementById('nsCount');
   if(!box)return;
+  nsPaintModes();
   if(_nsIdx>=_nsQueue.length){ renderNaturalDone(); return; }
+  if(nsMode()==='vs'&&_nsQueue.length-_nsIdx>=2){ renderNaturalVs(); return; }
   const a=_nsQueue[_nsIdx];
   if(cnt)cnt.textContent=(_nsIdx+1)+' of '+_nsQueue.length+(_nsDrop.length?' · '+_nsDrop.length+' to drop':'');
   const img=a.img?`<img class="ns-art" src="${escH(a.img)}" alt="" onerror="this.style.display='none'">`:'';
@@ -6712,15 +6751,15 @@ function renderNatural(){
 // The synopsis is the reason this can be answered at all, so it is fetched per
 // card — reusing the same cache the title page fills, so anything you have
 // already opened costs nothing here.
-async function nsLoadSyn(a,quiet){
-  const el=()=>document.getElementById('nsSyn');
-  // A prefetch must never write to the card on screen — it is for a title you
-  // have not reached yet. It fills the cache and says nothing.
-  const put=t=>{ if(quiet)return; const e=el(); if(e&&_nsQueue[_nsIdx]===a)e.textContent=t; };
-  if(!a.aniId){put('No description linked to this one yet.');return;}
-  const cached=(typeof _richCache!=='undefined')&&_richCache[a.aniId];
+// One fetch, one cache, two callers — the single-card view and each side of a
+// head-to-head round. Splitting the FETCH from the WRITING is what lets a
+// prefetch fill the cache without touching a card that is on screen.
+async function nsSynText(a){
+  if(!a)return '';
+  if(!a.aniId)return 'No description linked to this one yet.';
   const strip=d=>String(d||'').replace(/<br\s*\/?>/gi,'\n').replace(/<[^>]+>/g,'').trim();
-  if(cached){put(strip(cached.description)||'No description for this one.');return;}
+  const cached=(typeof _richCache!=='undefined')&&_richCache[a.aniId];
+  if(cached&&cached.description!==undefined)return strip(cached.description)||'No description for this one.';
   try{
     const type=kindOf(a)==='read'?'MANGA':'ANIME';
     const q=`query($id:Int){Media(id:$id,type:${type}){description(asHtml:false)}}`;
@@ -6729,8 +6768,20 @@ async function nsLoadSyn(a,quiet){
     if(!r.ok)throw 0;
     const d=((await r.json()).data||{}).Media||{};
     try{if(typeof _richCache!=='undefined')_richCache[a.aniId]=Object.assign(_richCache[a.aniId]||{},d);}catch(e){}
-    put(strip(d.description)||'No description for this one.');
-  }catch(e){ put('Could not load the description.'); }
+    return strip(d.description)||'No description for this one.';
+  }catch(e){ return 'Could not load the description.'; }
+}
+// Same fetch, addressed to a specific element — a head-to-head round has two.
+async function nsLoadSynInto(a,elId){
+  const put=t=>{const e=document.getElementById(elId); if(e)e.textContent=t;};
+  put('Loading\u2026');
+  put(await nsSynText(a));
+}
+async function nsLoadSyn(a,quiet){
+  const txt=await nsSynText(a);
+  if(quiet)return;                       // prefetch: fill the cache, say nothing
+  const e=document.getElementById('nsSyn');
+  if(e&&_nsQueue[_nsIdx]===a)e.textContent=txt;
 }
 // A card deck on a desktop should answer to the arrow keys; reaching for the
 // mouse for each of 122 titles is the difference between doing this and not.
@@ -6758,6 +6809,43 @@ function nsDecide(keep,silent){
   const a=_nsQueue[_nsIdx];
   if(!keep&&a)_nsDrop.push(a);
   _nsIdx++;
+  renderNatural();
+}
+// A round is two titles. Picking one archives the other; both can be kept, or
+// neither. The pair consumes two entries either way, which is why this gets
+// through a long list in half the decisions.
+function renderNaturalVs(){
+  const box=document.getElementById('nsBody'), cnt=document.getElementById('nsCount');
+  const a=_nsQueue[_nsIdx], b=_nsQueue[_nsIdx+1];
+  if(!a||!b){ renderNaturalDone(); return; }
+  const left=_nsQueue.length-_nsIdx;
+  if(cnt)cnt.textContent=left+' left'+(_nsDrop.length?' \u00b7 '+_nsDrop.length+' to archive':'');
+  const card=(x,side)=>`<div class="ns-vs-card" onclick="nsPick('${side}')">
+      ${x.img?`<img class="ns-vs-art" src="${escH(x.img)}" alt="" onerror="this.style.display='none'">`:''}
+      <div class="ns-vs-body">
+        <div class="ns-vs-title">${escH(x.title)}</div>
+        <div class="ns-vs-meta">${escH(nsMeta(x).join(' \u00b7 '))||'&nbsp;'}${x.aniId?'':' \u00b7 never matched'}</div>
+        <p class="ns-vs-syn" id="nsSyn${side}">\u2026</p>
+        <div class="ns-vs-pick">Keep this one</div>
+      </div>
+    </div>`;
+  box.innerHTML=`<div class="ns-vs">${card(a,'L')}${card(b,'R')}</div>
+    <div class="ns-acts" style="margin-top:10px">
+      <button class="ns-act drop" onclick="nsPick('none')">${icon('trash')} Neither</button>
+      <button class="ns-act keep" onclick="nsPick('both')">${icon('check')} Keep both</button>
+    </div>
+    <p class="ai-desc" style="margin-top:10px">Tap the one you want \u2014 the other is set aside. Nothing moves until you confirm at the end.</p>`;
+  try{hydrateIcons(document.getElementById('nsSheet'));}catch(e){}
+  nsLoadSynInto(a,'nsSynL'); nsLoadSynInto(b,'nsSynR');
+  for(let i=2;i<=3;i++){ const nx=_nsQueue[_nsIdx+i]; if(nx)nsLoadSyn(nx,true); }
+}
+function nsPick(which){
+  const a=_nsQueue[_nsIdx], b=_nsQueue[_nsIdx+1];
+  if(!a||!b)return;
+  if(which==='L')_nsDrop.push(b);
+  else if(which==='R')_nsDrop.push(a);
+  else if(which==='none'){_nsDrop.push(a);_nsDrop.push(b);}
+  _nsIdx+=2;
   renderNatural();
 }
 function nsArmSwipe(){
@@ -6843,7 +6931,7 @@ function nsApply(){
 // closer to full resolution so detail survives. 1.0 was drawing it at exactly 1:1
 // — sharp, but with no pixels left in it at all, which is not the point. 1.2
 // keeps a visible texture on a large picture while leaving it readable.
-const PX_DIV=2.5, PX_DIV_FINE=1.1, PX_MIN=26;
+const PX_DIV=1.8, PX_DIV_FINE=1.25, PX_MIN=34;
 const PX_SEL='.pcard-img,.rz-img,.pk-cover,.dt-cover,.sched-thumb,.resume-art,.pop-cover,.pick-img,.rc-note-img,.hero-bg-img,.dt-banner-img';
 let _pxIO=null;
 function pxObserver(){
@@ -6903,6 +6991,12 @@ function _pxDraw(img,w,h){
   }catch(e){}
   return c;
 }
+// As fine as it can be while still reading as pixels. The range is narrow on
+// purpose: 1.8 on a small cover down to 1.25 on a large one. Wider than that and
+// the small end turns to mush; narrower and the blocks stop being visible at all,
+// which is not the effect. PX_MIN keeps the smallest thumbnails from collapsing
+// past recognition on the way down.
+//
 // How coarse, as a function of how big. It used to be a two-step — one value
 // under 260px and another above — which put the cover on a title page, the one
 // picture you actually stop and look at, on the coarse side of the line.
@@ -18067,13 +18161,12 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-14.50',
-  title:'Titles that arrive mangled can be repaired',
-  push:'Plus bigger pictures get better pixels.',
+  v:'2026-08-14.51',
+  title:'Natural selection: head to head',
+  push:'Two at a time, and the junk comes first.',
   notes:[
-    'A title that arrives with junk stuck on the end \u2014 "Yu Yu Hakusho Ghostfiles Mzvfd3" \u2014 can now be matched and cleaned up by Fix all. Whatever list it came from added that, and the person who sent it did not know why either. Only a trailing scrap mixing letters and digits is ever tried, and only if the database recognises what is left, so 86, Mob Psycho 100 and Steins;Gate 0 are never touched.',
-    'The bigger a picture is, the finer its pixels; the cover on a title page is always drawn at the best quality.',
-    'Opening a recommendation from a friend shows it properly \u2014 the cover was filling the panel and squeezing the title into a strip one letter wide.',
+    'A title that arrives with junk stuck on the end \u2014 "Yu Yu Hakusho Ghostfiles Mzvfd3" \u2014 can now be matched and cleaned up by Fix all. Only a trailing scrap mixing letters and digits is ever tried, and only if the database recognises what is left, so 86, Mob Psycho 100 and Steins;Gate 0 are never touched.',
+    'Pictures are drawn at the best quality that still looks like pixels, and the bigger the picture the finer they are.',
   ],
 };
 // The rows animate in once, on the first paint of a session. render() runs on

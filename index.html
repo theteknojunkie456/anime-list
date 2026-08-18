@@ -6253,8 +6253,18 @@ async function syncRestore(){
         toast('Enter this list’s password to unlock');
       }else if(inner&&Array.isArray(inner)&&inner.length){
         anime=migrate(inner);writeLocal();setSyncAt(res.updatedAt||Date.now());render();renderSyncUI();toast('Restored from cloud');
-      }else if(!prevCode){ // no backup here yet — adopting an empty code is fine, seed it
-        setSyncAt(0);syncPush();renderSyncUI();toast('Code linked. This device backs up here now');
+      }else if(!prevCode){
+        // Nothing is stored under that code. Adopting it is still fine — this
+        // device backs up here from now on — but SAY so. "Code linked. This
+        // device backs up here now" reads as success to the one person most
+        // likely to be here: someone who pasted their code expecting their list
+        // back. They then sit looking at an empty screen believing it restored,
+        // instead of going to the device that still has the list. That happened.
+        setSyncAt(0);syncPush();renderSyncUI();
+        toast(realList().length
+          ? 'Code linked. This device backs up here now'
+          : 'Nothing is backed up under that code. If your list is on another device, open the app there — it will back itself up',
+          realList().length?3000:7000);
       }else{ // there IS a working code here and the new one holds nothing — don't trade down
         restorePrev();
         toast('Nothing is stored under that code. Kept the one you had');

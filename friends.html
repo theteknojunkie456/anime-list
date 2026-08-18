@@ -402,6 +402,23 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 }
 #recDetailSheet .dt-info{flex:1;min-width:0;}
 #recDetailSheet .dt-title{white-space:normal;overflow-wrap:anywhere;}
+/* PIXELATING PROGRESS
+   Doing every cover up front costs real time on a long list. Hiding that makes
+   the app feel broken; showing it makes it a wait, which people are fine with as
+   long as it ends and they can see it ending. Docked above the nav, out of the
+   way of the thumb, and it removes itself the moment it is done. */
+.px-bar{position:fixed;left:12px;right:12px;bottom:calc(var(--safe-b) + 86px);z-index:70;
+  padding:9px 12px 10px;border-radius:12px;pointer-events:none;
+  background:color-mix(in srgb,var(--bg2) 94%,transparent);border:1px solid var(--b2);
+  box-shadow:0 8px 24px -10px rgba(0,0,0,.7);
+  opacity:0;transform:translateY(6px);transition:opacity .2s ease,transform .2s ease;}
+.px-bar.on{opacity:1;transform:none;}
+.px-bar-t{display:flex;align-items:baseline;gap:8px;font-size:12px;color:var(--t2);}
+.px-bar-t b{color:var(--t1);font-weight:700;font-variant-numeric:tabular-nums;}
+.px-bar-t span{margin-left:auto;color:var(--t3);font-variant-numeric:tabular-nums;}
+.px-bar-track{margin-top:7px;height:4px;border-radius:99px;background:var(--bg4);overflow:hidden;}
+.px-bar-fill{height:100%;background:var(--a);border-radius:99px;transition:width .18s linear;}
+@media (prefers-reduced-motion:reduce){.px-bar,.px-bar-fill{transition:none;}}
 /* ARCHIVE */
 .ar-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--bn2);cursor:pointer;}
 .ar-row img,.ar-ph{width:36px;height:51px;object-fit:cover;border-radius:6px;flex:none;background:var(--bg4);
@@ -7065,6 +7082,41 @@ let _pxTick=0;
 // gating on scroll position is what let the effect be outrun. Chunked across
 // frames rather than done in one pass, because 185 canvases in a single go is
 // the freeze this started as.
+// Progress, so a long first pass is a wait rather than a mystery. The estimate
+// comes from what this device has actually managed so far, not a guess: covers
+// differ in size and machines differ in speed, and an ETA that ignores both is
+// worse than none.
+let _pxTotal=0, _pxDone=0, _pxT0=0;
+function pxProgress(){
+  let el=document.getElementById('pxBar');
+  const left=_pxPending.size;
+  // Not worth a bar for a handful — it would flash up and vanish.
+  if(!retroMode()||_pxTotal<12||left<=0){
+    if(el){el.classList.remove('on');setTimeout(()=>{try{el.remove();}catch(e){}},260);}
+    _pxTotal=0;_pxDone=0;_pxT0=0;
+    return;
+  }
+  if(!el){
+    el=document.createElement('div');el.id='pxBar';el.className='px-bar';
+    el.setAttribute('aria-hidden','true');
+    el.innerHTML='<div class="px-bar-t">Pixelating covers <b id="pxBarN"></b><span id="pxBarEta"></span></div>'
+      +'<div class="px-bar-track"><div class="px-bar-fill" id="pxBarFill" style="width:0%"></div></div>';
+    document.body.appendChild(el);
+    requestAnimationFrame(()=>el.classList.add('on'));
+  }
+  const done=Math.max(0,_pxTotal-left);
+  const pct=Math.round(done/_pxTotal*100);
+  const f=document.getElementById('pxBarFill'); if(f)f.style.width=pct+'%';
+  const n=document.getElementById('pxBarN'); if(n)n.textContent=done+' / '+_pxTotal;
+  const e=document.getElementById('pxBarEta');
+  if(e){
+    const ms=_pxT0?(performance.now()-_pxT0):0;
+    if(done>2&&ms>400){
+      const per=ms/done, secs=Math.round(per*left/1000);
+      e.textContent=secs>0?('about '+(secs>90?Math.round(secs/60)+' min':secs+'s')+' left'):'almost done';
+    }else e.textContent='';
+  }
+}
 function pxSweep(){
   _pxTick=0;
   if(!retroMode()||!_pxPending.size)return;
@@ -7076,7 +7128,11 @@ function pxSweep(){
     pixelateOne(img);
     if(img.dataset.pxDone==='1'){ _pxPending.delete(img); drawn++; try{pxObserver().unobserve(img);}catch(e){} }
   }
+  try{pxProgress();}catch(e){}
   if(more&&!_pxTick)_pxTick=requestAnimationFrame(pxSweep);
+  // Keep going even when nothing is on screen: the point is to finish the whole
+  // list up front so it can never be outrun later.
+  else if(_pxPending.size&&!_pxTick)_pxTick=requestAnimationFrame(pxSweep);
 }
 // The observer's callback is asynchronous and batched, which a fast flick
 // outruns. A scroll listener answers within the frame instead — captured,
@@ -7089,6 +7145,8 @@ function pixelateCovers(){
     document.querySelectorAll(PX_SEL).forEach(img=>{
       if(img.tagName!=='IMG'||img.dataset.pxDone==='1'||img.dataset.pxObs==='1')return;
       img.dataset.pxObs='1';
+      if(!_pxT0){_pxT0=performance.now();_pxTotal=0;}
+      _pxTotal++;
       // A lazy image the browser has not fetched has NO pixels to copy, which is
       // the real reason the effect could be outrun: switching sort rebuilds the
       // list and most covers are unfetched again. In Retro they load eagerly —
@@ -18194,12 +18252,12 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-14.52',
-  title:'The pixel covers are back on',
-  push:'They had been quietly off for two releases.',
+  v:'2026-08-14.53',
+  title:'Pixel covers, done up front with a progress bar',
+  push:'You can see how long it will take.',
   notes:[
-    'Pixel covers work again. They had been off for two releases without anything appearing to be wrong: an edit removed a few lines the drawing code depended on, and because that code guards itself against errors, it failed silently every time rather than complaining. Nothing looked broken, it just quietly did nothing.',
-    'Natural selection has a head to head mode: two titles at once, keep one, keep both, or neither.',
+    'Pixel covers work again \u2014 they had been off for two releases without anything appearing to be wrong. An edit removed a few lines the drawing code depended on, and because that code guards itself against errors it failed silently every time rather than complaining.',
+    'Turning Retro on now does the whole list up front instead of catching up as you scroll, with a bar at the bottom showing how far it has got and roughly how long is left. The estimate comes from how fast your own device is actually going, so it is honest rather than a guess, and the bar takes itself away when it finishes.',
   ],
 };
 // The rows animate in once, on the first paint of a session. render() runs on

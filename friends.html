@@ -1851,6 +1851,14 @@ body.first-paint .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards
 .empty-icon{font-size:52px;margin-bottom:16px;opacity:0.9;filter:drop-shadow(0 6px 16px var(--glow));}
 .empty p{font-size:15px;line-height:1.65;}
 .empty .hero-cta{margin-top:20px;background:var(--a);color:var(--aFg);box-shadow:0 8px 22px var(--glow);}
+/* Secondary to Import, not a rival to it: quiet until you need it, which is
+   exactly the moment you realise the list you're looking at isn't gone. */
+.empty-alt{display:inline-flex;align-items:center;gap:8px;margin-top:12px;padding:9px 16px;border-radius:999px;
+  background:transparent;border:1px solid var(--edge);color:var(--t2);font:inherit;font-size:13.5px;font-weight:600;
+  cursor:pointer;transition:color .18s ease,border-color .18s ease,background .18s ease;}
+.empty-alt:hover{color:var(--t);border-color:color-mix(in srgb,var(--a) 45%,var(--edge));background:color-mix(in srgb,var(--a) 7%,transparent);}
+.empty-alt svg,.empty-alt i{width:15px;height:15px;}
+[data-retro] .empty-alt{border-radius:2px;}
 
 /* ── BOTTOM NAV ── */
 /* A floating pill, not a bar welded to the bottom edge. The list scrolls under
@@ -9028,6 +9036,16 @@ function renderHomeLayoutUI(){
     </div>`;
   }).join('')+`<button class="hl-reset" onclick="resetHomeLayout()">Reset to default</button>`;
 }
+// An empty list on a device with no sync code is, more often than not, someone
+// who cleared their cookies or moved browsers — their list is safe in the cloud
+// and all they need is the code. The empty state offered Import alone, which
+// sends that person off to rebuild by hand a list they never actually lost.
+// Shown only when there is no code here: if backup is already on, there is
+// nothing to restore.
+function emptyRestoreHTML(){
+  try{ if(typeof syncCode==='function'&&syncCode())return ''; }catch(e){}
+  return `<button class="empty-alt" onclick="openSheet('backupSheet')">${icon('cloud')} Restore from backup</button>`;
+}
 function renderHome(){
   const el=document.getElementById('pageEl');
   clearInterval(bbTimer);bbTimer=0;   // stop any rotation; the main path re-arms it
@@ -9056,8 +9074,8 @@ function renderHome(){
   if(!pool.length){
     const beg=beginnerShelfActive(isRead);
     const emptyBox=isRead
-      ?`<div class="empty"><div class="empty-icon">${icon('book')}</div><p>Your reading list is empty.<br>Add a manhwa, webtoon, manga or light novel — tap ＋ and choose Read.</p><button class="hero-cta" onclick="openSheet_add()">＋ Add something to read</button></div>`
-      :`<div class="empty"><div class="empty-icon">${icon('inbox')}</div><p>Your list is empty.<br>Add a title or import your whole list from Notes in one paste.</p><button class="hero-cta" onclick="openSheet('importSheet')">${icon('clipboard')} Import a list</button></div>`;
+      ?`<div class="empty"><div class="empty-icon">${icon('book')}</div><p>Your reading list is empty.<br>Add a manhwa, webtoon, manga or light novel — tap ＋ and choose Read.</p><button class="hero-cta" onclick="openSheet_add()">＋ Add something to read</button>${emptyRestoreHTML()}</div>`
+      :`<div class="empty"><div class="empty-icon">${icon('inbox')}</div><p>Your list is empty.<br>Add a title or import your whole list from Notes in one paste.</p><button class="hero-cta" onclick="openSheet('importSheet')">${icon('clipboard')} Import a list</button>${emptyRestoreHTML()}</div>`;
     el.innerHTML=emptyBox+(beg?beginnerShelfHTML():'');
     if(beg)loadPopularShelf();
     return;

@@ -65,13 +65,20 @@ The lesson is not that configurability is bad — it is that every axis is a
 question the reader has to answer before they can use the thing, and a question
 nobody asked is a cost with no matching benefit.
 
-**UI style** (`data-ui`: `soft` | `sharp` | `round`). Radius is *not* tokenised in
-this file — 163 hardcoded values against zero uses of `--r` — so a style that
-rewrote everything would be a refactor pretending to be a feature. Each style
-overrides only the surfaces that carry the character: cards, sheets, bars,
-buttons, chips, nav. Change those and the whole thing changes; change the other
-140 and nobody can tell. If radii are ever tokenised, these collapse to three
-values.
+**UI style** (`data-ui`: `soft` | `sharp` | `round`) — **removed**. The idea was
+sound: radius is *not* tokenised in this file (163 hardcoded values against zero
+uses of `--r`), so rather than a refactor pretending to be a feature, each style
+overrode only the surfaces that carry the character — cards, sheets, bars,
+buttons, chips, nav.
+
+What actually shipped was 24 CSS rules and no control: nothing in the app ever
+set `data-ui`, on any element, so not one of those rules could ever match. They
+sat dead long enough to mislead a later reader into thinking `[data-ui=soft]`
+was winning a specificity fight against a theme, which cost real time. The rules
+are gone; this note stays so the idea is not lost.
+
+To bring it back you need a stored key, one `setAttribute` on the root, and a
+three-way control — the styles themselves were complete and are in git history.
 
 **Surface tint** mixes into the *active theme's* greys rather than replacing
 them, so the relationship between the five surface steps survives and a tinted

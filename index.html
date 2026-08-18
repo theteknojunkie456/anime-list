@@ -6653,7 +6653,14 @@ function openNatural(){
   if(!isAdminDevice())return;
   const pool=anime.filter(a=>a.status==='plan'&&kindOf(a)===viewKind);
   if(pool.length<2){toast('Nothing in Plan to sort through');return;}
-  _nsQueue=pool.slice(); _nsDrop=[]; _nsIdx=0;
+  // Slop first. On a plan list of a hundred-plus, most of what you want gone is
+  // the stuff that never linked to anything: no database match, no cover, no
+  // episode count. Sorting those to the front means the easy "no" decisions come
+  // first and the list is visibly shorter within a minute, rather than the junk
+  // being spread evenly through a long session.
+  const slop=a=>(a.aniId?0:4)+(a.img?0:2)+(a.epTotal?0:1);
+  _nsQueue=pool.slice().sort((x,y)=>slop(y)-slop(x));
+  _nsDrop=[]; _nsIdx=0;
   try{document.removeEventListener('keydown',nsKeys);document.addEventListener('keydown',nsKeys);}catch(e){}
   openSheet('nsSheet');
   renderNatural();
@@ -6661,8 +6668,12 @@ function openNatural(){
 function nsMeta(a){
   const bits=[];
   const n=a.epTotal||0; if(n)bits.push(n+(kindOf(a)==='read'?' chapters':' eps'));
+  // The cost of keeping it — but "~0h to watch" is what an hour-rounded number
+  // says about anything under half an hour, and on the junk entries this screen
+  // shows first that was most of them.
   const mins=kindOf(a)==='watch'?totalWatchMins(a):0;
-  if(mins)bits.push('~'+Math.round(mins/60)+'h to watch');      // the cost of keeping it
+  if(mins>=60)bits.push('~'+Math.round(mins/60)+'h to watch');
+  else if(mins>0)bits.push('~'+Math.round(mins)+' min');
   if(a.genre)bits.push(String(a.genre).split(',').slice(0,3).map(g=>g.trim()).join(' · '));
   return bits;
 }
@@ -6680,7 +6691,7 @@ function renderNatural(){
         ${img}
         <div class="ns-body">
           <div class="ns-title">${escH(a.title)}</div>
-          <div class="ns-meta">${nsMeta(a).map(b=>`<span>${escH(b)}</span>`).join('')}</div>
+          <div class="ns-meta">${nsMeta(a).map(b=>`<span>${escH(b)}</span>`).join('')}${a.aniId?'':`<span style="color:var(--a2)">never matched anything</span>`}</div>
           <p class="ns-syn" id="nsSyn">Loading what it's about\u2026</p>
         </div>
       </div>
@@ -6693,13 +6704,19 @@ function renderNatural(){
   try{hydrateIcons(document.getElementById('nsSheet'));}catch(e){}
   nsArmSwipe();
   nsLoadSyn(a);
+  // Fetch what is coming, so the next card is already written when it arrives.
+  // Waiting a beat per title is what makes going through a hundred of them feel
+  // slow — it is the same request either way, just made earlier.
+  for(let i=1;i<=2;i++){ const nx=_nsQueue[_nsIdx+i]; if(nx)nsLoadSyn(nx,true); }
 }
 // The synopsis is the reason this can be answered at all, so it is fetched per
 // card — reusing the same cache the title page fills, so anything you have
 // already opened costs nothing here.
-async function nsLoadSyn(a){
+async function nsLoadSyn(a,quiet){
   const el=()=>document.getElementById('nsSyn');
-  const put=t=>{const e=el(); if(e&&_nsQueue[_nsIdx]===a)e.textContent=t;};
+  // A prefetch must never write to the card on screen — it is for a title you
+  // have not reached yet. It fills the cache and says nothing.
+  const put=t=>{ if(quiet)return; const e=el(); if(e&&_nsQueue[_nsIdx]===a)e.textContent=t; };
   if(!a.aniId){put('No description linked to this one yet.');return;}
   const cached=(typeof _richCache!=='undefined')&&_richCache[a.aniId];
   const strip=d=>String(d||'').replace(/<br\s*\/?>/gi,'\n').replace(/<[^>]+>/g,'').trim();
@@ -8299,12 +8316,34 @@ async function fixAll(){
 // AniList returns NOTHING for "the ogre s bride" while "the ogre's bride"
 // finds it first try. Same for "tamon s b side" -> "tamon's b-side".
 // So repair the obvious damage before deciding a title has no match.
+// A trailing token of random-looking junk — "Yu Yu Hakusho Ghostfiles Mzvfd3".
+// It arrives from whatever list someone imported, and the person who sent it does
+// not know why it is there either, so the app has to cope rather than the sender.
+//
+// This only ever produces a CANDIDATE. Every variant here is checked against the
+// database and the first one that actually matches wins, so a wrong guess costs
+// nothing — which is what makes the heuristic safe to be loose. It has to be:
+// real titles are full of things that look like junk. "86", "Mob Psycho 100" and
+// "Season 2" end in digits, so a pure number is never stripped; only a token
+// mixing letters AND digits, which is what an id looks like and what a word does
+// not.
+function junkTailStripped(raw){
+  const parts=String(raw||'').trim().split(/\s+/);
+  if(parts.length<2)return '';
+  const last=parts[parts.length-1];
+  if(last.length<4||last.length>24)return '';
+  if(!/[a-z]/i.test(last)||!/\d/.test(last))return '';     // needs both to look like an id
+  if(/^(s|season|ep|episode|part|vol|volume|cour)\d+$/i.test(last))return '';
+  return parts.slice(0,-1).join(' ');
+}
 function titleRepairs(t){
   const raw=String(t||'').trim(); if(!raw)return [];
   // Same reason the dedupe needs them: AniList finds nothing for
   // "Ao Haru Ride (Blue Spring Ride)" but finds either half first try, which is
   // why an imported title like that sits unlinked with a placeholder cover.
   const out=[...titleAliases(raw)];
+  const noTail=junkTailStripped(raw);
+  if(noTail){ out.push(noTail); titleAliases(noTail).forEach(v=>out.push(v)); }
   // orphan possessive: "ogre s bride" -> "ogre's bride"
   const poss=raw.replace(/\b([A-Za-z]{2,})\s+s\b/g,"$1's");
   if(poss!==raw)out.push(poss);
@@ -18028,13 +18067,13 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-14.49',
-  title:'Bigger pictures, better pixels',
-  push:'And a friend\u2019s recommendation opens properly.',
+  v:'2026-08-14.50',
+  title:'Titles that arrive mangled can be repaired',
+  push:'Plus bigger pictures get better pixels.',
   notes:[
-    'The bigger a picture is, the finer its pixels. It used to be two settings either side of a line, which put the cover on a title page \u2014 the one picture you stop and look at \u2014 on the coarse side. It slides with size now, and that cover is always drawn at the best quality whatever size it happens to be.',
-    'Opening a recommendation from a friend shows it properly. The cover was taking the full width of the panel and squeezing the title into a strip one letter wide.',
-    'Changing the glow on one device now shows up on your others, and resetting your appearance resets the glow with everything else.',
+    'A title that arrives with junk stuck on the end \u2014 "Yu Yu Hakusho Ghostfiles Mzvfd3" \u2014 can now be matched and cleaned up by Fix all. Whatever list it came from added that, and the person who sent it did not know why either. Only a trailing scrap mixing letters and digits is ever tried, and only if the database recognises what is left, so 86, Mob Psycho 100 and Steins;Gate 0 are never touched.',
+    'The bigger a picture is, the finer its pixels; the cover on a title page is always drawn at the best quality.',
+    'Opening a recommendation from a friend shows it properly \u2014 the cover was filling the panel and squeezing the title into a strip one letter wide.',
   ],
 };
 // The rows animate in once, on the first paint of a session. render() runs on

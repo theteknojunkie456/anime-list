@@ -7878,7 +7878,7 @@ function resumeRailHTML(items,isRead){
     const showBar=!isRead&&known;
     const art=titleBg(a)||a.img;
     const ch=((a.title||'?').trim()[0]||'?').toUpperCase().replace(/['"<&]/g,'?');
-    const bg=art?`<img class="rz-img" src="${escH(art)}" loading="lazy" alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'rz-ph',textContent:'${ch}'}))">`:`<div class="rz-ph">${ch}</div>`;
+    const bg=art?`<img class="rz-img" decoding="async" src="${escH(art)}" loading="lazy" alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'rz-ph',textContent:'${ch}'}))">`:`<div class="rz-ph">${ch}</div>`;
     return `<button class="rz-card" onclick="${isRead?`readManga('${a.id}',${next})`:`resumeWatch('${a.id}')`}">
       ${bg}<div class="rz-scrim"></div>
       <div class="rz-play">${icon(isRead?'book':'play')}</div>
@@ -8598,7 +8598,7 @@ function posterCard(a,nSeas){
   const multi=nSeas>1;
   const title=multi?seasonBase(a.title):a.title;
   const img=a.img
-    ?`<img class="pcard-img" src="${escH(a.img)}" loading="lazy" alt="" onerror="artFallback(this,${JSON.stringify(String(title||a.title||'?')).replace(/"/g,'&quot;')},'pcard-ph')">`
+    ?`<img class="pcard-img" decoding="async" src="${escH(a.img)}" loading="lazy" alt="" onerror="artFallback(this,${JSON.stringify(String(title||a.title||'?')).replace(/"/g,'&quot;')},'pcard-ph')">`
     :`<div class="pcard-ph">${((title||'?').trim()[0]||'?').toUpperCase().replace(/['"<&]/g,'?')}</div>`;
   const p=prog(a);
   const bar=(a.status==='watching'&&a.epTotal)?`<div class="pbar"><div class="pfill" style="width:${Math.round(p*100)}%"></div></div>`:'';
@@ -8701,7 +8701,7 @@ function epNextHTML(a){
 function bbSlideHTML(a){
   const art=titleBg(a);
   let bg=`<div class="hero-bg" style="background:linear-gradient(135deg,var(--bg4),var(--bg2))"></div>`;
-  if(art)bg+=`<img class="hero-bg-img" src="${escH(art)}" loading="lazy" alt="" onerror="this.remove()">`;
+  if(art)bg+=`<img class="hero-bg-img" decoding="async" src="${escH(art)}" loading="lazy" alt="" onerror="this.remove()">`;
   else if(safeImg(a.img))bg=`<div class="hero-bg" style="background-image:url('${safeImg(a.img)}')"></div>`;
   const av=accentVars(a),p=prog(a),air=airingInfo(a);
   const cd=bbCountdown(a);
@@ -8819,7 +8819,7 @@ function airingRailHTML(items){
   const card=a=>{
     const inf=airingInfo(a),art=titleBg(a)||a.img;
     const ch=((a.title||'?').trim()[0]||'?').toUpperCase().replace(/['"<&]/g,'?');
-    const bg=art?`<img class="rz-img" src="${escH(art)}" loading="lazy" alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'rz-ph',textContent:'${ch}'}))">`:`<div class="rz-ph">${ch}</div>`;
+    const bg=art?`<img class="rz-img" decoding="async" src="${escH(art)}" loading="lazy" alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'rz-ph',textContent:'${ch}'}))">`:`<div class="rz-ph">${ch}</div>`;
     const when=inf?(inf.ep?`Ep ${inf.ep} · ${inf.when}`:inf.when):'';
     return `<button class="rz-card" onclick="openDetail('${a.id}')">
       ${bg}<div class="rz-scrim"></div>
@@ -9116,11 +9116,11 @@ function renderDetail(){
   const _pw=Math.max(0,Math.min(1,prog(a)));
   const _lvl=(a.epTotal&&_pw>0)?`<div class="dt-level${_pw>=1?' full':''}" style="height:${(_pw*100).toFixed(1)}%"></div>`:'';
   const cover=`<div class="dt-cover-wrap">`+(a.img
-    ?`<img loading="lazy" class="dt-cover" src="${escH(a.img)}" alt="" onerror="artFallback(this,${JSON.stringify(String(a.title||'?')).replace(/"/g,'&quot;')},'dt-cover-ph')">`
+    ?`<img loading="lazy" class="dt-cover" decoding="async" src="${escH(a.img)}" alt="" onerror="artFallback(this,${JSON.stringify(String(a.title||'?')).replace(/"/g,'&quot;')},'dt-cover-ph')">`
     :`<div class="dt-cover-ph">${((a.title||'?').trim()[0]||'?').toUpperCase().replace(/['"<&]/g,'?')}</div>`)+_lvl+`</div>`;
   // per-title banner header + accent tint (scoped to this sheet only, never the global chrome)
   const art=titleBg(a);
-  const bannerHTML=art?`<div class="dt-banner"><img class="dt-banner-img" src="${escH(art)}" loading="lazy" alt="" onerror="this.closest('.dt-banner').remove()"><div class="dt-banner-scrim"></div></div>`:'';
+  const bannerHTML=art?`<div class="dt-banner"><img class="dt-banner-img" decoding="async" src="${escH(art)}" loading="lazy" alt="" onerror="this.closest('.dt-banner').remove()"><div class="dt-banner-scrim"></div></div>`:'';
   // Watch/Plan/Done/Drop reads wrong on a manga. Same four states, said the way
   // that kind of thing is actually talked about.
   const stLabel=st=>statusLabel(st,read);
@@ -12679,7 +12679,7 @@ function behindHTML(){
   // home screen opened on a colour clash with itself. It belongs to the app, not
   // to the show, so it takes the theme.
   return`<div class="resume-wrap"><button class="resume-card" onclick="resumeWatch('${a.id}')">
-    ${art?`<img class="resume-art" src="${escH(art)}" alt="" loading="lazy" onerror="artFallback(this,${JSON.stringify(String(a.title||'?')).replace(/"/g,'&quot;')},'resume-ph')">`:`<span class="resume-ph">${ch}</span>`}
+    ${art?`<img class="resume-art" decoding="async" src="${escH(art)}" alt="" loading="lazy" onerror="artFallback(this,${JSON.stringify(String(a.title||'?')).replace(/"/g,'&quot;')},'resume-ph')">`:`<span class="resume-ph">${ch}</span>`}
     <span class="resume-body">
       <span class="resume-k">Pick up where you left off</span>
       <span class="resume-t">${schEsc(a.title)}</span>
@@ -15440,7 +15440,7 @@ function tellPassed(rec){
 }
 function recCard(k,rec){
   const it=rec.item,s0=rec.senders[0],col=friendColor(s0.code);
-  const img=it.img?`<img class="pcard-img" src="${escH(it.img)}" loading="lazy" alt="" onerror="artFallback(this,${JSON.stringify(String(it.title||'?')).replace(/"/g,'&quot;')},'pcard-ph')">`:`<div class="pcard-ph">${escH(((it.title||'?').trim()[0]||'?').toUpperCase())}</div>`;
+  const img=it.img?`<img class="pcard-img" decoding="async" src="${escH(it.img)}" loading="lazy" alt="" onerror="artFallback(this,${JSON.stringify(String(it.title||'?')).replace(/"/g,'&quot;')},'pcard-ph')">`:`<div class="pcard-ph">${escH(((it.title||'?').trim()[0]||'?').toUpperCase())}</div>`;
   const more=rec.senders.length>1?` +${rec.senders.length-1}`:'';
   return `<div class="pcard rec-card" style="--fc:${col}" onclick="openRecDetail('${encodeURIComponent(k)}')">
     <div class="pcard-wrap rec-wrap">${img}<span class="rec-flag" style="background:${col}">${icon('users')}</span>
@@ -15464,7 +15464,7 @@ function renderRecDetail(){
   const rec=recByAni()[recDetailKey];
   if(!rec){box.innerHTML='<p class="ai-desc">This recommendation is no longer available.</p>';return;}
   const it=rec.item;
-  const cover=it.img?`<img loading="lazy" class="dt-cover" src="${escH(it.img)}" alt="" onerror="artFallback(this,${JSON.stringify(String(it.title||'?')).replace(/"/g,'&quot;')},'dt-cover-ph')">`:`<div class="dt-cover-ph">${escH(((it.title||'?').trim()[0]||'?').toUpperCase())}</div>`;
+  const cover=it.img?`<img loading="lazy" class="dt-cover" decoding="async" src="${escH(it.img)}" alt="" onerror="artFallback(this,${JSON.stringify(String(it.title||'?')).replace(/"/g,'&quot;')},'dt-cover-ph')">`:`<div class="dt-cover-ph">${escH(((it.title||'?').trim()[0]||'?').toUpperCase())}</div>`;
   const chips=(it.genre||'').split(',').map(g=>g.trim()).filter(Boolean).map(g=>`<span class="chip">${escH(g)}</span>`).join('');
   box.innerHTML=`
     <div class="dt-top">${cover}<div class="dt-info"><div class="dt-title">${escH(it.title)}</div><div class="dt-meta">${it.kind==='read'?'Manga / manhwa':'Anime'}</div></div></div>
@@ -17966,7 +17966,7 @@ function renderSchedDays(ws,eps){
       dEps.forEach(e=>{
         const t=new Date(e.airingAt*1000).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
         const ch=((e.title||'?').charAt(0)||'?').replace(/[^A-Za-z0-9]/g,'')||'?';
-        const thumb=e.img?'<img class="sched-thumb" src="'+escH(e.img)+'" alt="" loading="lazy" onerror="this.outerHTML=schPh(\''+ch+'\')">':schPh(ch);
+        const thumb=e.img?'<img class="sched-thumb" decoding="async" src="'+escH(e.img)+'" alt="" loading="lazy" onerror="this.outerHTML=schPh(\''+ch+'\')">':schPh(ch);
         const nset=e.read?notifSetR:notifSet;
         const bell=nset&&e.aniId&&nset.has(e.aniId)?'<span class="sched-bell" title="Notifications on">'+icon('bell')+'</span>':'';
         var _isRel=e.id&&(''+e.id).indexOf('rel:')===0;var _click=_isRel?("addRelatedSched('"+e.aniId+"')"):("openDetail('"+e.id+"')");var _newt=_isRel?'<span class="sched-new">NEW</span>':'';

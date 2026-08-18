@@ -4670,7 +4670,11 @@ async function ownerUnlock(){
   if(!tok){if(err)err.textContent='Paste your admin token';return;}
   if(err)err.textContent='Unlocking\u2026';
   try{
-    const r=await netCall('/approve',{token:tok,deviceId:wlDevice()});
+    // Send the name and identity too: on a fresh device there is no roster row
+    // yet, so the server creates one from this — without a name it files as
+    // "Admin device" and the roster reads like a stranger.
+    const nm=(document.getElementById('joinName')||{}).value||knownName()||'';
+    const r=await netCall('/approve',{token:tok,deviceId:wlDevice(),name:String(nm).trim(),...joinIdentity()});
     if(!r||r.error||r.ok===false)throw new Error((r&&r.error)||'rejected');
     // Keep the token: this device is now an admin device, which is what makes it
     // the LAST time — the gate check itself will pass from here on.
@@ -4678,7 +4682,13 @@ async function ownerUnlock(){
     setNetStatus('approved');
     hideJoinGate();
     safeReload();
-  }catch(e){ if(err)err.textContent='That token was not accepted'; }
+  }catch(e){
+    const m=String((e&&e.message)||'');
+    if(err)err.textContent = /unauthorized/i.test(m) ? 'That token was not accepted'
+      : /capacity/i.test(m) ? m.replace(/^at /,'Roster is at ')
+      : /Failed to fetch|NetworkError|load failed/i.test(m) ? 'Could not reach the server \u2014 check your connection'
+      : ('Unlock failed: '+(m||'unknown error'));
+  }
 }
 function showJoinGate(st){
   const el=document.getElementById('joinScreen');if(!el)return;

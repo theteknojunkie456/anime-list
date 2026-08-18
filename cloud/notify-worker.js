@@ -981,10 +981,28 @@ async function handleMembers(body, env) {
 
 async function handleDecide(body, env, status) {
   if (!adminOK(body, env)) return json({ ok: false, error: "unauthorized" }, 401);
-  const key = devKey(body.deviceId);
+  const id = String(body.deviceId || "").replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 64);
+  if (!id) return json({ ok: false, error: "deviceId required" }, 400);
+  const key = devKey(id);
   const raw = await env.SUBS.get(key);
-  if (!raw) return json({ ok: false, error: "device not found" }, 404);
   const cap = await getCap(env);
+  // An admin approving an id the roster has never seen is the owner unlocking a
+  // FRESH device: cookies cleared, new id, and no /join yet because the launch
+  // probe deliberately writes nothing. Refusing that as "device not found" is
+  // what made the unlock button fail on exactly the device it exists for, and
+  // the client reported it as a bad token. Approving an unknown id creates the
+  // row; denying one still has nothing to deny.
+  if (!raw) {
+    if (status !== "approved") return json({ ok: false, error: "device not found" }, 404);
+    if ((await countApproved(env)) >= cap) {
+      return json({ ok: false, error: "at capacity (" + cap + ")" }, 409);
+    }
+    const nm = String(body.name || "").trim().slice(0, 40) || "Admin device";
+    const rec = { id, status: "approved", name: nm, invite: "", joinedAt: Date.now(), decidedAt: Date.now() };
+    await env.SUBS.put(key, JSON.stringify(rec));
+    await rememberIdentity(id, body, env);
+    return json({ ok: true, status: "approved", created: true });
+  }
   if (status === "approved" && (await countApproved(env)) >= cap) {
     return json({ ok: false, error: "at capacity (" + cap + ")" }, 409);
   }

@@ -1483,6 +1483,10 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
   font-family:inherit;font-size:12px;font-weight:800;color:var(--t1);
   background:var(--bg3);border:1px solid var(--b2);}
 .fixbar-b:hover{border-color:var(--b3);}
+/* Delete sits beside the fix, not in competition with it: no fill, and it only
+   picks up the warning colour on hover. */
+.fixbar-b.ghost{background:transparent;color:var(--t2);border-color:var(--b1);}
+.fixbar-b.ghost:hover{color:#ff6b6b;border-color:color-mix(in srgb,#ff6b6b 55%,transparent);}
 .fixbar-b:active{transform:scale(.96);}
 
 /* The app's established alert red (#ff6b6b — same as .dact.danger and the form
@@ -8552,6 +8556,7 @@ function renderFixBar(){
   bar.className='fixbar on';
   bar.innerHTML=`<span class="fixbar-i">${icon('refresh')}</span>`
     +`<span class="fixbar-t">${bits.join(' \u00b7 ')}</span>`
+    +(unmatched.length?`<button class="fixbar-b ghost" onclick="deleteUnlinked()">Delete</button>`:'')
     +`<button class="fixbar-b" onclick="fixAll()">Fix all</button>`;
   armFixSwipe(bar,n);
 }
@@ -8591,6 +8596,38 @@ function armFixSwipe(bar,n){
 // from data already on the device, with no network at all. Only the genuinely
 // unlinked titles need a lookup, and they run after, so the list visibly
 // improves straight away instead of after a round trip.
+// Not everything the bar complains about is worth rescuing. A lossy import
+// leaves rows that never matched anything and never will — junk with a title
+// attached — and the only offer was "Fix all", which spends a database lookup on
+// each one and then reports the same count back. Deleting them is the honest
+// answer for that pile, so it is offered next to the fix rather than instead of
+// it, and only for the ones that failed to link (a messy NAME is fixable; a row
+// that matches nothing usually isn't a show).
+function deleteUnlinked(){
+  const {unmatched}=needsFix(viewKind);
+  if(!unmatched.length){toast('Nothing to delete');return;}
+  const shown=unmatched.slice(0,4).map(a=>a.title).filter(Boolean);
+  const rest=unmatched.length-shown.length;
+  askConfirm({
+    title:`Delete ${unmatched.length} unlinked ${unmatched.length===1?'title':'titles'}?`,
+    msg:shown.join(', ')+(rest>0?`, and ${rest} more`:'')+'. These never matched a database entry. You can undo straight after.',
+    yes:'Delete',
+    onYes:()=>{
+      const ids=new Set(unmatched.map(a=>a.id));
+      const removed=anime.filter(a=>ids.has(a.id));
+      // Tombstone each, or the next sync pulls them back from another device.
+      removed.forEach(a=>{try{tombstone(a.id);}catch(e){}});
+      anime=anime.filter(a=>!ids.has(a.id));
+      save();render();
+      toast(`Deleted ${removed.length}`,7000,()=>{
+        // Fresh ids on the way back: tombstones merge as a union across devices,
+        // so a restored row keeping its old id would be deleted again on sync.
+        removed.forEach(a=>anime.unshift({...a,id:uid(),upd:Date.now()}));
+        save();render();toast('Brought back');
+      });
+    }
+  });
+}
 async function fixAll(){
   const {unmatched,mistitled}=needsFix(viewKind);
   let renamed=0;

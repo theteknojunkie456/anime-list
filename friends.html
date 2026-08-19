@@ -2407,6 +2407,14 @@ html.rotating .pv-frame:fullscreen,html.rotating .pv-frame:-webkit-full-screen{o
 .playerview .sv-back:active{transform:scale(.9);background:rgba(255,255,255,.15);}
 .pv-title{flex:1;min-width:0;font-family:var(--fd);font-size:15px;font-weight:800;letter-spacing:-.2px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .pv-title .pv-ep{margin-left:7px;color:var(--a2);font-weight:700;font-size:15px;}
+/* The episode number is the control that corrects it. */
+.pv-title .pv-ep{cursor:pointer;border-bottom:1px dashed color-mix(in srgb,var(--a2) 55%,transparent);}
+.pv-epset{display:flex;align-items:center;gap:6px;flex-shrink:0;}
+.pv-epset-b,.pv-epset-x{width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;
+  background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);color:#fff;font:700 16px/1 inherit;cursor:pointer;}
+.pv-epset-x .ico{width:15px;height:15px;}
+.pv-epset-n{min-width:30px;text-align:center;color:#fff;font-weight:800;font-size:15px;font-variant-numeric:tabular-nums;}
+.pv-epset-go{height:32px;padding:0 12px;border-radius:10px;border:0;background:var(--a);color:var(--aFg);font:800 13px/1 inherit;cursor:pointer;white-space:nowrap;}
 .pv-ext{width:40px;height:40px;flex-shrink:0;border-radius:14px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);color:#fff;display:flex;align-items:center;justify-content:center;transition:background .15s,transform .12s;}
 .pv-ext .ico{width:18px;height:18px;}
 .pv-ext:active{transform:scale(.9);background:rgba(255,255,255,.15);}
@@ -4332,6 +4340,16 @@ body.recsel .pcard{position:relative;}
   <div class="pv-top">
     <button class="sv-back" onclick="closePlayer()" aria-label="Back"><i data-ic="chevron-left"></i></button>
     <div class="pv-title" id="pvTitle"></div>
+    <!-- Sites whose player swaps episodes without navigating give us no signal at
+         all, so the number in the header can sit two or three behind what is
+         actually playing. The person is looking straight at the real one. -->
+    <div class="pv-epset" id="pvEpSet" hidden>
+      <button class="pv-epset-b" onclick="pvEpSetStep(-1)" aria-label="Lower">&minus;</button>
+      <span class="pv-epset-n" id="pvEpSetN">1</span>
+      <button class="pv-epset-b" onclick="pvEpSetStep(1)" aria-label="Higher">+</button>
+      <button class="pv-epset-go" onclick="pvEpSetApply()">I'm here</button>
+      <button class="pv-epset-x" onclick="pvEpSetClose()" aria-label="Cancel"><i data-ic="x"></i></button>
+    </div>
     <button class="pv-ext" id="pvExt" aria-label="Find this title on the site" title="Wrong page? Search this title"><i data-ic="search"></i></button>
     <button class="pv-ext" id="pvOpen" onclick="pvOpenExternal()" aria-label="Open in your browser" title="Open in your browser"><i data-ic="external"></i></button>
   </div>
@@ -13699,6 +13717,67 @@ function episodeURL(a,ep){
   if(!src||!/\{ep\d?\}/i.test(src))return null;   // no way to address an episode
   return fillSourceTokens(src,a,ep);
 }
+// ── "I'm on this one" ──────────────────────────────────────────────────────
+// The follow-along above only fires when the frame NAVIGATES. Sites whose player
+// swaps episodes in place (AniNeko among them) never do, so the header can read
+// Ep 2 while Episode 4 is playing, and every later auto-mark is measured from the
+// wrong number. Nothing in the frame can tell us — but the person is looking
+// straight at the real number, and one tap is cheaper than any heuristic.
+//
+// Setting it to N banks 1..N-1 as watched (you don't reach episode 4 without the
+// three before it) and leaves N as the one in progress. The frame is not touched:
+// they are already watching it.
+let _pvEpSetVal=0;
+function pvEpSetOpen(){
+  if(!pvReturnId)return;
+  const a=anime.find(x=>x.id===pvReturnId); if(!a)return;
+  _pvEpSetVal=pvWatchEp||1;
+  const box=document.getElementById('pvEpSet'), t=document.getElementById('pvTitle');
+  if(!box)return;
+  box.hidden=false; if(t)t.style.display='none';
+  pvEpSetPaint();
+  try{paintIcons&&paintIcons();}catch(e){}
+}
+function pvEpSetClose(){
+  const box=document.getElementById('pvEpSet'), t=document.getElementById('pvTitle');
+  if(box)box.hidden=true; if(t)t.style.display='';
+}
+function pvEpSetPaint(){
+  const n=document.getElementById('pvEpSetN'); if(n)n.textContent=_pvEpSetVal;
+}
+function pvEpSetStep(d){
+  const a=pvReturnId?anime.find(x=>x.id===pvReturnId):null;
+  const max=(a&&a.epTotal)||9999;
+  _pvEpSetVal=Math.max(1,Math.min(max,_pvEpSetVal+d));
+  pvEpSetPaint();
+}
+function pvEpSetApply(){
+  const a=pvReturnId?anime.find(x=>x.id===pvReturnId):null;
+  if(!a){pvEpSetClose();return;}
+  const ep=Math.max(1,_pvEpSetVal), read=kindOf(a)==='read';
+  const before=a.ep||0;
+  if(ep>1)applyWatched(pvReturnId,ep-1);
+  pvWatchEp=ep;
+  pvSetResume(0);                      // a resume point from another episode is a lie
+  pvOpenTime=Date.now();               // this episode earns its own clock
+  savePvSession(pvReturnId,ep,read?'read':'watch');
+  const t=document.getElementById('pvTitle');
+  if(t)t.innerHTML=escH(a.title)+' <span class="pv-ep">'+(read?'Ch ':'Ep ')+ep+'</span>';
+  renderPvNav(a);
+  pvEpSetClose();
+  try{if(!nativeFullscreen())toast('Caught up \u2014 '+(read?'Ch ':'Ep ')+ep+' in progress',5000,()=>{
+    applyWatched(pvReturnId,before); pvWatchEp=before||1;
+    if(t)t.innerHTML=escH(a.title)+' <span class="pv-ep">'+(read?'Ch ':'Ep ')+(before||1)+'</span>';
+    renderPvNav(a);
+  });}catch(e){}
+}
+// The chip is rendered from three places; one delegated listener covers them all.
+try{
+  document.addEventListener('click',e=>{
+    const c=e.target&&e.target.closest&&e.target.closest('.pv-ep');
+    if(c){e.preventDefault();e.stopPropagation();pvEpSetOpen();}
+  },true);
+}catch(e){}
 function renderPvNav(a){
   const nav=document.getElementById('pvNav'); if(!nav) return;
   const total=(a&&a.epTotal)||0;

@@ -1805,6 +1805,19 @@ body.first-paint .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards
    on a card whose whole face is already a target, so it stays quiet until the
    card is hovered — and on a touch screen, where there is no hover, it is simply
    always there. */
+/* Bumping an episode was: open the card, find the stepper, tap, close. Four
+   moves for the thing done most often. It lives on the card now, opposite the
+   recommend button so the two can never collide, and only while something is in
+   progress — a plan or a finished show has no next one. */
+.pcard-bump{position:absolute;left:5px;bottom:5px;z-index:4;height:30px;min-width:34px;padding:0 8px;
+  display:flex;align-items:center;justify-content:center;border-radius:6px;
+  background:rgba(8,8,11,.82);border:1px solid rgba(255,255,255,.16);color:#fff;
+  font:800 12px/1 inherit;cursor:pointer;
+  opacity:0;transform:translateY(3px);transition:opacity .14s ease,transform .14s ease,background-color .14s;}
+.pcard:hover .pcard-bump,.pcard-bump:focus-visible{opacity:1;transform:none;}
+.pcard-bump:hover{background:var(--a);border-color:transparent;color:var(--aFg);}
+@media(hover:none){.pcard-bump{opacity:1;transform:none;}}
+[data-retro] .pcard-bump{border-radius:2px;}
 .pcard-rec{position:absolute;right:5px;bottom:5px;z-index:4;width:30px;height:30px;
   display:flex;align-items:center;justify-content:center;border-radius:6px;
   background:rgba(8,8,11,.82);border:1px solid rgba(255,255,255,.16);color:#fff;
@@ -4564,6 +4577,28 @@ const STATUS_META={
 // ─── STORAGE ───────────────────────────────────────────────────────────────
 // The state a cover badge announces, said the way that kind of thing is talked
 // about: a manga is Reading, not Watching.
+// One tap, from wherever the show is on screen. applyWatched does the rest of
+// the bookkeeping — resume points, status, AniList — so this only has to decide
+// that there IS a next one, and be undoable, because a mis-tap on a grid of
+// posters is a certainty rather than a risk.
+function bumpEp(id,ev){
+  try{ev.stopPropagation();ev.preventDefault();}catch(e){}
+  const a=anime.find(x=>x.id===id); if(!a)return;
+  const read=kindOf(a)==='read', word=read?'Ch ':'Ep ';
+  const before=a.ep||0, beforeStatus=a.status;
+  if(a.epTotal&&before>=a.epTotal){toast(read?'That\u2019s the last chapter':'That\u2019s the last episode');return;}
+  applyWatched(id,before+1);
+  const now=anime.find(x=>x.id===id);
+  const done=(now&&now.status==='finished')?' \u00b7 finished':'';
+  toast(word+(before+1)+done,5000,()=>{
+    const b=anime.find(x=>x.id===id); if(!b)return;
+    b.ep=before; b.status=beforeStatus;
+    try{touch(b);}catch(e){}
+    save();render();
+    try{alPushItem(b);}catch(e){}
+    if(detailId===id)try{renderDetail();}catch(e){}
+  });
+}
 function statusTag(a){
   const st=(a&&a.status)||'plan';
   if(a&&kindOf(a)==='read')
@@ -8653,6 +8688,7 @@ function posterCard(a,nSeas){
       })()}
       ${a.fav?'<span class="pcard-fav">'+icon('heart','fill')+'</span>':''}
       <button class="pcard-rec" onclick="recThis('${a.id}',event)" aria-label="Recommend ${escH(a.title)} to a friend" title="Recommend to a friend">${icon('send')}</button>
+      ${a.status==='watching'?`<button class="pcard-bump" onclick="bumpEp('${a.id}',event)" aria-label="Mark the next ${kindOf(a)==='read'?'chapter':'episode'} of ${escH(a.title)}" title="Watched the next one">+1</button>`:''}
       ${seas}
     </div>
     ${bar}
@@ -8947,7 +8983,12 @@ function renderHome(){
     const msg=q
       ?`No matches for “${schEsc(q)}”${filterStatus!=='all'?` in ${stLbl}`:` in your ${isRead?'reading':'watch'} list`}`
       :`Nothing in ${stLbl} yet`;
-    el.innerHTML=`<div class="empty"><div class="empty-icon">${q?icon('search'):filterStatus==='fav'?icon('heart'):(STATUS_META[filterStatus]?STATUS_META[filterStatus].icon:(isRead?icon('book'):icon('inbox')))}</div><p>${msg}</p></div>`;
+    // Searching for something you don't have yet is the app's clearest statement
+    // of intent, and the answer used to be a dead end: it told you it wasn't
+    // there and left you to open +, type the same words again, then search
+    // again. The words are right here.
+    const addBtn=q?`<button class="hero-cta" onclick="addFromSearch(${JSON.stringify(q).replace(/"/g,'&quot;')})">${icon('plus')} Add “${schEsc(q)}”</button>`:'';
+    el.innerHTML=`<div class="empty"><div class="empty-icon">${q?icon('search'):filterStatus==='fav'?icon('heart'):(STATUS_META[filterStatus]?STATUS_META[filterStatus].icon:(isRead?icon('book'):icon('inbox')))}</div><p>${msg}</p>${addBtn}</div>`;
     return;
   }
   if(!pool.length){
@@ -10051,6 +10092,17 @@ function formKindLabels(){
   const fOrder=document.getElementById('fOrder');if(fOrder)fOrder.placeholder=read?'Vol 1 — ch 1–10\nVol 2 — ch 11–20':'TV: Season 1 — 12 eps\nOVA: Side story — after S1\nTV: Season 2 — 12 eps';
   const btn=document.getElementById('autofillBtn');
   if(btn&&!btn.classList.contains('loading'))btn.innerHTML=read?'<span>'+icon('sparkles')+'</span> Autofill — cover, chapters, genre &amp; status':'<span>'+icon('sparkles')+'</span> Autofill — cover, episodes, genre &amp; watch order';
+}
+// Carry the words across. openSheet_add clears the form and focuses the title
+// field on a timer, so this lands just after and hands the same query straight
+// to the database lookup — one tap from "no matches" to a filled-in card.
+function addFromSearch(q){
+  openSheet_add();
+  setTimeout(()=>{
+    const t=document.getElementById('fTitle'); if(!t)return;
+    t.value=String(q||'').trim();
+    if(t.value)try{aiAutofill();}catch(e){}
+  },380);
 }
 function openSheet_add(){
   editingId=null;pendingAni=null;

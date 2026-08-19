@@ -15723,8 +15723,13 @@ function recNoteRows(rec){
   return rec.senders.map(s=>{const col=friendColor(s.code);return `<div class="rec-badge" style="--fc:${col}"><div class="rec-badge-who">${icon('users')} ${escH(friendDisplay(s.code,s.name))} recommends this</div>${s.note?`<div class="rec-badge-note">“${escH(s.note)}”</div>`:''}</div>`;}).join('');
 }
 function friendRecBadge(a){
-  if(IS_NATIVE||!a||!a.aniId)return '';
-  const rec=recByAni()['a'+a.aniId]; if(!rec)return '';
+  if(IS_NATIVE||!a)return '';
+  // Recs without an AniList id are keyed by title (recByAni does both). Looking
+  // up only the id meant a title-only recommendation showed no badge at all —
+  // and now that the comment no longer goes into notes, that would lose it.
+  const m=recByAni();
+  const rec=(a.aniId&&m['a'+a.aniId])||m['t'+String(a.title||'').toLowerCase()];
+  if(!rec)return '';
   return `<div class="rec-badges">${recNoteRows(rec)}</div>`;
 }
 let recDetailKey='';
@@ -15752,9 +15757,14 @@ function addRecToList(watchAfter){
   if(existing){id=existing.id;}
   else{
     id=uid();
-    const noteLines=rec.senders.map(s=>`${s.name}: ${s.note||'recommended this'}`).join('\n');
+    // Notes is the owner's own field. Stamping "Yasso: it's soooo tuff" into it
+    // put someone else's words in the one place meant for yours, and you then had
+    // to delete them by hand on every show a friend sent. Their comment already
+    // has a home: the recommendation badge on the card, which stacks one row per
+    // sender, so five people recommending the same show read as five voices
+    // instead of five lines glued into your note.
     // add it like any freshly-added show: top of the list, marked recent, then enriched
-    anime.unshift({id,title:safeText(it.title),status:'plan',kind:it.kind==='read'?'read':'watch',aniId:it.aniId||0,img:safeImg(it.img),eps:'',epTotal:0,time:'',genre:safeText(it.genre),order:[],notes:noteLines,rating:0,fav:false,upd:Date.now()});
+    anime.unshift({id,title:safeText(it.title),status:'plan',kind:it.kind==='read'?'read':'watch',aniId:it.aniId||0,img:safeImg(it.img),eps:'',epTotal:0,time:'',genre:safeText(it.genre),order:[],notes:'',rating:0,fav:false,upd:Date.now()});
     dedupeAnime();save();setTimeout(fetchCovers,300);   // pull episode counts / banner / airing
   }
   render();closeAll();

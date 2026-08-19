@@ -7197,10 +7197,24 @@ let _pxTick=0;
 // comes from what this device has actually managed so far, not a guess: covers
 // differ in size and machines differ in speed, and an ETA that ignores both is
 // worse than none.
-let _pxTotal=0, _pxDone=0, _pxT0=0;
+let _pxTotal=0, _pxDone=0, _pxT0=0, _pxLastLeft=0, _pxStallAt=0;
+// How long an undecoded image gets before it is written off, and how long the
+// bar may sit at the same number before it gives up on whatever is left.
+const PX_GIVEUP_MS=15000, PX_STALL_MS=20000;
 function pxProgress(){
   let el=document.getElementById('pxBar');
   const left=_pxPending.size;
+  // Last resort. Whatever is left after this long is not going to finish, and a
+  // progress bar that cannot reach its end is worse than no bar: it is the app
+  // telling you it is busy, forever. Drop the remainder and let it close.
+  if(left>0){
+    if(left!==_pxLastLeft){_pxLastLeft=left;_pxStallAt=performance.now();}
+    else if(_pxStallAt&&performance.now()-_pxStallAt>PX_STALL_MS){
+      _pxPending.forEach(i=>{try{i.dataset.pxDone='1';}catch(e){}});
+      _pxPending.clear(); _pxLastLeft=0; _pxStallAt=0;
+      return pxProgress();
+    }
+  }else{_pxLastLeft=0;_pxStallAt=0;}
   // Not worth a bar for a handful — it would flash up and vanish.
   if(!retroMode()||_pxTotal<12||left<=0){
     if(el){el.classList.remove('on');setTimeout(()=>{try{el.remove();}catch(e){}},260);}
@@ -7235,7 +7249,18 @@ function pxSweep(){
   for(const img of Array.from(_pxPending)){
     if(!img.isConnected||img.dataset.pxDone==='1'){ _pxPending.delete(img); continue; }
     if(drawn>=PX_BATCH){ more=true; break; }
-    if(!img.complete||!img.naturalWidth)continue;   // not fetched yet — its load event will get it
+    if(!img.complete||!img.naturalWidth){
+      // Not fetched yet — its load event will normally get it. But count the
+      // passes: an image still not decoded after this many sweeps is not slow,
+      // it is stuck, and one stuck image used to keep the whole bar alive.
+      // Timed, not counted: the sweep runs every frame, so a count of passes
+      // writes off a cover that is merely still downloading. Fifteen seconds is
+      // long enough for any image that is actually coming.
+      const seen=+img.dataset.pxSeen||0;
+      if(!seen){img.dataset.pxSeen=Date.now();}
+      else if(Date.now()-seen>PX_GIVEUP_MS){ img.dataset.pxDone='1'; _pxPending.delete(img); try{pxObserver().unobserve(img);}catch(e){} }
+      continue;
+    }
     pixelateOne(img);
     if(img.dataset.pxDone==='1'){ _pxPending.delete(img); drawn++; try{pxObserver().unobserve(img);}catch(e){} }
   }
@@ -7258,6 +7283,13 @@ function pixelateCovers(){
       img.dataset.pxObs='1';
       if(!_pxT0){_pxT0=performance.now();_pxTotal=0;}
       _pxTotal++;
+      // Retire an image that will never produce pixels. A 404, a blocked host or
+      // a cover that simply never decodes used to sit in _pxPending forever, so
+      // `left` never reached 0, so _pxT0 never cleared, so _pxTotal kept counting
+      // up on every re-render — 171 shows read as 45,400 covers and the bar ran
+      // all night at "almost done". Anything that errors is done, as far as this
+      // is concerned.
+      img.addEventListener('error',()=>{ try{ img.dataset.pxDone='1'; _pxPending.delete(img); pxProgress(); }catch(e){} },{once:true});
       // A lazy image the browser has not fetched has NO pixels to copy, which is
       // the real reason the effect could be outrun: switching sort rebuilds the
       // list and most covers are unfetched again. In Retro they load eagerly —

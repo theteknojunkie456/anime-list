@@ -2204,6 +2204,13 @@ body.first-paint .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards
    textbook AI callout. A plain panel with a hairline says the same thing without
    the tell. */
 .dt-note{font-size:13px;line-height:1.55;color:var(--t1);background:var(--bg3);border:1px solid var(--b1);border-radius:14px;padding:12px 14px;}
+/* The note is now the control that writes it, so it has to look touchable
+   without shouting — same box, a pointer, and it warms on hover. Empty reads as
+   an invitation rather than an error. */
+.dt-note{cursor:text;transition:border-color .18s ease,color .18s ease;}
+.dt-note:hover,.dt-note:focus-visible{border-color:color-mix(in srgb,var(--a) 40%,var(--b1));}
+.dt-note-add{color:var(--t3);cursor:pointer;}
+.dt-note-add:hover{color:var(--t2);}
 /* Rich detail (synopsis / meta / trailer / characters / more-like-this) */
 .dt-rich-load{color:var(--t3);font-size:13px;display:flex;align-items:center;gap:8px;padding:14px 0;}
 .dt-rich-meta{display:flex;flex-wrap:wrap;gap:7px;margin-top:14px;}
@@ -5455,7 +5462,20 @@ function writeLocal(){
     offloadImages().then(()=>{try{const raw=JSON.stringify(_persistList());s.setItem(LSKEY,raw);backupLocal(s,raw);saveWarned=false;}catch(e2){_saveFailed(e2);}});
   }
 }
-function save(){writeLocal();try{ensureBackup();}catch(e){}schedulePush();scheduleNotifyUpdate();}
+function save(){
+  // "No duplicates in any way" is a property of the list, not of the ten call
+  // sites that currently remember to ask for it — and any new path that adds a
+  // title is one more chance to forget. Every mutation lands here, so here is
+  // the only place the guarantee can actually hold.
+  //
+  // Skipped while the list is a locked placeholder or post-corruption defaults:
+  // `anime` is not the real list then, and collapsing it would be destructive.
+  try{
+    const unsafe=(typeof appLocked!=='undefined'&&appLocked)||(typeof listUntrusted!=='undefined'&&listUntrusted);
+    if(!unsafe)dedupeAnime();
+  }catch(e){}
+  writeLocal();try{ensureBackup();}catch(e){}schedulePush();scheduleNotifyUpdate();
+}
 // The other half of the mirror. localStorage is read synchronously at boot and
 // IndexedDB can't be, so this runs just after and only steps in when the local
 // read produced nothing real — an empty list or one that wouldn't parse. It can
@@ -9269,6 +9289,28 @@ setInterval(()=>{if(watchingNow())return;try{pollAdmin();}catch(e){}},120000);
 // class has to go on before the sheet opens, so the list narrows in the same
 // frame the panel slides in rather than jumping afterwards.
 function twoPaneOK(){try{return matchMedia('(min-width:1200px)').matches;}catch(e){return false;}}
+// Write a note without leaving the card you thought of it on.
+function editNote(id){
+  const a=anime.find(x=>x.id===id); if(!a)return;
+  const view=document.getElementById('dtNote'), box=document.getElementById('dtNoteEdit'), ta=document.getElementById('dtNoteIn');
+  if(!view||!box||!ta)return;
+  ta.value=String(a.notes||'');
+  view.style.display='none'; box.style.display='';
+  try{ta.focus({preventScroll:true});ta.setSelectionRange(ta.value.length,ta.value.length);}catch(e){}
+}
+function cancelNote(){
+  const v=document.getElementById('dtNote'), b=document.getElementById('dtNoteEdit');
+  if(b)b.style.display='none'; if(v)v.style.display='';
+}
+function saveNote(id){
+  const a=anime.find(x=>x.id===id); if(!a)return;
+  const ta=document.getElementById('dtNoteIn'); if(!ta)return;
+  const v=ta.value.trim();
+  if(v===String(a.notes||'').trim()){cancelNote();return;}
+  a.notes=v; a.upd=Date.now();
+  save(); openDetail(id);
+  toast(v?'Note saved':'Note cleared');
+}
 function openDetail(id){
   return _openDetailReal(id);
 }
@@ -9351,7 +9393,23 @@ function renderDetail(){
     const filmsHTML=grouped?`<details class="films-acc"><summary>${icon('film')} ${films.length} side films — optional, watch any time</summary><ol class="order-list">${films.map(s=>li(s,true)).join('')}</ol></details>`:'';
     orderHTML=`<div class="dt-label">${read?'Read order':'Watch order'}</div><ol class="order-list">${main.map(s=>li(s,false)).join('')}</ol>${filmsHTML}`;
   }
-  const notesHTML=(a.notes&&a.notes.trim())?`<div class="dt-label">Notes</div><div class="dt-note">${schEsc(a.notes)}</div>`:'';
+  // Notes were display-only here, and only appeared once one existed. Writing one
+  // meant leaving the card for the whole Edit form, so in practice the note you
+  // thought of while looking at a show never got written. It belongs where you
+  // are when you think of it.
+  const _nt=String(a.notes||'').trim();
+  const notesHTML=`<div class="dt-label">Notes</div>
+    <div class="dt-note${_nt?'':' dt-note-add'}" id="dtNote" tabindex="0" role="button"
+      onclick="editNote('${a.id}')"
+      onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();editNote('${a.id}');}"
+      >${_nt?schEsc(_nt):'Add a note'}</div>
+    <div id="dtNoteEdit" style="display:none">
+      <textarea class="ai-prompt-in" id="dtNoteIn" rows="3" placeholder="Where you left off, who recommended it, why it's here"></textarea>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="parse-btn" style="flex:1" onclick="saveNote('${a.id}')">Save note</button>
+        <button class="parse-btn" style="flex:0 0 auto;width:auto;padding-left:16px;padding-right:16px" onclick="cancelNote()">Cancel</button>
+      </div>
+    </div>`;
   // Seasons/parts. For watch items with an AniList id we show the WHOLE franchise
   // (every season, even ones not on your list), filled async by loadFranchise().
   // Everything else falls back to just the seasons already on your list.
@@ -9454,6 +9512,7 @@ function renderDetail(){
     </div>`:''}
     <div class="dt-actions">
       <button class="dact ai-act" onclick="aiCardInsight('${a.id}')">${icon('sparkles')} AI Insight</button>
+      <button class="dact" onclick="recThis('${a.id}',event)">${icon('send')} Recommend</button>
       <button class="dact" onclick="editItem('${a.id}')">${icon('edit')} Edit</button>
       <button class="dact danger" onclick="confirmDelete('${a.id}')">${icon('trash')}</button>
     </div>`;
@@ -10617,11 +10676,33 @@ function titleAliases(t){
   }
   return [...new Set(out)];
 }
+// Every name a title answers to, kept on the item so a later import in the other
+// language collides with it instead of landing beside it. Capped, and never
+// storing the displayed title twice.
+function rememberNames(a,names){
+  if(!a||!Array.isArray(names))return;
+  const seen=new Set([normTitle(a.title)]);
+  const out=Array.isArray(a.alt)?a.alt.slice():[];
+  out.forEach(n=>seen.add(normTitle(n)));
+  for(const n of names){
+    const t=String(n||'').trim(); const nt=normTitle(t);
+    if(!t||!nt||seen.has(nt))continue;
+    seen.add(nt); out.push(t);
+  }
+  if(out.length)a.alt=out.slice(0,6);
+}
 function dupeKeys(a){
   const k=[]; const kind=kindOf(a);
   if(a.aniId)k.push('ani:'+a.aniId);
   if(a.malId)k.push('mal:'+a.malId+'|'+kind);
-  titleAliases(a.title).forEach(t=>{const nt=normTitle(t); if(nt)k.push('t:'+nt+'|'+kind);});
+  // An item stores ONE title — english or romaji, whichever the source used. Two
+  // lists that made opposite choices ("Dusk Maiden of Amnesia" / "Tasogare Otome
+  // x Amnesia") therefore shared no key at all unless both happened to carry an
+  // id, which is exactly the import that came back full of duplicates. `alt`
+  // holds every name AniList gave us, so both spellings collide the way they
+  // always should have.
+  const names=[a.title,...(Array.isArray(a.alt)?a.alt:[])];
+  names.forEach(n=>titleAliases(n).forEach(t=>{const nt=normTitle(t); if(nt)k.push('t:'+nt+'|'+kind);}));
   return k;
 }
 // Hard guarantee: the list never holds the same title twice, no matter how it got
@@ -10637,6 +10718,7 @@ function dedupeList(list){
     if(hit<0){ const i=kept.length; kept.push(a); keys.forEach(k=>seen.set(k,i)); continue; }
     const b=kept[hit];   // merge a into the kept copy b
     if(!b.aniId&&a.aniId)b.aniId=a.aniId;
+    rememberNames(b,[a.title,...(Array.isArray(a.alt)?a.alt:[])]);
     if(!b.malId&&a.malId)b.malId=a.malId;
     if((a.ep||0)>(b.ep||0))b.ep=a.ep;
     if(!b.epTotal&&a.epTotal)b.epTotal=a.epTotal;
@@ -17485,6 +17567,7 @@ async function fixUnmatchedTitles(){
     const names=[m.title&&m.title.english,m.title&&m.title.romaji,m.title&&m.title.native].filter(Boolean);
     if(!names.some(n=>titleLooksRight(n,typed)))return false;
     a.aniId=m.id; delete a.nameFix;
+    rememberNames(a,names);
     return true;
   };
   // 1) spelling variants — free, and covers the apostrophe cases
@@ -17726,6 +17809,7 @@ async function fetchCovers(){
           // is why nothing on a reading list could be tracked: chapter alerts and
           // the chapter list are both keyed by it, and manga simply never had one.
           if(m.id)a.aniId=m.id;
+          if(m.title)rememberNames(a,[m.title.english,m.title.romaji,m.title.native]);
           // A {malid} template built an address with a hole in it for every title on
           // the list, because this pass never asked for the id — it only arrived via
           // a season lookup most titles never get. It's a scalar field and costs

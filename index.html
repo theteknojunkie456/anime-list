@@ -13755,7 +13755,7 @@ function pvEpSetApply(){
   const a=pvReturnId?anime.find(x=>x.id===pvReturnId):null;
   if(!a){pvEpSetClose();return;}
   const ep=Math.max(1,_pvEpSetVal), read=kindOf(a)==='read';
-  const before=a.ep||0;
+  const before=a.ep||0, beforeWatch=pvWatchEp||1;
   if(ep>1)applyWatched(pvReturnId,ep-1);
   pvWatchEp=ep;
   pvSetResume(0);                      // a resume point from another episode is a lie
@@ -13766,8 +13766,9 @@ function pvEpSetApply(){
   renderPvNav(a);
   pvEpSetClose();
   try{if(!nativeFullscreen())toast('Caught up \u2014 '+(read?'Ch ':'Ep ')+ep+' in progress',5000,()=>{
-    applyWatched(pvReturnId,before); pvWatchEp=before||1;
-    if(t)t.innerHTML=escH(a.title)+' <span class="pv-ep">'+(read?'Ch ':'Ep ')+(before||1)+'</span>';
+    applyWatched(pvReturnId,before); pvWatchEp=beforeWatch;
+    savePvSession(pvReturnId,beforeWatch,read?'read':'watch');
+    if(t)t.innerHTML=escH(a.title)+' <span class="pv-ep">'+(read?'Ch ':'Ep ')+beforeWatch+'</span>';
     renderPvNav(a);
   });}catch(e){}
 }

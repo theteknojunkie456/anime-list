@@ -273,8 +273,6 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
    thing on screen that refuses to. Turning it down lets the chrome lead without
    touching the picture's brightness, so nothing becomes hard to recognise.
    This is the number to tune: .6 sits back, .85 barely moves, .4 is severe. */
-[data-retro] canvas.pxc{image-rendering:pixelated;filter:saturate(1.2) contrast(1.06);}
-[data-retro] img.pxc-src{display:none;}
 [data-retro] .pcard-img,[data-retro] .rz-img,[data-retro] .pk-cover,
 [data-retro] .dt-cover,[data-retro] .sched-thumb,[data-retro] .resume-art,
 [data-retro] .pop-cover,[data-retro] .pick-img,
@@ -407,18 +405,6 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
    the app feel broken; showing it makes it a wait, which people are fine with as
    long as it ends and they can see it ending. Docked above the nav, out of the
    way of the thumb, and it removes itself the moment it is done. */
-.px-bar{position:fixed;left:12px;right:12px;bottom:calc(var(--safe-b) + 86px);z-index:70;
-  padding:9px 12px 10px;border-radius:12px;pointer-events:none;
-  background:color-mix(in srgb,var(--bg2) 94%,transparent);border:1px solid var(--b2);
-  box-shadow:0 8px 24px -10px rgba(0,0,0,.7);
-  opacity:0;transform:translateY(6px);transition:opacity .2s ease,transform .2s ease;}
-.px-bar.on{opacity:1;transform:none;}
-.px-bar-t{display:flex;align-items:baseline;gap:8px;font-size:12px;color:var(--t2);}
-.px-bar-t b{color:var(--t1);font-weight:700;font-variant-numeric:tabular-nums;}
-.px-bar-t span{margin-left:auto;color:var(--t3);font-variant-numeric:tabular-nums;}
-.px-bar-track{margin-top:7px;height:4px;border-radius:99px;background:var(--bg4);overflow:hidden;}
-.px-bar-fill{height:100%;background:var(--a);border-radius:99px;transition:width .18s linear;}
-@media (prefers-reduced-motion:reduce){.px-bar,.px-bar-fill{transition:none;}}
 /* ARCHIVE */
 .ar-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--bn2);cursor:pointer;}
 .ar-row img,.ar-ph{width:36px;height:51px;object-fit:cover;border-radius:6px;flex:none;background:var(--bg4);
@@ -7049,266 +7035,19 @@ function nsApply(){
   toast(`Moved ${n} to Archive`);
   _nsQueue=[];_nsDrop=[];_nsIdx=0;
 }
-// ─── COVERS AS PIXELS ───────────────────────────────────────────────────────
-// Back after being pulled for speed. The cost was never one canvas — it was 185
-// of them, drawn after every render, on the main thread, while scrolling. So the
-// work is bounded to what is actually on screen: an IntersectionObserver draws a
-// cover as it comes into view and then stops watching it. A render only has to
-// hand new images to the observer, which is cheap; the drawing is what was not.
-// Small cards stay chunky; big art (detail covers, hero, banners) is drawn much
-// closer to full resolution so detail survives. 1.0 was drawing it at exactly 1:1
-// — sharp, but with no pixels left in it at all, which is not the point. 1.2
-// keeps a visible texture on a large picture while leaving it readable.
-const PX_DIV=1.8, PX_DIV_FINE=1.25, PX_MIN=34;
-const PX_SEL='.pcard-img,.rz-img,.pk-cover,.dt-cover,.sched-thumb,.resume-art,.pop-cover,.pick-img,.rc-note-img,.hero-bg-img,.dt-banner-img';
-let _pxIO=null;
-function pxObserver(){
-  if(_pxIO)return _pxIO;
-  _pxIO=new IntersectionObserver(es=>{
-    es.forEach(e=>{ if(e.isIntersecting){ pixelateOne(e.target); _pxIO.unobserve(e.target); } });
-  },{rootMargin:'1400px'});    // several screens of lead time — see the catch-up note below
-  return _pxIO;
-}
-// One canvas, reused, never in the DOM. The previous version put a <canvas>
-// beside every cover: 581 of them for 200 titles, because a title appears in
-// several rows and each <img> got its own. The typical frame was fine and the
-// tail was catastrophic — measured at p95 1100-2800ms against 75-190ms with the
-// effect off.
+// ─── COVERS AS PIXELS — REMOVED ─────────────────────────────────────────────
+// The effect is gone. It cost more than it was worth: every image the page had
+// (characters, episode thumbnails, "more like this", the popular shelf) went
+// through a canvas, a stuck cover could hold a requestAnimationFrame loop open
+// indefinitely, and the progress bar it needed was itself a thing that could go
+// wrong — and did, running overnight at "45396 / 45400".
 //
-// The cover CDN sends access-control-allow-origin for this site, so with
-// crossOrigin='anonymous' the canvas is NOT tainted and its pixels can be read
-// back. That changes everything: draw once into a single scratch canvas, take a
-// data URL, and hand it to the image as its own src. No canvas elements exist,
-// nothing extra composites, and the result is cached per source+size — so the
-// same cover in four rows is computed once instead of four times.
-//
-// If CORS is ever refused (another CDN, a user's own art) toDataURL throws and
-// this falls back to the old element-per-image path, which is slow but correct.
-const _pxCache=new Map();
-let _pxScratch=null;
-function _pxDraw(img,w,h){
-  const c=_pxScratch||(_pxScratch=document.createElement('canvas'));
-  c.width=w; c.height=h;
-  const x=c.getContext('2d');
-  x.clearRect(0,0,w,h);
-  x.imageSmoothingEnabled=false;
-  // object-fit:cover CROPS to fill the frame; drawing the whole source in
-  // squashes the picture to whatever shape the box happens to be.
-  const iw=img.naturalWidth, ih=img.naturalHeight;
-  let sx=0, sy=0, sw=iw, sh=ih;
-  const tAR=w/h, sAR=iw/ih;
-  if(sAR>tAR){ sw=ih*tAR; sx=(iw-sw)/2; } else { sh=iw/tAR; sy=(ih-sh)/2; }
-  x.drawImage(img,sx,sy,sw,sh,0,0,w,h);
-  // Graded rather than filtered: highlights lift, shadows sink, and a wash of
-  // the theme's colour runs through one corner.
-  try{
-    const g=x.createLinearGradient(0,0,0,h);
-    g.addColorStop(0,'rgba(255,255,255,.24)');
-    g.addColorStop(.52,'rgba(128,128,128,0)');
-    g.addColorStop(1,'rgba(0,0,0,.30)');
-    x.globalCompositeOperation='overlay';
-    x.fillStyle=g; x.fillRect(0,0,w,h);
-    const cs=getComputedStyle(document.documentElement);
-    let tint=(cs.getPropertyValue('--edge')||'').trim();
-    if(!/^#|^rgb/.test(tint))tint=(cs.getPropertyValue('--a')||'#7c5cff').trim();
-    const rg=x.createRadialGradient(0,0,0,0,0,Math.max(w,h)*1.15);
-    rg.addColorStop(0,tint); rg.addColorStop(1,'rgba(0,0,0,0)');
-    x.globalCompositeOperation='soft-light'; x.globalAlpha=.5;
-    x.fillStyle=rg; x.fillRect(0,0,w,h);
-    x.globalAlpha=1; x.globalCompositeOperation='source-over';
-  }catch(e){}
-  return c;
-}
-// As fine as it can be while still reading as pixels. The range is narrow on
-// purpose: 1.8 on a small cover down to 1.25 on a large one. Wider than that and
-// the small end turns to mush; narrower and the blocks stop being visible at all,
-// which is not the effect. PX_MIN keeps the smallest thumbnails from collapsing
-// past recognition on the way down.
-//
-// How coarse, as a function of how big. It used to be a two-step — one value
-// under 260px and another above — which put the cover on a title page, the one
-// picture you actually stop and look at, on the coarse side of the line.
-//
-// A ramp instead: the bigger the picture, the finer the blocks, so a thumbnail
-// still reads as pixels while a banner keeps its detail. The detail cover is
-// pinned to the finest setting regardless of its measured size, because what
-// matters there is that you are studying it, not how many pixels wide it is.
-const PX_FINE_SEL='.dt-cover,.dt-cover-ph';
-function pxDivFor(img,w){
-  try{ if(img.matches(PX_FINE_SEL))return PX_DIV_FINE; }catch(e){}
-  const t=Math.max(0,Math.min(1,(w-100)/700));      // 100px -> coarse, 800px+ -> finest
-  return PX_DIV - t*(PX_DIV-PX_DIV_FINE);
-}
-function pixelateOne(img){
-  if(!img||img.dataset.pxDone==='1')return;
-  const orig=img.dataset.pxOrig||img.getAttribute('src')||'';
-  if(!orig||orig.startsWith('data:'))return;
-  const r=img.getBoundingClientRect(); if(r.width<4)return;
-  const div=pxDivFor(img,r.width);
-  const w=Math.max(PX_MIN,Math.round(r.width/div));
-  const h=Math.max(1,Math.round(w*((r.height/r.width)||1.42)));
-  const key=orig+'|'+w+'x'+h;
-  img.dataset.pxOrig=orig;
-  const cached=_pxCache.get(key);
-  if(cached){ img.dataset.pxDone='1'; img.src=cached; return; }
-  // crossOrigin has to be set before the bytes are fetched, so an image already
-  // loaded without it must come again — from cache, since the CDN sends a long
-  // max-age. Guarded so this happens at most once per element.
-  if(img.crossOrigin!=='anonymous'){
-    if(img.dataset.pxCors==='1')return;      // already retried; wait for onload
-    img.dataset.pxCors='1';
-    img.addEventListener('load',()=>{ if(retroMode())pixelateOne(img); },{once:true});
-    img.crossOrigin='anonymous';
-    img.src=orig;                            // re-request with CORS
-    return;
-  }
-  if(!img.complete||!img.naturalWidth)return;
-  try{
-    const url=_pxDraw(img,w,h).toDataURL('image/png');   // throws if tainted
-    if(_pxCache.size>400)_pxCache.clear();               // bounded; covers churn as lists change
-    _pxCache.set(key,url);
-    img.dataset.pxDone='1';
-    img.src=url;
-  }catch(e){
-    // Tainted after all — fall back to the element-per-image overlay.
-    try{
-      const c=_pxDraw(img,w,h);
-      c.className=img.className+' pxc'; c.setAttribute('aria-hidden','true');
-      img.dataset.pxDone='1'; img.classList.add('pxc-src'); img.after(c);
-    }catch(e2){}
-  }
-}
-// Everything below was deleted by accident in the release that moved pixels from
-// canvas elements to data URLs: that edit replaced the whole span between
-// pixelateOne and pixelateCovers, which happened to contain the pending set, the
-// sweep and the scroll listener. pixelateCovers then threw ReferenceError on
-// _pxPending every single call — inside its own try/catch, so nothing was logged
-// and nothing was drawn. Pixel covers were simply off for two releases while the
-// code still looked correct.
-const PX_NEAR=1400, PX_BATCH=40;
-const _pxPending=new Set();
-let _pxTick=0;
-// Draw everything that CAN be drawn, not just what is near the viewport:
-// switching sort or filter rebuilds the list and those images are cache-hot, so
-// gating on scroll position is what let the effect be outrun. Chunked across
-// frames rather than done in one pass, because 185 canvases in a single go is
-// the freeze this started as.
-// Progress, so a long first pass is a wait rather than a mystery. The estimate
-// comes from what this device has actually managed so far, not a guess: covers
-// differ in size and machines differ in speed, and an ETA that ignores both is
-// worse than none.
-let _pxTotal=0, _pxDone=0, _pxT0=0, _pxLastLeft=0, _pxStallAt=0;
-// How long an undecoded image gets before it is written off, and how long the
-// bar may sit at the same number before it gives up on whatever is left.
-const PX_GIVEUP_MS=15000, PX_STALL_MS=20000;
-function pxProgress(){
-  let el=document.getElementById('pxBar');
-  const left=_pxPending.size;
-  // Last resort. Whatever is left after this long is not going to finish, and a
-  // progress bar that cannot reach its end is worse than no bar: it is the app
-  // telling you it is busy, forever. Drop the remainder and let it close.
-  if(left>0){
-    if(left!==_pxLastLeft){_pxLastLeft=left;_pxStallAt=performance.now();}
-    else if(_pxStallAt&&performance.now()-_pxStallAt>PX_STALL_MS){
-      _pxPending.forEach(i=>{try{i.dataset.pxDone='1';}catch(e){}});
-      _pxPending.clear(); _pxLastLeft=0; _pxStallAt=0;
-      return pxProgress();
-    }
-  }else{_pxLastLeft=0;_pxStallAt=0;}
-  // Not worth a bar for a handful — it would flash up and vanish.
-  if(!retroMode()||_pxTotal<12||left<=0){
-    if(el){el.classList.remove('on');setTimeout(()=>{try{el.remove();}catch(e){}},260);}
-    _pxTotal=0;_pxDone=0;_pxT0=0;
-    return;
-  }
-  if(!el){
-    el=document.createElement('div');el.id='pxBar';el.className='px-bar';
-    el.setAttribute('aria-hidden','true');
-    el.innerHTML='<div class="px-bar-t">Pixelating covers <b id="pxBarN"></b><span id="pxBarEta"></span></div>'
-      +'<div class="px-bar-track"><div class="px-bar-fill" id="pxBarFill" style="width:0%"></div></div>';
-    document.body.appendChild(el);
-    requestAnimationFrame(()=>el.classList.add('on'));
-  }
-  const done=Math.max(0,_pxTotal-left);
-  const pct=Math.round(done/_pxTotal*100);
-  const f=document.getElementById('pxBarFill'); if(f)f.style.width=pct+'%';
-  const n=document.getElementById('pxBarN'); if(n)n.textContent=done+' / '+_pxTotal;
-  const e=document.getElementById('pxBarEta');
-  if(e){
-    const ms=_pxT0?(performance.now()-_pxT0):0;
-    if(done>2&&ms>400){
-      const per=ms/done, secs=Math.round(per*left/1000);
-      e.textContent=secs>0?('about '+(secs>90?Math.round(secs/60)+' min':secs+'s')+' left'):'almost done';
-    }else e.textContent='';
-  }
-}
-function pxSweep(){
-  _pxTick=0;
-  if(!retroMode()||!_pxPending.size)return;
-  let drawn=0, more=false;
-  for(const img of Array.from(_pxPending)){
-    if(!img.isConnected||img.dataset.pxDone==='1'){ _pxPending.delete(img); continue; }
-    if(drawn>=PX_BATCH){ more=true; break; }
-    if(!img.complete||!img.naturalWidth){
-      // Not fetched yet — its load event will normally get it. But count the
-      // passes: an image still not decoded after this many sweeps is not slow,
-      // it is stuck, and one stuck image used to keep the whole bar alive.
-      // Timed, not counted: the sweep runs every frame, so a count of passes
-      // writes off a cover that is merely still downloading. Fifteen seconds is
-      // long enough for any image that is actually coming.
-      const seen=+img.dataset.pxSeen||0;
-      if(!seen){img.dataset.pxSeen=Date.now();}
-      else if(Date.now()-seen>PX_GIVEUP_MS){ img.dataset.pxDone='1'; _pxPending.delete(img); try{pxObserver().unobserve(img);}catch(e){} }
-      continue;
-    }
-    pixelateOne(img);
-    if(img.dataset.pxDone==='1'){ _pxPending.delete(img); drawn++; try{pxObserver().unobserve(img);}catch(e){} }
-  }
-  try{pxProgress();}catch(e){}
-  if(more&&!_pxTick)_pxTick=requestAnimationFrame(pxSweep);
-  // Keep going even when nothing is on screen: the point is to finish the whole
-  // list up front so it can never be outrun later.
-  else if(_pxPending.size&&!_pxTick)_pxTick=requestAnimationFrame(pxSweep);
-}
-// The observer's callback is asynchronous and batched, which a fast flick
-// outruns. A scroll listener answers within the frame instead — captured,
-// because the list scrolls inside .page rather than the window.
-function pxOnScroll(){ if(!_pxTick)_pxTick=requestAnimationFrame(pxSweep); }
-try{addEventListener('scroll',pxOnScroll,{passive:true,capture:true});}catch(e){}
-function pixelateCovers(){
-  if(!retroMode())return;
-  try{
-    document.querySelectorAll(PX_SEL).forEach(img=>{
-      if(img.tagName!=='IMG'||img.dataset.pxDone==='1'||img.dataset.pxObs==='1')return;
-      img.dataset.pxObs='1';
-      if(!_pxT0){_pxT0=performance.now();_pxTotal=0;}
-      _pxTotal++;
-      // Retire an image that will never produce pixels. A 404, a blocked host or
-      // a cover that simply never decodes used to sit in _pxPending forever, so
-      // `left` never reached 0, so _pxT0 never cleared, so _pxTotal kept counting
-      // up on every re-render — 171 shows read as 45,400 covers and the bar ran
-      // all night at "almost done". Anything that errors is done, as far as this
-      // is concerned.
-      img.addEventListener('error',()=>{ try{ img.dataset.pxDone='1'; _pxPending.delete(img); pxProgress(); }catch(e){} },{once:true});
-      // A lazy image the browser has not fetched has NO pixels to copy, which is
-      // the real reason the effect could be outrun: switching sort rebuilds the
-      // list and most covers are unfetched again. In Retro they load eagerly —
-      // after the first view they come from cache, so this costs nothing on a
-      // re-sort and only pulls forward fetches that scrolling would do anyway.
-      try{if(img.loading==='lazy')img.loading='eager';}catch(e){}
-      _pxPending.add(img);
-      // Still observed, so an image that lazy-loads later is caught the moment
-      // it arrives rather than waiting for a scroll.
-      pxObserver().observe(img);
-      if(!img.complete||!img.naturalWidth)img.addEventListener('load',()=>{ if(retroMode())pixelateOne(img); },{once:true});
-    });
-    pxSweep();            // start now, before the frame is shown
-  }catch(e){}
-}
+// What stays is the cleanup: a device that ran the old code has canvases in the
+// DOM and pixel data URLs sitting in img.src, and nothing else would put the
+// real covers back. refreshPixels() is kept as the name its three call sites
+// already use, and now only undoes.
 function unpixelateCovers(){
   try{
-    if(_pxIO){_pxIO.disconnect();_pxIO=null;}
-    _pxPending.clear();
     document.querySelectorAll('canvas.pxc').forEach(c=>c.remove());
     document.querySelectorAll('img.pxc-src').forEach(i=>{i.classList.remove('pxc-src');});
     // Put the real picture back. The image now CARRIES the pixel version as its
@@ -7319,7 +7058,7 @@ function unpixelateCovers(){
     });
   }catch(e){}
 }
-function refreshPixels(){ if(retroMode())pixelateCovers(); else unpixelateCovers(); }
+function refreshPixels(){ unpixelateCovers(); }
 // ─── RETRO MODE ─────────────────────────────────────────────────────────────
 // Retro used to be a theme, which forced a choice it had no business forcing:
 // take the treatment and lose your colours. Almost nothing that makes it Retro

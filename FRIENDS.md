@@ -80,8 +80,12 @@ and the list becomes the record:
   shows the cover, a state pill, and the whole timeline: when you sent it, when
   they added it, started it, finished or dropped it, whether they turned it down
   and when, what it costs to watch, and which send it belonged to. Their replies
-  are quoted under it; when there is nothing yet, the row says which kind of
-  nothing — not opened, opened but nothing said, or turned down. Taking back is
+  are quoted under it, and **the note you attached when you sent it** is quoted
+  above them — it is the first thing anyone said about that show, and this tab
+  used to be the one place it never appeared. When there is nothing back yet, the
+  row says which kind of nothing — not opened, opened but nothing said, or turned
+  down. (Sends logged before the note was kept have nothing to show; only sends
+  from here on carry it.) Taking back is
   still per envelope (that is what the server files), so a row from a multi-title
   send says *Take back all 7*.
 - **The tabs stay put.** They are pinned to the top of the list, so scrolling

@@ -16228,7 +16228,7 @@ function rtmSentRowsHTML(q){
       // a title you have, and your own copy carries both.
       const own=anime.find(a=>(it.aniId&&a.aniId===it.aniId)||normTitle(a.title)===normTitle(it.title))||null;
       rows.push({title:it.title,aniId:it.aniId||(own&&own.aniId)||0,img:it.img||(own&&own.img)||'',
-        own,code:e.code,id:e.id,at:e.at||0,n:items.length});
+        note:String(it.note||''),own,code:e.code,id:e.id,at:e.at||0,n:items.length});
     });
   });
   const rank={added:1,started:2,dropped:3,finished:4};
@@ -16263,7 +16263,12 @@ function rtmSentRowsHTML(q){
     // Their words back, oldest first, so a thread reads like one.
     const notes=news.filter(x=>x.kind==='note'&&x.note).sort((a,b)=>(a.at||0)-(b.at||0)).slice(-5)
       .map(x=>`<div class="rtm-line"><span class="rtm-name" style="color:${col}">${escH(who)}</span><span class="rtm-quote">“${escH(x.note)}”</span></div>`).join('');
-    const said=notes||`<div class="rtm-line"><span class="rtm-name" style="color:${col}">${escH(who)}</span><span class="rtm-quote plain">${best?'hasn’t said anything about it':passed?'turned this one down':'hasn’t opened it yet'}</span></div>`;
+    // What YOU said when you sent it comes first — it is the first thing anyone
+    // said about this show, and it was the one voice this tab never showed.
+    // Sends logged before the note was kept simply have nothing to show.
+    const yours=r.note?`<div class="rtm-line"><span class="rtm-name you">You</span><span class="rtm-quote">“${escH(r.note)}”</span></div>`:'';
+    const back=notes||`<div class="rtm-line"><span class="rtm-name" style="color:${col}">${escH(who)}</span><span class="rtm-quote plain">${best?'hasn’t said anything about it':passed?'turned this one down':'hasn’t opened it yet'}</span></div>`;
+    const said=yours+back;
     return `<div class="rtm-row" style="--fc:${col}">
       ${rtmArt(r.title,r.img)}
       <div class="rtm-main">
@@ -16803,7 +16808,7 @@ function noteRecSent(code,id,items){
     // a poster instead of a letter. Both, because dropping `titles` would blank
     // every entry logged before today.
     l.unshift({code,id,at:Date.now(),titles:(items||[]).map(i=>i.title).filter(Boolean).slice(0,12),
-      items:(items||[]).filter(i=>i&&i.title).slice(0,12).map(i=>({title:i.title,aniId:i.aniId||0,img:i.img||''}))});
+      items:(items||[]).filter(i=>i&&i.title).slice(0,12).map(i=>({title:i.title,aniId:i.aniId||0,img:i.img||'',note:String(i.note||'')}))});
     localStorage.setItem(RECS_SENT,JSON.stringify(l.slice(0,60)));
   }catch(e){}
 }

@@ -5630,6 +5630,7 @@ function writeLocal(){
   }
 }
 function save(){
+  _popHave=null;   // the "do I have this?" index is rebuilt on next use
   // "No duplicates in any way" is a property of the list, not of the ten call
   // sites that currently remember to ask for it — and any new path that adds a
   // title is one more chance to forget. Every mutation lands here, so here is
@@ -10610,7 +10611,7 @@ async function loadPopularShelf(){
     box.innerHTML=_popCache.map(m=>{
       const t=(m.title.english||m.title.romaji||'').replace(/'/g,'&#39;');
       const img=safeImg((m.coverImage||{}).large||'');   // sanitized: lands in url('…') and a JS-string onclick arg
-      const have=anime.some(a=>a.aniId===m.id);   // already on the list → show it checked, not tappable
+      const have=haveThis(_popHave||(_popHave=alreadyHave()),m);   // already on the list → show it checked, not tappable
       return `<button class="pop-card${have?' added':''}"${have?' disabled':''} onclick="addPopular(${m.id},'${jsq(t)}','${img}',${m.episodes||0},this)">
         <div class="pop-cover" style="background-image:url('${img}')"></div>
         <div class="pop-name">${escH(m.title.english||m.title.romaji||'')}</div></button>`;
@@ -18496,7 +18497,7 @@ async function scanUpcomingRelated(){
 function addRelatedSched(aniId){
   aniId=+aniId;
   const r=upcomingRelated().find(x=>x.aniId===aniId);if(!r)return;
-  if(anime.some(a=>a.aniId===aniId)){toast('Already in your list');return;}
+  if(haveThis(alreadyHave(),{id:aniId,title:{english:r.titleEn||'',romaji:r.titleRo||'',native:r.title||''}})){toast('Already in your list');return;}
   anime.unshift({id:uid(),kind:'watch',status:'plan',title:r.title,titleEn:r.titleEn||'',titleRo:r.titleRo||'',aniId:r.aniId,malId:0,img:r.img||'',banner:r.banner||'',aniColor:r.aniColor||'',bgImage:'',bgAccent:'',eps:r.epTotal?r.epTotal+' eps':'',epTotal:r.epTotal||0,ep:0,airAt:r.airAt||0,airEp:r.airEp||0,dur:r.dur||0,time:'',genre:r.genre||'',order:[],notes:'',rating:0,fav:false,upd:Date.now()});
   save();render();toast('\u201c'+r.title+'\u201d added to Plan');
   try{nativeScheduleNotifs();}catch(e){}
@@ -18593,6 +18594,31 @@ function renderSchedDays(ws,eps){
 // ─── FOR YOU (tailored recommendations — AniList recommendation graph) ───────
 let fyCache={watch:null,read:null};
 function fyPh(ch){return '<div class="fy-ph">'+ch+'</div>';}
+// One answer to "do I already have this?", for anything offering you titles.
+// Keyed by AniList id and by every name we know a thing under, because half the
+// point is catching the copy that never got an id.
+var _popHave=null;
+function alreadyHave(){
+  const keys=new Set();
+  const add=a=>{
+    if(!a)return;
+    if(a.aniId)keys.add('ani:'+a.aniId);
+    [a.title,...(Array.isArray(a.alt)?a.alt:[])].forEach(t=>{
+      titleAliases(t).forEach(x=>{const n=normTitle(x); if(n)keys.add('t:'+n);});
+    });
+  };
+  anime.forEach(add);
+  try{archiveList().forEach(add);}catch(e){}
+  return keys;
+}
+function haveThis(keys,media){
+  if(!media)return false;
+  if(media.id&&keys.has('ani:'+media.id))return true;
+  const t=media.title||{};
+  return [t.english,t.romaji,t.native,media.title&&typeof media.title==='string'?media.title:null]
+    .filter(Boolean)
+    .some(n=>{const k=normTitle(n);return k&&keys.has('t:'+k);});
+}
 function openForYou(){openSheet('forYouSheet');}
 function refreshForYou(){fyCache[viewKind==='read'?'read':'watch']=null;renderForYou();}
 function renderForYou(){
@@ -18625,7 +18651,12 @@ async function computeForYou(kind){
   if(!sources.length){try{if(typeof fetchCovers==='function')await fetchCovers();}catch(e){}sources=anime.filter(a=>kindOf(a)===K&&a.aniId&&W[a.status]);}
   if(!sources.length)return [];
   const top=sources.map(a=>({aniId:a.aniId,title:a.title,w:W[a.status]})).sort((a,b)=>b.w-a.w).slice(0,24);
-  const onList=new Set(anime.map(a=>a.aniId).filter(Boolean));
+  // Everything you already have, by id AND by name. Ids alone missed the rows
+  // that never linked to a database entry — the ones the fix bar counts — so the
+  // compass cheerfully suggested shows already sitting in your list under a
+  // slightly different spelling. Archived titles count too: you set those aside
+  // deliberately, and being offered them back is the opposite of help.
+  const onList=alreadyHave();
   const agg={};
   for(let i=0;i<top.length;i+=8){
     const batch=top.slice(i,i+8);
@@ -18637,7 +18668,8 @@ async function computeForYou(kind){
       batch.forEach((s,idx)=>{
         const md=data['m'+idx];if(!md||!md.recommendations)return;
         (md.recommendations.nodes||[]).forEach(n=>{
-          const rec=n.mediaRecommendation;if(!rec||!rec.id||onList.has(rec.id))return;
+          const rec=n.mediaRecommendation;if(!rec||!rec.id)return;
+          if(haveThis(onList,rec))return;
           if(rec.type&&rec.type!==WANT)return;               // a manga's anime adaptation is not a reading pick
           if(isAdultMedia(rec))return;                      // never recommend adult titles
           if(!rec.coverImage||!rec.coverImage.large)return;

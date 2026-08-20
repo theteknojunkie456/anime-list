@@ -3033,6 +3033,31 @@ body.no-party .friend-only{display:flex;}
 .rec-badge-note{margin-top:4px;font-size:13px;color:var(--t1);font-style:italic;}
 /* Recommended-to-you: a record, so it reads as a list of conversations rather
    than a grid of posters. Art small, words first. */
+/* Social hub: two equal doors, not a stack of menu rows. */
+.hub-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:4px;}
+.hub-card{display:flex;flex-direction:column;align-items:flex-start;gap:8px;padding:20px 18px 18px;border-radius:20px;
+  background:var(--bg3);border:1px solid var(--b1);color:var(--t);text-align:left;cursor:pointer;
+  transition:transform .16s cubic-bezier(.2,.8,.3,1),border-color .16s ease,background .16s ease;}
+.hub-card:hover{transform:translateY(-2px);border-color:var(--b3);background:var(--bg4);}
+.hub-card:active{transform:translateY(0);}
+.hub-ico{width:46px;height:46px;border-radius:14px;display:flex;align-items:center;justify-content:center;
+  background:color-mix(in srgb,var(--a) 16%,transparent);color:var(--a2);}
+.hub-ico .ico{width:22px;height:22px;}
+.hub-card.party .hub-ico{background:color-mix(in srgb,#7c5cff 20%,transparent);color:#b6a4ff;}
+.hub-name{font-weight:800;font-size:16px;line-height:1.2;}
+.hub-sub{font-size:12.5px;color:var(--t3);line-height:1.4;}
+.hub-strip{display:flex;align-items:center;gap:11px;width:100%;margin-top:12px;padding:14px 16px;border-radius:16px;
+  background:transparent;border:1px solid var(--b1);color:var(--t1);cursor:pointer;text-align:left;
+  transition:border-color .16s ease,background .16s ease;}
+.hub-strip:hover{border-color:var(--b3);background:var(--bg3);}
+.hub-strip-ico{color:var(--t3);display:flex;}
+.hub-strip-ico .ico{width:17px;height:17px;}
+.hub-strip-t{flex:1;font-weight:700;font-size:14px;}
+.hub-strip-n{margin-left:8px;font-weight:800;color:var(--a2);}
+.hub-strip .ico{width:16px;height:16px;color:var(--t3);}
+@media(max-width:420px){.hub-grid{grid-template-columns:1fr;}.hub-card{flex-direction:row;align-items:center;gap:14px;padding:16px;}
+  .hub-card .hub-name{flex:0 0 auto;}
+  .hub-card .hub-sub{display:none;}}
 .rtm-row{display:flex;gap:12px;padding:13px 0;border-bottom:1px solid var(--b1);}
 .rtm-art{width:48px;height:68px;flex-shrink:0;border-radius:8px;object-fit:cover;background:var(--bg3);}
 .rtm-art.ph{display:flex;align-items:center;justify-content:center;color:var(--t3);font-weight:800;font-size:19px;}
@@ -4082,11 +4107,30 @@ body.recsel .pcard{position:relative;}
   <div class="ns-modes" id="nsModes"></div>
   <div id="nsBody"></div>
 </div>
+<!-- The two things behind the people icon were two small buttons stacked at the
+     bottom of a mostly empty sheet, which is a menu pretending to be a screen.
+     They are the two halves of everything social in the app, so they get equal
+     weight and enough size to hit without aiming — one door, two rooms. -->
 <div class="sheet" id="hubSheet">
   <div class="sheet-handle"></div>
   <div class="sheet-header"><div class="sheet-title">Social</div><button class="sheet-cancel" onclick="closeAll()">Done</button></div>
-  <button class="dt-watch" onclick="closeAll();setTimeout(openFriends,240)"><i data-ic="users"></i> Friends</button>
-  <button class="dt-watch" style="margin-top:10px;background:var(--bg4);color:var(--t1)" onclick="closeAll();setTimeout(function(){openSheet('partySheet')},240)"><i data-ic="play"></i> Watch Party</button>
+  <div class="hub-grid">
+    <button class="hub-card" onclick="closeAll();setTimeout(openFriends,240)">
+      <span class="hub-ico"><i data-ic="users"></i></span>
+      <span class="hub-name">Friends</span>
+      <span class="hub-sub" id="hubFriendsSub">Share lists, recommend, see what they're on</span>
+    </button>
+    <button class="hub-card party" onclick="closeAll();setTimeout(function(){openSheet('partySheet')},240)">
+      <span class="hub-ico"><i data-ic="play"></i></span>
+      <span class="hub-name">Watch party</span>
+      <span class="hub-sub" id="hubPartySub">Watch together, in sync, with voice</span>
+    </button>
+  </div>
+  <button class="hub-strip" onclick="closeAll();setTimeout(openRecsToMe,240)">
+    <span class="hub-strip-ico"><i data-ic="inbox"></i></span>
+    <span class="hub-strip-t">Recommended to you<span class="hub-strip-n" id="hubRecN"></span></span>
+    <i data-ic="chevron-right"></i>
+  </button>
 </div>
 <div class="sheet" id="partySheet">
   <div class="sheet-handle"></div>
@@ -6017,6 +6061,9 @@ function touch(a){
   try{ if(a&&Array.isArray(a.recFrom)&&a.recFrom.length)recStageCheck(a); }catch(e){}
 }
 function recStageCheck(a){
+  // Dropping it is news too — arguably the most useful kind, since it is the one
+  // that tells them not to ask how you're getting on with it.
+  if(a.status==='dropped'){tellRec(a,'dropped');return;}
   if(a.status==='finished'){tellRec(a,'finished');return;}
   if(a.status==='watching'||(a.ep||0)>0)tellRec(a,'started');
 }
@@ -8391,14 +8438,19 @@ function airingInfo(a){
 }
 function renderFiltRow(){
   const items=anime.filter(a=>kindOf(a)===viewKind);
-  const counts={all:items.length,watching:0,plan:0,finished:0,dropped:0};
+  const counts={all:items.length,watching:0,plan:0,finished:0,dropped:0,rec:0};
   items.forEach(a=>counts[a.status]!==undefined&&counts[a.status]++);
+  counts.rec=items.filter(a=>Array.isArray(a.recFrom)&&a.recFrom.length).length;
   const isRead=viewKind==='read';
   // just the everyday three so the row never scrolls; Finished/Dropped live in the sort menu
   const filts=[['all','All'],['watching',isRead?'Reading':'Watching'],['plan',isRead?'To Read':'Plan']];
+  // "From friends" earns a place next to them once there is anything in it —
+  // where a recommendation came from is a way you think about your list, not a
+  // thing that should live only on a social screen.
+  if(counts.rec)filts.push(['rec','From friends']);
   document.getElementById('filtRow').innerHTML=filts.map(([f,l])=>{
     const on=filterStatus===f;
-    const cls=on?(f==='all'?'on':'on-'+f):'';
+    const cls=on?(f==='all'||f==='rec'?'on':'on-'+f):'';
     const n=counts[f]||0;
     return`<button class="fchip${cls?' '+cls:''}" onclick="setFilter('${f}')">${l}<span class="fn">${n}</span></button>`;
   }).join('')
@@ -9071,7 +9123,10 @@ function renderHome(){
   const pool=anime.filter(a=>kindOf(a)===viewKind);
   if(q||filterStatus!=='all'){
     let list=pool;
-    if(filterStatus!=='all')list=list.filter(a=>filterStatus==='fav'?!!a.fav:a.status===filterStatus);
+    if(filterStatus!=='all')list=list.filter(a=>
+      filterStatus==='fav'?!!a.fav
+      :filterStatus==='rec'?(Array.isArray(a.recFrom)&&a.recFrom.length>0)
+      :a.status===filterStatus);
     // Sort normally FIRST, then order by relevance. Array.sort is stable, so two
     // titles that match equally well keep the order the list is meant to be in
     // rather than whatever order they happened to be stored in.
@@ -9081,7 +9136,7 @@ function renderHome(){
     }
     const hits=list;
     if(hits.length){el.innerHTML=`<div class="grid">${hits.map(posterCard).join('')}</div>`+bulkBarHTML();return;}
-    const stLbl=filterStatus==='fav'?'Favorites':filterStatus==='watching'?(isRead?'Reading':'Watching'):(STATUS_META[filterStatus]?STATUS_META[filterStatus].label:filterStatus);
+    const stLbl=filterStatus==='fav'?'Favorites':filterStatus==='rec'?'From friends':filterStatus==='watching'?(isRead?'Reading':'Watching'):(STATUS_META[filterStatus]?STATUS_META[filterStatus].label:filterStatus);
     const msg=q
       ?`No matches for “${schEsc(q)}”${filterStatus!=='all'?` in ${stLbl}`:` in your ${isRead?'reading':'watch'} list`}`
       :`Nothing in ${stLbl} yet`;
@@ -9091,7 +9146,7 @@ function renderHome(){
     // again. The words are right here.
     const typed=(()=>{try{return document.getElementById('searchIn').value.trim();}catch(e){return q;}})()||q;
     const addBtn=q?`<button class="hero-cta" onclick="addFromSearch(${JSON.stringify(typed).replace(/"/g,'&quot;')})">${icon('plus')} Add “${schEsc(typed)}”</button>`:'';
-    el.innerHTML=`<div class="empty"><div class="empty-icon">${q?icon('search'):filterStatus==='fav'?icon('heart'):(STATUS_META[filterStatus]?STATUS_META[filterStatus].icon:(isRead?icon('book'):icon('inbox')))}</div><p>${msg}</p>${addBtn}</div>`;
+    el.innerHTML=`<div class="empty"><div class="empty-icon">${q?icon('search'):filterStatus==='fav'?icon('heart'):filterStatus==='rec'?icon('users'):(STATUS_META[filterStatus]?STATUS_META[filterStatus].icon:(isRead?icon('book'):icon('inbox')))}</div><p>${msg}</p>${addBtn}</div>`;
     return;
   }
   if(!pool.length){
@@ -15781,6 +15836,7 @@ function recSendersFor(a){
 // every screen. This is the other thing — the record. Everything anyone has ever
 // recommended you, whether it is still undecided, sitting in Plan, half-watched
 // or finished years ago, with their note, your reply, and what they were told.
+let _rtmDirty=false;
 function recsToMeRows(){
   const rows=[];
   // On your list, with a remembered sender.
@@ -15790,17 +15846,35 @@ function recsToMeRows(){
       at:Math.max(...a.recFrom.map(f=>f.at||0),0),status:a.status,ep:a.ep||0,epTotal:a.epTotal||0,
       replies:Array.isArray(a.recSaidNotes)?a.recSaidNotes:[],told:a.recSaid||{}});
   });
-  // Still in the mailbox — recommended, not yet added.
+  // The mailbox, which is where the HISTORY actually lives. Skipping entries
+  // whose show is already on the list was wrong twice over: those are exactly
+  // the recommendations you acted on, and they are the only record of anything
+  // recommended before senders started being kept on items. A mailbox entry for
+  // a show you own gets folded into that show's row rather than dropped.
   try{
     const m=recByAni();
     Object.keys(m).forEach(k=>{
       const rec=m[k], it=rec.item||{};
-      const onList=anime.some(a=>(it.aniId&&a.aniId===it.aniId)||normTitle(a.title)===normTitle(it.title));
-      if(onList)return;
+      const mine=anime.find(a=>(it.aniId&&a.aniId===it.aniId)||normTitle(a.title)===normTitle(it.title));
+      if(mine){
+        // Backfill: write the senders onto the item so this survives the mailbox
+        // rotating out from under us (the server keeps the last 200).
+        const had=JSON.stringify(mine.recFrom||[]);
+        rememberRecFrom(mine,rec.senders);
+        if(JSON.stringify(mine.recFrom||[])!==had)_rtmDirty=true;
+        const row=rows.find(r=>r.id===mine.id);
+        if(row){ row.senders=mine.recFrom||row.senders; row.at=Math.max(row.at||0,...(rec.senders||[]).map(x=>x.at||0)); }
+        else rows.push({kind:'mine',id:mine.id,item:mine,title:mine.title,img:mine.img,senders:mine.recFrom||rec.senders||[],
+          at:Math.max(...(rec.senders||[]).map(x=>x.at||0),0),status:mine.status,ep:mine.ep||0,epTotal:mine.epTotal||0,
+          replies:Array.isArray(mine.recSaidNotes)?mine.recSaidNotes:[],told:mine.recSaid||{},key:k});
+        return;
+      }
       rows.push({kind:'new',key:k,item:it,title:it.title,img:it.img,senders:rec.senders||[],
         at:Math.max(...(rec.senders||[]).map(x=>x.at||0),0),status:'',replies:[],told:{}});
     });
   }catch(e){}
+  // Persist anything the backfill learned, once, outside the loop.
+  if(_rtmDirty){_rtmDirty=false;try{save();}catch(e){}}
   rows.sort((x,y)=>(y.at||0)-(x.at||0));
   return rows;
 }
@@ -15973,7 +16047,18 @@ function tellRec(a,kind,note){
   }catch(e){}
 }
 function openFriends(){renderFriends();openSheet('friendsSheet');pullRecs();pullFriendReqs();}
-function openHub(){ openSheet('hubSheet'); }
+function openHub(){
+  openSheet('hubSheet');
+  // Counts, so the doors say how much is behind them.
+  try{
+    const f=friendsList().length, on=friendsList().filter(x=>isFriendOnline&&isFriendOnline(x.code)).length;
+    const fs=document.getElementById('hubFriendsSub');
+    if(fs&&f)fs.textContent=on?`${f} friend${f>1?'s':''} · ${on} on now`:`${f} friend${f>1?'s':''}`;
+    const n=recsToMeRows().length, rn=document.getElementById('hubRecN');
+    if(rn)rn.textContent=n?' · '+n:'';
+  }catch(e){}
+  try{paintIcons();}catch(e){}
+}
 function renderFriends(){
   const box=document.getElementById('friendsBody');if(!box)return;
   const code=myFriendCode(),name=myFriendName(),fr=friendsList(),out=friendsOut(),reqs=friendReqs;
@@ -16422,14 +16507,14 @@ function passedTitles(e){
 // What became of the things you sent, for one friend's entry in the sent list.
 // A pass is already reported next door; this is the other half — the half worth
 // sending something for.
-const _echoWord={added:'added it',started:'started it',finished:'finished it'};
+const _echoWord={added:'added it',started:'started it',finished:'finished it',dropped:'dropped it'};
 function echoBits(e){
   if(!e||!e.code||!Array.isArray(recsEcho)||!recsEcho.length)return '';
   const sent=(e.titles||[]).map(t=>String(t||'').toLowerCase());
   const mine=recsEcho.filter(x=>x&&x.from&&x.from.code===e.code&&sent.includes(String(x.title||'').toLowerCase()));
   if(!mine.length)return '';
   // Furthest along wins: "finished it" says everything "added it" did.
-  const rank={added:1,started:2,finished:3};
+  const rank={added:1,started:2,dropped:3,finished:4};
   const best={};
   mine.filter(x=>x.kind!=='note').forEach(x=>{
     const t=String(x.title||'');

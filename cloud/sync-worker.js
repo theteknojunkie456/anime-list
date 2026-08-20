@@ -344,7 +344,7 @@ export default {
       const kind = String(body.kind || '');
       if (!/^[A-Za-z0-9]{10,64}$/.test(to)) return json({ error: 'bad to' }, 400, cors);
       if (!/^[A-Za-z0-9]{10,64}$/.test(fromCode)) return json({ error: 'bad from' }, 400, cors);
-      if (!['added', 'started', 'finished', 'note'].includes(kind)) return json({ error: 'bad kind' }, 400, cors);
+      if (!['added', 'started', 'finished', 'dropped', 'note'].includes(kind)) return json({ error: 'bad kind' }, 400, cors);
       const title = String(body.title || '').slice(0, 200);
       const aniId = Number(body.aniId) || 0;
       if (!title && !aniId) return json({ error: 'no show' }, 400, cors);

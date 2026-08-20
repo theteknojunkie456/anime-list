@@ -33,6 +33,16 @@ const echo = (env, extra) => call(env, { op: 'rec_echo', to: THEM, from: { code:
   console.log('ok  added / started / finished all reach the recommender');
 }
 
+// ── dropping it is news as well ────────────────────────────────────────────
+{
+  const env = mkEnv();
+  await echo(env, { kind: 'started' });
+  await echo(env, { kind: 'dropped' });
+  const pull = await jsonOf(await call(env, { op: 'rec_pull', code: THEM }));
+  assert.deepEqual(pull.echoes.map(e => e.kind), ['started', 'dropped']);
+  console.log('ok  dropping it reaches the recommender too');
+}
+
 // ── the same stage twice is still one ──────────────────────────────────────
 {
   const env = mkEnv();

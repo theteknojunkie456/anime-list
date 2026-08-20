@@ -3061,6 +3061,16 @@ body.no-party .friend-only{display:flex;}
 /* A record you scroll: art left, a rule between entries, and every line of text
    worth one line of height. The first version gave each note a filled bubble,
    which turned every entry into a card and fitted four on a screen. */
+/* Two halves of one subject, not two screens. */
+.rtm-tabs{display:flex;gap:6px;margin:2px 0 8px;}
+.rtm-tab{flex:1;padding:9px 12px;border-radius:12px;background:var(--bg3);border:1px solid var(--b1);
+  color:var(--t2);font:800 13px/1 inherit;cursor:pointer;transition:color .16s,background .16s,border-color .16s;}
+.rtm-tab.on{background:color-mix(in srgb,var(--a) 16%,transparent);border-color:color-mix(in srgb,var(--a) 45%,transparent);color:var(--t);}
+.rtm-tab-n{color:var(--t3);font-weight:700;}
+.rtm-tab.on .rtm-tab-n{color:var(--a2);}
+.rtm-acts{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
+.rtm-acts .src-chip.go{background:var(--a);color:var(--aFg);border-color:transparent;}
+.rtm-replybox{margin-top:8px;}
 .rtm-list{margin-top:6px;border-top:1px solid var(--b1);}
 .rtm-row{display:flex;gap:12px;padding:11px 0;border-bottom:1px solid var(--b1);}
 .rtm-art{width:44px;height:63px;flex-shrink:0;border-radius:7px;object-fit:cover;background:var(--bg3);}
@@ -4176,11 +4186,19 @@ body.recsel .pcard{position:relative;}
 </div>
 
 <!-- EVERYTHING ANYONE HAS EVER RECOMMENDED YOU — the whole record, not a queue -->
+<!-- Everything recommendation-shaped, in one place: what came to you, what you
+     sent, and every action either needs. It used to be a record here, the
+     add/pass buttons on a different sheet, and the sent list buried at the
+     bottom of Friends. -->
 <div class="sheet" id="recsToMeSheet">
   <div class="sheet-handle"></div>
   <div class="sheet-header">
     <div class="sheet-title"><i data-ic="users"></i> From Friends</div>
     <button class="sheet-cancel" onclick="openSheet('friendsSheet')">Back</button>
+  </div>
+  <div class="rtm-tabs">
+    <button class="rtm-tab on" id="rtmTabIn" onclick="setRtmTab('in')">To you<span class="rtm-tab-n" id="rtmNIn"></span></button>
+    <button class="rtm-tab" id="rtmTabOut" onclick="setRtmTab('out')">You sent<span class="rtm-tab-n" id="rtmNOut"></span></button>
   </div>
   <div id="recsToMeBody"></div>
 </div>
@@ -15885,10 +15903,59 @@ function recsToMeRows(){
   rows.sort((x,y)=>(y.at||0)-(x.at||0));
   return rows;
 }
-function openRecsToMe(){renderRecsToMe();openSheet('recsToMeSheet');}
+// Add / turn down / answer, all from the row. These reuse the existing flows
+// rather than reimplementing them: the same add, the same pass that tells the
+// sender, the same note that reaches everyone who suggested it.
+function rtmAdd(k){
+  recDetailKey=decodeURIComponent(String(k||''));
+  const rec=recByAni()[recDetailKey]; if(!rec){toast('That recommendation is gone');return;}
+  addRecToList(false);
+  setTimeout(()=>{try{openRecsToMe('in');}catch(e){}},260);
+}
+function rtmPass(k){
+  const key=decodeURIComponent(String(k||''));
+  const rec=recByAni()[key]; if(!rec)return;
+  try{dismissRec(encodeURIComponent(key),{stopPropagation(){},preventDefault(){}});}catch(e){}
+  setTimeout(()=>{try{renderRecsToMe();}catch(e){}},60);
+}
+function rtmReply(id,close){
+  const box=document.getElementById('rtmR'+id); if(!box)return;
+  box.hidden=close?true:!box.hidden;
+  if(!box.hidden){const t=box.querySelector('textarea'); if(t)try{t.focus({preventScroll:true});}catch(e){}}
+}
+function rtmReplySend(id){
+  const a=anime.find(x=>x.id===id); if(!a)return;
+  const box=document.getElementById('rtmR'+id); const t=box&&box.querySelector('textarea');
+  const v=t?t.value.trim():'';
+  if(!v){toast('Write something first');return;}
+  if(!myFriendCode()){toast('Turn on cloud backup first \u2014 that\u2019s what your friends know you by');return;}
+  tellRec(a,'note',v);
+  a.recSaidNotes=(Array.isArray(a.recSaidNotes)?a.recSaidNotes:[]).concat([{note:v,at:Date.now()}]).slice(-20);
+  touch(a);save();
+  renderRecsToMe();
+  toast('Sent');
+}
+let rtmTab='in';
+function setRtmTab(t){
+  rtmTab=t;
+  ['in','out'].forEach(k=>{const b=document.getElementById('rtmTab'+(k==='in'?'In':'Out'));if(b)b.classList.toggle('on',k===t);});
+  renderRecsToMe();
+}
+function openRecsToMe(t){ if(t)rtmTab=t; setRtmTab(rtmTab); openSheet('recsToMeSheet'); }
 function renderRecsToMe(){
   const box=document.getElementById('recsToMeBody'); if(!box)return;
   const rows=recsToMeRows();
+  // Counts on the tabs, so you can see which half has something in it.
+  try{
+    const a=document.getElementById('rtmNIn'); if(a)a.textContent=rows.length?' '+rows.length:'';
+    const b=document.getElementById('rtmNOut'); if(b){const n=recsSent().length;b.textContent=n?' '+n:'';}
+  }catch(e){}
+  if(rtmTab==='out'){
+    box.innerHTML=`<button class="hero-cta" style="margin:6px 0 4px" onclick="closeAll();setTimeout(startRecommend,240)">${icon('send')} Recommend something</button>`
+      +(sentRecsHTML()||'<p class="ai-desc">You haven\u2019t sent anything yet. Anything you send shows up here with what became of it.</p>');
+    try{paintIcons();}catch(e){}
+    return;
+  }
   if(!rows.length){
     box.innerHTML='<p class="ai-desc">Nothing yet. When a friend recommends you something it lands here, and it stays here \u2014 after you add it, after you finish it, with everything either of you said about it.</p>';
     return;
@@ -15920,18 +15987,30 @@ function renderRecsToMe(){
       </div>`).join('');
     const mine=r.replies.map(x=>`<div class="rtm-line"><span class="rtm-name you">You</span><span class="rtm-quote">\u201c${escH(x.note)}\u201d</span></div>`).join('');
     const art=r.img?`<img class="rtm-art" src="${escH(r.img)}" alt="" loading="lazy">`:`<div class="rtm-art ph">${escH(((r.title||'?')[0]||'?').toUpperCase())}</div>`;
-    const go=r.kind==='new'
-      ? `<button class="src-chip" onclick="openRecDetail('${encodeURIComponent(r.key||'')}')">Look at it</button>`
+    // Everything this row can need, on the row. Adding it, turning it down,
+    // answering, or opening what you already have — no second sheet for any of it.
+    const acts=r.kind==='new'
+      ? `<button class="src-chip go" onclick="rtmAdd('${encodeURIComponent(r.key||'')}')">Add</button>
+         <button class="src-chip" onclick="rtmPass('${encodeURIComponent(r.key||'')}')">Not for me</button>`
       : `<button class="src-chip" onclick="closeAll();openDetail('${r.id}')">Open</button>`;
+    const canReply=r.kind!=='new'||r.id;
+    const go=`<div class="rtm-acts">${acts}${canReply&&r.id?`<button class="src-chip" onclick="rtmReply('${r.id}')">Reply</button>`:''}</div>`;
     return `<div class="rtm-row" style="--fc:${col}">
       ${art}
       <div class="rtm-main">
         <div class="rtm-head">
           <div class="rtm-title">${escH(r.title||'?')}</div>
-          ${go}
         </div>
         <div class="rtm-facts">${[stateOf(r)].concat(facts).map(escH).join(' \u00b7 ')}</div>
         ${people}${mine}
+        ${go}
+        <div class="rtm-replybox" id="rtmR${escH(r.id||r.key||'')}" hidden>
+          <textarea class="ai-prompt-in" rows="2" placeholder="man this was great"></textarea>
+          <div style="display:flex;gap:8px;margin-top:6px">
+            <button class="parse-btn" style="flex:1" onclick="rtmReplySend('${r.id||''}')">Send</button>
+            <button class="parse-btn" style="flex:0 0 auto;width:auto;padding-left:14px;padding-right:14px" onclick="rtmReply('${r.id||''}',1)">Cancel</button>
+          </div>
+        </div>
       </div>
     </div>`;
   }).join('')+`</div>`;
@@ -16107,11 +16186,10 @@ function renderFriends(){
       <button class="parse-btn" onclick="doAddFriend()">Send friend request</button>
       <div class="fr-err" id="frErr"></div>
     </details>
-    ${(()=>{const n=recsToMeRows().length;return `<button class="src-opt" style="margin-top:16px;width:100%;text-align:left" onclick="openRecsToMe()">
+    ${(()=>{const n=recsToMeRows().length,m=recsSent().length;return `<button class="src-opt" style="margin-top:16px;width:100%;text-align:left" onclick="openRecsToMe('in')">
       <div class="src-name">${icon('users')} From Friends${n?` · ${n}`:''}</div>
-      <div class="src-sub">Everything anyone has sent you, with their notes \u2014 kept after you add it and after you finish it</div>
-    </button>`;})()}
-    ${sentRecsHTML()}`;
+      <div class="src-sub">Everything they've sent you and everything you've sent${m?` · ${m} sent`:''} \u2014 add, turn down, reply, take back</div>
+    </button>`;})()}`;
 }
 // Online first, then by name. One comparator, so the first paint and every
 // presence repaint agree on the order.

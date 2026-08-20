@@ -74,12 +74,19 @@ and the list becomes the record:
   (recommended → added → started → finished/dropped), every friend who sent it
   with what they said, and your replies back. Add, turn down, open and reply all
   happen on the row.
-- **You sent** — one row **per title**, not per envelope. A send of seven shows
-  used to be seven titles comma-joined into one grey line with a single button
-  beside it. Each row now says who it went to, when, and what became of it —
-  added, started, finished, dropped, passed, or no word yet — plus anything they
-  said back. Taking back is still per envelope (that is what the server files),
-  so a row from a multi-title send says *Take back all 7*.
+- **You sent** — one row **per title**, not per envelope, carrying the same
+  detail as the other tab from the other side. A send of seven shows used to be
+  seven titles comma-joined into one grey line with a single button. Each row now
+  shows the cover, a state pill, and the whole timeline: when you sent it, when
+  they added it, started it, finished or dropped it, whether they turned it down
+  and when, what it costs to watch, and which send it belonged to. Their replies
+  are quoted under it; when there is nothing yet, the row says which kind of
+  nothing — not opened, opened but nothing said, or turned down. Taking back is
+  still per envelope (that is what the server files), so a row from a multi-title
+  send says *Take back all 7*.
+- **The tabs stay put.** They are pinned to the top of the list, so scrolling
+  nineteen rows of history no longer carries the only way back to the other half
+  off the screen with it.
 - **The badges count what is waiting**, never the lifetime total. A number that
   only ever grows is decoration, not a notification.
 - **The kind switch still applies.** A manhwa someone sent belongs to the reading

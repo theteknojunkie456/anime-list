@@ -3129,7 +3129,19 @@ body.no-party .friend-only{display:flex;}
    worth one line of height. The first version gave each note a filled bubble,
    which turned every entry into a card and fitted four on a screen. */
 /* Two halves of one subject, not two screens. */
-.rtm-tabs{display:flex;gap:6px;margin:2px 0 8px;}
+/* Pinned to the top of the scroller. Scrolling nineteen rows of history used to
+   carry the only way back to the other half off the screen with them; you had to
+   scroll all the way up to reach "You sent". `.page` is the scroll container and
+   the top bar is its SIBLING, not an overlay, so top:0 lands exactly under the
+   bar rather than beneath it. Opaque, because rows pass underneath. */
+.rtm-tabs{display:flex;gap:6px;position:sticky;top:0;z-index:6;
+  margin:0 0 8px;padding:10px 0 9px;background:var(--bg);}
+/* The strip has to reach the page's edges or rows show through beside it, so it
+   bleeds back out by exactly the wrapper's own inset — which is why the inset is
+   declared here rather than inherited from whatever the page happens to give. */
+.rtm-wrap{padding:0 18px;}
+.rtm-tabs::before{content:"";position:absolute;top:0;bottom:0;left:-18px;right:-18px;z-index:-1;
+  background:var(--bg);border-bottom:1px solid var(--b1);}
 .rtm-tab{flex:1;padding:9px 12px;border-radius:14px;background:var(--bg3);border:1px solid var(--b1);
   color:var(--t2);font:800 13px/1 inherit;cursor:pointer;transition:color .16s,background .16s,border-color .16s;}
 .rtm-tab.on{background:color-mix(in srgb,var(--a) 16%,transparent);border-color:color-mix(in srgb,var(--a) 45%,transparent);color:var(--t);}
@@ -16212,28 +16224,46 @@ function rtmSentRowsHTML(q){
     const items=Array.isArray(e.items)&&e.items.length?e.items:(e.titles||[]).map(t=>({title:t}));
     items.forEach(it=>{
       if(!it||!it.title)return;
-      // Art the log didn't keep: you recommended it, so it is usually a title you
-      // have, and your own copy has the cover.
-      let img=it.img||'';
-      if(!img){ const own=anime.find(a=>(it.aniId&&a.aniId===it.aniId)||normTitle(a.title)===normTitle(it.title)); if(own)img=own.img||''; }
-      rows.push({title:it.title,img,code:e.code,id:e.id,at:e.at||0,n:items.length});
+      // Art and runtime the log never kept: you recommended it, so it is usually
+      // a title you have, and your own copy carries both.
+      const own=anime.find(a=>(it.aniId&&a.aniId===it.aniId)||normTitle(a.title)===normTitle(it.title))||null;
+      rows.push({title:it.title,aniId:it.aniId||(own&&own.aniId)||0,img:it.img||(own&&own.img)||'',
+        own,code:e.code,id:e.id,at:e.at||0,n:items.length});
     });
   });
   const rank={added:1,started:2,dropped:3,finished:4};
+  const cap=x=>String(x||'').charAt(0).toUpperCase()+String(x||'').slice(1);
   const out=rows.filter(r=>!q||searchHit(r.title,q)).sort((x,y)=>(y.at||0)-(x.at||0)).map(r=>{
     const col=friendColor(r.code), who=friendDisplay(r.code,'A friend');
+    const id=r.own?r.own.id:'';        // a uid() this app minted; hoisted so it reads as one
     const lower=String(r.title).toLowerCase();
-    const news=(Array.isArray(recsEcho)?recsEcho:[]).filter(x=>x&&x.from&&x.from.code===r.code&&String(x.title||'').toLowerCase()===lower);
-    // Furthest along wins: "finished it" says everything "added it" did.
+    // Match on the id when both sides have one; fall back to the title otherwise.
+    const same=x=>x&&x.from&&x.from.code===r.code&&((r.aniId&&x.aniId)?x.aniId===r.aniId:String(x.title||'').toLowerCase()===lower);
+    const news=(Array.isArray(recsEcho)?recsEcho:[]).filter(same);
+    const passed=(Array.isArray(recsPassed)?recsPassed:[]).find(same);
+    // Furthest along wins for the pill: "finished it" says everything "added it" did.
     let best=null;
     news.filter(x=>x.kind!=='note').forEach(x=>{ if(!best||(rank[x.kind]||0)>(rank[best.kind]||0))best=x; });
-    const passed=(Array.isArray(recsPassed)?recsPassed:[]).some(x=>x&&x.from&&x.from.code===r.code&&String(x.title||'').toLowerCase()===lower);
-    const cap=x=>String(x||'').charAt(0).toUpperCase()+String(x||'').slice(1);
-    const st=best?{t:cap(_echoWord[best.kind]?_echoWord[best.kind].replace(' it',''):best.kind),c:best.kind==='finished'?'finished':best.kind==='dropped'?'dropped':'watching'}
+    const st=best?{t:cap(_echoWord[best.kind]?_echoWord[best.kind].replace(' it',''):best.kind),
+                   c:best.kind==='finished'?'finished':best.kind==='dropped'?'dropped':'watching'}
              :passed?{t:'Passed',c:'dropped'}:{t:'No word yet',c:''};
-    const notes=news.filter(x=>x.kind==='note'&&x.note).slice(-3)
+    // THE SAME DEETS THE OTHER TAB SHOWS, from the other side: when you sent it,
+    // every stage they took it through and when, whether they turned it down,
+    // and what it costs to watch. Not just "to Yasso · 14 days ago".
+    const facts=['sent '+rtmDay(r.at)];
+    const stage={};
+    news.filter(x=>x.kind!=='note').forEach(x=>{ if(!stage[x.kind]||x.at<stage[x.kind])stage[x.kind]=x.at; });
+    ['added','started','dropped','finished'].forEach(k=>{
+      if(stage[k])facts.push('they '+_echoWord[k].replace(' it','')+' it '+rtmDay(stage[k]));
+    });
+    if(passed)facts.push('passed '+rtmDay(passed.at));
+    const mins=r.own&&kindOf(r.own)==='watch'?totalWatchMins(r.own):0;
+    if(mins)facts.push(fmtWatch(mins));
+    if(r.n>1)facts.push('one of '+r.n+' in that send');
+    // Their words back, oldest first, so a thread reads like one.
+    const notes=news.filter(x=>x.kind==='note'&&x.note).sort((a,b)=>(a.at||0)-(b.at||0)).slice(-5)
       .map(x=>`<div class="rtm-line"><span class="rtm-name" style="color:${col}">${escH(who)}</span><span class="rtm-quote">“${escH(x.note)}”</span></div>`).join('');
-    const facts=['to '+who,rtmDay(r.at)].filter(Boolean);
+    const said=notes||`<div class="rtm-line"><span class="rtm-name" style="color:${col}">${escH(who)}</span><span class="rtm-quote plain">${best?'hasn’t said anything about it':passed?'turned this one down':'hasn’t opened it yet'}</span></div>`;
     return `<div class="rtm-row" style="--fc:${col}">
       ${rtmArt(r.title,r.img)}
       <div class="rtm-main">
@@ -16242,8 +16272,11 @@ function rtmSentRowsHTML(q){
           <span class="rtm-state ${st.c}">${escH(st.t)}</span>
         </div>
         <div class="rtm-facts">${facts.map(escH).join(' · ')}</div>
-        ${notes}
-        <div class="rtm-acts"><button class="src-chip" onclick="unsendRec('${escH(r.id)}','${escH(r.code)}')">${icon('x')} ${r.n>1?`Take back all ${r.n}`:'Take back'}</button></div>
+        ${said}
+        <div class="rtm-acts">
+          ${id?`<button class="src-chip" onclick="openDetail('${id}')">${icon('external')} Open</button>`:''}
+          <button class="src-chip" onclick="unsendRec('${escH(r.id)}','${escH(r.code)}')">${icon('x')} ${r.n>1?`Take back all ${r.n}`:'Take back'}</button>
+        </div>
       </div>
     </div>`;
   }).join('');
@@ -16251,7 +16284,8 @@ function rtmSentRowsHTML(q){
 }
 function searchHit(title,q){ return !q||String(title||'').toLowerCase().includes(String(q).toLowerCase()); }
 // The whole of From Friends, as page content.
-function recsInlineHTML(q){
+function recsInlineHTML(q){ return '<div class="rtm-wrap">'+recsInlineBody(q)+'</div>'; }
+function recsInlineBody(q){
   const waiting=recsWaiting(), sentN=recsSent().length;
   const tabs=`<div class="rtm-tabs">
     <button class="rtm-tab${rtmTab==='in'?' on':''}" onclick="setRtmTab('in')">${icon('inbox')} To you<span class="rtm-tab-n">${waiting?waiting:''}</span></button>

@@ -4581,7 +4581,7 @@ const STATUS_META={
 // the bookkeeping — resume points, status, AniList — so this only has to decide
 // that there IS a next one, and be undoable, because a mis-tap on a grid of
 // posters is a certainty rather than a risk.
-function bumpEp(id,ev){
+function cardBump(id,ev){
   try{ev.stopPropagation();ev.preventDefault();}catch(e){}
   const a=anime.find(x=>x.id===id); if(!a)return;
   const read=kindOf(a)==='read', word=read?'Ch ':'Ep ';
@@ -8688,7 +8688,7 @@ function posterCard(a,nSeas){
       })()}
       ${a.fav?'<span class="pcard-fav">'+icon('heart','fill')+'</span>':''}
       <button class="pcard-rec" onclick="recThis('${a.id}',event)" aria-label="Recommend ${escH(a.title)} to a friend" title="Recommend to a friend">${icon('send')}</button>
-      ${a.status==='watching'?`<button class="pcard-bump" onclick="bumpEp('${a.id}',event)" aria-label="Mark the next ${kindOf(a)==='read'?'chapter':'episode'} of ${escH(a.title)}" title="Watched the next one">+1</button>`:''}
+      ${a.status==='watching'?`<button class="pcard-bump" onclick="cardBump('${a.id}',event)" aria-label="Mark the next ${kindOf(a)==='read'?'chapter':'episode'} of ${escH(a.title)}" title="Watched the next one">+1</button>`:''}
       ${seas}
     </div>
     ${bar}
@@ -9494,7 +9494,6 @@ async function loadRichDetail(aniId,forId){
 // In-app playback for episodes the rights-holders publish on YouTube themselves
 // (Muse Asia, Ani-One, and the like). Uses YouTube's own iframe embed, which
 // their terms allow. No scraping: we only ever embed a real YouTube video id.
-function ytId(u){const m=String(u||'').match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/|v\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/);return m?m[1]:'';}
 function playYouTube(videoId,forId,ep){
   if(!videoId)return;closeYouTube();
   // Same session record the in-app player writes, so a reload (or a lock) can
@@ -15261,16 +15260,6 @@ function friendDisplay(code,fallback){const f=friendsList().find(x=>x.code===cod
 // (kept on the outgoing request) forward as your local alias, so it survives
 // the accept instead of being replaced by their self-name.
 function newFriendObj(code,name,at){code=safeCode(code);const o={code,name:name||'Friend',nameAt:at||0};const p=friendsOut().find(f=>f.code===code);if(p&&p.name&&p.name.trim())o.alias=p.name.trim().slice(0,40);return o;}
-function renameFriendPrompt(code){
-  const fr=friendsList(),f=fr.find(x=>x.code===code); if(!f)return;
-  const next=window.prompt('What do you want to call this friend?',f.alias||f.name||'');
-  if(next===null)return;                       // cancelled
-  const v=next.trim().slice(0,40);
-  if(v)f.alias=v; else delete f.alias;         // clearing it resets to their own name
-  saveFriends(fr);
-  toast(v?`Renamed to ${v}`:'Name reset');
-  renderFriends();
-}
 // Pull my mailbox: auto-add anyone who ACCEPTED my request; surface incoming requests.
 // ─── HEAL ONE-SIDED FRIENDSHIPS ─────────────────────────────────────────────
 // While the app couldn't receive, friendships completed on one side only: they have

@@ -3141,22 +3141,35 @@ body.no-party .friend-only{display:flex;}
 .rtm-tab-n:empty{display:none;}
 /* A total, not an unread mark — it does not get to look like one. */
 .rtm-tab-n.quiet{background:var(--bg4);border:1px solid var(--bn2);color:var(--t3);}
-.rtm-acts{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
+.rtm-acts{display:flex;flex-wrap:wrap;gap:7px;margin-top:9px;}
+.rtm-acts .src-chip{display:inline-flex;align-items:center;gap:7px;}
+.rtm-acts .src-chip .ico{width:16px;height:16px;}
+.rtm-list.large .rtm-acts .src-chip{font-size:15px;padding:11px 18px;}
+.rtm-list.large .rtm-acts .src-chip .ico{width:17px;height:17px;}
 .rtm-acts .src-chip.go{background:var(--a);color:var(--aFg);border-color:transparent;}
 .rtm-replybox{margin-top:8px;}
 .rtm-list{margin-top:6px;border-top:1px solid var(--b1);}
 .rtm-row{display:flex;gap:12px;padding:11px 0;border-bottom:1px solid var(--b1);}
-.rtm-art{width:44px;height:63px;flex-shrink:0;border-radius:6px;object-fit:cover;background:var(--bg3);}
-.rtm-list.compact .rtm-art{width:34px;height:49px;}
-.rtm-list.compact .rtm-row{padding:8px 0;gap:10px;}
-.rtm-list.large .rtm-art{width:58px;height:83px;}
-.rtm-list.large .rtm-row{padding:14px 0;gap:14px;}
-.rtm-art.ph{display:flex;align-items:center;justify-content:center;font-family:var(--fd);font-weight:800;font-size:17px;
+/* Density means the same thing here as it does on the grid. It didn't: the grid's
+   Large is a 132px poster, and this row was handing back 58 — so turning artwork
+   UP made the covers in From Friends barely bigger than the text beside them.
+   These are the grid's own poster widths scaled for a row (2:3, as everywhere),
+   and they step up again on a desktop window, where a 58px thumbnail was
+   stranded at the left edge of a 1500px row. */
+.rtm-art{width:62px;height:89px;flex-shrink:0;border-radius:6px;object-fit:cover;background:var(--bg3);}
+.rtm-list.compact .rtm-art{width:46px;height:66px;}
+.rtm-list.compact .rtm-row{padding:9px 0;gap:11px;}
+.rtm-list.large .rtm-art{width:84px;height:120px;}
+.rtm-list.large .rtm-row{padding:15px 0;gap:15px;}
+.rtm-art.ph{display:flex;align-items:center;justify-content:center;font-family:var(--fd);font-weight:800;font-size:21px;
   background:linear-gradient(155deg,color-mix(in srgb,var(--fc,var(--a)) 30%,var(--bg4)) 0%,var(--bg4) 80%);
   color:color-mix(in srgb,var(--t1) 45%,transparent);}
 .rtm-main{flex:1;min-width:0;}
-.rtm-head{display:flex;align-items:baseline;gap:8px;}
-.rtm-title{flex:1;min-width:0;font-weight:800;font-size:15px;color:var(--t);line-height:1.25;
+/* The pill used to be pushed to the far end of the row by a flex:1 title, which
+   on a desktop window parked "Planned" a thousand pixels from the thing it
+   describes. It sits directly after the title now, at every width. */
+.rtm-head{display:flex;align-items:baseline;gap:9px;}
+.rtm-title{flex:0 1 auto;min-width:0;font-weight:800;font-size:15px;color:var(--t);line-height:1.25;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .rtm-list.large .rtm-title{font-size:17px;}
 /* Where it stands, as a pill in its status's own colour. It used to be the first
@@ -3178,6 +3191,19 @@ body.no-party .friend-only{display:flex;}
 .rtm-group:first-child{margin-top:8px;}
 .rtm-group::after{content:"";flex:1;height:1px;background:var(--b1);}
 .rtm-group .ico{width:13px;height:13px;}
+/* AFTER the rules it overrides, not before them — same specificity, so source
+   order decides, and a media block sitting above `.rtm-list.large .rtm-title`
+   simply loses to it. */
+@media (min-width:900px){
+  .rtm-art{width:80px;height:114px;}
+  .rtm-list.compact .rtm-art{width:58px;height:83px;}
+  .rtm-list.large .rtm-art{width:112px;height:160px;}
+  .rtm-list.large .rtm-row{padding:18px 0;gap:18px;}
+  .rtm-list.large .rtm-title{font-size:21px;}
+  .rtm-list.large .rtm-line{font-size:15px;}
+  .rtm-list.large .rtm-facts{font-size:12px;}
+  .rtm-list.large .rtm-state{font-size:12px;padding:3px 10px;}
+}
 .rtm-name{font-weight:800;margin-right:6px;}
 .rtm-name.you{color:var(--t3);}
 .rtm-quote{color:var(--t1);font-style:italic;}

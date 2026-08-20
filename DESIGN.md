@@ -208,6 +208,16 @@ body is what stopped the UI reading flat when everything was one family at
   your list, so it is one of the list's filters and it renders into the page like
   every other one. The rule: if picking it from the filter menu is how you get
   there, the page is where it belongs.
+- **Density means the same thing everywhere** — the grid's Large is a 132px
+  poster; the From Friends row was handing back 58, so turning artwork *up* made
+  those covers barely bigger than the text beside them. Row artwork is derived
+  from the grid's own per-density widths and steps up again at ≥900px, where a
+  thumbnail was stranded at the left edge of a 1500px row. Its media block sits
+  **after** the rules it overrides — same specificity, so source order decides.
+- **A pill belongs to the thing it labels** — the status pill was pushed to the
+  far end by a `flex:1` title, which on a desktop window parked "Planned" a
+  thousand pixels from the title it described. It sits directly after the title
+  at every width.
 - **A badge counts what is waiting** — the From Friends badge carried the
   lifetime total, so it read "19" forever and never went down. A number that only
   grows stops being read. The unread mark counts what still wants a decision and

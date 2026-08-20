@@ -3058,22 +3058,32 @@ body.no-party .friend-only{display:flex;}
 @media(max-width:420px){.hub-grid{grid-template-columns:1fr;}.hub-card{flex-direction:row;align-items:center;gap:14px;padding:16px;}
   .hub-card .hub-name{flex:0 0 auto;}
   .hub-card .hub-sub{display:none;}}
-.rtm-row{display:flex;gap:12px;padding:13px 0;border-bottom:1px solid var(--b1);}
-.rtm-art{width:48px;height:68px;flex-shrink:0;border-radius:8px;object-fit:cover;background:var(--bg3);}
+/* A record you scroll, ruled between entries, art on the left and everything
+   said about it on the right. Row height follows the density you already picked
+   for the list, because this IS a list. */
+.rtm-list{margin-top:6px;border-top:1px solid var(--b1);}
+.rtm-row{display:flex;gap:13px;padding:14px 0;border-bottom:1px solid var(--b1);}
+.rtm-art{width:52px;height:74px;flex-shrink:0;border-radius:9px;object-fit:cover;background:var(--bg3);}
+.rtm-list.compact .rtm-art{width:40px;height:57px;}
+.rtm-list.compact .rtm-row{padding:10px 0;gap:11px;}
+.rtm-list.large .rtm-art{width:70px;height:100px;}
+.rtm-list.large .rtm-row{padding:18px 0;gap:15px;}
 .rtm-art.ph{display:flex;align-items:center;justify-content:center;color:var(--t3);font-weight:800;font-size:19px;}
 .rtm-main{flex:1;min-width:0;}
-.rtm-title{font-weight:800;font-size:14.5px;color:var(--t);line-height:1.3;}
-.rtm-state{font-size:12px;color:var(--t3);margin-top:2px;}
-.rtm-who{margin-top:7px;}
-.rtm-name{font-size:12.5px;font-weight:800;color:var(--fc);}
-.rtm-when{font-size:11.5px;color:var(--t3);margin-left:6px;}
+.rtm-head{display:flex;align-items:flex-start;gap:10px;}
+.rtm-title{flex:1;min-width:0;font-weight:800;font-size:15px;color:var(--t);line-height:1.25;}
+.rtm-list.large .rtm-title{font-size:16.5px;}
+.rtm-state{font-size:12px;color:var(--t3);margin-top:3px;}
+.rtm-facts{margin-top:4px;font-size:11.5px;color:var(--t3);line-height:1.5;}
+.rtm-who{margin-top:8px;}
+.rtm-name{font-size:12.5px;font-weight:800;}
+.rtm-when{font-size:11px;color:var(--t3);margin-left:7px;}
 .rtm-note{margin-top:4px;font-size:12.5px;color:var(--t1);font-style:italic;line-height:1.45;
-  padding:7px 10px;border-radius:10px;background:color-mix(in srgb,var(--fc) 11%,transparent);}
+  padding:8px 11px;border-radius:11px;background:color-mix(in srgb,var(--fc) 12%,transparent);}
 .rtm-note.you{color:var(--t2);background:var(--bg3);border:1px solid var(--b1);font-style:normal;}
 .rtm-told{margin-top:6px;font-size:11.5px;font-weight:700;color:var(--a2);}
-.rtm-mine{margin-top:6px;}
-.rtm-mine::before{content:'You said';display:block;font-size:11px;font-weight:800;color:var(--t3);letter-spacing:.02em;}
-.rtm-act{flex-shrink:0;display:flex;align-items:flex-start;}
+.rtm-mine{margin-top:8px;}
+.rtm-mine::before{content:'You said';display:block;font-size:11px;font-weight:800;color:var(--t3);margin-bottom:2px;}
 .rec-echo{margin-top:4px;font-size:12px;font-weight:700;color:var(--a2);}
 .rec-echo-note{margin-top:4px;font-size:12.5px;color:var(--t1);font-style:italic;
   padding:6px 9px;border-radius:9px;background:var(--bg3);border:1px solid var(--b1);}
@@ -15886,7 +15896,11 @@ function renderRecsToMe(){
     box.innerHTML='<p class="ai-desc">Nothing yet. When a friend recommends you something it lands here, and it stays here \u2014 after you add it, after you finish it, with everything either of you said about it.</p>';
     return;
   }
-  const when=t=>{const d=Math.round((Date.now()-(t||0))/86400000);return !t?'':d<=0?'today':d===1?'yesterday':d<30?d+' days ago':Math.round(d/30)+' months ago';};
+  // A date, not "3 days ago". You are looking back through a record; the whole
+  // point is when things happened.
+  const day=t=>{ if(!t)return ''; const d=new Date(t), now=new Date();
+    const s1=d.toLocaleDateString(undefined,{day:'numeric',month:'short'});
+    return d.getFullYear()===now.getFullYear()?s1:s1+' '+d.getFullYear(); };
   const stateOf=r=>{
     if(r.kind==='new')return 'Not on your list yet';
     if(r.status==='finished')return 'Finished';
@@ -15895,30 +15909,38 @@ function renderRecsToMe(){
     return kindOf(r.item)==='read'?'To read':'Planned';
   };
   box.innerHTML=`<p class="ai-desc">Everything anyone has recommended you, with what they said \u2014 it stays here after you add it and after you finish it.</p>`
-  +rows.map(r=>{
+  +`<div class="rtm-list ${escH(density())}">`+rows.map(r=>{
     const col=friendColor((r.senders[0]||{}).code);
-    const people=r.senders.map(sd=>`<div class="rtm-who" style="--fc:${friendColor(sd.code)}">
-        <span class="rtm-name">${escH(friendDisplay(sd.code,sd.name))}</span>
-        <span class="rtm-when">${escH(when(sd.at))}</span>
-        ${sd.note?`<div class="rtm-note">\u201c${escH(sd.note)}\u201d</div>`:''}
+    const first=Math.min(...r.senders.map(sd=>sd.at||Infinity).concat([Infinity]));
+    // The dates, in the order they happened, each only when it did.
+    const facts=[];
+    if(isFinite(first)&&first)facts.push(`recommended ${day(first)}`);
+    ['added','started','dropped','finished'].forEach(k=>{ const t=(r.told||{})[k]; if(t)facts.push(`${_echoWord[k].replace(' it','')} ${day(t)}`); });
+    const mins=r.item&&kindOf(r.item)==='watch'?totalWatchMins(r.item):0;
+    if(mins)facts.push(fmtWatch(mins));
+    const people=r.senders.map(sd=>`<div class="rtm-who">
+        <span class="rtm-name" style="color:${friendColor(sd.code)}">${escH(friendDisplay(sd.code,sd.name))}</span>
+        ${sd.at?`<span class="rtm-when">${escH(day(sd.at))}</span>`:''}
+        ${sd.note?`<div class="rtm-note" style="--fc:${friendColor(sd.code)}">\u201c${escH(sd.note)}\u201d</div>`:''}
       </div>`).join('');
-    const told=Object.keys(r.told||{}).filter(k=>r.told[k]);
-    const toldLine=told.length?`<div class="rtm-told">${escH(told.map(k=>_echoWord[k]||k).join(' \u00b7 '))} \u2014 they were told</div>`:'';
-    const mine=r.replies.length?`<div class="rtm-mine">${r.replies.slice(-3).map(x=>`<div class="rtm-note you">\u201c${escH(x.note)}\u201d</div>`).join('')}</div>`:'';
+    const mine=r.replies.length?`<div class="rtm-mine">${r.replies.map(x=>`<div class="rtm-note you">\u201c${escH(x.note)}\u201d<span class="rtm-when">${escH(day(x.at))}</span></div>`).join('')}</div>`:'';
     const art=r.img?`<img class="rtm-art" src="${escH(r.img)}" alt="" loading="lazy">`:`<div class="rtm-art ph">${escH(((r.title||'?')[0]||'?').toUpperCase())}</div>`;
     const go=r.kind==='new'
-      ? `<button class="src-chip" onclick="openRecDetail('${encodeURIComponent(r.key)}')">Look at it</button>`
+      ? `<button class="src-chip" onclick="openRecDetail('${encodeURIComponent(r.key||'')}')">Look at it</button>`
       : `<button class="src-chip" onclick="closeAll();openDetail('${r.id}')">Open</button>`;
     return `<div class="rtm-row" style="--fc:${col}">
       ${art}
       <div class="rtm-main">
-        <div class="rtm-title">${escH(r.title||'?')}</div>
+        <div class="rtm-head">
+          <div class="rtm-title">${escH(r.title||'?')}</div>
+          ${go}
+        </div>
         <div class="rtm-state">${escH(stateOf(r))}</div>
-        ${people}${toldLine}${mine}
+        ${facts.length?`<div class="rtm-facts">${facts.map(escH).join(' \u00b7 ')}</div>`:''}
+        ${people}${mine}
       </div>
-      <div class="rtm-act">${go}</div>
     </div>`;
-  }).join('');
+  }).join('')+`</div>`;
   try{paintIcons();}catch(e){}
 }
 function friendRecBadge(a){

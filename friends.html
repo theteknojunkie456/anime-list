@@ -393,13 +393,6 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
    fell back to width:100%;height:100% and filled the sheet, squeezing the title
    and the note into a clipped column a few characters wide. Here it is a
    thumbnail beside the text, which is what the layout assumes. */
-#recDetailSheet .dt-top{display:flex;align-items:flex-start;gap:14px;}
-#recDetailSheet .dt-cover,#recDetailSheet .dt-cover-ph{
-  width:112px;height:158px;flex:0 0 auto;object-fit:cover;border-radius:10px;
-  display:flex;align-items:center;justify-content:center;
-}
-#recDetailSheet .dt-info{flex:1;min-width:0;}
-#recDetailSheet .dt-title{white-space:normal;overflow-wrap:anywhere;}
 /* PIXELATING PROGRESS
    Doing every cover up front costs real time on a long list. Hiding that makes
    the app feel broken; showing it makes it a wait, which people are fine with as
@@ -4224,17 +4217,6 @@ body.recsel .pcard{position:relative;}
 </div>
 
 <!-- FRIENDS — view a received recommendation -->
-<div class="sheet" id="recDetailSheet">
-  <div class="sheet-handle"></div>
-  <div class="sheet-header">
-    <div class="sheet-title"><i data-ic="users"></i> Recommended for you</div>
-    <button class="sheet-cancel" onclick="closeAll()">Close</button>
-  </div>
-  <div id="recDetailBody"></div>
-</div>
-
-
-<!-- WATCH — "Open in [service]" chooser (official app only) -->
 <div class="sheet" id="watchSheet">
   <div class="sheet-handle"></div>
   <div class="sheet-header">
@@ -10136,7 +10118,6 @@ function openSheet(id){
   if(id==='friendsSheet'){renderFriends();friendPresenceWatch(true);}
   if(id==='recPickSheet')renderRecPick();
   if(id==='recSendSheet')renderRecSend();
-  if(id==='recDetailSheet')renderRecDetail();
   // A sheet builds its own markup, so its pictures never passed through render()
   // and were never handed to the pixel pass — which is why a title's banner and
   // cover stayed sharp while every cover behind them was pixels.
@@ -15827,7 +15808,7 @@ function recCard(k,rec){
   const it=rec.item,s0=rec.senders[0],col=friendColor(s0.code);
   const img=it.img?`<img class="pcard-img" decoding="async" src="${escH(it.img)}" loading="lazy" alt="" onerror="artFallback(this,${JSON.stringify(String(it.title||'?')).replace(/"/g,'&quot;')},'pcard-ph')">`:`<div class="pcard-ph">${escH(((it.title||'?').trim()[0]||'?').toUpperCase())}</div>`;
   const more=rec.senders.length>1?` +${rec.senders.length-1}`:'';
-  return `<div class="pcard rec-card" style="--fc:${col}" onclick="openRecDetail('${encodeURIComponent(k)}')">
+  return `<div class="pcard rec-card" style="--fc:${col}" onclick="openRecsToMe('in')">
     <div class="pcard-wrap rec-wrap">${img}<span class="rec-flag" style="background:${col}">${icon('users')}</span>
       <button class="rec-x" onclick="dismissRec('${encodeURIComponent(k)}',event)" aria-label="Pass on this recommendation — the friend who sent it is told" title="Not for me — they'll see you passed">${icon('x')}</button></div>
     <div class="pcard-title">${escH(it.title)}</div>
@@ -16020,59 +16001,15 @@ function friendRecBadge(a){
   if(IS_NATIVE||!a)return '';
   const senders=recSendersFor(a);
   if(!senders.length)return '';
-  const rows=recNoteRows({senders});
-  // One reply for the show, not one per person: you are answering the
-  // recommendation, and everyone who made it should hear the same thing.
-  const who=senders.length===1?friendDisplay(senders[0].code,senders[0].name):senders.length+' of them';
-  return `<div class="rec-badges">${rows}
-    <button class="rec-reply-b" id="recReplyB" onclick="recReplyOpen('${a.id}')">${icon('message')} Tell ${escH(who)} what you thought</button>
-    <div class="rec-reply" id="recReply" hidden>
-      <textarea class="ai-prompt-in" id="recReplyIn" rows="2" placeholder="man this was great"></textarea>
-      <div style="display:flex;gap:8px;margin-top:8px">
-        <button class="parse-btn" style="flex:1" onclick="recReplySend('${a.id}')">Send</button>
-        <button class="parse-btn" style="flex:0 0 auto;width:auto;padding-left:16px;padding-right:16px" onclick="recReplyClose()">Cancel</button>
-      </div>
-    </div>
-  </div>`;
-}
-function recReplyOpen(id){
-  const b=document.getElementById('recReplyB'), box=document.getElementById('recReply');
-  if(!box)return; box.hidden=false; if(b)b.style.display='none';
-  const t=document.getElementById('recReplyIn'); if(t)try{t.focus({preventScroll:true});}catch(e){}
-}
-function recReplyClose(){
-  const b=document.getElementById('recReplyB'), box=document.getElementById('recReply');
-  if(box)box.hidden=true; if(b)b.style.display='';
-}
-function recReplySend(id){
-  const a=anime.find(x=>x.id===id); if(!a)return recReplyClose();
-  const t=document.getElementById('recReplyIn'); if(!t)return;
-  const v=t.value.trim();
-  if(!v){toast('Write something first');return;}
-  if(!myFriendCode()){toast('Turn on cloud backup first — that\u2019s what your friends know you by');return;}
-  tellRec(a,'note',v);
-  a.recSaidNotes=(Array.isArray(a.recSaidNotes)?a.recSaidNotes:[]).concat([{note:v,at:Date.now()}]).slice(-20);
-  touch(a);save();
-  t.value=''; recReplyClose();
-  try{renderRecsToMe();}catch(e){}
-  toast('Sent');
+  // Context, not a control. Who told you about this and what they said belongs
+  // on the card; answering happens where every other recommendation action now
+  // happens, so there is one reply path instead of two.
+  return `<div class="rec-badges">${recNoteRows({senders})}</div>`;
 }
 let recDetailKey='';
-function openRecDetail(k){recDetailKey=decodeURIComponent(k);renderRecDetail();openSheet('recDetailSheet');}
-function renderRecDetail(){
-  const box=document.getElementById('recDetailBody');if(!box)return;
-  const rec=recByAni()[recDetailKey];
-  if(!rec){box.innerHTML='<p class="ai-desc">This recommendation is no longer available.</p>';return;}
-  const it=rec.item;
-  const cover=it.img?`<img loading="lazy" class="dt-cover" decoding="async" src="${escH(it.img)}" alt="" onerror="artFallback(this,${JSON.stringify(String(it.title||'?')).replace(/"/g,'&quot;')},'dt-cover-ph')">`:`<div class="dt-cover-ph">${escH(((it.title||'?').trim()[0]||'?').toUpperCase())}</div>`;
-  const chips=(it.genre||'').split(',').map(g=>g.trim()).filter(Boolean).map(g=>`<span class="chip">${escH(g)}</span>`).join('');
-  box.innerHTML=`
-    <div class="dt-top">${cover}<div class="dt-info"><div class="dt-title">${escH(it.title)}</div><div class="dt-meta">${it.kind==='read'?'Manga / manhwa':'Anime'}</div></div></div>
-    <div class="rec-badges">${recNoteRows(rec)}</div>
-    ${chips?`<div class="dt-label">Genres</div><div class="chips">${chips}</div>`:''}
-    <button class="dt-watch" onclick="addRecToList(false)">${icon('plus')} Add to My List</button>
-    ${it.kind!=='read'?`<button class="dt-watch" style="margin-top:8px" onclick="addRecToList(true)">${icon('play')} Add & Watch now</button>`:''}`;
-}
+// The sheet this opened is gone: looking at a recommendation, adding it and
+// turning it down all happen on its row in From Friends now. recDetailKey
+// survives because it is still how addRecToList knows which one you mean.
 function addRecToList(watchAfter){
   const rec=recByAni()[recDetailKey];if(!rec)return;
   const it=rec.item,nt=normTitle(it.title);

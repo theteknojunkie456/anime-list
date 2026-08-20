@@ -10773,6 +10773,16 @@ function dedupeList(list){
     if(a.fav)b.fav=true;
     if((_statusRank[a.status]||0)>(_statusRank[b.status]||0))b.status=a.status;
     b.upd=Math.max(b.upd||0,a.upd||0);
+    // Everything else the discarded copy knew and the kept one doesn't. The
+    // merge above names the fields it cares about, which quietly threw away
+    // every field added since it was written — noLink among them, so a title you
+    // had marked "this really isn't in the database" came back counted as broken
+    // the next time its duplicate was collapsed. Only genuinely absent keys are
+    // filled, so nothing already decided is overwritten.
+    for(const k in a){ if(b[k]===undefined&&a[k]!==undefined)b[k]=a[k]; }
+    // A kept copy with no id inherits the "leave it alone" mark; one that HAS an
+    // id is linked, and the mark would be a lie.
+    if(a.noLink&&!b.aniId)b.noLink=1; else if(b.aniId)delete b.noLink;
     dupeKeys(b).forEach(k=>seen.set(k,hit));   // b may have just gained an id key
     removed++;
   }

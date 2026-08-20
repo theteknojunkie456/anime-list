@@ -410,23 +410,44 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 .ar-bar{display:flex;gap:10px;margin-top:12px;}
 /* NATURAL SELECTION */
 .ns-modes{display:flex;gap:6px;margin:2px 0 10px;}
-.ns-mode{flex:1;padding:8px;border-radius:10px;font-size:12px;font-weight:800;
+.ns-mode{flex:1;padding:9px;border-radius:10px;font-size:12px;font-weight:800;
+  display:flex;align-items:center;justify-content:center;gap:6px;
   background:var(--bg3);border:1px solid var(--bn2);color:var(--t3);}
+.ns-mode .ico{width:13px;height:13px;}
 .ns-mode.on{color:var(--t1);border-color:var(--a);background:var(--ag);}
+/* Half this list never matched a database, so half the cards had no cover — and
+   a card with no cover was just a paragraph with a button under it. Every card
+   gets art: the real poster, or a tinted plate with the title's initial and the
+   kind it is, so the two sides of a round always look like two things. */
+.ns-ph{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;
+  background:linear-gradient(155deg,color-mix(in srgb,var(--a) 26%,var(--bg4)) 0%,var(--bg4) 78%);color:var(--t3);}
+.ns-ph .ico{width:20px;height:20px;opacity:.5;}
+.ns-ph b{font-family:var(--fd);font-size:26px;font-weight:800;line-height:1;color:color-mix(in srgb,var(--t1) 42%,transparent);}
+/* The facts were one grey run of middots that wrapped to three lines. Each is
+   its own chip now, with the icon for what it measures. */
+.ns-facts{margin-top:6px;display:flex;flex-wrap:wrap;gap:4px;}
+.ns-fact{display:inline-flex;align-items:center;gap:4px;padding:3px 7px;border-radius:6px;
+  font-size:10px;font-weight:700;line-height:1.3;background:var(--bg4);border:1px solid var(--bn2);color:var(--t3);}
+.ns-fact .ico{width:11px;height:11px;opacity:.8;flex:none;}
+.ns-fact.warn{color:var(--a2);background:var(--ag);border-color:color-mix(in srgb,var(--a) 30%,transparent);}
+.ns-card .ns-fact{font-size:12px;padding:4px 9px;}
+.ns-card .ns-fact .ico{width:12px;height:12px;}
 /* Two side by side, even on a phone: the whole point is seeing them together,
    so they stay in one row and the text shrinks rather than stacking. */
 .ns-vs{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:stretch;}
 .ns-vs-card{display:flex;flex-direction:column;border-radius:14px;overflow:hidden;
   background:var(--bg3);border:1px solid var(--bn2);cursor:pointer;text-align:left;}
 .ns-vs-card:active{transform:scale(.98);}
-.ns-vs-art{width:100%;height:clamp(120px,20vh,190px);object-fit:cover;display:block;background:var(--bg4);}
+.ns-vs-art{position:relative;width:100%;height:clamp(120px,20vh,190px);display:block;background:var(--bg4);overflow:hidden;}
+.ns-vs-art img{position:relative;z-index:1;width:100%;height:100%;object-fit:cover;display:block;}
 .ns-vs-body{padding:9px 10px 11px;flex:1;display:flex;flex-direction:column;}
 .ns-vs-title{font-family:var(--fd);font-size:14px;font-weight:700;line-height:1.25;color:var(--t1);}
-.ns-vs-meta{margin-top:4px;font-size:11px;color:var(--t3);}
 .ns-vs-syn{margin-top:7px;font-size:11.5px;line-height:1.5;color:var(--t2);
   max-height:clamp(70px,14vh,130px);overflow-y:auto;overscroll-behavior:contain;}
-.ns-vs-pick{margin-top:9px;padding:9px;border-radius:10px;font-size:12px;font-weight:800;
-  background:var(--a);color:var(--aFg);text-align:center;}
+.ns-vs-pick{margin-top:auto;padding:10px;border-radius:10px;font-size:12px;font-weight:800;
+  display:flex;align-items:center;justify-content:center;gap:5px;
+  background:var(--a);color:var(--aFg);text-align:center;box-shadow:0 6px 16px -8px var(--glow);}
+.ns-vs-pick .ico{width:13px;height:13px;}
 .ns-count{margin-left:auto;font-size:12px;color:var(--t3);font-variant-numeric:tabular-nums;}
 .ns-stage{position:relative;min-height:clamp(300px,46vh,420px);margin:6px 0 12px;}
 .ns-card{
@@ -434,10 +455,11 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
   border:1px solid var(--bn2);box-shadow:0 8px 24px -8px rgba(0,0,0,.6);
   will-change:transform,opacity;touch-action:pan-y;
 }
-.ns-art{width:100%;height:clamp(150px,24vh,220px);object-fit:cover;display:block;background:var(--bg4);}
+.ns-art{position:relative;width:100%;height:clamp(150px,24vh,220px);display:block;background:var(--bg4);overflow:hidden;}
+.ns-art img{position:relative;z-index:1;width:100%;height:100%;object-fit:cover;display:block;}
 .ns-body{padding:12px 14px 14px;}
 .ns-title{font-family:var(--fd);font-size:17px;font-weight:700;line-height:1.25;color:var(--t1);}
-.ns-meta{margin-top:5px;font-size:12px;color:var(--t3);display:flex;flex-wrap:wrap;gap:4px 10px;}
+
 /* Not clamped. This paragraph is the entire reason the question can be answered,
    so cutting it off at six lines and hiding the rest behind a tap nobody knows
    about defeats the point. Long ones scroll inside the card instead. */
@@ -1406,9 +1428,13 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
    designed. The count is now just a number, set smaller and lighter beside the
    label, and the only rounded shape left is the segment itself. */
 .filt-row .fchip{
-  background:none;border:0;box-shadow:none;padding:7px 13px;height:34px;
-  flex:0 1 auto;min-width:0;justify-content:center;overflow:hidden;
-  font-size:13px;font-weight:700;letter-spacing:-.01em;gap:7px;
+  /* "To Read" broke onto two lines inside a 34px segment, which pushed the
+     whole track taller and made the row look broken. A segment's label is one
+     line by definition — so the label never wraps, and the padding gives way
+     first when the three of them are tight for room. */
+  background:none;border:0;box-shadow:none;padding:7px clamp(8px,2.6vw,14px);height:34px;
+  flex:0 1 auto;min-width:0;justify-content:center;overflow:hidden;white-space:nowrap;
+  font-size:13px;font-weight:700;letter-spacing:-.01em;gap:6px;
 }
 .filt-row .fchip>span.fn{flex:none;}
 .filt-row .fchip:not(.on):not([class*="on-"]):hover{color:var(--t1);}
@@ -2412,15 +2438,39 @@ html.rotating .pv-frame:fullscreen,html.rotating .pv-frame:-webkit-full-screen{o
 .playerview .sv-back{width:40px;height:40px;border-radius:14px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);color:#fff;transition:background .15s,transform .12s;}
 .playerview .sv-back:active{transform:scale(.9);background:rgba(255,255,255,.15);}
 .pv-title{flex:1;min-width:0;font-family:var(--fd);font-size:15px;font-weight:800;letter-spacing:-.2px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.pv-title .pv-ep{margin-left:7px;color:var(--a2);font-weight:700;font-size:15px;}
-/* The episode number is the control that corrects it. */
-.pv-title .pv-ep{cursor:pointer;border-bottom:1px dashed color-mix(in srgb,var(--a2) 55%,transparent);}
-.pv-epset{display:flex;align-items:center;gap:6px;flex-shrink:0;}
-.pv-epset-b,.pv-epset-x{width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;
-  background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);color:#fff;font:700 16px/1 inherit;cursor:pointer;}
-.pv-epset-x .ico{width:15px;height:15px;}
-.pv-epset-n{min-width:30px;text-align:center;color:#fff;font-weight:800;font-size:15px;font-variant-numeric:tabular-nums;}
-.pv-epset-go{height:32px;padding:0 12px;border-radius:10px;border:0;background:var(--a);color:var(--aFg);font:800 13px/1 inherit;cursor:pointer;white-space:nowrap;}
+/* The episode number is also the control that corrects it — so it looks like a
+   control. A dashed underline under coloured text is the web's oldest "this
+   might be a link" hedge; a small filled chip just says press me. */
+.pv-title .pv-ep{margin-left:8px;color:var(--a2);font-weight:800;font-size:12px;cursor:pointer;
+  display:inline-flex;align-items:center;padding:3px 8px;border-radius:99px;vertical-align:1px;
+  background:color-mix(in srgb,var(--a) 22%,transparent);border:1px solid color-mix(in srgb,var(--a) 34%,transparent);}
+.pv-title .pv-ep:active{transform:scale(.94);}
+/* ITS OWN ROW, under the header — see the markup for why. */
+.pv-epbar{flex-shrink:0;display:flex;align-items:center;gap:10px;
+  padding:10px max(14px,env(safe-area-inset-right)) 10px max(14px,env(safe-area-inset-left));
+  background:#0a0a0c;border-bottom:1px solid rgba(255,255,255,.06);}
+.pv-epbar[hidden]{display:none;}
+.pv-epbar-q{flex:1;min-width:0;font-size:12px;font-weight:700;color:rgba(255,255,255,.62);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.pv-epbar-step{flex:0 0 auto;display:flex;align-items:center;gap:2px;padding:3px;border-radius:14px;
+  background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);}
+.pv-epbar-b{width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;
+  background:transparent;border:0;color:#fff;cursor:pointer;transition:background .15s,transform .12s;}
+.pv-epbar-b .ico{width:16px;height:16px;}
+.pv-epbar-b:active{transform:scale(.9);background:rgba(255,255,255,.14);}
+.pv-epbar-n{min-width:34px;text-align:center;color:#fff;font-family:var(--fd);font-weight:800;font-size:17px;font-variant-numeric:tabular-nums;}
+.pv-epbar-go{flex:0 0 auto;height:38px;padding:0 14px;border-radius:14px;border:0;background:var(--a);color:var(--aFg);
+  display:flex;align-items:center;gap:6px;font-family:var(--fd);font-size:13px;font-weight:800;cursor:pointer;white-space:nowrap;
+  box-shadow:0 6px 16px -8px var(--glow);transition:transform .12s;}
+.pv-epbar-go .ico{width:15px;height:15px;}
+.pv-epbar-go:active{transform:scale(.96);}
+.pv-epbar-x{width:32px;height:32px;flex:0 0 auto;border-radius:10px;display:flex;align-items:center;justify-content:center;
+  background:transparent;border:0;color:rgba(255,255,255,.5);cursor:pointer;}
+.pv-epbar-x .ico{width:15px;height:15px;}
+/* On a phone the question is the first thing to go — the stepper and the confirm
+   button are the parts you actually operate, and the button already names the
+   episode it will set. Truncating it to "Which ep…" helps nobody. */
+@media (max-width:520px){.pv-epbar-q{display:none;}.pv-epbar-step{flex:1;justify-content:center;}}
 .pv-ext{width:40px;height:40px;flex-shrink:0;border-radius:14px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);color:#fff;display:flex;align-items:center;justify-content:center;transition:background .15s,transform .12s;}
 .pv-ext .ico{width:18px;height:18px;}
 .pv-ext:active{transform:scale(.9);background:rgba(255,255,255,.15);}
@@ -2441,12 +2491,22 @@ html.rotating .pv-frame:fullscreen,html.rotating .pv-frame:-webkit-full-screen{o
 .pv-host-chat{width:50px;height:48px;flex-shrink:0;border-radius:14px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);color:#fff;display:flex;align-items:center;justify-content:center;}
 .pv-host-main:active,.pv-host-next:active,.pv-host-chat:active{transform:scale(.96);}
 .pv-host-chat .ico{width:19px;height:19px;}
-.pv-nav{flex-shrink:0;display:flex;align-items:center;gap:9px;padding:12px max(14px,env(safe-area-inset-right)) calc(var(--safe-b) + 12px) max(14px,env(safe-area-inset-left));background:linear-gradient(0deg,#161618 0%,#0a0a0c 100%);border-top:1px solid rgba(255,255,255,.06);}
-.pv-nav-arrow{width:50px;height:48px;flex-shrink:0;border-radius:14px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);color:#fff;display:flex;align-items:center;justify-content:center;transition:opacity .15s,transform .12s,background .15s;}
+.pv-nav{flex-shrink:0;padding:0 max(14px,env(safe-area-inset-right)) calc(var(--safe-b) + 12px) max(14px,env(safe-area-inset-left));background:linear-gradient(0deg,#161618 0%,#0a0a0c 100%);border-top:1px solid rgba(255,255,255,.06);}
+/* A hairline the full width of the bar: how far into the series this episode is,
+   read without counting. It sits ON the bar's top edge, so it costs no height. */
+.pv-nav-prog{height:2px;margin:0 calc(-1 * max(14px,env(safe-area-inset-left))) 0 calc(-1 * max(14px,env(safe-area-inset-right)));background:rgba(255,255,255,.08);overflow:hidden;}
+.pv-nav-prog span{display:block;height:100%;width:0;background:var(--a);border-radius:0 2px 2px 0;transition:width .3s cubic-bezier(.2,1,.28,1);}
+.pv-nav-row{display:flex;align-items:center;gap:9px;padding-top:12px;}
+.pv-nav-arrow{width:50px;height:54px;flex-shrink:0;border-radius:14px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);color:#fff;display:flex;align-items:center;justify-content:center;transition:opacity .15s,transform .12s,background .15s;}
 .pv-nav-arrow .ico{width:22px;height:22px;}
 .pv-nav-arrow:active{transform:scale(.93);background:rgba(255,255,255,.15);}
 .pv-nav-arrow:disabled{opacity:.28;pointer-events:none;}
-.pv-nav-mark{flex:1;height:48px;border-radius:14px;background:var(--a);border:0;color:var(--aFg,#fff);font-family:var(--fd);font-size:15px;font-weight:800;letter-spacing:-.1px;display:flex;align-items:center;justify-content:center;gap:7px;box-shadow:0 8px 22px -8px var(--glow);transition:transform .12s;}
+.pv-nav-mark{flex:1;min-width:0;height:54px;border-radius:14px;background:var(--a);border:0;color:var(--aFg,#fff);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  box-shadow:0 8px 22px -8px var(--glow);transition:transform .12s;}
+.pv-nav-mark-t{font-family:var(--fd);font-size:15px;font-weight:800;letter-spacing:-.1px;line-height:1.1;white-space:nowrap;}
+.pv-nav-mark-s{font-size:10px;font-weight:700;line-height:1;opacity:.72;font-variant-numeric:tabular-nums;white-space:nowrap;}
+.pv-nav-mark-s:empty{display:none;}
 .pv-nav-mark:active{transform:scale(.98);}
 .pv-nav-mark:disabled{opacity:.5;pointer-events:none;}
 .dt-actions{display:flex;gap:8px;margin-top:10px;}
@@ -2586,26 +2646,40 @@ textarea.ai-prompt-in{resize:none;line-height:1.45;display:block;}
 /* Letting this wrap turned it into a four-row block sitting over the middle of
    the page — worse than the problem it exists to solve. It's one slim line now:
    it scrolls sideways if a narrow phone can't fit it, and never grows taller. */
-.pv-wrong{position:absolute;left:8px;right:8px;bottom:10px;z-index:4;display:none;align-items:center;gap:7px;flex-wrap:nowrap;
-  overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;
-  padding:7px 8px 7px 12px;border-radius:18px;background:color-mix(in srgb,var(--bg2) 94%,transparent);border:1px solid var(--b3);box-shadow:0 10px 30px rgba(0,0,0,.5);}
-.pv-wrong::-webkit-scrollbar{display:none;}
-/* On a narrow screen this scrolled sideways with the scrollbar hidden, so the
-   last button and the dismiss X sat off the edge looking clipped rather than
-   scrollable — and the one control that closes it was the one you could not
-   reach. It wraps there instead. */
-@media (max-width:560px){
-  .pv-wrong{flex-wrap:wrap;overflow-x:visible;row-gap:6px;}
-}
-.pv-wrong-t{flex:0 0 auto;}
-.pv-wrong-b{flex:0 0 auto;}
+/* A card, not a strip of pills. It floats over the bottom of the video, says
+   what happened in one line, explains why in the next, and puts the fix that
+   sticks first. The old version scrolled sideways with its close button off the
+   edge; this one is a fixed block that never needs scrolling at any width. */
+.pv-wrong{position:absolute;left:10px;right:10px;bottom:12px;z-index:4;display:none;flex-direction:column;gap:10px;
+  padding:13px 13px 11px;border-radius:18px;
+  background:color-mix(in srgb,var(--bg2) 96%,transparent);
+  -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
+  border:1px solid var(--b3);box-shadow:0 18px 44px rgba(0,0,0,.6);
+  max-width:520px;margin:0 auto;}
 .pv-wrong.on{display:flex;}
-.pv-wrong-t{font-size:13px;font-weight:700;color:var(--t1);}
-.pv-wrong-b{font-size:12px;font-weight:700;padding:7px 12px;border-radius:99px;background:var(--bg4);border:1px solid var(--b2);color:var(--t1);white-space:nowrap;cursor:pointer;}
+.pv-wrong-head{display:flex;align-items:flex-start;gap:11px;}
+.pv-wrong-ic{flex:0 0 auto;width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;
+  background:color-mix(in srgb,var(--a) 20%,transparent);color:var(--a2);}
+.pv-wrong-ic .ico{width:16px;height:16px;}
+.pv-wrong-copy{flex:1;min-width:0;}
+.pv-wrong-t{font-family:var(--fd);font-size:15px;font-weight:800;letter-spacing:-.15px;color:var(--t1);}
+.pv-wrong-s{margin-top:3px;font-size:12px;line-height:1.45;color:var(--t3);}
+.pv-wrong-x{flex:0 0 auto;width:28px;height:28px;margin:-2px -2px 0 0;display:flex;align-items:center;justify-content:center;
+  border-radius:99px;background:transparent;border:none;color:var(--t3);cursor:pointer;}
+.pv-wrong-x .ico,.pv-wrong-x svg{width:15px;height:15px;}
+.pv-wrong-acts{display:flex;gap:8px;}
+.pv-wrong-b{flex:1;min-width:0;font-size:12px;font-weight:800;padding:11px 10px;border-radius:14px;
+  background:var(--bg4);border:1px solid var(--b2);color:var(--t1);cursor:pointer;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:transform .12s;}
 .pv-wrong-b:active{transform:scale(.97);}
-.pv-wrong-x{width:26px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:99px;background:transparent;border:none;color:var(--t3);cursor:pointer;}
-.pv-wrong-x svg{width:14px;height:14px;}
-.pv-wrong-b.prim{background:var(--a);border-color:var(--a);color:var(--aFg);}
+.pv-wrong-b.prim{background:var(--a);border-color:var(--a);color:var(--aFg);box-shadow:0 6px 18px -8px var(--glow);}
+/* The last resort reads as a last resort: a quiet line, not a fourth button
+   competing with the two that fix the common case. */
+.pv-wrong-last{width:100%;padding:2px 0 1px;background:none;border:0;cursor:pointer;
+  font-size:10px;font-weight:700;line-height:1.4;color:var(--t3);text-align:center;
+  text-decoration:underline;text-decoration-color:color-mix(in srgb,var(--t3) 40%,transparent);text-underline-offset:3px;}
+.pv-wrong-last:active{color:var(--t2);}
+@media (max-width:380px){.pv-wrong-acts{flex-direction:column;}.pv-wrong-b{white-space:normal;}}
 /* Paste-the-right-address panel. */
 .pv-set{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:5;display:none;width:min(420px,92%);
   padding:18px;border-radius:18px;background:var(--bg2);border:1px solid var(--b3);box-shadow:0 18px 50px rgba(0,0,0,.6);}
@@ -4441,18 +4515,26 @@ body.recsel .pcard{position:relative;}
   <div class="pv-top">
     <button class="sv-back" onclick="closePlayer()" aria-label="Back"><i data-ic="chevron-left"></i></button>
     <div class="pv-title" id="pvTitle"></div>
-    <!-- Sites whose player swaps episodes without navigating give us no signal at
-         all, so the number in the header can sit two or three behind what is
-         actually playing. The person is looking straight at the real one. -->
-    <div class="pv-epset" id="pvEpSet" hidden>
-      <button class="pv-epset-b" onclick="pvEpSetStep(-1)" aria-label="Lower">&minus;</button>
-      <span class="pv-epset-n" id="pvEpSetN">1</span>
-      <button class="pv-epset-b" onclick="pvEpSetStep(1)" aria-label="Higher">+</button>
-      <button class="pv-epset-go" onclick="pvEpSetApply()">I'm here</button>
-      <button class="pv-epset-x" onclick="pvEpSetClose()" aria-label="Cancel"><i data-ic="x"></i></button>
-    </div>
     <button class="pv-ext" id="pvExt" aria-label="Find this title on the site" title="Wrong page? Search this title"><i data-ic="search"></i></button>
     <button class="pv-ext" id="pvOpen" onclick="pvOpenExternal()" aria-label="Open in your browser" title="Open in your browser"><i data-ic="external"></i></button>
+  </div>
+  <!-- Sites whose player swaps episodes without navigating give us no signal at
+       all, so the number in the header can sit two or three behind what is
+       actually playing. The person is looking straight at the real one.
+
+       This used to sit INSIDE the header row, where opening it crushed the title
+       to a single letter and left seven controls fighting over a phone's width.
+       It gets its own row now: the title stays readable, the number is big enough
+       to read at arm's length, and the button says which episode it will set. -->
+  <div class="pv-epbar" id="pvEpSet" hidden>
+    <span class="pv-epbar-q">Which one is playing?</span>
+    <div class="pv-epbar-step">
+      <button class="pv-epbar-b" onclick="pvEpSetStep(-1)" aria-label="Lower"><i data-ic="minus"></i></button>
+      <span class="pv-epbar-n" id="pvEpSetN">1</span>
+      <button class="pv-epbar-b" onclick="pvEpSetStep(1)" aria-label="Higher"><i data-ic="plus"></i></button>
+    </div>
+    <button class="pv-epbar-go" onclick="pvEpSetApply()" id="pvEpSetGo"><i data-ic="check"></i><span id="pvEpSetGoT">I'm here</span></button>
+    <button class="pv-epbar-x" onclick="pvEpSetClose()" aria-label="Cancel"><i data-ic="x"></i></button>
   </div>
   <!-- sandbox WITHOUT allow-popups / allow-top-navigation: the player still runs
        (verified HLS plays), but the frame can't spawn pop-up tabs or redirect the
@@ -4466,13 +4548,25 @@ body.recsel .pcard{position:relative;}
          site uses (Initial D vs initial-d-first-stage). An iframe can't expose
          its HTTP status cross-origin, so the app cannot detect that itself —
          this puts the two recoveries one tap away instead of behind an icon. -->
+    <!-- Five equal pills reading "Wrong page? Spelling Search Set it Won't play"
+         asked a question and then offered four answers that all looked the same,
+         none of which said what they'd do. It opens by naming what went wrong and
+         why, then leads with the one fix that sticks — teaching the site's own
+         name for the show — with the cheaper attempts underneath it. -->
     <div class="pv-wrong" id="pvWrong">
-      <span class="pv-wrong-t">Wrong page?</span>
-      <button class="pv-wrong-b" onclick="pvTrySpelling()" title="Try another spelling">Spelling</button>
-      <button class="pv-wrong-b" onclick="pvSearchHere()" title="Search this site for the show">Search</button>
-      <button class="pv-wrong-b prim" onclick="pvSetPrompt()" title="Set the right page">Set it</button>
-      <button class="pv-wrong-b" onclick="pvAllowMore()" title="This site refuses to run in a protected frame">Won't play</button>
-      <button class="pv-wrong-x" onclick="document.getElementById('pvWrong').classList.remove('on')" aria-label="Dismiss"><i data-ic="x"></i></button>
+      <div class="pv-wrong-head">
+        <span class="pv-wrong-ic"><i data-ic="search"></i></span>
+        <div class="pv-wrong-copy">
+          <div class="pv-wrong-t">This isn't your show?</div>
+          <div class="pv-wrong-s">This site spells titles its own way, so the link can land somewhere else. Point WatchList at the right page once and every episode works from then on.</div>
+        </div>
+        <button class="pv-wrong-x" onclick="document.getElementById('pvWrong').classList.remove('on')" aria-label="Dismiss"><i data-ic="x"></i></button>
+      </div>
+      <div class="pv-wrong-acts">
+        <button class="pv-wrong-b prim" onclick="pvSetPrompt()">Find it on this site</button>
+        <button class="pv-wrong-b" onclick="pvTrySpelling()" title="Try the show's other titles">Try another spelling</button>
+      </div>
+      <button class="pv-wrong-last" onclick="pvAllowMore()">Screen stayed blank? This site may refuse to play in here</button>
     </div>
     <!-- Learn the site's own name for this show, from one working address. -->
     <div class="pv-set" id="pvSet">
@@ -4500,9 +4594,19 @@ body.recsel .pcard{position:relative;}
        (an {ep} token) — hidden for search/plain sources and for reading, where
        there's no episode to step through. -->
   <div class="pv-nav" id="pvNav" style="display:none">
-    <button class="pv-nav-arrow" id="pvPrev" onclick="pvStep(-1)" aria-label="Previous episode"><i data-ic="chevron-left"></i></button>
-    <button class="pv-nav-mark" id="pvMark" onclick="pvMarkNext()">Mark watched &amp; next</button>
-    <button class="pv-nav-arrow" id="pvNext" onclick="pvStep(1)" aria-label="Next episode"><i data-ic="chevron-right"></i></button>
+    <!-- Where you are in the series, as a line rather than a sentence. The bar
+         was three anonymous buttons that never said what pressing the big one
+         would do; now it shows the episode you're on, how far in that is, and
+         which one you'd land on next. -->
+    <div class="pv-nav-prog"><span id="pvNavBar"></span></div>
+    <div class="pv-nav-row">
+      <button class="pv-nav-arrow" id="pvPrev" onclick="pvStep(-1)" aria-label="Previous episode"><i data-ic="chevron-left"></i></button>
+      <button class="pv-nav-mark" id="pvMark" onclick="pvMarkNext()">
+        <span class="pv-nav-mark-t" id="pvMarkT">Mark watched &amp; next</span>
+        <span class="pv-nav-mark-s" id="pvMarkS"></span>
+      </button>
+      <button class="pv-nav-arrow" id="pvNext" onclick="pvStep(1)" aria-label="Next episode"><i data-ic="chevron-right"></i></button>
+    </div>
   </div>
   <!-- host's party remote, right in the player — pause/next everyone without leaving the video -->
   <div class="pv-host" id="pvHostBar" style="display:none">
@@ -4625,6 +4729,7 @@ users:'<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7
 copy:'<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
 inbox:'<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5.1 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.9A2 2 0 0 0 16.8 4H7.2a2 2 0 0 0-1.7 1.1z"/>',
 plus:'<path d="M12 5v14M5 12h14"/>',
+minus:'<path d="M5 12h14"/>',
 compass:'<circle cx="12" cy="12" r="9.5"/><path d="m16 8-2 6-6 2 2-6z"/>',
 layers:'<path d="M12 2 2 7l10 5 10-5z"/><path d="m2 17 10 5 10-5"/><path d="m2 12 10 5 10-5"/>',
   send:'<path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4z"/>',
@@ -7019,25 +7124,39 @@ function openNatural(){
   openSheet('nsSheet');
   renderNatural();
 }
-function nsMeta(a){
-  const bits=[];
-  const n=a.epTotal||0; if(n)bits.push(n+(kindOf(a)==='read'?' chapters':' eps'));
-  // The cost of keeping it — but "~0h to watch" is what an hour-rounded number
-  // says about anything under half an hour, and on the junk entries this screen
-  // shows first that was most of them.
-  const mins=kindOf(a)==='watch'?totalWatchMins(a):0;
-  if(mins>=60)bits.push('~'+Math.round(mins/60)+'h to watch');
-  else if(mins>0)bits.push('~'+Math.round(mins)+' min');
-  if(a.genre)bits.push(String(a.genre).split(',').slice(0,3).map(g=>g.trim()).join(' · '));
-  return bits;
+// Every card has art, even the ones that never matched a database: the poster if
+// there is one, and a tinted plate with the title's initial if there isn't. The
+// image sits ON TOP of the plate and removes itself if it fails to load, so a
+// dead cover URL falls back instead of leaving a hole.
+function nsArt(a,cls){
+  const read=kindOf(a)==='read';
+  const ini=escH(String(a.title||'?').trim().charAt(0).toUpperCase()||'?');
+  return `<div class="${cls}"><span class="ns-ph">${icon(read?'book':'film')}<b>${ini}</b></span>`
+    +(a.img?`<img src="${escH(a.img)}" alt="" onerror="this.remove()">`:'')+`</div>`;
+}
+// What it costs to keep, each fact carrying the icon for what it measures —
+// rather than one grey run of middots that wrapped to three lines.
+function nsFacts(a,tight){
+  const read=kindOf(a)==='read', out=[];
+  const n=a.epTotal||0;
+  if(n)out.push(`<span class="ns-fact">${icon(read?'book':'film')}${n} ${read?'ch':'eps'}</span>`);
+  // "~0h to watch" is what an hour-rounded number says about anything under half
+  // an hour, and on the junk entries this screen shows first that was most of them.
+  const mins=read?0:totalWatchMins(a);
+  if(mins>=60)out.push(`<span class="ns-fact">${icon('clock')}~${Math.round(mins/60)}h</span>`);
+  else if(mins>0)out.push(`<span class="ns-fact">${icon('clock')}~${Math.round(mins)} min</span>`);
+  if(a.genre)String(a.genre).split(',').slice(0,tight?1:2).map(g=>g.trim()).filter(Boolean)
+    .forEach(g=>out.push(`<span class="ns-fact">${escH(g)}</span>`));
+  if(!a.aniId)out.push(`<span class="ns-fact warn">${icon('search')}never matched</span>`);
+  return `<div class="ns-facts">${out.join('')}</div>`;
 }
 function nsPaintModes(){
   const el=document.getElementById('nsModes'); if(!el)return;
   const m=nsMode(), done=_nsIdx>=_nsQueue.length;
   el.style.display=done?'none':'';
   if(done){el.innerHTML='';return;}
-  el.innerHTML=`<button class="ns-mode${m==='solo'?' on':''}" onclick="setNsMode('solo')">One at a time</button>`
-    +`<button class="ns-mode${m==='vs'?' on':''}" onclick="setNsMode('vs')">Head to head</button>`;
+  el.innerHTML=`<button class="ns-mode${m==='solo'?' on':''}" onclick="setNsMode('solo')">${icon('layers')}One at a time</button>`
+    +`<button class="ns-mode${m==='vs'?' on':''}" onclick="setNsMode('vs')">${icon('copy')}Head to head</button>`;
 }
 function renderNatural(){
   const box=document.getElementById('nsBody'), cnt=document.getElementById('nsCount');
@@ -7047,15 +7166,14 @@ function renderNatural(){
   if(nsMode()==='vs'&&_nsQueue.length-_nsIdx>=2){ renderNaturalVs(); return; }
   const a=_nsQueue[_nsIdx];
   if(cnt)cnt.textContent=(_nsIdx+1)+' of '+_nsQueue.length+(_nsDrop.length?' · '+_nsDrop.length+' to drop':'');
-  const img=a.img?`<img class="ns-art" src="${escH(a.img)}" alt="" onerror="this.style.display='none'">`:'';
   box.innerHTML=`<div class="ns-stage" id="nsStage">
       <div class="ns-card" id="nsCard">
         <span class="ns-stamp keep" id="nsKeepStamp">Keep</span>
         <span class="ns-stamp drop" id="nsDropStamp">Remove</span>
-        ${img}
+        ${nsArt(a,'ns-art')}
         <div class="ns-body">
           <div class="ns-title">${escH(a.title)}</div>
-          <div class="ns-meta">${nsMeta(a).map(b=>`<span>${escH(b)}</span>`).join('')}${a.aniId?'':`<span style="color:var(--a2)">never matched anything</span>`}</div>
+          ${nsFacts(a)}
           <p class="ns-syn" id="nsSyn">Loading what it's about\u2026</p>
         </div>
       </div>
@@ -7146,12 +7264,12 @@ function renderNaturalVs(){
   const left=_nsQueue.length-_nsIdx;
   if(cnt)cnt.textContent=left+' left'+(_nsDrop.length?' \u00b7 '+_nsDrop.length+' to archive':'');
   const card=(x,side)=>`<div class="ns-vs-card" onclick="nsPick('${side}')">
-      ${x.img?`<img class="ns-vs-art" src="${escH(x.img)}" alt="" onerror="this.style.display='none'">`:''}
+      ${nsArt(x,'ns-vs-art')}
       <div class="ns-vs-body">
         <div class="ns-vs-title">${escH(x.title)}</div>
-        <div class="ns-vs-meta">${escH(nsMeta(x).join(' \u00b7 '))||'&nbsp;'}${x.aniId?'':' \u00b7 never matched'}</div>
+        ${nsFacts(x,1)}
         <p class="ns-vs-syn" id="nsSyn${side}">\u2026</p>
-        <div class="ns-vs-pick">Keep this one</div>
+        <div class="ns-vs-pick">${icon('check')}Keep this one</div>
       </div>
     </div>`;
   box.innerHTML=`<div class="ns-vs">${card(a,'L')}${card(b,'R')}</div>
@@ -13959,9 +14077,9 @@ function pvEpSetOpen(){
   _pvEpSetVal=pvWatchEp||1;
   const box=document.getElementById('pvEpSet'), t=document.getElementById('pvTitle');
   if(!box)return;
-  box.hidden=false; if(t)t.style.display='none';
+  box.hidden=false; if(t)t.style.display='';    // its own row now — the title stays
   pvEpSetPaint();
-  try{paintIcons&&paintIcons();}catch(e){}
+  try{hydrateIcons(document.getElementById('pvEpSet'));}catch(e){}
 }
 function pvEpSetClose(){
   const box=document.getElementById('pvEpSet'), t=document.getElementById('pvTitle');
@@ -13969,6 +14087,14 @@ function pvEpSetClose(){
 }
 function pvEpSetPaint(){
   const n=document.getElementById('pvEpSetN'); if(n)n.textContent=_pvEpSetVal;
+  // The button used to say "I'm here", which is true but doesn't say what it
+  // will do. Naming the episode it's about to set means the number and the
+  // confirmation agree before you press anything.
+  const a=pvReturnId?anime.find(x=>x.id===pvReturnId):null;
+  const t=document.getElementById('pvEpSetGoT');
+  if(t)t.textContent='I\u2019m on '+(a&&kindOf(a)==='read'?'Ch ':'Ep ')+_pvEpSetVal;
+  const q=document.querySelector('.pv-epbar-q');
+  if(q)q.textContent=(a&&kindOf(a)==='read')?'Which chapter are you on?':'Which episode is playing?';
 }
 function pvEpSetStep(d){
   const a=pvReturnId?anime.find(x=>x.id===pvReturnId):null;
@@ -14012,7 +14138,16 @@ function renderPvNav(a){
   if(!show) return;
   document.getElementById('pvPrev').disabled=pvWatchEp<=1;
   document.getElementById('pvNext').disabled=pvWatchEp>=total;
-  document.getElementById('pvMark').textContent=pvWatchEp>=total?'Mark finished':'Mark watched & next';
+  const read=kindOf(a)==='read', unit=read?'Ch':'Ep', last=pvWatchEp>=total;
+  const t=document.getElementById('pvMarkT'), sub=document.getElementById('pvMarkS');
+  if(t)t.textContent=last?(read?'Mark it read':'Mark it finished')
+                         :(read?'Mark read & next':'Mark watched & next');
+  // What pressing it actually does, spelled out: the one you're on, the one
+  // you'd land on, and how much of the series that is.
+  if(sub)sub.textContent=last?unit+' '+pvWatchEp+' of '+total+' \u00b7 the last one'
+                             :unit+' '+pvWatchEp+' \u2192 '+(pvWatchEp+1)+' of '+total;
+  const bar=document.getElementById('pvNavBar');
+  if(bar)bar.style.width=Math.max(1.5,Math.min(100,(pvWatchEp/total)*100))+'%';
 }
 function pvGoTo(a,ep){
   const url=episodeURL(a,ep); if(!url) return;

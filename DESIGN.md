@@ -154,6 +154,26 @@ body is what stopped the UI reading flat when everything was one family at
   asking for.
 - **Player** — full-screen overlay, sandboxed cross-origin iframe. Its chrome is
   the only place a countdown chip or overlay sits on artwork.
+  Its two bars carry a rule each. The header holds one row of controls and
+  nothing else: the episode corrector used to open *inside* it, which crushed the
+  title to a single letter and left seven controls fighting over a phone's width
+  — it gets **its own row** underneath now, and the confirm button names the
+  episode it will set ("I'm on Ep 4") rather than saying "I'm here". The bottom
+  bar says what pressing it does: a hairline of series progress along its top
+  edge, and under the label the episode you're on, the one you'd land on, and how
+  many there are. Three anonymous buttons never said any of that.
+- **Recovery notices** — a row of same-looking pills is not a set of choices.
+  When the deep link misses, the player's notice opens by naming what happened
+  and why in two lines, leads with the fix that *sticks* (teach the site's own
+  name for the show), puts the cheap retry beside it, and demotes the last resort
+  to a quiet underlined line. It's a fixed card, not a sideways-scrolling strip —
+  the old one put its own close button off the edge on a phone.
+- **Every card gets art** — half a plan list never matched a database, so half
+  the Natural-selection cards had no cover and read as a paragraph with a button
+  under it. Missing artwork falls back to a tinted plate with the title's initial
+  and the icon for its kind, and the real cover sits on top and removes itself if
+  it fails to load. The facts under the title are chips carrying the icon for
+  what they measure, not one grey run of middots that wrapped three deep.
 - **Sheets** — bottom sheets for everything modal. No nested cards.
 - **Bottom nav** — docked to the bottom edge, full width, rounded on the two
   corners that face the content only. A detached pill left a strip of page under
@@ -183,6 +203,10 @@ body is what stopped the UI reading flat when everything was one family at
   mirrors the nav exactly: same material, same blur, **same left/right inset at
   every width** (verified 10px at ≤360, 14px above). That shared inset is what
   makes the two ends read as one language rather than two.
+- **Segment labels are one line** — a segmented control whose label wraps has
+  stopped being one. "To Read" broke in two and pushed the whole track taller;
+  labels never wrap, and the padding is what gives way when three of them are
+  tight for room.
 - **Flat inside a panel** — anything inside `.topbar` loses its own border and
   fill: a bordered field inside a bordered track inside a bordered panel is
   three boxes deep. The panel owns the edge; the parts are divided by a hairline.

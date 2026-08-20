@@ -3031,6 +3031,14 @@ body.no-party .friend-only{display:flex;}
 .rec-badge-who{font-weight:800;font-size:13px;color:var(--fc);display:flex;align-items:center;gap:6px;}
 .rec-badge-who .ico{width:14px;height:14px;}
 .rec-badge-note{margin-top:4px;font-size:13px;color:var(--t1);font-style:italic;}
+.rec-echo{margin-top:4px;font-size:12px;font-weight:700;color:var(--a2);}
+.rec-echo-note{margin-top:4px;font-size:12.5px;color:var(--t1);font-style:italic;
+  padding:6px 9px;border-radius:9px;background:var(--bg3);border:1px solid var(--b1);}
+.rec-reply-b{display:inline-flex;align-items:center;gap:7px;margin-top:2px;padding:8px 13px;border-radius:99px;
+  background:transparent;border:1px solid var(--b2);color:var(--t2);font:600 12.5px/1 inherit;cursor:pointer;
+  transition:color .18s ease,border-color .18s ease;}
+.rec-reply-b:hover{color:var(--t);border-color:var(--b3);}
+.rec-reply-b .ico{width:14px;height:14px;}
 .fr-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.08);}
 .fr-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0;}
 .fr-info{flex:1;min-width:0;display:block;}
@@ -5936,7 +5944,18 @@ function renderLockUI(){
   }
 }
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2);}
-function touch(a){a.upd=Date.now();}
+function touch(a){
+  a.upd=Date.now();
+  // Every mutation in the app comes through here, which makes it the one place
+  // that sees a show start or finish however it happened — the card's +1, the
+  // stepper, a bulk status change, the player's auto-mark. For anything a friend
+  // didn't recommend this is a single property check and out.
+  try{ if(a&&Array.isArray(a.recFrom)&&a.recFrom.length)recStageCheck(a); }catch(e){}
+}
+function recStageCheck(a){
+  if(a.status==='finished'){tellRec(a,'finished');return;}
+  if(a.status==='watching'||(a.ep||0)>0)tellRec(a,'started');
+}
 
 // ─── CLOUD SYNC (Cloudflare Worker + KV) ────────────────────────────────────
 function syncCode(){try{return localStorage.getItem('sync_'+LSKEY)||'';}catch{return'';}}
@@ -15537,10 +15556,11 @@ function connectFriendWS(){
 let recsIn=[];
 // Passes on things YOU sent: {from:{code,name},title,aniId,at}. Cached like the
 // recs themselves so the sent list reads the same offline.
-let recsPassed=[];
+let recsPassed=[],recsEcho=[];
 function loadRecsCache(){
   try{const a=JSON.parse(localStorage.getItem('recs_in')||'[]');recsIn=Array.isArray(a)?a:[];}catch{recsIn=[];}
   try{const p=JSON.parse(localStorage.getItem('recs_passed')||'[]');recsPassed=Array.isArray(p)?p:[];}catch{recsPassed=[];}
+  try{const e=JSON.parse(localStorage.getItem('recs_echo')||'[]');recsEcho=Array.isArray(e)?e:[];}catch{recsEcho=[];}
 }
 async function pullRecs(){
   // Same gate, same consequence: recommendations sent to the app went nowhere.
@@ -15552,8 +15572,10 @@ async function pullRecs(){
     recsIn=Array.isArray(j.recs)?j.recs:[];
     recsIn.forEach(e=>refreshFriendName(e.from&&e.from.code,e.from&&e.from.name,e.at));   // keep friend names current
     recsPassed=Array.isArray(j.passes)?j.passes:[];
+    recsEcho=Array.isArray(j.echoes)?j.echoes:[];
     try{localStorage.setItem('recs_in',JSON.stringify(recsIn));}catch{}
     try{localStorage.setItem('recs_passed',JSON.stringify(recsPassed));}catch{}
+    try{localStorage.setItem('recs_echo',JSON.stringify(recsEcho));}catch{}
     const ls=document.getElementById('lockScreen');
     if(!ls||getComputedStyle(ls).display==='none'){try{render();}catch(e){}}
   }catch(e){}
@@ -15652,15 +15674,60 @@ function recCard(k,rec){
 function recNoteRows(rec){
   return rec.senders.map(s=>{const col=friendColor(s.code);return `<div class="rec-badge" style="--fc:${col}"><div class="rec-badge-who">${icon('users')} ${escH(friendDisplay(s.code,s.name))} recommends this</div>${s.note?`<div class="rec-badge-note">“${escH(s.note)}”</div>`:''}</div>`;}).join('');
 }
+// Everyone who suggested this, from both directions: the incoming mailbox (still
+// undecided) and the record kept on the item (added at some point, possibly long
+// ago). The mailbox empties; the item's copy does not, which is the whole reason
+// a show a friend told you about stopped saying so the moment you added it.
+function recSendersFor(a){
+  const out=[];
+  const add=x=>{ if(!x||!x.code)return; const ex=out.find(o=>o.code===x.code);
+    if(ex){ if(x.note&&!ex.note)ex.note=x.note; if(x.name)ex.name=x.name; }
+    else out.push({code:x.code,name:x.name||'A friend',note:x.note||''}); };
+  try{
+    const m=recByAni();
+    const rec=(a.aniId&&m['a'+a.aniId])||m['t'+String(a.title||'').toLowerCase()];
+    (rec&&rec.senders||[]).forEach(add);
+  }catch(e){}
+  (Array.isArray(a.recFrom)?a.recFrom:[]).forEach(add);
+  return out;
+}
 function friendRecBadge(a){
   if(IS_NATIVE||!a)return '';
-  // Recs without an AniList id are keyed by title (recByAni does both). Looking
-  // up only the id meant a title-only recommendation showed no badge at all —
-  // and now that the comment no longer goes into notes, that would lose it.
-  const m=recByAni();
-  const rec=(a.aniId&&m['a'+a.aniId])||m['t'+String(a.title||'').toLowerCase()];
-  if(!rec)return '';
-  return `<div class="rec-badges">${recNoteRows(rec)}</div>`;
+  const senders=recSendersFor(a);
+  if(!senders.length)return '';
+  const rows=recNoteRows({senders});
+  // One reply for the show, not one per person: you are answering the
+  // recommendation, and everyone who made it should hear the same thing.
+  const who=senders.length===1?friendDisplay(senders[0].code,senders[0].name):senders.length+' of them';
+  return `<div class="rec-badges">${rows}
+    <button class="rec-reply-b" id="recReplyB" onclick="recReplyOpen('${a.id}')">${icon('message')} Tell ${escH(who)} what you thought</button>
+    <div class="rec-reply" id="recReply" hidden>
+      <textarea class="ai-prompt-in" id="recReplyIn" rows="2" placeholder="man this was great"></textarea>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="parse-btn" style="flex:1" onclick="recReplySend('${a.id}')">Send</button>
+        <button class="parse-btn" style="flex:0 0 auto;width:auto;padding-left:16px;padding-right:16px" onclick="recReplyClose()">Cancel</button>
+      </div>
+    </div>
+  </div>`;
+}
+function recReplyOpen(id){
+  const b=document.getElementById('recReplyB'), box=document.getElementById('recReply');
+  if(!box)return; box.hidden=false; if(b)b.style.display='none';
+  const t=document.getElementById('recReplyIn'); if(t)try{t.focus({preventScroll:true});}catch(e){}
+}
+function recReplyClose(){
+  const b=document.getElementById('recReplyB'), box=document.getElementById('recReply');
+  if(box)box.hidden=true; if(b)b.style.display='';
+}
+function recReplySend(id){
+  const a=anime.find(x=>x.id===id); if(!a)return recReplyClose();
+  const t=document.getElementById('recReplyIn'); if(!t)return;
+  const v=t.value.trim();
+  if(!v){toast('Write something first');return;}
+  if(!myFriendCode()){toast('Turn on cloud backup first — that\u2019s what your friends know you by');return;}
+  tellRec(a,'note',v);
+  t.value=''; recReplyClose();
+  toast('Sent');
 }
 let recDetailKey='';
 function openRecDetail(k){recDetailKey=decodeURIComponent(k);renderRecDetail();openSheet('recDetailSheet');}
@@ -15697,10 +15764,54 @@ function addRecToList(watchAfter){
     anime.unshift({id,title:safeText(it.title),status:'plan',kind:it.kind==='read'?'read':'watch',aniId:it.aniId||0,img:safeImg(it.img),eps:'',epTotal:0,time:'',genre:safeText(it.genre),order:[],notes:'',rating:0,fav:false,upd:Date.now()});
     dedupeAnime();save();setTimeout(fetchCovers,300);   // pull episode counts / banner / airing
   }
+  // Who sent it, kept ON the item. The badge used to read from the incoming
+  // mailbox, which is a delivery queue: once a recommendation was added to the
+  // list it aged out and every trace of who suggested it went with it. Kept here
+  // it survives the mailbox, survives a restore, and is what the progress news
+  // below is addressed to.
+  const got=anime.find(a=>a.id===id);
+  if(got){
+    rememberRecFrom(got,rec.senders);
+    save();
+    tellRec(got,'added');
+  }
   render();closeAll();
   const item=anime.find(a=>a.id===id);
   if(watchAfter&&item&&kindOf(item)==='watch'){watchAnime(id);}
   else{toast(existing?'Already on your list':'Added to your list');openDetail(id);}
+}
+// One record per friend, their most recent note kept, capped so a popular show
+// can't grow an unbounded guest list.
+function rememberRecFrom(a,senders){
+  if(!a||!Array.isArray(senders))return;
+  const out=Array.isArray(a.recFrom)?a.recFrom.slice():[];
+  senders.filter(x=>x&&x.code).forEach(sd=>{
+    const ex=out.find(x=>x.code===sd.code);
+    if(ex){ if(sd.name)ex.name=sd.name; if(sd.note)ex.note=sd.note; ex.at=Math.max(ex.at||0,sd.at||0); }
+    else out.push({code:sd.code,name:sd.name||'A friend',note:sd.note||'',at:sd.at||Date.now()});
+  });
+  if(out.length)a.recFrom=out.slice(0,12);
+}
+// Tell whoever suggested it what became of it. Same manners as a pass: it waits
+// in their sent list, it is never a push, and a failure is silent — news about a
+// show is not worth an error message in front of someone watching one.
+function tellRec(a,kind,note){
+  try{
+    if(!a||!Array.isArray(a.recFrom)||!a.recFrom.length)return;
+    const from={code:myFriendCode(),name:myFriendName()||'A friend'};
+    if(!from.code)return;
+    if(kind!=='note'){
+      // Each stage is announced once per show, from this device's point of view;
+      // the server dedupes across devices as well.
+      const said=a.recSaid||{};
+      if(said[kind])return;
+      said[kind]=Date.now(); a.recSaid=said;
+    }
+    a.recFrom.filter(f=>f&&f.code).forEach(f=>{
+      try{fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({op:'rec_echo',to:f.code,from,title:a.title||'',aniId:a.aniId||0,kind,note:note||''})}).catch(()=>{});}catch(e){}
+    });
+  }catch(e){}
 }
 function openFriends(){renderFriends();openSheet('friendsSheet');pullRecs();pullFriendReqs();}
 function openHub(){ openSheet('hubSheet'); }
@@ -16145,6 +16256,28 @@ function passedTitles(e){
   if(!hit.length)return '';
   return hit.length===1?`passed on ${hit[0]}`:`passed on ${hit.length} of them`;
 }
+// What became of the things you sent, for one friend's entry in the sent list.
+// A pass is already reported next door; this is the other half — the half worth
+// sending something for.
+const _echoWord={added:'added it',started:'started it',finished:'finished it'};
+function echoBits(e){
+  if(!e||!e.code||!Array.isArray(recsEcho)||!recsEcho.length)return '';
+  const sent=(e.titles||[]).map(t=>String(t||'').toLowerCase());
+  const mine=recsEcho.filter(x=>x&&x.from&&x.from.code===e.code&&sent.includes(String(x.title||'').toLowerCase()));
+  if(!mine.length)return '';
+  // Furthest along wins: "finished it" says everything "added it" did.
+  const rank={added:1,started:2,finished:3};
+  const best={};
+  mine.filter(x=>x.kind!=='note').forEach(x=>{
+    const t=String(x.title||'');
+    if(!best[t]||rank[x.kind]>rank[best[t].kind])best[t]=x;
+  });
+  const stages=Object.keys(best).map(t=>`${escH(t)} \u2014 ${_echoWord[best[t].kind]||best[t].kind}`);
+  const notes=mine.filter(x=>x.kind==='note'&&x.note)
+    .slice(-3)
+    .map(x=>`<div class="rec-echo-note">\u201c${escH(x.note)}\u201d</div>`).join('');
+  return (stages.length?`<div class="rec-echo">${stages.join(' \u00b7 ')}</div>`:'')+notes;
+}
 function sentRecsHTML(){
   const l=recsSent();
   const sweep=(friendsList().length||l.length)
@@ -16162,6 +16295,7 @@ function sentRecsHTML(){
         <div style="flex:1;min-width:0">
           <div class="src-name">${escH(e.titles&&e.titles.length?e.titles.join(', '):'A recommendation')}</div>
           <div class="src-sub">to ${escH(who)} · ${escH(when)}${passed?` · <span class="rec-passed">${escH(passed)}</span>`:''}</div>
+          ${echoBits(e)}
         </div>
         <button class="src-chip" onclick="unsendRec('${escH(e.id)}','${escH(e.code)}')">Take back</button>
       </div>`;}).join('')}${sweep}`;

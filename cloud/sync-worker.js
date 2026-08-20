@@ -290,7 +290,10 @@ export default {
       let passes = [];
       try { const p = await env.LISTS.get('pass:' + code); if (p) passes = JSON.parse(p); } catch {}
       if (!Array.isArray(passes)) passes = [];
-      return json({ recs: list, passes }, 200, cors);
+      let echoes = [];
+      try { const e = await env.LISTS.get('echo:' + code); if (e) echoes = JSON.parse(e); } catch {}
+      if (!Array.isArray(echoes)) echoes = [];
+      return json({ recs: list, passes, echoes }, 200, cors);
     }
 
     // ── passing on a recommendation ──────────────────────────────────────────
@@ -320,6 +323,46 @@ export default {
       if (list.length > 200) list = list.slice(list.length - 200);
       await env.LISTS.put(key, JSON.stringify(list));
       ctx.waitUntil(notifyChan(env, to, 'pass', { title }));
+      return json({ ok: true }, 200, cors);
+    }
+
+    // ── what became of it ───────────────────────────────────────────────────
+    // Recommending something and never hearing another word about it is the
+    // dullest possible version of sharing. A pass already travels back; so should
+    // the good news — added, started, finished — and a note written by hand when
+    // they have something to say about it.
+    //
+    // Same shape and the same manners as a pass: filed under the RECOMMENDER's
+    // code, carrying only the show they themselves sent, never pushed. One entry
+    // per friend per show per kind, so 'started' cannot arrive twice; notes are
+    // the exception, because two things said are two things said.
+    if (op === 'rec_echo') {
+      const to = String(body.to || '');
+      const from = (body.from && typeof body.from === 'object') ? body.from : {};
+      const fromCode = String(from.code || '');
+      const fromName = String(from.name || 'A friend').slice(0, 40);
+      const kind = String(body.kind || '');
+      if (!/^[A-Za-z0-9]{10,64}$/.test(to)) return json({ error: 'bad to' }, 400, cors);
+      if (!/^[A-Za-z0-9]{10,64}$/.test(fromCode)) return json({ error: 'bad from' }, 400, cors);
+      if (!['added', 'started', 'finished', 'note'].includes(kind)) return json({ error: 'bad kind' }, 400, cors);
+      const title = String(body.title || '').slice(0, 200);
+      const aniId = Number(body.aniId) || 0;
+      if (!title && !aniId) return json({ error: 'no show' }, 400, cors);
+      const note = String(body.note || '').slice(0, 500);
+      if (kind === 'note' && !note) return json({ error: 'empty note' }, 400, cors);
+      const key = 'echo:' + to;
+      let list = [];
+      try { const s2 = await env.LISTS.get(key); if (s2) list = JSON.parse(s2); } catch {}
+      if (!Array.isArray(list)) list = [];
+      const sameShow = e => e && e.from && e.from.code === fromCode &&
+        (aniId ? e.aniId === aniId : String(e.title || '').toLowerCase() === title.toLowerCase());
+      if (kind !== 'note') list = list.filter(e => !(sameShow(e) && e.kind === kind));
+      list.push({ from: { code: fromCode, name: fromName }, title, aniId, kind, note, at: Date.now() });
+      if (list.length > 200) list = list.slice(list.length - 200);
+      await env.LISTS.put(key, JSON.stringify(list));
+      // The show travels, the person does not: the name is already in the pull,
+      // and this is what a notification would be built from.
+      ctx.waitUntil(notifyChan(env, to, 'echo', { title, kind }));
       return json({ ok: true }, 200, cors);
     }
 

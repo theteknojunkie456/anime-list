@@ -3058,32 +3058,30 @@ body.no-party .friend-only{display:flex;}
 @media(max-width:420px){.hub-grid{grid-template-columns:1fr;}.hub-card{flex-direction:row;align-items:center;gap:14px;padding:16px;}
   .hub-card .hub-name{flex:0 0 auto;}
   .hub-card .hub-sub{display:none;}}
-/* A record you scroll, ruled between entries, art on the left and everything
-   said about it on the right. Row height follows the density you already picked
-   for the list, because this IS a list. */
+/* A record you scroll: art left, a rule between entries, and every line of text
+   worth one line of height. The first version gave each note a filled bubble,
+   which turned every entry into a card and fitted four on a screen. */
 .rtm-list{margin-top:6px;border-top:1px solid var(--b1);}
-.rtm-row{display:flex;gap:13px;padding:14px 0;border-bottom:1px solid var(--b1);}
-.rtm-art{width:52px;height:74px;flex-shrink:0;border-radius:9px;object-fit:cover;background:var(--bg3);}
-.rtm-list.compact .rtm-art{width:40px;height:57px;}
-.rtm-list.compact .rtm-row{padding:10px 0;gap:11px;}
-.rtm-list.large .rtm-art{width:70px;height:100px;}
-.rtm-list.large .rtm-row{padding:18px 0;gap:15px;}
-.rtm-art.ph{display:flex;align-items:center;justify-content:center;color:var(--t3);font-weight:800;font-size:19px;}
+.rtm-row{display:flex;gap:12px;padding:11px 0;border-bottom:1px solid var(--b1);}
+.rtm-art{width:44px;height:63px;flex-shrink:0;border-radius:7px;object-fit:cover;background:var(--bg3);}
+.rtm-list.compact .rtm-art{width:34px;height:49px;}
+.rtm-list.compact .rtm-row{padding:8px 0;gap:10px;}
+.rtm-list.large .rtm-art{width:58px;height:83px;}
+.rtm-list.large .rtm-row{padding:14px 0;gap:14px;}
+.rtm-art.ph{display:flex;align-items:center;justify-content:center;color:var(--t3);font-weight:800;font-size:17px;}
 .rtm-main{flex:1;min-width:0;}
-.rtm-head{display:flex;align-items:flex-start;gap:10px;}
-.rtm-title{flex:1;min-width:0;font-weight:800;font-size:15px;color:var(--t);line-height:1.25;}
-.rtm-list.large .rtm-title{font-size:16.5px;}
-.rtm-state{font-size:12px;color:var(--t3);margin-top:3px;}
-.rtm-facts{margin-top:4px;font-size:11.5px;color:var(--t3);line-height:1.5;}
-.rtm-who{margin-top:8px;}
-.rtm-name{font-size:12.5px;font-weight:800;}
-.rtm-when{font-size:11px;color:var(--t3);margin-left:7px;}
-.rtm-note{margin-top:4px;font-size:12.5px;color:var(--t1);font-style:italic;line-height:1.45;
-  padding:8px 11px;border-radius:11px;background:color-mix(in srgb,var(--fc) 12%,transparent);}
-.rtm-note.you{color:var(--t2);background:var(--bg3);border:1px solid var(--b1);font-style:normal;}
-.rtm-told{margin-top:6px;font-size:11.5px;font-weight:700;color:var(--a2);}
-.rtm-mine{margin-top:8px;}
-.rtm-mine::before{content:'You said';display:block;font-size:11px;font-weight:800;color:var(--t3);margin-bottom:2px;}
+.rtm-head{display:flex;align-items:baseline;gap:10px;}
+.rtm-title{flex:1;min-width:0;font-weight:800;font-size:14.5px;color:var(--t);line-height:1.25;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.rtm-list.large .rtm-title{font-size:15.5px;}
+.rtm-facts{margin-top:2px;font-size:11.5px;color:var(--t3);line-height:1.45;}
+/* Name and quote share a line; the quote wraps under it only when it must. */
+.rtm-line{margin-top:4px;font-size:12.5px;line-height:1.45;}
+.rtm-name{font-weight:800;margin-right:6px;}
+.rtm-name.you{color:var(--t3);}
+.rtm-quote{color:var(--t1);font-style:italic;}
+.rtm-quote.plain{color:var(--t3);font-style:normal;}
+.rtm-row .src-chip{flex-shrink:0;}
 .rec-echo{margin-top:4px;font-size:12px;font-weight:700;color:var(--a2);}
 .rec-echo-note{margin-top:4px;font-size:12.5px;color:var(--t1);font-style:italic;
   padding:6px 9px;border-radius:9px;background:var(--bg3);border:1px solid var(--b1);}
@@ -4138,7 +4136,7 @@ body.recsel .pcard{position:relative;}
   </div>
   <button class="hub-strip" onclick="closeAll();setTimeout(openRecsToMe,240)">
     <span class="hub-strip-ico"><i data-ic="inbox"></i></span>
-    <span class="hub-strip-t">Recommended to you<span class="hub-strip-n" id="hubRecN"></span></span>
+    <span class="hub-strip-t">From Friends<span class="hub-strip-n" id="hubRecN"></span></span>
     <i data-ic="chevron-right"></i>
   </button>
 </div>
@@ -4181,7 +4179,7 @@ body.recsel .pcard{position:relative;}
 <div class="sheet" id="recsToMeSheet">
   <div class="sheet-handle"></div>
   <div class="sheet-header">
-    <div class="sheet-title"><i data-ic="users"></i> Recommended to you</div>
+    <div class="sheet-title"><i data-ic="users"></i> From Friends</div>
     <button class="sheet-cancel" onclick="openSheet('friendsSheet')">Back</button>
   </div>
   <div id="recsToMeBody"></div>
@@ -8448,19 +8446,16 @@ function airingInfo(a){
 }
 function renderFiltRow(){
   const items=anime.filter(a=>kindOf(a)===viewKind);
-  const counts={all:items.length,watching:0,plan:0,finished:0,dropped:0,rec:0};
+  const counts={all:items.length,watching:0,plan:0,finished:0,dropped:0};
   items.forEach(a=>counts[a.status]!==undefined&&counts[a.status]++);
-  counts.rec=items.filter(a=>Array.isArray(a.recFrom)&&a.recFrom.length).length;
+
   const isRead=viewKind==='read';
   // just the everyday three so the row never scrolls; Finished/Dropped live in the sort menu
   const filts=[['all','All'],['watching',isRead?'Reading':'Watching'],['plan',isRead?'To Read':'Plan']];
-  // "From friends" earns a place next to them once there is anything in it —
-  // where a recommendation came from is a way you think about your list, not a
-  // thing that should live only on a social screen.
-  if(counts.rec)filts.push(['rec','From friends']);
+
   document.getElementById('filtRow').innerHTML=filts.map(([f,l])=>{
     const on=filterStatus===f;
-    const cls=on?(f==='all'||f==='rec'?'on':'on-'+f):'';
+    const cls=on?(f==='all'?'on':'on-'+f):'';
     const n=counts[f]||0;
     return`<button class="fchip${cls?' '+cls:''}" onclick="setFilter('${f}')">${l}<span class="fn">${n}</span></button>`;
   }).join('')
@@ -8781,7 +8776,7 @@ async function retryUnmatched(){
 const SORT_MODES=[['recent','clock','Recent'],['az',null,'A–Z'],['rating','star','Your rating'],['score','trophy','Top rated'],['progress','play','Progress'],['duration','film','Shortest']];
 // Favorites was a row on the home screen and nothing you could actually filter
 // TO — the one list you curate by hand, with no way to see only it.
-const MENU_FILTS=[['fav','heart','Favorites'],['finished','check','Finished'],['dropped','x','Dropped']];
+const MENU_FILTS=[['fav','heart','Favorites'],['rec','users','From Friends'],['finished','check','Finished'],['dropped','x','Dropped']];
 function renderSortRow(){
   try{renderFixBar();}catch(e){}
   const curSort=SORT_MODES.find(x=>x[0]===sortMode)||SORT_MODES[0];
@@ -8798,6 +8793,7 @@ function renderSortRow(){
     const items=anime.filter(a=>kindOf(a)===viewKind); const cnt={finished:0,dropped:0};
     items.forEach(a=>{if(cnt[a.status]!==undefined)cnt[a.status]++;});
     cnt.fav=items.filter(a=>a.fav).length;
+    cnt.rec=items.filter(a=>Array.isArray(a.recFrom)&&a.recFrom.length).length;
     const sortHTML=SORT_MODES.map(([m,ic,t])=>`<button class="sort-opt${sortMode===m?' on':''}" onclick="pickSort('${m}')">${ic?icon(ic):'<span class="ico"></span>'}<span>${t}</span>${sortMode===m?`<span class="chk">${icon('check')}</span>`:''}</button>`).join('');
     const filtHTML=MENU_FILTS.map(([f,ic,t])=>`<button class="sort-opt${filterStatus===f?' on':''}" onclick="pickFilt('${f}')">${icon(ic)}<span>${t}</span><span class="sort-cnt">${cnt[f]||0}</span>${filterStatus===f?`<span class="chk">${icon('check')}</span>`:''}</button>`).join('');
     menu.innerHTML=sortHTML+`<div class="sort-div"></div>`+filtHTML;
@@ -9146,7 +9142,7 @@ function renderHome(){
     }
     const hits=list;
     if(hits.length){el.innerHTML=`<div class="grid">${hits.map(posterCard).join('')}</div>`+bulkBarHTML();return;}
-    const stLbl=filterStatus==='fav'?'Favorites':filterStatus==='rec'?'From friends':filterStatus==='watching'?(isRead?'Reading':'Watching'):(STATUS_META[filterStatus]?STATUS_META[filterStatus].label:filterStatus);
+    const stLbl=filterStatus==='fav'?'Favorites':filterStatus==='rec'?'From Friends':filterStatus==='watching'?(isRead?'Reading':'Watching'):(STATUS_META[filterStatus]?STATUS_META[filterStatus].label:filterStatus);
     const msg=q
       ?`No matches for “${schEsc(q)}”${filterStatus!=='all'?` in ${stLbl}`:` in your ${isRead?'reading':'watch'} list`}`
       :`Nothing in ${stLbl} yet`;
@@ -15918,12 +15914,10 @@ function renderRecsToMe(){
     ['added','started','dropped','finished'].forEach(k=>{ const t=(r.told||{})[k]; if(t)facts.push(`${_echoWord[k].replace(' it','')} ${day(t)}`); });
     const mins=r.item&&kindOf(r.item)==='watch'?totalWatchMins(r.item):0;
     if(mins)facts.push(fmtWatch(mins));
-    const people=r.senders.map(sd=>`<div class="rtm-who">
-        <span class="rtm-name" style="color:${friendColor(sd.code)}">${escH(friendDisplay(sd.code,sd.name))}</span>
-        ${sd.at?`<span class="rtm-when">${escH(day(sd.at))}</span>`:''}
-        ${sd.note?`<div class="rtm-note" style="--fc:${friendColor(sd.code)}">\u201c${escH(sd.note)}\u201d</div>`:''}
+    const people=r.senders.map(sd=>`<div class="rtm-line">
+        <span class="rtm-name" style="color:${friendColor(sd.code)}">${escH(friendDisplay(sd.code,sd.name))}</span>${sd.note?`<span class="rtm-quote">\u201c${escH(sd.note)}\u201d</span>`:'<span class="rtm-quote plain">recommended this</span>'}
       </div>`).join('');
-    const mine=r.replies.length?`<div class="rtm-mine">${r.replies.map(x=>`<div class="rtm-note you">\u201c${escH(x.note)}\u201d<span class="rtm-when">${escH(day(x.at))}</span></div>`).join('')}</div>`:'';
+    const mine=r.replies.map(x=>`<div class="rtm-line"><span class="rtm-name you">You</span><span class="rtm-quote">\u201c${escH(x.note)}\u201d</span></div>`).join('');
     const art=r.img?`<img class="rtm-art" src="${escH(r.img)}" alt="" loading="lazy">`:`<div class="rtm-art ph">${escH(((r.title||'?')[0]||'?').toUpperCase())}</div>`;
     const go=r.kind==='new'
       ? `<button class="src-chip" onclick="openRecDetail('${encodeURIComponent(r.key||'')}')">Look at it</button>`
@@ -15935,8 +15929,7 @@ function renderRecsToMe(){
           <div class="rtm-title">${escH(r.title||'?')}</div>
           ${go}
         </div>
-        <div class="rtm-state">${escH(stateOf(r))}</div>
-        ${facts.length?`<div class="rtm-facts">${facts.map(escH).join(' \u00b7 ')}</div>`:''}
+        <div class="rtm-facts">${[stateOf(r)].concat(facts).map(escH).join(' \u00b7 ')}</div>
         ${people}${mine}
       </div>
     </div>`;
@@ -16114,7 +16107,7 @@ function renderFriends(){
       <div class="fr-err" id="frErr"></div>
     </details>
     ${(()=>{const n=recsToMeRows().length;return `<button class="src-opt" style="margin-top:16px;width:100%;text-align:left" onclick="openRecsToMe()">
-      <div class="src-name">${icon('users')} Recommended to you${n?` · ${n}`:''}</div>
+      <div class="src-name">${icon('users')} From Friends${n?` · ${n}`:''}</div>
       <div class="src-sub">Everything anyone has sent you, with their notes \u2014 kept after you add it and after you finish it</div>
     </button>`;})()}
     ${sentRecsHTML()}`;

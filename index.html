@@ -3130,30 +3130,54 @@ body.no-party .friend-only{display:flex;}
    which turned every entry into a card and fitted four on a screen. */
 /* Two halves of one subject, not two screens. */
 .rtm-tabs{display:flex;gap:6px;margin:2px 0 8px;}
-.rtm-tab{flex:1;padding:9px 12px;border-radius:12px;background:var(--bg3);border:1px solid var(--b1);
+.rtm-tab{flex:1;padding:9px 12px;border-radius:14px;background:var(--bg3);border:1px solid var(--b1);
   color:var(--t2);font:800 13px/1 inherit;cursor:pointer;transition:color .16s,background .16s,border-color .16s;}
 .rtm-tab.on{background:color-mix(in srgb,var(--a) 16%,transparent);border-color:color-mix(in srgb,var(--a) 45%,transparent);color:var(--t);}
-.rtm-tab-n{color:var(--t3);font-weight:700;}
-.rtm-tab.on .rtm-tab-n{color:var(--a2);}
+/* The number on a tab is what's WAITING, not what exists — see renderRecsToMe.
+   A badge that counts your whole history never goes down, so it stops meaning
+   anything; this one is a real unread mark and it earns the accent colour. */
+.rtm-tab-n{margin-left:6px;padding:1px 6px;border-radius:99px;font-size:10px;font-weight:800;
+  background:var(--a);color:var(--aFg);font-variant-numeric:tabular-nums;}
+.rtm-tab-n:empty{display:none;}
+/* A total, not an unread mark — it does not get to look like one. */
+.rtm-tab-n.quiet{background:var(--bg4);border:1px solid var(--bn2);color:var(--t3);}
 .rtm-acts{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
 .rtm-acts .src-chip.go{background:var(--a);color:var(--aFg);border-color:transparent;}
 .rtm-replybox{margin-top:8px;}
 .rtm-list{margin-top:6px;border-top:1px solid var(--b1);}
 .rtm-row{display:flex;gap:12px;padding:11px 0;border-bottom:1px solid var(--b1);}
-.rtm-art{width:44px;height:63px;flex-shrink:0;border-radius:7px;object-fit:cover;background:var(--bg3);}
+.rtm-art{width:44px;height:63px;flex-shrink:0;border-radius:6px;object-fit:cover;background:var(--bg3);}
 .rtm-list.compact .rtm-art{width:34px;height:49px;}
 .rtm-list.compact .rtm-row{padding:8px 0;gap:10px;}
 .rtm-list.large .rtm-art{width:58px;height:83px;}
 .rtm-list.large .rtm-row{padding:14px 0;gap:14px;}
-.rtm-art.ph{display:flex;align-items:center;justify-content:center;color:var(--t3);font-weight:800;font-size:17px;}
+.rtm-art.ph{display:flex;align-items:center;justify-content:center;font-family:var(--fd);font-weight:800;font-size:17px;
+  background:linear-gradient(155deg,color-mix(in srgb,var(--fc,var(--a)) 30%,var(--bg4)) 0%,var(--bg4) 80%);
+  color:color-mix(in srgb,var(--t1) 45%,transparent);}
 .rtm-main{flex:1;min-width:0;}
-.rtm-head{display:flex;align-items:baseline;gap:10px;}
-.rtm-title{flex:1;min-width:0;font-weight:800;font-size:14.5px;color:var(--t);line-height:1.25;
+.rtm-head{display:flex;align-items:baseline;gap:8px;}
+.rtm-title{flex:1;min-width:0;font-weight:800;font-size:15px;color:var(--t);line-height:1.25;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.rtm-list.large .rtm-title{font-size:15.5px;}
-.rtm-facts{margin-top:2px;font-size:11.5px;color:var(--t3);line-height:1.45;}
+.rtm-list.large .rtm-title{font-size:17px;}
+/* Where it stands, as a pill in its status's own colour. It used to be the first
+   item in a grey run of middots, which is where a row's most important fact
+   should never be. */
+.rtm-state{flex:0 0 auto;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:800;
+  background:var(--bg4);border:1px solid var(--bn2);color:var(--t3);white-space:nowrap;}
+.rtm-state.wait{background:color-mix(in srgb,var(--a) 20%,transparent);border-color:color-mix(in srgb,var(--a) 40%,transparent);color:var(--a2);}
+.rtm-state.watching{color:var(--wat);border-color:color-mix(in srgb,var(--wat) 40%,transparent);}
+.rtm-state.finished{color:var(--fin);border-color:color-mix(in srgb,var(--fin) 40%,transparent);}
+.rtm-state.dropped{color:var(--drp);border-color:color-mix(in srgb,var(--drp) 40%,transparent);}
+.rtm-facts{margin-top:3px;font-size:10px;color:var(--t3);line-height:1.5;}
 /* Name and quote share a line; the quote wraps under it only when it must. */
-.rtm-line{margin-top:4px;font-size:12.5px;line-height:1.45;}
+.rtm-line{margin-top:4px;font-size:13px;line-height:1.45;}
+/* One header per group, so a wall of rows reads as two piles: the ones that want
+   a decision, and the record behind them. */
+.rtm-group{display:flex;align-items:center;gap:8px;margin:16px 0 2px;
+  font-family:var(--fd);font-size:12px;font-weight:800;letter-spacing:.02em;text-transform:uppercase;color:var(--t3);}
+.rtm-group:first-child{margin-top:8px;}
+.rtm-group::after{content:"";flex:1;height:1px;background:var(--b1);}
+.rtm-group .ico{width:13px;height:13px;}
 .rtm-name{font-weight:800;margin-right:6px;}
 .rtm-name.you{color:var(--t3);}
 .rtm-quote{color:var(--t1);font-style:italic;}
@@ -4211,7 +4235,7 @@ body.recsel .pcard{position:relative;}
       <span class="hub-sub" id="hubPartySub">Watch together, in sync, with voice</span>
     </button>
   </div>
-  <button class="hub-strip" onclick="closeAll();setTimeout(openRecsToMe,240)">
+  <button class="hub-strip" onclick="openRecsToMe('in')">
     <span class="hub-strip-ico"><i data-ic="inbox"></i></span>
     <span class="hub-strip-t">From Friends<span class="hub-strip-n" id="hubRecN"></span></span>
     <i data-ic="chevron-right"></i>
@@ -4253,22 +4277,10 @@ body.recsel .pcard{position:relative;}
 </div>
 
 <!-- EVERYTHING ANYONE HAS EVER RECOMMENDED YOU — the whole record, not a queue -->
-<!-- Everything recommendation-shaped, in one place: what came to you, what you
-     sent, and every action either needs. It used to be a record here, the
-     add/pass buttons on a different sheet, and the sent list buried at the
-     bottom of Friends. -->
-<div class="sheet" id="recsToMeSheet">
-  <div class="sheet-handle"></div>
-  <div class="sheet-header">
-    <div class="sheet-title"><i data-ic="users"></i> From Friends</div>
-    <button class="sheet-cancel" onclick="openSheet('friendsSheet')">Back</button>
-  </div>
-  <div class="rtm-tabs">
-    <button class="rtm-tab on" id="rtmTabIn" onclick="setRtmTab('in')">To you<span class="rtm-tab-n" id="rtmNIn"></span></button>
-    <button class="rtm-tab" id="rtmTabOut" onclick="setRtmTab('out')">You sent<span class="rtm-tab-n" id="rtmNOut"></span></button>
-  </div>
-  <div id="recsToMeBody"></div>
-</div>
+<!-- From Friends has no sheet. It IS a way of looking at your list, so it is one
+     of the list's filters and renders into the page like every other one — see
+     recsInlineHTML. What used to be here was a panel on top of the list showing
+     a different list. -->
 
 <!-- FRIENDS — pick shows to recommend -->
 <div class="sheet" id="recPickSheet">
@@ -8912,7 +8924,11 @@ function renderSortRow(){
     const items=anime.filter(a=>kindOf(a)===viewKind); const cnt={finished:0,dropped:0};
     items.forEach(a=>{if(cnt[a.status]!==undefined)cnt[a.status]++;});
     cnt.fav=items.filter(a=>a.fav).length;
-    cnt.rec=items.filter(a=>Array.isArray(a.recFrom)&&a.recFrom.length).length;
+    // What the From Friends view will actually show — which includes things a
+    // friend sent that are NOT on your list, so counting your own items undercounted
+    // exactly the ones that still want a decision.
+    try{cnt.rec=recsToMeRows(1).filter(r=>kindOf(r.item||{})===viewKind).length;}
+    catch(e){cnt.rec=items.filter(a=>Array.isArray(a.recFrom)&&a.recFrom.length).length;}
     const sortHTML=SORT_MODES.map(([m,ic,t])=>`<button class="sort-opt${sortMode===m?' on':''}" onclick="pickSort('${m}')">${ic?icon(ic):'<span class="ico"></span>'}<span>${t}</span>${sortMode===m?`<span class="chk">${icon('check')}</span>`:''}</button>`).join('');
     const filtHTML=MENU_FILTS.map(([f,ic,t])=>`<button class="sort-opt${filterStatus===f?' on':''}" onclick="pickFilt('${f}')">${icon(ic)}<span>${t}</span><span class="sort-cnt">${cnt[f]||0}</span>${filterStatus===f?`<span class="chk">${icon('check')}</span>`:''}</button>`).join('');
     menu.innerHTML=sortHTML+`<div class="sort-div"></div>`+filtHTML;
@@ -9246,6 +9262,13 @@ function renderHome(){
   const q=query();
   const isRead=viewKind==='read';
   const pool=anime.filter(a=>kindOf(a)===viewKind);
+  // From Friends is NOT a subset of your list — it is the record of everything
+  // anyone has ever sent you, most of which may not be on your list at all. So
+  // it renders its own rows straight into the page, the same as any other
+  // filter does: pick it in the dropdown and the list becomes that. It used to
+  // open a sheet on top of the list, which is a different place to look for
+  // something that is already a way of looking at your list.
+  if(filterStatus==='rec'){ el.innerHTML=recsInlineHTML(q); try{hydrateIcons(el);}catch(e){} return; }
   if(q||filterStatus!=='all'){
     let list=pool;
     if(filterStatus!=='all')list=list.filter(a=>
@@ -15988,7 +16011,11 @@ function recSendersFor(a){
 // recommended you, whether it is still undecided, sitting in Plan, half-watched
 // or finished years ago, with their note, your reply, and what they were told.
 let _rtmDirty=false;
-function recsToMeRows(){
+// `peek` = counting only. The counts are wanted on every repaint of the sort row
+// and every open of the hub, and the backfill below writes to the list — work
+// that belongs to actually LOOKING at the record, not to putting a number on a
+// menu item.
+function recsToMeRows(peek){
   const rows=[];
   // On your list, with a remembered sender.
   anime.forEach(a=>{
@@ -16010,9 +16037,11 @@ function recsToMeRows(){
       if(mine){
         // Backfill: write the senders onto the item so this survives the mailbox
         // rotating out from under us (the server keeps the last 200).
-        const had=JSON.stringify(mine.recFrom||[]);
-        rememberRecFrom(mine,rec.senders);
-        if(JSON.stringify(mine.recFrom||[])!==had)_rtmDirty=true;
+        if(!peek){
+          const had=JSON.stringify(mine.recFrom||[]);
+          rememberRecFrom(mine,rec.senders);
+          if(JSON.stringify(mine.recFrom||[])!==had)_rtmDirty=true;
+        }
         const row=rows.find(r=>r.id===mine.id);
         if(row){ row.senders=mine.recFrom||row.senders; row.at=Math.max(row.at||0,...(rec.senders||[]).map(x=>x.at||0)); }
         else rows.push({kind:'mine',id:mine.id,item:mine,title:mine.title,img:mine.img,senders:mine.recFrom||rec.senders||[],
@@ -16025,7 +16054,7 @@ function recsToMeRows(){
     });
   }catch(e){}
   // Persist anything the backfill learned, once, outside the loop.
-  if(_rtmDirty){_rtmDirty=false;try{save();}catch(e){}}
+  if(_rtmDirty&&!peek){_rtmDirty=false;try{save();}catch(e){}}
   rows.sort((x,y)=>(y.at||0)-(x.at||0));
   return rows;
 }
@@ -16036,7 +16065,7 @@ function rtmAdd(k){
   recDetailKey=decodeURIComponent(String(k||''));
   const rec=recByAni()[recDetailKey]; if(!rec){toast('That recommendation is gone');return;}
   addRecToList(false);
-  setTimeout(()=>{try{openRecsToMe('in');}catch(e){}},260);
+  setTimeout(()=>{try{renderRecsToMe();}catch(e){}},260);
 }
 function rtmPass(k){
   const key=decodeURIComponent(String(k||''));
@@ -16062,85 +16091,176 @@ function rtmReplySend(id){
   toast('Sent');
 }
 let rtmTab='in';
-function setRtmTab(t){
-  rtmTab=t;
-  ['in','out'].forEach(k=>{const b=document.getElementById('rtmTab'+(k==='in'?'In':'Out'));if(b)b.classList.toggle('on',k===t);});
-  renderRecsToMe();
+function setRtmTab(t){ rtmTab=t; renderRecsToMe(); }
+// No sheet any more. "Open From Friends" means "put the list INTO From Friends",
+// wherever it's asked from — the Social hub, a rec card, the Friends screen. It
+// used to open a panel on top of the list, which is a second place to look for
+// something that is already a way of looking at your list.
+function openRecsToMe(t){
+  if(t)rtmTab=t;
+  try{closeAll();}catch(e){}
+  setFilter('rec');
 }
-function openRecsToMe(t){ if(t)rtmTab=t; setRtmTab(rtmTab); openSheet('recsToMeSheet'); }
-function renderRecsToMe(){
-  const box=document.getElementById('recsToMeBody'); if(!box)return;
-  const rows=recsToMeRows();
-  // Counts on the tabs, so you can see which half has something in it.
-  try{
-    const a=document.getElementById('rtmNIn'); if(a)a.textContent=rows.length?' '+rows.length:'';
-    const b=document.getElementById('rtmNOut'); if(b){const n=recsSent().length;b.textContent=n?' '+n:'';}
-  }catch(e){}
-  if(rtmTab==='out'){
-    box.innerHTML=`<button class="hero-cta" style="margin:6px 0 4px" onclick="closeAll();setTimeout(startRecommend,240)">${icon('send')} Recommend something</button>`
-      +(sentRecsHTML()||'<p class="ai-desc">You haven\u2019t sent anything yet. Anything you send shows up here with what became of it.</p>');
-    try{paintIcons();}catch(e){}
-    return;
-  }
-  if(!rows.length){
-    box.innerHTML='<p class="ai-desc">Nothing yet. When a friend recommends you something it lands here, and it stays here \u2014 after you add it, after you finish it, with everything either of you said about it.</p>';
-    return;
-  }
-  // A date, not "3 days ago". You are looking back through a record; the whole
-  // point is when things happened.
-  const day=t=>{ if(!t)return ''; const d=new Date(t), now=new Date();
-    const s1=d.toLocaleDateString(undefined,{day:'numeric',month:'short'});
-    return d.getFullYear()===now.getFullYear()?s1:s1+' '+d.getFullYear(); };
-  const stateOf=r=>{
-    if(r.kind==='new')return 'Not on your list yet';
-    if(r.status==='finished')return 'Finished';
-    if(r.status==='dropped')return 'Dropped';
-    if(r.status==='watching')return (kindOf(r.item)==='read'?'Reading':'Watching')+(r.epTotal?` \u00b7 ${r.ep}/${r.epTotal}`:r.ep?` \u00b7 ${r.ep}`:'');
-    return kindOf(r.item)==='read'?'To read':'Planned';
-  };
-  box.innerHTML=`<p class="ai-desc">Everything anyone has recommended you, with what they said \u2014 it stays here after you add it and after you finish it.</p>`
-  +`<div class="rtm-list ${escH(density())}">`+rows.map(r=>{
-    const col=friendColor((r.senders[0]||{}).code);
-    const first=Math.min(...r.senders.map(sd=>sd.at||Infinity).concat([Infinity]));
-    // The dates, in the order they happened, each only when it did.
-    const facts=[];
-    if(isFinite(first)&&first)facts.push(`recommended ${day(first)}`);
-    ['added','started','dropped','finished'].forEach(k=>{ const t=(r.told||{})[k]; if(t)facts.push(`${_echoWord[k].replace(' it','')} ${day(t)}`); });
-    const mins=r.item&&kindOf(r.item)==='watch'?totalWatchMins(r.item):0;
-    if(mins)facts.push(fmtWatch(mins));
-    const people=r.senders.map(sd=>`<div class="rtm-line">
-        <span class="rtm-name" style="color:${friendColor(sd.code)}">${escH(friendDisplay(sd.code,sd.name))}</span>${sd.note?`<span class="rtm-quote">\u201c${escH(sd.note)}\u201d</span>`:'<span class="rtm-quote plain">recommended this</span>'}
-      </div>`).join('');
-    const mine=r.replies.map(x=>`<div class="rtm-line"><span class="rtm-name you">You</span><span class="rtm-quote">\u201c${escH(x.note)}\u201d</span></div>`).join('');
-    const art=r.img?`<img class="rtm-art" src="${escH(r.img)}" alt="" loading="lazy">`:`<div class="rtm-art ph">${escH(((r.title||'?')[0]||'?').toUpperCase())}</div>`;
-    // Everything this row can need, on the row. Adding it, turning it down,
-    // answering, or opening what you already have — no second sheet for any of it.
-    const acts=r.kind==='new'
-      ? `<button class="src-chip go" onclick="rtmAdd('${encodeURIComponent(r.key||'')}')">Add</button>
-         <button class="src-chip" onclick="rtmPass('${encodeURIComponent(r.key||'')}')">Not for me</button>`
-      : `<button class="src-chip" onclick="closeAll();openDetail('${r.id}')">Open</button>`;
-    const canReply=r.kind!=='new'||r.id;
-    const go=`<div class="rtm-acts">${acts}${canReply&&r.id?`<button class="src-chip" onclick="rtmReply('${r.id}')">Reply</button>`:''}</div>`;
+// Anything that changes a recommendation repaints the list — but only when the
+// list is the thing showing them.
+function renderRecsToMe(){ if(filterStatus==='rec'){try{renderHome();}catch(e){}} }
+// What is actually WAITING on you. The badge used to carry the lifetime total,
+// so it read "19" forever and never went down — a count that only ever grows is
+// decoration, not a notification.
+function recsWaiting(){ try{return recsToMeRows(1).filter(r=>r.kind==='new').length;}catch(e){return 0;} }
+
+// A date, not "3 days ago". You are looking back through a record; the whole
+// point is when things happened.
+function rtmDay(t){
+  if(!t||!isFinite(t))return '';
+  const d=new Date(t), now=new Date();
+  const s1=d.toLocaleDateString(undefined,{day:'numeric',month:'short'});
+  return d.getFullYear()===now.getFullYear()?s1:s1+' '+d.getFullYear();
+}
+// Where it stands, as its own pill in its status's colour.
+function rtmState(r){
+  if(r.kind==='new')return {t:'Waiting on you',c:'wait'};
+  if(r.status==='finished')return {t:kindOf(r.item)==='read'?'Read':'Finished',c:'finished'};
+  if(r.status==='dropped')return {t:'Dropped',c:'dropped'};
+  if(r.status==='watching')return {t:(kindOf(r.item)==='read'?'Reading':'Watching')+(r.epTotal?` ${r.ep}/${r.epTotal}`:r.ep?` ${r.ep}`:''),c:'watching'};
+  return {t:kindOf(r.item)==='read'?'To read':'Planned',c:''};
+}
+function rtmArt(title,img){
+  return img?`<img class="rtm-art" src="${escH(img)}" alt="" loading="lazy">`
+            :`<div class="rtm-art ph">${escH((String(title||'?').trim()[0]||'?').toUpperCase())}</div>`;
+}
+// One row, one recommendation: art, title, where it stands, the dates, every
+// voice on it, and everything it can need done to it.
+function rtmRowHTML(r){
+  const col=friendColor((r.senders[0]||{}).code);
+  const st=rtmState(r);
+  const first=Math.min(...r.senders.map(sd=>sd.at||Infinity).concat([Infinity]));
+  const facts=[];
+  if(isFinite(first)&&first)facts.push('recommended '+rtmDay(first));
+  ['added','started','dropped','finished'].forEach(k=>{
+    const t=(r.told||{})[k];
+    if(t&&isFinite(t)&&t>1e11)facts.push(_echoWord[k].replace(' it','')+' '+rtmDay(t));
+  });
+  const mins=r.item&&kindOf(r.item)==='watch'?totalWatchMins(r.item):0;
+  if(mins)facts.push(fmtWatch(mins));
+  const people=r.senders.map(sd=>`<div class="rtm-line">
+      <span class="rtm-name" style="color:${friendColor(sd.code)}">${escH(friendDisplay(sd.code,sd.name))}</span>${sd.note?`<span class="rtm-quote">“${escH(sd.note)}”</span>`:'<span class="rtm-quote plain">recommended this</span>'}
+    </div>`).join('');
+  const mine=(r.replies||[]).map(x=>`<div class="rtm-line"><span class="rtm-name you">You</span><span class="rtm-quote">“${escH(x.note)}”</span></div>`).join('');
+  const acts=r.kind==='new'
+    ? `<button class="src-chip go" onclick="rtmAdd('${encodeURIComponent(r.key||'')}')">${icon('plus')} Add to my list</button>
+       <button class="src-chip" onclick="rtmPass('${encodeURIComponent(r.key||'')}')">${icon('x')} Not for me</button>`
+    : `<button class="src-chip" onclick="openDetail('${r.id}')">${icon('external')} Open</button>`
+      +`<button class="src-chip" onclick="rtmReply('${r.id}')">${icon('message')} Reply</button>`;
+  return `<div class="rtm-row" style="--fc:${col}">
+    ${rtmArt(r.title,r.img)}
+    <div class="rtm-main">
+      <div class="rtm-head">
+        <div class="rtm-title">${escH(r.title||'?')}</div>
+        <span class="rtm-state ${st.c}">${escH(st.t)}</span>
+      </div>
+      ${facts.length?`<div class="rtm-facts">${facts.map(escH).join(' · ')}</div>`:''}
+      ${people}${mine}
+      <div class="rtm-acts">${acts}</div>
+      ${r.id?`<div class="rtm-replybox" id="rtmR${escH(r.id)}" hidden>
+        <textarea class="ai-prompt-in" rows="2" placeholder="man this was great"></textarea>
+        <div style="display:flex;gap:8px;margin-top:6px">
+          <button class="parse-btn" style="flex:1" onclick="rtmReplySend('${r.id}')">Send</button>
+          <button class="parse-btn" style="flex:0 0 auto;width:auto;padding-left:14px;padding-right:14px" onclick="rtmReply('${r.id}',1)">Cancel</button>
+        </div>
+      </div>`:''}
+    </div>
+  </div>`;
+}
+// What you sent, ONE ROW PER TITLE. It used to be one row per envelope, so a
+// send of seven shows was seven titles comma-joined into a single grey line with
+// one button beside it — unreadable, and it never said what became of any of
+// them. Taking back is still per envelope, because that is what the server
+// files, so a row from a multi-title send says so on the button.
+function rtmSentRowsHTML(q){
+  const l=recsSent();
+  if(!l.length)return '';
+  const rows=[];
+  l.forEach(e=>{
+    if(!e)return;
+    const items=Array.isArray(e.items)&&e.items.length?e.items:(e.titles||[]).map(t=>({title:t}));
+    items.forEach(it=>{
+      if(!it||!it.title)return;
+      // Art the log didn't keep: you recommended it, so it is usually a title you
+      // have, and your own copy has the cover.
+      let img=it.img||'';
+      if(!img){ const own=anime.find(a=>(it.aniId&&a.aniId===it.aniId)||normTitle(a.title)===normTitle(it.title)); if(own)img=own.img||''; }
+      rows.push({title:it.title,img,code:e.code,id:e.id,at:e.at||0,n:items.length});
+    });
+  });
+  const rank={added:1,started:2,dropped:3,finished:4};
+  const out=rows.filter(r=>!q||searchHit(r.title,q)).sort((x,y)=>(y.at||0)-(x.at||0)).map(r=>{
+    const col=friendColor(r.code), who=friendDisplay(r.code,'A friend');
+    const lower=String(r.title).toLowerCase();
+    const news=(Array.isArray(recsEcho)?recsEcho:[]).filter(x=>x&&x.from&&x.from.code===r.code&&String(x.title||'').toLowerCase()===lower);
+    // Furthest along wins: "finished it" says everything "added it" did.
+    let best=null;
+    news.filter(x=>x.kind!=='note').forEach(x=>{ if(!best||(rank[x.kind]||0)>(rank[best.kind]||0))best=x; });
+    const passed=(Array.isArray(recsPassed)?recsPassed:[]).some(x=>x&&x.from&&x.from.code===r.code&&String(x.title||'').toLowerCase()===lower);
+    const cap=x=>String(x||'').charAt(0).toUpperCase()+String(x||'').slice(1);
+    const st=best?{t:cap(_echoWord[best.kind]?_echoWord[best.kind].replace(' it',''):best.kind),c:best.kind==='finished'?'finished':best.kind==='dropped'?'dropped':'watching'}
+             :passed?{t:'Passed',c:'dropped'}:{t:'No word yet',c:''};
+    const notes=news.filter(x=>x.kind==='note'&&x.note).slice(-3)
+      .map(x=>`<div class="rtm-line"><span class="rtm-name" style="color:${col}">${escH(who)}</span><span class="rtm-quote">“${escH(x.note)}”</span></div>`).join('');
+    const facts=['to '+who,rtmDay(r.at)].filter(Boolean);
     return `<div class="rtm-row" style="--fc:${col}">
-      ${art}
+      ${rtmArt(r.title,r.img)}
       <div class="rtm-main">
         <div class="rtm-head">
-          <div class="rtm-title">${escH(r.title||'?')}</div>
+          <div class="rtm-title">${escH(r.title)}</div>
+          <span class="rtm-state ${st.c}">${escH(st.t)}</span>
         </div>
-        <div class="rtm-facts">${[stateOf(r)].concat(facts).map(escH).join(' \u00b7 ')}</div>
-        ${people}${mine}
-        ${go}
-        <div class="rtm-replybox" id="rtmR${escH(r.id||r.key||'')}" hidden>
-          <textarea class="ai-prompt-in" rows="2" placeholder="man this was great"></textarea>
-          <div style="display:flex;gap:8px;margin-top:6px">
-            <button class="parse-btn" style="flex:1" onclick="rtmReplySend('${r.id||''}')">Send</button>
-            <button class="parse-btn" style="flex:0 0 auto;width:auto;padding-left:14px;padding-right:14px" onclick="rtmReply('${r.id||''}',1)">Cancel</button>
-          </div>
-        </div>
+        <div class="rtm-facts">${facts.map(escH).join(' · ')}</div>
+        ${notes}
+        <div class="rtm-acts"><button class="src-chip" onclick="unsendRec('${escH(r.id)}','${escH(r.code)}')">${icon('x')} ${r.n>1?`Take back all ${r.n}`:'Take back'}</button></div>
       </div>
     </div>`;
-  }).join('')+`</div>`;
-  try{paintIcons();}catch(e){}
+  }).join('');
+  return out;
+}
+function searchHit(title,q){ return !q||String(title||'').toLowerCase().includes(String(q).toLowerCase()); }
+// The whole of From Friends, as page content.
+function recsInlineHTML(q){
+  const waiting=recsWaiting(), sentN=recsSent().length;
+  const tabs=`<div class="rtm-tabs">
+    <button class="rtm-tab${rtmTab==='in'?' on':''}" onclick="setRtmTab('in')">${icon('inbox')} To you<span class="rtm-tab-n">${waiting?waiting:''}</span></button>
+    <button class="rtm-tab${rtmTab==='out'?' on':''}" onclick="setRtmTab('out')">${icon('send')} You sent<span class="rtm-tab-n quiet">${sentN?sentN:''}</span></button>
+  </div>`;
+  if(rtmTab==='out'){
+    const body=rtmSentRowsHTML(q);
+    const sweep=(friendsList().length||sentN)
+      ? `<button class="chat-clear" style="margin-top:14px" onclick="confirmUnsendEverything()">${icon('trash')} Take back everything I've ever sent</button>` : '';
+    return tabs
+      +`<button class="hero-cta" style="margin:2px 0 6px" onclick="closeAll();setTimeout(startRecommend,240)">${icon('send')} Recommend something</button>`
+      +(body?`<p class="ai-desc">Sent something by mistake? Take it back and it disappears from their app the next time they open it.</p><div class="rtm-list ${escH(density())}">${body}</div>`
+            :`<p class="ai-desc">${q?'Nothing you sent matches that.':'You haven’t sent anything yet. Anything you send shows up here with what became of it.'}</p>`)
+      +sweep;
+  }
+  const all=recsToMeRows();
+  // The other pile's kind, and the word for it. Two literals, never anyone's
+  // typing — but hoisted rather than interpolated inline, because a ternary
+  // inside a quoted onclick is exactly the shape smoke.mjs is right to flag.
+  const k=viewKind==='read'?'watch':'read', otherWord=viewKind==='read'?'watch':'reading';
+  // The kind switch still means something here: a manhwa someone sent you belongs
+  // to the reading list. Nothing is hidden silently — the other pile is counted.
+  const mine=all.filter(r=>kindOf(r.item||{})===viewKind);
+  const other=all.length-mine.length;
+  const rows=mine.filter(r=>!q||searchHit(r.title,q));
+  if(!rows.length){
+    return tabs+`<div class="empty"><div class="empty-icon">${icon('users')}</div><p>${q?'Nothing from your friends matches that.':'Nothing yet. When a friend recommends you something it lands here — and it stays, after you add it and after you finish it, with everything either of you said about it.'}</p>${other?`<button class="empty-alt" onclick="setKind('${k}')">${icon('refresh')} ${other} waiting in your ${otherWord} list</button>`:''}</div>`;
+  }
+  const wait=rows.filter(r=>r.kind==='new'), kept=rows.filter(r=>r.kind!=='new');
+  const group=(ic,label,n)=>`<div class="rtm-group">${icon(ic)} ${escH(label)} · ${n}</div>`;
+  let out=tabs;
+  if(wait.length)out+=group('inbox','Waiting on you',wait.length)+`<div class="rtm-list ${escH(density())}">${wait.map(rtmRowHTML).join('')}</div>`;
+  if(kept.length)out+=group('check','Already on your list',kept.length)+`<div class="rtm-list ${escH(density())}">${kept.map(rtmRowHTML).join('')}</div>`;
+  if(other)out+=`<button class="empty-alt" style="margin-top:14px" onclick="setKind('${k}')">${icon('refresh')} ${other} more in your ${otherWord} list</button>`;
+  return out;
 }
 function friendRecBadge(a){
   if(IS_NATIVE||!a)return '';
@@ -16231,10 +16351,10 @@ function openHub(){
     const f=friendsList().length, on=friendsList().filter(x=>isFriendOnline&&isFriendOnline(x.code)).length;
     const fs=document.getElementById('hubFriendsSub');
     if(fs&&f)fs.textContent=on?`${f} friend${f>1?'s':''} · ${on} on now`:`${f} friend${f>1?'s':''}`;
-    const n=recsToMeRows().length, rn=document.getElementById('hubRecN');
-    if(rn)rn.textContent=n?' · '+n:'';
+    const n=recsWaiting(), rn=document.getElementById('hubRecN');
+    if(rn)rn.textContent=n?' · '+n+' waiting':'';
   }catch(e){}
-  try{paintIcons();}catch(e){}
+  try{hydrateIcons();}catch(e){}
 }
 function renderFriends(){
   const box=document.getElementById('friendsBody');if(!box)return;
@@ -16268,8 +16388,8 @@ function renderFriends(){
       <button class="parse-btn" onclick="doAddFriend()">Send friend request</button>
       <div class="fr-err" id="frErr"></div>
     </details>
-    ${(()=>{const n=recsToMeRows().length,m=recsSent().length;return `<button class="src-opt" style="margin-top:16px;width:100%;text-align:left" onclick="openRecsToMe('in')">
-      <div class="src-name">${icon('users')} From Friends${n?` · ${n}`:''}</div>
+    ${(()=>{const n=recsWaiting(),m=recsSent().length;return `<button class="src-opt" style="margin-top:16px;width:100%;text-align:left" onclick="openRecsToMe('in')">
+      <div class="src-name">${icon('users')} From Friends${n?` · ${n} waiting`:''}</div>
       <div class="src-sub">Everything they've sent you and everything you've sent${m?` · ${m} sent`:''} \u2014 add, turn down, reply, take back</div>
     </button>`;})()}`;
 }
@@ -16618,7 +16738,12 @@ function recsSent(){try{const a=JSON.parse(localStorage.getItem(RECS_SENT)||'[]'
 function noteRecSent(code,id,items){
   try{
     const l=recsSent();
-    l.unshift({code,id,at:Date.now(),titles:(items||[]).map(i=>i.title).filter(Boolean).slice(0,6)});
+    // `titles` is what every older entry has and what the take-back copy reads;
+    // `items` is the same list with the cover and the id, so a sent row can show
+    // a poster instead of a letter. Both, because dropping `titles` would blank
+    // every entry logged before today.
+    l.unshift({code,id,at:Date.now(),titles:(items||[]).map(i=>i.title).filter(Boolean).slice(0,12),
+      items:(items||[]).filter(i=>i&&i.title).slice(0,12).map(i=>({title:i.title,aniId:i.aniId||0,img:i.img||''}))});
     localStorage.setItem(RECS_SENT,JSON.stringify(l.slice(0,60)));
   }catch(e){}
 }
@@ -16630,7 +16755,10 @@ async function unsendRec(id,code){
     if(!j.ok)throw new Error('failed');
   }catch(e){toast('Couldn\u2019t reach the network. Try again');return;}
   try{localStorage.setItem(RECS_SENT,JSON.stringify(recsSent().filter(x=>!(x.id===id&&x.code===code))));}catch(e){}
-  renderFriends();
+  // The sent list moved into From Friends; repainting only Friends left the row
+  // you just took back sitting there as though nothing had happened.
+  try{renderRecsToMe();}catch(e){}
+  try{renderFriends();}catch(e){}
   toast('Taken back');
 }
 // Everything you have ever recommended, not just what the local log remembers.

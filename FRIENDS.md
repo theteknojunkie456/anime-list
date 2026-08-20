@@ -60,6 +60,34 @@ viewing a friend's list never touches or overwrites your personal WatchList.
 
 ---
 
+## From Friends
+
+Everything recommendation-shaped lives in one place, and that place is **the list
+itself** — not a panel over it. Pick **From Friends** in the sort/filter dropdown
+and the list becomes the record:
+
+- **To you** — every recommendation anyone has ever sent you, in two groups.
+  *Waiting on you* are the ones still undecided, and they sort above everything
+  else so a new one never lands underneath a year of history. *Already on your
+  list* is the rest, and it stays there after you add it and after you finish it.
+  Each row carries the cover, where it stands, the dates it passed through
+  (recommended → added → started → finished/dropped), every friend who sent it
+  with what they said, and your replies back. Add, turn down, open and reply all
+  happen on the row.
+- **You sent** — one row **per title**, not per envelope. A send of seven shows
+  used to be seven titles comma-joined into one grey line with a single button
+  beside it. Each row now says who it went to, when, and what became of it —
+  added, started, finished, dropped, passed, or no word yet — plus anything they
+  said back. Taking back is still per envelope (that is what the server files),
+  so a row from a multi-title send says *Take back all 7*.
+- **The badges count what is waiting**, never the lifetime total. A number that
+  only ever grows is decoration, not a notification.
+- **The kind switch still applies.** A manhwa someone sent belongs to the reading
+  list; nothing is hidden silently, and the other pile is counted with a way
+  across.
+
+---
+
 ## Privacy model
 
 - **Your list is not public.** The GitHub repo is public (that's just the app's

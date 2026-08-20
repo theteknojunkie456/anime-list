@@ -203,6 +203,15 @@ body is what stopped the UI reading flat when everything was one family at
   mirrors the nav exactly: same material, same blur, **same left/right inset at
   every width** (verified 10px at ≤360, 14px above). That shared inset is what
   makes the two ends read as one language rather than two.
+- **A filter renders into the list, not over it** — From Friends was a sheet you
+  opened on top of the list, showing a different list. It is a way of *looking at*
+  your list, so it is one of the list's filters and it renders into the page like
+  every other one. The rule: if picking it from the filter menu is how you get
+  there, the page is where it belongs.
+- **A badge counts what is waiting** — the From Friends badge carried the
+  lifetime total, so it read "19" forever and never went down. A number that only
+  grows stops being read. The unread mark counts what still wants a decision and
+  earns the accent colour; a plain total gets a quiet chip instead.
 - **Segment labels are one line** — a segmented control whose label wraps has
   stopped being one. "To Read" broke in two and pushed the whole track taller;
   labels never wrap, and the padding is what gives way when three of them are

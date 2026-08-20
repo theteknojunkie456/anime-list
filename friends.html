@@ -3768,10 +3768,10 @@ body.recsel .pcard{position:relative;}
          The admin token already proves who you are; this lets it do that here. -->
     <a class="lock-alt" id="joinOwner" onclick="showOwnerUnlock()">I'm the owner</a>
     <div id="ownerUnlock" style="display:none;margin-top:10px">
-      <input id="ownerTok" class="lock-in" type="password" placeholder="Admin token" autocomplete="off" spellcheck="false"
+      <input id="ownerTok" class="lock-in" type="password" placeholder="Setup key or admin token" autocomplete="off" spellcheck="false"
              enterkeyhint="go" onkeydown="if(event.key==='Enter')ownerUnlock()">
       <button class="lock-btn" style="margin-top:8px" onclick="ownerUnlock()">Unlock this device</button>
-      <div class="join-hint">Approves this device straight away and remembers it, so this is the last time.</div>
+      <div class="join-hint">Approves this device straight away and remembers it, so this is the last time. Your <b>setup key</b> does this and brings your list down with it \u2014 copy it from Cloud backup on a device you already use.</div>
     </div>
   </div>
 </div>
@@ -4760,8 +4760,16 @@ function showOwnerUnlock(){
 }
 async function ownerUnlock(){
   const i=document.getElementById('ownerTok'), err=document.getElementById('joinErr');
-  const tok=((i&&i.value)||'').trim();
-  if(!tok){if(err)err.textContent='Paste your admin token';return;}
+  let tok=((i&&i.value)||'').trim();
+  if(!tok){if(err)err.textContent='Paste your key';return;}
+  // A setup key carries the list code alongside the token. Take the token to get
+  // in, and keep the code so the list restores itself after the reload below
+  // instead of asking for a second paste.
+  const setup=parseSetupKey(tok);
+  if(setup){
+    tok=setup.admin;
+    if(setup.sync)try{setSyncCode(setup.sync);setSyncAt(0);}catch(e){}
+  }
   if(err)err.textContent='Unlocking\u2026';
   try{
     // Send the name and identity too: on a fresh device there is no roster row
@@ -4869,6 +4877,34 @@ async function fetchAdminSources(){
 // Reached via ?admin=1 (or openAdmin()). The panel is harmless to see — every
 // action is verified server-side against ADMIN_TOKEN, so without the token it
 // does nothing. The token is stored locally once entered, for convenience.
+// ─── ONE KEY TO CARRY ───────────────────────────────────────────────────────
+// There are two secrets and they are not the same kind of thing. The sync code
+// is where your list lives, and you HAND IT TO FRIENDS so they can read it. The
+// admin token approves anyone onto the whole service. Merging them into one
+// string would make every friend you shared your list with an admin, so they
+// stay separate on the wire and in storage.
+//
+// What was actually painful is being made to paste twice on every new device.
+// A setup key is both of them in one line, for one person — you — to keep in
+// one place. Anywhere that takes either will take this and pull out the part it
+// needs. Sharing it is sharing your admin token, which is why it is never shown
+// unless the device already has one.
+const SETUP_PREFIX='WL1';
+function makeSetupKey(){
+  const sync=syncCode(), adm=adminToken();
+  if(!adm)return '';
+  return [SETUP_PREFIX,sync||'-',adm].join('.');
+}
+function parseSetupKey(raw){
+  const t=String(raw||'').trim();
+  if(!t)return null;
+  const p=t.split('.');
+  if(p.length!==3||p[0]!==SETUP_PREFIX)return null;
+  const sync=p[1]==='-'?'':p[1].replace(/[^A-Za-z0-9]/g,'').toUpperCase();
+  const admin=p[2].replace(/[^A-Za-z0-9]/g,'');
+  if(!admin)return null;
+  return {sync,admin};
+}
 const ADMIN_TK='wl_admin_token';
 function adminToken(){try{return localStorage.getItem(ADMIN_TK)||'';}catch{return '';}}
 const ADMIN_CK='wl_admin_ck';
@@ -6324,6 +6360,15 @@ async function syncRestore(){
   // Strip ANY separator, not just spaces. Codes get written down, pasted out of
   // messages, and read aloud — hyphens and dots come back with them, and a
   // hyphen used to fail the check below before the code was ever tried.
+  const typed=(document.getElementById('syncCodeIn').value||'').trim();
+  // Pasted the whole setup key in here? Take the list code out of it, and keep
+  // the admin token while we're at it — this device clearly belongs to you.
+  const _setup=parseSetupKey(typed);
+  if(_setup){
+    if(_setup.admin){try{setAdminToken(_setup.admin);bindAdminKey();}catch(e){}}
+    if(!_setup.sync){toast('That key has no list code in it');return;}
+    document.getElementById('syncCodeIn').value=_setup.sync;
+  }
   const raw=(document.getElementById('syncCodeIn').value||'').replace(/[^A-Za-z0-9]/g,'').toUpperCase();
   // A recovery key is 24 characters and a sync code is 20, both from the same
   // alphabet, and the app shows them in near-identical blocks of four. Pasting
@@ -6385,6 +6430,13 @@ async function syncRestore(){
   else proceed();
 }
 function syncOff(){setSyncCode('');setBackupDeclined(true);renderSyncUI();try{render();}catch(e){}toast('Backup off. Your list stays on this device');}
+function copySetupKey(){
+  const k=makeSetupKey();
+  if(!k){toast('This device has no admin token');return;}
+  const done=()=>toast('Setup key copied \u2014 keep it to yourself');
+  if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(k).then(done).catch(()=>{try{prompt('Copy this:',k);}catch(e){}});
+  else{try{prompt('Copy this:',k);}catch(e){}}
+}
 function copySyncCode(){const c=syncCode();if(!c)return;markCodeSeen();const done=()=>toast('Code copied');if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(c).then(done).catch(()=>fallbackCopy(c,done));else fallbackCopy(c,done);}
 function renderSyncUI(){
   const box=document.getElementById('syncBox');if(!box)return;
@@ -6405,6 +6457,9 @@ function renderSyncUI(){
         <button class="imp-all" onclick="syncOff()">Turn off</button>
       </div>
       <p class="ai-desc" style="margin-top:10px">On another device: install the app, open this panel, paste the code, tap <b>Use code</b>.</p>
+      ${adminToken()?`<div class="dt-label" style="margin-top:16px">${icon('lock')} Your setup key</div>
+      <p class="ai-desc">Both keys in one line, for your own devices. Paste it into the unlock box on a new device and it lets the device in <b>and</b> pulls your list down \u2014 one paste instead of two. <b style="color:#ff6b6b">Never share this one</b>: it contains your admin token, which approves people onto the whole app. The 20-character code above is the one you give friends.</p>
+      <button class="parse-btn" onclick="copySetupKey()">${icon('clipboard')} Copy setup key</button>`:''}
       <div class="dt-label" style="margin-top:16px">${icon('refresh')} Bring another list here</div>
       <p class="ai-desc">Restoring replaces what's on this device with the list saved under that code.</p>
       <div style="display:flex;gap:8px;">

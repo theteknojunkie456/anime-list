@@ -2043,6 +2043,56 @@ body.first-paint .pfill,body.content-in .pfill{animation:barGrow .62s cubic-bezi
 .onb-dot{width:7px;height:7px;border-radius:50%;background:var(--bg5);transition:width .22s,background-color .22s;}
 .onb-dot.on{background:var(--a2);width:22px;border-radius:99px;}
 .onb-next{background:var(--a);color:var(--aFg,#fff);border:0;border-radius:99px;padding:12px 28px;font-family:var(--fd);font-size:15px;font-weight:800;box-shadow:0 8px 22px -6px var(--glow);white-space:nowrap;}
+/* The setup card carries four rows, so it gets the width and stops centring. */
+.onb-card.wide{justify-content:flex-start;padding-top:min(11vh,86px);}
+.onb-list{width:100%;max-width:420px;display:flex;flex-direction:column;gap:8px;margin-top:6px;text-align:left;}
+.onb-task{display:flex;align-items:center;gap:12px;padding:13px 14px;border-radius:14px;
+  background:var(--bg2);border:1px solid var(--b1);}
+.onb-task-ic{flex:0 0 auto;width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;
+  background:var(--bg4);color:var(--t2);}
+.onb-task-ic .ico{width:16px;height:16px;}
+.onb-task-txt{flex:1;min-width:0;}
+.onb-task-t{font-size:13px;font-weight:800;color:var(--t1);line-height:1.25;}
+.onb-task-s{margin-top:2px;font-size:12px;line-height:1.4;color:var(--t3);}
+.onb-task-go{flex:0 0 auto;padding:9px 14px;min-height:38px;border-radius:10px;border:1px solid var(--b2);
+  background:var(--bg4);color:var(--t1);font-size:12px;font-weight:800;cursor:pointer;white-space:nowrap;}
+.onb-task-done{flex:0 0 auto;font-size:12px;font-weight:800;color:var(--fin);white-space:nowrap;}
+.onb-task.done{background:var(--finbg);border-color:color-mix(in srgb,var(--fin) 30%,transparent);}
+.onb-task.done .onb-task-ic{background:color-mix(in srgb,var(--fin) 20%,transparent);color:var(--fin);}
+/* Pictures of the real thing, drawn from the app's own tokens rather than
+   screenshots that go stale the first time anything moves. */
+.onb-art{width:100%;max-width:340px;margin-bottom:22px;}
+.oa-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px 10px;}
+.oa-card{display:flex;flex-direction:column;gap:5px;}
+.oa-poster{position:relative;display:block;height:var(--h,58px);border-radius:10px;
+  background:linear-gradient(150deg,color-mix(in srgb,var(--oc) 34%,var(--bg4)),var(--bg4));}
+.oa-badge{position:absolute;left:5px;top:5px;width:6px;height:6px;border-radius:50%;}
+.oa-badge.w{background:var(--wat);} .oa-badge.f{background:var(--fin);} .oa-badge.p{background:var(--pln);}
+.oa-line{display:block;height:6px;border-radius:99px;background:var(--bg5);width:78%;}
+.oa-bar{display:block;height:4px;border-radius:99px;background:var(--bg5);overflow:hidden;}
+.oa-bar i{display:block;height:100%;background:linear-gradient(90deg,var(--a),var(--a2));}
+.oa-bar.big{height:6px;margin-top:9px;}
+.oa-time .oa-row{display:flex;gap:14px;align-items:flex-start;}
+.oa-time .oa-poster{width:52px;flex:0 0 auto;}
+.oa-meta{flex:1;min-width:0;display:flex;flex-direction:column;align-items:flex-start;}
+/* A block inside a flex column with align-items:flex-start shrinks to its
+   content, and this one has none — the progress bar was rendering at zero width
+   and reading as absent. It stretches. */
+.oa-meta .oa-bar{align-self:stretch;}
+.oa-title{display:block;height:9px;border-radius:99px;background:var(--bg5);width:80%;margin-bottom:9px;}
+.oa-pill{display:inline-block;padding:4px 10px;border-radius:99px;font-size:11px;font-weight:800;
+  color:var(--a2);background:var(--ag);border:1px solid color-mix(in srgb,var(--a) 34%,transparent);}
+.oa-sub{margin-top:7px;font-size:11px;color:var(--t3);}
+.oa-rec{display:flex;flex-direction:column;gap:9px;text-align:left;}
+.oa-msg{display:block;padding:11px 13px;border-radius:14px;font-size:12.5px;line-height:1.45;color:var(--t2);
+  background:var(--bg2);border:1px solid var(--b1);}
+.oa-msg b{color:var(--t1);font-weight:800;}
+.oa-msg em{display:block;margin-top:3px;color:var(--t3);font-style:italic;}
+.oa-msg.you{background:var(--ag);border-color:color-mix(in srgb,var(--a) 26%,transparent);margin-left:22px;}
+@media (max-height:680px){
+  .onb-art{margin-bottom:14px;} .onb-card.wide{padding-top:56px;}
+  .onb-task{padding:10px 12px;} .onb-task-s{display:none;}
+}
 .sheet{
   position:fixed;left:0;right:0;bottom:0;z-index:80;max-height:90dvh;overflow-y:auto;overflow-x:hidden;
   background:var(--bg2);border-radius:26px 26px 0 0;border-top:1px solid var(--b3);
@@ -8635,7 +8685,21 @@ function flushRender(){
   if(_renderDirty){_renderDirty=false;render();}
   if(_detailDirty){_detailDirty=false;try{renderDetail();}catch(e){}}
 }
+// Seventy call sites ask for a render, and they cluster: a mutation saves and
+// renders, the sync that save scheduled comes back and renders, a status change
+// renders and then re-sorts. Each one rebuilt the whole page. They are collapsed
+// into one rebuild per frame — the screen cannot show more than that anyway, and
+// nothing here reads the DOM straight after asking, so no caller loses.
+let _renderRAF=0;
 function render(){
+  if(_hidden()){_renderDirty=true;return;}
+  if(_renderRAF)return;
+  _renderRAF=requestAnimationFrame(()=>{_renderRAF=0;renderNow();});
+}
+// The escape hatch, for the few places that DO need the DOM to exist on the next
+// line — measuring, focusing, scrolling to something just drawn.
+function renderSync(){ if(_renderRAF){cancelAnimationFrame(_renderRAF);_renderRAF=0;} renderNow(); }
+function renderNow(){
   if(_hidden()){_renderDirty=true;return;}
   // Each section renders independently so one thrower can't blank the whole app.
   const step=fn=>{try{fn();}catch(e){try{console.error('render',e);}catch{}}};
@@ -9123,6 +9187,44 @@ function goHome(){document.getElementById('searchIn').value='';filterStatus='all
 
 // nSeas>1 → this card stands in for a whole series (multiple seasons collapsed
 // into one tile, Netflix-style); show a seasons pill and the series' base title.
+// The only flat grid in the app, and on "Finished" or a broad search it is the
+// whole list at once — a hundred and eighty cards built, laid out and painted
+// before anything appears. It paints a couple of screenfuls and appends the rest
+// as you approach them, which is the difference between a filter switch that
+// stutters and one that doesn't. `_gridAll` keeps the full order so selection
+// and keyboard navigation still know about cards that aren't drawn yet.
+const GRID_CHUNK=48;
+let _gridAll=[],_gridShown=0,_gridIO=null;
+function gridHTML(list){
+  _gridAll=list||[];
+  _gridShown=Math.min(GRID_CHUNK,_gridAll.length);
+  const rest=_gridAll.length>_gridShown?'<div id="gridMore" aria-hidden="true"></div>':'';
+  return `<div class="grid" id="gridEl">${_gridAll.slice(0,_gridShown).map(a=>posterCard(a)).join('')}</div>${rest}`;
+}
+function armGridMore(){
+  try{if(_gridIO){_gridIO.disconnect();_gridIO=null;}}catch(e){}
+  const sentinel=document.getElementById('gridMore'); if(!sentinel)return;
+  const root=document.getElementById('pageEl');
+  const fill=()=>{
+    const g=document.getElementById('gridEl'); if(!g)return;
+    const next=_gridAll.slice(_gridShown,_gridShown+GRID_CHUNK);
+    if(next.length){
+      g.insertAdjacentHTML('beforeend',next.map(a=>posterCard(a)).join(''));
+      _gridShown+=next.length;
+      try{hydrateImages&&hydrateImages();}catch(e){}
+      try{syncBulkUI&&syncBulkUI();}catch(e){}      // a card drawn late still shows it is selected
+    }
+    if(_gridShown>=_gridAll.length){
+      try{_gridIO&&_gridIO.disconnect();}catch(e){} _gridIO=null;
+      try{sentinel.remove();}catch(e){}
+    }
+  };
+  try{
+    _gridIO=new IntersectionObserver(es=>{ if(es.some(e=>e.isIntersecting))fill(); },
+      {root:root||null,rootMargin:'900px 0px'});
+    _gridIO.observe(sentinel);
+  }catch(e){ while(_gridShown<_gridAll.length)fill(); }   // no observer: just draw it all
+}
 function posterCard(a,nSeas){
   const multi=nSeas>1;
   const title=multi?seasonBase(a.title):a.title;
@@ -9475,7 +9577,12 @@ function renderHome(){
       list=list.map(a=>[a,searchScore(a,q)]).filter(x=>x[1]>0).sort((x,y)=>y[1]-x[1]).map(x=>x[0]);
     }
     const hits=list;
-    if(hits.length){el.innerHTML=`<div class="grid">${hits.map(posterCard).join('')}</div>`+bulkBarHTML();return;}
+    // `hits.map(posterCard)` handed Array.map's SECOND argument — the index — to
+    // posterCard's `nSeas`. So every card from index 2 onward rendered as a
+    // collapsed multi-season series: its season suffix stripped off the title,
+    // and a seasons pill showing the array index as a count. Every filtered view
+    // and every search result in the app. One-argument call.
+    if(hits.length){el.innerHTML=gridHTML(hits)+bulkBarHTML();armGridMore();return;}
     const stLbl=filterStatus==='fav'?'Favorites':filterStatus==='rec'?'From Friends':filterStatus==='watching'?(isRead?'Reading':'Watching'):(STATUS_META[filterStatus]?STATUS_META[filterStatus].label:filterStatus);
     const msg=q
       ?`No matches for “${schEsc(q)}”${filterStatus!=='all'?` in ${stLbl}`:` in your ${isRead?'reading':'watch'} list`}`
@@ -10458,6 +10565,7 @@ function openSheet(id){
   try{updatePartyPill();}catch{}
 }
 function closeAll(){
+  try{setTimeout(refreshOnbTasks,60);}catch(e){}
   try{document.documentElement.classList.remove('two-pane');}catch(e){}
   try{sheetFocusGuard(null,false);}catch(e){}
   try{if(schedTickT){clearInterval(schedTickT);schedTickT=null;}}catch(e){}
@@ -13096,29 +13204,88 @@ function maybeShowTutorial(){
 }
 // ─── ONBOARDING (swipeable welcome + setup) ─────────────────────────────────
 const _iOS=/iP(hone|ad|od)/.test(navigator.userAgent)||(/Macintosh/.test(navigator.userAgent)&&navigator.maxTouchPoints>1);
+// Eight screens, six of them chores, every one a paragraph — asked before anybody
+// had seen a single title. Nobody reads a manual to try an app, and a setup task
+// means nothing until you know what it protects.
+//
+// Three cards that SHOW the app rather than describe it, then one card that holds
+// every setup task together as a checklist which reports its own state. The
+// checklist is the part worth keeping: it stays truthful afterwards (Settings
+// opens the same thing), so "did I ever turn backup on?" has an answer.
 const ONB=[
-  {ic:'layers',oc:'#c084fc',title:'Welcome to WatchList',body:'Track every anime & manga, see the total time to binge a whole series, watch on free sources, and swap recommendations with friends — all in one place.'},
-  {ic:'upload',oc:'#4dabf7',imp:'Recommended',title:'Add to your Home Screen',body:_iOS
-    ? 'Tap the <b>Share</b> button in Safari’s toolbar (the box with an ↑), scroll down, and tap <b>Add to Home Screen</b>. WatchList then opens full-screen like a real app — and on iPhone it’s the <b>only</b> way episode alerts can reach you.'
-    : 'Open your browser’s menu and tap <b>Install app</b> (or <b>Add to Home screen</b>). WatchList opens full-screen like a real app, and notifications work.'},
-  {ic:'cloud',oc:'#4dabf7',imp:'Recommended',title:'Never lose your list',body:'Your list lives on this device. Turn on <b>Cloud backup</b> for a key that restores it anywhere. <b>Save that key somewhere safe</b> — your Notes app is perfect. It\'s the only way back.',cta:{label:'Set up backup',sheet:'backupSheet'}},
-  {ic:'lock',oc:'#51cf66',title:'Lock your list',body:'Add a <b>password</b> and everything gets encrypted. You\'ll get a one-time <b>recovery key</b> — the only way in if you forget the password. Save both.',cta:{label:'Set a password',sheet:'securitySheet'}},
-  {ic:'key',oc:'#ffd43b',title:'Unlock without typing',body:'Once a password is set, open the app with <b>'+bioName()+'</b> instead of typing it every time.',cta:{label:'Set up '+bioName(),sheet:'securitySheet'}},
-  {ic:'bell',oc:'#ff6b6b',title:'Episode alerts',body:'Get a heads-up the moment a new episode of something you\'re watching airs. Only the shows you follow — no spam.',cta:{label:'Turn on alerts',sheet:'notifySheet'}},
-  {ic:'play',oc:'#f783ac',title:'Watch where you already pay',body:'Tap <b>Watch</b> and it lists where a show actually is, then remembers your pick. Not in the US? Add <b>TVING</b>, <b>Wavve</b>, <b>iQIYI</b>, <b>JioHotstar</b> and more in one tap — or paste any service\'s search page and we\'ll wire it up. Yours always show first.',cta:{label:'Pick your services',sheet:'sourceSheet'}},
-  {ic:'compass',oc:'#20c997',title:'You\'re all set',body:'Tap <b>+</b> to add anything, or <b>Import</b> your whole list from Notes in one paste. The icons up top are Friends, schedule, AI and themes. Anything you skipped is waiting in <b>Settings</b>.',primary:'Start watching'},
+  {ic:'layers',oc:'#c084fc',title:'Everything you\'re watching, in one place',
+   body:'Anime and manga, what you\'ve finished, what you dropped, and exactly where you left off.',
+   art:'grid'},
+  {ic:'clock',oc:'#4dabf7',title:'Know what you\'re in for',
+   body:'Every series carries the time it takes to finish — and what\'s left of it once you\'ve started.',
+   art:'time'},
+  {ic:'users',oc:'#f783ac',title:'Swap picks with friends',
+   body:'Send someone a show with a note. You\'ll see when they add it, start it, and finish it.',
+   art:'rec'},
+  {ic:'check',oc:'#51cf66',title:'Worth two minutes',
+   body:'All optional, all changeable later in Settings.',
+   list:true,primary:'Start watching'},
 ];
+// Each row says what it is FOR, not what it is called, and reports its own state.
+function onbTasks(){
+  const standalone=(window.matchMedia&&matchMedia('(display-mode: standalone)').matches)||navigator.standalone===true;
+  const notifOn=(typeof IS_NATIVE!=='undefined'&&IS_NATIVE)||(('Notification'in window)&&Notification.permission==='granted');
+  let backup=false; try{backup=!!syncCode();}catch(e){}
+  let locked=false; try{locked=!!(typeof encEnabled==='function'&&encEnabled());}catch(e){}
+  return [
+    {k:'install',ic:'upload',t:'Add to your Home Screen',
+     s:_iOS?'Share → Add to Home Screen. On iPhone, the only way alerts can arrive.'
+           :'Browser menu → Install app. Full-screen, and alerts work.',
+     done:standalone,doneLabel:'Installed',act:null},
+    {k:'backup',ic:'cloud',t:'Never lose your list',
+     s:'A key that restores it anywhere. Save the key — it is the only way back.',
+     done:backup,doneLabel:'On',act:'backupSheet',label:'Turn on'},
+    {k:'alerts',ic:'bell',t:'Know when an episode lands',
+     s:'Only the shows you follow.',
+     done:notifOn,doneLabel:'On',act:'notifySheet',label:'Turn on'},
+    {k:'lock',ic:'lock',t:'Lock it with a password',
+     s:'Encrypted here and in the cloud. Comes with a recovery key.',
+     done:locked,doneLabel:'On',act:'securitySheet',label:'Set up'},
+  ];
+}
+function onbTasksHTML(){
+  return `<div class="onb-list">`+onbTasks().map(t=>{
+    const k=t.act||'';        // a sheet id from the list above, never anyone's typing
+    return `<div class="onb-task${t.done?' done':''}">
+      <span class="onb-task-ic">${icon(t.done?'check':t.ic)}</span>
+      <div class="onb-task-txt"><div class="onb-task-t">${escH(t.t)}</div><div class="onb-task-s">${escH(t.s)}</div></div>
+      ${t.done?`<span class="onb-task-done">${escH(t.doneLabel)}</span>`
+              :(k?`<button class="onb-task-go" onclick="onbCTA('${k}')">${escH(t.label)}</button>`:'')}
+    </div>`;}).join('')+`</div>`;
+}
+// Small, honest pictures of the real thing, drawn from the same tokens the app
+// uses — so what you are shown on day one is what you get on day two.
+function onbArt(kind){
+  if(kind==='grid'){
+    const card=(h,pct,st)=>`<span class="oa-card"><span class="oa-poster" style="--h:${h}px"><span class="oa-badge ${st}"></span></span><span class="oa-line"></span><span class="oa-bar"><i style="width:${pct}%"></i></span></span>`;
+    return `<div class="onb-art oa-grid">${card(58,70,'w')+card(58,100,'f')+card(58,25,'w')+card(58,0,'p')+card(58,45,'w')+card(58,100,'f')}</div>`;
+  }
+  if(kind==='time'){
+    return `<div class="onb-art oa-time">
+      <span class="oa-row"><span class="oa-poster" style="--h:74px"></span>
+        <span class="oa-meta"><span class="oa-title"></span><span class="oa-pill">~41h to finish</span>
+        <span class="oa-bar big"><i style="width:62%"></i></span><span class="oa-sub">Episode 15 of 24</span></span></span></div>`;
+  }
+  return `<div class="onb-art oa-rec">
+    <span class="oa-msg them"><b>Yasso</b> sent you <b>Frieren</b><em>“trust me on this one”</em></span>
+    <span class="oa-msg you"><b>You</b> finished it<em>“that ending though”</em></span></div>`;
+}
 let onbIdx=0;
 function renderOnb(){
   const track=document.getElementById('onbTrack'); if(!track)return;
-  track.innerHTML=ONB.map(c=>`<div class="onb-card" style="--oc:${c.oc}">
-    <div class="onb-ico">${icon(c.ic)}</div>
-    ${c.imp?`<span class="onb-imp">${c.imp}</span>`:''}
+  track.innerHTML=ONB.map(c=>`<div class="onb-card${c.list?' wide':''}" style="--oc:${c.oc}">
+    ${c.art?onbArt(c.art):`<div class="onb-ico">${icon(c.ic)}</div>`}
     <div class="onb-title">${c.title}</div>
     <div class="onb-body">${c.body}</div>
-    ${c.cta?`<button class="onb-cta" onclick="onbCTA('${c.cta.sheet}')">${c.cta.label}</button><div class="onb-note">You can change this anytime in Settings. Nothing here is permanent.</div>`:''}
+    ${c.list?onbTasksHTML():''}
   </div>`).join('');
-  onbIdx=0;updOnbDots();
+  const keep=onbIdx; onbIdx=0; updOnbDots();
+  if(keep){onbIdx=keep;track.scrollLeft=keep*track.clientWidth;updOnbDots();}
 }
 function updOnbDots(){
   const dots=document.getElementById('onbDots'); if(dots)dots.innerHTML=ONB.map((_,i)=>`<span class="onb-dot${i===onbIdx?' on':''}"></span>`).join('');
@@ -13136,6 +13303,16 @@ function onbNext(){
   onbIdx++; track.scrollTo({left:onbIdx*track.clientWidth,behavior:_scrollBehavior()}); updOnbDots();
 }
 function onbCTA(sheet){ if(sheet==='notifySheet')openNotifySheet(); else openSheet(sheet); }   // opens on top of onboarding
+// Coming back from a setup sheet has to tick the box you just ticked, or the
+// checklist is a picture of a checklist.
+function refreshOnbTasks(){
+  try{
+    const v=document.getElementById('onb'); if(!v||!v.classList.contains('on'))return;
+    const box=v.querySelector('.onb-list'); if(!box)return;
+    const tmp=document.createElement('div'); tmp.innerHTML=onbTasksHTML();
+    box.replaceWith(tmp.firstElementChild);
+  }catch(e){}
+}
 function showOnb(){
   renderOnb();
   const v=document.getElementById('onb'); if(v)v.classList.add('on');
@@ -16769,8 +16946,13 @@ function pickFromList(){recSel=new Set(recPickShows);closeAll();render();documen
 // are on screen, which is the order you are reading them in.
 let bulkSel=null,_bulkAnchor=-1;
 function bulkOn(){return !!(bulkSel&&bulkSel.size);}
-function _cardIds(){return Array.prototype.slice.call(document.querySelectorAll('#pageEl .pcard')).map(c=>{
-  const m=/pcTap\('([^']+)'/.exec(c.getAttribute('onclick')||'');return m?m[1]:'';});}
+function _cardIds(){
+  // Prefer the rendered ORDER over the rendered MARKUP: with the grid filling in
+  // as you scroll, a shift-click range that read only the DOM would stop at
+  // whatever happened to be drawn.
+  if(_gridAll&&_gridAll.length)return _gridAll.map(a=>a.id);
+  return Array.prototype.slice.call(document.querySelectorAll('#pageEl .pcard')).map(c=>{
+    const m=/pcTap\('([^']+)'/.exec(c.getAttribute('onclick')||'');return m?m[1]:'';});}
 // Selection is a class on a card and a bar at the foot of the list. Going
 // through render() for it meant rebuilding every card's markup on every tap,
 // which is what made picking several feel like wading.

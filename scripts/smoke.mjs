@@ -183,6 +183,32 @@ try {
   });
 }
 
+// `list.map(fn)` hands fn the INDEX as its second argument. When fn takes a
+// second parameter that means something else, every element past the first two
+// silently renders wrong — which is exactly what `hits.map(posterCard)` did to
+// every filtered view and every search result: posterCard's `nSeas` became the
+// array index, so each card claimed to be a multi-season series and had its
+// season suffix stripped off its title. It looked like a data problem for as
+// long as nobody read the call.
+{
+  // Comments describe this bug by name, so the scan reads code only — otherwise
+  // the note explaining the fix trips the check that guards it.
+  const src3 = readFileSync('index.html', 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .split('\n').map(l => l.replace(/^\s*\/\/.*$/, '')).join('\n');
+  const called = [...new Set([...src3.matchAll(/\.map\(([A-Za-z_$][\w$]*)\)/g)].map(m => m[1]))];
+  const leaky = called.filter(n => {
+    const d = new RegExp('function\\s+' + n + '\\s*\\(([^)]*)\\)').exec(src3);
+    if (!d) return false;
+    return d[1].split(',').filter(x => x.trim()).length > 1;
+  });
+  results.push({
+    n: 'no .map() leaks the index into a real parameter',
+    ok: leaky.length === 0,
+    d: leaky.length ? leaky.join(', ') + ' take a 2nd argument — wrap in an arrow' : called.length + ' bare .map(fn) calls, all single-argument',
+  });
+}
+
 // The type ramp and the radius scale, enforced. Fifteen text sizes crammed
 // between 8.5px and 15px is what "cleaner" actually meant: sizes half a pixel
 // apart cannot read as hierarchy, they read as misalignment. Six steps do the

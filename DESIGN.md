@@ -203,6 +203,15 @@ body is what stopped the UI reading flat when everything was one family at
   mirrors the nav exactly: same material, same blur, **same left/right inset at
   every width** (verified 10px at ≤360, 14px above). That shared inset is what
   makes the two ends read as one language rather than two.
+- **A tutorial shows the app; it doesn't describe it** — onboarding was eight
+  screens of paragraphs, six of them setup chores, asked before anybody had seen
+  a single title. Nobody reads a manual to try an app, and a setup task means
+  nothing until you know what it protects. Three cards that *show* the thing —
+  the list, the time-to-finish, a recommendation coming back finished — drawn
+  from the app's own tokens rather than screenshots that go stale. Then one card
+  holding every chore as a checklist that **reports its own state**: installed,
+  backup on, alerts on, password set. That last card is the part worth keeping,
+  because it stays truthful afterwards.
 - **Tap targets are the hit area, not the label** — a device-accurate sweep of
   ten viewports (320/390/430 portrait *and* landscape, iPad both ways, desktop,
   ultrawide) found four controls under 30px: every sheet's Done/Close/Back at
@@ -210,6 +219,16 @@ body is what stopped the UI reading flat when everything was one family at
   15px, and the hero button squeezed to 29px in landscape. All four grew by
   padding, pulled back with negative margins so no layout moved. The labels are
   the same size they were.
+- **One rebuild per frame** — seventy call sites ask for a render and they
+  cluster: a mutation saves and renders, the sync that save scheduled comes back
+  and renders, a status change renders and re-sorts. They collapse into one
+  rebuild per frame. `renderSync()` is the escape hatch for the few places that
+  need the DOM on the next line.
+- **The flat grid paints a screenful, then fills in** — "Finished" or a broad
+  search is the whole list at once, built and painted before anything appears.
+  It renders 48 and appends as you approach the rest. Selection and keyboard
+  navigation read the rendered ORDER (`_gridAll`), not the rendered markup, so a
+  shift-click range still spans cards that aren't drawn yet.
 - **Off-screen work is skipped, not done and hidden** — a 186-title list is about
   7,600 elements, every one laid out and painted on every render, and render runs
   on every tap. `content-visibility:auto` with a real `contain-intrinsic-size`

@@ -203,6 +203,25 @@ body is what stopped the UI reading flat when everything was one family at
   mirrors the nav exactly: same material, same blur, **same left/right inset at
   every width** (verified 10px at ≤360, 14px above). That shared inset is what
   makes the two ends read as one language rather than two.
+- **Tap targets are the hit area, not the label** — a device-accurate sweep of
+  ten viewports (320/390/430 portrait *and* landscape, iPad both ways, desktop,
+  ultrawide) found four controls under 30px: every sheet's Done/Close/Back at
+  27px, "take back everything" at 14px, the lock screen's recovery-key link at
+  15px, and the hero button squeezed to 29px in landscape. All four grew by
+  padding, pulled back with negative margins so no layout moved. The labels are
+  the same size they were.
+- **Off-screen work is skipped, not done and hidden** — a 186-title list is about
+  7,600 elements, every one laid out and painted on every render, and render runs
+  on every tap. `content-visibility:auto` with a real `contain-intrinsic-size`
+  per density lets the browser skip layout and paint for what is off screen while
+  keeping the scrollbar honest.
+- **A theme's accent has to belong to its ground** — Naruto put a saturated warm
+  orange on a cold blue-black page, which is what made it read as cheap, and
+  ran a khaki text ramp (`#c3b697`/`#a08c52`) that turned every secondary line
+  sepia. Warm accent, warm ground, neutral warm greys for text. Its Watching
+  colour was `#ffcc00` — yellow beside an orange accent, so the status you look
+  at most was the hardest to pick out; the three statuses now take three hues the
+  accent doesn't use.
 - **A filter renders into the list, not over it** — From Friends was a sheet you
   opened on top of the list, showing a different list. It is a way of *looking at*
   your list, so it is one of the list's filters and it renders into the page like

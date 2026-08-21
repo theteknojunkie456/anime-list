@@ -93,7 +93,7 @@
    The greys are pulled toward cyan rather than neutral, so even the quiet text
    belongs to the same night. */
 
-[data-theme=naruto]{--aFg:#140b06;--bg:#08090e;--bg2:#0e0f18;--bg3:#151720;--bg4:#1c1f2a;--bg5:#232734;--b1:rgba(255,140,0,0.06);--b2:rgba(255,140,0,0.12);--b3:rgba(255,140,0,0.22);--t1:#fff6e8;--t2:#c3b697;--t3:#a08c52;--a:#f57800;--a2:#ffaa33;--ag:rgba(245,120,0,0.13);--glow:rgba(245,120,0,0.22);--fin:#5ed47a;--finbg:rgba(94,212,122,0.11);--wat:#ffcc00;--watbg:rgba(255,204,0,0.11);--pln:#4a9eff;--plnbg:rgba(74,158,255,0.11);--topgrad:linear-gradient(180deg,#1c0e00 0%,#08090e 100%);}
+[data-theme=naruto]{--bg:#0b0908;--bg2:#12100e;--bg3:#1a1715;--bg4:#221e1b;--bg5:#2b2622;--b1:rgba(255,178,120,0.06);--b2:rgba(255,178,120,0.12);--b3:rgba(255,178,120,0.20);--t1:#f6efe8;--t2:#bdb2a8;--t3:#978d84;--aFg:#ffffff;--a:#c8500b;--a2:#ff8c3a;--ag:rgba(200,80,11,0.15);--glow:rgba(200,80,11,0.26);--fin:#4ade80;--finbg:rgba(74,222,128,0.11);--wat:#4fc3f7;--watbg:rgba(79,195,247,0.11);--pln:#a78bfa;--plnbg:rgba(167,139,250,0.11);--topgrad:linear-gradient(180deg,#221004 0%,#0b0908 100%);}
 [data-theme=sasuke]{--aFg:#ffffff;--bg:#06060d;--bg2:#0b0b18;--bg3:#101022;--bg4:#16162c;--bg5:#1c1c36;--b1:rgba(130,90,255,0.06);--b2:rgba(130,90,255,0.13);--b3:rgba(130,90,255,0.24);--t1:#e6e2f8;--t2:#ada9c9;--t3:#8581aa;--a:#7730e8;--a2:#a07af8;--ag:rgba(119,48,232,0.15);--glow:rgba(119,48,232,0.28);--fin:#4ecba8;--finbg:rgba(78,203,168,0.11);--wat:#c084fc;--watbg:rgba(192,132,252,0.11);--pln:#818cf8;--plnbg:rgba(129,140,248,0.11);--topgrad:linear-gradient(180deg,#0a0420 0%,#06060d 100%);}
 [data-theme=luffy]{--aFg:#ffffff;--bg:#060c16;--bg2:#0b1420;--bg3:#101c2c;--bg4:#152438;--bg5:#1a2c44;--b1:rgba(210,50,50,0.06);--b2:rgba(210,50,50,0.13);--b3:rgba(210,50,50,0.24);--t1:#eeeae4;--t2:#b4bec8;--t3:#7996ac;--a:#d03838;--a2:#ff6060;--ag:rgba(208,56,56,0.13);--glow:rgba(208,56,56,0.22);--fin:#4ecb82;--finbg:rgba(78,203,130,0.11);--wat:#f5c842;--watbg:rgba(245,200,66,0.11);--pln:#3b9eff;--plnbg:rgba(59,158,255,0.11);--topgrad:linear-gradient(180deg,#140608 0%,#060c16 100%);}
 /* Sanji, rebuilt from the reference: the wine suit is the accent and the ground
@@ -1540,8 +1540,36 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 .hero-bg-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 30%;animation:kenburns 28s ease-in-out infinite alternate;}
 @keyframes kenburns{from{transform:scale(1.06) translate(0,0);}to{transform:scale(1.18) translate(-2.5%,-3%);}}
 /* Phase-2 motion: staggered reveals + tactile press */
-body.first-paint .pcard{animation:cardIn .42s cubic-bezier(.2,1,.3,1) backwards;}
+/* Entrance motion used to re-run on every render — and render runs on every tap,
+   so bumping one episode re-animated the whole page. That was fixed by limiting
+   it to the FIRST paint, which over-corrected: the app moved once when you opened
+   it and was then completely still for the rest of the session. Filter to
+   Finished, search, switch to Manga — a whole new set of titles appeared with no
+   more life than a page reload.
+   It replays when the CONTENT changes (see renderHome's `sig`), and stays still
+   when you are just operating a card that is already on screen. */
+body.first-paint .pcard,body.content-in .pcard{animation:cardIn .42s cubic-bezier(.2,1,.3,1) backwards;}
 @keyframes cardIn{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:none;}}
+/* A 186-title list is ~7,600 elements, and every one of them was laid out and
+   painted on every render — and render runs on every tap. That is the lag people
+   were describing, and the scrolling with it.
+   `content-visibility:auto` lets the browser skip layout and paint for anything
+   off screen; `contain-intrinsic-size` tells it how big to assume each one is so
+   the scrollbar and scroll position stay honest instead of jumping as cards come
+   into view. Nothing about the markup changes — the work simply stops being done
+   for the ~170 cards nobody is looking at.
+   Sizes are the real rendered heights per density, so an assumed card and a real
+   one are the same height and nothing shifts as you scroll. */
+.grid .pcard{content-visibility:auto;contain-intrinsic-size:auto 232px;}
+.grid.compact .pcard{contain-intrinsic-size:auto 190px;}
+.grid.large .pcard{contain-intrinsic-size:auto 286px;}
+.rtm-row{content-visibility:auto;contain-intrinsic-size:auto 168px;}
+.rtm-list.compact .rtm-row{contain-intrinsic-size:auto 140px;}
+.rtm-list.large .rtm-row{contain-intrinsic-size:auto 210px;}
+/* Whole shelves too — an off-screen row is a row of cards plus its header. */
+.row-sec{content-visibility:auto;contain-intrinsic-size:auto 268px;}
+/* Printing and find-in-page need the skipped content to exist. */
+@media print{.grid .pcard,.rtm-row,.row-sec{content-visibility:visible;}}
 .row-scroll .pcard:nth-child(2),.grid .pcard:nth-child(2){animation-delay:.03s}
 .row-scroll .pcard:nth-child(3),.grid .pcard:nth-child(3){animation-delay:.06s}
 .row-scroll .pcard:nth-child(4),.grid .pcard:nth-child(4){animation-delay:.09s}
@@ -1550,7 +1578,7 @@ body.first-paint .pcard{animation:cardIn .42s cubic-bezier(.2,1,.3,1) backwards;
 .row-scroll .pcard:nth-child(n+7),.grid .pcard:nth-child(n+7){animation-delay:.17s}
 /* Entrance animations used to re-run on every render, and render runs on every
    tap — a filter change re-animated the whole page. First paint only now. */
-body.first-paint .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards;}
+body.first-paint .row-sec,body.content-in .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards;}
 .hero{transition:transform .16s ease;}
 .hero:active{transform:scale(.99);}
 /* Full-screen Stats experience */
@@ -1676,9 +1704,9 @@ body.first-paint .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards
 .hero-prog .pbar{flex:1;}
 .hero-prog span{font-size:12px;font-weight:700;color:rgba(255,255,255,0.85);}
 .hero-cta{
-  margin-top:12px;display:inline-flex;align-items:center;gap:7px;
+  margin-top:12px;display:inline-flex;align-items:center;justify-content:center;gap:7px;
   background:rgba(255,255,255,0.94);color:#0a0a0c;font-size:13px;font-weight:800;
-  padding:9px 16px;border-radius:99px;
+  padding:9px 16px;border-radius:99px;min-height:38px;
 }
 /* ── BILLBOARD (auto-rotating spotlight) ── */
 .billboard{position:relative;margin:14px 18px 6px;border-radius:26px;overflow:hidden;min-height:240px;box-shadow:0 18px 44px -14px rgba(0,0,0,.72);animation:fadeUp .4s ease both;}
@@ -1864,6 +1892,15 @@ body.first-paint .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards
 }
 .pbar{height:4px;border-radius:99px;background:rgba(255,255,255,0.13);overflow:hidden;}
 .pfill{height:100%;border-radius:99px;background:linear-gradient(90deg,var(--a),var(--a2));transition:width .4s cubic-bezier(.32,.72,.28,1);}
+/* On a fresh set of cards the bar grows to where you are instead of arriving
+   already full — the one number on the card that is about you, drawn. */
+body.first-paint .pfill,body.content-in .pfill{animation:barGrow .62s cubic-bezier(.2,1,.3,1) backwards;animation-delay:.14s;}
+@keyframes barGrow{from{width:0;}}
+/* The show you are actually in the middle of breathes; the ones you are not
+   don't. One dot, slow enough to read as alive rather than as an alert. */
+.pcard-badge.b-watching::before{animation:dotBreathe 2.6s ease-in-out infinite;}
+@keyframes dotBreathe{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.45;transform:scale(.78);}}
+@media(prefers-reduced-motion:reduce){.pcard-badge.b-watching::before{animation:none;}}
 
 /* ── SEARCH GRID ── */
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:16px 12px;padding:16px 18px;}
@@ -2020,7 +2057,13 @@ body.first-paint .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards
 .sheet-handle{width:40px;height:5px;border-radius:99px;background:var(--b3);margin:8px auto 14px;}
 .sheet-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;}
 .sheet-title{font-size:21px;font-weight:800;letter-spacing:-0.35px;}
-.sheet-cancel{font-size:13px;font-weight:700;color:var(--t2);padding:6px 2px;}
+/* The way out of every sheet in the app, and it was a 27px tap target — the
+   thing you reach for in a hurry, sized like a footnote. The label is the same
+   size; the padding is what grew, pulled back with a negative margin so the
+   header's layout does not move. */
+.sheet-cancel{font-size:13px;font-weight:700;color:var(--t2);padding:11px 10px;margin:-11px -10px -11px 0;
+  min-height:40px;display:inline-flex;align-items:center;border-radius:10px;}
+.sheet-cancel:active{background:var(--b1);}
 
 /* ── DETAIL SHEET ── */
 .dt-top{display:flex;gap:16px;margin-bottom:16px;}
@@ -2073,7 +2116,12 @@ body.first-paint .row-sec{animation:fadeUp .5s cubic-bezier(.2,1,.3,1) backwards
 .lock-err{color:#ff6b6b;font-size:13px;font-weight:600;min-height:18px;margin-top:14px;}
 .lock-card.shake{animation:lshake .4s;}
 @keyframes lshake{10%,90%{transform:translateX(-2px);}20%,80%{transform:translateX(4px);}30%,50%,70%{transform:translateX(-8px);}40%,60%{transform:translateX(8px);}}
-.lock-alt{display:inline-block;margin-top:18px;color:var(--t2);font-size:13px;font-weight:600;text-decoration:underline;cursor:pointer;}
+.lock-alt{display:inline-flex;align-items:center;justify-content:center;margin-top:12px;padding:11px 14px;min-height:40px;
+  color:var(--t2);font-size:13px;font-weight:600;text-decoration:underline;text-underline-offset:3px;cursor:pointer;border-radius:10px;}
+.lock-alt:active{opacity:.6;background:var(--b1);}
+/* A link inside a sentence keeps the sentence's line height, so it cannot be
+   grown like a button — the padding reaches past the text without moving it. */
+.inline-link{color:var(--a2);cursor:pointer;padding:6px 2px;margin:-6px -2px;text-decoration:underline;text-underline-offset:2px;}
 .lock-alt:active{opacity:.6;}
 .lock-btn2{width:100%;margin-top:10px;padding:13px;border-radius:14px;border:1px solid var(--b2);background:transparent;color:var(--t2);font-weight:700;font-size:15px;cursor:pointer;}
 .rec-code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:21px;font-weight:800;letter-spacing:1px;color:var(--t1);background:var(--bg3);border:1px solid var(--b2);border-radius:14px;padding:16px 12px;margin-bottom:16px;word-break:break-all;line-height:1.5;}
@@ -2595,7 +2643,8 @@ textarea.ai-prompt-in{resize:none;line-height:1.45;display:block;}
 .chat-send{width:44px;height:44px;flex-shrink:0;border-radius:14px;background:var(--a);color:var(--aFg);display:inline-flex;align-items:center;justify-content:center;transition:transform .12s,filter .16s;}
 .chat-send .ico{width:19px;height:19px;}
 .chat-send:active{transform:scale(.94);}
-.chat-clear{background:none;border:none;color:var(--t3);font-size:12px;font-weight:700;margin-top:9px;display:inline-flex;align-items:center;gap:5px;cursor:pointer;}
+.chat-clear{background:none;border:none;color:var(--t3);font-size:12px;font-weight:700;margin-top:9px;
+  display:inline-flex;align-items:center;gap:5px;cursor:pointer;padding:11px 12px 11px 0;min-height:38px;}
 .chat-clear .ico{width:12px;height:12px;}
 .chat-msg.ai{position:relative;}
 .chat-copy{position:absolute;bottom:-9px;right:-2px;width:26px;height:26px;border-radius:10px;background:var(--bg4);border:1px solid var(--b2);color:var(--t3);display:inline-flex;align-items:center;justify-content:center;opacity:.5;transition:opacity .15s,color .15s;cursor:pointer;}
@@ -2650,36 +2699,40 @@ textarea.ai-prompt-in{resize:none;line-height:1.45;display:block;}
    what happened in one line, explains why in the next, and puts the fix that
    sticks first. The old version scrolled sideways with its close button off the
    edge; this one is a fixed block that never needs scrolling at any width. */
-.pv-wrong{position:absolute;left:10px;right:10px;bottom:12px;z-index:4;display:none;flex-direction:column;gap:10px;
-  padding:13px 13px 11px;border-radius:18px;
-  background:color-mix(in srgb,var(--bg2) 96%,transparent);
-  -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
-  border:1px solid var(--b3);box-shadow:0 18px 44px rgba(0,0,0,.6);
-  max-width:520px;margin:0 auto;}
+/* It sits ON TOP of the video somebody is trying to watch, so it gets as little
+   of the screen as the message needs and no more. The previous version was a
+   full card — 32px icon tile, a three-line paragraph, two tall buttons and a
+   footer link — roughly a fifth of a phone screen for a maybe-question. Same
+   information, one title line, one short line, and the buttons inline with them
+   where there is room. */
+.pv-wrong{position:absolute;left:10px;right:10px;bottom:10px;z-index:4;display:none;
+  align-items:center;gap:10px;flex-wrap:wrap;
+  padding:8px 8px 8px 12px;border-radius:14px;
+  background:color-mix(in srgb,var(--bg2) 94%,transparent);
+  -webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);
+  border:1px solid var(--b2);box-shadow:0 10px 26px rgba(0,0,0,.55);
+  max-width:560px;margin:0 auto;}
 .pv-wrong.on{display:flex;}
-.pv-wrong-head{display:flex;align-items:flex-start;gap:11px;}
-.pv-wrong-ic{flex:0 0 auto;width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;
-  background:color-mix(in srgb,var(--a) 20%,transparent);color:var(--a2);}
-.pv-wrong-ic .ico{width:16px;height:16px;}
+.pv-wrong-head{display:flex;align-items:center;gap:9px;flex:1 1 190px;min-width:0;}
+.pv-wrong-ic{display:none;}                      /* the words carry it; the tile was decoration */
 .pv-wrong-copy{flex:1;min-width:0;}
-.pv-wrong-t{font-family:var(--fd);font-size:15px;font-weight:800;letter-spacing:-.15px;color:var(--t1);}
-.pv-wrong-s{margin-top:3px;font-size:12px;line-height:1.45;color:var(--t3);}
-.pv-wrong-x{flex:0 0 auto;width:28px;height:28px;margin:-2px -2px 0 0;display:flex;align-items:center;justify-content:center;
+.pv-wrong-t{font-size:13px;font-weight:800;color:var(--t1);line-height:1.25;}
+.pv-wrong-s{margin-top:1px;font-size:10px;line-height:1.35;color:var(--t3);}
+.pv-wrong-x{flex:0 0 auto;order:9;width:26px;height:26px;display:flex;align-items:center;justify-content:center;
   border-radius:99px;background:transparent;border:none;color:var(--t3);cursor:pointer;}
-.pv-wrong-x .ico,.pv-wrong-x svg{width:15px;height:15px;}
-.pv-wrong-acts{display:flex;gap:8px;}
-.pv-wrong-b{flex:1;min-width:0;font-size:12px;font-weight:800;padding:11px 10px;border-radius:14px;
+.pv-wrong-x .ico,.pv-wrong-x svg{width:14px;height:14px;}
+.pv-wrong-acts{display:flex;gap:6px;flex:0 1 auto;}
+.pv-wrong-b{flex:0 1 auto;min-width:0;font-size:12px;font-weight:800;padding:8px 12px;border-radius:10px;
   background:var(--bg4);border:1px solid var(--b2);color:var(--t1);cursor:pointer;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:transform .12s;}
 .pv-wrong-b:active{transform:scale(.97);}
-.pv-wrong-b.prim{background:var(--a);border-color:var(--a);color:var(--aFg);box-shadow:0 6px 18px -8px var(--glow);}
-/* The last resort reads as a last resort: a quiet line, not a fourth button
+.pv-wrong-b.prim{background:var(--a);border-color:var(--a);color:var(--aFg);}
+/* The last resort reads as a last resort: a quiet line, not a third button
    competing with the two that fix the common case. */
-.pv-wrong-last{width:100%;padding:2px 0 1px;background:none;border:0;cursor:pointer;
-  font-size:10px;font-weight:700;line-height:1.4;color:var(--t3);text-align:center;
-  text-decoration:underline;text-decoration-color:color-mix(in srgb,var(--t3) 40%,transparent);text-underline-offset:3px;}
+.pv-wrong-last{flex:1 0 100%;order:10;padding:1px 0 0;background:none;border:0;cursor:pointer;
+  font-size:10px;font-weight:700;line-height:1.3;color:var(--t3);text-align:left;
+  text-decoration:underline;text-decoration-color:color-mix(in srgb,var(--t3) 35%,transparent);text-underline-offset:2px;}
 .pv-wrong-last:active{color:var(--t2);}
-@media (max-width:380px){.pv-wrong-acts{flex-direction:column;}.pv-wrong-b{white-space:normal;}}
 /* Paste-the-right-address panel. */
 .pv-set{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:5;display:none;width:min(420px,92%);
   padding:18px;border-radius:18px;background:var(--bg2);border:1px solid var(--b3);box-shadow:0 18px 50px rgba(0,0,0,.6);}
@@ -4168,7 +4221,7 @@ body.recsel .pcard{position:relative;}
     <summary>How do I get a free key? (2 minutes)</summary>
     <div class="keyhow-body">
       <p class="ai-desc" style="margin:0 0 12px">Google AI Studio is free, takes about two minutes, and <b style="color:var(--t1)">doesn't ask for a credit card</b>. It's the one to pick: the chat sends your whole list every time you ask something, and this is the free key with room for that.</p>
-      <div class="keystep"><span class="keynum">1</span><div>Tap <b><a onclick="openExternal('https://aistudio.google.com/apikey')" style="color:var(--a2);cursor:pointer">aistudio.google.com/apikey</a></b> to open AI Studio.</div></div>
+      <div class="keystep"><span class="keynum">1</span><div>Tap <b><a class="inline-link" onclick="openExternal('https://aistudio.google.com/apikey')">aistudio.google.com/apikey</a></b> to open AI Studio.</div></div>
       <div class="keystep"><span class="keynum">2</span><div>Sign in with your Google account. Accept the terms if it asks — it lands you on the API keys page.</div></div>
       <div class="keystep"><span class="keynum">3</span><div>Tap <b>Create API key</b>. If it asks for a project, take the one it offers.</div></div>
       <div class="keystep"><span class="keynum">4</span><div><b style="color:var(--a2)">Copy it.</b> It starts with <code>AIza</code>. You can come back and copy it again later, so there's no rush.</div></div>
@@ -4607,14 +4660,14 @@ body.recsel .pcard{position:relative;}
       <div class="pv-wrong-head">
         <span class="pv-wrong-ic"><i data-ic="search"></i></span>
         <div class="pv-wrong-copy">
-          <div class="pv-wrong-t">This isn't your show?</div>
-          <div class="pv-wrong-s">This site spells titles its own way, so the link can land somewhere else. Point WatchList at the right page once and every episode works from then on.</div>
+          <div class="pv-wrong-t">Not your show?</div>
+          <div class="pv-wrong-s">This site spells titles its own way. Point it out once and every episode works.</div>
         </div>
         <button class="pv-wrong-x" onclick="document.getElementById('pvWrong').classList.remove('on')" aria-label="Dismiss"><i data-ic="x"></i></button>
       </div>
       <div class="pv-wrong-acts">
-        <button class="pv-wrong-b prim" onclick="pvSetPrompt()">Find it on this site</button>
-        <button class="pv-wrong-b" onclick="pvTrySpelling()" title="Try the show's other titles">Try another spelling</button>
+        <button class="pv-wrong-b prim" onclick="pvSetPrompt()">Find it</button>
+        <button class="pv-wrong-b" onclick="pvTrySpelling()" title="Try the show's other titles">Spelling</button>
       </div>
       <button class="pv-wrong-last" onclick="pvAllowMore()">Screen stayed blank? This site may refuse to play in here</button>
     </div>
@@ -4894,7 +4947,13 @@ function captureGateTest(){try{
     if(v==='0')sessionStorage.removeItem('wl_gate_test');else sessionStorage.setItem('wl_gate_test',v==='force'?'force':'1');
     u.searchParams.delete('gate');history.replaceState(null,'',u.pathname+u.search+u.hash);}
 }catch{}}
-function wlDevice(){try{let d=localStorage.getItem(NET_KEY);if(!d){d='d'+Math.random().toString(36).slice(2)+Date.now().toString(36);localStorage.setItem(NET_KEY,d);}return d;}catch{return 'd'+Date.now();}}
+// Minted on first read — which at boot is a race the mirror loses, because the
+// mirror is IndexedDB and IndexedDB is async. A device that had been approved
+// came back with a BRAND NEW id and had to ask the owner for permission all over
+// again. Anything invented during this session is noted, so restoreCreds is
+// allowed to put the real one back over it (and only over it).
+const _mintedNow=new Set();
+function wlDevice(){try{let d=localStorage.getItem(NET_KEY);if(!d){d='d'+Math.random().toString(36).slice(2)+Date.now().toString(36);localStorage.setItem(NET_KEY,d);_mintedNow.add(NET_KEY);}return d;}catch{return 'd'+Date.now();}}
 function netStatus(){try{return localStorage.getItem(NET_STATUS)||'';}catch{return '';}}
 function setNetStatus(s){try{s?localStorage.setItem(NET_STATUS,s):localStorage.removeItem(NET_STATUS);}catch{}}
 // Capture ?invite=CODE from a shared link, remember it, and clean the URL.
@@ -5767,6 +5826,7 @@ function _saveFailed(e){
   }
 }
 function writeLocal(){
+  try{mirrorCreds();}catch(e){}
   const s=store();if(!s)return;
   if(appLocked)return;      // locked: `anime` is an empty placeholder — never persist it over the ciphertext
   if(cryptoKey&&envWraps){                       // password set → persist ciphertext only
@@ -5807,6 +5867,82 @@ function save(){
 // Deletions are safe: every write is mirrored, including the one that empties the
 // list, so the mirror is empty too and there is nothing to resurrect. That is why
 // the non-empty check below is the whole guard it needs.
+// ─── KEEPING PEOPLE SIGNED IN ───────────────────────────────────────────────
+// "It signed me out and I had to put my cloud key in again." Nobody was signing
+// anybody out: Safari's storage policy deletes a site's script-writable storage
+// after seven days without a visit, and everything that identifies this device —
+// the sync code, the friend code, the device id, the admin token — lived in
+// localStorage and nowhere else. Come back after a fortnight and the app is a
+// stranger holding an empty list, asking for a code you wrote down once.
+//
+// Two halves, because either alone is not enough:
+//   1. ASK FOR PERSISTENT STORAGE. A granted origin is exempt from the sweep.
+//      Browsers grant it on engagement signals — installed to the Home Screen,
+//      bookmarked, used repeatedly — so this asks early and asks again after a
+//      real interaction rather than accepting the first "no".
+//   2. MIRROR THE KEYS. IndexedDB is swept by the same policy, so the mirror is
+//      not a defence against eviction — it is a defence against the FIRST half
+//      failing on its own, which is the common case: localStorage cleared by a
+//      "clear cookies" tap while IndexedDB survived, a private-window session, a
+//      quota purge that took the smaller store. The list already had this mirror.
+//      Its keys did not, which is why the list came back and the identity didn't.
+// The real key names, taken from their declarations rather than guessed:
+// NET_KEY 'wl_device' is the device the owner approved, ADMIN_TK the admin token,
+// NET_INVITE the invite it joined with, and the friend pair is how everyone else
+// knows this person. Lose any one and the app asks you to prove yourself again.
+const CRED_KEYS=['friend_code','friend_name','party_name','wl_device','wl_admin_token','wl_admin_ck','wl_invite','wl_net_status'];
+const IDB_CRED_KEY='__creds__';
+function credKeys(){ return CRED_KEYS.concat(['sync_'+LSKEY,'syncat_'+LSKEY]); }
+function mirrorCreds(){
+  try{
+    const out={};
+    credKeys().forEach(k=>{ try{const v=localStorage.getItem(k); if(v)out[k]=v;}catch(e){} });
+    if(!Object.keys(out).length)return;
+    idbSet(IDB_CRED_KEY,JSON.stringify({at:Date.now(),v:out})).catch(()=>{});
+  }catch(e){}
+}
+// Only ever fills BLANKS. A key that is present locally always wins — the mirror
+// is older by definition, and restoring over a code somebody just typed in is how
+// you take a working device and point it at the wrong list.
+async function restoreCreds(){
+  try{
+    let raw=''; try{raw=await idbGet(IDB_CRED_KEY);}catch(e){return;}
+    if(!raw)return;
+    let box=null; try{box=JSON.parse(raw);}catch(e){return;}
+    const v=box&&box.v; if(!v||typeof v!=='object')return;
+    let put=0;
+    Object.keys(v).forEach(k=>{
+      try{
+        const cur=localStorage.getItem(k);
+        const mintedHere=(typeof _mintedNow!=='undefined')&&_mintedNow.has(k);
+        if(v[k]&&(!cur||(mintedHere&&cur!==v[k]))){localStorage.setItem(k,v[k]);put++;}
+      }catch(e){}
+    });
+    if(put){
+      try{logProblem('storage','put this device’s keys back from the on-device mirror',put+' key(s)');}catch(e){}
+      try{renderSyncUI();}catch(e){}
+    }
+  }catch(e){}
+}
+// Asked once at boot and again after the first real interaction: browsers weigh
+// engagement, and a request made before anybody has touched anything is the one
+// most likely to be turned down.
+let _persistTried=0;
+async function askPersist(){
+  try{
+    if(_persistTried>1||!navigator.storage||!navigator.storage.persist)return;
+    _persistTried++;
+    if(navigator.storage.persisted&&await navigator.storage.persisted())return;
+    await navigator.storage.persist();
+  }catch(e){}
+}
+try{
+  ['pointerdown','keydown'].forEach(t=>document.addEventListener(t,function once(){
+    try{document.removeEventListener(t,once);}catch(e){}
+    askPersist();
+  },{once:true,passive:true}));
+}catch(e){}
+
 async function restoreFromIDB(){
   try{
     if(appLocked)return;                       // ciphertext path looks after itself
@@ -6234,7 +6370,8 @@ function recStageCheck(a){
 
 // ─── CLOUD SYNC (Cloudflare Worker + KV) ────────────────────────────────────
 function syncCode(){try{return localStorage.getItem('sync_'+LSKEY)||'';}catch{return'';}}
-function setSyncCode(c){try{if(c)localStorage.setItem('sync_'+LSKEY,c);else localStorage.removeItem('sync_'+LSKEY);}catch{}}
+function setSyncCode(c){try{if(c)localStorage.setItem('sync_'+LSKEY,c);else localStorage.removeItem('sync_'+LSKEY);}catch{}
+  try{if(c)mirrorCreds();else idbSet(IDB_CRED_KEY,'').catch(()=>{});}catch(e){}}
 function syncAt(){try{return +localStorage.getItem('syncat_'+LSKEY)||0;}catch{return 0;}}
 function setSyncAt(t){try{localStorage.setItem('syncat_'+LSKEY,String(t||0));}catch{}}
 // One sync code should carry your WHOLE setup, not just the titles. `extra` is a flat
@@ -9294,8 +9431,25 @@ function emptyRestoreHTML(){
   try{ if(typeof syncCode==='function'&&syncCode())return ''; }catch(e){}
   return `<button class="empty-alt" onclick="openSheet('backupSheet')">${icon('cloud')} Restore from backup</button>`;
 }
+// What is on screen, as one string. When it changes the page is showing a
+// DIFFERENT set of titles and earns an entrance; when it doesn't, you are
+// operating a card that is already there and the page should hold still.
+let _viewSig='';
+function markContentChange(){
+  const sig=[filterStatus,viewKind,sortMode,query(),rtmTab].join('|');
+  if(sig===_viewSig)return;
+  _viewSig=sig;
+  const b=document.body;
+  b.classList.remove('content-in');
+  void b.offsetWidth;                       // restart the animation, don't queue it
+  b.classList.add('content-in');
+  clearTimeout(_viewSigT);
+  _viewSigT=setTimeout(()=>{try{b.classList.remove('content-in');}catch(e){}},900);
+}
+let _viewSigT=0;
 function renderHome(){
   const el=document.getElementById('pageEl');
+  try{markContentChange();}catch(e){}
   clearInterval(bbTimer);bbTimer=0;   // stop any rotation; the main path re-arms it
   const q=query();
   const isRead=viewKind==='read';
@@ -15589,7 +15743,7 @@ function watchOpen(i){
 // All localStorage + the KV mailbox. Gated to the web build (mirrors party=app).
 const FRIEND_COLORS=['#ff6b6b','#4dabf7','#51cf66','#ffd43b','#cc5de8','#20c997','#ff922b','#f783ac','#748ffc','#a9e34b'];
 function friendColor(code){let h=2166136261;const s=String(code||'');for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}return FRIEND_COLORS[(h>>>0)%FRIEND_COLORS.length];}
-function myFriendCode(){try{let c=localStorage.getItem('friend_code');if(!c||!/^[A-Za-z0-9]{10,64}$/.test(c)){c=(Math.random().toString(36).slice(2)+Math.random().toString(36).slice(2)+Date.now().toString(36)).replace(/[^A-Za-z0-9]/g,'').slice(0,16);while(c.length<12)c+='7';localStorage.setItem('friend_code',c);}return c;}catch{return '';}}
+function myFriendCode(){try{let c=localStorage.getItem('friend_code');if(!c||!/^[A-Za-z0-9]{10,64}$/.test(c)){c=(Math.random().toString(36).slice(2)+Math.random().toString(36).slice(2)+Date.now().toString(36)).replace(/[^A-Za-z0-9]/g,'').slice(0,16);while(c.length<12)c+='7';localStorage.setItem('friend_code',c);try{_mintedNow.add('friend_code');}catch(e){}}return c;}catch{return '';}}
 function myFriendName(){try{return localStorage.getItem('friend_name')||localStorage.getItem('party_name')||'';}catch{return '';}}
 function setMyFriendName(n){try{localStorage.setItem('friend_name',String(n||'').slice(0,40));}catch{}}
 function friendsList(){try{const a=JSON.parse(localStorage.getItem('friends')||'[]');return Array.isArray(a)?a:[];}catch{return [];}}
@@ -19488,7 +19642,13 @@ try{if(_SR&&window.isSecureContext){const m=document.getElementById('chatMic');i
 
 // ─── INIT ───────────────────────────────────────────────────────────────────
 try{hydrateIcons();}catch{}
-load();try{_hadItemsAtLoad=anime.length>0;}catch{}try{restorePos();}catch(e){}try{setTimeout(()=>{try{fetchSequels();}catch(e){}},6000);}catch{}try{setTimeout(restoreFromIDB,0);}catch{}try{setTimeout(()=>{try{ensureBackup();}catch(e){}},1200);}catch{}try{purgeAdult();}catch{}try{if(!appLocked&&dedupeAnime())writeLocal();}catch{}
+load();try{_hadItemsAtLoad=anime.length>0;}catch{}try{restorePos();}catch(e){}
+// Before anything asks this device who it is: put the keys back if localStorage
+// lost them, then ask to be exempt from the sweep that lost them. Both are async
+// and neither blocks the first paint — a device that still HAS its keys does no
+// work here at all, because restoreCreds only fills blanks.
+try{askPersist();}catch(e){}
+try{setTimeout(()=>{restoreCreds().then(()=>{try{if(typeof syncOnOpen==='function')syncOnOpen();}catch(e){}});},0);}catch{}try{setTimeout(()=>{try{fetchSequels();}catch(e){}},6000);}catch{}try{setTimeout(restoreFromIDB,0);}catch{}try{setTimeout(()=>{try{ensureBackup();}catch(e){}},1200);}catch{}try{purgeAdult();}catch{}try{if(!appLocked&&dedupeAnime())writeLocal();}catch{}
 try{if(!appLocked&&adoptOfficialCase())writeLocal();}catch{}
 loadTheme();try{seedHiddenDefaults();}catch{}try{_restoreUpd();}catch{}render();try{nativeScheduleNotifs();}catch{}try{hydrateImages();}catch{}
 // After the list is up — and after the tutorial has had its chance to claim a

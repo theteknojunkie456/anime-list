@@ -1467,6 +1467,15 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 .fx-load,.fx-none{font-size:12px;color:var(--t3);align-self:center;}
 .fx-rename{flex:0 0 auto;align-self:center;margin-left:4px;padding:7px 12px;border-radius:99px;
   border:1px solid var(--b2);background:var(--bg3);color:var(--t2);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;}
+/* A row that matched nothing is often one you don't want at all. "Delete all
+   unlinked" already existed; this is the same for ONE of them, which is what you
+   want when three of the four are worth keeping. */
+.fx-del{flex:0 0 auto;align-self:center;margin-left:4px;padding:7px 12px;border-radius:99px;
+  display:inline-flex;align-items:center;gap:6px;
+  border:1px solid rgba(255,107,107,.4);background:rgba(255,107,107,.1);color:#ff8b8b;
+  font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;}
+.fx-del .ico{width:13px;height:13px;}
+.fx-del:active{transform:scale(.97);}
 .fx-ok{font-size:12px;font-weight:800;color:var(--fin);}
 /* What happens when you tap Watch, stated before any settings — a newcomer met
    the paste-your-own-site form first and reasonably assumed setup was required. */
@@ -2298,6 +2307,8 @@ body.first-paint .pfill,body.content-in .pfill{animation:barGrow .62s cubic-bezi
 .prog-row{display:flex;align-items:center;gap:14px;margin:0 0 16px;}
 .prog-btn{width:46px;height:46px;border-radius:14px;background:var(--bg4);border:1px solid var(--b2);font-size:21px;font-weight:800;color:var(--t1);display:flex;align-items:center;justify-content:center;transition:transform .12s,background .14s,border-color .14s;}
 .prog-btn:active{background:var(--ag);border-color:var(--a);transform:scale(0.92);}
+/* Holding a stepper must not select the label or open a long-press menu. */
+.prog-btn{touch-action:manipulation;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;}
 .prog-mid{flex:1;text-align:center;}
 .prog-num{font-size:17px;font-weight:800;}
 .prog-num span{color:var(--t3);font-weight:700;font-size:13px;}
@@ -4668,6 +4679,7 @@ body.recsel .pcard{position:relative;}
   <div class="pv-top">
     <button class="sv-back" onclick="closePlayer()" aria-label="Back"><i data-ic="chevron-left"></i></button>
     <div class="pv-title" id="pvTitle"></div>
+    <button class="pv-ext" id="pvRefresh" onclick="pvReload()" aria-label="Reload this page" title="Reload this page"><i data-ic="refresh"></i></button>
     <button class="pv-ext" id="pvExt" aria-label="Find this title on the site" title="Wrong page? Search this title"><i data-ic="search"></i></button>
     <button class="pv-ext" id="pvOpen" onclick="pvOpenExternal()" aria-label="Open in your browser" title="Open in your browser"><i data-ic="external"></i></button>
   </div>
@@ -9066,7 +9078,8 @@ async function openFixSheet(){
     if(!hits.length){
       box.innerHTML='<span class="fx-none">Nothing found for this name</span>'
         +`<button class="fx-rename" onclick="fixRename('${escH(a.id)}')">Rename</button>`
-        +`<button class="fx-rename" onclick="fixKeep('${escH(a.id)}')">Keep as is</button>`;
+        +`<button class="fx-rename" onclick="fixKeep('${escH(a.id)}')">Keep as is</button>`
+        +`<button class="fx-del" onclick="fixDelete('${escH(a.id)}')">${icon('trash')} Delete</button>`;
       await pause(400); continue;
     }
     box.innerHTML=hits.slice(0,4).map(m=>{
@@ -9077,7 +9090,8 @@ async function openFixSheet(){
         +(img?`<img src="${escH(img)}" alt="" loading="lazy">`:'<span class="fx-ph"></span>')
         +`<span class="fx-opt-t">${schEsc(t)}${yr?` <em>${yr}</em>`:''}</span></button>`;
     }).join('')+`<button class="fx-rename" onclick="fixRename('${escH(a.id)}')">None of these</button>`
-      +`<button class="fx-rename" onclick="fixKeep('${escH(a.id)}')">Keep as is</button>`;
+      +`<button class="fx-rename" onclick="fixKeep('${escH(a.id)}')">Keep as is</button>`
+      +`<button class="fx-del" onclick="fixDelete('${escH(a.id)}')">${icon('trash')} Delete</button>`;
     await pause(400);
   }
 }
@@ -9107,6 +9121,21 @@ function fixKeep(id){
   if(row){row.classList.add('fx-done');row.innerHTML='<div class="fx-have">'+escH(a.title)+'</div><span class="fx-ok">Kept</span>';}
   const {unmatched}=needsFix(kindOf(a));
   toast(unmatched.length?'Kept as is':'Kept — nothing left to fix');
+}
+function fixDelete(id){
+  const a=anime.find(x=>x.id===id); if(!a)return;
+  const title=a.title||'this one';
+  askConfirm({title:'Delete “'+title+'”?',msg:'It comes off your list on every device. This is not the same as Keep as is, which leaves it alone.',
+    yes:'Delete',onYes:function(){
+      const i=anime.findIndex(x=>x.id===id); if(i<0)return;
+      anime.splice(i,1);
+      tombstone(id);                 // or the next sync brings it back from another device
+      try{save();render();}catch(e){}
+      const row=document.getElementById('fx-'+id);
+      if(row){row.classList.add('fx-done');row.innerHTML='<div class="fx-have">'+escH(title)+'</div><span class="fx-ok">Deleted</span>';}
+      const {unmatched}=needsFix(kindOf(a));
+      toast(unmatched.length?'Deleted':'Deleted — nothing left to fix');
+    }});
 }
 function fixRename(id){
   const a=anime.find(x=>x.id===id); if(!a)return;
@@ -9835,11 +9864,11 @@ function renderDetail(){
   // the third thing on screen naming the same fact. The resume note went too:
   // the Continue button underneath already says "Resume Ep 5 at 12:04".
   const progHTML=`<div class="prog-row">
-      <button class="prog-btn" onclick="bumpEp(-1)">−</button>
+      <button class="prog-btn" onpointerdown="epHoldStart(-1,event)" onclick="event.preventDefault()" aria-label="One fewer episode">−</button>
       <div class="prog-mid">
         <div class="prog-num">${a.ep||0}${a.epTotal?` <span>/ ${a.epTotal}</span>`:''}</div>
       </div>
-      <button class="prog-btn" onclick="bumpEp(1)">＋</button>
+      <button class="prog-btn" onpointerdown="epHoldStart(1,event)" onclick="event.preventDefault()" aria-label="One more episode">＋</button>
     </div>`;
   const stars=`<div class="dt-label">Your rating</div><div class="stars">${[1,2,3,4,5].map(n=>
     `<button class="star${(a.rating||0)>=n?' on':''}" onclick="setRating(${n})">${icon('star')}</button>`).join('')}</div>`;
@@ -10333,6 +10362,32 @@ async function fetchFranchise(a){
   if(a.aniId&&!seasons.some(s=>s.aniId===a.aniId))
     seasons.unshift({aniId:a.aniId,malId:a.malId||0,title:a.title,year:0,month:0,format:'TV',status:'',episodes:a.epTotal||0,img:a.img||'',airingAt:a.airAt||0,airEp:a.airEp||0,src:'self'});
   seasons.sort((x,y)=>(x.year||9999)-(y.year||9999)||(x.month||0)-(y.month||0));
+  // The merge above pairs entries by id — but the same season can arrive from
+  // AniList carrying only an AniList id and from MyAnimeList carrying only a MAL
+  // id, and with no id in common it is pushed twice. On screen that is the same
+  // season listed twice, both rows pointing at the same title on your list.
+  //
+  // So a second pass on the one thing both copies always have: the title. Only
+  // collapsed when the format agrees (or one of them never said) and the years
+  // do not contradict each other — a remake and its original share a title and
+  // must stay two rows.
+  seasons=(()=>{
+    const out=[],byName=new Map();
+    seasons.forEach(sn=>{
+      const k=normTitle(sn.title||'')+'|'+(sn.format||'');
+      const ex=byName.get(k)||byName.get(normTitle(sn.title||'')+'|');
+      const clash=ex&&ex.year&&sn.year&&ex.year!==sn.year;
+      if(ex&&!clash){
+        if(!ex.aniId&&sn.aniId)ex.aniId=sn.aniId;
+        if(!ex.malId&&sn.malId)ex.malId=sn.malId;
+        ['img','year','month','episodes','airingAt','airEp','format','status'].forEach(f=>{if(!ex[f]&&sn[f])ex[f]=sn[f];});
+        return;
+      }
+      out.push(sn);
+      byName.set(normTitle(sn.title||'')+'|'+(sn.format||''),sn);
+    });
+    return out;
+  })();
   franchiseCache[key]=seasons;
   return seasons;
 }
@@ -10511,15 +10566,89 @@ function setDetailStatus(s){
   touch(a);save();renderDetail();render();alPushItem(a);
   if(s==='finished'&&was!=='finished')offerNextSeason(a);
 }
-function bumpEp(d){
-  const a=anime.find(x=>x.id===detailId);if(!a)return;
-  a.ep=Math.max(0,(a.ep||0)+d);
-  if(a.epTotal)a.ep=Math.min(a.ep,a.epTotal);
+// One Piece is on episode 1175. Asking for one tap per episode is not a counter,
+// it is a punishment — so holding either button runs it.
+//
+// Two speeds and one commit. While your finger is down only the number on screen
+// changes; the save, the re-render, the AniList push and the "finished!" toast
+// all happen ONCE when you let go. Doing that work per tick is what made an
+// earlier version of this stutter and fire a toast forty times.
+let _epHold=null,_epCapToldFor='';
+// How far the counter is allowed to go. A show still airing has a total that has
+// not happened yet: The Ogre's Bride says 12 episodes, but episode 8 airs on
+// Saturday — so seven exist and the counter should stop at seven. `airEp` is the
+// NEXT episode to air, which makes the one before it the last one out.
+//
+// Anything not currently airing keeps its total, and a show with no airing data
+// is left unbounded rather than wrongly pinned — guessing low would stop somebody
+// logging episodes they have genuinely watched.
+function epCeiling(a){
+  const total=(a&&a.epTotal)||0;
+  let aired=0;
+  try{
+    const air=airingInfo(a);
+    // `out:true` means that episode has just landed, so it counts; otherwise the
+    // next one is still ahead and the last one out is the one before it.
+    if(air&&air.ep>0)aired=air.out?air.ep:air.ep-1;
+  }catch(e){}
+  if(aired>0)return total?Math.min(total,aired):aired;
+  return total||999999;
+}
+function epStepOnce(a,d){
+  const max=epCeiling(a);
+  const next=Math.max(0,Math.min(max,(a.ep||0)+d));
+  if(next===(a.ep||0)){                             // at an end — nothing to do
+    // Stopping short of the total needs a reason, or it reads as a broken button.
+    if(d>0&&a.epTotal&&(a.ep||0)<a.epTotal&&_epCapToldFor!==a.id){
+      _epCapToldFor=a.id;
+      try{const air=airingInfo(a);
+        toast(air&&air.when?`Ep ${(a.ep||0)+1} airs ${air.when}`:'That\u2019s everything out so far',3200);}catch(e){}
+    }
+    return false;
+  }
+  a.ep=next;
+  const el=document.querySelector('.prog-num');
+  if(el)el.innerHTML=`${a.ep||0}${a.epTotal?` <span>/ ${a.epTotal}</span>`:''}`;
+  return true;
+}
+function epHoldStart(d,ev){
+  try{ev&&ev.preventDefault&&ev.preventDefault();}catch(e){}
+  const a=anime.find(x=>x.id===detailId); if(!a)return;
+  if(_epHold)clearTimeout(_epHold.t);
+  _epHold={d,t:0,n:0,from:(a.ep||0)}; _epCapToldFor='';
+  epStepOnce(a,d);                                   // a tap is still exactly one episode
+  // The run only begins if the finger is still down after a beat, so a normal
+  // tap never accelerates into a second one.
+  _epHold.t=setTimeout(function run(){
+    const cur=anime.find(x=>x.id===detailId);
+    if(!cur||!_epHold)return;
+    if(!epStepOnce(cur,_epHold.d))return;            // hit 0 or the total: stop
+    _epHold.n++;
+    const n=_epHold.n;
+    _epHold.t=setTimeout(run, n<8?110 : n<20?60 : n<50?34 : 20);
+  },430);
+}
+function epHoldEnd(){
+  if(!_epHold)return;
+  clearTimeout(_epHold.t);
+  const from=_epHold.from; _epHold=null;
+  const a=anime.find(x=>x.id===detailId); if(!a)return;
+  if((a.ep||0)===from)return;                        // never moved: nothing to write
+  commitEp(a);
+}
+function commitEp(a){
   let _justFinished=false;
   if(a.epTotal&&a.ep===a.epTotal&&a.status!=='finished'){a.status='finished';toast('Marked as finished!');_justFinished=true;}
   else if(a.ep>0&&a.status==='plan'){a.status='watching';}
   touch(a);save();renderDetail();render();alPushItem(a);
   if(_justFinished)offerNextSeason(a);
+}
+try{['pointerup','pointercancel'].forEach(t=>window.addEventListener(t,epHoldEnd,{passive:true}));}catch(e){}
+// Kept for every other caller, and for anyone driving the app by keyboard.
+function bumpEp(d){
+  const a=anime.find(x=>x.id===detailId);if(!a)return;
+  if(!epStepOnce(a,d))return;
+  commitEp(a);
 }
 function setRating(n){
   const a=anime.find(x=>x.id===detailId);if(!a)return;
@@ -14175,6 +14304,13 @@ function pvOfferFix(){
   _pvWrongT=setTimeout(()=>{
     const blocked=document.getElementById('pvBlocked');
     if(blocked&&blocked.classList.contains('on'))return;   // nothing painted — that panel is the useful one
+    // If this site has already been given room to open tabs, the last line is
+    // how you take that back — which is what somebody complaining about tabs
+    // actually needs, and it was buried in Sources.
+    try{
+      const last=b.querySelector('.pv-wrong-last'), loose=pvLooseLine();
+      if(last)last.textContent=loose||'Screen stayed blank? This site may refuse to play in here';
+    }catch(e){}
     b.classList.add('on');
   },3500);
 }
@@ -14490,7 +14626,7 @@ function pvEpSetPaint(){
 }
 function pvEpSetStep(d){
   const a=pvReturnId?anime.find(x=>x.id===pvReturnId):null;
-  const max=(a&&a.epTotal)||9999;
+  const max=a?epCeiling(a):9999;      // what has aired, not what is promised
   _pvEpSetVal=Math.max(1,Math.min(max,_pvEpSetVal+d));
   pvEpSetPaint();
 }
@@ -15453,6 +15589,27 @@ function applyFrameSandbox(el,url){
 // before it does anything: this site's ads get to open tabs. Top navigation is
 // still withheld, so the worst it can do is open a tab you can close, not
 // replace the app you are holding.
+// Reload the page inside the player. A stalled embed, an ad that swallowed the
+// video, a source that came back after a dropout — all of it used to mean closing
+// the player and opening it again, which loses your place in the episode.
+function pvReload(){
+  const f=document.getElementById('pvFrame'); if(!f)return;
+  let url=''; try{url=f.src||'';}catch(e){}
+  if(!url){toast('Nothing loaded here yet');return;}
+  try{applyFrameSandbox(f,url);}catch(e){}
+  // Same URL assigned again does not always re-fetch, so it goes blank first.
+  try{f.removeAttribute('src');}catch(e){}
+  setTimeout(()=>{try{f.src=url;}catch(e){}},30);
+  try{pvOfferFix();}catch(e){}          // re-arm the "wrong page?" grace period
+  toast('Reloading\u2026',1400);
+}
+// The current host's popup permission, in words, for the notice's last line.
+function pvLooseLine(){
+  const f=document.getElementById('pvFrame'); if(!f)return null;
+  let host=''; try{host=new URL(f.src||'',location.href).hostname.replace(/^www\./,'').toLowerCase();}catch(e){}
+  if(!host||!isLooseFrame(host))return null;
+  return host+' is allowed to open tabs \u2014 put it back in the protected frame';
+}
 function pvAllowMore(){
   const f=document.getElementById('pvFrame'); if(!f)return;
   let url=''; try{url=f.src||'';}catch(e){}
@@ -16546,6 +16703,52 @@ function rtmRowHTML(r){
 // one button beside it — unreadable, and it never said what became of any of
 // them. Taking back is still per envelope, because that is what the server
 // files, so a row from a multi-title send says so on the button.
+// The note you wrote when you sent something travelled inside the envelope and
+// was never written to the local log, so every send before that was fixed shows
+// their reply and not the thing you said. It is not lost — it is sitting in the
+// envelope in their mailbox, and rec_peek hands a sender their own envelope back
+// (see the worker: the envelope's own from.code is the gate).
+//
+// One pass, oldest gap first, a few at a time so opening the tab never fires
+// thirty requests. An envelope they have dealt with is `gone`, and that entry is
+// marked so it is never asked for twice.
+let _peekBusy=false;
+async function backfillSentNotes(){
+  if(_peekBusy||!SYNC_URL)return; 
+  const me=myFriendCode(); if(!me)return;
+  const l=recsSent();
+  const need=l.filter(e=>e&&e.id&&e.code&&!e.peeked&&
+    !(Array.isArray(e.items)&&e.items.some(i=>i&&i.note))).slice(0,6);
+  if(!need.length)return;
+  _peekBusy=true;
+  let changed=false;
+  for(const e of need){
+    try{
+      const r=await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({op:'rec_peek',to:e.code,from:{code:me},id:e.id})});
+      if(!r.ok)continue;
+      const j=await r.json();
+      if(!j||!j.ok)continue;
+      e.peeked=1; changed=true;                       // asked; never ask again
+      if(j.gone||!Array.isArray(j.items))continue;
+      // Merge onto what the log already has, matching by title, so a cover or an
+      // id the local entry knows about is not thrown away by the answer.
+      const byTitle={};
+      (Array.isArray(e.items)?e.items:[]).forEach(i=>{ if(i&&i.title)byTitle[normTitle(i.title)]=i; });
+      e.items=j.items.map(it=>{
+        const had=byTitle[normTitle(it.title)]||{};
+        return {title:it.title||had.title||'',aniId:it.aniId||had.aniId||0,
+                img:it.img||had.img||'',note:it.note||had.note||''};
+      });
+      if(!e.titles||!e.titles.length)e.titles=e.items.map(i=>i.title).filter(Boolean);
+    }catch(err){ break; }                              // offline: try again next time
+  }
+  _peekBusy=false;
+  if(changed){
+    try{localStorage.setItem(RECS_SENT,JSON.stringify(l));}catch(e){}
+    try{renderRecsToMe();}catch(e){}
+  }
+}
 function rtmSentRowsHTML(q){
   const l=recsSent();
   if(!l.length)return '';
@@ -16628,6 +16831,7 @@ function recsInlineBody(q){
     <button class="rtm-tab${rtmTab==='out'?' on':''}" onclick="setRtmTab('out')">${icon('send')} You sent<span class="rtm-tab-n quiet">${sentN?sentN:''}</span></button>
   </div>`;
   if(rtmTab==='out'){
+    try{setTimeout(backfillSentNotes,120);}catch(e){}
     const body=rtmSentRowsHTML(q);
     const sweep=(friendsList().length||sentN)
       ? `<button class="chat-clear" style="margin-top:14px" onclick="confirmUnsendEverything()">${icon('trash')} Take back everything I've ever sent</button>` : '';

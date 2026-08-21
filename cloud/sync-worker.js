@@ -149,6 +149,40 @@ export default {
       ctx.waitUntil(notifyChan(env, to, 'rec', envelope));
       return json({ ok: true, id: envelope.id }, 200, cors);
     }
+    // ── read back what YOU sent ──────────────────────────────────────────────
+    // Envelopes are filed under the RECIPIENT's code, which is what makes a
+    // sender's own note unreadable to the sender: their app logs the titles it
+    // sent, but the note travelled inside the envelope and stayed there. There
+    // is no way to scan KV for "everything from this person", and there should
+    // not be — but a sender already knows exactly which mailboxes and which
+    // envelope ids are theirs, so they can ask for one at a time.
+    //
+    // The gate is the envelope's own `from.code`. Knowing a recipient's code and
+    // an envelope id is not enough: the envelope has to say you sent it. That is
+    // the same fact the recipient's app already shows them, so this reveals
+    // nothing to a sender they did not write themselves.
+    if (op === 'rec_peek') {
+      const to = String(body.to || '');
+      const from = (body.from && typeof body.from === 'object') ? body.from : {};
+      const fromCode = String(from.code || '');
+      const id = String(body.id || '').slice(0, 64);
+      if (!/^[A-Za-z0-9]{10,64}$/.test(to)) return json({ error: 'bad to' }, 400, cors);
+      if (!/^[A-Za-z0-9]{10,64}$/.test(fromCode)) return json({ error: 'bad from' }, 400, cors);
+      if (!id) return json({ error: 'bad id' }, 400, cors);
+      let list = [];
+      try { const s = await env.LISTS.get('rec:' + to); if (s) list = JSON.parse(s); } catch {}
+      if (!Array.isArray(list)) list = [];
+      const env0 = list.find(e => e && e.id === id && e.from && e.from.code === fromCode);
+      // Gone is a normal answer, not an error: they may have dealt with it, or it
+      // may have aged out of the last 200.
+      if (!env0) return json({ ok: true, gone: true }, 200, cors);
+      return json({
+        ok: true,
+        at: env0.at || 0,
+        items: (env0.items || []).map(it => ({ title: it.title || '', aniId: it.aniId || 0, img: it.img || '', note: it.note || '' })),
+      }, 200, cors);
+    }
+
     // ── shared source setups ─────────────────────────────────────────────────
     // Someone who has their streaming site working can hand that setup to a
     // friend instead of talking them through it. Same mailbox shape as rec_send:

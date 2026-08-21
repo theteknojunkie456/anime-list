@@ -15523,8 +15523,8 @@ function frameBlockedHTML(){
 function looseFramesHTML(){
   const hosts=Object.keys(looseFrames());
   if(!hosts.length)return '';
-  return `<div class="dt-label" style="margin-top:18px">Allowed to open tabs</div>
-    <p class="ai-desc">These wouldn't play inside the protected frame, so you gave them room to open pop-up tabs. They still can't navigate away from your list. Tap one to put it back.</p>
+  return `<div class="dt-label" style="margin-top:18px">Allowed their own dialogs</div>
+    <p class="ai-desc">These wouldn't play inside the protected frame, so you gave them a little more room. <b>None of them can open a browser tab</b> — nothing in the player leaves WatchList any more. Tap one to put it all the way back.</p>
     <div class="src-picks">${hosts.map(h=>`<button class="src-chip on" onclick="unLoosen('${jsq(h)}')">${escH(h)} · put back</button>`).join('')}</div>`;
 }
 function unLoosen(host){
@@ -15566,7 +15566,23 @@ function challengeHost(h){
 // pop-ups and modals. It NEVER grants allow-top-navigation, whatever the site
 // claims to need, because that one is the whole app.
 const SANDBOX_BASE='allow-scripts allow-same-origin allow-forms allow-presentation allow-orientation-lock';
-const SANDBOX_LOOSE=SANDBOX_BASE+' allow-popups allow-popups-to-escape-sandbox allow-modals';
+// NOTHING GETS TO LEAVE THE APP.
+//
+// `allow-popups` lets a framed site call window.open, and
+// `allow-popups-to-escape-sandbox` lets what it opens land as an ordinary
+// browser tab with none of these restrictions. That pair is the only way a page
+// in the player can put you somewhere else, and it is why miruro.tv kept
+// throwing up tabs: it had been given "more room" at some point, and its ads
+// used the room. Both are gone. A site can still run its player, submit its
+// forms and open its own dialogs; it cannot open a tab, and it has never been
+// able to navigate away from the app (allow-top-navigation is not granted, and
+// never has been).
+//
+// Sites that genuinely cannot play in a frame are not fixed by popups anyway —
+// that is a refusal from their own headers, and the answer there is the "Open in
+// your browser" button, which is you choosing to leave rather than an ad
+// deciding for you.
+const SANDBOX_LOOSE=SANDBOX_BASE+' allow-modals';
 const LOOSE_KEY='loose_frames';
 function looseFrames(){try{const v=JSON.parse(localStorage.getItem(LOOSE_KEY)||'{}');return (v&&typeof v==='object')?v:{};}catch(e){return{};}}
 function isLooseFrame(host){return !!looseFrames()[String(host||'').toLowerCase()];}
@@ -15603,13 +15619,10 @@ function pvReload(){
   try{pvOfferFix();}catch(e){}          // re-arm the "wrong page?" grace period
   toast('Reloading\u2026',1400);
 }
-// The current host's popup permission, in words, for the notice's last line.
-function pvLooseLine(){
-  const f=document.getElementById('pvFrame'); if(!f)return null;
-  let host=''; try{host=new URL(f.src||'',location.href).hostname.replace(/^www\./,'').toLowerCase();}catch(e){}
-  if(!host||!isLooseFrame(host))return null;
-  return host+' is allowed to open tabs \u2014 put it back in the protected frame';
-}
+// Nothing in the player can open a tab any more, so the last line no longer has a
+// permission to take back. What somebody staring at a blank frame actually needs
+// is the way out, and that is a choice they make rather than one a site makes.
+function pvLooseLine(){ return null; }
 function pvAllowMore(){
   const f=document.getElementById('pvFrame'); if(!f)return;
   let url=''; try{url=f.src||'';}catch(e){}
@@ -15622,13 +15635,13 @@ function pvAllowMore(){
     return;
   }
   askConfirm({
-    title:`Let ${host} open tabs?`,
-    msg:`WatchList plays sites inside a protected frame, which stops them opening pop-up tabs and stops them navigating away from your list. Some sites won't play inside it.\n\nGiving ${host} more room usually fixes that, and its ads will be able to open tabs. It still can't replace WatchList. Undo it in Sources.`,
+    title:`Give ${host} more room?`,
+    msg:`WatchList plays sites inside a protected frame. Some players need to open their own dialogs and won't start without them.\n\nThis allows that, and nothing else: ${host} still cannot open a browser tab and still cannot navigate away from your list. If the screen stays blank the site is refusing to be framed at all, and "Open in your browser" is the way through. Undo this in Sources.`,
     yes:'Give it more room',
     onYes:()=>{
       setLooseFrame(host,true);
       applyFrameSandbox(f,url); try{f.src=url;}catch(e){}
-      toast(`${host} can open tabs now. Undo it in Sources`,3600);
+      toast(`${host} can show its own dialogs now. Undo it in Sources`,3600);
     },
   });
 }

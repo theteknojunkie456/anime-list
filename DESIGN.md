@@ -710,6 +710,17 @@ allowlist of four origins now, and `smoke.mjs` fails on any handler that tests
 site. Checked in `smoke.mjs`, which is how the trailer player's second,
 completely unsandboxed iframe was found.
 
+**Nothing in the player leaves the app.** `allow-popups` lets a framed site call
+`window.open`, and `allow-popups-to-escape-sandbox` lets what it opens land as an
+ordinary browser tab with none of these restrictions. That pair used to be
+granted to any site you gave "more room" to, which is how miruro.tv threw browser
+tabs at somebody mid-episode: the room was given for its player, and its ads used
+it. Both are gone, and `smoke.mjs` fails on either string appearing in the file —
+verified by putting one back and watching the check fail. A site that genuinely
+cannot be framed is refusing from its own headers, which popups never fixed
+anyway; the answer there is **Open in your browser**, which is the person
+choosing to leave rather than an ad deciding for them.
+
 **Credentials.** None in the client. Worker secrets live in worker env. The
 password lock is real AES-GCM with PBKDF2 at 150k iterations, and the derived key
 lives in sessionStorage, which sync never collects. The AI key and AniList tokens

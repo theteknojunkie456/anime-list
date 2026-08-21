@@ -249,11 +249,19 @@ try {
   const raw4 = readFileSync('index.html', 'utf8')
     .replace(/<!--[\s\S]*?-->/g, '').replace(/^\s*\/\/.*$/gm, '');
   const topNav = /allow-top-navigation/.test(raw4);
+  // The other pair that lets a framed page put you somewhere else: allow-popups
+  // opens the window, allow-popups-to-escape-sandbox makes what it opens an
+  // ordinary tab with none of these restrictions. Granting them is how miruro.tv
+  // ended up throwing browser tabs at somebody watching an episode. Nothing in
+  // the player leaves the app, so neither belongs in this file.
+  const popups = [...raw4.matchAll(/allow-popups[a-z-]*/g)].map(m => m[0]);
   const frames = [...raw4.matchAll(/<iframe[^>]*>/g)].map(m => m[0])
     .filter(f => /pvFrame|ytFrame/.test(f));
   const unsandboxed = frames.filter(f => !/sandbox=/.test(f));
-  results.push({ n: 'player frames are sandboxed', ok: unsandboxed.length === 0 && !topNav,
-    d: topNav ? 'allow-top-navigation is present' : (unsandboxed.length ? unsandboxed.length + ' frame(s) with no sandbox' : 'sandboxed, no top-navigation') });
+  results.push({ n: 'player frames are sandboxed', ok: unsandboxed.length === 0 && !topNav && popups.length === 0,
+    d: topNav ? 'allow-top-navigation is present'
+      : popups.length ? popups.join(', ') + ' is present — a framed page could open a tab'
+      : (unsandboxed.length ? unsandboxed.length + ' frame(s) with no sandbox' : 'sandboxed; no top-navigation, no popups') });
 }
 
 // Origin checks must be exact. A regex like /youtube\.com/ is a substring test,

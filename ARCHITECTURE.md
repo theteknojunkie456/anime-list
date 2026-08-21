@@ -444,3 +444,28 @@ can't.
    The two moves available are opening the user's *own* service (official app)
    and the neutral user-configured custom-source field. See §10.
 2. **No adult content.** Enforced by the gate in §7 — don't weaken it.
+
+## Your own AI endpoint
+
+The four built-in providers are recognised by the **shape of the key** — `gsk_`
+Groq, `sk-or-` OpenRouter, `AIza` Google, `sk-ant-` Claude. That works right up
+until you put a router in front of them: a Manifest / LiteLLM / self-hosted proxy
+key starts with none of those prefixes and was rejected as "not a key".
+
+Setting a base URL (AI Key sheet → *Use your own endpoint*) switches the app to
+`custom`, and it is checked **before** the prefixes — the whole point is that the
+key's shape no longer tells you where the request goes. From then on:
+
+- the key can be any shape, because the endpoint decides what it means;
+- the address is normalised, so the root, `/v1`, or the full
+  `/v1/chat/completions` all work;
+- the **model name is yours to give** — a router routes on it, and guessing one
+  would send every request to something that isn't there. There are no fallbacks
+  for a custom endpoint, so an unset model is an explicit error rather than an
+  empty chain that throws `null`;
+- the model dropdown hides, because the name you typed *is* the choice;
+- both paths speak the same protocol: one-shot calls and the streaming chat.
+
+The base URL and key are localStorage-only and are **never synced**, for the same
+reason the provider keys aren't: a credential in cloud storage is a credential
+given away.

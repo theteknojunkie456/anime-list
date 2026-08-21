@@ -4273,6 +4273,19 @@ body.recsel .pcard{position:relative;}
     <button class="ai-run-btn" id="keyPasteBtn" onclick="pasteKey()" title="Paste from clipboard"><i data-ic="clipboard"></i></button>
     <button class="ai-run-btn" onclick="saveKeyAndClose()">Save</button>
   </div>
+  <details class="keyhow" style="margin-top:10px">
+    <summary>Use your own endpoint (Manifest, LiteLLM, a proxy)</summary>
+    <div class="keyhow-body">
+      <p class="ai-desc" style="margin:0 0 10px">Anything that speaks the OpenAI chat format. Set this and the key above can be any shape — whatever you paste is sent here instead, and this endpoint decides what it means.</p>
+      <input class="ai-prompt-in" id="aiBaseIn" type="url" placeholder="https://api.example.com/v1" autocomplete="off" spellcheck="false" inputmode="url">
+      <input class="ai-prompt-in" id="aiModelIn" style="margin-top:8px" placeholder="model name, exactly as your endpoint expects" autocomplete="off" spellcheck="false">
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="ai-run-btn" style="flex:1" onclick="saveAiEndpoint()">Save endpoint</button>
+        <button class="parse-btn" style="flex:0 0 auto;width:auto;padding:0 16px" onclick="clearAiEndpoint()">Clear</button>
+      </div>
+      <p class="ai-desc" style="margin-top:10px">The root, the <code>/v1</code>, or the full <code>/v1/chat/completions</code> all work. Your key and this address stay on this device — neither is ever synced.</p>
+    </div>
+  </details>
   <button class="chat-clear" onclick="removeKey()" style="margin-top:10px"><i data-ic="trash"></i> Remove key</button>
   <p class="ai-desc" style="margin-top:12px">Your key stays on this device only — it never leaves your phone. The AI features are optional; everything else works without one.</p>
 
@@ -18154,12 +18167,15 @@ function saveKey(){
     return;
   }
   const prov=keyProvider(v);
-  if(prov===null){                          // looks nothing like a key — don't save junk
+  // The shape check exists to stop junk being saved silently. It only means
+  // anything when WE choose the destination — with your own endpoint set, the
+  // thing on the other end decides what a valid key looks like.
+  if(prov===null&&!aiBaseURL()){
     toast("That doesn't look like a key — it should start with gsk_, sk-or-, AIza or sk-ant-");
     return;
   }
   try{localStorage.setItem('anthropic_key',v);}catch{}
-  toast(prov+' key saved');            // name the provider so they know it registered
+  toast((prov||'Endpoint')+' key saved');   // name the provider so they know it registered
   renderModelPicker();updateKeyBtn();       // <- updateKeyBtn was missing: button stayed "Add AI Key"
 }
 // Say which of these it actually is. "Check your key" is right for exactly one
@@ -18224,12 +18240,27 @@ function modelChain(prov){
   const seen=new Set(),out=[];
   for(const m of [getModel()].concat(AI_MODELS[prov]||[],AI_EXTRA[prov]||[]))
     if(m&&!seen.has(m)){seen.add(m);out.push(m);}
+  // Your own endpoint has no fallbacks to fall back to. An empty chain would
+  // loop zero times and throw `null`, which reads as nothing happening at all.
+  if(!out.length&&prov==='custom'){
+    const e=new Error('no model set');e.detail='Set a model name for your endpoint in the AI Key sheet.';throw e;
+  }
   return out;
 }
 function modelRejected(err){
   const d=String(err&&err.detail||'').toLowerCase();
   return (err&&(err.status===404||err.status===400))&&
     /model|decommission|deprecat|not found|does not exist|unsupported/.test(d);
+}
+// People paste the root ("https://api.manifest.build"), the version prefix
+// (".../v1") or the whole endpoint (".../v1/chat/completions"). All three mean
+// the same thing, so all three work.
+function aiChatURL(){
+  let u=aiBaseURL().replace(/\/+$/,'');
+  if(!u)return '';
+  if(/\/chat\/completions$/.test(u))return u;
+  if(/\/v\d+$/.test(u))return u+'/chat/completions';
+  return u+'/v1/chat/completions';
 }
 async function callOpenAICompat(url,key,models,prompt){
   const chain=Array.isArray(models)?models:[models];
@@ -18254,6 +18285,7 @@ async function callAI(prompt){
   const prov=aiProvider();
   if(!prov)throw unknownKeyErr();
   const chain=modelChain(prov);
+  if(prov==='custom')     return callOpenAICompat(aiChatURL(),key,chain,prompt);
   if(prov==='groq')       return callOpenAICompat('https://api.groq.com/openai/v1/chat/completions',key,chain,prompt);
   if(prov==='openrouter') return callOpenAICompat('https://openrouter.ai/api/v1/chat/completions',key,chain,prompt);
   let last=null;
@@ -18614,11 +18646,34 @@ function _streamChat(){
     renderChatThread(false);saveChat();
   });
 }
-const AI_MODELS={groq:['openai/gpt-oss-120b','openai/gpt-oss-20b'],openrouter:['meta-llama/llama-3.3-70b-instruct:free','google/gemini-2.0-flash-exp:free'],gemini:['gemini-2.5-flash','gemini-2.5-pro'],claude:['claude-sonnet-5','claude-haiku-4-5-20251001']};
+const AI_MODELS={groq:['openai/gpt-oss-120b','openai/gpt-oss-20b'],openrouter:['meta-llama/llama-3.3-70b-instruct:free','google/gemini-2.0-flash-exp:free'],gemini:['gemini-2.5-flash','gemini-2.5-pro'],claude:['claude-sonnet-5','claude-haiku-4-5-20251001'],
+  // Nothing to guess at: a router routes on the model name you give it, and
+  // guessing one would send every request to something that isn't there.
+  custom:[]};
 // Only sk-ant- keys are Claude — a random non-empty string is NOT a key. (The old
 // `if(k)return'claude'` sent junk to the Claude endpoint and failed cryptically.)
-function aiProvider(){const k=getKey();if(k.startsWith('gsk_'))return'groq';if(k.startsWith('sk-or-'))return'openrouter';if(k.startsWith('AIza'))return'gemini';if(k.startsWith('sk-ant-'))return'claude';return'';}
-function getModel(){const p=aiProvider();if(!p)return'';try{return localStorage.getItem('ai_model_'+p)||AI_MODELS[p][0];}catch{return AI_MODELS[p][0];}}
+// YOUR OWN ENDPOINT.
+//
+// The four providers are recognised by the shape of their key, which works right
+// up until you put a router in front of them — a Manifest key (or a self-hosted
+// proxy, or LiteLLM) starts with none of those prefixes and was rejected as "not
+// a key". Setting a base URL says "send it here instead", and then the key can be
+// anything, because the thing on the other end decides what it means.
+//
+// It has to be checked FIRST: the whole point is that the key's shape no longer
+// tells you where the request goes.
+function aiBaseURL(){try{return (localStorage.getItem('ai_base_url')||'').trim();}catch{return'';}}
+function setAiBaseURL(u){try{u?localStorage.setItem('ai_base_url',u):localStorage.removeItem('ai_base_url');}catch{}}
+function aiProvider(){
+  if(aiBaseURL())return'custom';
+  const k=getKey();
+  if(k.startsWith('gsk_'))return'groq';
+  if(k.startsWith('sk-or-'))return'openrouter';
+  if(k.startsWith('AIza'))return'gemini';
+  if(k.startsWith('sk-ant-'))return'claude';
+  return'';
+}
+function getModel(){const p=aiProvider();if(!p)return'';try{return localStorage.getItem('ai_model_'+p)||AI_MODELS[p][0]||'';}catch{return (AI_MODELS[p]||[])[0]||'';}}
 function setModelSel(v){const p=aiProvider();if(p){try{localStorage.setItem('ai_model_'+p,v);}catch{}}}
 function updateKeyBtn(){
   const b=document.getElementById('keyBtn');if(!b)return;
@@ -18626,7 +18681,30 @@ function updateKeyBtn(){
   if(k){b.innerHTML=icon('key')+' Change AI key ('+(keyProvider(k)||'custom')+')';b.classList.remove('key-cta');}
   else {b.innerHTML=icon('key')+' Add a free key to enable AI';b.classList.add('key-cta');}   // highlight when missing so it's not scrolled past
 }
-function openKeySheet(){const inp=document.getElementById('apiKeyIn');if(inp)inp.value=getKey();openSheet('keySheet');}
+function saveAiEndpoint(){
+  const u=(document.getElementById('aiBaseIn').value||'').trim();
+  const m=(document.getElementById('aiModelIn').value||'').trim();
+  if(u&&!/^https:\/\//i.test(u)){toast('The address has to start with https://');return;}
+  setAiBaseURL(u);
+  try{m?localStorage.setItem('ai_model_custom',m):localStorage.removeItem('ai_model_custom');}catch(e){}
+  renderModelPicker();updateKeyBtn();
+  toast(u?(m?'Endpoint saved':'Endpoint saved \u2014 add a model name'):'Endpoint cleared');
+}
+function clearAiEndpoint(){
+  setAiBaseURL('');
+  try{localStorage.removeItem('ai_model_custom');}catch(e){}
+  const a=document.getElementById('aiBaseIn'),b=document.getElementById('aiModelIn');
+  if(a)a.value='';if(b)b.value='';
+  renderModelPicker();updateKeyBtn();
+  toast('Back to the built-in providers');
+}
+function openKeySheet(){
+  const inp=document.getElementById('apiKeyIn');if(inp)inp.value=getKey();
+  const b=document.getElementById('aiBaseIn');if(b)b.value=aiBaseURL();
+  const m=document.getElementById('aiModelIn');
+  if(m){try{m.value=localStorage.getItem('ai_model_custom')||'';}catch(e){m.value='';}}
+  openSheet('keySheet');
+}
 // One tap to the exact page where the key is created — signing up lands you
 // straight there, so there's no menu to hunt. Open the how-to too, in case they
 // want the steps.
@@ -18653,8 +18731,13 @@ function renderModelPicker(){
   const sel=document.getElementById('modelSel');if(!sel)return;
   const p=aiProvider();
   if(!p){sel.style.display='none';return;}
+  // Your own endpoint has no menu of models to offer — the name you typed in the
+  // AI Key sheet IS the choice. Rendering an empty <select> here would show a
+  // blank control that silently clears the model when touched.
+  const list=AI_MODELS[p]||[];
+  if(!list.length){sel.style.display='none';return;}
   sel.style.display='';const cur=getModel();
-  sel.innerHTML=AI_MODELS[p].map(m=>'<option value="'+m+'"'+(m===cur?' selected':'')+'>'+m.split('/').pop()+'</option>').join('');
+  sel.innerHTML=list.map(m=>'<option value="'+m+'"'+(m===cur?' selected':'')+'>'+m.split('/').pop()+'</option>').join('');
 }
 async function readSSE(resp,onData){
   const reader=resp.body.getReader(),dec=new TextDecoder();let buf='';
@@ -18671,8 +18754,10 @@ async function callAIChatStream(history,onToken){
   let last=null;
   for(const model of modelChain(prov)){
     let resp;
-    if(prov==='groq'||prov==='openrouter'){
-      const url=prov==='groq'?'https://api.groq.com/openai/v1/chat/completions':'https://openrouter.ai/api/v1/chat/completions';
+    if(prov==='groq'||prov==='openrouter'||prov==='custom'){
+      const url=prov==='custom'?aiChatURL()
+        :prov==='groq'?'https://api.groq.com/openai/v1/chat/completions'
+        :'https://openrouter.ai/api/v1/chat/completions';
       resp=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify({model,messages:[{role:'system',content:system}].concat(history),stream:true,max_tokens:2000})});
       if(resp.ok){let full='';await readSSE(resp,d=>{d=d.trim();if(d==='[DONE]'||!d)return;try{const j=JSON.parse(d);const t=j.choices?.[0]?.delta?.content;if(t){full+=t;onToken(t);}}catch(e){}});return full;}
     }else if(prov==='gemini'){
@@ -18833,11 +18918,14 @@ async function fixUnmatchedTitles(){
   const list=left.slice(0,20).map((a,i)=>`${i+1}. ${a.title} (${kindOf(a)==='read'?'manga/manhwa/novel':'anime'})`).join('\n');
   const prompt=`These titles were not found on AniList, probably because of spelling, romanisation, or the user typing a fan translation.\nFor each, give the title AniList itself uses (its English or romaji entry). If you don't know the series, give an empty string — a wrong guess is worse than none.\n\n${list}\n\nReply with ONLY a JSON array of strings, one per numbered item, in order.`;
   let names=[];
+  // This posted straight to Anthropic with a hardcoded Claude model, whatever
+  // provider was actually set up — so on a Google or Groq key it sent that key to
+  // a service that would never accept it, failed, and swallowed the failure. It
+  // goes through callAI like everything else, which knows where this person's
+  // requests are supposed to go.
   try{
-    const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-5',max_tokens:900,messages:[{role:'user',content:prompt}]})});
-    const d=await r.json();
-    const txt=((d.content||[])[0]||{}).text||'';
-    const mm=txt.match(/\[[\s\S]*\]/);
+    const txt=await callAI(prompt);
+    const mm=String(txt||'').match(/\[[\s\S]*\]/);
     if(mm)names=JSON.parse(mm[0]);
   }catch(e){}
   for(let i=0;i<left.length;i++){

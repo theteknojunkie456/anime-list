@@ -21,7 +21,7 @@
      rest of the head parses removes a DNS+TLS round trip from every cold start. -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Manrope:wght@400..800&family=VT323&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Manrope:wght@400..800&family=VT323&family=Pixelify+Sans:wght@400..700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 <style>
 :root{
@@ -219,6 +219,12 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
    retro skin unusable, and this app is mostly prose — titles, notes, times. */
 [data-retro]{
   --fd:'VT323','Bricolage Grotesque',-apple-system,sans-serif;
+  /* The body face was still Manrope, so retro was a pixel headline sitting on
+     perfectly smooth body copy — and under a pixel grid that mismatch is what
+     makes small text hard to read rather than stylised. VT323 is a terminal face
+     and goes thin below about 15px, so the body takes Pixelify Sans, which is
+     drawn to stay legible at the sizes most of this app is set in. */
+  --fb:'Pixelify Sans','Manrope',-apple-system,sans-serif;
   /* The lit edge. Every bevel lip, hairline, caption, cursor and marching-ant in
      this theme mixes from this ONE colour, so switching it repaints the whole
      look rather than a handful of borders. Set on :root by setRetroEdge(). */
@@ -2460,6 +2466,36 @@ body.yt-open{overflow:hidden;touch-action:none;}
 .dt-rec:active .dt-rec-img{transform:scale(.95);}
 .dt-rec-img::after{content:'＋';position:absolute;right:5px;bottom:5px;width:24px;height:24px;border-radius:50%;background:var(--a);color:var(--aFg);font-size:17px;font-weight:700;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 8px rgba(0,0,0,.35);}
 .dt-rec-t{font-size:12px;color:var(--t2);line-height:1.3;margin-top:6px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+/* RETRO, AS ONE LAYER.
+   The old approach redrew every cover through a canvas, one image at a time, and
+   that is what ran overnight stuck at "45396 / 45400". This is a single fixed
+   pane laid over the content: a pixel grid and a slight vertical bloom, drawn
+   once by the compositor and never touched again.
+   It starts at the top of the search bar (set from the real element, so it holds
+   at any width) and runs to the bottom, which leaves the WatchList mark above it
+   crisp. pointer-events:none, so nothing under it stops being pressable.
+   It is a SIBLING of the scroller, never an ancestor: a filter or a stacking
+   context wrapped around the page would make itself the containing block for the
+   fixed nav and every sheet, and they would all detach.
+   Honest about what it is: CSS can tint, line and bloom what is beneath it, but
+   there is no property that mosaics live pixels. This reads as a pixel screen
+   rather than genuinely resampling the page, which is the trade that keeps
+   scrolling smooth. */
+.retro-px{display:none;}
+[data-retro] .retro-px{
+  display:block;position:fixed;left:0;right:0;bottom:0;top:var(--rpx-top,132px);
+  z-index:59;pointer-events:none;
+  background-image:
+    repeating-linear-gradient(to right,rgba(0,0,0,.20) 0 1px,transparent 1px 3px),
+    repeating-linear-gradient(to bottom,rgba(0,0,0,.20) 0 1px,transparent 1px 3px),
+    repeating-linear-gradient(to bottom,rgba(0,0,0,.16) 0 2px,transparent 2px 4px);
+  mix-blend-mode:multiply;
+}
+/* The grid is the whole effect, and on a low-resolution screen 3px cells turn
+   into mush — they get a touch bigger where the pixels are physically larger. */
+@media (max-width:380px){[data-retro] .retro-px{background-size:auto;}}
+@media (prefers-reduced-motion:reduce){[data-retro] .retro-px{background-image:
+  repeating-linear-gradient(to bottom,rgba(0,0,0,.14) 0 2px,transparent 2px 4px);}}
 /* THE WALKTHROUGH.
    A ring around a real control rather than a picture of one. The dimming is a
    single enormous box-shadow spreading out from the hole, which is why there is
@@ -2532,6 +2568,18 @@ body.yt-open{overflow:hidden;touch-action:none;}
 .sd-st.dropped{color:var(--drp);}
 .sd-st.soon{color:var(--a2);border-color:color-mix(in srgb,var(--a) 34%,transparent);}
 .sd-here{flex:0 0 auto;font-size:11px;font-weight:800;color:var(--a2);}
+/* Offered, never done for you. */
+.dt-rewatch{display:flex;align-items:center;gap:11px;margin-bottom:12px;padding:11px 12px;border-radius:14px;
+  background:var(--ag);border:1px solid color-mix(in srgb,var(--a) 32%,transparent);}
+.dt-rewatch-ic{flex:0 0 auto;width:30px;height:30px;border-radius:10px;display:flex;align-items:center;justify-content:center;
+  background:color-mix(in srgb,var(--a) 22%,transparent);color:var(--a2);}
+.dt-rewatch-ic .ico{width:15px;height:15px;}
+.dt-rewatch-c{flex:1;min-width:0;}
+.dt-rewatch-t{font-size:13px;font-weight:800;color:var(--t1);line-height:1.3;}
+.dt-rewatch-s{margin-top:2px;font-size:12px;color:var(--t2);line-height:1.4;}
+.dt-rewatch-go{flex:0 0 auto;padding:9px 13px;min-height:38px;border-radius:11px;border:0;
+  background:var(--a);color:var(--aFg);font-size:12px;font-weight:800;cursor:pointer;white-space:nowrap;}
+.dt-rewatch-go:active{transform:scale(.97);}
 .dt-seasons{display:flex;flex-direction:column;gap:8px;}
 .dt-season{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:var(--bg3);border:1px solid var(--b1);border-radius:14px;padding:9px 12px;transition:border-color .15s,background .15s;}
 .dt-season.cur{border-color:var(--a);background:var(--ag);}
@@ -4208,6 +4256,8 @@ body.recsel .pcard{position:relative;}
   </div>
   <div class="fixbar" id="fixBar"></div>
   <div class="page" id="pageEl"></div>
+  <!-- RETRO: one grid over everything, instead of pixelating each picture -->
+  <div class="retro-px" id="retroPx" aria-hidden="true"></div>
 </div>
 
 <!-- BOTTOM NAV -->
@@ -7846,6 +7896,7 @@ function applyRetroMode(){
   try{
     const el=document.documentElement;
     if(retroMode())el.setAttribute('data-retro','1');else el.removeAttribute('data-retro');
+    try{placeRetroPx();}catch(e){}      // the pane starts at the search bar, measured
   }catch(e){}
   try{applyRetroEdge();}catch(e){}
   try{refreshPixels();}catch(e){}
@@ -10659,7 +10710,35 @@ function paintFranchise(){
   // "Seen all" still means the numbered run only. Silently marking somebody's
   // films watched because they tapped it on the seasons list would be a lie.
   const allSeen=mainIdx.length&&mainIdx.every(i=>{const mine=franchiseMine(seasons[i]);return mine&&mine.status==='finished';});
+  // A new season landing is the one moment the earlier ones matter again — and
+  // it is exactly when people go "wait, what happened in season 2". If something
+  // in this franchise is still to come and you have already finished something
+  // earlier, say so, and put the way back to them one tap away. It offers; it
+  // never moves anything, because "finished" is a record of what you did and
+  // resetting it to stage a rewatch would be a lie about your own history.
   let html='';
+  (()=>{
+    const soonest=seasons.filter(x=>x.status==='NOT_YET_RELEASED'||(x.airingAt&&x.airingAt*1000>Date.now()))
+      .sort((x,y)=>(x.airingAt||Infinity)-(y.airingAt||Infinity))[0];
+    if(!soonest)return;
+    const doneCount=seasons.filter(x=>{const m=franchiseMine(x);return m&&m.status==='finished';}).length;
+    if(!doneCount)return;                       // nothing to rewatch yet
+    let when='';
+    if(soonest.airingAt&&soonest.airingAt*1000>Date.now()){
+      const d=new Date(soonest.airingAt*1000);
+      when=(soonest.airingAt*1000-Date.now())<7*86400000
+        ? d.toLocaleDateString([],{weekday:'long'})
+        : d.toLocaleDateString([],{month:'short',day:'numeric'});
+    } else if(soonest.year) when=String(soonest.year);
+    html+=`<div class="dt-rewatch">
+      <span class="dt-rewatch-ic">${icon('refresh')}</span>
+      <div class="dt-rewatch-c">
+        <div class="dt-rewatch-t">${schEsc(soonest.title||'A new season')}${when?' lands '+schEsc(when):' is coming'}</div>
+        <div class="dt-rewatch-s">Care for a rewatch? You have finished ${doneCount} already.</div>
+      </div>
+      <button class="dt-rewatch-go" onclick="openSeasonsDrawer('${escH(a.id)}')">Show them</button>
+    </div>`;
+  })();
   if(mainIdx.length)
     html+=`<div class="dt-seasons-head"><div class="dt-label">Seasons · ${mainIdx.length}</div>
       <button class="dt-seenall" onclick="markFranchiseSeen()">${icon(allSeen?'check':'layers')} ${allSeen?'All seen':'Seen all'}</button></div>
@@ -10880,6 +10959,21 @@ function wtPlace(){
   card.style.left=Math.round(left)+'px';
   card.style.top=Math.round(top)+'px';
 }
+// Where the pane starts: the top of the search bar, measured rather than assumed,
+// so the logo above it stays crisp at every width and on every device.
+function placeRetroPx(){
+  try{
+    const el=document.getElementById('searchIn')||document.querySelector('.topbar');
+    if(!el)return;
+    const r=el.getBoundingClientRect();
+    if(r.height)document.documentElement.style.setProperty('--rpx-top',Math.max(0,Math.round(r.top-6))+'px');
+  }catch(e){}
+}
+try{
+  window.addEventListener('resize',placeRetroPx,{passive:true});
+  window.addEventListener('orientationchange',placeRetroPx,{passive:true});
+  setTimeout(placeRetroPx,300);
+}catch(e){}
 function wtSeen(){try{return !!localStorage.getItem('wt_done_'+LSKEY);}catch(e){return false;}}
 
 // ─── ALL SEASONS, FROM ANYWHERE ─────────────────────────────────────────────

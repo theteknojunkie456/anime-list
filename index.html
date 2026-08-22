@@ -2460,6 +2460,36 @@ body.yt-open{overflow:hidden;touch-action:none;}
 .dt-rec:active .dt-rec-img{transform:scale(.95);}
 .dt-rec-img::after{content:'＋';position:absolute;right:5px;bottom:5px;width:24px;height:24px;border-radius:50%;background:var(--a);color:var(--aFg);font-size:17px;font-weight:700;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 8px rgba(0,0,0,.35);}
 .dt-rec-t{font-size:12px;color:var(--t2);line-height:1.3;margin-top:6px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+/* THE WALKTHROUGH.
+   A ring around a real control rather than a picture of one. The dimming is a
+   single enormous box-shadow spreading out from the hole, which is why there is
+   no full-screen panel here: a panel would have to sit ON TOP of the thing it is
+   pointing at, and then you could not press it. Nothing here takes pointer
+   events except the card, so every control stays live and the step you are being
+   shown is the step you can actually do. */
+.wt{position:fixed;inset:0;z-index:96;display:none;pointer-events:none;}
+.wt.on{display:block;}
+.wt-hole{position:fixed;border-radius:16px;pointer-events:none;
+  box-shadow:0 0 0 9999px rgba(0,0,0,.74),0 0 0 3px var(--a),0 0 26px 4px var(--glow);
+  transition:top .3s cubic-bezier(.2,1,.28,1),left .3s cubic-bezier(.2,1,.28,1),
+             width .3s cubic-bezier(.2,1,.28,1),height .3s cubic-bezier(.2,1,.28,1);}
+.wt-card{position:fixed;pointer-events:auto;width:min(340px,calc(100vw - 28px));
+  padding:15px 16px 13px;border-radius:18px;background:var(--bg2);border:1px solid var(--b3);
+  box-shadow:0 22px 60px rgba(0,0,0,.65);transition:top .3s cubic-bezier(.2,1,.28,1),left .3s cubic-bezier(.2,1,.28,1);}
+.wt-step{font-size:10px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:var(--a2);}
+.wt-t{margin-top:5px;font-family:var(--fd);font-size:17px;font-weight:800;letter-spacing:-.2px;color:var(--t1);line-height:1.2;}
+.wt-b{margin-top:7px;font-size:13px;line-height:1.55;color:var(--t2);}
+.wt-b b{color:var(--t1);}
+/* A step you cannot skip says why, instead of just refusing to advance. */
+.wt-need{margin-top:10px;padding:9px 11px;border-radius:12px;font-size:12px;line-height:1.45;
+  background:var(--ag);border:1px solid color-mix(in srgb,var(--a) 34%,transparent);color:var(--a2);}
+.wt-row{display:flex;align-items:center;gap:8px;margin-top:13px;}
+.wt-skip,.wt-back{background:none;border:0;color:var(--t3);font-size:13px;font-weight:700;
+  padding:10px 10px;margin:-10px -4px;min-height:40px;border-radius:10px;cursor:pointer;}
+.wt-skip:active,.wt-back:active{background:var(--b1);}
+.wt-next{padding:10px 18px;min-height:40px;border-radius:12px;border:0;background:var(--a);color:var(--aFg);
+  font-family:var(--fd);font-size:14px;font-weight:800;cursor:pointer;box-shadow:0 8px 20px -8px var(--glow);}
+.wt-next:disabled{background:var(--bg4);color:var(--t3);box-shadow:none;cursor:default;}
 /* Comes in from the side and stops short of the edge, so the list underneath is
    still visible behind it — this is a reference you glance at, not a place you
    go. On a phone there is no room for that, so it takes the width. */
@@ -4205,6 +4235,23 @@ body.recsel .pcard{position:relative;}
   <div class="onb-foot">
     <div class="onb-dots" id="onbDots"></div>
     <button class="onb-next" id="onbNextBtn" onclick="onbNext()">Next</button>
+  </div>
+</div>
+
+<!-- WALKTHROUGH — a spotlight over the REAL app, not a description of it -->
+<div class="wt" id="wt" aria-hidden="true">
+  <div class="wt-hole" id="wtHole"></div>
+  <div class="wt-card" id="wtCard" role="dialog" aria-live="polite">
+    <div class="wt-step" id="wtStep"></div>
+    <div class="wt-t" id="wtT"></div>
+    <div class="wt-b" id="wtB"></div>
+    <div class="wt-need" id="wtNeed" hidden></div>
+    <div class="wt-row">
+      <button class="wt-skip" id="wtSkip" onclick="wtEnd(true)">Skip</button>
+      <span style="flex:1"></span>
+      <button class="wt-back" id="wtBack" onclick="wtBack()">Back</button>
+      <button class="wt-next" id="wtNext" onclick="wtNext()">Next</button>
+    </div>
   </div>
 </div>
 
@@ -10689,6 +10736,140 @@ function seasonToItem(s,status){
 //
 // It goes on as Plan, not Watching: you haven't watched any of it yet, and the
 // first episode you mark promotes it on its own.
+// ─── THE WALKTHROUGH ────────────────────────────────────────────────────────
+// Setting this app up used to be a phone call: open it in Safari, no not that
+// browser, add it to your home screen, now send me a request, now turn on cloud
+// backup, now save the key, now find Friends, now paste my code. Every one of
+// those is a real control that already exists — the problem was never that they
+// were missing, it was that nobody could find them in the right order.
+//
+// So this points at the real thing. Each step rings a live control, says what it
+// is for in a sentence, and leaves it pressable. The two that matter — cloud
+// backup and a friend — will not let you past until they are actually done,
+// because those are the two people skip and then lose everything to.
+const WT_STEPS=[
+  {sel:'#searchIn',
+   t:'This is everything you watch',
+   b:'Anime and manga, what you finished, what you dropped, and where you left off. Search it from here.'},
+  {sel:'#nav-add',
+   t:'Add anything with +',
+   b:'Type a name and it fills in the artwork, the episode count and how long the whole thing takes. You can paste a whole list in one go, too.'},
+  {sel:'#nav-settings', open:()=>openSheet('backupSheet'),
+   t:'Turn on cloud backup — do not skip this',
+   b:'Your list lives on this device. Backup gives you a <b>key</b> that brings it back on any other one. Without it, clearing your browser loses the lot.',
+   need:()=>{try{return !!syncCode();}catch(e){return false;}},
+   needMsg:'Tap <b>Turn on backup</b> in the panel below. This step is the one thing you cannot skip.'},
+  {sel:'#backupSheet .sheet-header', open:()=>openSheet('backupSheet'),
+   t:'Save that key somewhere real',
+   b:'Copy it into your Notes now. It is the only way back to your list, and nobody can recover it for you, not even me.'},
+  {sel:'#hb-social', open:()=>openSheet('friendsSheet'),
+   t:'Friends, and your own code',
+   b:'Open <b>Your code &amp; adding friends</b>. Send someone your code, or paste theirs. Then you can recommend shows to each other and see what they thought.',
+   need:()=>{try{return (friendsList()||[]).length>0||(friendsOut()||[]).length>0;}catch(e){return true;}},
+   needMsg:'Add one friend, or send one request, and this step is done.'},
+  {sel:'#nav-sources', open:()=>openSheet('sourceSheet'),
+   t:'Where you actually watch',
+   b:'Pick the services you use and <b>Watch</b> opens straight to them. A friend can hand you their whole setup instead, if that is easier.'},
+  {sel:'#notifyBell', open:()=>{try{openNotifySheet();}catch(e){}},
+   t:'Know when an episode lands',
+   b:'Only the shows you follow. On iPhone this needs the app on your Home Screen first.'},
+  {sel:'#hb-look',
+   t:'Make it yours',
+   b:'Themes, density, artwork size. None of it changes your list; it is all just how it looks.'},
+  {sel:'#nav-home',
+   t:'That is the whole thing',
+   b:'Everything you skipped is waiting in Settings, and you can run this again from there any time.'},
+];
+let _wtI=-1,_wtPoll=0,_wtOn=false;
+function wtStart(){
+  if(!WT_STEPS.length)return;
+  _wtOn=true;
+  const el=document.getElementById('wt'); if(el)el.classList.add('on');
+  try{['resize','scroll'].forEach(t=>window.addEventListener(t,wtPlace,{passive:true}));}catch(e){}
+  wtGo(0);
+}
+function wtEnd(skipped){
+  _wtOn=false;
+  clearInterval(_wtPoll);_wtPoll=0;
+  const el=document.getElementById('wt'); if(el)el.classList.remove('on');
+  try{['resize','scroll'].forEach(t=>window.removeEventListener(t,wtPlace));}catch(e){}
+  try{localStorage.setItem('wt_done_'+LSKEY,skipped?'skipped':'1');}catch(e){}
+  try{closeAll();}catch(e){}
+  if(!skipped)toast('That is it. Everything else is in Settings');
+}
+function wtGo(i){
+  if(i<0||i>=WT_STEPS.length){wtEnd(false);return;}
+  _wtI=i;
+  const st=WT_STEPS[i];
+  // Some steps live inside a sheet, so the sheet has to be open before there is
+  // anything to point at.
+  try{ if(st.open)st.open(); }catch(e){}
+  const set=(id,v)=>{const e=document.getElementById(id); if(e)e.innerHTML=v;};
+  set('wtStep','Step '+(i+1)+' of '+WT_STEPS.length);
+  set('wtT',st.t);
+  set('wtB',st.b);
+  const back=document.getElementById('wtBack'); if(back)back.style.visibility=i?'':'hidden';
+  const next=document.getElementById('wtNext'); if(next)next.textContent=(i===WT_STEPS.length-1)?'Done':'Next';
+  // Give a sheet a beat to lay out before measuring what to ring.
+  setTimeout(wtPlace,st.open?260:0);
+  wtCheckNeed();
+  clearInterval(_wtPoll);
+  if(st.need)_wtPoll=setInterval(wtCheckNeed,600);   // it becomes done while they work, not when they press
+}
+function wtCheckNeed(){
+  const st=WT_STEPS[_wtI]; if(!st)return;
+  const box=document.getElementById('wtNeed'), next=document.getElementById('wtNext');
+  let ok=true;
+  try{ ok=st.need?!!st.need():true; }catch(e){ ok=true; }
+  if(box){ box.hidden=!(st.need&&!ok); if(st.need&&!ok)box.innerHTML=st.needMsg||'Finish this step to carry on.'; }
+  if(next)next.disabled=!!(st.need&&!ok);
+}
+function wtNext(){ wtGo(_wtI+1); }
+function wtBack(){ wtGo(_wtI-1); }
+// Ring the target and put the card where it does not cover it.
+function wtPlace(){
+  if(!_wtOn)return;
+  const st=WT_STEPS[_wtI]; if(!st)return;
+  const hole=document.getElementById('wtHole'), card=document.getElementById('wtCard');
+  if(!hole||!card)return;
+  let el=null; try{ el=typeof st.sel==='function'?st.sel():document.querySelector(st.sel); }catch(e){}
+  const pad=8;
+  if(!el||!el.getClientRects().length){
+    // Nothing to point at — the step still reads, centred, rather than ringing
+    // the top-left corner of the screen like something has gone wrong.
+    hole.style.opacity='0';
+    card.style.left=Math.round((innerWidth-card.offsetWidth)/2)+'px';
+    card.style.top=Math.round((innerHeight-card.offsetHeight)/2)+'px';
+    return;
+  }
+  hole.style.opacity='1';
+  const r=el.getBoundingClientRect();
+  hole.style.left=(r.left-pad)+'px';
+  hole.style.top=(r.top-pad)+'px';
+  hole.style.width=(r.width+pad*2)+'px';
+  hole.style.height=(r.height+pad*2)+'px';
+  const cw=card.offsetWidth||320, ch=card.offsetHeight||160, gap=14;
+  let top,left;
+  // A target that fills most of the screen — a whole sheet — has no "beside" to
+  // sit in, and centring on it drops the card straight over the control being
+  // pointed at. It goes to the bottom edge instead, where a sheet's own actions
+  // are not.
+  if(r.height>innerHeight*0.55){
+    top=innerHeight-ch-14;
+    left=(innerWidth-cw)/2;
+  }else{
+    top=r.bottom+gap;
+    if(top+ch>innerHeight-10)top=r.top-gap-ch;      // no room below → go above
+    if(top<10)top=Math.min(innerHeight-ch-10,Math.max(10,r.bottom+gap));
+    left=r.left+r.width/2-cw/2;
+  }
+  left=Math.max(10,Math.min(innerWidth-cw-10,left));
+  top=Math.max(10,Math.min(innerHeight-ch-10,top));
+  card.style.left=Math.round(left)+'px';
+  card.style.top=Math.round(top)+'px';
+}
+function wtSeen(){try{return !!localStorage.getItem('wt_done_'+LSKEY);}catch(e){return false;}}
+
 // ─── ALL SEASONS, FROM ANYWHERE ─────────────────────────────────────────────
 // The franchise list lived only at the bottom of one card, which is no use when
 // what you want to know is "have I seen season 1 yet" while looking at season 2.
@@ -10719,7 +10900,7 @@ function renderSeasonsDrawer(loading){
   if(t)t.textContent=_sdTitle||'All seasons';
   if(loading){box.innerHTML=`<p class="ai-desc">${icon('loader')} Looking up every season, film and special\u2026</p>`;return;}
   if(!_sdList.length){
-    box.innerHTML=`<p class="ai-desc">Nothing else found for this one. Either it stands alone, or it never matched a database \u2014 Fix titles will sort that out.</p>`;
+    box.innerHTML=`<p class="ai-desc">Nothing else found for this one. Either it stands alone, or it never matched a database. Fix titles will sort that out.</p>`;
     return;
   }
   const rows=_sdList.map((sn,i)=>{
@@ -10742,7 +10923,7 @@ function renderSeasonsDrawer(loading){
       ${cur?'<span class="sd-here">Here</span>':icon('chevron-right')}
     </button>`;
   }).join('');
-  box.innerHTML=`<p class="ai-desc" style="margin-bottom:10px">In order. What you've done with each is on the row \u2014 tap one to go to it.</p>${rows}`;
+  box.innerHTML=`<p class="ai-desc" style="margin-bottom:10px">In order. What you've done with each is on the row. Tap one to go to it.</p>${rows}`;
   try{hydrateIcons(box);}catch(e){}
 }
 function sdOpen(i){
@@ -13685,7 +13866,13 @@ function showOnb(){
   markTutSeen();   // don't also pop the old text tutorial
   try{localStorage.setItem('onboarded_'+LSKEY,'1');}catch{}
 }
-function finishOnb(){ const v=document.getElementById('onb'); if(v)v.classList.remove('on'); markTutSeen(); }
+function finishOnb(){
+  const v=document.getElementById('onb'); if(v)v.classList.remove('on');
+  markTutSeen();
+  // The intro cards say what this is; the walkthrough says where everything is.
+  // Running it straight after is what replaces the phone call.
+  try{ if(!wtSeen())setTimeout(()=>{try{wtStart();}catch(e){}},420); }catch(e){}
+}
 
 // ─── SETTINGS HUB ───────────────────────────────────────────────────────────
 // Each row states its own status, so "backup is off" is visible at a glance
@@ -13758,7 +13945,8 @@ function renderSettings(){
   const el=document.getElementById('settingsBody');if(!el)return;
   const backedUp=!!syncCode();
   const rows=[
-    {ic:'bulb',     h:'How WatchList works', p:'A quick tour — and how not to lose your list', go:'openTutorial()'},
+    {ic:'compass',  h:'Show me around',      p:wtSeen()?'Run the walkthrough again':'A guided walkthrough of the real app', go:'wtStart()'},
+    {ic:'bulb',     h:'How WatchList works', p:'The written version, if you prefer reading', go:'openTutorial()'},
     {ic:'cloud',    h:'Cloud backup',        p:backupStatusLine(),
      go:"openSheet('backupSheet')", warn:!backedUp||backupFailing()},
     {ic:'lock',     h:'Password',            p:encEnabled()?'On — your list is encrypted':'Off', go:"openSheet('securitySheet')"},
@@ -19118,7 +19306,14 @@ async function lookupShowById(id){
     time:d.averageRuntime&&eps.length?`~${Math.round(d.averageRuntime*eps.length/60)} hrs`:'',
     genre:(d.genres||[]).slice(0,3).join(', '),
     order:sNums.length>1?sNums.map(s=>`TV: Season ${s} — ${seasons[s]} eps`):[],
-    notes:['Live action',d.status,(d.premiered||'').slice(0,4)].filter(Boolean).join(' · '),
+    // TVMaze is mostly live-action television, so this asserted "Live action" on
+    // everything it returned — but it also carries anime and donghua, and a
+    // Chinese animation matched here came back labelled as live action on its
+    // own card. TVMaze states the answer itself: `type` is "Animation" for
+    // animated shows, and the genre list carries "Anime". When it says so, the
+    // label is simply left off rather than replaced with another guess.
+    notes:[(String(d.type||'').toLowerCase()==='animation'||(d.genres||[]).some(g=>/^anime$/i.test(String(g))))?'':'Live action',
+           d.status,(d.premiered||'').slice(0,4)].filter(Boolean).join(' · '),
     img:d.image?(d.image.original||d.image.medium||''):''
   };
 }

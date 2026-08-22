@@ -2491,27 +2491,22 @@ body.yt-open{overflow:hidden;touch-action:none;}
    real covers. The bit settings and the scanline stay. */
 /* The small source has to be drawn as squares, not smoothed back into a blur. */
 [data-retro] .pcard-img,[data-retro] .dt-cover,[data-retro] .sd-art,[data-retro] .rtm-art{image-rendering:pixelated;}
-/* FLAT COLOUR, WHICH IS THE HALF THAT WORKS.
-   Real mosaicking of live images is not something CSS can do — the transform
-   trick loses to Chrome re-rasterising at the final resolution, and the SVG tile
-   filter never filled its cells. Both were tried and both are gone.
-   Colour reduction is a different mechanism and it does work: each channel snaps
-   to a few steps, so gradients become flat bands. Fewer steps the further back
-   the era goes. */
-[data-retro] .pcard-img,[data-retro] .hero-bg-img,[data-retro] .dt-banner-img,
-[data-retro] .dt-cover,[data-retro] .sd-art,[data-retro] .rtm-art,[data-retro] .ns-art img,[data-retro] .ns-vs-art img{
+/* FLAT COLOUR, ON EVERY PIECE OF ARTWORK.
+   Real mosaicking is done by the canvas pass; this is the colour half. Each
+   channel snaps to a set number of steps, so gradients become flat bands. The
+   step counts are high enough that hues survive — too few and a skin tone lands
+   on magenta because red rounded up while green rounded down. */
+[data-retro] .pcard-img,[data-retro] .rz-img,[data-retro] .pk-cover,[data-retro] .dt-cover,[data-retro] .dt-banner-img,[data-retro] .hero-bg-img,[data-retro] .sd-art,[data-retro] .rtm-art,[data-retro] .ns-art img,[data-retro] .ns-vs-art img{
   filter:url(#wl-pal10);
 }
-[data-retro][data-bits="8"] .pcard-img,[data-retro][data-bits="8"] .hero-bg-img,[data-retro][data-bits="8"] .dt-banner-img,
-[data-retro][data-bits="8"] .dt-cover,[data-retro][data-bits="8"] .sd-art,[data-retro][data-bits="8"] .rtm-art,
-[data-retro][data-bits="8"] .ns-art img,[data-retro][data-bits="8"] .ns-vs-art img{
+[data-retro][data-bits="8"] .pcard-img,[data-retro][data-bits="8"] .rz-img,[data-retro][data-bits="8"] .pk-cover,[data-retro][data-bits="8"] .dt-cover,[data-retro][data-bits="8"] .dt-banner-img,[data-retro][data-bits="8"] .hero-bg-img,[data-retro][data-bits="8"] .sd-art,[data-retro][data-bits="8"] .rtm-art,[data-retro][data-bits="8"] .ns-art img,[data-retro][data-bits="8"] .ns-vs-art img{
   filter:url(#wl-pal4) saturate(1.1);
 }
-[data-retro][data-bits="16"] .pcard-img,[data-retro][data-bits="16"] .hero-bg-img,[data-retro][data-bits="16"] .dt-banner-img,
-[data-retro][data-bits="16"] .dt-cover,[data-retro][data-bits="16"] .sd-art,[data-retro][data-bits="16"] .rtm-art,
-[data-retro][data-bits="16"] .ns-art img,[data-retro][data-bits="16"] .ns-vs-art img{
+[data-retro][data-bits="16"] .pcard-img,[data-retro][data-bits="16"] .rz-img,[data-retro][data-bits="16"] .pk-cover,[data-retro][data-bits="16"] .dt-cover,[data-retro][data-bits="16"] .dt-banner-img,[data-retro][data-bits="16"] .hero-bg-img,[data-retro][data-bits="16"] .sd-art,[data-retro][data-bits="16"] .rtm-art,[data-retro][data-bits="16"] .ns-art img,[data-retro][data-bits="16"] .ns-vs-art img{
   filter:url(#wl-pal6) saturate(1.06);
 }
+/* The small source has to be drawn as squares, not smoothed back into a blur. */
+[data-retro] .pcard-img,[data-retro] .rz-img,[data-retro] .pk-cover,[data-retro] .dt-cover,[data-retro] .dt-banner-img,[data-retro] .hero-bg-img,[data-retro] .sd-art,[data-retro] .rtm-art,[data-retro] .ns-art img,[data-retro] .ns-vs-art img{image-rendering:pixelated;}
 .bits-sw{flex:1;min-width:0;padding:9px 6px;border-radius:10px;font-size:12px;font-weight:800;
   background:var(--bg3);border:1px solid var(--bn2);color:var(--t3);cursor:pointer;white-space:nowrap;}
 .bits-sw.on{color:var(--t1);border-color:var(--a);background:var(--ag);}
@@ -8942,6 +8937,11 @@ function pxSrc(url){
 //     refuses CORS simply fails that one probe and is left alone forever.
 //   - a hard cap per pass, so a big list spreads over several idle turns instead
 //     of doing 186 canvases in one frame.
+// EVERY piece of artwork in the app, in one place. The airing row was smooth
+// while the grid below it was blocky, because this list lived in two forms — a
+// selector for the canvas pass and a different one for the colour filter — and
+// they drifted. One list, both consumers.
+const PX_ART=['.pcard-img','.rz-img','.pk-cover','.dt-cover','.dt-banner-img','.hero-bg-img','.sd-art','.rtm-art'];
 const _pxCache=new Map();
 const PX_MAX_PER_PASS=12;
 // 64-bit used to return 0 — no canvas, no blocks — on the theory that it was the
@@ -8994,7 +8994,7 @@ function pixelateCovers(){
     try{
       const n=pxBlock();
       if(!retroMode()||!n)return;
-      const list=document.querySelectorAll('img.pcard-img:not([data-pxd]),img.dt-cover:not([data-pxd]),img.sd-art:not([data-pxd]),img.rtm-art:not([data-pxd])');
+      const list=document.querySelectorAll(PX_ART.map(c=>'img'+c+':not([data-pxd])').join(','));
       let done=0;
       for(const img of list){
         if(done>=PX_MAX_PER_PASS)break;

@@ -9152,7 +9152,49 @@ function searchScore(a,q){
   }
   const meta=((a.genre||'')+' '+(a.notes||'')).toLowerCase();
   if(meta.includes(q))return 20;
+  // WORD ORDER. Everything above tests the query as one run of characters, so
+  // "attack titan" only survives as a subsequence and "titan attack" not at all —
+  // even though both are obviously the same show. If every word lands somewhere
+  // on this title, it counts; the score sits under the contiguous matches
+  // because a looser match should never outrank an exact one.
+  const words=q.split(/\s+/).filter(w=>w.length>1);
+  if(words.length>1){
+    const hay=[t].concat(alts).join(' ')+' '+meta;
+    const flatHay=hay.replace(/[^a-z0-9]/g,'');
+    if(words.every(w=>hay.includes(w)||flatHay.includes(w.replace(/[^a-z0-9]/g,''))))return 25;
+  }
   return 0;
+}
+// WHAT YOU ACTUALLY TYPE. "finished romance" is a sentence about your own list,
+// and it used to find nothing: the whole string was matched against one title at
+// a time, so the two words could only ever both land on a show literally called
+// that. These words are pulled out and applied as conditions, and whatever is
+// left is the title search.
+const SRCH_TERMS={
+  finished:a=>a.status==='finished', done:a=>a.status==='finished',
+  watching:a=>a.status==='watching', reading:a=>a.status==='watching',
+  plan:a=>a.status==='plan', planned:a=>a.status==='plan',
+  dropped:a=>a.status==='dropped',
+  fav:a=>!!a.fav, favorite:a=>!!a.fav, favourite:a=>!!a.fav,
+  airing:a=>{try{return !!airingInfo(a);}catch(e){return false;}},
+  unwatched:a=>!(a.ep>0), started:a=>(a.ep||0)>0,
+  rated:a=>(a.rating||0)>0, unrated:a=>!(a.rating||0),
+};
+function parseQuery(q){
+  const out={terms:[],text:''};
+  const keep=[];
+  String(q||'').split(/\s+/).filter(Boolean).forEach(w=>{
+    const fn=SRCH_TERMS[w];
+    if(fn)out.terms.push(fn); else keep.push(w);
+  });
+  out.text=keep.join(' ').trim();
+  return out;
+}
+// A year on its own is a filter too — "2016" should not be hunting for a title
+// with 2016 in the name.
+function yearOf(a){
+  const m=String(a&&a.notes||'').match(/\b(19|20)\d{2}\b/);
+  return m?m[0]:'';
 }
 
 // Rebuilding the home list costs 40–90ms of main thread on a 108-title list
@@ -10092,8 +10134,13 @@ function renderHome(){
     // titles that match equally well keep the order the list is meant to be in
     // rather than whatever order they happened to be stored in.
     list=sorted(list);
-    if(q){
-      list=list.map(a=>[a,searchScore(a,q)]).filter(x=>x[1]>0).sort((x,y)=>y[1]-x[1]).map(x=>x[0]);
+    // "finished romance" is two different questions: one about status, one about
+    // the title. The status words become conditions and only what is left is
+    // searched, so the sentence works instead of matching nothing.
+    const _pq=parseQuery(q);
+    if(_pq.terms.length)list=list.filter(a=>_pq.terms.every(fn=>{try{return fn(a);}catch(e){return false;}}));
+    if(_pq.text){
+      list=list.map(a=>[a,searchScore(a,_pq.text)]).filter(x=>x[1]>0).sort((x,y)=>y[1]-x[1]).map(x=>x[0]);
     }
     const hits=list;
     // `hits.map(posterCard)` handed Array.map's SECOND argument — the index — to
@@ -10112,7 +10159,19 @@ function renderHome(){
     // again. The words are right here.
     const typed=(()=>{try{return document.getElementById('searchIn').value.trim();}catch(e){return q;}})()||q;
     const addBtn=q?`<button class="hero-cta" onclick="addFromSearch(${JSON.stringify(typed).replace(/"/g,'&quot;')})">${icon('plus')} Add “${schEsc(typed)}”</button>`:'';
-    el.innerHTML=`<div class="empty"><div class="empty-icon">${q?icon('search'):filterStatus==='fav'?icon('heart'):filterStatus==='rec'?icon('users'):(STATUS_META[filterStatus]?STATUS_META[filterStatus].icon:(isRead?icon('book'):icon('inbox')))}</div><p>${msg}</p>${addBtn}</div>`;
+    // The commonest reason a search finds nothing: it is in your OTHER list.
+    // Saying "no matches" while the thing sits one tab away is just wrong.
+    let otherBtn='';
+    if(q){
+      try{
+        const k=viewKind==='read'?'watch':'read';
+        let others=anime.filter(a=>kindOf(a)===k);
+        if(_pq.terms.length)others=others.filter(a=>_pq.terms.every(fn=>{try{return fn(a);}catch(e){return false;}}));
+        const n=_pq.text?others.filter(a=>searchScore(a,_pq.text)>0).length:others.length;
+        if(n)otherBtn=`<button class="empty-alt" onclick="setKind('${k}')">${icon('refresh')} ${n} match${n>1?'es':''} in your ${k==='read'?'reading':'watch'} list</button>`;
+      }catch(e){}
+    }
+    el.innerHTML=`<div class="empty"><div class="empty-icon">${q?icon('search'):filterStatus==='fav'?icon('heart'):filterStatus==='rec'?icon('users'):(STATUS_META[filterStatus]?STATUS_META[filterStatus].icon:(isRead?icon('book'):icon('inbox')))}</div><p>${msg}</p>${addBtn}${otherBtn}</div>`;
     return;
   }
   if(!pool.length){

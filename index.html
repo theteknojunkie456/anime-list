@@ -4109,11 +4109,11 @@ body.recsel .pcard{position:relative;}
     <div class="hdr-title" role="button" tabindex="0" onclick="adminTap()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();adminTap();}"><b>Watch</b><i>list</i></div>
     <div class="hdr-actions">
       <button class="hbtn hbtn-ai" onclick="openAIChat()" title="Ask about your list" aria-label="Ask about your list"><i data-ic="sparkles"></i></button>
-      <button class="hbtn" onclick="openHub()" title="Friends & Watch Party" aria-label="Friends and Watch Party"><i data-ic="users"></i></button>
-      <button class="hbtn" onclick="openForYou()" title="For You — tailored recommendations" aria-label="For You recommendations"><i data-ic="compass"></i></button>
-      <button class="hbtn" onclick="openSchedule()" title="Weekly airing schedule" aria-label="Weekly airing schedule"><i data-ic="calendar"></i></button>
+      <button class="hbtn" id="hb-social" onclick="openHub()" title="Friends & Watch Party" aria-label="Friends and Watch Party"><i data-ic="users"></i></button>
+      <button class="hbtn" id="hb-foryou" onclick="openForYou()" title="For You — tailored recommendations" aria-label="For You recommendations"><i data-ic="compass"></i></button>
+      <button class="hbtn" id="hb-schedule" onclick="openSchedule()" title="Weekly airing schedule" aria-label="Weekly airing schedule"><i data-ic="calendar"></i></button>
       <button class="hbtn" id="notifyBell" onclick="openNotifySheet()" title="Episode notifications" aria-label="Notifications"><i data-ic="bell-off"></i></button>
-      <button class="hbtn" onclick="togglePaint()" title="Look" aria-label="Change how it looks"><i data-ic="palette"></i></button>
+      <button class="hbtn" id="hb-look" onclick="togglePaint()" title="Look" aria-label="Change how it looks"><i data-ic="palette"></i></button>
     </div>
   </div>
   <div class="topbar">
@@ -4141,10 +4141,10 @@ body.recsel .pcard{position:relative;}
 <!-- BOTTOM NAV -->
 <div class="nav">
   <button class="nbtn on" id="nav-home" onclick="goHome()"><span><i data-ic="home"></i></span><small>Home</small></button>
-  <button class="nbtn" onclick="openStats()"><span><i data-ic="chart"></i></span><small>Stats</small></button>
-  <button class="nbtn add" onclick="openSheet_add()">＋</button>
-  <button class="nbtn" onclick="openSheet('settingsSheet')"><span><i data-ic="settings"></i></span><small>Settings</small></button>
-  <button class="nbtn" onclick="openSheet('sourceSheet')"><span><i data-ic="play"></i></span><small>Sources</small></button>
+  <button class="nbtn" id="nav-stats" onclick="openStats()"><span><i data-ic="chart"></i></span><small>Stats</small></button>
+  <button class="nbtn add" id="nav-add" onclick="openSheet_add()">＋</button>
+  <button class="nbtn" id="nav-settings" onclick="openSheet('settingsSheet')"><span><i data-ic="settings"></i></span><small>Settings</small></button>
+  <button class="nbtn" id="nav-sources" onclick="openSheet('sourceSheet')"><span><i data-ic="play"></i></span><small>Sources</small></button>
 </div>
 
 <!-- AI SUMMON — edges glow while two fingers are held, then the AI opens -->
@@ -17249,6 +17249,22 @@ function recThis(id,ev){
   recPickShows=new Set([id]);recToFriends=new Set();recItemNotes={};
   try{proceedRecommend();}catch(e){try{startRecommend();}catch(_){}}
 }
+// The selection bar could only move things between the four statuses, while a
+// right-click on one card offered stars and favourite as well. Same objects, two
+// different sets of powers depending on how you reached them. These are the two
+// the bar was missing; the rest live behind "More", which opens the very menu a
+// right-click gives you rather than a second copy of it.
+function bulkRecommend(){
+  const ids=[...(bulkSel||[])];
+  if(!ids.length)return;
+  recPickShows=new Set(ids);recToFriends=new Set();recItemNotes={};
+  try{proceedRecommend();}catch(e){try{startRecommend();}catch(_){}}
+}
+function bulkMore(ev){
+  try{ev&&ev.stopPropagation&&ev.stopPropagation();}catch(e){}
+  const r=(ev&&ev.currentTarget&&ev.currentTarget.getBoundingClientRect)?ev.currentTarget.getBoundingClientRect():null;
+  openBulkMenu(r?r.left:innerWidth/2, r?r.top:innerHeight/2, null);
+}
 function startRecommend(){recPickShows=new Set();recToFriends=new Set();recItemNotes={};renderRecPick();openSheet('recPickSheet');}
 // Who's picked shows up in the picker too, so a pre-chosen friend is never a surprise.
 function toggleRecPick(id){if(recPickShows.has(id))recPickShows.delete(id);else recPickShows.add(id);renderRecPick();}
@@ -17354,8 +17370,21 @@ function openBulkMenu(x,y,singleId){
   el.innerHTML=`<div class="bulk-menu-h">${one?schEsc(one.title).slice(0,42):n+' selected'}</div>`
     +Object.keys(STATUS_META).map(st=>`<button class="bulk-mi" onclick="bulkSetStatus('${st}')">${STATUS_META[st].icon}<span>Move to ${statusLabel(st,viewKind==='read')}</span></button>`).join('')
     +`<div class="bulk-menu-d"></div>`
-    +`<button class="bulk-mi" onclick="bulkFav(true)">${icon('heart')}<span>Favourite</span></button>`
-    +`<button class="bulk-mi" onclick="bulkFav(false)">${icon('heart')}<span>Remove favourite</span></button>`
+    // Both were offered every time, so a show you had never favourited still
+    // said "Remove favourite" underneath "Favourite". A menu should describe the
+    // thing it was opened on: one entry when every target agrees, and both only
+    // when a mixed selection genuinely needs the choice.
+    +(()=>{
+      const items=menuTargets().map(id=>anime.find(a=>a.id===id)).filter(Boolean);
+      const favd=items.filter(a=>a.fav).length;
+      const add=`<button class="bulk-mi" onclick="bulkFav(true)">${icon('heart')}<span>Favourite</span></button>`;
+      const rm=`<button class="bulk-mi" onclick="bulkFav(false)">${icon('heart','fill')}<span>Remove favourite</span></button>`;
+      if(!items.length)return add;
+      if(favd===0)return add;                 // none are — only one of these makes sense
+      if(favd===items.length)return rm;       // all are
+      return add+rm;                          // mixed selection: both, deliberately
+    })()
+    +`<button class="bulk-mi" onclick="bulkRecommend()">${icon('send')}<span>Recommend\u2026</span></button>`
     +(one?`<div class="bulk-menu-d"></div><button class="bulk-mi" onclick="startSelect('${one.id}')">${icon('check')}<span>Select more\u2026</span></button>`:'')
     +`<div class="bulk-menu-d"></div>`
     +`<div class="bulk-rate">${[1,2,3,4,5].map(r=>`<button class="bulk-star" onclick="bulkRate(${r})" aria-label="Rate ${r}">${icon('star')}</button>`).join('')}</div>`;
@@ -17416,6 +17445,9 @@ function bulkBarHTML(){
   return `<div class="bulk-bar">
     <span class="bulk-n">${bulkSel.size} selected</span>
     ${Object.keys(STATUS_META).map(st=>`<button class="bulk-b" onclick="bulkSetStatus('${st}')">${STATUS_META[st].icon} ${statusLabel(st,viewKind==='read')}</button>`).join('')}
+    <button class="bulk-b" onclick="bulkFav(true)">${icon('heart')} Favourite</button>
+    <button class="bulk-b" onclick="bulkRecommend()">${icon('send')} Recommend</button>
+    <button class="bulk-b" onclick="bulkMore(event)">${icon('sort')} More</button>
     <button class="bulk-x" onclick="bulkClear()" aria-label="Clear selection">${icon('x')}</button>
   </div>`;
 }

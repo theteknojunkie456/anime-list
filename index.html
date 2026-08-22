@@ -2489,8 +2489,6 @@ body.yt-open{overflow:hidden;touch-action:none;}
    an explicit --card-w and the real grid sizes itself.
    Verified wrong on real covers, so it comes out until it is verified right on
    real covers. The bit settings and the scanline stay. */
-/* The small source has to be drawn as squares, not smoothed back into a blur. */
-[data-retro] .pcard-img,[data-retro] .dt-cover,[data-retro] .sd-art,[data-retro] .rtm-art{image-rendering:pixelated;}
 /* FLAT COLOUR, ON EVERY PIECE OF ARTWORK.
    Real mosaicking is done by the canvas pass; this is the colour half. Each
    channel snaps to a set number of steps, so gradients become flat bands. The
@@ -2507,6 +2505,9 @@ body.yt-open{overflow:hidden;touch-action:none;}
 }
 /* The small source has to be drawn as squares, not smoothed back into a blur. */
 [data-retro] .pcard-img,[data-retro] .rz-img,[data-retro] .pk-cover,[data-retro] .dt-cover,[data-retro] .dt-banner-img,[data-retro] .hero-bg-img,[data-retro] .sd-art,[data-retro] .rtm-art,[data-retro] .ns-art img,[data-retro] .ns-vs-art img{image-rendering:pixelated;}
+/* None: keep the scanlines, the bevels and the pixel type; leave the pictures
+   exactly as they are. */
+[data-retro][data-bits="off"] .pcard-img,[data-retro][data-bits="off"] .rz-img,[data-retro][data-bits="off"] .pk-cover,[data-retro][data-bits="off"] .dt-cover,[data-retro][data-bits="off"] .dt-banner-img,[data-retro][data-bits="off"] .hero-bg-img,[data-retro][data-bits="off"] .sd-art,[data-retro][data-bits="off"] .rtm-art,[data-retro][data-bits="off"] .ns-art img,[data-retro][data-bits="off"] .ns-vs-art img{filter:none;image-rendering:auto;}
 .bits-sw{flex:1;min-width:0;padding:9px 6px;border-radius:10px;font-size:12px;font-weight:800;
   background:var(--bg3);border:1px solid var(--bn2);color:var(--t3);cursor:pointer;white-space:nowrap;}
 .bits-sw.on{color:var(--t1);border-color:var(--a);background:var(--ag);}
@@ -7969,11 +7970,14 @@ const RETRO_KEY='retro_mode';
 //       N64/PS1 era: still obviously a screen, but a good one.
 const RETRO_BITS_KEY='retro_bits';
 function retroBits(){
-  try{const v=localStorage.getItem(RETRO_BITS_KEY);return (v==='8'||v==='16'||v==='64')?v:'64';}
+  try{const v=localStorage.getItem(RETRO_BITS_KEY);return (v==='off'||v==='8'||v==='16'||v==='64')?v:'64';}
   catch(e){return '64';}
 }
 function setRetroBits(v){
   try{localStorage.setItem(RETRO_BITS_KEY,String(v));}catch(e){}
+  // Changing the block size invalidates every image already resampled at the old
+  // one, so they all go back to the original and are done again from scratch.
+  try{pxRestore();}catch(e){}
   applyRetroMode();
   try{renderRetroRow();}catch(e){}
 }
@@ -8063,7 +8067,7 @@ function renderRetroRow(){
   if(lb4&&row4){
     lb4.style.display=on?'':'none'; row4.style.display=on?'':'none';
     const b=retroBits();
-    row4.innerHTML=on?[['8','8-bit','Coarse, hard scanline'],['16','16-bit','The middle'],['64','64-bit','Fine grid, soft bloom']]
+    row4.innerHTML=on?[['off','None','Retro look, artwork left alone'],['8','8-bit','Chunkiest blocks'],['16','16-bit','The middle'],['64','64-bit','Gentlest blocks']]
       .map(([v,t,tip])=>`<button class="bits-sw${b===v?' on':''}" onclick="setRetroBits('${v}')" title="${tip}">${t}</button>`).join(''):'';
   }
 }
@@ -8915,7 +8919,8 @@ function fmtWatch(mins){
 function pxSrc(url){
   try{
     if(!retroMode())return url;
-    if(retroBits()==='64')return url;
+    const b=retroBits();
+    if(b==='off'||b==='64')return url;   // full-size art when nothing is being resampled
     return String(url||'').replace(/\/cover\/(?:extraLarge|large)\//,'/cover/medium/');
   }catch(e){return url;}
 }
@@ -8951,7 +8956,7 @@ const PX_MAX_PER_PASS=12;
 // The divisor: a /cover/medium/ source is about 100px, so 8-bit at 6 leaves a
 // ~17px picture to blow back up. Nine was past the point where a face survived
 // it, which reads as damage rather than as a low-resolution screen.
-function pxBlock(){ try{const b=retroBits(); return b==='8'?6:b==='16'?4:2;}catch(e){return 2;} }
+function pxBlock(){ try{const b=retroBits(); return b==='off'?0:b==='8'?6:b==='16'?4:2;}catch(e){return 2;} }
 function pxOne(img,n){
   const src=img.getAttribute('data-pxsrc')||img.getAttribute('src')||'';
   if(!src||src.slice(0,5)==='data:')return;
@@ -8989,6 +8994,19 @@ function pxOne(img,n){
   // only runs on render and only twelve images at a time.
   probe.onerror=()=>{ try{delete img.dataset.pxd;}catch(e){} };
   probe.src=bust;
+}
+// Turning pixels off has to put the pictures back. A processed image is carrying a
+// data: URL in src and the original in data-pxsrc, and anything not redrawn by
+// the next render would otherwise stay blocky forever.
+function pxRestore(){
+  try{
+    document.querySelectorAll('img[data-pxsrc]').forEach(img=>{
+      const orig=img.getAttribute('data-pxsrc');
+      if(orig)img.src=orig;
+      img.removeAttribute('data-pxsrc');
+      try{delete img.dataset.pxd;}catch(e){}
+    });
+  }catch(e){}
 }
 let _pxT=0;
 function pixelateCovers(){

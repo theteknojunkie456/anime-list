@@ -2500,17 +2500,17 @@ body.yt-open{overflow:hidden;touch-action:none;}
    the era goes. */
 [data-retro] .pcard-img,[data-retro] .hero-bg-img,[data-retro] .dt-banner-img,
 [data-retro] .dt-cover,[data-retro] .sd-art,[data-retro] .rtm-art,[data-retro] .ns-art img,[data-retro] .ns-vs-art img{
-  filter:url(#wl-pal10) saturate(1.08);
+  filter:url(#wl-pal10);
 }
 [data-retro][data-bits="8"] .pcard-img,[data-retro][data-bits="8"] .hero-bg-img,[data-retro][data-bits="8"] .dt-banner-img,
 [data-retro][data-bits="8"] .dt-cover,[data-retro][data-bits="8"] .sd-art,[data-retro][data-bits="8"] .rtm-art,
 [data-retro][data-bits="8"] .ns-art img,[data-retro][data-bits="8"] .ns-vs-art img{
-  filter:url(#wl-pal4) saturate(1.25) contrast(1.1);
+  filter:url(#wl-pal4) saturate(1.1);
 }
 [data-retro][data-bits="16"] .pcard-img,[data-retro][data-bits="16"] .hero-bg-img,[data-retro][data-bits="16"] .dt-banner-img,
 [data-retro][data-bits="16"] .dt-cover,[data-retro][data-bits="16"] .sd-art,[data-retro][data-bits="16"] .rtm-art,
 [data-retro][data-bits="16"] .ns-art img,[data-retro][data-bits="16"] .ns-vs-art img{
-  filter:url(#wl-pal6) saturate(1.15) contrast(1.05);
+  filter:url(#wl-pal6) saturate(1.06);
 }
 .bits-sw{flex:1;min-width:0;padding:9px 6px;border-radius:10px;font-size:12px;font-weight:800;
   background:var(--bg3);border:1px solid var(--bn2);color:var(--t3);cursor:pointer;white-space:nowrap;}
@@ -4236,13 +4236,13 @@ body.recsel .pcard{position:relative;}
 <svg width="0" height="0" style="position:absolute;pointer-events:none" aria-hidden="true" focusable="false">
   <defs>
     <filter id="wl-pal4" color-interpolation-filters="sRGB"><feComponentTransfer>
-      <feFuncR type="discrete" tableValues="0.000 0.333 0.667 1.000"/><feFuncG type="discrete" tableValues="0.000 0.333 0.667 1.000"/><feFuncB type="discrete" tableValues="0.000 0.333 0.667 1.000"/>
-    </feComponentTransfer></filter>
-    <filter id="wl-pal6" color-interpolation-filters="sRGB"><feComponentTransfer>
       <feFuncR type="discrete" tableValues="0.000 0.200 0.400 0.600 0.800 1.000"/><feFuncG type="discrete" tableValues="0.000 0.200 0.400 0.600 0.800 1.000"/><feFuncB type="discrete" tableValues="0.000 0.200 0.400 0.600 0.800 1.000"/>
     </feComponentTransfer></filter>
+    <filter id="wl-pal6" color-interpolation-filters="sRGB"><feComponentTransfer>
+      <feFuncR type="discrete" tableValues="0.000 0.143 0.286 0.429 0.571 0.714 0.857 1.000"/><feFuncG type="discrete" tableValues="0.000 0.143 0.286 0.429 0.571 0.714 0.857 1.000"/><feFuncB type="discrete" tableValues="0.000 0.143 0.286 0.429 0.571 0.714 0.857 1.000"/>
+    </feComponentTransfer></filter>
     <filter id="wl-pal10" color-interpolation-filters="sRGB"><feComponentTransfer>
-      <feFuncR type="discrete" tableValues="0.000 0.111 0.222 0.333 0.444 0.556 0.667 0.778 0.889 1.000"/><feFuncG type="discrete" tableValues="0.000 0.111 0.222 0.333 0.444 0.556 0.667 0.778 0.889 1.000"/><feFuncB type="discrete" tableValues="0.000 0.111 0.222 0.333 0.444 0.556 0.667 0.778 0.889 1.000"/>
+      <feFuncR type="discrete" tableValues="0.000 0.077 0.154 0.231 0.308 0.385 0.462 0.538 0.615 0.692 0.769 0.846 0.923 1.000"/><feFuncG type="discrete" tableValues="0.000 0.077 0.154 0.231 0.308 0.385 0.462 0.538 0.615 0.692 0.769 0.846 0.923 1.000"/><feFuncB type="discrete" tableValues="0.000 0.077 0.154 0.231 0.308 0.385 0.462 0.538 0.615 0.692 0.769 0.846 0.923 1.000"/>
     </feComponentTransfer></filter>
   </defs>
 </svg>
@@ -8944,7 +8944,11 @@ function pxSrc(url){
 //     of doing 186 canvases in one frame.
 const _pxCache=new Map();
 const PX_MAX_PER_PASS=12;
-function pxBlock(){ try{const b=retroBits(); return b==='8'?9:b==='16'?5:0;}catch(e){return 0;} }
+// 64-bit used to return 0 — no canvas, no blocks — on the theory that it was the
+// "good screen" whose palette did the work. But it is the DEFAULT, so the common
+// case was retro with no pixels in it at all. Every level blocks now; 64 is
+// simply the gentlest.
+function pxBlock(){ try{const b=retroBits(); return b==='8'?9:b==='16'?5:3;}catch(e){return 3;} }
 function pxOne(img,n){
   const src=img.getAttribute('data-pxsrc')||img.getAttribute('src')||'';
   if(!src||src.slice(0,5)==='data:')return;
@@ -8954,6 +8958,14 @@ function pxOne(img,n){
   if(hit){ img.setAttribute('data-pxsrc',src); img.src=hit; return; }
   const probe=new Image();
   probe.crossOrigin='anonymous';                         // required, or the canvas is tainted
+  // THE TRAP THAT MADE THIS DO NOTHING.
+  // The card already fetched this exact URL for display, WITHOUT crossOrigin, so
+  // the browser has a cached response carrying no CORS headers. A second request
+  // for the same URL — even one asking for CORS — is served from that cache,
+  // fails the check, and lands in onerror. Silently. Every image, every time.
+  // A query string the CDN ignores gives it a cache entry of its own, fetched
+  // with the headers this needs.
+  const bust=src+(src.indexOf('?')>=0?'&':'?')+'wlpx=1';
   probe.onload=()=>{
     try{
       const w=Math.max(6,Math.round((probe.naturalWidth||100)/n));
@@ -8969,8 +8981,11 @@ function pxOne(img,n){
       img.src=url;
     }catch(e){}
   };
-  probe.onerror=()=>{};                                  // no CORS, no blocks, no fuss
-  probe.src=src;
+  // A failure here is not permanent: the mark is lifted so a later pass can try
+  // again (a cold CDN, a dropped connection). It will not spin, because a pass
+  // only runs on render and only twelve images at a time.
+  probe.onerror=()=>{ try{delete img.dataset.pxd;}catch(e){} };
+  probe.src=bust;
 }
 let _pxT=0;
 function pixelateCovers(){
@@ -10726,6 +10741,29 @@ function richDetailHTML(d,forId){
 // Plus an AniList title search as a cheap third net. All merged by AniList id /
 // MAL id into one normalized list. Cached per franchise.
 let franchiseCache={},curFranchise=[],curFranchiseFor='';
+// A franchise does not change between Tuesday and Wednesday, so the answer is
+// worth keeping. In memory it only survives until the tab closes, which is why
+// "Loading seasons, films & specials" came back every single launch. On disk it
+// survives, and a title you have opened before paints instantly.
+const FRAN_KEY='wl_fran_v1', FRAN_TTL=7*86400000;
+function franDisk(){try{const v=JSON.parse(localStorage.getItem(FRAN_KEY)||'{}');return (v&&typeof v==='object')?v:{};}catch(e){return {};}}
+function franDiskGet(k){
+  try{const box=franDisk()[k];
+    if(box&&box.at&&(Date.now()-box.at)<FRAN_TTL&&Array.isArray(box.v))return box.v;}catch(e){}
+  return null;
+}
+function franDiskPut(k,v){
+  try{
+    const all=franDisk();
+    all[k]={at:Date.now(),v:v};
+    // Oldest out first, so this cannot grow without limit on a big list.
+    const keys=Object.keys(all);
+    if(keys.length>120){
+      keys.sort((a,b)=>(all[a].at||0)-(all[b].at||0)).slice(0,keys.length-120).forEach(x=>{delete all[x];});
+    }
+    localStorage.setItem(FRAN_KEY,JSON.stringify(all));
+  }catch(e){}
+}
 const SEASON_FMT=new Set(['TV','TV_SHORT','ONA']);   // the numbered run — what "Season 2" means
 // Films, OVAs and specials used to be thrown away here, which meant a franchise
 // panel could tell you there were three seasons while saying nothing about the
@@ -10748,29 +10786,53 @@ function malSeason(d){return{aniId:0,malId:d.mal_id,title:d.title_english||d.tit
 // deliberately absent: those cross into the manga and other media, not more of
 // the show. Node type is filtered to ANIME regardless.
 const FRANCHISE_RELS=new Set(['SEQUEL','PREQUEL','SIDE_STORY','PARENT','ALTERNATIVE','SPIN_OFF','SUMMARY','COMPILATION','CONTAINS']);
+// One request PER NODE, in a queue, with a 320ms sleep between each — up to 26 of
+// them. That is eight seconds of deliberate waiting before AniList has done
+// anything, which is why "Loading seasons, films & specials" sat there on a big
+// franchise.
+//
+// The walk is breadth-first, so a whole level can be asked for at once. AniList
+// takes aliased queries — the cover fetcher already leans on that for 25 titles a
+// request — so a franchise that took twenty-odd round trips now takes two or
+// three, and the sleep only happens between LEVELS rather than between nodes.
+const GRAPH_FIELDS='id idMal isAdult genres format status episodes seasonYear startDate{year month} title{romaji english} coverImage{large} nextAiringEpisode{airingAt episode} relations{edges{relationType node{id type isAdult genres}}}';
 async function aniGraph(seedId){
-  const nodes={},want=[seedId],seen=new Set([seedId]);let hops=0;
-  while(want.length&&hops<26){
-    hops++;const id=want.shift();
-    const q=`query($id:Int){Media(id:$id){id idMal isAdult genres format status episodes seasonYear startDate{year month} title{romaji english} coverImage{large} nextAiringEpisode{airingAt episode} relations{edges{relationType node{id type isAdult genres}}}}}`;
-    let m;try{const r=await fetch('https://graphql.anilist.co',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({query:q,variables:{id}})});if(r.status===429){await pause(1400);want.unshift(id);hops--;continue;}if(!r.ok)continue;m=((await r.json()).data||{}).Media;}catch{continue;}
-    if(!m)continue;
-    if(isAdultMedia(m))continue;                 // never surfaces, and never walked through
-    nodes[m.id]=m;
-    ((m.relations&&m.relations.edges)||[]).forEach(e=>{
-      if(!e||!e.node||e.node.type!=='ANIME'||seen.has(e.node.id))return;
-      if(!FRANCHISE_RELS.has(e.relationType))return;
-      // Adult spin-offs hang off perfectly ordinary series. Widening this walk to
-      // side stories and spin-offs is what let them in; the flag travels on the
-      // edge, so they're dropped before they're ever fetched or shown.
-      if(isAdultMedia(e.node)){seen.add(e.node.id);return;}
-      seen.add(e.node.id);
-      // Walk the main line first — a franchise with a dozen side stories should
-      // still find season 3 before it runs out of hops.
-      if(e.relationType==='SEQUEL'||e.relationType==='PREQUEL')want.unshift(e.node.id);
-      else want.push(e.node.id);
+  const nodes={},seen=new Set([seedId]);
+  let level=[seedId],depth=0;
+  while(level.length&&depth<4&&Object.keys(nodes).length<40){
+    depth++;
+    const batch=level.slice(0,24);
+    const q='{'+batch.map((id,i)=>`n${i}:Media(id:${id}){${GRAPH_FIELDS}}`).join(' ')+'}';
+    let data=null;
+    try{
+      let r=await fetch('https://graphql.anilist.co',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({query:q})});
+      if(r.status===429){ await pause(1200);
+        r=await fetch('https://graphql.anilist.co',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({query:q})}); }
+      // A batch answers per field: one dead id does not have to cost the rest.
+      const body=await r.json().catch(()=>null);
+      data=body&&body.data;
+    }catch(e){}
+    if(!data)break;
+    const next=[];
+    Object.keys(data).forEach(k=>{
+      const m=data[k];
+      if(!m||isAdultMedia(m))return;              // never surfaces, and never walked through
+      nodes[m.id]=m;
+      ((m.relations&&m.relations.edges)||[]).forEach(e=>{
+        if(!e||!e.node||e.node.type!=='ANIME'||seen.has(e.node.id))return;
+        if(!FRANCHISE_RELS.has(e.relationType))return;
+        // Adult spin-offs hang off perfectly ordinary series. The flag travels on
+        // the edge, so they are dropped before they are ever fetched or shown.
+        if(isAdultMedia(e.node)){seen.add(e.node.id);return;}
+        seen.add(e.node.id);
+        // The main line first, so a franchise with a dozen side stories still
+        // reaches season 3 before it runs out of depth.
+        if(e.relationType==='SEQUEL'||e.relationType==='PREQUEL')next.unshift(e.node.id);
+        else next.push(e.node.id);
+      });
     });
-    if(want.length)await pause(320);
+    level=next;
+    if(level.length)await pause(260);
   }
   return Object.values(nodes);
 }
@@ -10795,10 +10857,12 @@ async function aniSearchSeasons(base){
     return media.filter(m=>m&&[seasonBase(m.title.english),seasonBase(m.title.romaji)].filter(Boolean).some(x=>x===base));
   }catch{return[];}
 }
-async function fetchFranchise(a){
+async function fetchFranchise(a,onPartial){
   const base=seasonBase(a.title)||normTitle(a.title);
   const key=a.aniId?('id:'+a.aniId):('mal:'+(a.malId||0)+'|t:'+base);
   if(franchiseCache[key])return franchiseCache[key];
+  const onDisk=franDiskGet(key);
+  if(onDisk&&onDisk.length){ franchiseCache[key]=onDisk; return onDisk; }
   // merge everything into one list, deduped by AniList id and MAL id
   const list=[],byAni=new Map(),byMal=new Map();
   const merge=s=>{
@@ -10825,6 +10889,10 @@ async function fetchFranchise(a){
   }
   // 2) AniList title search (cheap third net; also seeds MAL id if graph gave none)
   (await aniSearchSeasons(base)).forEach(m=>{if(!seedMal&&m.idMal)seedMal=m.idMal;merge(aniSeason(m));});
+  // Show what we have before going out again. The MyAnimeList walk is a second
+  // opinion that fills gaps; making people watch a spinner for it when AniList
+  // has already answered is the wrong way round.
+  try{ if(typeof onPartial==='function'&&list.length)onPartial(list.slice()); }catch(e){}
   // 3) MyAnimeList graph — the independent second source
   if(seedMal){(await malGraph(seedMal)).forEach(d=>merge(malSeason(d)));}
   // keep only real seasons; always include the one you're viewing
@@ -10859,11 +10927,23 @@ async function fetchFranchise(a){
     return out;
   })();
   franchiseCache[key]=seasons;
+  try{if(seasons.length)franDiskPut(key,seasons);}catch(e){}
   return seasons;
 }
 async function loadFranchise(detId){
   const a=anime.find(x=>x.id===detId);if(!a)return;
-  let seasons=[];try{seasons=await fetchFranchise(a);}catch{}
+  let seasons=[];
+  try{
+    seasons=await fetchFranchise(a,partial=>{
+      // First pass: draw it. The second source only ever adds to this.
+      if(detailId!==detId)return;
+      try{
+        const shown=partial.filter(x=>SEASON_FMT.has(x.format)||EXTRA_FMT.has(x.format))
+          .sort((x,y)=>(x.year||9999)-(y.year||9999)||(x.month||0)-(y.month||0));
+        if(shown.length>1){curFranchise=shown;curFranchiseFor=detId;paintFranchise();}
+      }catch(e){}
+    });
+  }catch{}
   if(detailId!==detId)return;   // navigated away while the request was in flight
   curFranchise=seasons;curFranchiseFor=detId;
   paintFranchise();

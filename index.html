@@ -8068,7 +8068,7 @@ function renderRetroRow(){
     lb4.style.display=on?'':'none'; row4.style.display=on?'':'none';
     const b=retroBits();
     row4.innerHTML=on?[['off','None','Retro look, artwork left alone'],['8','8-bit','Chunkiest blocks'],['16','16-bit','The middle'],['64','64-bit','Gentlest blocks']]
-      .map(([v,t,tip])=>`<button class="bits-sw${b===v?' on':''}" onclick="setRetroBits('${v}')" title="${tip}">${t}</button>`).join(''):'';
+      .map(([k,t,tip])=>`<button class="bits-sw${b===k?' on':''}" onclick="setRetroBits('${k}')" title="${tip}">${t}</button>`).join(''):'';
   }
 }
 const ACCENT_KEY='accent_override';
@@ -9782,15 +9782,25 @@ function posterCard(a,nSeas){
 // already sorted; we keep the first season encountered and drop its siblings,
 // then render that one card standing in for the whole series (with a count).
 // Returns [{a, n}] — the representative item and how many seasons it covers.
+// Seasons used to be folded into one card that stood in for the whole series,
+// with a pill saying how many. Which seasons got folded depended entirely on how
+// the studio named them: seasonBase() strips "Season 2", "Part 2" and trailing
+// roman numerals, so "Solo Leveling" and "Solo Leveling Season 2" became one
+// card — while "Naruto" and "Naruto: Shippuden" stayed two, because Shippuden is
+// a word and not a number. Same relationship, opposite treatment, for a reason
+// nobody looking at the list could possibly infer.
+//
+// So nothing is folded. Each season is its own card, which is also what makes the
+// grid honest: the count under a row is the number of things you have, and a
+// card is a thing you can be watching episode 7 of. Where they belong TOGETHER is
+// on the card you opened — the Seasons panel in the detail sheet, and "View all
+// seasons" from a long press, both of which show the whole franchise including
+// entries that are not on your list at all.
+//
+// Kept as a function returning {a,n} so its four call sites and posterCard's
+// second argument stay as they are.
 function collapseSeries(items){
-  const idx=new Map(),out=[];
-  for(const a of items){
-    const k=seriesKey(a);
-    if(!k){out.push({a,n:1});continue;}
-    if(idx.has(k)){out[idx.get(k)].n++;continue;}
-    idx.set(k,out.length);out.push({a,n:1});
-  }
-  return out;
+  return (items||[]).map(a=>({a,n:1}));
 }
 let bbItems=[],bbIdx=0,bbTimer=0,bbP=1;   // bbP = physical slide index (clones at 0 and N+1)
 // "airs Wed 4:00 PM" makes you do the arithmetic. A countdown doesn't, which is

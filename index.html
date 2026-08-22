@@ -2489,6 +2489,27 @@ body.yt-open{overflow:hidden;touch-action:none;}
    an explicit --card-w and the real grid sizes itself.
    Verified wrong on real covers, so it comes out until it is verified right on
    real covers. The bit settings and the scanline stay. */
+/* FLAT COLOUR, WHICH IS THE HALF THAT WORKS.
+   Real mosaicking of live images is not something CSS can do — the transform
+   trick loses to Chrome re-rasterising at the final resolution, and the SVG tile
+   filter never filled its cells. Both were tried and both are gone.
+   Colour reduction is a different mechanism and it does work: each channel snaps
+   to a few steps, so gradients become flat bands. Fewer steps the further back
+   the era goes. */
+[data-retro] .pcard-img,[data-retro] .hero-bg-img,[data-retro] .dt-banner-img,
+[data-retro] .dt-cover,[data-retro] .sd-art,[data-retro] .rtm-art,[data-retro] .ns-art img,[data-retro] .ns-vs-art img{
+  filter:url(#wl-pal10) saturate(1.08);
+}
+[data-retro][data-bits="8"] .pcard-img,[data-retro][data-bits="8"] .hero-bg-img,[data-retro][data-bits="8"] .dt-banner-img,
+[data-retro][data-bits="8"] .dt-cover,[data-retro][data-bits="8"] .sd-art,[data-retro][data-bits="8"] .rtm-art,
+[data-retro][data-bits="8"] .ns-art img,[data-retro][data-bits="8"] .ns-vs-art img{
+  filter:url(#wl-pal4) saturate(1.25) contrast(1.1);
+}
+[data-retro][data-bits="16"] .pcard-img,[data-retro][data-bits="16"] .hero-bg-img,[data-retro][data-bits="16"] .dt-banner-img,
+[data-retro][data-bits="16"] .dt-cover,[data-retro][data-bits="16"] .sd-art,[data-retro][data-bits="16"] .rtm-art,
+[data-retro][data-bits="16"] .ns-art img,[data-retro][data-bits="16"] .ns-vs-art img{
+  filter:url(#wl-pal6) saturate(1.15) contrast(1.05);
+}
 .bits-sw{flex:1;min-width:0;padding:9px 6px;border-radius:10px;font-size:12px;font-weight:800;
   background:var(--bg3);border:1px solid var(--bn2);color:var(--t3);cursor:pointer;white-space:nowrap;}
 .bits-sw.on{color:var(--t1);border-color:var(--a);background:var(--ag);}
@@ -4200,6 +4221,29 @@ body.recsel .pcard{position:relative;}
 </style>
 </head>
 <body>
+
+<!-- RETRO: PALETTE REDUCTION.
+     The half of the look that survives. `feComponentTransfer type="discrete"`
+     snaps each colour channel to a handful of steps, so gradients and soft
+     shading collapse into flat bands — which is what actually reads as old
+     hardware. It is a per-pixel lookup, cheap and GPU-friendly, unlike the
+     feTile/feMorphology mosaic that never filled its cells and got dropped.
+     Applied to <img> only. `filter` makes an element a containing block for
+     fixed descendants, and an image has none, so the nav and the sheets cannot
+     be caught by it. -->
+<svg width="0" height="0" style="position:absolute;pointer-events:none" aria-hidden="true" focusable="false">
+  <defs>
+    <filter id="wl-pal4" color-interpolation-filters="sRGB"><feComponentTransfer>
+      <feFuncR type="discrete" tableValues="0.000 0.333 0.667 1.000"/><feFuncG type="discrete" tableValues="0.000 0.333 0.667 1.000"/><feFuncB type="discrete" tableValues="0.000 0.333 0.667 1.000"/>
+    </feComponentTransfer></filter>
+    <filter id="wl-pal6" color-interpolation-filters="sRGB"><feComponentTransfer>
+      <feFuncR type="discrete" tableValues="0.000 0.200 0.400 0.600 0.800 1.000"/><feFuncG type="discrete" tableValues="0.000 0.200 0.400 0.600 0.800 1.000"/><feFuncB type="discrete" tableValues="0.000 0.200 0.400 0.600 0.800 1.000"/>
+    </feComponentTransfer></filter>
+    <filter id="wl-pal10" color-interpolation-filters="sRGB"><feComponentTransfer>
+      <feFuncR type="discrete" tableValues="0.000 0.111 0.222 0.333 0.444 0.556 0.667 0.778 0.889 1.000"/><feFuncG type="discrete" tableValues="0.000 0.111 0.222 0.333 0.444 0.556 0.667 0.778 0.889 1.000"/><feFuncB type="discrete" tableValues="0.000 0.111 0.222 0.333 0.444 0.556 0.667 0.778 0.889 1.000"/>
+    </feComponentTransfer></filter>
+  </defs>
+</svg>
 
 <div class="ambient" aria-hidden="true"></div>
 <div id="brightVeil" aria-hidden="true"></div>

@@ -7997,6 +7997,7 @@ function applyRetroMode(){
     else {el.removeAttribute('data-retro');el.removeAttribute('data-bits');}
     try{placeRetroPx();}catch(e){}      // the pane starts at the search bar, measured
     try{render();}catch(e){}            // covers point at a different file per mode
+    try{pixelateCovers();}catch(e){}
   }catch(e){}
   try{applyRetroEdge();}catch(e){}
   try{refreshPixels();}catch(e){}
@@ -8923,6 +8924,72 @@ function pxSrc(url){
     return String(url||'').replace(/\/cover\/(?:extraLarge|large)\//,'/cover/medium/');
   }catch(e){return url;}
 }
+// ─── REAL BLOCKS ────────────────────────────────────────────────────────────
+// The one method that genuinely mosaics an image is to resample it yourself:
+// draw it into a tiny canvas with smoothing off, then let that tiny picture
+// scale back up. Everything else I tried was the browser politely refusing to
+// lose quality.
+//
+// This is the machinery that once sat overnight at "45396 / 45400", so it is
+// built to be incapable of that:
+//   - no requestAnimationFrame, no progress counter, no pending/stuck bookkeeping.
+//     Those were the parts that could never finish, not the drawing.
+//   - one shot per image, marked on the element, so a re-render cannot re-enter it.
+//   - a cache keyed by URL AND block size, so 186 cards that share art cost one
+//     canvas between them, and switching bits does not redo what is already done.
+//   - the source is fetched into a SEPARATE Image with crossOrigin set, so the
+//     picture you are looking at is never held up by this, and a host that
+//     refuses CORS simply fails that one probe and is left alone forever.
+//   - a hard cap per pass, so a big list spreads over several idle turns instead
+//     of doing 186 canvases in one frame.
+const _pxCache=new Map();
+const PX_MAX_PER_PASS=12;
+function pxBlock(){ try{const b=retroBits(); return b==='8'?9:b==='16'?5:0;}catch(e){return 0;} }
+function pxOne(img,n){
+  const src=img.getAttribute('data-pxsrc')||img.getAttribute('src')||'';
+  if(!src||src.slice(0,5)==='data:')return;
+  img.dataset.pxd='1';                                   // never twice, whatever happens next
+  const key=src+'|'+n;
+  const hit=_pxCache.get(key);
+  if(hit){ img.setAttribute('data-pxsrc',src); img.src=hit; return; }
+  const probe=new Image();
+  probe.crossOrigin='anonymous';                         // required, or the canvas is tainted
+  probe.onload=()=>{
+    try{
+      const w=Math.max(6,Math.round((probe.naturalWidth||100)/n));
+      const h=Math.max(6,Math.round((probe.naturalHeight||142)/n));
+      const c=document.createElement('canvas'); c.width=w; c.height=h;
+      const x=c.getContext('2d'); if(!x)return;
+      x.imageSmoothingEnabled=false;
+      x.drawImage(probe,0,0,w,h);
+      const url=c.toDataURL('image/png');                // throws if tainted -> caught
+      _pxCache.set(key,url);
+      if(_pxCache.size>400)_pxCache.clear();             // a ceiling, not a leak
+      img.setAttribute('data-pxsrc',src);
+      img.src=url;
+    }catch(e){}
+  };
+  probe.onerror=()=>{};                                  // no CORS, no blocks, no fuss
+  probe.src=src;
+}
+let _pxT=0;
+function pixelateCovers(){
+  clearTimeout(_pxT);
+  _pxT=setTimeout(()=>{
+    try{
+      const n=pxBlock();
+      if(!retroMode()||!n)return;
+      const list=document.querySelectorAll('img.pcard-img:not([data-pxd]),img.dt-cover:not([data-pxd]),img.sd-art:not([data-pxd]),img.rtm-art:not([data-pxd])');
+      let done=0;
+      for(const img of list){
+        if(done>=PX_MAX_PER_PASS)break;
+        if(!img.getAttribute('src'))continue;
+        pxOne(img,n); done++;
+      }
+      if(done>=PX_MAX_PER_PASS)pixelateCovers();          // more to do: next turn, not this frame
+    }catch(e){}
+  },120);
+}
 function titleBg(a){
   if(!a)return '';
   if(a.bgImage)return a.bgImage;
@@ -9093,6 +9160,7 @@ function renderNow(){
   const step=fn=>{try{fn();}catch(e){try{console.error('render',e);}catch{}}};
   step(renderKindSeg);step(renderFiltRow);step(renderSortRow);step(renderHome);
   forgetAmbBands();   // the bands just moved
+  try{pixelateCovers();}catch(e){}
   try{refreshPixels();}catch(e){}
 }
 function renderKindSeg(){

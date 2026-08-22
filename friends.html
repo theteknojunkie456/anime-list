@@ -8948,7 +8948,10 @@ const PX_MAX_PER_PASS=12;
 // "good screen" whose palette did the work. But it is the DEFAULT, so the common
 // case was retro with no pixels in it at all. Every level blocks now; 64 is
 // simply the gentlest.
-function pxBlock(){ try{const b=retroBits(); return b==='8'?9:b==='16'?5:3;}catch(e){return 3;} }
+// The divisor: a /cover/medium/ source is about 100px, so 8-bit at 6 leaves a
+// ~17px picture to blow back up. Nine was past the point where a face survived
+// it, which reads as damage rather than as a low-resolution screen.
+function pxBlock(){ try{const b=retroBits(); return b==='8'?6:b==='16'?4:2;}catch(e){return 2;} }
 function pxOne(img,n){
   const src=img.getAttribute('data-pxsrc')||img.getAttribute('src')||'';
   if(!src||src.slice(0,5)==='data:')return;

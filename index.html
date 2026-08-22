@@ -1975,7 +1975,12 @@ body.first-paint .pfill,body.content-in .pfill{animation:barGrow .62s cubic-bezi
   }
 }
 .nbtn{
-  display:flex;flex-direction:column;align-items:center;gap:3px;justify-self:center;
+  /* Each of these sat in an equal grid track but shrank to fit its own label, so
+     the selected pill was as wide as the WORD — "Stats" got a visibly narrower
+     highlight than "Settings" next to it. The button fills its track and centres
+     its contents, so the pills match whatever they say. The + opts out below,
+     being a circle. */
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;justify-self:stretch;width:100%;
   font-size:17px;color:var(--t2);min-width:0;max-width:100%;overflow:hidden;padding:6px clamp(2px,1.8vw,10px);border-radius:18px;
   transition:transform .12s,background-color .16s,color .16s;
 }
@@ -1986,6 +1991,7 @@ body.first-paint .pfill,body.content-in .pfill{animation:barGrow .62s cubic-bezi
    work of saying where you are, and at 9px it wasn't enough. */
 .nbtn.on{color:var(--a2);background:color-mix(in srgb,var(--a) 16%,transparent);}
 .nbtn.add{
+  justify-self:center;width:auto;    /* a circle, not a track-wide pill */
   /* It used to break the top edge of the bar. That silhouette never sat right —
      a circle half-in and half-out of a pill reads as a mistake however it is
      aligned, and it was the third time it came back looking wrong. So it sits
@@ -2619,12 +2625,27 @@ html.rotating .pv-frame:fullscreen,html.rotating .pv-frame:-webkit-full-screen{o
 .pv-nav-mark:active{transform:scale(.98);}
 .pv-nav-mark:disabled{opacity:.5;pointer-events:none;}
 .dt-actions{display:flex;gap:8px;margin-top:10px;}
+/* These had no horizontal padding and were not flex, so the space between an
+   icon and its label was a collapsed text space — tight enough to touch the
+   letters on the busiest button. A row with a real gap, real side padding, and
+   one height across all four. */
 .dact{
-  flex:1;padding:12px 0;border-radius:14px;font-size:12px;font-weight:800;
+  flex:1 1 0;min-width:0;height:46px;padding:0 10px;border-radius:14px;
+  display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  font-size:12px;font-weight:800;line-height:1;
   background:var(--bg4);border:1px solid var(--b2);color:var(--t1);
+  white-space:nowrap;overflow:hidden;
 }
+.dact .ico{width:14px;height:14px;flex:none;}
 .dact.ai-act{color:var(--a2);border-color:var(--ag);background:var(--ag);}
-.dact.danger{color:#ff6b6b;flex:0 0 52px;}
+/* Icon-only, so it is a square of the same height rather than a slab of some
+   other width sitting beside three that match each other. */
+.dact.danger{color:#ff6b6b;flex:0 0 46px;padding:0;}
+/* "Recommend" is the longest label and a phone is the narrowest case: at 390px
+   the side padding was being eaten before the word was. The padding gives way
+   first, then the gap, and only then the type. */
+@media (max-width:440px){.dact{padding:0 6px;gap:6px;}}
+@media (max-width:360px){.dact{font-size:10px;gap:5px;padding:0 4px;}.dact .ico{width:13px;height:13px;}}
 
 /* ── FORMS ── */
 .fgroup{margin-bottom:16px;}
@@ -6018,6 +6039,26 @@ try{
   },{once:true,passive:true}));
 }catch(e){}
 
+// A banner with no stamp predates the check and cannot be vouched for; a banner
+// whose stamp disagrees with the title's id is provably the wrong show's. Both
+// are dropped and re-fetched from this title's own id — which is the only way to
+// get the right one back, since the wrong art is indistinguishable from the right
+// art once it is sitting in the record.
+function repairBanners(){
+  let n=0;
+  try{
+    anime.forEach(a=>{
+      if(!a||!a.banner)return;
+      const unverifiable=!a.bannerFor;
+      const mismatched=a.bannerFor&&a.aniId&&a.bannerFor!==a.aniId;
+      if(!unverifiable&&!mismatched)return;
+      delete a.banner; delete a.bannerFor; delete a.bannerTried;   // fetchCovers will fill it again
+      n++;
+    });
+    if(n){writeLocal();try{render();}catch(e){}}
+  }catch(e){}
+  return n;
+}
 async function restoreFromIDB(){
   try{
     if(appLocked)return;                       // ciphertext path looks after itself
@@ -8566,7 +8607,18 @@ function fmtWatch(mins){
   return `~${h}h · ${Math.round(h/24)}d`;
 }
 // per-title theming: user's own bg wins over AniList banner; accent follows the same source.
-function titleBg(a){return (a&&(a.bgImage||a.banner))||'';}
+// Your own background always wins and is always yours. An AniList banner is only
+// used when it can be shown to belong to THIS title: it carries the id it was
+// fetched for, and if that does not match the title's own id it is somebody
+// else's artwork and is not drawn. Banners saved before the stamp existed cannot
+// be checked, so `repairBanners()` re-derives them once rather than trusting them.
+function titleBg(a){
+  if(!a)return '';
+  if(a.bgImage)return a.bgImage;
+  if(!a.banner)return '';
+  if(a.bannerFor&&a.aniId&&a.bannerFor!==a.aniId)return '';
+  return a.banner;
+}
 function titleAccent(a){if(!a)return'';return (a.bgImage?(a.bgAccent||a.aniColor):a.aniColor)||'';}
 let _ambBase='';   // last adaptive color from what you're browsing
 // The background glow (--amb) obeys a user setting: adaptive (follow content),
@@ -19123,7 +19175,12 @@ async function fetchCovers(){
           // that is the only thing that differs from what was typed.
           try{const _c=a.titleEn||a.titleRo||'';if(_c&&_c!==a.title&&String(_c).toLowerCase()===String(a.title||'').toLowerCase())a.title=_c;}catch(e){}
           // per-title theming: wide banner art + AniList's dominant color (kept independent of any user-set bgImage/bgAccent)
-          if(m.bannerImage)a.banner=m.bannerImage;
+          // Stamped with the id it came from. A banner is the one field that is
+          // written even when the cover is already set, so a title whose art was
+          // right could still end up wearing another show's scene — and nothing
+          // in the record said where it came from, which made it unfixable
+          // without wiping the row. Now it can be checked.
+          if(m.bannerImage){a.banner=m.bannerImage;a.bannerFor=m.id||a.aniId||0;}
           if(m.coverImage&&m.coverImage.color)a.aniColor=m.coverImage.color;
           if(m.averageScore)a.aniScore=m.averageScore;
           if(!a.eps){
@@ -20135,6 +20192,7 @@ load();try{_hadItemsAtLoad=anime.length>0;}catch{}try{restorePos();}catch(e){}
 // and neither blocks the first paint — a device that still HAS its keys does no
 // work here at all, because restoreCreds only fills blanks.
 try{askPersist();}catch(e){}
+try{setTimeout(()=>{try{repairBanners();}catch(e){}},900);}catch(e){}
 try{setTimeout(()=>{restoreCreds().then(()=>{try{if(typeof syncOnOpen==='function')syncOnOpen();}catch(e){}});},0);}catch{}try{setTimeout(()=>{try{fetchSequels();}catch(e){}},6000);}catch{}try{setTimeout(restoreFromIDB,0);}catch{}try{setTimeout(()=>{try{ensureBackup();}catch(e){}},1200);}catch{}try{purgeAdult();}catch{}try{if(!appLocked&&dedupeAnime())writeLocal();}catch{}
 try{if(!appLocked&&adoptOfficialCase())writeLocal();}catch{}
 loadTheme();try{seedHiddenDefaults();}catch{}try{_restoreUpd();}catch{}render();try{nativeScheduleNotifs();}catch{}try{hydrateImages();}catch{}

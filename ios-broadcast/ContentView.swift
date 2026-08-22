@@ -27,7 +27,10 @@ struct ContentView: View {
 
 struct WatchListShell: UIViewRepresentable {
     let broadcaster: BroadcastController
-    private let siteURL = URL(string: "https://theteknojunkie456.github.io/anime-list/")!
+    // Static so the nested Coordinator can reach it too (a nested type may use the
+    // enclosing type's private members in the same file, but an INSTANCE property
+    // needs an instance, and the coordinator has none).
+    fileprivate static let siteURL = URL(string: "https://theteknojunkie456.github.io/anime-list/")!
 
     func makeCoordinator() -> Coordinator { Coordinator(broadcaster: broadcaster) }
 
@@ -78,7 +81,7 @@ struct WatchListShell: UIViewRepresentable {
         broadcaster.picker.alpha = 0.01
         wv.addSubview(broadcaster.picker)   // must be in the hierarchy to fire
 
-        wv.load(URLRequest(url: siteURL))
+        wv.load(URLRequest(url: Self.siteURL))
         return wv
     }
 
@@ -211,6 +214,25 @@ struct WatchListShell: UIViewRepresentable {
         }
 
         // page loaded → if we saved the password, Face ID → auto-unlock the web lock
+        // "It crashes when I join voice chat." The app is not crashing — iOS is
+        // killing the web view's content process, which is a separate process
+        // under its own memory limit. Joining a call loads a whole second web app
+        // plus WebRTC encoders into that process, and on an older phone it goes
+        // over. Nothing is reported: the view simply goes blank and stays blank,
+        // which from the outside is indistinguishable from a crash.
+        //
+        // Unhandled, a terminated content process leaves a dead white view
+        // forever. Reloading brings the app straight back, and because the list
+        // lives in local storage rather than in the page, nothing is lost.
+        func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+            NSLog("WatchList: web content process was terminated (likely memory) — reloading")
+            pageLoaded = false
+            if webView.url != nil {
+                webView.reload()
+            } else {
+                webView.load(URLRequest(url: WatchListShell.siteURL))
+            }
+        }
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
             let saved = PWStore.hasSaved()
             NSLog("WatchList: page loaded — password in Keychain? %@", saved ? "yes" : "no (unlock once in the app to save it)")

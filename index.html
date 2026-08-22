@@ -10972,6 +10972,11 @@ const WT_STEPS=[
 let _wtI=-1,_wtPoll=0,_wtOn=false;
 function wtStart(){
   if(!WT_STEPS.length)return;
+  // It is nearly always started FROM somewhere — Settings, or the last card of
+  // the intro — and whatever that was is still sitting over the app. Step one
+  // points at the search bar, so leaving a sheet open means ringing something
+  // nobody can see and dimming a panel that is not part of the tour.
+  try{closeAll();}catch(e){}
   _wtOn=true;
   const el=document.getElementById('wt'); if(el)el.classList.add('on');
   try{['resize','scroll'].forEach(t=>window.addEventListener(t,wtPlace,{passive:true}));}catch(e){}
@@ -10991,8 +10996,10 @@ function wtGo(i){
   _wtI=i;
   const st=WT_STEPS[i];
   // Some steps live inside a sheet, so the sheet has to be open before there is
-  // anything to point at.
-  try{ if(st.open)st.open(); }catch(e){}
+  // anything to point at — and the ones that DON'T have to close whatever the
+  // previous step opened, or going Back from a sheet step leaves that sheet
+  // covering the control the earlier step is pointing at.
+  try{ if(st.open)st.open(); else closeAll(); }catch(e){}
   const set=(id,v)=>{const e=document.getElementById(id); if(e)e.innerHTML=v;};
   set('wtStep','Step '+(i+1)+' of '+WT_STEPS.length);
   set('wtT',st.t);

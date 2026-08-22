@@ -2481,47 +2481,14 @@ body.yt-open{overflow:hidden;touch-action:none;}
    there is no property that mosaics live pixels. This reads as a pixel screen
    rather than genuinely resampling the page, which is the trade that keeps
    scrolling smooth. */
-/* REAL PIXELATION, WITHOUT A CANVAS IN SIGHT.
-   I said CSS could not mosaic live pixels. That is true of arbitrary DOM, and
-   wrong about IMAGES, which is what actually needed it.
-   Lay the image out at 1/N of its box and scale it back up by N. The browser
-   rasterises at the LAYOUT size and the transform enlarges that raster, so
-   information is genuinely thrown away and comes back as blocks —
-   `image-rendering:pixelated` is what keeps the blocks square instead of
-   smearing them. One transform per image, composited on the GPU, no canvas, no
-   readback, no per-image loop. This is the thing the old pixel mode was trying
-   to do when it sat overnight at "45396 / 45400".
-   N comes from the bit setting, so 8-bit is genuinely chunkier than 64-bit
-   rather than differently-lined. */
-[data-retro]{--px-n:2.5;}
-[data-retro][data-bits="8"]{--px-n:6;}
-[data-retro][data-bits="16"]{--px-n:4;}
-[data-retro][data-bits="64"]{--px-n:2.5;}
-/* The wrapper has to own the size, or shrinking the image collapses the box it
-   lives in. It also has to clip, because a scaled child overflows by design. */
-[data-retro] .pcard-wrap{overflow:hidden;border-radius:14px;}
-[data-retro] .grid .pcard-wrap{aspect-ratio:104/148;}
-[data-retro] .pcard-img,
-[data-retro] .dt-cover,
-[data-retro] .sd-art,
-[data-retro] .rtm-art,
-[data-retro] .dt-banner-img{
-  image-rendering:pixelated;
-  width:calc(100% / var(--px-n));
-  height:calc(100% / var(--px-n));
-  transform:scale(var(--px-n));
-  transform-origin:top left;
-}
-/* These sit in boxes that size themselves, so they get the clip and a definite
-   box to be a fraction OF. */
-[data-retro] .dt-cover-wrap,[data-retro] .sd-row,[data-retro] .rtm-row{overflow:hidden;}
-[data-retro] .dt-banner{overflow:hidden;}
-@supports not (image-rendering:pixelated){
-  /* Without nearest-neighbour the scale-up is just a blur, which is worse than
-     leaving it alone. */
-  [data-retro] .pcard-img,[data-retro] .dt-cover,[data-retro] .sd-art,
-  [data-retro] .rtm-art,[data-retro] .dt-banner-img{width:100%;height:100%;transform:none;}
-}
+/* The image mosaic is OUT for now. Laying a cover out at 1/N and scaling it back
+   up did produce real blocks, but in the live grid it came out as a magnified
+   corner of each cover rather than the whole thing shrunk: the fractional
+   width/height interacts with object-fit and the grid's own aspect-ratio in a
+   way my isolated test did not reproduce, because that test used one card with
+   an explicit --card-w and the real grid sizes itself.
+   Verified wrong on real covers, so it comes out until it is verified right on
+   real covers. The bit settings and the scanline stay. */
 .bits-sw{flex:1;min-width:0;padding:9px 6px;border-radius:10px;font-size:12px;font-weight:800;
   background:var(--bg3);border:1px solid var(--bn2);color:var(--t3);cursor:pointer;white-space:nowrap;}
 .bits-sw.on{color:var(--t1);border-color:var(--a);background:var(--ag);}
@@ -2529,31 +2496,30 @@ body.yt-open{overflow:hidden;touch-action:none;}
 [data-retro] .retro-px{
   display:block;position:fixed;left:0;right:0;bottom:0;top:var(--rpx-top,132px);
   z-index:59;pointer-events:none;
-  background-image:
-    repeating-linear-gradient(to right,rgba(0,0,0,.20) 0 1px,transparent 1px 3px),
-    repeating-linear-gradient(to bottom,rgba(0,0,0,.20) 0 1px,transparent 1px 3px),
-    repeating-linear-gradient(to bottom,rgba(0,0,0,.16) 0 2px,transparent 2px 4px);
+  /* SCANLINES ONLY. The first version drew 1px lines every 2px in BOTH
+     directions, which is a mesh covering half of every pixel on screen — over
+     artwork that reads as a grey screen door, not as a pixel display, and it
+     fought the thing it was supposed to support. The mosaic on the images IS the
+     effect; this is a whisper of CRT on top of it, horizontal only. */
+  background-image:repeating-linear-gradient(to bottom,rgba(0,0,0,.10) 0 1px,transparent 1px 4px);
   mix-blend-mode:multiply;
 }
-/* 8-BIT: coarse cells and a hard scanline. A CRT you were sitting too close to. */
+/* 8-BIT: the line you can actually see, because that era's screens showed it. */
 [data-retro][data-bits="8"] .retro-px{
-  background-image:
-    repeating-linear-gradient(to right,rgba(0,0,0,.30) 0 2px,transparent 2px 6px),
-    repeating-linear-gradient(to bottom,rgba(0,0,0,.30) 0 2px,transparent 2px 6px),
-    repeating-linear-gradient(to bottom,rgba(0,0,0,.26) 0 3px,transparent 3px 6px);
+  background-image:repeating-linear-gradient(to bottom,rgba(0,0,0,.20) 0 1px,transparent 1px 3px);
 }
-/* 64-BIT: a fine grid and a soft bloom rather than a screen door. The lines are
-   nearly gone; what is left is the glow a good CRT put around bright things. */
+[data-retro][data-bits="16"] .retro-px{
+  background-image:repeating-linear-gradient(to bottom,rgba(0,0,0,.13) 0 1px,transparent 1px 4px);
+}
+/* 64-BIT: barely a texture, plus the glow a good CRT put around bright things.
+   At this setting the blocks are the whole point and the screen gets out of the
+   way. */
 [data-retro][data-bits="64"] .retro-px{
-  background-image:
-    repeating-linear-gradient(to bottom,rgba(0,0,0,.13) 0 1px,transparent 1px 2px),
-    repeating-linear-gradient(to right,rgba(0,0,0,.07) 0 1px,transparent 1px 2px);
-  mix-blend-mode:multiply;
+  background-image:repeating-linear-gradient(to bottom,rgba(0,0,0,.06) 0 1px,transparent 1px 5px);
 }
-/* The bloom is its own pass, so it lightens instead of darkening with the grid. */
 [data-retro][data-bits="64"] .retro-px::after{
   content:"";position:absolute;inset:0;pointer-events:none;
-  background:radial-gradient(120% 80% at 50% 0%,rgba(255,255,255,.055),transparent 62%);
+  background:radial-gradient(120% 80% at 50% 0%,rgba(255,255,255,.04),transparent 62%);
   mix-blend-mode:screen;
 }
 /* The grid is the whole effect, and on a low-resolution screen the cells turn

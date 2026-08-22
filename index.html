@@ -2325,14 +2325,31 @@ body.first-paint .pfill,body.content-in .pfill{animation:barGrow .62s cubic-bezi
 .star:active{transform:scale(1.25);}
 .chips{display:flex;flex-wrap:wrap;gap:6px;}
 .chip{font-size:12px;font-weight:700;padding:5px 11px;border-radius:99px;background:var(--bg4);color:var(--t2);border:1px solid var(--b1);}
-.order-list{list-style:none;display:flex;flex-direction:column;gap:7px;}
-.order-item{display:flex;gap:9px;align-items:baseline;font-size:13px;line-height:1.45;color:var(--t1);}
-.order-badge{flex-shrink:0;font-size:10px;font-weight:800;padding:2.5px 7px;border-radius:6px;letter-spacing:0.05em;}
-.ob-tv{background:var(--plnbg);color:var(--pln);}
-.ob-movie{background:var(--ag);color:var(--a2);}
-.ob-ova{background:var(--watbg);color:var(--wat);}
-.ob-special,.ob-key{background:var(--finbg);color:var(--fin);}
-.ob-skip{background:var(--drpbg);color:var(--drp);text-decoration:line-through;}
+/* A run down the page: one rule, a dot per stop. */
+.order-list{list-style:none;display:flex;flex-direction:column;gap:0;position:relative;margin-top:2px;}
+.order-list::before{content:"";position:absolute;left:5px;top:10px;bottom:10px;width:1px;background:var(--b2);}
+.order-item{position:relative;display:flex;align-items:baseline;gap:10px;padding:7px 0;
+  font-size:13px;line-height:1.45;color:var(--t1);}
+.order-dot{position:relative;z-index:1;flex:0 0 auto;width:11px;height:11px;border-radius:50%;
+  background:var(--bg2);border:2px solid var(--t3);align-self:center;}
+.order-t{flex:1;min-width:0;font-weight:600;}
+/* Only when it is not the ordinary case — a row of "TV TV TV" says nothing. */
+.order-k{flex:0 0 auto;font-size:10px;font-weight:800;letter-spacing:.06em;color:var(--t3);}
+.order-d{flex:0 0 auto;font-size:12px;color:var(--t3);font-variant-numeric:tabular-nums;}
+.order-item.ob-tv .order-dot{border-color:var(--a2);}
+.order-item.ob-ova .order-dot{border-color:var(--wat);}
+.order-item.ob-ova .order-k{color:var(--wat);}
+.order-item.ob-movie .order-dot{border-color:var(--pln);}
+.order-item.ob-movie .order-k{color:var(--pln);}
+.order-item.ob-special .order-dot{border-color:var(--fin);}
+.order-item.ob-special .order-k{color:var(--fin);}
+.order-item.ob-key .order-dot{background:var(--a2);border-color:var(--a2);}
+.order-item.ob-key .order-k{color:var(--a2);}
+/* A step you're told to skip is dimmed and struck, rather than shouting SKIP in
+   a coloured box as loudly as the ones you should watch. */
+.order-item.ob-skip{opacity:.55;}
+.order-item.ob-skip .order-t{text-decoration:line-through;text-decoration-color:var(--t3);}
+.order-item.ob-skip .order-dot{border-color:var(--t3);border-style:dashed;}
 .films-acc{margin-top:10px;}
 .films-acc summary{font-size:12px;font-weight:700;color:var(--t2);padding:7px 0;cursor:pointer;list-style-position:inside;}
 .films-acc[open] summary{color:var(--a2);}
@@ -2502,6 +2519,11 @@ body.yt-open{overflow:hidden;touch-action:none;}
 .ai-badge{font-size:10px;font-weight:800;letter-spacing:0.1em;text-transform:uppercase;color:var(--a2);margin-bottom:6px;}
 /* Watch button — the primary action on an anime, so it gets the accent and full width */
 .dt-watch{width:100%;margin-top:18px;padding:15px;border-radius:14px;border:none;background:var(--a);color:var(--aFg);font-family:var(--fd);font-size:15px;font-weight:800;letter-spacing:-.2px;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 8px 22px -6px var(--glow);transition:transform .12s;}
+/* A show that hasn't aired can't be started. The button stays where it is and
+   says when episode 1 lands, instead of disappearing (which reads as broken) or
+   offering to play nothing. */
+.dt-watch:disabled{background:var(--bg4);color:var(--t2);border:1px solid var(--b2);box-shadow:none;cursor:default;}
+.dt-watch:disabled .ico{opacity:.7;}
 .dt-watch:active{transform:scale(.97);}
 .dt-pin-toggle{width:100%;margin-top:9px;padding:8px;background:none;border:none;color:var(--t2);font-family:inherit;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;transition:color .15s;}
 .dt-pin-toggle:active{color:var(--t1);}
@@ -9938,6 +9960,16 @@ function renderDetail(){
   const stars=`<div class="dt-label">Your rating</div><div class="stars">${[1,2,3,4,5].map(n=>
     `<button class="star${(a.rating||0)>=n?' on':''}" onclick="setRating(${n})">${icon('star')}</button>`).join('')}</div>`;
   const chips=(a.genre||'').split(',').map(g=>g.trim()).filter(Boolean).map(g=>`<span class="chip">${g}</span>`).join('');
+  // A filled colour slab in front of every line, at the same weight whether the
+  // line mattered or not, made this read as a table of labels rather than an
+  // order to follow. It is a run down the page now: one rule, a dot per stop, the
+  // step in normal type, and what the step costs you sitting quietly at the end.
+  // The kind is only called out when it is NOT the ordinary case.
+  //
+  // `text` used to be interpolated raw. It comes from the Edit form, from AI
+  // autofill and from a pasted import — and friends.html renders a FRIEND's list
+  // through this same code, so a title's watch order was a way into someone
+  // else's page. It is escaped.
   const li=(step,strip)=>{
     const s=step.toLowerCase();
     let cls='ob-tv',lbl='TV';
@@ -9948,7 +9980,15 @@ function renderDetail(){
     else if(s.startsWith('special:')||s.startsWith('web:')||s.startsWith('live action:')){cls='ob-special';lbl='SPEC';}
     let text=step.replace(/^[^:]+:\s*/,'');
     if(strip)text=text.replace(/\s*—\s*side film.*$/i,'');
-    return`<li class="order-item"><span class="order-badge ${cls}">${lbl}</span>${text}</li>`;
+    // "Season 2 (Zoku) — 13 eps" is a step and a cost; they are not the same
+    // thing and should not be the same colour.
+    const parts=String(text).split(/\s+[—–-]\s+/);
+    const head=parts.shift()||text, tail=parts.join(' — ');
+    return`<li class="order-item ${cls}"><span class="order-dot" aria-hidden="true"></span>`
+      +`<span class="order-t">${schEsc(head)}</span>`
+      +(lbl!=='TV'?`<span class="order-k">${lbl}</span>`:'')
+      +(tail?`<span class="order-d">${schEsc(tail)}</span>`:'')
+      +`</li>`;
   };
   let orderHTML='';
   if(a.order&&a.order.length){
@@ -10039,8 +10079,10 @@ function renderDetail(){
       </div>`;})()}
     ${friendRecBadge(a)}
     <div class="dt-deck">
-    ${(kindOf(a)==='watch'&&a.aniId)?`
-    <button class="dt-watch" onclick="watchAnime('${a.id}')">${icon('play')} ${(_res&&canResumeHere(a))?`Resume Ep ${a.posEp} at ${fmtPos(_res)}`:((a.ep||0)>0?'Continue Watching':'Start Watching')}</button>
+    ${(kindOf(a)==='watch')?`
+    ${notOutYet(a)
+      ? `<button class="dt-watch" disabled aria-disabled="true">${icon('calendar')} ${(()=>{const air=airingInfo(a);return air&&air.when?`Episode 1 airs ${schEsc(air.when)}`:'Not out yet';})()}</button>`
+      : `<button class="dt-watch" onclick="watchAnime('${a.id}')">${icon('play')} ${(_res&&canResumeHere(a))?`Resume Ep ${a.posEp} at ${fmtPos(_res)}`:((a.ep||0)>0?'Continue Watching':'Start Watching')}</button>`}
     ${progHTML}
     ${titleWatchPickerHTML(a)}
     <button class="dt-pin-toggle" onclick="togglePin()">${icon('external')} ${a.srcUrl?'Advanced: edit the direct link':'Advanced: paste a direct episode link'}</button>
@@ -10649,16 +10691,22 @@ let _epHold=null,_epCapToldFor='';
 // logging episodes they have genuinely watched.
 function epCeiling(a){
   const total=(a&&a.epTotal)||0;
-  let aired=0;
+  let aired=-1;                       // -1 = we have no idea, which is not the same as none
   try{
     const air=airingInfo(a);
     // `out:true` means that episode has just landed, so it counts; otherwise the
     // next one is still ahead and the last one out is the one before it.
     if(air&&air.ep>0)aired=air.out?air.ep:air.ep-1;
   }catch(e){}
-  if(aired>0)return total?Math.min(total,aired):aired;
-  return total||999999;
+  // Episode 1 airs on Thursday: nothing exists yet, so the counter is pinned at
+  // zero rather than letting you claim twelve episodes of a show that has not
+  // started. This is the case `aired > 0` used to fall through — it read "no
+  // information" and handed back the full total, which is the opposite answer.
+  if(aired>=0)return total?Math.min(total,aired):aired;
+  return total||999999;               // genuinely unknown → don't pin it
 }
+// Airing data exists and says nothing has come out yet.
+function notOutYet(a){ try{ return epCeiling(a)===0 && !!(a&&a.epTotal); }catch(e){ return false; } }
 function epStepOnce(a,d){
   const max=epCeiling(a);
   const next=Math.max(0,Math.min(max,(a.ep||0)+d));

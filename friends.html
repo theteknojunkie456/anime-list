@@ -2460,6 +2460,48 @@ body.yt-open{overflow:hidden;touch-action:none;}
 .dt-rec:active .dt-rec-img{transform:scale(.95);}
 .dt-rec-img::after{content:'＋';position:absolute;right:5px;bottom:5px;width:24px;height:24px;border-radius:50%;background:var(--a);color:var(--aFg);font-size:17px;font-weight:700;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 8px rgba(0,0,0,.35);}
 .dt-rec-t{font-size:12px;color:var(--t2);line-height:1.3;margin-top:6px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+/* Comes in from the side and stops short of the edge, so the list underneath is
+   still visible behind it — this is a reference you glance at, not a place you
+   go. On a phone there is no room for that, so it takes the width. */
+.sdrawer{position:fixed;top:0;right:0;bottom:0;z-index:88;width:min(420px,86vw);
+  display:flex;flex-direction:column;background:var(--bg2);border-left:1px solid var(--b3);
+  box-shadow:-24px 0 60px rgba(0,0,0,.55);transform:translateX(102%);
+  transition:transform .34s cubic-bezier(.2,1,.28,1);overflow:hidden;}
+.sdrawer.on{transform:none;}
+@media (max-width:520px){.sdrawer{width:100%;}}
+.sd-head{flex:0 0 auto;display:flex;align-items:center;gap:10px;
+  padding:calc(var(--safe-t) + 14px) 16px 12px;border-bottom:1px solid var(--b1);}
+.sd-h-t{flex:1;min-width:0;display:flex;align-items:center;gap:8px;
+  font-family:var(--fd);font-size:15px;font-weight:800;color:var(--t1);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.sd-h-t .ico{width:16px;height:16px;color:var(--a2);flex:none;}
+.sd-x{flex:0 0 auto;padding:11px 12px;margin:-11px -6px -11px 0;min-height:40px;display:inline-flex;align-items:center;
+  background:none;border:0;color:var(--t2);font-size:13px;font-weight:700;border-radius:10px;cursor:pointer;}
+.sd-x:active{background:var(--b1);}
+#sdBody{flex:1;min-height:0;overflow-y:auto;padding:14px 16px calc(var(--safe-b) + 20px);}
+.sd-row{width:100%;display:flex;align-items:center;gap:12px;padding:9px;margin-bottom:8px;border-radius:14px;
+  background:var(--bg3);border:1px solid var(--b1);color:var(--t1);text-align:left;cursor:pointer;
+  transition:border-color .15s,background .15s;}
+.sd-row:active{transform:scale(.99);}
+.sd-row.cur{border-color:var(--a);background:var(--ag);}
+.sd-row > .ico{flex:none;width:16px;height:16px;color:var(--t3);}
+.sd-art{flex:0 0 auto;width:46px;height:66px;border-radius:8px;object-fit:cover;background:var(--bg4);display:block;}
+.sd-art.ph{display:flex;align-items:center;justify-content:center;font-family:var(--fd);font-weight:800;font-size:17px;color:var(--t3);}
+.sd-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:5px;}
+.sd-t{font-size:13px;font-weight:800;line-height:1.3;color:var(--t1);
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.sd-meta{display:flex;align-items:center;flex-wrap:wrap;gap:6px;}
+.sd-kind{font-size:10px;font-weight:800;letter-spacing:.05em;color:var(--t3);}
+.sd-yr{font-size:10px;color:var(--t3);font-variant-numeric:tabular-nums;}
+/* The whole point of the drawer: where each one stands, without opening it. */
+.sd-st{font-size:10px;font-weight:800;padding:2px 8px;border-radius:99px;
+  background:var(--bg4);border:1px solid var(--bn2);color:var(--t3);white-space:nowrap;}
+.sd-st.finished{color:var(--fin);border-color:color-mix(in srgb,var(--fin) 40%,transparent);}
+.sd-st.watching{color:var(--wat);border-color:color-mix(in srgb,var(--wat) 40%,transparent);}
+.sd-st.plan{color:var(--pln);border-color:color-mix(in srgb,var(--pln) 40%,transparent);}
+.sd-st.dropped{color:var(--drp);}
+.sd-st.soon{color:var(--a2);border-color:color-mix(in srgb,var(--a) 34%,transparent);}
+.sd-here{flex:0 0 auto;font-size:11px;font-weight:800;color:var(--a2);}
 .dt-seasons{display:flex;flex-direction:column;gap:8px;}
 .dt-season{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:var(--bg3);border:1px solid var(--b1);border-radius:14px;padding:9px 12px;transition:border-color .15s,background .15s;}
 .dt-season.cur{border-color:var(--a);background:var(--ag);}
@@ -4164,6 +4206,15 @@ body.recsel .pcard{position:relative;}
     <div class="onb-dots" id="onbDots"></div>
     <button class="onb-next" id="onbNextBtn" onclick="onbNext()">Next</button>
   </div>
+</div>
+
+<!-- ALL SEASONS — a drawer, reachable by holding any card -->
+<div class="sdrawer" id="seasonDrawer" aria-hidden="true">
+  <div class="sd-head">
+    <div class="sd-h-t"><i data-ic="layers"></i> <span id="sdTitle">All seasons</span></div>
+    <button class="sd-x" onclick="closeSeasonsDrawer()" aria-label="Close">Done</button>
+  </div>
+  <div id="sdBody"></div>
 </div>
 
 <!-- DETAIL SHEET -->
@@ -10124,8 +10175,14 @@ function renderDetail(){
       <button class="dact" onclick="editItem('${a.id}')">${icon('edit')} Edit</button>
       <button class="dact danger" onclick="confirmDelete('${a.id}')">${icon('trash')}</button>
     </div>`;
-  // fill the franchise season list — from cache instantly, else fetch
-  if(kindOf(a)==='watch'&&a.aniId){
+  // fill the franchise season list — from cache instantly, else fetch.
+  // The `a.aniId` requirement was the reason so many titles showed no seasons at
+  // all: fetchFranchise only NEEDS an id for its first source (the relation
+  // graph), and falls back to a title search and a MyAnimeList walk without one.
+  // Requiring the id here meant every unmatched title — and there are plenty —
+  // silently had no franchise, including ones whose seasons were sitting on the
+  // list right next to them.
+  if(kindOf(a)==='watch'){
     if(curFranchiseFor===a.id&&curFranchise.length)paintFranchise();
     else loadFranchise(a.id,a.aniId);
   }
@@ -10632,6 +10689,73 @@ function seasonToItem(s,status){
 //
 // It goes on as Plan, not Watching: you haven't watched any of it yet, and the
 // first episode you mark promotes it on its own.
+// ─── ALL SEASONS, FROM ANYWHERE ─────────────────────────────────────────────
+// The franchise list lived only at the bottom of one card, which is no use when
+// what you want to know is "have I seen season 1 yet" while looking at season 2.
+// Hold any card and it comes to you: every season, OVA and film of that show,
+// each carrying what you did with it, and tapping one takes you straight there —
+// adding it first if it isn't on your list.
+let _sdList=[],_sdFor='',_sdTitle='';
+function openSeasonsDrawer(id){
+  const a=anime.find(x=>x.id===id); if(!a){toast('That one is gone');return;}
+  try{closeBulkMenu();}catch(e){}
+  _sdFor=id; _sdTitle=a.title||''; _sdList=[];
+  const d=document.getElementById('seasonDrawer'); if(!d)return;
+  d.classList.add('on');
+  renderSeasonsDrawer(true);
+  fetchFranchise(a).then(list=>{
+    if(_sdFor!==id)return;                       // opened something else meanwhile
+    _sdList=Array.isArray(list)?list:[];
+    renderSeasonsDrawer(false);
+  }).catch(()=>{ if(_sdFor===id){_sdList=[];renderSeasonsDrawer(false);} });
+}
+function closeSeasonsDrawer(){
+  const d=document.getElementById('seasonDrawer'); if(d)d.classList.remove('on');
+  _sdFor='';_sdList=[];
+}
+function renderSeasonsDrawer(loading){
+  const box=document.getElementById('sdBody'); if(!box)return;
+  const t=document.getElementById('sdTitle');
+  if(t)t.textContent=_sdTitle||'All seasons';
+  if(loading){box.innerHTML=`<p class="ai-desc">${icon('loader')} Looking up every season, film and special\u2026</p>`;return;}
+  if(!_sdList.length){
+    box.innerHTML=`<p class="ai-desc">Nothing else found for this one. Either it stands alone, or it never matched a database \u2014 Fix titles will sort that out.</p>`;
+    return;
+  }
+  const rows=_sdList.map((sn,i)=>{
+    const mine=franchiseMine(sn);
+    const cur=mine&&mine.id===_sdFor;
+    const kind=fmtLabel(sn);
+    let cls='none',label='Not on your list';
+    if(mine){
+      const st=STATUS_META[mine.status];
+      cls=mine.status; label=(st?st.label:mine.status)+(mine.epTotal?` \u00b7 ${mine.ep||0}/${mine.epTotal}`:'');
+    } else if(sn.status==='NOT_YET_RELEASED'){ cls='soon'; label='Not out yet'; }
+    const img=sn.img||(mine&&mine.img)||'';
+    return `<button class="sd-row${cur?' cur':''}" onclick="sdOpen(${i})">
+      ${img?`<img class="sd-art" src="${escH(img)}" alt="" loading="lazy">`
+           :`<span class="sd-art ph">${escH((String(sn.title||'?').trim()[0]||'?').toUpperCase())}</span>`}
+      <span class="sd-main">
+        <span class="sd-t">${schEsc(sn.title||'?')}</span>
+        <span class="sd-meta">${kind?`<span class="sd-kind">${escH(kind)}</span>`:''}<span class="sd-st ${cls}">${schEsc(label)}</span>${sn.year?`<span class="sd-yr">${sn.year}</span>`:''}</span>
+      </span>
+      ${cur?'<span class="sd-here">Here</span>':icon('chevron-right')}
+    </button>`;
+  }).join('');
+  box.innerHTML=`<p class="ai-desc" style="margin-bottom:10px">In order. What you've done with each is on the row \u2014 tap one to go to it.</p>${rows}`;
+  try{hydrateIcons(box);}catch(e){}
+}
+function sdOpen(i){
+  const sn=_sdList[i]; if(!sn)return;
+  const mine=franchiseMine(sn);
+  if(mine){closeSeasonsDrawer();closeAll();openDetail(mine.id);return;}
+  const it=seasonToItem(sn,'plan');
+  anime.unshift(it);
+  try{save();render();}catch(e){}
+  try{setTimeout(fetchCovers,300);}catch(e){}
+  closeSeasonsDrawer();closeAll();openDetail(it.id);
+  toast('Added '+(it.title.length>34?it.title.slice(0,34)+'\u2026':it.title));
+}
 function openSeason(idx){
   const s=(curFranchise||[])[idx];if(!s)return;
   const mine=franchiseMine(s);
@@ -17385,6 +17509,7 @@ function openBulkMenu(x,y,singleId){
       return add+rm;                          // mixed selection: both, deliberately
     })()
     +`<button class="bulk-mi" onclick="bulkRecommend()">${icon('send')}<span>Recommend\u2026</span></button>`
+    +(one&&kindOf(one)==='watch'?`<button class="bulk-mi" onclick="openSeasonsDrawer('${one.id}')">${icon('layers')}<span>View all seasons\u2026</span></button>`:'')
     +(one?`<div class="bulk-menu-d"></div><button class="bulk-mi" onclick="startSelect('${one.id}')">${icon('check')}<span>Select more\u2026</span></button>`:'')
     +`<div class="bulk-menu-d"></div>`
     +`<div class="bulk-rate">${[1,2,3,4,5].map(r=>`<button class="bulk-star" onclick="bulkRate(${r})" aria-label="Rate ${r}">${icon('star')}</button>`).join('')}</div>`;

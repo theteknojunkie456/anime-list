@@ -2481,6 +2481,50 @@ body.yt-open{overflow:hidden;touch-action:none;}
    there is no property that mosaics live pixels. This reads as a pixel screen
    rather than genuinely resampling the page, which is the trade that keeps
    scrolling smooth. */
+/* REAL PIXELATION, WITHOUT A CANVAS IN SIGHT.
+   I said CSS could not mosaic live pixels. That is true of arbitrary DOM, and
+   wrong about IMAGES, which is what actually needed it.
+   Lay the image out at 1/N of its box and scale it back up by N. The browser
+   rasterises at the LAYOUT size and the transform enlarges that raster, so
+   information is genuinely thrown away and comes back as blocks —
+   `image-rendering:pixelated` is what keeps the blocks square instead of
+   smearing them. One transform per image, composited on the GPU, no canvas, no
+   readback, no per-image loop. This is the thing the old pixel mode was trying
+   to do when it sat overnight at "45396 / 45400".
+   N comes from the bit setting, so 8-bit is genuinely chunkier than 64-bit
+   rather than differently-lined. */
+[data-retro]{--px-n:2.5;}
+[data-retro][data-bits="8"]{--px-n:6;}
+[data-retro][data-bits="16"]{--px-n:4;}
+[data-retro][data-bits="64"]{--px-n:2.5;}
+/* The wrapper has to own the size, or shrinking the image collapses the box it
+   lives in. It also has to clip, because a scaled child overflows by design. */
+[data-retro] .pcard-wrap{overflow:hidden;border-radius:14px;}
+[data-retro] .grid .pcard-wrap{aspect-ratio:104/148;}
+[data-retro] .pcard-img,
+[data-retro] .dt-cover,
+[data-retro] .sd-art,
+[data-retro] .rtm-art,
+[data-retro] .dt-banner-img{
+  image-rendering:pixelated;
+  width:calc(100% / var(--px-n));
+  height:calc(100% / var(--px-n));
+  transform:scale(var(--px-n));
+  transform-origin:top left;
+}
+/* These sit in boxes that size themselves, so they get the clip and a definite
+   box to be a fraction OF. */
+[data-retro] .dt-cover-wrap,[data-retro] .sd-row,[data-retro] .rtm-row{overflow:hidden;}
+[data-retro] .dt-banner{overflow:hidden;}
+@supports not (image-rendering:pixelated){
+  /* Without nearest-neighbour the scale-up is just a blur, which is worse than
+     leaving it alone. */
+  [data-retro] .pcard-img,[data-retro] .dt-cover,[data-retro] .sd-art,
+  [data-retro] .rtm-art,[data-retro] .dt-banner-img{width:100%;height:100%;transform:none;}
+}
+.bits-sw{flex:1;min-width:0;padding:9px 6px;border-radius:10px;font-size:12px;font-weight:800;
+  background:var(--bg3);border:1px solid var(--bn2);color:var(--t3);cursor:pointer;white-space:nowrap;}
+.bits-sw.on{color:var(--t1);border-color:var(--a);background:var(--ag);}
 .retro-px{display:none;}
 [data-retro] .retro-px{
   display:block;position:fixed;left:0;right:0;bottom:0;top:var(--rpx-top,132px);
@@ -2491,11 +2535,35 @@ body.yt-open{overflow:hidden;touch-action:none;}
     repeating-linear-gradient(to bottom,rgba(0,0,0,.16) 0 2px,transparent 2px 4px);
   mix-blend-mode:multiply;
 }
-/* The grid is the whole effect, and on a low-resolution screen 3px cells turn
+/* 8-BIT: coarse cells and a hard scanline. A CRT you were sitting too close to. */
+[data-retro][data-bits="8"] .retro-px{
+  background-image:
+    repeating-linear-gradient(to right,rgba(0,0,0,.30) 0 2px,transparent 2px 6px),
+    repeating-linear-gradient(to bottom,rgba(0,0,0,.30) 0 2px,transparent 2px 6px),
+    repeating-linear-gradient(to bottom,rgba(0,0,0,.26) 0 3px,transparent 3px 6px);
+}
+/* 64-BIT: a fine grid and a soft bloom rather than a screen door. The lines are
+   nearly gone; what is left is the glow a good CRT put around bright things. */
+[data-retro][data-bits="64"] .retro-px{
+  background-image:
+    repeating-linear-gradient(to bottom,rgba(0,0,0,.13) 0 1px,transparent 1px 2px),
+    repeating-linear-gradient(to right,rgba(0,0,0,.07) 0 1px,transparent 1px 2px);
+  mix-blend-mode:multiply;
+}
+/* The bloom is its own pass, so it lightens instead of darkening with the grid. */
+[data-retro][data-bits="64"] .retro-px::after{
+  content:"";position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(120% 80% at 50% 0%,rgba(255,255,255,.055),transparent 62%);
+  mix-blend-mode:screen;
+}
+/* The grid is the whole effect, and on a low-resolution screen the cells turn
    into mush — they get a touch bigger where the pixels are physically larger. */
 @media (max-width:380px){[data-retro] .retro-px{background-size:auto;}}
-@media (prefers-reduced-motion:reduce){[data-retro] .retro-px{background-image:
-  repeating-linear-gradient(to bottom,rgba(0,0,0,.14) 0 2px,transparent 2px 4px);}}
+/* No reduced-motion variant: this pane does not move. It was a defensive habit
+   copied from the animated effects, and because it targeted [data-retro] it beat
+   the plain 16-bit rule while losing to the more specific 8 and 64 ones — so the
+   middle setting quietly rendered a different, thinner grid than the two either
+   side of it for anyone with reduced motion on. */
 /* THE WALKTHROUGH.
    A ring around a real control rather than a picture of one. The dimming is a
    single enormous box-shadow spreading out from the hole, which is why there is
@@ -7884,6 +7952,24 @@ function refreshPixels(){ unpixelateCovers(); }
 // The Retro PALETTE survives as a theme, so nobody loses the violet ground they
 // picked — the two are simply no longer welded together.
 const RETRO_KEY='retro_mode';
+// HOW MANY BITS. The pane is the whole look, and "retro" is not one look — the
+// distance between a 1988 console and a 1996 one is mostly how coarse the screen
+// was and how much colour it could hold. Three settings rather than an argument
+// about which one "retro" means:
+//   8   coarse cells, hard scanline, no subtlety. A CRT you sat too close to.
+//   16  the middle, and what this shipped as.
+//   64  a fine grid and a soft bloom instead of a screen door. Reads as the
+//       N64/PS1 era: still obviously a screen, but a good one.
+const RETRO_BITS_KEY='retro_bits';
+function retroBits(){
+  try{const v=localStorage.getItem(RETRO_BITS_KEY);return (v==='8'||v==='16'||v==='64')?v:'64';}
+  catch(e){return '64';}
+}
+function setRetroBits(v){
+  try{localStorage.setItem(RETRO_BITS_KEY,String(v));}catch(e){}
+  applyRetroMode();
+  try{renderRetroRow();}catch(e){}
+}
 function retroMode(){
   try{
     const v=localStorage.getItem(RETRO_KEY);
@@ -7895,7 +7981,8 @@ function retroMode(){
 function applyRetroMode(){
   try{
     const el=document.documentElement;
-    if(retroMode())el.setAttribute('data-retro','1');else el.removeAttribute('data-retro');
+    if(retroMode()){el.setAttribute('data-retro','1');el.setAttribute('data-bits',retroBits());}
+    else {el.removeAttribute('data-retro');el.removeAttribute('data-bits');}
     try{placeRetroPx();}catch(e){}      // the pane starts at the search bar, measured
   }catch(e){}
   try{applyRetroEdge();}catch(e){}
@@ -7961,6 +8048,15 @@ function renderRetroRow(){
   const lb3=document.getElementById('retroLb3'),row3=document.getElementById('retroRow3');
   if(lb2&&row2){ lb2.style.display=on?'':'none'; row2.style.display=on?'':'none'; row2.innerHTML=on?picks(edge,'setRetroEdge'):''; }
   if(lb3&&row3){ lb3.style.display=on?'':'none'; row3.style.display=on?'':'none'; row3.innerHTML=on?picks(edge2,'setRetroEdge2'):''; }
+  // Not a colour, so not a swatch: three named settings, because the difference
+  // between them is coarseness and that is a word, not a hue.
+  const lb4=document.getElementById('retroLb4'),row4=document.getElementById('retroRow4');
+  if(lb4&&row4){
+    lb4.style.display=on?'':'none'; row4.style.display=on?'':'none';
+    const b=retroBits();
+    row4.innerHTML=on?[['8','8-bit','Coarse, hard scanline'],['16','16-bit','The middle'],['64','64-bit','Fine grid, soft bloom']]
+      .map(([v,t,tip])=>`<button class="bits-sw${b===v?' on':''}" onclick="setRetroBits('${v}')" title="${tip}">${t}</button>`).join(''):'';
+  }
 }
 const ACCENT_KEY='accent_override';
 function accentOverride(){try{return localStorage.getItem(ACCENT_KEY)||'';}catch(e){return '';}}
@@ -8221,6 +8317,8 @@ function startPaint(){
       <div class="acc-row" id="retroRow2" style="display:none"></div>
       <div class="paint-lb" id="retroLb3" style="display:none">Bottom shadow color</div>
       <div class="acc-row" id="retroRow3" style="display:none"></div>
+      <div class="paint-lb" id="retroLb4" style="display:none">How many bits</div>
+      <div class="acc-row" id="retroRow4" style="display:none"></div>
       <div class="paint-lb">Accent</div>
       <div class="acc-row" id="accentRow"></div>
       <div class="paint-lb">Background</div>

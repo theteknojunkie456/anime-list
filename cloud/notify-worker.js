@@ -703,6 +703,12 @@ async function adoptByIdentity(id, body, env) {
   }
   return null;
 }
+// Friend codes are alphanumeric and self-minted by the client; anything else is
+// not one and is not stored.
+function fcodeOf(body) {
+  const v = String((body && body.fcode) || "");
+  return /^[A-Za-z0-9]{10,64}$/.test(v) ? v : "";
+}
 async function rememberIdentity(id, body, env) {
   // Only the sync code is indexed, for the same reason it is the only one
   // accepted above — indexing the friend code would keep the door standing even
@@ -728,10 +734,14 @@ async function handleJoin(body, env) {
     const rec = JSON.parse(existing);
     const incoming = String(body.name || "").slice(0, 40).trim();
     const placeholder = !rec.name || rec.name === "(existing)";
-    if (incoming && placeholder && !rec.alias) {
-      rec.name = incoming;
-      await env.SUBS.put(key, JSON.stringify(rec));
-    }
+    let dirty = false;
+    if (incoming && placeholder && !rec.alias) { rec.name = incoming; dirty = true; }
+    // Everyone who joined before this existed has no friend code on file. They
+    // pick one up the next time their app checks in, rather than having to
+    // rejoin.
+    const fc = fcodeOf(body);
+    if (fc && rec.fcode !== fc) { rec.fcode = fc; dirty = true; }
+    if (dirty) await env.SUBS.put(key, JSON.stringify(rec));
     await rememberIdentity(id, body, env);
     return json({ ok: true, status: rec.status, name: rec.alias || rec.name || "" });
   }
@@ -776,11 +786,19 @@ async function handleJoin(body, env) {
     }
   }
 
+  // The friend code the app already sends on every join, kept on the record so the
+  // admin roster can offer "add friend" instead of the owner reading a code out
+  // over Messages and talking somebody through pasting it.
+  //
+  // Kept, NOT indexed. rememberIdentity deliberately indexes only the sync code,
+  // because an index is a way IN — a device that presents a matching value gets
+  // adopted. This is the opposite direction: a value the admin reads back out.
   const rec = {
     id, status,
     name: nm,
     source: String(body.source || "").slice(0, 40),   // how they heard about it
     invite: inviteCode,
+    fcode: fcodeOf(body),
     joinedAt: Date.now(),
   };
   await env.SUBS.put(key, JSON.stringify(rec));

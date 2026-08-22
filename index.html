@@ -5600,6 +5600,18 @@ async function loadMembers(){
   const ap=d=>`<button class="src-chip on" onclick="adminDecide('${d.id}','approve')">Approve</button>`;
   const dn=d=>`<button class="src-chip" onclick="adminDecide('${d.id}','deny')">Deny</button>`;
   const rm=d=>`<button class="src-chip fr-danger" onclick="adminForget('${d.id}')">Remove</button>`;
+  // The roster already knows who these people are, so being friends with one of
+  // them should not mean reading a code out over Messages and talking them
+  // through pasting it. Only offered when their app has actually reported a
+  // friend code, and never for yourself or someone you already have.
+  const fr=d=>{
+    const code=String(d.fcode||'');
+    if(!/^[A-Za-z0-9]{10,64}$/.test(code))return '';
+    try{ if(code===myFriendCode())return ''; }catch(e){}
+    try{ if(friendsList().some(f=>f.code===code))return `<span class="src-tag">friends</span>`; }catch(e){}
+    try{ if(friendsOut().some(f=>f.code===code))return `<span class="src-tag">requested</span>`; }catch(e){}
+    return `<button class="src-chip" onclick="adminAddFriend('${jsq(code)}','${jsq(memberLabel(d)||'')}',this)">${icon('plus')} Add friend</button>`;
+  };
   // Every group is always shown, with its count — an empty section is
   // information too ("nobody is waiting on me"), and a section that only appears
   // when non-empty means you can't tell the difference between none and broken.
@@ -5613,7 +5625,7 @@ async function loadMembers(){
   box.innerHTML=
     `<div class="dt-label" style="margin-top:2px">${icon('users')} Everyone · ${devs.length}${onl?` · ${onl} online`:''}</div>`
     +group('Waiting on you',pending,d=>ap(d)+dn(d)+rm(d))
-    +group('Members',approved,d=>dn(d)+rm(d))
+    +group('Members',approved,d=>fr(d)+dn(d)+rm(d))
     +group('Denied',denied,d=>ap(d)+rm(d),true);
   // Presence only means anything if it's current, so the open panel refreshes
   // itself — and stops the moment it isn't on screen.
@@ -16529,6 +16541,20 @@ function addFrHandled(id){try{const a=frHandled();if(!a.includes(id)){a.push(id)
 let friendReqs=[];   // pending incoming requests [{id,from:{code,name},at}]
 // Friending is now a two-sided request: this posts a request to their mailbox and
 // marks it pending. They accept → an 'accept' comes back and both sides add each other.
+// From the admin roster: one tap instead of a code read out over Messages.
+async function adminAddFriend(code,name,btn){
+  if(btn){btn.disabled=true;btn.textContent='Sending\u2026';}
+  let err='';
+  try{ err=await sendFriendRequest(code,name); }catch(e){ err='Network error, try again.'; }
+  if(err){
+    toast(err);
+    if(btn){btn.disabled=false;btn.innerHTML=icon('plus')+' Add friend';}
+    return;
+  }
+  toast('Request sent to '+(name||'them'));
+  try{renderFriends();}catch(e){}
+  try{loadMembers();}catch(e){}          // the row becomes "requested"
+}
 async function sendFriendRequest(code,name){
   code=String(code||'').trim();
   if(!/^[A-Za-z0-9]{10,64}$/.test(code))return "That doesn't look like a friend code.";

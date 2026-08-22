@@ -2489,6 +2489,8 @@ body.yt-open{overflow:hidden;touch-action:none;}
    an explicit --card-w and the real grid sizes itself.
    Verified wrong on real covers, so it comes out until it is verified right on
    real covers. The bit settings and the scanline stay. */
+/* The small source has to be drawn as squares, not smoothed back into a blur. */
+[data-retro] .pcard-img,[data-retro] .dt-cover,[data-retro] .sd-art,[data-retro] .rtm-art{image-rendering:pixelated;}
 /* FLAT COLOUR, WHICH IS THE HALF THAT WORKS.
    Real mosaicking of live images is not something CSS can do — the transform
    trick loses to Chrome re-rasterising at the final resolution, and the SVG tile
@@ -7994,6 +7996,7 @@ function applyRetroMode(){
     if(retroMode()){el.setAttribute('data-retro','1');el.setAttribute('data-bits',retroBits());}
     else {el.removeAttribute('data-retro');el.removeAttribute('data-bits');}
     try{placeRetroPx();}catch(e){}      // the pane starts at the search bar, measured
+    try{render();}catch(e){}            // covers point at a different file per mode
   }catch(e){}
   try{applyRetroEdge();}catch(e){}
   try{refreshPixels();}catch(e){}
@@ -8903,6 +8906,23 @@ function fmtWatch(mins){
 // fetched for, and if that does not match the title's own id it is somebody
 // else's artwork and is not drawn. Banners saved before the stamp existed cannot
 // be checked, so `repairBanners()` re-derives them once rather than trusting them.
+// MORE PIXELLY, THE ONLY WAY THAT ACTUALLY WORKS.
+// Two attempts failed at making the browser throw pixels away: a transform-scale
+// trick (Chrome re-rasterises at the final size, so nothing is lost) and an SVG
+// tile filter (its cells never filled). The answer is not to discard pixels at
+// all — it is to ASK FOR FEWER. AniList serves every cover at more than one size
+// off the same path, so retro points at the small one and lets it scale up.
+// A ~100px source in a 200px card, drawn nearest-neighbour, is genuinely blocky:
+// real pixels, no canvas, and it downloads less than it did before.
+// 64-bit keeps the full-size art, because that setting is meant to be the good
+// screen — the palette does the work there.
+function pxSrc(url){
+  try{
+    if(!retroMode())return url;
+    if(retroBits()==='64')return url;
+    return String(url||'').replace(/\/cover\/(?:extraLarge|large)\//,'/cover/medium/');
+  }catch(e){return url;}
+}
 function titleBg(a){
   if(!a)return '';
   if(a.bgImage)return a.bgImage;
@@ -9614,7 +9634,7 @@ function posterCard(a,nSeas){
   const multi=nSeas>1;
   const title=multi?seasonBase(a.title):a.title;
   const img=a.img
-    ?`<img class="pcard-img" decoding="async" src="${escH(a.img)}" loading="lazy" alt="" onerror="artFallback(this,${JSON.stringify(String(title||a.title||'?')).replace(/"/g,'&quot;')},'pcard-ph')">`
+    ?`<img class="pcard-img" decoding="async" src="${escH(pxSrc(a.img))}" loading="lazy" alt="" onerror="artFallback(this,${JSON.stringify(String(title||a.title||'?')).replace(/"/g,'&quot;')},'pcard-ph')">`
     :`<div class="pcard-ph">${((title||'?').trim()[0]||'?').toUpperCase().replace(/['"<&]/g,'?')}</div>`;
   const p=prog(a);
   const bar=(a.status==='watching'&&a.epTotal)?`<div class="pbar"><div class="pfill" style="width:${Math.round(p*100)}%"></div></div>`:'';
@@ -10203,7 +10223,7 @@ function renderDetail(){
   const _pw=Math.max(0,Math.min(1,prog(a)));
   const _lvl=(a.epTotal&&_pw>0)?`<div class="dt-level${_pw>=1?' full':''}" style="height:${(_pw*100).toFixed(1)}%"></div>`:'';
   const cover=`<div class="dt-cover-wrap">`+(a.img
-    ?`<img loading="lazy" class="dt-cover" decoding="async" src="${escH(a.img)}" alt="" onerror="artFallback(this,${JSON.stringify(String(a.title||'?')).replace(/"/g,'&quot;')},'dt-cover-ph')">`
+    ?`<img loading="lazy" class="dt-cover" decoding="async" src="${escH(pxSrc(a.img))}" alt="" onerror="artFallback(this,${JSON.stringify(String(a.title||'?')).replace(/"/g,'&quot;')},'dt-cover-ph')">`
     :`<div class="dt-cover-ph">${((a.title||'?').trim()[0]||'?').toUpperCase().replace(/['"<&]/g,'?')}</div>`)+_lvl+`</div>`;
   // per-title banner header + accent tint (scoped to this sheet only, never the global chrome)
   const art=titleBg(a);

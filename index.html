@@ -16473,6 +16473,32 @@ function templatizeSearchURL(raw){
     if(v!==null&&v!==''){u.searchParams.set(k,'__WLQ__');
       return u.toString().replace(/__WLQ__/g,'{query}');}
   }
+  // Episodes in the QUERY rather than the path: /watch/some-show?ep=9. Nothing
+  // handled this shape, so the whole address came back untouched and the setup
+  // said it could not read it. The slug is whichever path segment is not
+  // structural, and the id case below is checked first because it cannot
+  // generalise at all.
+  {
+    const EPQ=['ep','episode','e','epi','episodio'];
+    let epKey='';
+    for(const k of EPQ){const v=u.searchParams.get(k); if(v!==null&&/^\d+$/.test(v)){epKey=k;break;}}
+    if(epKey){
+      const segs=u.pathname.split('/').filter(Boolean);
+      const STRUCTURAL=/^(watch|anime|series|video|tv|show|title|play|stream|v|w)$/i;
+      // An opaque numeric id in the path is the thing that cannot be derived from
+      // a title, so a template built around it would send every show to this one.
+      // Left alone here; quickSetup explains it rather than producing a link that
+      // 404s on everything else.
+      const opaque=segs.some(x=>/^\d{3,}$/.test(x));
+      const si=segs.findIndex(x=>!STRUCTURAL.test(x)&&!/^\d{3,}$/.test(x)&&/[a-z]/i.test(x));
+      if(!opaque&&si>=0){
+        segs[si]='{slug}';
+        u.pathname='/'+segs.join('/');
+        u.searchParams.set(epKey,'__WLEP__');
+        return decodeURIComponent(u.toString()).replace(/__WLEP__/g,'{ep}');
+      }
+    }
+  }
   // /search/cowboy-bebop style — templatize the last path segment instead.
   // Episode-style paths: /watch/tomo-chan-is-a-girl/ep-7 → /watch/{slug}/ep-{ep}
   // The episode marker must carry an ep/episode/e prefix. That's what keeps
@@ -16931,6 +16957,23 @@ function quickSetup(){
     // Couldn't see a show/episode in it — usually a homepage, or a player page
     // that hides the show behind a query string. Say what would work, and offer
     // the AI as a way out rather than a prerequisite.
+    // A site that addresses shows by a number of its own — /watch/162804/... — is
+    // not a template problem, it is unsolvable by template: that number cannot be
+    // worked out from a title, so any pattern built around it would send every
+    // other show to this one. Say that, rather than "I can't read it", and point
+    // at the thing that does work.
+    const opaqueId=(()=>{try{
+      const segs=new URL(url).pathname.split('/').filter(Boolean);
+      return segs.some(x=>/^\d{3,}$/.test(x))&&segs.some(x=>/[a-z]{3,}/i.test(x));
+    }catch(e){return false;}})();
+    if(opaqueId){
+      let host=''; try{host=new URL(url).hostname.replace(/^www\./,'');}catch(e){}
+      out.innerHTML=`<div class="src-quick-bad">${icon('search')} ${escH(host||'That site')} gives every show its own number, and that number can't be worked out from a title.<br>
+        A pattern built on this link would send <b>every</b> show to this one, so there's nothing to learn here.
+        <p class="ai-desc" style="margin:9px 0 0">What works instead: open a show, and use <b>Advanced: paste a direct episode link</b> on its card. That pins the address for that one title, and the episode number still follows you through it.</p>
+        </div>`;
+      return;
+    }
     out.innerHTML=`<div class="src-quick-bad">${icon('search')} I can't tell which show or episode that address points at.<br>
       The one to copy is a <b>single episode's</b> page — its address usually has the show's name in it.
       ${getKey()?`
@@ -16964,7 +17007,11 @@ function quickShowTemplate(tpl,url){
   const known=slugSeg?anime.find(a=>norm(slugTitle(a))===norm(slugSeg))
     ||anime.find(a=>norm(slugTitle(a)).startsWith(norm(slugSeg).slice(0,10))&&norm(slugSeg).length>5):null;
   const showName=known?known.title:(slugSeg?slugSeg.replace(/[-_]+/g,' ').replace(/\b\w/g,c=>c.toUpperCase()):'that show');
-  let site=''; try{site=new URL(tpl.replace(/\{[^}]+\}/g,'x')).hostname.replace(/^www\./,'');}catch{}
+  // Read the host from the address they pasted, not from the template. Templates
+  // can start with a {domain} token, and blanking tokens to "x" then made the
+  // hostname literally "x" — which is what "That's 162804 on x." was.
+  let site=''; try{site=new URL(url).hostname.replace(/^www\./,'');}catch{}
+  if(!site){try{site=new URL(tpl.replace(/\{[^}]+\}/g,'x')).hostname.replace(/^www\./,'');}catch{}}
   // Prove it generalises: resolve the SAME template for a different show they own.
   const other=anime.find(a=>kindOf(a)==='watch'&&a!==known)||anime.find(a=>a!==known);
   const proof=other?fillSourceTokens(tpl,other,3):'';

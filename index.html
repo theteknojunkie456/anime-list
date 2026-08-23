@@ -5119,8 +5119,8 @@ body.recsel .pcard{position:relative;}
   <!-- host's party remote, right in the player — pause/next everyone without leaving the video -->
   <div class="pv-host" id="pvHostBar" style="display:none">
     <button class="pv-host-main" id="pvHostPause">Pause everyone</button>
-    <button class="pv-host-next" onclick="partyResync()" title="Count everyone back in together">Re-sync</button>
-    <button class="pv-host-next" onclick="partyNext()">Next</button>
+    <button class="pv-host-next" id="pvPartyResync" onclick="partyResync()" title="Count everyone back in together">Re-sync</button>
+    <button class="pv-host-next" id="pvHostNext" onclick="partyNext()">Next</button>
     <button class="pv-host-chat party-only" onclick="openSheet('partySheet')" aria-label="Party chat"><i data-ic="message"></i></button>
   </div>
 </div>
@@ -12782,7 +12782,7 @@ function partyConnect(code,create){
   partyWS=ws;
   ws.onopen=()=>{partyReconn=0;if(partyReconnecting){partyReconnecting=false;toast('Back in the party');}updatePartyPill();};
   ws.onmessage=e=>{let m;try{m=JSON.parse(e.data);}catch{return;}
-    if(m.t==='state')applyRoom(m.room);
+    if(m.t==='state'){notePartyClock(m);applyRoom(m.room);}
     else if(m.t==='react')processReacts(m.r?[m.r]:m.reacts);   // lightweight: float the emoji, no full-state churn
     else if(m.t==='ytsync')applyYtSync(m);                      // follow the host's player, hands-free
     else if(m.t==='psync')applyPlaybackSync(m);                 // …and on real sites, in the app
@@ -12874,8 +12874,10 @@ function partyCue(room){
   if(!ov)return;
   lbl.textContent='Get ready…';ov.classList.add('on');
   const tick=()=>{
-    const left=Math.ceil((room.playAt-Date.now())/1000);
-    if(left>0){num.textContent=left;num.style.animation='none';void num.offsetWidth;num.style.animation='';setTimeout(tick,Math.min(1000,room.playAt-Date.now()));}
+    // Against the ROOM's clock. A device a few seconds fast used to start that
+    // many seconds early and blame the network for it.
+    const left=Math.ceil((room.playAt-partyNow())/1000);
+    if(left>0){num.textContent=left;num.style.animation='none';void num.offsetWidth;num.style.animation='';setTimeout(tick,Math.min(1000,room.playAt-partyNow()));}
     else{num.innerHTML=icon('play');lbl.textContent='Playing!';setTimeout(()=>{ov.classList.remove('on');closeAll();if(room.title)watchParty(room.title,room.ep,room.aniId||0);},450);}
   };
   tick();
@@ -13028,10 +13030,22 @@ function followHost(room){
 // The host's remote, in the player itself — pause/next everyone without leaving the video.
 function renderPvHostBar(){
   const bar=document.getElementById('pvHostBar');if(!bar)return;
-  const show=partyInSession&&partyIsHost&&document.getElementById('playerView').classList.contains('on');
+  // Everyone in the party gets this bar, not just the host. A viewer needs the
+  // re-sync more than the host does — the host is the reference — and needing it
+  // while the video is playing is exactly when leaving the player to find a
+  // button is the worst thing to ask.
+  const show=partyInSession&&document.getElementById('playerView').classList.contains('on');
   bar.style.display=show?'':'none';
   if(!show)return;
-  const paused=!!(partyRoom&&partyRoom.paused),pb=document.getElementById('pvHostPause');
+  const pb=document.getElementById('pvHostPause'), nx=document.getElementById('pvHostNext');
+  const rs=document.getElementById('pvPartyResync');
+  // What only the host can do stays the host's.
+  if(pb)pb.style.display=partyIsHost?'':'none';
+  if(nx)nx.style.display=partyIsHost?'':'none';
+  // And the one thing a viewer actually needs says what it is for.
+  if(rs){rs.textContent=partyIsHost?'Re-sync':'Out of sync';rs.style.flex=partyIsHost?'':'1';}
+  if(!partyIsHost)return;
+  const paused=!!(partyRoom&&partyRoom.paused);
   pb.textContent=paused?'Resume everyone':'Pause everyone';
   pb.classList.toggle('paused',paused);
   pb.onclick=paused?partyPlay:partyPause;
@@ -13171,10 +13185,23 @@ function partyBroadcastPlayback(playing){
   if(!partyIsHost)return;
   try{wsSend({t:'ytsync',at:_ytState.at||0,playing:!!playing});}catch(e){}
 }
+// How far this device's clock is from the room's. Measured off the same message
+// that carries the countdown deadline, so there is no extra round trip and no
+// assumption that anybody's clock is right.
+let _partySkew=0;
+function notePartyClock(m){
+  try{ if(m&&typeof m.now==='number')_partySkew=m.now-Date.now(); }catch(e){}
+}
+// The room's clock, not this device's.
+function partyNow(){ return Date.now()+_partySkew; }
+// Being out of sync is the one problem only the person suffering it can see, so
+// gating the fix behind the host meant saying so out loud and hoping they were
+// listening. Everyone restarts together either way; a viewer asking costs the
+// room the same three seconds a host does.
 function partyResync(){
-  if(!partyIsHost){toast('Only the host can re-sync');return;}
+  if(!partyActive()){toast('You are not in a party');return;}
   wsSend({t:'resync'});
-  toast('Counting everyone back in…');
+  toast(partyIsHost?'Counting everyone back in…':'Asked everyone to count back in…');
 }
 function partyPick(id){
   const a=anime.find(x=>x.id===id);if(!a)return;

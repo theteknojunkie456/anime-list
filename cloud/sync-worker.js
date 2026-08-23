@@ -670,10 +670,14 @@ export class PartyRoom {
         return;
       }
       case 'resync': {
-        if (!isHost) return;
+        // ANYONE may ask. Being out of sync is the one problem only the person
+        // suffering it can see, and host-gating it meant saying so out loud and
+        // hoping the host was listening. Everyone restarts together either way,
+        // so a viewer asking costs the room the same three seconds a host does.
         room.paused = false;
         room.playAt = Date.now() + 3600;
-        this.sys(room, '▶ Re-syncing — pause and get ready');
+        this.sys(room, isHost ? '▶ Re-syncing — pause and get ready'
+                              : `▶ ${name} was out of sync — everyone gets ready`);
         room.rev++; await this.save(); this.broadcast(); return;
       }
       case 'queue-next': {   // host advances the party to the first queued item + fires the 3·2·1
@@ -737,7 +741,12 @@ export class PartyRoom {
     return { code: r.code, host: r.host, title: r.title, animeId: r.animeId, ep: r.ep, img: r.img, playAt: r.playAt, paused: !!r.paused, sharing: r.sharing || '', queue: r.queue || [], voice: Object.keys(r.voice || {}),
       members: Object.entries(r.members).map(([uid, m]) => ({ uid, name: m.name })), chat: r.chat, reacts: (r.reacts || []).filter(x => Date.now() - x.t < 8000), rev: r.rev };
   }
-  broadcast() { const s = JSON.stringify({ t: 'state', room: this.view() }); for (const ws of this.state.getWebSockets()) { try { ws.send(s); } catch {} } }
+  // `now` rides along with every room update. The countdown is a wall-clock
+  // deadline (playAt), and a device whose clock is a few seconds out starts that
+  // many seconds early or late — through no fault of the network. With the
+  // server's own time in the same message, each client can measure its offset and
+  // count down against the room's clock instead of its own.
+  broadcast() { const s = JSON.stringify({ t: 'state', room: this.view(), now: Date.now() }); for (const ws of this.state.getWebSockets()) { try { ws.send(s); } catch {} } }
   broadcastReact(rc) { const s = JSON.stringify({ t: 'react', r: rc }); for (const ws of this.state.getWebSockets()) { try { ws.send(s); } catch {} } }
   sendTo(uid, obj) { const s = JSON.stringify(obj); for (const ws of this.state.getWebSockets(uid)) { try { ws.send(s); } catch {} } }
   // Straight to everyone but the sender, with no room-state write. Playback

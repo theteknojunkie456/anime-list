@@ -2746,6 +2746,14 @@ body.yt-open{overflow:hidden;touch-action:none;}
 /* A show that hasn't aired can't be started. The button stays where it is and
    says when episode 1 lands, instead of disappearing (which reads as broken) or
    offering to play nothing. */
+/* Beside Watch, not instead of it: the same width and shape so it reads as the
+   second half of one decision, quieter so it never competes with just watching. */
+.dt-together{width:100%;margin-top:8px;padding:13px;border-radius:14px;
+  background:var(--bg4);border:1px solid var(--b2);color:var(--t1);
+  font-family:var(--fd);font-size:14px;font-weight:800;letter-spacing:-.1px;
+  display:flex;align-items:center;justify-content:center;gap:8px;transition:transform .12s,border-color .15s;}
+.dt-together .ico{width:16px;height:16px;color:var(--a2);}
+.dt-together:active{transform:scale(.98);}
 .dt-watch:disabled{background:var(--bg4);color:var(--t2);border:1px solid var(--b2);box-shadow:none;cursor:default;}
 .dt-watch:disabled .ico{opacity:.7;}
 .dt-watch:active{transform:scale(.97);}
@@ -10738,6 +10746,7 @@ function renderDetail(){
     ${notOutYet(a)
       ? `<button class="dt-watch" disabled aria-disabled="true">${icon('calendar')} ${(()=>{const air=airingInfo(a);return air&&air.when?`Episode 1 airs ${schEsc(air.when)}`:'Not out yet';})()}</button>`
       : `<button class="dt-watch" onclick="watchAnime('${a.id}')">${icon('play')} ${(_res&&canResumeHere(a))?`Resume Ep ${a.posEp} at ${fmtPos(_res)}`:((a.ep||0)>0?'Continue Watching':'Start Watching')}</button>`}
+    ${kindOf(a)==='watch'?`<button class="dt-together" onclick="watchTogether('${a.id}')">${icon('users')} ${partyActive()?'Watch this in the party':'Watch together'}</button>`:''}
     ${progHTML}
     ${titleWatchPickerHTML(a)}
     <button class="dt-pin-toggle" onclick="togglePin()">${icon('external')} ${a.srcUrl?'Advanced: edit the direct link':'Advanced: paste a direct episode link'}</button>
@@ -12798,7 +12807,7 @@ function partyConnect(code,create){
   partyWS=ws;
   ws.onopen=()=>{partyReconn=0;if(partyReconnecting){partyReconnecting=false;toast('Back in the party');}updatePartyPill();};
   ws.onmessage=e=>{let m;try{m=JSON.parse(e.data);}catch{return;}
-    if(m.t==='state'){notePartyClock(m);applyRoom(m.room);}
+    if(m.t==='state'){notePartyClock(m);applyRoom(m.room);partyApplyPending();}
     else if(m.t==='react')processReacts(m.r?[m.r]:m.reacts);   // lightweight: float the emoji, no full-state churn
     else if(m.t==='ytsync')applyYtSync(m);                      // follow the host's player, hands-free
     else if(m.t==='psync')applyPlaybackSync(m);                 // …and on real sites, in the app
@@ -13237,6 +13246,43 @@ function partyResync(){
   if(!partyActive()){toast('You are not in a party');return;}
   wsSend({t:'resync'});
   toast(partyIsHost?'Counting everyone back in…':'Asked everyone to count back in…');
+}
+// WATCH TOGETHER, FROM THE SHOW.
+// The party lived behind an icon, inside a hub, two taps from anywhere and
+// invisible unless you already knew it existed. But the moment you want it is
+// the moment you are looking at something and thinking "they'd like this" — so
+// it belongs on the card, next to Watch.
+//
+// One tap does the whole setup: makes the room if there isn't one, points it at
+// this show and episode, and opens the invite. Already in a party, it just aims
+// the party here.
+function watchTogether(id){
+  const a=anime.find(x=>x.id===id); if(!a)return;
+  if(partyActive()){
+    partyPick(id);
+    closeAll(); openSheet('partySheet');
+    return;
+  }
+  // A party needs a name to show the others. If there isn't one yet, the sheet
+  // is where that gets typed, so send them there rather than failing quietly.
+  if(!partyName()){
+    closeAll(); openSheet('partySheet');
+    toast('Put your name in, then start the party');
+    return;
+  }
+  _ptPending=id;                        // aim it as soon as the room is live
+  partyCreate();
+  closeAll(); openSheet('partySheet');
+}
+// The socket takes a moment to come up, and 'set' before it is open goes
+// nowhere. Rather than guessing at a delay, the pick is held and applied by the
+// first room update that arrives.
+let _ptPending='';
+function partyApplyPending(){
+  if(!_ptPending)return;
+  if(!partyActive()||!partyIsHost)return;
+  const id=_ptPending; _ptPending='';
+  try{partyPick(id);}catch(e){}
 }
 function partyPick(id){
   const a=anime.find(x=>x.id===id);if(!a)return;

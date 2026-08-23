@@ -1675,7 +1675,12 @@ body.first-paint .row-sec,body.content-in .row-sec{animation:fadeUp .5s cubic-be
 /* ── AUTOFILL PICKER ── */
 .pick-group{font-family:var(--fd);font-size:13px;font-weight:600;color:var(--t3);margin:16px 0 2px;}
 .pick-group:first-child{margin-top:4px;}
-.pick-group + .pick-have{flex:0 0 auto;font-size:11px;font-weight:800;color:var(--fin);white-space:nowrap;}
+.pick-group + /* Artwork fades in on decode. No attribute means fully visible, so this can only
+   ever make a loading picture gentler, never hide a loaded one. */
+img[data-fd="wait"]{opacity:0;}
+img[data-fd="in"]{opacity:1;transition:opacity .18s ease-out;}
+@media (prefers-reduced-motion:reduce){img[data-fd="wait"]{opacity:1;}img[data-fd="in"]{transition:none;}}
+.pick-have{flex:0 0 auto;font-size:11px;font-weight:800;color:var(--fin);white-space:nowrap;}
 .pick-row.have{opacity:.72;}
 .pick-row{border-top:none;}
 .pick-row{display:flex;align-items:center;gap:12px;width:100%;padding:9px 0;border-top:1px solid var(--bn2);text-align:left;}
@@ -9108,6 +9113,27 @@ function pxRestore(){
     });
   }catch(e){}
 }
+// Covers arrive rather than snap in. Deliberately opt-IN: an image only becomes
+// transparent once this has marked it as still loading, so if any of this fails
+// to run the default is a fully visible picture. Hiding artwork by default and
+// relying on a listener to reveal it is the version of this that leaves people
+// staring at blank cards.
+//
+// A cached cover is already `complete`, so it is marked shown immediately and
+// never fades — which is most of them, most of the time. Only a genuinely slow
+// one gets the 180ms.
+function fadeArtIn(){
+  try{
+    const sel=PX_ART.map(c=>'img'+c+':not([data-fd])').join(',');
+    document.querySelectorAll(sel).forEach(img=>{
+      if(img.complete){img.setAttribute('data-fd','in');return;}
+      img.setAttribute('data-fd','wait');
+      const show=()=>{try{img.setAttribute('data-fd','in');}catch(e){}};
+      img.addEventListener('load',show,{once:true});
+      img.addEventListener('error',show,{once:true});   // a broken cover must not stay invisible
+    });
+  }catch(e){}
+}
 let _pxT=0;
 function pixelateCovers(){
   clearTimeout(_pxT);
@@ -9338,6 +9364,7 @@ function renderNow(){
   const step=fn=>{try{fn();}catch(e){try{console.error('render',e);}catch{}}};
   step(renderKindSeg);step(renderFiltRow);step(renderSortRow);step(renderHome);
   forgetAmbBands();   // the bands just moved
+  try{fadeArtIn();}catch(e){}
   try{pixelateCovers();}catch(e){}
   try{refreshPixels();}catch(e){}
 }

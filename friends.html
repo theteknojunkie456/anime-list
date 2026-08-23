@@ -1456,6 +1456,11 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
   color:var(--t3);
 }
 .filt-row .fchip.on .fn,.filt-row .fchip[class*="on-"] .fn{color:inherit;opacity:.72;}
+/* A count that changed lifts once. A count that did not stays put. */
+@keyframes fnBump{0%{transform:translateY(-40%);opacity:0;}60%{opacity:1;}100%{transform:none;opacity:1;}}
+.filt-row .fn{display:inline-block;}
+.filt-row .fn.bumped{animation:fnBump .3s cubic-bezier(.2,1,.3,1);}
+@media (prefers-reduced-motion:reduce){.filt-row .fn.bumped{animation:none;}}
 /* Its own row, full width. It lived in the filter row and made that
    horizontally-scrolling row wide enough to push "All" off the left edge — an
    alert shouldn't cost you a filter, and a wider tap target is the point. */
@@ -1579,6 +1584,15 @@ body.first-paint .pcard,body.content-in .pcard{animation:cardIn .42s cubic-bezie
 .grid.compact .pcard{contain-intrinsic-size:auto 190px;}
 .grid.large .pcard{contain-intrinsic-size:auto 286px;}
 .rtm-row{content-visibility:auto;contain-intrinsic-size:auto 168px;}
+/* The grid staggers its cards; these arrived all at once. Same curve, same
+   ceiling on the delay, and tied to content-in so it plays when the list is
+   genuinely new rather than on every repaint. */
+body.content-in .rtm-row,.sdrawer.on .sd-row{animation:cardIn .38s cubic-bezier(.2,1,.3,1) backwards;}
+body.content-in .rtm-row:nth-child(2),.sdrawer.on .sd-row:nth-child(2){animation-delay:.04s;}
+body.content-in .rtm-row:nth-child(3),.sdrawer.on .sd-row:nth-child(3){animation-delay:.08s;}
+body.content-in .rtm-row:nth-child(4),.sdrawer.on .sd-row:nth-child(4){animation-delay:.12s;}
+body.content-in .rtm-row:nth-child(5),.sdrawer.on .sd-row:nth-child(5){animation-delay:.16s;}
+body.content-in .rtm-row:nth-child(n+6),.sdrawer.on .sd-row:nth-child(n+6){animation-delay:.19s;}
 .rtm-list.compact .rtm-row{contain-intrinsic-size:auto 140px;}
 .rtm-list.large .rtm-row{contain-intrinsic-size:auto 210px;}
 /* Whole shelves too — an off-screen row is a row of cards plus its header. */
@@ -2325,6 +2339,30 @@ body.first-paint .pfill,body.content-in .pfill{animation:barGrow .62s cubic-bezi
 .prog-btn{touch-action:manipulation;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;}
 .prog-mid{flex:1;text-align:center;}
 .prog-num{font-size:17px;font-weight:800;}
+/* A nudge in the direction you pressed. Short enough that holding the button
+   reads as a counter running, not as forty animations fighting. */
+@keyframes tickUp{from{transform:translateY(24%);opacity:.45;}to{transform:none;opacity:1;}}
+@keyframes tickDn{from{transform:translateY(-24%);opacity:.45;}to{transform:none;opacity:1;}}
+.prog-num{display:inline-block;will-change:transform;}
+.prog-num.tick-up{animation:tickUp .15s cubic-bezier(.2,1,.3,1);}
+.prog-num.tick-dn{animation:tickDn .15s cubic-bezier(.2,1,.3,1);}
+/* Finished: one sweep of light up the poster, the same direction the waterline
+   has been rising all along. */
+@keyframes doneSweep{
+  0%{opacity:0;transform:translateY(45%);}
+  30%{opacity:1;}
+  100%{opacity:0;transform:translateY(-115%);}
+}
+.dt-cover-wrap{position:relative;}
+.dt-cover-wrap.just-done::after{
+  content:"";position:absolute;inset:0;border-radius:18px;pointer-events:none;z-index:2;
+  background:linear-gradient(to top,transparent 0%,color-mix(in srgb,var(--a2) 42%,transparent) 45%,transparent 100%);
+  animation:doneSweep .95s cubic-bezier(.3,.9,.4,1);
+}
+@media (prefers-reduced-motion:reduce){
+  .prog-num.tick-up,.prog-num.tick-dn{animation:none;}
+  .dt-cover-wrap.just-done::after{animation:none;opacity:0;}
+}
 .prog-num span{color:var(--t3);font-weight:700;font-size:13px;}
 .prog-row .pbar{height:5px;margin-top:8px;}
 .stars{display:flex;gap:8px;justify-content:center;}
@@ -9212,7 +9250,7 @@ function searchScore(a,q){
     for(const s of alts)if(s.replace(/[^a-z0-9]/g,'').includes(fq))return 40;
     if(fq.length>=3&&srchSubseq(flat,fq))return 30;
   }
-  const meta=((a.genre||'')+' '+(a.notes||'')).toLowerCase();
+  const meta=((a.genre||'')+' '+(a.notes||'')+' '+(a.studio||'')).toLowerCase();
   if(meta.includes(q))return 20;
   // WORD ORDER. Everything above tests the query as one run of characters, so
   // "attack titan" only survives as a subsequence and "titan attack" not at all —
@@ -9410,6 +9448,11 @@ function airingInfo(a){
   const date=d.toLocaleDateString([],{month:'short',day:'numeric'});
   return{ep:a.airEp||0,soon,day,time,date,when:soon?`${day} ${time}`:date};
 }
+// What each count was last time, so only a number that MOVED reacts. The filter
+// row is rebuilt on every render, so animating on insert would have every count
+// flashing at you constantly — which is the same trap that made entrance
+// animations re-run on every tap.
+let _lastCounts={};
 function renderFiltRow(){
   const items=anime.filter(a=>kindOf(a)===viewKind);
   const counts={all:items.length,watching:0,plan:0,finished:0,dropped:0};
@@ -9423,7 +9466,9 @@ function renderFiltRow(){
     const on=filterStatus===f;
     const cls=on?(f==='all'?'on':'on-'+f):'';
     const n=counts[f]||0;
-    return`<button class="fchip${cls?' '+cls:''}" onclick="setFilter('${f}')">${l}<span class="fn">${n}</span></button>`;
+    const moved=_lastCounts[f]!==undefined&&_lastCounts[f]!==n;
+    _lastCounts[f]=n;
+    return`<button class="fchip${cls?' '+cls:''}" onclick="setFilter('${f}')">${l}<span class="fn${moved?' bumped':''}">${n}</span></button>`;
   }).join('')
   // Sits with the Plan chip because that's the pile you stare at without choosing.
   ;   // "Decide" used to sit here, crowding the filter row it had nothing to do with — it lives under "Not sure what to watch?" now.
@@ -10575,6 +10620,7 @@ function renderDetail(){
       // down them and two shows put the same fact in the same place.
       const rows=[];
       const done=Math.min(a.ep||0,a.epTotal||0), tw=totalWatchMins(a);
+      if(a.studio)rows.push(['Studio',`<em>${schEsc(a.studio)}</em>`]);
       if(kindOf(a)==='watch'&&tw){
         const left=a.epTotal?Math.max(0,a.epTotal-done):0;
         // "~59h to watch all 148 episodes" is only true before you start. On a
@@ -10802,7 +10848,11 @@ function richDetailHTML(d,forId){
   if(d.episodes)meta.push(`${d.episodes} eps`);
   if(d.duration)meta.push(`${d.duration}m`);
   if(d.seasonYear)meta.push(`${d.season?cap(d.season)+' ':''}${d.seasonYear}`);
-  const studio=(((d.studios||{}).nodes||[])[0]||{}).name||'';if(studio)meta.push(studio);
+  // The studio has its own row in the facts column now, so it is not repeated
+  // here — but a title added before this shipped has no stored studio, and this
+  // response carries one, so it is filled in.
+  const studio=(((d.studios||{}).nodes||[])[0]||{}).name||'';
+  try{ if(studio&&_it&&_it.studio!==studio){_it.studio=studio;save();} }catch(e){}
   const metaHTML=meta.length?`<div class="dt-rich-meta">${meta.map(m=>`<span>${m.indexOf('<')>=0?m:schEsc(m)}</span>`).join('')}</div>`:'';
   const _seenSite=new Set();const links=((d.externalLinks)||[]).filter(l=>{if(!(l&&l.type==='STREAMING'&&l.url))return false;const k=(l.site||'').trim().toLowerCase();if(!k||k==='crunchyroll'||_seenSite.has(k))return false;_seenSite.add(k);return true;});
   const linksHTML=links.length?`<div class="dt-label" style="margin-top:16px">${icon('external')} Also streaming on</div><div class="dt-watchlinks">${links.map(l=>`<button class="dt-watchlink" onclick="openExternal('${escH(l.url).replace(/'/g,"\\'")}')">${schEsc(l.site)} ${icon('external')}</button>`).join('')}</div>`:'';
@@ -11567,7 +11617,28 @@ function epStepOnce(a,d){
   }
   a.ep=next;
   const el=document.querySelector('.prog-num');
-  if(el)el.innerHTML=`${a.ep||0}${a.epTotal?` <span>/ ${a.epTotal}</span>`:''}`;
+  if(el){
+    el.innerHTML=`${a.ep||0}${a.epTotal?` <span>/ ${a.epTotal}</span>`:''}`;
+    // The most frequent action in the app was a silent text swap. A short nudge
+    // in the direction you pressed says the tap landed — retriggered rather than
+    // queued, so holding the button runs the counter instead of stacking 40
+    // animations on top of each other.
+    try{
+      el.classList.remove('tick-up','tick-dn');
+      void el.offsetWidth;
+      el.classList.add(d>0?'tick-up':'tick-dn');
+    }catch(e){}
+  }
+  // The waterline on the poster follows along instead of jumping when you let go.
+  // It already carries a height transition, so this only has to set the number.
+  try{
+    const lvl=document.querySelector('.dt-level');
+    if(lvl&&a.epTotal){
+      const pw=Math.max(0,Math.min(1,(a.ep||0)/a.epTotal));
+      lvl.style.height=(pw*100).toFixed(1)+'%';
+      lvl.classList.toggle('full',pw>=1);
+    }
+  }catch(e){}
   return true;
 }
 function epHoldStart(d,ev){
@@ -11600,6 +11671,17 @@ function commitEp(a){
   if(a.epTotal&&a.ep===a.epTotal&&a.status!=='finished'){a.status='finished';toast('Marked as finished!');_justFinished=true;}
   else if(a.ep>0&&a.status==='plan'){a.status='watching';}
   touch(a);save();renderDetail();render();alPushItem(a);
+  // Finishing something is the payoff of the whole app and nothing happened. One
+  // sweep of light up the poster, in the direction the waterline has been rising
+  // the whole time you were watching — the metaphor the card already uses, played
+  // once. Nothing bursts, nothing turns gold.
+  if(_justFinished)try{
+    const w=document.querySelector('.dt-cover-wrap');
+    if(w){
+      w.classList.remove('just-done'); void w.offsetWidth; w.classList.add('just-done');
+      setTimeout(()=>{try{w.classList.remove('just-done');}catch(e){}},1100);
+    }
+  }catch(e){}
   if(_justFinished)offerNextSeason(a);
 }
 try{['pointerup','pointercancel'].forEach(t=>window.addEventListener(t,epHoldEnd,{passive:true}));}catch(e){}
@@ -20072,7 +20154,7 @@ async function fetchCovers(){
         // lets anything in the app rank by "is this actually good".
         const fields=read
           ?'id idMal title{romaji english native} coverImage{large extraLarge color} bannerImage chapters volumes genres isAdult averageScore'
-          :'id idMal title{romaji english native} coverImage{large extraLarge color} bannerImage episodes duration genres isAdult averageScore nextAiringEpisode{airingAt episode}';
+          :'id idMal title{romaji english native} coverImage{large extraLarge color} bannerImage episodes duration genres isAdult averageScore studios(isMain:true){nodes{name}} nextAiringEpisode{airingAt episode}';
         // Known season? Refresh that EXACT media by id — a title search would drift to
         // whatever AniList ranks first (often a different, currently-airing season),
         // pinning the wrong air date. Only unknown items fall back to a title search.
@@ -20137,6 +20219,9 @@ async function fetchCovers(){
           // without wiping the row. Now it can be checked.
           if(m.bannerImage){a.banner=m.bannerImage;a.bannerFor=m.id||a.aniId||0;}
           if(m.coverImage&&m.coverImage.color)a.aniColor=m.coverImage.color;
+          // Who made it. Stored on the title so it can be shown and searched
+          // without waiting for the per-card detail fetch.
+          try{const st=(((m.studios||{}).nodes||[])[0]||{}).name||'';if(st)a.studio=st;}catch(e){}
           if(m.averageScore)a.aniScore=m.averageScore;
           if(!a.eps){
             if(read){

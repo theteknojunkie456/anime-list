@@ -4291,6 +4291,18 @@ body.recsel .pcard{position:relative;}
          mints a new device id, so every reset used to mean a fresh request and
          somebody on the other end approving it — five times on one machine.
          The admin token already proves who you are; this lets it do that here. -->
+    <!-- Most people meet this screen because they opened the app somewhere new —
+         a second browser, or finally adding it to their Home Screen — and they
+         are not a stranger, they are already in. Making them queue for an
+         approval they were granted months ago is nonsense when the cloud key
+         they already own proves it. -->
+    <a class="lock-alt" id="joinHaveKey" onclick="showKeyUnlock()">I already use WatchList</a>
+    <div id="keyUnlock" style="display:none;margin-top:10px">
+      <input id="joinSyncIn" class="lock-in" type="text" placeholder="Your cloud key" autocomplete="off" spellcheck="false"
+             autocapitalize="characters" enterkeyhint="go" onkeydown="if(event.key==='Enter')keyUnlock()">
+      <button class="lock-btn" style="margin-top:8px" onclick="keyUnlock()">Use my key</button>
+      <div class="join-hint">Lets this device straight in and brings your list down with it. It is the 20-character key from <b>Cloud backup</b> on a device you already use.</div>
+    </div>
     <a class="lock-alt" id="joinOwner" onclick="showOwnerUnlock()">I'm the owner</a>
     <div id="ownerUnlock" style="display:none;margin-top:10px">
       <input id="ownerTok" class="lock-in" type="password" placeholder="Setup key or admin token" autocomplete="off" spellcheck="false"
@@ -5365,6 +5377,54 @@ function showOwnerUnlock(){
   if(b)b.style.display='';
   if(a)a.style.display='none';
   const i=document.getElementById('ownerTok'); if(i)i.focus();
+}
+function showKeyUnlock(){
+  const b=document.getElementById('keyUnlock'), a=document.getElementById('joinHaveKey');
+  if(b)b.style.display='';
+  if(a)a.style.display='none';
+  const i=document.getElementById('joinSyncIn'); if(i)try{i.focus({preventScroll:true});}catch(e){}
+}
+// The key IS the proof. The worker files every sync code against the device that
+// used it (idn:<code>), and adoptByIdentity lets a device presenting a known one
+// straight through — that is how a returning device is recognised at all. All
+// this does is put the code in place BEFORE the join call, so the identity the
+// server already trusts is included in it.
+async function keyUnlock(){
+  const i=document.getElementById('joinSyncIn'), err=document.getElementById('joinErr');
+  // Written down, pasted out of a message, read aloud: separators come with it.
+  let code=((i&&i.value)||'').replace(/[\s-]/g,'').trim().toUpperCase();
+  // A setup key works here too, rather than telling somebody holding one that it
+  // is the wrong sort of key.
+  const setup=parseSetupKey(code);
+  if(setup&&setup.sync)code=setup.sync;
+  if(!/^[A-Z0-9]{16,32}$/.test(code)){if(err)err.textContent='That does not look like a cloud key';return;}
+  if(err)err.textContent='Checking\u2026';
+  try{
+    setSyncCode(code); setSyncAt(0);
+    const nm=(document.getElementById('joinName')||{}).value||knownName()||'';
+    const r=await netCall('/join',{deviceId:wlDevice(),name:String(nm).trim()||'Returning device',...joinIdentity()});
+    const st=(r&&r.status)||'';
+    if(st!=='approved'){
+      // The code is not one this network knows, so it proves nothing. Put things
+      // back rather than leaving a wrong code wired up to push over their list.
+      try{setSyncCode('');}catch(e){}
+      if(err)err.textContent=st==='pending'
+        ? 'Sent as a request instead \u2014 that key is not on this network yet'
+        : 'That key is not recognised here. Check it on a device you already use';
+      return;
+    }
+    setNetStatus('approved');
+    hideJoinGate();
+    if(err)err.textContent='';
+    toast('Welcome back \u2014 pulling your list down');
+    // The same path a normal launch takes: pull, decrypt if it is locked, adopt,
+    // with all the empty-cloud guards already in it. No second implementation.
+    try{await syncOnOpen();}catch(e){}
+    try{render();}catch(e){}
+  }catch(e){
+    try{setSyncCode('');}catch(_){}
+    if(err)err.textContent='Could not reach the network. Try again';
+  }
 }
 async function ownerUnlock(){
   const i=document.getElementById('ownerTok'), err=document.getElementById('joinErr');

@@ -1661,7 +1661,9 @@ body.first-paint .row-sec,body.content-in .row-sec{animation:fadeUp .5s cubic-be
 /* ── AUTOFILL PICKER ── */
 .pick-group{font-family:var(--fd);font-size:13px;font-weight:600;color:var(--t3);margin:16px 0 2px;}
 .pick-group:first-child{margin-top:4px;}
-.pick-group + .pick-row{border-top:none;}
+.pick-group + .pick-have{flex:0 0 auto;font-size:11px;font-weight:800;color:var(--fin);white-space:nowrap;}
+.pick-row.have{opacity:.72;}
+.pick-row{border-top:none;}
 .pick-row{display:flex;align-items:center;gap:12px;width:100%;padding:9px 0;border-top:1px solid var(--bn2);text-align:left;}
 .pick-row:first-child{border-top:none;}
 .pick-row:active{transform:scale(.985);}
@@ -20280,6 +20282,35 @@ function dedupSeasons(media,n,animeOnly){
   const main=pick(new Set(['TV','TV_SHORT','MOVIE']));            // real series/films
   return main.length?main:pick(new Set(['ONA']));                // ONA only when the show IS ONA-original
 }
+// The same format filter, WITHOUT folding seasons together.
+//
+// The picker used to collapse them and keep two results, which meant searching
+// "Naruto" offered the original and nothing else — Shippuden was not on the list
+// to choose. You could not add a second season from the add screen at all; you
+// added the base series and then fought it. Now that every season is its own
+// card, the picker has to be able to offer every season.
+function searchHits(media,n,animeOnly){
+  const take=formats=>{
+    const seen=new Set(),out=[];
+    for(const m of media){
+      if(formats&&!formats.has(m.format))continue;
+      if(seen.has(m.id))continue;
+      seen.add(m.id);out.push(m);
+      if(out.length>=n)break;
+    }
+    return out;
+  };
+  if(!animeOnly)return take(null);
+  const main=take(new Set(['TV','TV_SHORT','MOVIE','ONA']));
+  return main.length?main:take(null);
+}
+// Already on your list? Say so, and let the row take you there instead of
+// creating a second copy of something you are already watching.
+function onListAlready(aniId,title,kind){
+  try{
+    return anime.find(a=>kindOf(a)===kind&&((aniId&&a.aniId===aniId)||normTitle(a.title)===normTitle(title)))||null;
+  }catch(e){return null;}
+}
 async function aiAutofill(){
   const title=document.getElementById('fTitle').value.trim();
   if(!title){toast('Enter a title first');return;}
@@ -20290,17 +20321,17 @@ async function aiAutofill(){
     // Keep the list short and grouped: a few best anime, then a couple of live-action.
     // AniList/TVMaze already return best-match-first, so the top few are the ones that matter.
     if(curKind==='read'){
-      dedupSeasons(await aniSearch(title,'MANGA'),4).forEach(m=>cands.push({group:'Manga',
+      searchHits(await aniSearch(title,'MANGA'),8).forEach(m=>cands.push({group:'Manga',
         title:m.title.english||m.title.romaji,
         sub:[aniLabel(m),m.startDate&&m.startDate.year,m.chapters?m.chapters+' ch':''].filter(Boolean).join(' · '),
-        img:(m.coverImage&&m.coverImage.large)||'',data:aniToData(m,'read')}));
+        img:(m.coverImage&&m.coverImage.large)||'',aniId:m.id,kind:'read',data:aniToData(m,'read')}));
     }else{
       // collapse seasons into one entry — the app shows the full season chain in
       // watch order once you pick the base series, so listing every season is noise.
-      dedupSeasons(await aniSearch(title,'ANIME'),2,true).forEach(m=>cands.push({group:'Anime',
+      searchHits(await aniSearch(title,'ANIME'),8,true).forEach(m=>cands.push({group:'Anime',
         title:m.title.english||m.title.romaji,
         sub:[aniLabel(m),m.startDate&&m.startDate.year,m.episodes?m.episodes+' eps':''].filter(Boolean).join(' · '),
-        img:(m.coverImage&&m.coverImage.large)||'',data:aniToData(m,'watch')}));
+        img:(m.coverImage&&m.coverImage.large)||'',aniId:m.id,kind:'watch',data:aniToData(m,'watch')}));
       try{ // live-action is a *choice*, never a silent substitute for the anime
         (await tvSearch(title)).slice(0,2).forEach(s=>cands.push({group:'Live action',
           title:s.name,
@@ -20312,7 +20343,13 @@ async function aiAutofill(){
   btn.classList.remove('loading');formKindLabels();
   if(!cands.length){toast('No match found. Fill it in manually.');return;}
   pickCands=cands;
-  if(cands.length===1){applyCandidate(0);return;}
+  // "Only one result" is not the same as "obviously right". A rare title returns
+  // one hit that can still be the wrong season, and it was applied silently.
+  // Skipping the picker needs the name to actually match what was typed.
+  const typed=normTitle(title);
+  const exact=cands.filter(c=>normTitle(c.title)===typed);
+  if(exact.length===1){applyCandidate(cands.indexOf(exact[0]));return;}
+  if(cands.length===1&&exact.length===1){applyCandidate(0);return;}
   renderPicker();openSheet('pickSheet');
 }
 function renderPicker(){
@@ -20320,9 +20357,16 @@ function renderPicker(){
   const rowHTML=(c,i)=>{
     const ch=((c.title||'?').charAt(0)||'?').replace(/[^A-Za-z0-9]/g,'')||'?';
     const cover=c.img?`<img class="pick-img" src="${escH(c.img)}" alt="" loading="lazy" onerror="this.outerHTML='<div class=\\'pick-ph\\'>${ch}</div>'">`:`<div class="pick-ph">${ch}</div>`;
-    return`<button class="pick-row" onclick="applyCandidate(${i})">${cover}
+    // Adding something twice is the easy mistake here, and more so now the picker
+    // lists every season: two of them look nearly identical in a row. If one is
+    // already yours the row says so and takes you to it, instead of making a
+    // second copy you then have to find and delete.
+    const mine=onListAlready(c.aniId,c.title,c.kind||curKind);
+    const tag=mine?`<span class="pick-have">On your list</span>`:`<span class="set-chev">${icon('chevron-right')}</span>`;
+    const act=mine?`closeAll();openDetail('${mine.id}')`:`applyCandidate(${i})`;
+    return`<button class="pick-row${mine?' have':''}" onclick="${act}">${cover}
       <div class="pick-txt"><div class="pick-t">${schEsc(c.title)}</div><div class="pick-s">${schEsc(c.sub||'')}</div></div>
-      <span class="set-chev">${icon('chevron-right')}</span></button>`;
+      ${tag}</button>`;
   };
   // group into sections in a stable order, but keep each row's ORIGINAL index so
   // applyCandidate(i) still points at the right candidate.

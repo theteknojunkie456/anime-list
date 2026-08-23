@@ -1881,6 +1881,12 @@ img[data-fd="in"]{opacity:1;transition:opacity .18s ease-out;}
 .pcard-badge::before{content:'';width:5px;height:5px;border-radius:50%;background:currentColor;}
 .pcard-badge .ico{display:none;}
 .pcard-badge{max-width:calc(100% - 14px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+/* The note that matched, under the title, with your words marked. Two lines at
+   most — it is a reason, not the note itself. */
+.pcard-note{display:flex;gap:5px;margin-top:4px;font-size:12px;line-height:1.4;color:var(--t3);}
+.pcard-note .ico{width:11px;height:11px;flex:none;margin-top:3px;opacity:.7;}
+.pcard-note span{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.pcard-note mark{background:var(--ag);color:var(--a2);border-radius:3px;padding:0 2px;font-weight:700;}
 .pcard-sub{font-size:12px;font-weight:600;color:var(--t3);margin-top:4px;font-variant-numeric:tabular-nums;}
 .pcard-sub{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .pcard-fav{position:absolute;top:5px;right:7px;font-size:13px;text-shadow:0 1px 6px rgba(0,0,0,0.6);}
@@ -9910,6 +9916,38 @@ function armGridMore(){
     _gridIO.observe(sentinel);
   }catch(e){ while(_gridShown<_gridAll.length)fill(); }   // no observer: just draw it all
 }
+// WHY THIS ONE CAME BACK.
+// Notes were already searched, but a note is the one thing you cannot see on a
+// card — so searching your own words returned a poster and no explanation, and
+// you had to open it to find out whether it was the right one. If the note is
+// what matched, the note is what gets shown, with your words marked in it.
+let _searchQ='';
+function noteHitHTML(a){
+  const q=_searchQ;
+  if(!q||!a||!a.notes)return '';
+  const note=String(a.notes);
+  const low=note.toLowerCase();
+  const words=q.split(/\s+/).filter(w=>w.length>1);
+  // Either the phrase as typed, or every word of it somewhere in the note — the
+  // same two ways the search itself counts a match.
+  const whole=low.indexOf(q);
+  const marks=whole>=0?[q]:(words.length&&words.every(w=>low.includes(w))?words:null);
+  if(!marks)return '';
+  // A window around the first hit, so a long note shows the part you searched for
+  // rather than its first line.
+  const at=whole>=0?whole:low.indexOf(marks[0]);
+  let start=Math.max(0,at-40), end=Math.min(note.length,at+110);
+  let snip=note.slice(start,end);
+  if(start>0)snip='\u2026'+snip;
+  if(end<note.length)snip=snip+'\u2026';
+  // Escape FIRST, then mark, so the marking cannot be smuggled in through a note.
+  let html=schEsc(snip);
+  marks.forEach(m=>{
+    const esc=schEsc(m).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+    if(esc)html=html.replace(new RegExp(esc,'ig'),x=>`<mark>${x}</mark>`);
+  });
+  return `<div class="pcard-note">${icon('edit')}<span>${html}</span></div>`;
+}
 function posterCard(a,nSeas){
   const multi=nSeas>1;
   const title=multi?seasonBase(a.title):a.title;
@@ -9928,6 +9966,7 @@ function posterCard(a,nSeas){
   const _nx=nextUpOf(a);
   const durBits=[twMins?fmtWatch(twMins):'',_nx?(_nx.soon?'S2 soon':'S2 out'):''].filter(Boolean);
   const durLine=durBits.length?`<div class="pcard-sub">${durBits.join(' \u00b7 ')}</div>`:'';
+  const noteLine=noteHitHTML(a);
   return`<div class="pcard${recSel&&recSel.has(a.id)?' sel':''}${bulkSel&&bulkSel.has(a.id)?' bulk':''}" onclick="pcTap('${a.id}',event)"
     oncontextmenu="pcMenu('${a.id}',event)" ontouchstart="pcHoldStart('${a.id}',event)" ontouchmove="pcHoldMove(event)" ontouchend="pcHoldEnd()" ontouchcancel="pcHoldEnd()">
     <div class="pcard-wrap">
@@ -9950,6 +9989,7 @@ function posterCard(a,nSeas){
     </div>
     ${bar}
     <div class="pcard-title">${schEsc(title)}</div>
+    ${noteLine}
     ${durLine}
     ${airHTML}
   </div>`;
@@ -10246,6 +10286,7 @@ function markContentChange(){
 let _viewSigT=0;
 function renderHome(){
   const el=document.getElementById('pageEl');
+  _searchQ='';                       // only a live search marks up notes
   try{markContentChange();}catch(e){}
   clearInterval(bbTimer);bbTimer=0;   // stop any rotation; the main path re-arms it
   const q=query();
@@ -10272,6 +10313,7 @@ function renderHome(){
     // the title. The status words become conditions and only what is left is
     // searched, so the sentence works instead of matching nothing.
     const _pq=parseQuery(q);
+    _searchQ=_pq.text||'';
     if(_pq.terms.length)list=list.filter(a=>_pq.terms.every(fn=>{try{return fn(a);}catch(e){return false;}}));
     if(_pq.text){
       list=list.map(a=>[a,searchScore(a,_pq.text)]).filter(x=>x[1]>0).sort((x,y)=>y[1]-x[1]).map(x=>x[0]);

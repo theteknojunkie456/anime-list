@@ -149,6 +149,50 @@ export default {
       ctx.waitUntil(notifyChan(env, to, 'rec', envelope));
       return json({ ok: true, id: envelope.id }, 200, cors);
     }
+    // ── telling your friends a party started ─────────────────────────────────
+    // The party was always capable and always invisible: you had to know it
+    // existed, then send someone a code out-of-band.
+    //
+    // The obvious build — drop a row in each friend's mailbox — costs one KV
+    // write per friend per party, and writes are the scarce thing here (a
+    // thousand a day, shared with every list sync). Twenty friends would make
+    // one party cost twenty writes and twenty round trips from the phone.
+    //
+    // So the host writes ONE key, their own, and friends read it. Fanning out
+    // on read instead of on write makes a party cost exactly one write no
+    // matter how many people are in it, and reads are the plentiful side.
+    //
+    // The trust model is unchanged and comes for free: pinv:<host> is only
+    // findable if you already hold that host's friend code.
+    if (op === 'party_tell') {
+      const from = (body.from && typeof body.from === 'object') ? body.from : {};
+      const fromCode = String(from.code || '');
+      const fromName = String(from.name || 'A friend').slice(0, 40);
+      if (!/^[A-Za-z0-9]{10,64}$/.test(fromCode)) return json({ error: 'bad from' }, 400, cors);
+      const room = String(body.room || '').toUpperCase();
+      if (!/^[A-Z0-9]{4,12}$/.test(room)) return json({ error: 'bad room' }, 400, cors);
+      const inv = {
+        room,
+        from: { code: fromCode, name: fromName },
+        title: String(body.title || '').slice(0, 200),
+        img: String(body.img || '').slice(0, 400),
+        at: Date.now(),
+      };
+      // Six hours is far longer than any party lasts. It is a floor under the
+      // read-side age check, so a key nobody clears still expires on its own.
+      await env.LISTS.put('pinv:' + fromCode, JSON.stringify(inv), { expirationTtl: 21600 });
+      return json({ ok: true }, 200, cors);
+    }
+
+    // Taking it down: you can only clear your own key, because the key IS your
+    // code. Called when the party ends, so the row does not outlive the room.
+    if (op === 'party_untell') {
+      const fromCode = String((body.from && body.from.code) || '');
+      if (!/^[A-Za-z0-9]{10,64}$/.test(fromCode)) return json({ error: 'bad from' }, 400, cors);
+      await env.LISTS.delete('pinv:' + fromCode);
+      return json({ ok: true }, 200, cors);
+    }
+
     // ── read back what YOU sent ──────────────────────────────────────────────
     // Envelopes are filed under the RECIPIENT's code, which is what makes a
     // sender's own note unreadable to the sender: their app logs the titles it
@@ -327,7 +371,27 @@ export default {
       let echoes = [];
       try { const e = await env.LISTS.get('echo:' + code); if (e) echoes = JSON.parse(e); } catch {}
       if (!Array.isArray(echoes)) echoes = [];
-      return json({ recs: list, passes, echoes }, 200, cors);
+      // Party rows ride along on the pull the app already makes, so a friend's
+      // party costs no extra round trip from the phone. The caller names the
+      // codes to check — which can only be friends it already holds — and each
+      // is one cheap read against that host's own key.
+      //
+      // Anything older than three hours is dropped on the way out: a stale row
+      // saying "join" that leads to a dead room is worse than no row at all,
+      // and the host may have closed the tab without ever clearing it.
+      let parties = [];
+      const want = (Array.isArray(body.friends) ? body.friends : [])
+        .map(c => String(c || '')).filter(c => /^[A-Za-z0-9]{10,64}$/.test(c) && c !== code)
+        .slice(0, 60);
+      if (want.length) {
+        const cutoff = Date.now() - 3 * 3600 * 1000;
+        const got = await Promise.all(want.map(async c => {
+          try { const v = await env.LISTS.get('pinv:' + c, { cacheTtl: 60 }); return v ? JSON.parse(v) : null; }
+          catch { return null; }
+        }));
+        parties = got.filter(x => x && x.room && Number(x.at) > cutoff);
+      }
+      return json({ recs: list, passes, echoes, parties }, 200, cors);
     }
 
     // ── passing on a recommendation ──────────────────────────────────────────

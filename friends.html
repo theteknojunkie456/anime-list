@@ -2754,6 +2754,30 @@ body.yt-open{overflow:hidden;touch-action:none;}
   display:flex;align-items:center;justify-content:center;gap:8px;transition:transform .12s,border-color .15s;}
 .dt-together .ico{width:16px;height:16px;color:var(--a2);}
 .dt-together:active{transform:scale(.98);}
+/* The live-party rail. Sits above every shelf on home because it is the one
+   thing there with a clock on it. Deliberately quiet — a card, not an alert —
+   since it appears unprompted and would wear thin as a red banner. */
+.ptrail{margin:0 18px 14px;display:flex;flex-direction:column;gap:8px;}
+.ptrail-row{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:14px;
+  background:var(--bg3);border:1px solid var(--b2);}
+.ptrail-art{width:38px;height:52px;flex:0 0 auto;border-radius:6px;object-fit:cover;background:var(--bg4);}
+.ptrail-txt{min-width:0;flex:1;}
+.ptrail-live{display:inline-flex;align-items:center;gap:5px;font-family:var(--fd);font-size:10px;
+  font-weight:800;letter-spacing:.7px;text-transform:uppercase;color:var(--a2);}
+.ptrail-live .ico{width:11px;height:11px;}
+/* The dot is the only motion on the row: enough to read as "now", small enough
+   to ignore. Held still for anyone who asked the OS for less movement. */
+.ptrail-live::after{content:'';width:5px;height:5px;border-radius:50%;background:var(--a2);
+  animation:ptpulse 2s ease-in-out infinite;}
+@keyframes ptpulse{0%,100%{opacity:1}50%{opacity:.25}}
+@media (prefers-reduced-motion:reduce){.ptrail-live::after{animation:none}}
+.ptrail-who{margin-top:2px;font-size:13px;color:var(--t2);line-height:1.35;
+  overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
+.ptrail-who b{color:var(--t1);font-weight:800;}
+.ptrail-go{flex:0 0 auto;min-height:44px;padding:9px 16px;border-radius:10px;border:none;background:var(--a);color:var(--aFg);
+  font-family:var(--fd);font-size:13px;font-weight:800;letter-spacing:-.1px;transition:transform .12s;}
+.ptrail-go:active{transform:scale(.96);}
+.ptrail-go.on{background:var(--bg4);color:var(--t2);border:1px solid var(--b2);}
 .dt-watch:disabled{background:var(--bg4);color:var(--t2);border:1px solid var(--b2);box-shadow:none;cursor:default;}
 .dt-watch:disabled .ico{opacity:.7;}
 .dt-watch:active{transform:scale(.97);}
@@ -10379,7 +10403,10 @@ function renderHome(){
     const emptyBox=isRead
       ?`<div class="empty"><div class="empty-icon">${icon('book')}</div><p>Your reading list is empty.<br>Add a manhwa, webtoon, manga or light novel — tap ＋ and choose Read.</p><button class="hero-cta" onclick="openSheet_add()">＋ Add something to read</button>${emptyRestoreHTML()}</div>`
       :`<div class="empty"><div class="empty-icon">${icon('inbox')}</div><p>Your list is empty.<br>Add a title or import your whole list from Notes in one paste.</p><button class="hero-cta" onclick="openSheet('importSheet')">${icon('clipboard')} Import a list</button>${emptyRestoreHTML()}</div>`;
-    el.innerHTML=emptyBox+(beg?beginnerShelfHTML():'');
+    // Someone with an empty list is exactly who should see this: they have no
+    // shelves for it to sit above, and a friend already watching something is a
+    // better reason to stay than an empty box telling them to import.
+    el.innerHTML=partyRailHTML()+emptyBox+(beg?beginnerShelfHTML():'');
     if(beg)loadPopularShelf();
     return;
   }
@@ -10416,7 +10443,7 @@ function renderHome(){
     quickpick:()=>quickPickStripHTML(pool,isRead),
     friendrecs:()=>friendRecRowHTML(),
   };
-  let html=topBanner+(beg?beginnerShelfHTML():'');
+  let html=partyRailHTML()+topBanner+(beg?beginnerShelfHTML():'');
   for(const key of homeOrder())if(homeOn(key)&&SECT[key])html+=SECT[key]();
   // each section wears its own status colour (STATUS_META) rather than the one
   // theme accent — the palette already exists, it was just unused outside chips
@@ -12807,7 +12834,7 @@ function partyConnect(code,create){
   partyWS=ws;
   ws.onopen=()=>{partyReconn=0;if(partyReconnecting){partyReconnecting=false;toast('Back in the party');}updatePartyPill();};
   ws.onmessage=e=>{let m;try{m=JSON.parse(e.data);}catch{return;}
-    if(m.t==='state'){notePartyClock(m);applyRoom(m.room);partyApplyPending();}
+    if(m.t==='state'){notePartyClock(m);applyRoom(m.room);partyApplyPending();partyTellFriends();}
     else if(m.t==='react')processReacts(m.r?[m.r]:m.reacts);   // lightweight: float the emoji, no full-state churn
     else if(m.t==='ytsync')applyYtSync(m);                      // follow the host's player, hands-free
     else if(m.t==='psync')applyPlaybackSync(m);                 // …and on real sites, in the app
@@ -12947,6 +12974,36 @@ function watchParty(title,ep,aniId){
   // reported for everyone else to follow.
   try{if(partyIsHost)startYtSync();}catch(e){}
 }
+// ── letting your friends know ───────────────────────────────────────────────
+// Sending a code out-of-band was the only way in, which meant a party only ever
+// happened between people already talking somewhere else. Every friend gets a
+// row instead — passive, no push — so opening the app is enough to find out.
+//
+// Only the host tells anyone. A guest doing it too would mean five people
+// filing five rows for one party, and the room would look like five parties.
+let _ptToldRoom='',_ptToldTitle='';
+function partyTellFriends(){
+  if(!partyActive()||!partyIsHost)return;
+  const code=myFriendCode(); if(!code)return;
+  const room=partyCode,title=(partyRoom&&partyRoom.title)||'';
+  // Re-announced when the party changes what it is showing, so the row stays
+  // true. Not on every room update — those arrive on chat, reactions and each
+  // tick, and each one would be another write.
+  if(room===_ptToldRoom&&title===_ptToldTitle)return;
+  _ptToldRoom=room;_ptToldTitle=title;
+  fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+    op:'party_tell',from:{code,name:partyName()||'A friend'},room,title,
+    img:(partyRoom&&partyRoom.img)||''})}).catch(()=>{});
+}
+// The row outlives the room unless we take it down, and a Join button that
+// leads nowhere is worse than no button. Best-effort: the server ages rows out
+// anyway, this just makes it immediate.
+function partyUntellFriends(){
+  const code=myFriendCode(); if(!code)return;
+  _ptToldRoom='';_ptToldTitle='';
+  fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+    op:'party_untell',from:{code}})}).catch(()=>{});
+}
 function partyCreate(){
   const n=(document.getElementById('ptName')?document.getElementById('ptName').value.trim():'')||partyName();
   if(!n){toast('Enter a name first');return;}
@@ -12974,6 +13031,7 @@ function partyEnd(silent){
   Object.keys(pcs).forEach(pcClose);hideShareView();partySeenSig=new Set();partyPrevSharing='';
   try{localStorage.removeItem('party_active');}catch{}
   if(ws){try{ws.close();}catch{}}   // DO removes us + tells the others
+  if(partyIsHost&&partyCode)partyUntellFriends();
   partyCode='';partyIsHost=false;partyRoom=null;partyInSession=false;partyReconnecting=false;_partyPrevMembers=null;_chatUnread=0;_lastChatLen=0;_typers={};updatePartyPill();nativeNotifyCode();
   if(document.getElementById('partySheet').classList.contains('on'))renderParty();
   if(silent)toast('The party ended');
@@ -17773,22 +17831,33 @@ let recsIn=[];
 // Passes on things YOU sent: {from:{code,name},title,aniId,at}. Cached like the
 // recs themselves so the sent list reads the same offline.
 let recsPassed=[],recsEcho=[];
+// Parties your friends have going. Cached like recommendations so the rail is
+// there on the first paint rather than popping in a second later.
+let partiesIn=[];
+function loadPartiesCache(){try{const a=JSON.parse(localStorage.getItem('parties_in')||'[]');partiesIn=Array.isArray(a)?a:[];}catch{partiesIn=[];}}
 function loadRecsCache(){
   try{const a=JSON.parse(localStorage.getItem('recs_in')||'[]');recsIn=Array.isArray(a)?a:[];}catch{recsIn=[];}
   try{const p=JSON.parse(localStorage.getItem('recs_passed')||'[]');recsPassed=Array.isArray(p)?p:[];}catch{recsPassed=[];}
   try{const e=JSON.parse(localStorage.getItem('recs_echo')||'[]');recsEcho=Array.isArray(e)?e:[];}catch{recsEcho=[];}
+  loadPartiesCache();
 }
 async function pullRecs(){
   // Same gate, same consequence: recommendations sent to the app went nowhere.
   const code=myFriendCode(); if(!code) return;
   try{
-    const r=await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({op:'rec_pull',code})});
+    const r=await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({op:'rec_pull',code,friends:friendsList().map(f=>f&&f.code).filter(Boolean).slice(0,60)})});
     if(!r.ok)return;
     const j=await r.json();
     recsIn=Array.isArray(j.recs)?j.recs:[];
     recsIn.forEach(e=>refreshFriendName(e.from&&e.from.code,e.from&&e.from.name,e.at));   // keep friend names current
     recsPassed=Array.isArray(j.passes)?j.passes:[];
     recsEcho=Array.isArray(j.echoes)?j.echoes:[];
+    // Your own party comes back to you if you told yourself, and a rail asking
+    // you to join the room you are already in would be nonsense.
+    const mine=safeCode(myFriendCode()||'');
+    partiesIn=(Array.isArray(j.parties)?j.parties:[]).filter(pp=>pp&&pp.from&&safeCode(pp.from.code||'')!==mine);
+    partiesIn.forEach(pp=>refreshFriendName(pp.from&&pp.from.code,pp.from&&pp.from.name,pp.at));
+    try{localStorage.setItem('parties_in',JSON.stringify(partiesIn));}catch{}
     try{localStorage.setItem('recs_in',JSON.stringify(recsIn));}catch{}
     try{localStorage.setItem('recs_passed',JSON.stringify(recsPassed));}catch{}
     try{localStorage.setItem('recs_echo',JSON.stringify(recsEcho));}catch{}
@@ -17810,6 +17879,40 @@ function recByAni(){
     else m[k].senders.push({name,code,note,at,noteAt:note?at:0});
   });});
   return m;
+}
+// A party nobody can find is a feature that does not exist. This is the row
+// that makes one findable: it sits above everything on home, and it is not one
+// of the re-orderable sections on purpose — a shelf can wait until you scroll
+// to it, something happening right now cannot.
+function partyRailHTML(){
+  if(!partiesIn.length)return '';
+  // Three hours is the server's cut-off too. Checked again here because the
+  // cached copy can outlive the pull that fetched it (offline, backgrounded).
+  const live=partiesIn.filter(p=>Date.now()-(p.at||0)<3*3600*1000).slice(0,3);
+  if(!live.length)return '';
+  return `<div class="ptrail">`+live.map(p=>{
+    const nm=escH(friendDisplay(safeCode((p.from&&p.from.code)||''),(p.from&&p.from.name)||''));
+    const what=p.title?`is watching <b>${escH(p.title)}</b>`:'started a party';
+    const src=safeImg(p.img||'');
+    const art=src?`<img class="ptrail-art" src="${escH(src)}" alt="" loading="lazy">`:'';
+    const room=safeId(p.room);
+    const here=partyActive()&&partyCode===room;
+    return `<div class="ptrail-row">${art}
+      <div class="ptrail-txt"><span class="ptrail-live">${icon('users')} Live</span>
+        <div class="ptrail-who">${nm} ${what}</div></div>
+      <button class="ptrail-go${here?' on':''}" onclick="joinPartyFrom('${safeId(room)}')"${here?' disabled':''}>${here?'Joined':'Join'}</button>
+    </div>`;
+  }).join('')+`</div>`;
+}
+// Joining from the rail is one tap when we already know your name, and the
+// party sheet when we do not — partyJoin refuses without one, and a button that
+// silently does nothing is how people decide a feature is broken.
+function joinPartyFrom(room){
+  if(partyActive()&&partyCode===room){closeAll();openSheet('partySheet');return;}
+  if(!partyName()){closeAll();openSheet('partySheet');toast('Put your name in, then join');return;}
+  if(partyActive())partyEnd();
+  partyJoin(room);
+  closeAll();openSheet('partySheet');
 }
 function friendRecRowHTML(){
   const map=recByAni();

@@ -276,6 +276,35 @@ their **You recommended** list — never a push, and the `CHAN` nudge carries on
 the title, so nothing on the wire says who turned it down. `dismissRec()` sends
 it fire-and-forget: hiding a card is a local act and never waits on the network.
 
+**Finding a party** (`party_tell` / `party_untell`, read back through
+`rec_pull`). A party used to be reachable only by sending someone its code out
+of band, which meant it only ever happened between people already talking
+somewhere else — capable, and invisible. Now the host announces it and every
+friend sees a live row above everything on home.
+
+The shape is *one write, many reads*. The obvious build — drop a row in each
+friend's mailbox — costs one KV write **per friend per party**, and writes are
+the scarce resource (1,000/day on the free plan, shared with every list sync).
+Instead the host writes a single key, `pinv:<hostCode>`, and `rec_pull` takes a
+`friends` array and reads those keys. A party costs exactly one write whether
+you have two friends or fifty, and the trust model comes for free: `pinv:<host>`
+is only findable by someone who already holds that host's friend code.
+
+Three rules the rows follow:
+- **No push.** A recommendation keeps; a party is happening now. Interrupting
+  everyone each time somebody presses start is how an app teaches people to turn
+  notifications off, so the row is passive — it is there when you open the app.
+- **Three hours and it's gone**, checked on read and again on the client, with a
+  six-hour KV TTL underneath. A Join button leading to a dead room is worse than
+  no button, and a host who closed the tab never cleared theirs.
+- **One row per host**, because the key *is* their code. Starting again or
+  switching show overwrites; it never stacks into a log of attempts.
+
+The rail is deliberately **not** one of the re-orderable home sections, and it
+renders above the empty-state box too — someone with nothing in their list has
+no shelves for it to sit above, and a friend already watching something is a
+better reason to stay than a box telling them to import.
+
 The client never uploads the plaintext list to the friends mailboxes — only
 metadata + per-show notes.
 

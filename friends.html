@@ -3196,6 +3196,21 @@ textarea.ai-prompt-in{resize:none;line-height:1.45;display:block;}
 .pt-code-cta{width:44px;height:44px;flex-shrink:0;border-radius:14px;background:var(--bg3);border:1px solid var(--b2);color:var(--t1);display:flex;align-items:center;justify-content:center;}
 .pt-code-cta:active{transform:scale(.92);}
 .pt-code-cta .ico{width:17px;height:17px;}
+/* Where everyone stands, said by them because nobody else can see it. */
+.pt-ready{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:10px 0 4px;}
+.pt-ready-me{flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;padding:9px 13px;min-height:38px;
+  border-radius:99px;font-size:12px;font-weight:800;cursor:pointer;
+  background:var(--bg3);border:1px solid var(--b2);color:var(--t2);}
+.pt-ready-me .ico{width:13px;height:13px;}
+.pt-ready-me.on{background:var(--finbg);border-color:color-mix(in srgb,var(--fin) 45%,transparent);color:var(--fin);}
+.pt-ready-n{flex:1;min-width:0;font-size:12px;color:var(--t3);}
+.pt-flag{display:inline-flex;margin-left:4px;}
+.pt-flag .ico{width:12px;height:12px;}
+.pt-flag.ok{color:var(--fin);}
+.pt-flag.wait{color:var(--wat);}
+.pt-chip.ready .dot{background:var(--fin);}
+.pt-chip.waiting .dot{background:var(--wat);}
+.pv-host-next.on{background:var(--watbg);border-color:color-mix(in srgb,var(--wat) 50%,transparent);color:var(--wat);}
 .pt-members{display:flex;flex-wrap:wrap;gap:7px;margin:4px 0 14px;}
 .pt-chip{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:700;color:var(--t1);background:var(--bg3);border:1px solid var(--b1);border-radius:99px;padding:6px 12px;}
 .pt-chip .dot{width:7px;height:7px;border-radius:50%;background:#3ecf7e;box-shadow:0 0 6px #3ecf7e;}
@@ -5121,6 +5136,7 @@ body.recsel .pcard{position:relative;}
     <button class="pv-host-main" id="pvHostPause">Pause everyone</button>
     <button class="pv-host-next" id="pvPartyResync" onclick="partyResync()" title="Count everyone back in together">Re-sync</button>
     <button class="pv-host-next" id="pvHostNext" onclick="partyNext()">Next</button>
+    <button class="pv-host-next" id="pvPartyWait" onclick="partyWaitToggle()" title="Tell everyone you need a moment">Wait for me</button>
     <button class="pv-host-chat party-only" onclick="openSheet('partySheet')" aria-label="Party chat"><i data-ic="message"></i></button>
   </div>
 </div>
@@ -13044,6 +13060,14 @@ function renderPvHostBar(){
   if(nx)nx.style.display=partyIsHost?'':'none';
   // And the one thing a viewer actually needs says what it is for.
   if(rs){rs.textContent=partyIsHost?'Re-sync':'Out of sync';rs.style.flex=partyIsHost?'':'1';}
+  // Buffering is the other thing only you can see, and it happens while the video
+  // is in front of you — so it is answered here rather than three taps away.
+  const wt=document.getElementById('pvPartyWait');
+  if(wt){
+    const me=((partyRoom&&partyRoom.members)||[]).find(x=>x.uid===partyUid())||{};
+    wt.textContent=me.wait?'I am good':'Wait for me';
+    wt.classList.toggle('on',!!me.wait);
+  }
   if(!partyIsHost)return;
   const paused=!!(partyRoom&&partyRoom.paused);
   pb.textContent=paused?'Resume everyone':'Pause everyone';
@@ -13198,6 +13222,17 @@ function partyNow(){ return Date.now()+_partySkew; }
 // gating the fix behind the host meant saying so out loud and hoping they were
 // listening. Everyone restarts together either way; a viewer asking costs the
 // room the same three seconds a host does.
+// Said by the person, because nobody else can see it.
+function partyReady(on){ if(!partyActive())return; wsSend({t:'ready',on:!!on}); }
+function partyWaitToggle(){
+  const me=((partyRoom&&partyRoom.members)||[]).find(x=>x.uid===partyUid())||{};
+  partyWait(!me.wait);
+}
+function partyWait(on){
+  if(!partyActive())return;
+  wsSend({t:'wait',on:!!on});
+  toast(on?'Everyone can see you need a moment':'Told everyone you are good');
+}
 function partyResync(){
   if(!partyActive()){toast('You are not in a party');return;}
   wsSend({t:'resync'});
@@ -14266,7 +14301,7 @@ function renderParty(){
   const meUid=partyUid();
   const mAct=m=>(partyIsHost&&m.uid!==meUid&&m.uid!==r.host)?`<button class="pt-mact" onclick="partyMakeHost('${safeId(m.uid)}',this.dataset.n)" data-n="${escH(m.name)}" aria-label="Make host" title="Make host">${icon('star')}</button><button class="pt-mact pt-mact-x" onclick="partyKick('${safeId(m.uid)}',this.dataset.n)" data-n="${escH(m.name)}" aria-label="Remove" title="Remove">${icon('x')}</button>`:'';
   const vset=new Set(r.voice||[]);
-  const members=r.members.map(m=>`<span class="pt-chip${m.uid===r.host?' host':''}"><span class="dot"></span>${schEsc(m.name)}${m.uid===r.host?`<span class="pt-host">${icon('star')}</span>`:''}${vset.has(m.uid)?`<span class="pt-vmic" title="In voice chat">${icon('mic')}</span>`:''}${mAct(m)}</span>`).join('');
+  const members=r.members.map(m=>`<span class="pt-chip${m.uid===r.host?' host':''}${m.wait?' waiting':''}${m.ready?' ready':''}"><span class="dot"></span>${schEsc(m.name)}${m.wait?`<span class="pt-flag wait" title="Needs a moment">${icon('clock')}</span>`:m.ready?`<span class="pt-flag ok" title="Ready">${icon('check')}</span>`:''}${m.uid===r.host?`<span class="pt-host">${icon('star')}</span>`:''}${vset.has(m.uid)?`<span class="pt-vmic" title="In voice chat">${icon('mic')}</span>`:''}${mAct(m)}</span>`).join('');
   const voiceUI=`<div class="pt-voice">
     <button class="pt-voicebtn${voiceOn?' on':''}" onclick="toggleVoice()">${icon('mic')}<span>${voiceOn?'Leave voice':'Join voice chat'}</span>${vset.size?`<span class="pt-voice-n">${vset.size}</span>`:''}</button>
     ${voiceOn?`<button class="pt-mutebtn${voiceMuted?' muted':''}" onclick="toggleMute()">${icon(voiceMuted?'mic-off':'mic')}<span>${voiceMuted?'Muted':'Mute'}</span></button>`:''}
@@ -14347,11 +14382,25 @@ function renderParty(){
   const inviteBlock=_friends.length?`<div class="dt-label" style="margin-top:14px">${icon('users')} Invite friends</div><div class="pt-invite">${_friends.map(f=>`<button class="pt-invite-btn" onclick="partyInviteFriend('${escH(f.code)}')"><span class="fr-dot" style="background:${friendColor(f.code)}"></span>${escH(f.name)}</button>`).join('')}</div>`:'';
   const _reactbar=`<div class="pt-reactbar">${PARTY_EMOJI.map(e=>`<button class="pt-react" onclick="partyReact('${e}')">${e}</button>`).join('')}</div>`;
   const _chatBlock=_reactbar+`<div class="pt-chat" id="ptChat">${chat||'<div class="pt-sys">Say hi</div>'}</div><div class="pt-typing" id="ptTyping" style="display:none"></div><div class="pt-chatbar"><input id="ptMsg" placeholder="Message…" maxlength="300" oninput="partyTypingPing()" onkeydown="if(event.key==='Enter')partySend()"><button class="pt-send" onclick="partySend()">${icon('send')}</button></div>`;
+  // ARE WE ALL HERE YET.
+  // The room cannot see anyone's player, so "ready" is the one thing only each
+  // person can answer. Without it the host counts down into silence and finds out
+  // afterwards that two people were still loading.
+  const _me=(r.members||[]).find(m=>m.uid===partyUid())||{};
+  const _n=(r.members||[]).length, _rdy=(r.members||[]).filter(m=>m.ready).length;
+  const _wait=(r.members||[]).filter(m=>m.wait);
+  const readyBar=`<div class="pt-ready">
+      <button class="pt-ready-me${_me.ready?' on':''}" onclick="partyReady(${_me.ready?'false':'true'})">
+        ${icon(_me.ready?'check':'clock')} ${_me.ready?'You are ready':'I am ready'}
+      </button>
+      <span class="pt-ready-n">${_rdy} of ${_n} ready${_wait.length?` \u00b7 ${schEsc(_wait.map(m=>m.name).join(', '))} needs a moment`:''}</span>
+    </div>`;
   const _controls=`${queueBlock}${hostCtl}${jitsiBtn}${voiceUI}${inviteBlock}`;
   // In a call: float the chat right under the call panel (no scrolling past the queue).
   // Otherwise: normal order with controls first, chat at the bottom.
   box.innerHTML=`
     <div class="pt-code"><div class="pt-code-val">${schEsc(r.code||partyCode)}</div><button class="pt-code-cta" onclick="sharePartyLink()" aria-label="Share invite link">${icon('send')}</button><button class="pt-code-cta" onclick="partyCopyCode()" aria-label="Copy code">${icon('copy')}</button></div>
+    ${readyBar}
     <div class="pt-members">${members}</div>
     ${now}${_jitsiApi?_chatBlock+_controls:_controls+_chatBlock}
     <button class="src-opt" style="margin-top:14px" onclick="partyEnd()"><div class="src-name" style="color:var(--t2)">${partyIsHost?'End the party':'Leave the party'}</div></button>`;

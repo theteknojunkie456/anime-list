@@ -594,10 +594,10 @@ export class PartyRoom {
         if (!isHost) return;
         room.title = String(msg.title || '').slice(0, 160); room.animeId = String(msg.animeId || '').slice(0, 40);
         room.ep = Math.max(0, Math.min(9999, parseInt(msg.ep, 10) || 0)); room.img = String(msg.img || '').slice(0, 400);
-        room.playAt = 0; room.paused = false;
+        room.playAt = 0; room.paused = false; this.clearFlags(room);
         this.sys(room, `Now watching ${room.title}${room.ep ? ' · Ep ' + room.ep : ''}`); room.rev++; await this.save(); this.broadcast(); return;
       }
-      case 'play': { if (!isHost) return; room.playAt = Date.now() + 3600; room.paused = false; this.sys(room, '▶ Starting in 3…'); room.rev++; await this.save(); this.broadcast(); return; }
+      case 'play': { if (!isHost) return; room.playAt = Date.now() + 3600; room.paused = false; this.clearFlags(room); this.sys(room, '▶ Starting in 3…'); room.rev++; await this.save(); this.broadcast(); return; }
       case 'pause': { if (!isHost) return; room.paused = true; room.playAt = 0; this.sys(room, `⏸ ${name} paused`); room.rev++; await this.save(); this.broadcast(); return; }
       case 'queue-add': {   // anyone may queue a pick for later
         const title = String(msg.title || '').slice(0, 160); if (!title) return;
@@ -669,6 +669,21 @@ export class PartyRoom {
         this.broadcastRaw({ t: 'psync', t2, ep, paused: !!msg.paused, sent: Date.now() }, uid);
         return;
       }
+      // Two things a member says about themselves, because on the web nobody else
+      // can see them. The room cannot read a cross-origin player, so "are you
+      // ready" and "are you buffering" are answers only the person sitting there
+      // can give — and without a way to give them, the host is guessing.
+      case 'ready': {
+        room.members[uid].ready = !!msg.on;
+        if (msg.on) room.members[uid].wait = false;   // saying you're ready cancels holding everyone up
+        room.rev++; await this.save(); this.broadcast(); return;
+      }
+      case 'wait': {
+        room.members[uid].wait = !!msg.on;
+        if (msg.on) room.members[uid].ready = false;
+        this.sys(room, msg.on ? `${name} needs a moment` : `${name} is good to go`);
+        room.rev++; await this.save(); this.broadcast(); return;
+      }
       case 'resync': {
         // ANYONE may ask. Being out of sync is the one problem only the person
         // suffering it can see, and host-gating it meant saying so out loud and
@@ -739,13 +754,17 @@ export class PartyRoom {
   view() {
     const r = this.room;
     return { code: r.code, host: r.host, title: r.title, animeId: r.animeId, ep: r.ep, img: r.img, playAt: r.playAt, paused: !!r.paused, sharing: r.sharing || '', queue: r.queue || [], voice: Object.keys(r.voice || {}),
-      members: Object.entries(r.members).map(([uid, m]) => ({ uid, name: m.name })), chat: r.chat, reacts: (r.reacts || []).filter(x => Date.now() - x.t < 8000), rev: r.rev };
+      members: Object.entries(r.members).map(([uid, m]) => ({ uid, name: m.name, ready: !!m.ready, wait: !!m.wait })), chat: r.chat, reacts: (r.reacts || []).filter(x => Date.now() - x.t < 8000), rev: r.rev };
   }
   // `now` rides along with every room update. The countdown is a wall-clock
   // deadline (playAt), and a device whose clock is a few seconds out starts that
   // many seconds early or late — through no fault of the network. With the
   // server's own time in the same message, each client can measure its offset and
   // count down against the room's clock instead of its own.
+  // Ready and wait describe one moment. Once the room moves on — a new pick, a
+  // fresh start — they are stale, and a stale "ready" is worse than none because
+  // the host reads it as current.
+  clearFlags(room) { try { for (const m of Object.values(room.members || {})) { m.ready = false; m.wait = false; } } catch (e) {} }
   broadcast() { const s = JSON.stringify({ t: 'state', room: this.view(), now: Date.now() }); for (const ws of this.state.getWebSockets()) { try { ws.send(s); } catch {} } }
   broadcastReact(rc) { const s = JSON.stringify({ t: 'react', r: rc }); for (const ws of this.state.getWebSockets()) { try { ws.send(s); } catch {} } }
   sendTo(uid, obj) { const s = JSON.stringify(obj); for (const ws of this.state.getWebSockets(uid)) { try { ws.send(s); } catch {} } }

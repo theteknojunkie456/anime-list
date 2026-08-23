@@ -16944,6 +16944,61 @@ function restoreSrcDraft(){
   inp.value=d;
   try{quickSetup();}catch(e){}
 }
+// Is this number an AniList (or MyAnimeList) id for the show named in the same
+// address? Ask, and compare what comes back against the slug. A number that
+// belongs to a database is a number this app can produce for every other title;
+// a number that belongs to the site is not.
+async function quickTryIdTemplate(url){
+  let u; try{u=new URL(url);}catch(e){return '';}
+  const segs=u.pathname.split('/').filter(Boolean);
+  const idIdx=segs.findIndex(x=>/^\d{3,}$/.test(x));
+  const slugIdx=segs.findIndex(x=>/[a-z]{3,}/i.test(x)&&!/^(watch|anime|series|video|tv|show|title|play|stream)$/i.test(x));
+  if(idIdx<0||slugIdx<0)return '';
+  const n=Number(segs[idIdx]);
+  const norm=x=>String(x||'').toLowerCase().replace(/[^a-z0-9]+/g,'');
+  const want=norm(segs[slugIdx]);
+  if(!want)return '';
+  // ASKED SEPARATELY, DELIBERATELY. Putting both lookups in one aliased query
+  // looks obviously right and is wrong: when the idMal half misses, AniList nulls
+  // BOTH aliases — {"A":null,"M":null} with a 404 — so the half that would have
+  // answered is destroyed by the half that could not. Two requests, and the
+  // second only happens if the first misses.
+  const ask=async(vars,sel)=>{
+    try{
+      const r=await fetch('https://graphql.anilist.co',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},
+        body:JSON.stringify({query:`query($v:Int){Media(${sel}:$v){id title{romaji english} synonyms}}`,variables:{v:vars}})});
+      return ((await r.json()).data||{}).Media||null;   // a 404 body still carries usable JSON
+    }catch(e){return null;}
+  };
+  const hit=m=>{
+    if(!m)return false;
+    // Filter AFTER normalising, not before. A Japanese or Russian synonym is a
+    // perfectly non-empty string that strips to nothing once punctuation and
+    // non-Latin characters are gone — and an empty name makes
+    // want.startsWith('') true, so every id matched every slug. That is how a
+    // deliberately wrong id still produced a template.
+    const names=[(m.title||{}).romaji,(m.title||{}).english]
+      .concat(m.synonyms||[]).map(norm).filter(x=>x.length>=4);
+    if(!names.length)return false;
+    // The slug is usually a title with the punctuation removed, so a prefix match
+    // either way is the honest test — but only on enough characters to mean
+    // something.
+    const P=12;
+    return names.some(x=>x===want||
+      (want.length>=P&&x.length>=P&&(x.startsWith(want.slice(0,P))||want.startsWith(x.slice(0,P)))));
+  };
+  let token='';
+  if(hit(await ask(n,'id')))token='{anilistid}';
+  else if(hit(await ask(n,'idMal')))token='{malid}';
+  if(!token)return '';
+  segs[idIdx]=token; segs[slugIdx]='{slug}';
+  u.pathname='/'+segs.join('/');
+  // Whatever carries the episode in the query comes along too.
+  let epKey='';
+  for(const k of ['ep','episode','e','epi','episodio']){const v=u.searchParams.get(k); if(v!==null&&/^\d+$/.test(v)){epKey=k;break;}}
+  if(epKey)u.searchParams.set(epKey,'__WLEP__');
+  return decodeURIComponent(u.toString()).replace(/__WLEP__/g,'{ep}');
+}
 function quickSetup(){
   const inp=document.getElementById('srcQuickIn'),out=document.getElementById('srcQuickOut');
   if(!inp||!out)return;
@@ -16966,6 +17021,16 @@ function quickSetup(){
       const segs=new URL(url).pathname.split('/').filter(Boolean);
       return segs.some(x=>/^\d{3,}$/.test(x))&&segs.some(x=>/[a-z]{3,}/i.test(x));
     }catch(e){return false;}})();
+    // Before giving up: that number may not be the site's own at all. Aggregators
+    // very often address shows by their AniList or MyAnimeList id — miruro does —
+    // and those are numbers this app already stores on every linked title. If the
+    // id resolves to a show whose name matches the slug in the same address, the
+    // whole thing templatises after all.
+    if(opaqueId){
+      quickTryIdTemplate(url).then(tpl2=>{
+        if(tpl2)quickShowTemplate(tpl2,url);
+      }).catch(()=>{});
+    }
     if(opaqueId){
       let host=''; try{host=new URL(url).hostname.replace(/^www\./,'');}catch(e){}
       out.innerHTML=`<div class="src-quick-bad">${icon('search')} ${escH(host||'That site')} gives every show its own number, and that number can't be worked out from a title.<br>

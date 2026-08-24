@@ -10503,7 +10503,16 @@ function renderHome(){
   // title, minus anything already up in the billboard so nothing appears twice.
   const railItems=resumeItems(pool,isRead).filter(a=>!spotSet.has(a.id));
   // one banner at most: backup warning (critical) wins; otherwise the behind nudge
-  const topBanner=shouldNudge()?nudgeHTML():(isRead?'':behindHTML());
+  // nudgeHTML() decides for itself which of its three banners applies, and its
+  // LAST branch is the one that calls shouldNudge(). Gating the call on
+  // shouldNudge() therefore hid the other two, because both need a sync code and
+  // shouldNudge() requires there to be none — so "cloud backup isn't going
+  // through" could not appear no matter how many pushes failed. That warning was
+  // the only thing standing between a silently broken backup and someone finding
+  // out when their device is gone, and it had never once been shown. Ask the
+  // function, then fall back.
+  const nudge=nudgeHTML();
+  const topBanner=nudge||(isRead?'':behindHTML());
   // A brand-new user who's started adding still sees the beginner shelf (up top) so
   // they can keep stacking titles — it rides above their small list until dismissed.
   const beg=beginnerShelfActive(isRead);

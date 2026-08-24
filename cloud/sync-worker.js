@@ -359,6 +359,27 @@ export default {
 
     // Your mailbox in one call: what people sent you, and what they made of what
     // you sent them. Passes ride along on the pull the app already makes.
+    // ── who is allowed to read a mailbox ────────────────────────────────────
+    // rec_pull identified the caller by friend code alone, and the friend code is
+    // handed out on purpose — there is a copy button for it, you give it to people
+    // so they can add you. So anyone you ever gave it to could read every
+    // recommendation sent to you, including the note the sender wrote. The notify
+    // worker already refuses to treat this code as a secret, for exactly this
+    // reason; this one was still doing it.
+    //
+    // The SYNC code is the private one, and the setup blob stored under it already
+    // carries the friend code that device publishes. Matching them proves
+    // ownership with no new storage, no new secret, and one cheap read.
+    const ownsMailbox = async (code, sync) => {
+      if (!/^[A-Za-z0-9]{10,64}$/.test(String(sync || ''))) return false;
+      try {
+        const raw = await env.LISTS.get('list:' + sync);
+        if (!raw) return false;
+        const j = JSON.parse(raw);
+        const fc = j && j.data && j.data.extra && j.data.extra.friend_code;
+        return typeof fc === 'string' && fc === code;
+      } catch { return false; }
+    };
     if (op === 'rec_pull') {
       const code = String(body.code || '');
       if (!/^[A-Za-z0-9]{10,64}$/.test(code)) return json({ error: 'bad code' }, 400, cors);
@@ -371,6 +392,16 @@ export default {
       let echoes = [];
       try { const e = await env.LISTS.get('echo:' + code); if (e) echoes = JSON.parse(e); } catch {}
       if (!Array.isArray(echoes)) echoes = [];
+      // Unproven callers still get the titles, so a client that has not updated
+      // keeps working — but not the note, which is the part someone wrote
+      // expecting one reader. Redacting beats refusing here: refusing would break
+      // every cached client at once, and the titles were never the private bit.
+      const owner = await ownsMailbox(code, body.sync);
+      if (!owner) list = list.map(env2 => ({
+        ...env2,
+        items: (env2.items || []).map(it => ({ ...it, note: '' })),
+        redacted: true,
+      }));
       // Party rows ride along on the pull the app already makes, so a friend's
       // party costs no extra round trip from the phone. The caller names the
       // codes to check — which can only be friends it already holds — and each

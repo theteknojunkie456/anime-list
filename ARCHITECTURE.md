@@ -323,6 +323,24 @@ their **You recommended** list — never a push, and the `CHAN` nudge carries on
 the title, so nothing on the wire says who turned it down. `dismissRec()` sends
 it fire-and-forget: hiding a card is a local act and never waits on the network.
 
+**Who may read a mailbox.** `rec_pull` identified the caller by friend code
+alone — and the friend code is handed out on purpose: there is a copy button for
+it, `rec_send` addresses recommendations to it, and the notify worker explicitly
+**refuses** to accept it as an authentication secret (see `adoptByIdentity`).
+This worker was still doing exactly that, so anyone holding your code could read
+every recommendation sent to you, including the note the sender wrote.
+
+The sync code is the private one, and the setup blob stored at `list:<sync>`
+already carries `extra.friend_code` — the code that device publishes. Matching
+them proves ownership with no new secret, no new storage and one cheap read.
+
+Unproven callers still get titles and sender names; only the **note** is
+redacted (with `redacted: true` on the envelope). Redacting beats refusing:
+refusing would break every cached client at once, and the titles were never the
+private part. One consequence worth knowing — someone who has turned cloud
+backup off has no sync code to present, so they see their own recommendations
+without notes until they turn it back on.
+
 **Finding a party** (`party_tell` / `party_untell`, read back through
 `rec_pull`). A party used to be reachable only by sending someone its code out
 of band, which meant it only ever happened between people already talking

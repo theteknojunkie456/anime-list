@@ -18079,7 +18079,7 @@ async function pullRecs(force){
   // Same gate, same consequence: recommendations sent to the app went nowhere.
   const code=myFriendCode(); if(!code) return;
   try{
-    const r=await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({op:'rec_pull',code,friends:friendsList().map(f=>f&&f.code).filter(Boolean).slice(0,60)})});
+    const r=await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({op:'rec_pull',code,sync:syncCode(),friends:friendsList().map(f=>f&&f.code).filter(Boolean).slice(0,60)})});
     if(!r.ok)return;
     const j=await r.json();
     recsIn=Array.isArray(j.recs)?j.recs:[];

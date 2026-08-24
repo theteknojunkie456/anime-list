@@ -254,7 +254,9 @@ cd cloud && npx wrangler deploy -c sync-wrangler.toml
 ```
 
 Bindings (`sync-wrangler.toml`):
-- **`LISTS`** (KV) — per-code list backup/sync (`push` / `pull` ops).
+- **`LISTS`** (KV) — per-code list backup/sync (`push` / `pull` ops). **Every
+  `push` is one KV write, and the free plan allows 1,000 a day** across all
+  users — see *The write budget* below before adding anything that pushes.
 - **`PARTY`** (Durable Object `PartyRoom`) — one instance per party code; live
   watch party over WebSockets. *(Official app only.)*
 - **`CHAN`** (Durable Object `UserChannel`) — one per user friend-code; holds the
@@ -262,6 +264,51 @@ Bindings (`sync-wrangler.toml`):
 
 > Free-plan Durable Objects require `new_sqlite_classes` in the migration (not
 > `new_classes`).
+
+### The write budget
+
+KV bills per write **operation**, not per byte: a 50-byte change and a 2 MB list
+both cost exactly one of the 1,000 writes a day. So the only thing that reduces
+cost is not writing — payload size is irrelevant to the limit, and "send a
+smaller delta" would have bought nothing.
+
+On 2026-08-23 the quota was exhausted before 03:00 UTC and `push` was failing
+account-wide with `KV put() limit exceeded for the day`. Because pushes are
+fire-and-forget, the app showed no error — it looks exactly like the app losing
+your data and asking for the cloud key again.
+
+Three things were spending it:
+
+**Pulls were writing.** `localStorage.setItem` is wrapped to schedule a push on
+any change, and `pullRecs()` rewrites `recs_in` / `recs_passed` / `recs_echo` /
+`parties_in` on every pull. So each pull spent a write re-saving a list that had
+not changed. Those keys are now in `syncSkip()` — nothing is lost, since the pull
+that fills them re-fetches them.
+
+**The list was sent twice.** `syncSkip()` covered `LSKEY` but not `LSKEY+'_bak'`,
+its byte-identical mirror, so `collectExtra()` swept the whole library into the
+settings bundle alongside the copy already in `list`. Now skipped — which, because
+`applyExtra()` filters through the same function, also stops a stale `_bak` from
+another device being written over yours.
+
+**Identical pushes.** `syncPush()` fingerprints the *plaintext* (list + extra) and
+returns early when it matches the last **confirmed** push. Plaintext, not payload:
+an encrypted envelope carries a fresh IV each time, so hashing what goes on the
+wire would differ on every call and the guard would never fire for exactly the
+people relying on it most. A failed push clears the fingerprint, so the failure
+mode is an extra write, never a backup that quietly stops.
+
+Timing is a debounce **with a ceiling** (`PUSH_WAIT` 10s, `PUSH_MAX` 45s). The
+ceiling is not decoration: a plain debounce is starved by anything that writes
+more often than the wait, and this app has a background save that runs about once
+a second — which would have starved the old 2.5s wait just as surely. Once a
+change has waited `PUSH_MAX`, the next scheduling attempt fires instead of
+deferring. `visibilitychange`/`pagehide` flush immediately, so the longer wait
+never costs anyone their backup.
+
+Measured in a real browser by counting `op:'push'` requests: ten no-op pulls cost
+0 writes, five rapid episode ticks cost 1, re-saving identical content costs 0,
+and a dropped connection is retried rather than mistaken for "nothing changed".
 
 **Friends** flow through KV mailboxes (`fr_send`/`fr_accept`/`fr_pull`,
 `rec_send`/`rec_pull`) **plus** a live push over `CHAN`. The push **carries the

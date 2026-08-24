@@ -6917,7 +6917,19 @@ function setSyncAt(t){try{localStorage.setItem('syncat_'+LSKEY,String(t||0));}ca
 function syncSkip(k){
   if(!k)return true;
   if(k===LSKEY||k===ENCFLAG||k==='anthropic_key'||k==='_t'||k==='wl_gate_test')return true;
+  // The last-known-good copy of the list. LSKEY itself is skipped because the
+  // list travels in `list`, not in the settings bundle — and this is the same
+  // bytes again. Left in, every push carried the whole library TWICE, and every
+  // save re-armed the push debounce below.
+  if(k===LSKEY+'_bak')return true;
   if(k==='party_uid'||k==='party_active')return true; // party_name (your display name) DOES sync
+  // Caches of things the server already holds. These are rewritten on EVERY
+  // pull, and because a setItem schedules a push, each pull was costing a KV
+  // write even when not one byte had actually changed — on a plan that allows a
+  // thousand writes a day, shared with every real edit. Nothing is lost by
+  // leaving them out: each one is re-fetched by the pull that fills it.
+  if(k==='recs_in'||k==='recs_passed'||k==='recs_echo'||k==='parties_in')return true;
+  if(k==='rel_scan_at'||k==='upcoming_related')return true;
   // ai_model_* is which model you chose, not a credential, so it travels with
   // the rest of your settings. The KEY itself (anthropic_key) stays on the
   // device, as do the AniList tokens: a credential in cloud storage is a
@@ -6999,7 +7011,54 @@ try{
     try{ if(typeof syncSkip==='function' && !syncSkip(k)) pushSettings(); }catch(e){}
   };
 }catch(e){}
-function schedulePush(){if(!syncCode()||!SYNC_URL)return;clearTimeout(pushT);pushT=setTimeout(syncPush,2500);}
+// A push is a KV write, and KV bills per write regardless of size — so the only
+// thing that reduces cost is not writing. Two guards do that:
+//
+// Waiting longer. 2.5s was short enough that ticking through a few episodes, or
+// changing a couple of settings, spent a write on each. Ten seconds collapses a
+// burst of edits into one write, and the tab-hidden flush below means the delay
+// never costs anyone their backup.
+const PUSH_WAIT=10000;
+// A debounce alone is not enough, and this is the trap: every re-arm pushes the
+// deadline out, so anything that writes to storage more often than the wait
+// starves the push completely and the backup silently never runs. A background
+// save ticking once a second does exactly that — and would have done it to the
+// old 2.5s wait just as surely, which is the sort of thing you only see when you
+// count. So the deadline is a ceiling, not a suggestion: once a change has been
+// waiting PUSH_MAX, the next scheduling attempt fires instead of deferring.
+const PUSH_MAX=45000;
+let _pushPending=false,_pushSince=0;
+function schedulePush(){
+  if(!syncCode()||!SYNC_URL)return;
+  const now=Date.now();
+  if(!_pushPending){_pushPending=true;_pushSince=now;}
+  if(now-_pushSince>=PUSH_MAX){flushPush();return;}
+  clearTimeout(pushT);pushT=setTimeout(()=>{_pushPending=false;_pushSince=0;syncPush();},PUSH_WAIT);
+}
+// Leaving the app is the one moment the wait is not free, so it ends there:
+// backgrounding a PWA can suspend timers indefinitely, and a pending push that
+// never fires is a backup silently a day behind. pagehide covers the iOS case
+// where visibilitychange alone is unreliable.
+function flushPush(){
+  if(!_pushPending)return;
+  _pushPending=false;_pushSince=0;clearTimeout(pushT);
+  try{syncPush();}catch(e){}
+}
+try{
+  addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')flushPush();});
+  addEventListener('pagehide',flushPush);
+}catch(e){}
+// What the cloud already holds, as a cheap fingerprint of the PLAINTEXT — not of
+// the payload we send. An encrypted envelope carries a fresh random IV every
+// time, so hashing the ciphertext would differ on every call and this guard
+// would never once fire for exactly the people who most rely on the backup.
+function pushFingerprint(code){
+  let str;
+  try{str=code+'|'+JSON.stringify(realList())+'|'+JSON.stringify(collectExtra());}catch(e){return '';}
+  let h=5381;
+  for(let i=0;i<str.length;i++)h=((h<<5)+h+str.charCodeAt(i))|0;
+  return str.length+':'+(h>>>0).toString(36);
+}
 // How many items are actually PERSISTED on this device? Encrypted storage isn't
 // an array, so it answers -1 for "can't tell" rather than 0 — the difference
 // between "genuinely empty" and "unreadable from here" decides whether a push
@@ -7052,6 +7111,17 @@ async function syncPush(){
       }
     }
   }
+  // Nothing changed since the last confirmed push? Then the write would store
+  // bytes the cloud already has. This is what pulls used to cost: a pull
+  // rewrites its caches, a cache write schedules a push, and the push spent a
+  // write re-saving an identical list.
+  //
+  // Deliberately keyed on a push the server CONFIRMED. If the last attempt
+  // failed the fingerprint is cleared, so a retry is never mistaken for a
+  // no-op — the failure mode of this guard has to be an extra write, never a
+  // backup that quietly stops.
+  const fp=pushFingerprint(code);
+  if(fp&&fp===lastPushFP()&&!pushState().n)return;
   try{
     let list=realList();
     if(cryptoKey&&envWraps){list=await buildEnvelope();} // ciphertext (master-key envelope) to cloud
@@ -7059,15 +7129,20 @@ async function syncPush(){
     const payload={v:3,list,extra:collectExtra()};
     const r=await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({op:'push',code,data:payload})});
     const d=await r.json();
-    if(d&&d.ok){setSyncAt(d.updatedAt);notePushOK();}
-    else notePushFail((d&&(d.error||d.ignored))||('HTTP '+r.status));
-  }catch(e){notePushFail((e&&e.message)||'no connection');}
+    if(d&&d.ok){setSyncAt(d.updatedAt);notePushOK();setLastPushFP(fp);}
+    else {setLastPushFP('');notePushFail((d&&(d.error||d.ignored))||('HTTP '+r.status));}
+  }catch(e){setLastPushFP('');notePushFail((e&&e.message)||'no connection');}
 }
 // Every push failure used to be swallowed by an empty catch. That was survivable
 // while backup was opt-in and advisory. It is not now that it is the default
 // safety net: a backup that has quietly failed for a week is worse than no
 // backup, because the settings row keeps saying "restorable on any device" and
 // nobody goes looking until the device is gone and the answer matters.
+// Kept under a sync_ key on purpose: syncSkip() already ignores that prefix, so
+// recording the fingerprint cannot itself schedule the push it just suppressed.
+const PUSH_FP='sync_pushfp_'+LSKEY;
+function lastPushFP(){try{return localStorage.getItem(PUSH_FP)||'';}catch{return '';}}
+function setLastPushFP(v){try{if(v)localStorage.setItem(PUSH_FP,v);else localStorage.removeItem(PUSH_FP);}catch{}}
 const PUSH_FAIL='pushfail_'+LSKEY;
 function pushState(){try{return JSON.parse(localStorage.getItem(PUSH_FAIL)||'null')||{n:0,at:0,why:''};}catch{return{n:0,at:0,why:''};}}
 function setPushState(v){try{localStorage.setItem(PUSH_FAIL,JSON.stringify(v));}catch{}}

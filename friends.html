@@ -5444,7 +5444,19 @@ async function networkGate(){
   if(typeof IS_NATIVE!=='undefined'&&IS_NATIVE)return false;   // official app: always open, no cap/gate
   if(!gateOn())return false;                              // feature off → open to all
   const force=gateTestMode()==='force';                   // preview mode ignores the shortcuts below
-  if(!force&&netStatus()==='approved')return false;       // cached approval → open, revalidate below
+  // "revalidate below" was the intent and there was no below: this returned and
+  // nothing else ran, so an approved device never called /join again. That is
+  // what broke Use my key. The server indexes your cloud code from the /join
+  // body, and the only moments it saw one were the first probe and the join
+  // form — both of which happen BEFORE anyone turns on cloud backup, because
+  // backup lives inside the app you have not been let into yet. So the index was
+  // written for nobody, adoptByIdentity found nothing for everybody, and every
+  // returning device was told its own key was "not on this network yet".
+  //
+  // Checking in keeps the code that restores your list attached to your name.
+  // Once a day is plenty — the server skips the write when nothing changed, so
+  // this costs a read, not one of the thousand daily writes.
+  if(!force&&netStatus()==='approved'){ try{identityCheckIn();}catch(e){} return false; }
   // Having a list on this device used to be enough to walk straight in, and the
   // app filed the person as "(existing)" — which is precisely how the roster
   // became a column of rows nobody could identify. It now only skips the gate
@@ -5465,6 +5477,18 @@ async function networkGate(){
     return false; }
   if(st==='approved'){setNetStatus('approved');return false;}
   showJoinGate(st); return true;
+}
+// Under a sync_ key so writing it cannot schedule a cloud push (syncSkip drops
+// that prefix) — the whole point here is to spend less, not more.
+const IDCHK='sync_idchk_'+LSKEY;
+function identityCheckIn(){
+  const id=joinIdentity();
+  if(!id.sync)return;                       // nothing worth indexing yet
+  let last=0; try{last=+localStorage.getItem(IDCHK)||0;}catch(e){}
+  if(Date.now()-last<20*3600*1000)return;   // once a day, not once a launch
+  try{localStorage.setItem(IDCHK,String(Date.now()));}catch(e){}
+  // Fire and forget: this is bookkeeping, and it must never delay opening the app.
+  try{netCall('/join',{deviceId:wlDevice(),name:knownName(),...id});}catch(e){}
 }
 let _joinSource='';
 function pickSource(el,val){_joinSource=val;const p=document.getElementById('joinSourceChips');if(p)p.querySelectorAll('.src-chip').forEach(c=>c.classList.remove('on'));if(el)el.classList.add('on');}

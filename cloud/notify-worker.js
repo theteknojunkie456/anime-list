@@ -713,8 +713,17 @@ async function rememberIdentity(id, body, env) {
   // Only the sync code is indexed, for the same reason it is the only one
   // accepted above — indexing the friend code would keep the door standing even
   // with the lock removed.
+  //
+  // Read before writing. Devices now check in once a day so this index actually
+  // gets written (it never used to be, which is what broke rejoining by key),
+  // and an unconditional put would turn every check-in into one of the thousand
+  // KV writes a day the whole account shares. The value is a device id that
+  // changes almost never, so almost every check-in costs a read instead.
   for (const v of [body.sync]) {
-    if (typeof v === "string" && v.length >= 10) await env.SUBS.put(idxKey(v), id);
+    if (typeof v !== "string" || v.length < 10) continue;
+    const k = idxKey(v);
+    const cur = await env.SUBS.get(k);
+    if (cur !== id) await env.SUBS.put(k, id);
   }
 }
 async function handleJoin(body, env) {

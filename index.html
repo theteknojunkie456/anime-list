@@ -5903,12 +5903,74 @@ async function loadMembers(){
   const cnt=document.getElementById('adminCount');if(cnt)cnt.textContent=`${r.approved}/${r.cap}`;
   const cap=document.getElementById('capIn');if(cap&&!cap.value)cap.value=r.cap;
   const devs=r.devices||[];
-  const pending=devs.filter(d=>d.status==='pending'), approved=devs.filter(d=>d.status==='approved'), denied=devs.filter(d=>d.status==='denied');
+  // ONE ROW PER PERSON, not per device. Rejoining deliberately leaves the old
+  // row in place — deleting it is what used to sign people out, because a phone
+  // and a laptop share one code and each would steal the record from the other.
+  // That trade is right, and this is the bill for it: a roster of the same
+  // handful of people several times over.
+  //
+  // The friend code is the identity that actually travels — it lives in the
+  // synced settings, so every device one person signs into ends up carrying the
+  // same one. Falling back to the name catches the older rows that predate it.
+  // Same cloud key, same account — that is what the key is for, so it is the
+  // first thing asked. The server sends a hash of it rather than the code
+  // itself, because the code restores a whole library and this answer is going
+  // to a browser. Friend code and then name are fallbacks for rows that predate
+  // the hash; they backfill on each device's next daily check-in.
+  const personKey=d=>{
+    const ac=String(d.acct||'');
+    if(/^[a-f0-9]{8,32}$/.test(ac))return 'a:'+ac;
+    const fc=String(d.fcode||'');
+    if(/^[A-Za-z0-9]{10,64}$/.test(fc))return 'f:'+fc;
+    const nm=String(d.alias||d.name||'').trim().toLowerCase();
+    return nm&&nm!=='(existing)'?'n:'+nm:'d:'+d.id;
+  };
+  const strongKey=d=>{const k=personKey(d);return k[0]==='a'||k[0]==='f'?k:'';};
+  const dispName=d=>String(d.alias||d.name||'').trim().toLowerCase();
+  const byPerson=list=>{
+    const m=new Map();
+    for(const d of list){const k=personKey(d);if(!m.has(k))m.set(k,[]);m.get(k).push(d);}
+    // Rows old enough to carry no identity at all cannot be matched on anything
+    // but their name, and leaving them stranded shows the same person twice —
+    // which is the whole complaint. If a nameless-key group's name matches a
+    // group that does have a real identity, it is that person's older device.
+    const named=new Map();
+    for(const [k,ds] of m) if(k[0]==='a'||k[0]==='f'){const n=dispName(ds[0]); if(n&&!named.has(n))named.set(n,k);}
+    for(const [k,ds] of [...m]){
+      if(k[0]==='a'||k[0]==='f')continue;
+      const host=named.get(dispName(ds[0]));
+      if(host&&m.has(host)){m.get(host).push(...ds);m.delete(k);}
+    }
+    return [...m.values()].map(ds=>{
+      // The device seen most recently speaks for the person: its presence dot and
+      // its name are the current ones.
+      ds.sort((a,b)=>(b.lastSeen||0)-(a.lastSeen||0));
+      const head=Object.assign({},ds[0]); head._all=ds; return head;
+    });
+  };
+  const pending=byPerson(devs.filter(d=>d.status==='pending')),
+        approved=byPerson(devs.filter(d=>d.status==='approved')),
+        denied=byPerson(devs.filter(d=>d.status==='denied'));
   const row=(d,actions)=>`<div class="src-opt" style="display:flex;align-items:center;gap:8px">
-    <div style="flex:1;min-width:0" onclick="adminRenameDevice('${jsq(d.id)}','${jsq(memberLabel(d))}')"><div class="src-name">${presDot(d)}${escH(memberLabel(d)||'Unnamed \u00b7 tap to name')}${d.alias&&realMemberName(d.name)&&d.alias!==d.name?` <span class="src-tag">${escH(d.name)}</span>`:''}</div><div class="src-sub">${presText(d)}${d.joinedAt?' · '+when(d.joinedAt):''}${d.devices>1?` · ${d.devices} sign-ins`:''}${d.source?' · heard: '+escH(d.source):''}${d.invite?' · invite':''}</div></div>${actions}</div>`;
-  const ap=d=>`<button class="src-chip on" onclick="adminDecide('${d.id}','approve')">Approve</button>`;
-  const dn=d=>`<button class="src-chip" onclick="adminDecide('${d.id}','deny')">Deny</button>`;
-  const rm=d=>`<button class="src-chip fr-danger" onclick="adminForget('${d.id}')">Remove</button>`;
+    <div style="flex:1;min-width:0" onclick="adminRenameDevice('${jsq(d.id)}','${jsq(memberLabel(d))}')"><div class="src-name">${presDot(d)}${escH(memberLabel(d)||'Unnamed \u00b7 tap to name')}${d.alias&&realMemberName(d.name)&&d.alias!==d.name?` <span class="src-tag">${escH(d.name)}</span>`:''}</div><div class="src-sub">${presText(d)}${d.joinedAt?' · '+when(d.joinedAt):''}${(d._all&&d._all.length>1)?` · ${d._all.length} devices`:''}${d.source?' · heard: '+escH(d.source):''}${d.invite?' · invite':''}</div></div>${actions}</div>`;
+  // A person is their devices. Removing one row of three leaves them on the
+  // roster twice and looks like the button did nothing, so every action takes
+  // the whole set.
+  const ids=d=>(d._all||[d]).map(x=>x.id).join(',');
+  // Somebody already on the roster, asking again from a wiped device, looks
+  // identical to a stranger — which is exactly how it looked when Faiz's own key
+  // was refused. If the account is already approved, say whose it is.
+  const known=new Set();
+  approved.forEach(p=>(p._all||[p]).forEach(d=>{const k=strongKey(d);if(k)known.add(k);}));
+  const back=d=>{
+    const hit=(d._all||[d]).map(strongKey).find(k=>k&&known.has(k));
+    if(!hit)return '';
+    const who=approved.find(p=>(p._all||[p]).some(x=>strongKey(x)===hit));
+    return `<span class="src-tag">${escH(who?(memberLabel(who)||'a member'):'a member')} again</span>`;
+  };
+  const ap=d=>`<button class="src-chip on" onclick="adminDecideAll('${jsq(ids(d))}','approve')">Approve</button>`;
+  const dn=d=>`<button class="src-chip" onclick="adminDecideAll('${jsq(ids(d))}','deny')">Deny</button>`;
+  const rm=d=>`<button class="src-chip fr-danger" onclick="adminForgetAll('${jsq(ids(d))}')">Remove${(d._all&&d._all.length>1)?' all '+d._all.length:''}</button>`;
   // The roster already knows who these people are, so being friends with one of
   // them should not mean reading a code out over Messages and talking them
   // through pasting it. Only offered when their app has actually reported a
@@ -5932,8 +5994,8 @@ async function loadMembers(){
   approved.sort((a,b)=>(b.lastSeen||0)-(a.lastSeen||0));
   const onl=approved.filter(isOnline).length;
   box.innerHTML=
-    `<div class="dt-label" style="margin-top:2px">${icon('users')} Everyone · ${devs.length}${onl?` · ${onl} online`:''}</div>`
-    +group('Waiting on you',pending,d=>ap(d)+dn(d)+rm(d))
+    `<div class="dt-label" style="margin-top:2px">${icon('users')} Everyone · ${pending.length+approved.length+denied.length}${devs.length!==(pending.length+approved.length+denied.length)?` · ${devs.length} devices`:''}${onl?` · ${onl} online`:''}</div>`
+    +group('Waiting on you',pending,d=>back(d)+ap(d)+dn(d)+rm(d))
     +group('Members',approved,d=>fr(d)+dn(d)+rm(d))
     +group('Denied',denied,d=>ap(d)+rm(d),true);
   // Presence only means anything if it's current, so the open panel refreshes
@@ -6026,6 +6088,39 @@ async function titlesClear(id){
 // asks first — and says what actually happens, since a removed device that still
 // has the app will simply request access again.
 let _forgetArmed=null;
+// A person can hold several rows, and acting on one of them is what makes the
+// button look broken: you remove somebody and they are still sitting there,
+// twice. These take the whole set.
+async function adminDecideAll(idCsv,action){
+  const list=String(idCsv||'').split(',').filter(Boolean);
+  if(!list.length)return;
+  let bad='';
+  for(const id of list){
+    try{const r=await adminCall('/'+action,{deviceId:id});if(r&&r.error)bad=r.error;}catch{bad='Failed';}
+  }
+  if(bad)toast(bad);
+  loadMembers();
+}
+let _forgetArmedSet='';
+async function adminForgetAll(idCsv){
+  const list=String(idCsv||'').split(',').filter(Boolean);
+  if(!list.length)return;
+  // Same two-tap confirmation as a single row — removing somebody with three
+  // devices deletes three rows, so it is worth being sure.
+  if(_forgetArmedSet!==idCsv){
+    _forgetArmedSet=idCsv;
+    toast(list.length>1?`Tap again to remove all ${list.length} devices`:'Tap Remove again to delete this row');
+    setTimeout(()=>{if(_forgetArmedSet===idCsv)_forgetArmedSet='';},4000);
+    return;
+  }
+  _forgetArmedSet='';
+  let bad='';
+  for(const id of list){
+    try{const r=await adminCall('/forget',{deviceId:id});if(r&&r.error)bad=r.error;}catch{bad='Couldn\u2019t remove that';}
+  }
+  toast(bad||(list.length>1?`Removed ${list.length} devices`:'Removed from the roster'));
+  loadMembers();
+}
 async function adminForget(id){
   if(_forgetArmed!==id){
     _forgetArmed=id;

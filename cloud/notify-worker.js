@@ -709,6 +709,15 @@ function fcodeOf(body) {
   const v = String((body && body.fcode) || "");
   return /^[A-Za-z0-9]{10,64}$/.test(v) ? v : "";
 }
+// Same cloud key means the same account — that is what the key IS. But the code
+// itself restores a whole library, and /members hands its answer to a browser,
+// so the code must not travel with it. A hash groups exactly as well and carries
+// nothing: it cannot be turned back into a key, and two devices only collide if
+// they really are signed into the same account.
+async function syncAccountHash(sync) {
+  if (typeof sync !== "string" || sync.length < 10) return "";
+  return (await sha256Hex("wl-acct:" + sync)).slice(0, 16);
+}
 async function rememberIdentity(id, body, env) {
   // Only the sync code is indexed, for the same reason it is the only one
   // accepted above — indexing the friend code would keep the door standing even
@@ -750,6 +759,10 @@ async function handleJoin(body, env) {
     // rejoin.
     const fc = fcodeOf(body);
     if (fc && rec.fcode !== fc) { rec.fcode = fc; dirty = true; }
+    // Backfills itself: every device picks this up on its next daily check-in,
+    // so the roster stops double-counting people without anyone doing anything.
+    const acct = await syncAccountHash(body.sync);
+    if (acct && rec.acct !== acct) { rec.acct = acct; dirty = true; }
     if (dirty) await env.SUBS.put(key, JSON.stringify(rec));
     await rememberIdentity(id, body, env);
     return json({ ok: true, status: rec.status, name: rec.alias || rec.name || "" });
@@ -808,6 +821,7 @@ async function handleJoin(body, env) {
     source: String(body.source || "").slice(0, 40),   // how they heard about it
     invite: inviteCode,
     fcode: fcodeOf(body),
+    acct: await syncAccountHash(body.sync),
     joinedAt: Date.now(),
   };
   await env.SUBS.put(key, JSON.stringify(rec));

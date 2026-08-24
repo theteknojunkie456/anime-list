@@ -17926,12 +17926,12 @@ function connectFriendWS(){
   try{
     const url=SYNC_URL.replace(/^http/,'ws')+'/friend?code='+encodeURIComponent(code);
     const ws=new WebSocket(url); friendWS=ws;
-    ws.onopen=()=>{friendWSRetry=0;pullRecs();pullFriendReqs();};   // catch up on anything missed while offline
+    ws.onopen=()=>{friendWSRetry=0;pullRecs(1);pullFriendReqs();};   // catch up on anything missed while offline
     ws.onmessage=(e)=>{
       let d=null; try{d=JSON.parse(e.data);}catch(err){}
       if(d&&d.kind==='rec'){ if(d.data)mergeRec(d.data); setTimeout(pullRecs,3000); }        // instant merge + reconcile once KV is consistent
       else if(d&&d.kind==='fr'){ if(d.data)mergeFriendMsg(d.data); setTimeout(pullFriendReqs,3000); }
-      else if(d&&d.kind==='pass'){ setTimeout(()=>{pullRecs().then(()=>{try{renderFriends();}catch(e){}});},3000); }   // their answer, waiting in your sent list
+      else if(d&&d.kind==='pass'){ setTimeout(()=>{pullRecs(1).then(()=>{try{renderFriends();}catch(e){}});},3000); }   // their answer, waiting in your sent list
       else if(d&&d.kind==='party_invite'){ if(d.data)onPartyInvite(d.data); }
       else { pullRecs(); pullFriendReqs(); }   // plain-ping fallback
     };
@@ -17954,7 +17954,22 @@ function loadRecsCache(){
   try{const e=JSON.parse(localStorage.getItem('recs_echo')||'[]');recsEcho=Array.isArray(e)?e:[];}catch{recsEcho=[];}
   loadPartiesCache();
 }
-async function pullRecs(){
+// Switching back to the app fires visibilitychange, and that used to re-pull
+// every time — which was merely wasteful when a pull was one read, and stopped
+// being merely wasteful once the party rail made it one read PER FRIEND. Fifty
+// people with fifty friends each, flicking between apps all day, would spend the
+// entire 100,000-read allowance on answers that had not changed since the last
+// one a few seconds earlier.
+//
+// A live socket already delivers anything urgent the moment it happens, so the
+// pull is a catch-up, not the delivery mechanism. Forced pulls — reconnecting,
+// or opening the friends sheet on purpose — always run.
+let _lastPullAt=0;
+const PULL_MIN=45000;
+async function pullRecs(force){
+  const now=Date.now();
+  if(!force&&now-_lastPullAt<PULL_MIN)return;
+  _lastPullAt=now;
   // Same gate, same consequence: recommendations sent to the app went nowhere.
   const code=myFriendCode(); if(!code) return;
   try{
@@ -18537,7 +18552,7 @@ function tellRec(a,kind,note){
     });
   }catch(e){}
 }
-function openFriends(){renderFriends();openSheet('friendsSheet');pullRecs();pullFriendReqs();}
+function openFriends(){renderFriends();openSheet('friendsSheet');pullRecs(1);pullFriendReqs();}
 function openHub(){
   openSheet('hubSheet');
   // Counts, so the doors say how much is behind them.
@@ -21914,11 +21929,11 @@ try{if(_updSnap){const pg=document.getElementById('pageEl'),y=_updSnap.y||0;if(y
 // Friends recommendations (public web build): show cached instantly, then refresh.
 try{loadRecsCache();}catch(e){}
 {
-  setTimeout(()=>{pullRecs();pullFriendReqs();connectFriendWS();},1100);
+  setTimeout(()=>{pullRecs(1);pullFriendReqs();connectFriendWS();},1100);
   // keepalive so Cloudflare doesn't drop the idle socket
   setInterval(()=>{try{if(friendWS&&friendWS.readyState===1)friendWS.send('p');}catch(e){}},25000);
   try{document.addEventListener('visibilitychange',()=>{if(!document.hidden){connectFriendWS();pullRecs();pullFriendReqs();}});}catch(e){}
-  try{window.addEventListener('online',()=>{connectFriendWS();pullRecs();pullFriendReqs();pullSrcPacks();});}catch(e){}
+  try{window.addEventListener('online',()=>{connectFriendWS();pullRecs(1);pullFriendReqs();pullSrcPacks();});}catch(e){}
 }
 setTimeout(fetchCovers,1200);
 setTimeout(syncOnOpen,300);

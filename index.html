@@ -7365,6 +7365,11 @@ async function syncRestore(){
       }}catch(_){}
     return;
   }
+  // Nothing pasted is not the same as pasted wrong. "That code looks off" sends
+  // you looking for a typo in a code you never entered — which is what it did to
+  // the first person to tap this with an empty box, most likely after a paste
+  // that silently did not take.
+  if(!raw){toast('Paste your code first, then tap Use code');return;}
   if(!/^[A-Z0-9]{10,64}$/.test(raw)){toast('That code looks off. Check it');return;}
   const proceed=async()=>{
     // The code used to be adopted BEFORE the pull was tried, and the failure path

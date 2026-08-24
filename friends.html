@@ -2757,6 +2757,17 @@ body.yt-open{overflow:hidden;touch-action:none;}
 /* The live-party rail. Sits above every shelf on home because it is the one
    thing there with a clock on it. Deliberately quiet — a card, not an alert —
    since it appears unprompted and would wear thin as a red banner. */
+/* A member row carries a name, a status line and up to four controls. Inline on
+   a phone that leaves the name no room, so the controls drop to their own line
+   as soon as they would start squeezing it. */
+.adm-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.adm-who{flex:1 1 11rem;min-width:0;}
+.adm-acts{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-left:auto;}
+.adm-acts .src-tag{white-space:nowrap;}
+@media (max-width:430px){
+  .adm-who{flex:1 1 100%;}
+  .adm-acts{margin-left:0;}
+}
 .ptrail{margin:0 18px 14px;display:flex;flex-direction:column;gap:8px;}
 .ptrail-row{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:14px;
   background:var(--bg3);border:1px solid var(--b2);}
@@ -5951,8 +5962,8 @@ async function loadMembers(){
   const pending=byPerson(devs.filter(d=>d.status==='pending')),
         approved=byPerson(devs.filter(d=>d.status==='approved')),
         denied=byPerson(devs.filter(d=>d.status==='denied'));
-  const row=(d,actions)=>`<div class="src-opt" style="display:flex;align-items:center;gap:8px">
-    <div style="flex:1;min-width:0" onclick="adminRenameDevice('${jsq(d.id)}','${jsq(memberLabel(d))}')"><div class="src-name">${presDot(d)}${escH(memberLabel(d)||'Unnamed \u00b7 tap to name')}${d.alias&&realMemberName(d.name)&&d.alias!==d.name?` <span class="src-tag">${escH(d.name)}</span>`:''}</div><div class="src-sub">${presText(d)}${d.joinedAt?' · '+when(d.joinedAt):''}${(d._all&&d._all.length>1)?` · ${d._all.length} devices`:''}${d.source?' · heard: '+escH(d.source):''}${d.invite?' · invite':''}</div></div>${actions}</div>`;
+  const row=(d,actions)=>`<div class="src-opt adm-row">
+    <div class="adm-who" onclick="adminRenameDevice('${jsq(d.id)}','${jsq(memberLabel(d))}')"><div class="src-name">${presDot(d)}${escH(memberLabel(d)||'Unnamed \u00b7 tap to name')}${d.alias&&realMemberName(d.name)&&d.alias!==d.name?` <span class="src-tag">${escH(d.name)}</span>`:''}</div><div class="src-sub">${presText(d)}${d.joinedAt?' · '+when(d.joinedAt):''}${(d._all&&d._all.length>1)?` · ${d._all.length} devices`:''}${d.source?' · heard: '+escH(d.source):''}${d.invite?' · invite':''}</div></div><div class="adm-acts">${actions}</div></div>`;
   // A person is their devices. Removing one row of three leaves them on the
   // roster twice and looks like the button did nothing, so every action takes
   // the whole set.

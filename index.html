@@ -3254,7 +3254,13 @@ textarea.ai-prompt-in{resize:none;line-height:1.45;display:block;}
 .pt-chip.ready .dot{background:var(--fin);}
 .pt-chip.waiting .dot{background:var(--wat);}
 .pv-host-next.on{background:var(--watbg);border-color:color-mix(in srgb,var(--wat) 50%,transparent);color:var(--wat);}
-.pt-members{display:flex;flex-wrap:wrap;gap:7px;margin:4px 0 14px;}
+/* Chips sized themselves to their contents, and a member's contents depend on how
+   many controls they happen to have — so four people wrapped into a ragged
+   two-up with a different width and height in every cell. Equal columns instead:
+   same width, same height, the controls landing in the same place on every row. */
+.pt-members{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:7px;margin:4px 0 14px;}
+.pt-chip{min-height:40px;overflow:hidden;}
+.pt-chip-n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .pt-chip{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:700;color:var(--t1);background:var(--bg3);border:1px solid var(--b1);border-radius:99px;padding:6px 12px;}
 .pt-chip .dot{width:7px;height:7px;border-radius:50%;background:#3ecf7e;box-shadow:0 0 6px #3ecf7e;}
 .pt-chip.host .dot{background:var(--a2);box-shadow:0 0 6px var(--a2);}
@@ -3777,7 +3783,10 @@ body.recsel .pcard{position:relative;}
 .pt-pick .ph{display:flex;align-items:center;justify-content:center;font-family:var(--fd);font-size:21px;font-weight:800;color:var(--t3);background:linear-gradient(135deg,var(--bg4),var(--bg2));}
 .pt-pick-info{flex:1;min-width:0;}
 .pt-pick-t{font-family:var(--fd);font-size:15px;font-weight:700;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.pt-pick-s{font-size:12px;color:var(--t3);margin-top:2px;}
+/* "Episode 5 · added by Rin" had no nowrap, so it broke onto two or three lines
+   depending on the name — every queue row a different height, and the buttons
+   beside them at a different place on each. One line, clipped. */
+.pt-pick-s{font-size:12px;color:var(--t3);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .pt-pick-go{width:32px;height:32px;flex-shrink:0;border-radius:50%;background:var(--ag);color:var(--a2);display:flex;align-items:center;justify-content:center;}
 .pt-pick-go .ico{width:15px;height:15px;fill:currentColor;margin-left:1px;}
 .pt-pick-q{flex-shrink:0;font-family:var(--fd);font-size:12px;font-weight:800;color:var(--a2);background:var(--ag);border-radius:18px;padding:6px 10px;white-space:nowrap;}
@@ -3787,7 +3796,12 @@ body.recsel .pcard{position:relative;}
 .pt-qx{width:32px;height:32px;flex-shrink:0;border-radius:50%;background:var(--bg4);color:var(--t3);display:flex;align-items:center;justify-content:center;}
 .pt-qx .ico{width:14px;height:14px;}
 /* queue item actions: vote (everyone) + reorder/remove (host) */
-.pt-qacts{display:flex;align-items:center;gap:5px;flex-shrink:0;}
+/* Five 32px controls plus gaps took half the row, and everything they took came
+   out of the title. Slightly smaller, slightly tighter, and the name gets the
+   space back — the hit area is unchanged, it is padded beyond the chip. */
+.pt-qacts{display:flex;align-items:center;gap:4px;flex-shrink:0;}
+.pt-qacts .pt-qx,.pt-qacts .pt-pick-go{width:30px;height:30px;}
+.pt-qacts .pt-pick-q{padding:5px 9px;}
 .pt-qvote{display:flex;align-items:center;gap:4px;height:32px;padding:0 10px;border-radius:99px;background:var(--bg4);border:1px solid var(--b1);color:var(--t2);font-weight:800;font-size:12px;font-variant-numeric:tabular-nums;}
 .pt-qvote .ico{width:14px;height:14px;}
 .pt-qvote.on{background:var(--ag);border-color:var(--a);color:var(--a2);}
@@ -14705,7 +14719,7 @@ function renderParty(){
   const meUid=partyUid();
   const mAct=m=>(partyIsHost&&m.uid!==meUid&&m.uid!==r.host)?`<button class="pt-mact" onclick="partyMakeHost('${safeId(m.uid)}',this.dataset.n)" data-n="${escH(m.name)}" aria-label="Make host" title="Make host">${icon('star')}</button><button class="pt-mact pt-mact-x" onclick="partyKick('${safeId(m.uid)}',this.dataset.n)" data-n="${escH(m.name)}" aria-label="Remove" title="Remove">${icon('x')}</button>`:'';
   const vset=new Set(r.voice||[]);
-  const members=r.members.map(m=>`<span class="pt-chip${m.uid===r.host?' host':''}${m.wait?' waiting':''}${m.ready?' ready':''}"><span class="dot"></span>${schEsc(m.name)}${m.wait?`<span class="pt-flag wait" title="Needs a moment">${icon('clock')}</span>`:m.ready?`<span class="pt-flag ok" title="Ready">${icon('check')}</span>`:''}${m.uid===r.host?`<span class="pt-host">${icon('star')}</span>`:''}${vset.has(m.uid)?`<span class="pt-vmic" title="In voice chat">${icon('mic')}</span>`:''}${mAct(m)}</span>`).join('');
+  const members=r.members.map(m=>`<span class="pt-chip${m.uid===r.host?' host':''}${m.wait?' waiting':''}${m.ready?' ready':''}"><span class="dot"></span><span class="pt-chip-n">${schEsc(m.name)}</span>${m.wait?`<span class="pt-flag wait" title="Needs a moment">${icon('clock')}</span>`:m.ready?`<span class="pt-flag ok" title="Ready">${icon('check')}</span>`:''}${m.uid===r.host?`<span class="pt-host">${icon('star')}</span>`:''}${vset.has(m.uid)?`<span class="pt-vmic" title="In voice chat">${icon('mic')}</span>`:''}${mAct(m)}</span>`).join('');
   const voiceUI=`<div class="pt-voice">
     <button class="pt-voicebtn${voiceOn?' on':''}" onclick="toggleVoice()">${icon('mic')}<span>${voiceOn?'Leave voice':'Join voice chat'}</span>${vset.size?`<span class="pt-voice-n">${vset.size}</span>`:''}</button>
     ${voiceOn?`<button class="pt-mutebtn${voiceMuted?' muted':''}" onclick="toggleMute()">${icon(voiceMuted?'mic-off':'mic')}<span>${voiceMuted?'Muted':'Mute'}</span></button>`:''}
@@ -14733,7 +14747,7 @@ function renderParty(){
   const queueBlock=qlist.length?`<div class="dt-label" style="margin-top:14px">Up next · ${qlist.length}${partyIsHost?'':' · vote for what’s next'}</div>
     <div class="pt-picklist">${qlist.map((q,i)=>`<div class="pt-pick pt-qitem">
       ${q.img?`<img src="${safeImg(q.img)}" alt="">`:`<div class="ph">${((q.title||'?')[0]||'?').toUpperCase()}</div>`}
-      <div class="pt-pick-info"><div class="pt-pick-t">${schEsc(q.title)}</div><div class="pt-pick-s">${q.ep?`Episode ${q.ep} · `:''}added by ${schEsc(q.by||'?')}</div></div>
+      <div class="pt-pick-info"><div class="pt-pick-t">${schEsc(q.title)}</div><div class="pt-pick-s">${q.ep?`Ep ${q.ep} · `:''}${schEsc(q.by||'?')}</div></div>
       ${qActs(q,i)}</div>`).join('')}</div>`:'';
   if(partyIsHost&&iShare){
     // Real WebRTC connection count, not just who's in the room — a viewer can be present

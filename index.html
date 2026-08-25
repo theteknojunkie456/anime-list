@@ -17341,7 +17341,7 @@ function showSrcOffer(){
 }
 async function clearSrcPack(id){
   if(String(id||'').indexOf('link:')===0){srcPacksIn=srcPacksIn.filter(p=>p.id!==id);return;}
-  try{await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({op:'src_clear',code:myFriendCode(),id})});}catch(e){}
+  try{await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({op:'src_clear',code:myFriendCode(),sync:syncCode(),id})});}catch(e){}
   srcPacksIn=srcPacksIn.filter(p=>p.id!==id);
 }
 function dismissSrcPack(id){clearSrcPack(id);closeAll();}

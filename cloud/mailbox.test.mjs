@@ -85,4 +85,35 @@ let n=0; const ok=m=>{n++;console.log('ok  '+m);};
   ok('titles, sender and the rest of the payload are untouched');
 }
 
+// ── who declined your recommendation is yours too ──────────────────────────
+{
+  const e=await setup();
+  await call(e,{op:'rec_pass',to:ME,from:{code:FRIEND,name:'Rin'},title:'Frieren',aniId:154587});
+  const owner=await j(await call(e,{op:'rec_pull',code:ME,sync:MYSYNC}));
+  assert.equal(owner.passes.length,1,'the owner sees who passed');
+  const snoop=await j(await call(e,{op:'rec_pull',code:ME}));
+  assert.deepEqual(snoop.passes,[],'a bare friend code does not');
+  assert.deepEqual(snoop.echoes,[]);
+  ok('passes and echoes are withheld from unproven callers');
+}
+
+// ── clearing an offer is a write, and writes need proof ────────────────────
+{
+  const e=await setup();
+  await call(e,{op:'src_send',to:ME,from:{code:FRIEND,name:'Rin'},pack:{src:'https://x/{query}',services:[{name:'a site',url:'https://x/{query}'}]}});
+  const before=await j(await call(e,{op:'src_pull',code:ME}));
+  assert.equal(before.packs.length,1);
+
+  const denied=await call(e,{op:'src_clear',code:ME,id:''});
+  assert.equal(denied.status,403,'no proof, no write — this is also a way to burn the daily write budget');
+  const still=await j(await call(e,{op:'src_pull',code:ME}));
+  assert.equal(still.packs.length,1,'nothing was deleted');
+
+  const okRes=await call(e,{op:'src_clear',code:ME,sync:MYSYNC,id:''});
+  assert.equal(okRes.status,200);
+  const after=await j(await call(e,{op:'src_pull',code:ME}));
+  assert.equal(after.packs.length,0,'the owner can still clear their own offers');
+  ok('only the owner can clear the offers waiting for them');
+}
+
 console.log('\n'+n+' passed');

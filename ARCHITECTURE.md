@@ -335,7 +335,15 @@ already carries `extra.friend_code` — the code that device publishes. Matching
 them proves ownership with no new secret, no new storage and one cheap read.
 
 Unproven callers still get titles and sender names; only the **note** is
-redacted (with `redacted: true` on the envelope). Redacting beats refusing:
+redacted (with `redacted: true` on the envelope), and `passes` / `echoes` come
+back empty — those are a record of your own sending, and unlike a title they
+have no harmless half. `src_clear` goes further and returns **403**: it deletes,
+and it writes, so an unproven caller could both clear the offers waiting for you
+and burn the daily write budget in a loop.
+
+`src_pull` is deliberately left open. It returns which sites a friend offered to
+share — genuinely not sensitive — and gating it would cost the feature entirely
+for anyone with cloud backup off, who has no sync code to present. Redacting beats refusing:
 refusing would break every cached client at once, and the titles were never the
 private part. One consequence worth knowing — someone who has turned cloud
 backup off has no sync code to present, so they see their own recommendations

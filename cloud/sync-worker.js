@@ -68,6 +68,28 @@ export default {
       } catch (e) { return json({ iceServers: base }, 200, tcors); }
     }
 
+    // ── who is allowed to read a mailbox ────────────────────────────────────
+    // rec_pull identified the caller by friend code alone, and the friend code is
+    // handed out on purpose — there is a copy button for it, you give it to people
+    // so they can add you. So anyone you ever gave it to could read every
+    // recommendation sent to you, including the note the sender wrote. The notify
+    // worker already refuses to treat this code as a secret, for exactly this
+    // reason; this one was still doing it.
+    //
+    // The SYNC code is the private one, and the setup blob stored under it already
+    // carries the friend code that device publishes. Matching them proves
+    // ownership with no new storage, no new secret, and one cheap read.
+    const ownsMailbox = async (code, sync) => {
+      if (!/^[A-Za-z0-9]{10,64}$/.test(String(sync || ''))) return false;
+      try {
+        const raw = await env.LISTS.get('list:' + sync);
+        if (!raw) return false;
+        const j = JSON.parse(raw);
+        const fc = j && j.data && j.data.extra && j.data.extra.friend_code;
+        return typeof fc === 'string' && fc === code;
+      } catch { return false; }
+    };
+
     // ── list sync (KV, unchanged) ──────────────────────────────────────────
     const cors = {
       'Access-Control-Allow-Origin': '*',
@@ -320,9 +342,16 @@ export default {
     }
 
     // Accepting or dismissing clears the offer, so it doesn't ask again.
+    //
+    // This one WRITES, and it was gated on the friend code — a published
+    // identifier. Anyone holding yours could clear the offers waiting for you,
+    // and could do it in a loop: a write per call, against a budget of a thousand
+    // a day shared by everyone. Proof of ownership is required here rather than
+    // degraded, because there is no harmless half of deleting something.
     if (op === 'src_clear') {
       const code = String(body.code || '');
       if (!/^[A-Za-z0-9]{10,64}$/.test(code)) return json({ error: 'bad code' }, 400, cors);
+      if (!(await ownsMailbox(code, body.sync))) return json({ error: 'not yours' }, 403, cors);
       const id = String(body.id || '');
       let list = [];
       try { const s2 = await env.LISTS.get('src:' + code); if (s2) list = JSON.parse(s2); } catch {}
@@ -359,27 +388,6 @@ export default {
 
     // Your mailbox in one call: what people sent you, and what they made of what
     // you sent them. Passes ride along on the pull the app already makes.
-    // ── who is allowed to read a mailbox ────────────────────────────────────
-    // rec_pull identified the caller by friend code alone, and the friend code is
-    // handed out on purpose — there is a copy button for it, you give it to people
-    // so they can add you. So anyone you ever gave it to could read every
-    // recommendation sent to you, including the note the sender wrote. The notify
-    // worker already refuses to treat this code as a secret, for exactly this
-    // reason; this one was still doing it.
-    //
-    // The SYNC code is the private one, and the setup blob stored under it already
-    // carries the friend code that device publishes. Matching them proves
-    // ownership with no new storage, no new secret, and one cheap read.
-    const ownsMailbox = async (code, sync) => {
-      if (!/^[A-Za-z0-9]{10,64}$/.test(String(sync || ''))) return false;
-      try {
-        const raw = await env.LISTS.get('list:' + sync);
-        if (!raw) return false;
-        const j = JSON.parse(raw);
-        const fc = j && j.data && j.data.extra && j.data.extra.friend_code;
-        return typeof fc === 'string' && fc === code;
-      } catch { return false; }
-    };
     if (op === 'rec_pull') {
       const code = String(body.code || '');
       if (!/^[A-Za-z0-9]{10,64}$/.test(code)) return json({ error: 'bad code' }, 400, cors);
@@ -397,6 +405,10 @@ export default {
       // expecting one reader. Redacting beats refusing here: refusing would break
       // every cached client at once, and the titles were never the private bit.
       const owner = await ownsMailbox(code, body.sync);
+      // Who turned your recommendation down, and who echoed it back, is a record
+      // of your own sending — nobody else's business either. Withheld rather
+      // than redacted: unlike a title, there is no harmless half.
+      if (!owner) { passes = []; echoes = []; }
       if (!owner) list = list.map(env2 => ({
         ...env2,
         items: (env2.items || []).map(it => ({ ...it, note: '' })),

@@ -14725,7 +14725,16 @@ function leaveJitsi(){
   const frame=document.getElementById('jitsiFrame');if(frame)frame.innerHTML='';
   try{if(document.getElementById('partySheet').classList.contains('on'))renderParty();}catch(e){}   // restore normal chat position
 }
-function renderParty(){
+function renderParty(){ try{ renderPartyInner(); }catch(e){
+  try{console.error('renderParty',e);}catch(_){}
+  const box=document.getElementById('partyBody');
+  if(box)box.innerHTML=`<div class="pt-now pt-now-empty"><div class="pt-now-b">
+    <div class="pt-now-k">Party</div>
+    <div class="pt-now-t">This panel hit a snag</div>
+    <div class="pt-now-s">You're still connected. Reopen it, or leave below.</div></div></div>
+    <button class="src-opt" style="margin-top:14px" onclick="partyEnd()"><div class="src-name" style="color:var(--t2)">${partyIsHost?'End the party':'Leave the party'}</div></button>`;
+}}
+function renderPartyInner(){
   const box=document.getElementById('partyBody');if(!box)return;
   if(!partyActive()){
     const nm=partyName();
@@ -14753,7 +14762,17 @@ function renderParty(){
       </div>`;
     return;
   }
-  const r=partyRoom||{members:[],chat:[]};
+  // The fallback only covered partyRoom being missing entirely. A room that
+  // ARRIVES without one of these — a trimmed state, an older worker, a resync
+  // that crossed with a member leaving — threw on .map and left the panel dead
+  // for the rest of the party, with nothing on screen explaining why. Every list
+  // the render walks is guaranteed to be a list here.
+  const r=partyRoom||{};
+  if(!Array.isArray(r.members))r.members=[];
+  if(!Array.isArray(r.chat))r.chat=[];
+  if(!Array.isArray(r.queue))r.queue=[];
+  if(!Array.isArray(r.reacts))r.reacts=[];
+  if(!r.voice)r.voice=[];
   const meUid=partyUid();
   const mAct=m=>(partyIsHost&&m.uid!==meUid&&m.uid!==r.host)?`<button class="pt-mact" onclick="partyMakeHost('${safeId(m.uid)}',this.dataset.n)" data-n="${escH(m.name)}" aria-label="Make host" title="Make host">${icon('star')}</button><button class="pt-mact pt-mact-x" onclick="partyKick('${safeId(m.uid)}',this.dataset.n)" data-n="${escH(m.name)}" aria-label="Remove" title="Remove">${icon('x')}</button>`:'';
   const vset=new Set(r.voice||[]);

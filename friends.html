@@ -219,16 +219,27 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
    retro skin unusable, and this app is mostly prose — titles, notes, times. */
 [data-retro]{
   --fd:'VT323','Bricolage Grotesque',-apple-system,sans-serif;
-  /* The body face was still Manrope, so retro was a pixel headline sitting on
-     perfectly smooth body copy — and under a pixel grid that mismatch is what
-     makes small text hard to read rather than stylised. VT323 is a terminal face
-     and goes thin below about 15px, so the body takes Pixelify Sans, which is
-     drawn to stay legible at the sizes most of this app is set in. */
   --fb:'Pixelify Sans','Manrope',-apple-system,sans-serif;
   /* The lit edge. Every bevel lip, hairline, caption, cursor and marching-ant in
      this theme mixes from this ONE colour, so switching it repaints the whole
      look rather than a handful of borders. Set on :root by setRetroEdge(). */
   --edge:#22e8ff;
+}
+/* Every word in the app was a pixel font — titles, chips, nav, and also whole
+   paragraphs of explanation. Applied to everything, a treatment stops reading as
+   a treatment and starts reading as a constraint, and the part that suffers is
+   the part you actually READ rather than look at.
+   So: sentences only. Labels, titles, chips, counts, buttons and the nav keep
+   the pixels — they are furniture and they are short. Anything set as a
+   paragraph gets a face built for reading, which is most of what "overused" was
+   pointing at. */
+[data-retro] p,
+[data-retro] .ai-desc,
+[data-retro] .pt-hint,
+[data-retro] .nudge-t,
+[data-retro] .pcard-note,
+[data-retro] .pt-start-p{
+  font-family:'Manrope',-apple-system,sans-serif;
 }
 [data-retro]{
   --notch:10px;
@@ -8394,10 +8405,7 @@ const RETRO_KEY='retro_mode';
 //   64  a fine grid and a soft bloom instead of a screen door. Reads as the
 //       N64/PS1 era: still obviously a screen, but a good one.
 const RETRO_BITS_KEY='retro_bits';
-function retroBits(){
-  try{const v=localStorage.getItem(RETRO_BITS_KEY);return (v==='off'||v==='8'||v==='16'||v==='64')?v:'64';}
-  catch(e){return '64';}
-}
+function retroBits(){ return '8'; }
 function setRetroBits(v){
   try{localStorage.setItem(RETRO_BITS_KEY,String(v));}catch(e){}
   // Changing the block size invalidates every image already resampled at the old
@@ -8488,12 +8496,10 @@ function renderRetroRow(){
   if(lb3&&row3){ lb3.style.display=on?'':'none'; row3.style.display=on?'':'none'; row3.innerHTML=on?picks(edge2,'setRetroEdge2'):''; }
   // Not a colour, so not a swatch: three named settings, because the difference
   // between them is coarseness and that is a word, not a hue.
+  // No picker: there is one retro, and this is it.
   const lb4=document.getElementById('retroLb4'),row4=document.getElementById('retroRow4');
   if(lb4&&row4){
-    lb4.style.display=on?'':'none'; row4.style.display=on?'':'none';
-    const b=retroBits();
-    row4.innerHTML=on?[['off','None','Retro look, artwork left alone'],['8','8-bit','Chunkiest blocks'],['16','16-bit','The middle'],['64','64-bit','Gentlest blocks']]
-      .map(([k,t,tip])=>`<button class="bits-sw${b===k?' on':''}" onclick="setRetroBits('${k}')" title="${tip}">${t}</button>`).join(''):'';
+    lb4.style.display='none'; row4.style.display='none'; row4.innerHTML='';
   }
 }
 const ACCENT_KEY='accent_override';
@@ -9389,7 +9395,7 @@ const PX_MAX_PER_PASS=12;
 // The divisor: a /cover/medium/ source is about 100px, so 8-bit at 6 leaves a
 // ~17px picture to blow back up. Nine was past the point where a face survived
 // it, which reads as damage rather than as a low-resolution screen.
-function pxBlock(){ try{const b=retroBits(); return b==='off'?0:b==='8'?6:b==='16'?4:2;}catch(e){return 2;} }
+function pxBlock(){ return 6; }   // the one coarseness retro has
 function pxOne(img,n){
   const src=img.getAttribute('data-pxsrc')||img.getAttribute('src')||'';
   if(!src||src.slice(0,5)==='data:')return;

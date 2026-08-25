@@ -371,6 +371,9 @@ struct WatchListShell: UIViewRepresentable {
                 let c = (body["code"] as? String ?? "").uppercased(); if !c.isEmpty { AppGroup.partyCode = c }
             case "broadcast":
                 let c = (body["code"] as? String ?? "").uppercased(); if !c.isEmpty { AppGroup.partyCode = c }
+                // Join as the person who pressed the button, not as a new member.
+                AppGroup.adoptIdentity(uid: body["uid"] as? String ?? "",
+                                       name: body["name"] as? String ?? "")
                 AppGroup.partyOn(true)
                 DispatchQueue.main.async { self.broadcaster.start() }
             case "notify":

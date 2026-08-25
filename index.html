@@ -13111,7 +13111,15 @@ const IS_NATIVE=/WatchListNative/i.test(navigator.userAgent||'');
 // Public web build = pure tracker: hide every party entry point. Only the official
 // app (WatchListNative UA) shows parties. CSS keys off body.no-party.
 if(!IS_NATIVE){try{document.body.classList.add('no-party');}catch(e){}}
-function nativeBroadcast(){try{window.webkit.messageHandlers.wl.postMessage({type:'broadcast',code:partyCode||''});}catch(e){toast('Broadcasting needs the WatchList app');}}
+// The broadcast runs in a separate process with its own storage, so unless it is
+// handed this page's party identity it joins the room as a SECOND member — and
+// then `sharing` comes back as an id this page does not recognise, so the host
+// sees somebody else broadcasting and never themselves.
+function nativeBroadcast(){
+  try{window.webkit.messageHandlers.wl.postMessage({type:'broadcast',code:partyCode||'',
+    uid:partyUid(),name:partyName()||'Host'});}
+  catch(e){toast('Broadcasting needs the WatchList app');}
+}
 // (4) A 3-2-1 count before the screen broadcast fires — same overlay as "Start together".
 function broadcastCountdown(){
   const ov=document.getElementById('partyCount'),num=document.getElementById('pcNum'),lbl=document.getElementById('pcLbl');

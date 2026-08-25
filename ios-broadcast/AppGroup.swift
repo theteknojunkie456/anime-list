@@ -48,12 +48,26 @@ enum AppGroup {
         get { let n = read()["name"] ?? ""; return n.isEmpty ? "Guest" : n }
         set { set("name", newValue) }
     }
-    // stable per-device id (the party worker keys members by uid)
+    // The id the party keys members by — and it has to be the SAME id the web
+    // page uses, or the broadcast extension joins the room as a second person.
+    // It did: the page minted "u…" in localStorage, this minted "ios-…", and so
+    // `sharing` came back as an id the host's own page did not recognise. The
+    // host saw somebody else broadcasting and never themselves.
     static var uid: String {
         if let u = read()["uid"], !u.isEmpty { return u }
         let u = "ios-" + UUID().uuidString.prefix(12)
         set("uid", String(u))
         return String(u)
+    }
+    /// Adopt the page's party identity. Called when the page asks to broadcast,
+    /// so the extension appears as the person who pressed the button.
+    static func adoptIdentity(uid: String, name: String) {
+        if !uid.isEmpty { set("uid", uid) }
+        if !name.isEmpty { set("name", name) }
+    }
+    static var displayName: String {
+        let n = read()["name"] ?? ""
+        return n.isEmpty ? "Host" : n
     }
     static func partyOn(_ on: Bool) { set("on", on ? "1" : "0") }
 }

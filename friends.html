@@ -15978,6 +15978,9 @@ function pvWatchBlocked(f){
       // pretends there's a fix.
       if(t)t.textContent='This site wants to verify you';
       if(d)d.textContent='It\u2019s asking to check you\u2019re human, and it won\u2019t do that inside an app. Nothing\u2019s broken on your end.';
+    }else if(v==='sandbox'){
+      if(t)t.textContent='This site won\u2019t play in the app\u2019s player';
+      if(d)d.textContent='It refuses to run in a sandboxed frame, and the sandbox is what stops a player page opening things over the app. It plays fine in a browser.';
     }else if(v==='blocked'){
       if(t)t.textContent='This site won\u2019t open in the app';
       if(d)d.textContent='It doesn\u2019t allow being shown inside other apps.';
@@ -15989,7 +15992,8 @@ function pvWatchBlocked(f){
       // A confirmed refusal has nowhere to go inside the app — offering only
       // "Change source" makes the show unwatchable on a source that works
       // perfectly well in a browser. Somewhere beats nowhere.
-      const again=v!=='blocked';
+      // Retrying a sandbox refusal changes nothing, so it is not offered.
+      const again=v!=='blocked'&&v!=='sandbox';
       btn.textContent=again?'Try again':'Open in browser';
       btn.setAttribute('onclick',again?'pvRetryFrame()':'pvOpenExternal()');
     }
@@ -17278,8 +17282,24 @@ function frameRefuses(host){
 // challenge page and say nothing about the site). Anything not measured is
 // unknown too. Unknown means TRY IT — refusing to load a site on a guess is how
 // a working source gets written off.
+// Some sites will happily be framed and then refuse to PLAY once they notice the
+// frame is sandboxed — aniwatch prints "Sandboxed our player is not allowed" into
+// an otherwise working page. That is a third cause, and it was being reported as
+// the second: "this site wants to verify you", with a Try again that can never
+// work, because retrying changes nothing about the sandbox.
+//
+// It cannot be detected from here — the frame is cross-origin, which is the whole
+// point — so the ones we know are named. Dropping the sandbox to satisfy them is
+// not on the table: it is what keeps a player page from opening things over the
+// app.
+const SANDBOX_REFUSERS=['aniwatch.to','hianime.to','hianime.nz','hianime.sx','hianime.pe','hianimez.to'];
+function refusesSandbox(host){
+  const h=String(host||'').toLowerCase().replace(/^www\./,'');
+  return SANDBOX_REFUSERS.some(d=>h===d||h.endsWith('.'+d));
+}
 function framesVerdict(host){
   try{
+    if(refusesSandbox(host))return 'sandbox';
     const v=_frameVerdicts&&_frameVerdicts[String(host||'').toLowerCase()];
     return (v&&v.frames)||'unknown';
   }catch(e){return 'unknown';}

@@ -3308,6 +3308,36 @@ textarea.ai-prompt-in{resize:none;line-height:1.45;display:block;}
 .pt-now-t{font-family:var(--fd);font-size:15px;font-weight:800;color:var(--t1);letter-spacing:-.02em;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;}
 .pt-now-s{font-size:12px;color:var(--t2);font-weight:600;margin-top:1px;}
+/* ── the hero ──
+   This is the party. It used to be a 46px thumbnail in a strip below the room
+   code and the member list; now it opens the panel and is sized like the subject
+   rather than like a row. A real poster shape, because that is what a show looks
+   like, and the episode line carries the count of people watching it with you. */
+.pt-now{padding:12px;gap:14px;border-radius:18px;align-items:center;}
+.pt-now img,.pt-now-ph{width:52px;height:74px;border-radius:10px;}
+.pt-now-ph{font-size:21px;}
+.pt-now-k{font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;}
+.pt-now-t{font-size:17px;line-height:1.2;white-space:normal;display:-webkit-box;
+  -webkit-line-clamp:2;-webkit-box-orient:vertical;margin-top:4px;}
+.pt-now-s{margin-top:4px;font-size:13px;}
+/* Nothing picked is a state worth designing rather than an empty space: quiet,
+   outlined instead of filled, and it says what happens next. */
+.pt-now-empty{background:var(--bg2);border-style:dashed;border-color:var(--b2);}
+.pt-now-empty .pt-now-ph{background:transparent;border:1px dashed var(--b2);color:var(--t3);}
+.pt-now-empty .pt-now-ph .ico{width:20px;height:20px;}
+.pt-now-empty .pt-now-k{color:var(--t3);}
+
+/* ── the invite, demoted ──
+   You need the code once, when you start. It does not deserve the top of the
+   panel for the whole party, so it sits with the other things you do rather than
+   the things you watch. */
+.pt-invite{margin-top:16px;padding-top:14px;border-top:1px solid var(--b1);}
+.pt-invite-k{font-family:var(--fd);font-size:10px;font-weight:800;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--t3);margin-bottom:8px;}
+.pt-invite .pt-code{margin-bottom:0;padding:10px 12px;background:var(--bg3);}
+.pt-invite .pt-code-val{font-size:17px;letter-spacing:.14em;}
+.pt-invite .pt-code-cta{width:38px;height:38px;border-radius:10px;}
+.pt-invite .pt-code-cta .ico{width:15px;height:15px;}
 .pt-live{flex:none;align-self:flex-start;padding:3px 9px;border-radius:99px;background:var(--a);color:var(--aFg);
   font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;}
 .pe-note{display:flex;gap:11px;align-items:flex-start;background:var(--ag);border:1px solid var(--b2);border-radius:14px;padding:13px 14px;margin-bottom:14px;font-size:13px;line-height:1.5;color:var(--t1);}
@@ -14733,6 +14763,14 @@ function renderParty(){
     <div class="pt-now-t">${schEsc(r.title)}</div>
     <div class="pt-now-s">${r.ep?`Episode ${r.ep}`:'Ready'} · ${r.members.length} watching</div></div>
     ${sharing?`<span class="pt-live">live</span>`:''}</div>`:'';
+  // An empty top is the worst version of this screen: it opens on nothing and
+  // reads as a party that has not started. When no show is picked the hero says
+  // so and points at the picker, which is directly below.
+  const hero=r.title?now:`<div class="pt-now pt-now-empty">
+      <div class="pt-now-ph">${icon('play')}</div>
+      <div class="pt-now-b"><div class="pt-now-k">Nothing playing yet</div>
+      <div class="pt-now-t">${partyIsHost?'Pick something below':'Waiting for the host'}</div>
+      <div class="pt-now-s">${r.members.length} ${r.members.length===1?'person':'people'} here</div></div></div>`;
   let hostCtl='';
   // Shared "Up next" queue — visible to everyone; the host can remove items and pull the head.
   const qlist=r.queue||[];
@@ -14816,11 +14854,19 @@ function renderParty(){
   const _controls=`${queueBlock}${hostCtl}${jitsiBtn}${voiceUI}${inviteBlock}`;
   // In a call: float the chat right under the call panel (no scrolling past the queue).
   // Otherwise: normal order with controls first, chat at the bottom.
+  // The room code was the first thing in the panel and the thing being watched
+  // was the fourth. A watch party is not an administrative record — the show is
+  // the subject, and the code is plumbing you need once, at the start. So: what
+  // is on, who is here, then the controls, and the code down with the actions.
   box.innerHTML=`
-    <div class="pt-code"><div class="pt-code-val">${schEsc(r.code||partyCode)}</div><button class="pt-code-cta" onclick="sharePartyLink()" aria-label="Share invite link">${icon('send')}</button><button class="pt-code-cta" onclick="partyCopyCode()" aria-label="Copy code">${icon('copy')}</button></div>
+    ${hero}
     ${readyBar}
     <div class="pt-members">${members}</div>
-    ${now}${_jitsiApi?_chatBlock+_controls:_controls+_chatBlock}
+    ${_jitsiApi?_chatBlock+_controls:_controls+_chatBlock}
+    <div class="pt-invite">
+      <div class="pt-invite-k">Invite</div>
+          <div class="pt-code"><div class="pt-code-val">${schEsc(r.code||partyCode)}</div><button class="pt-code-cta" onclick="sharePartyLink()" aria-label="Share invite link">${icon('send')}</button><button class="pt-code-cta" onclick="partyCopyCode()" aria-label="Copy code">${icon('copy')}</button></div>
+    </div>
     <button class="src-opt" style="margin-top:14px" onclick="partyEnd()"><div class="src-name" style="color:var(--t2)">${partyIsHost?'End the party':'Leave the party'}</div></button>`;
   const cc=document.getElementById('ptChat');if(cc)cc.scrollTop=cc.scrollHeight;
   _chatUnread=0;_lastChatLen=((partyRoom&&partyRoom.chat)||[]).length;updatePartyPill();   // viewing the sheet clears the unread badge

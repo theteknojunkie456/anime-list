@@ -11494,6 +11494,13 @@ async function aniSearchSeasons(base){
   const q=`query($s:String){Page(perPage:30){media(search:$s,type:ANIME,isAdult:false,sort:SEARCH_MATCH){id idMal format status episodes seasonYear startDate{year month} title{romaji english} coverImage{large} nextAiringEpisode{airingAt episode}}}}`;
   try{const r=await fetch('https://graphql.anilist.co',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({query:q,variables:{s:base}})});
     if(!r.ok)return[];const media=(((await r.json()).data||{}).Page||{}).media||[];
+    // The graph nets are relations — they are facts. This one is a name match,
+    // and a name match on a single short word is a guess: search "hunter" and
+    // every show with that word comes back, each one looking like a season of
+    // whatever you were holding. Two tokens, or long enough to be a name, or the
+    // guess is not worth making.
+    const tokens=String(base||'').split(' ').filter(Boolean);
+    if(tokens.length<2&&base.length<8)return[];
     return media.filter(m=>m&&[seasonBase(m.title.english),seasonBase(m.title.romaji)].filter(Boolean).some(x=>x===base));
   }catch{return[];}
 }
@@ -21168,7 +21175,11 @@ let pickCands=[];
 function seasonBase(title){
   let t=(title||'').toLowerCase();
   t=t.replace(/[:\-–—]?\s*\b((the\s+)?final\s+season|season\s*\d+|\d+(st|nd|rd|th)\s+season|(part|cour)\s*\d+)\b.*$/,'');
-  t=t.replace(/\s+(ii|iii|iv|v|vi|vii|viii|ix|x)\b.*$/,'');   // trailing roman numerals
+  // Only when the numeral ENDS the title. This used to swallow everything after
+  // it, and the alternation includes bare v and x — so "Hunter x Hunter" became
+  // "hunter", a base generic enough to drag in anything else called Hunter. A
+  // numeral in the middle of a name is part of the name.
+  t=t.replace(/\s+(ii|iii|iv|v|vi|vii|viii|ix|x)\s*$/,'');
   return t.replace(/[^a-z0-9]+/g,' ').trim();
 }
 // The series a title belongs to — used to gather seasons/parts under one entry.

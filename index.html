@@ -14712,6 +14712,7 @@ function renderParty(){
   </div>`;
   // Reliable cross-network A/V (Jitsi): the recommended path — talk + share your
   // screen with audio, connects anywhere. The custom voice above is the P2P fallback.
+  const sharing=!!r.sharing, iShare=r.sharing===meUid;
   const jitsiBtn=`<button class="pt-jitsi${_jitsiApi?' on':''}" onclick="openJitsi()">${icon('users')}<span>${_jitsiApi?'Back to voice &amp; screen':'Voice &amp; screen share'}</span><span class="pt-jitsi-tag">${_jitsiApi?'live':'works anywhere'}</span></button>`;
   const now=r.title?`<div class="pt-now">${r.img?`<img src="${safeImg(r.img)}" alt="">`:`<div class="pt-now-ph">${((r.title||'?')[0]||'?').toUpperCase()}</div>`}
     <div class="pt-now-b"><div class="pt-now-k">${sharing?'On screen now':'Up now'}</div>
@@ -14719,7 +14720,6 @@ function renderParty(){
     <div class="pt-now-s">${r.ep?`Episode ${r.ep}`:'Ready'} · ${r.members.length} watching</div></div>
     ${sharing?`<span class="pt-live">live</span>`:''}</div>`:'';
   let hostCtl='';
-  const sharing=!!r.sharing, iShare=r.sharing===meUid;
   // Shared "Up next" queue — visible to everyone; the host can remove items and pull the head.
   const qlist=r.queue||[];
   const qActs=(q,i)=>{

@@ -11698,6 +11698,7 @@ async function fetchSequel(aniId){
 // for as long as it's true.
 function nextUpOf(a){
   if(!a||kindOf(a)!=='watch')return null;
+  if(a.idWeak)return null;            // including any stored before the link was doubted
   const n=a.nextUp;
   if(!n||!n.id)return null;
   if(anime.some(x=>x.aniId===n.id))return null;   // on the list already — seen it, or watching it
@@ -11724,6 +11725,7 @@ function addNextUp(id,ev){
 }
 async function offerNextSeason(a){
   if(!a||kindOf(a)!=='watch'||!a.aniId)return;
+  if(a.idWeak)return;                 // a sequel of the wrong show is not a sequel
   const nxt=await fetchSequel(a.aniId);
   if(!nxt||!nxt.id)return;
   if(nextDeclined().includes(nxt.id))return;                 // they already said no
@@ -11930,6 +11932,14 @@ function openSeasonsDrawer(id){
   _sdFor=id; _sdTitle=a.title||''; _sdList=[];
   const d=document.getElementById('seasonDrawer'); if(!d)return;
   d.classList.add('on');
+  // Walking relations from an id we are not sure about produces a confident list
+  // of the wrong show's seasons. Better to say the link is the problem.
+  if(a.idWeak){
+    const box=document.getElementById('sdBody');
+    const t=document.getElementById('sdTitle'); if(t)t.textContent=a.title||'All seasons';
+    if(box)box.innerHTML=`<p class="ai-desc">This one isn\u2019t confidently matched to a database entry, so its seasons can\u2019t be trusted \u2014 they\u2019d be another show\u2019s. Fix the match from the show\u2019s page and this will fill in.</p>`;
+    return;
+  }
   renderSeasonsDrawer(true);
   fetchFranchise(a).then(list=>{
     if(_sdFor!==id)return;                       // opened something else meanwhile
@@ -21073,6 +21083,21 @@ async function fetchCovers(){
           // is why nothing on a reading list could be tracked: chapter alerts and
           // the chapter list are both keyed by it, and manga simply never had one.
           if(m.id)a.aniId=m.id;
+          // This takes AniList's single best guess for a title search and keeps
+          // it. That is right for a cover — a near-miss cover is a cosmetic
+          // problem you can see and fix. It is NOT right for the franchise
+          // features, because a wrong id there is invisible: the sequel lookup
+          // and the seasons drawer both walk relations from this id, and they
+          // will confidently show you another show's seasons and never say why.
+          //
+          // The other match path already gates on titleLooksRight. This one
+          // cannot reject outright without losing every abbreviation somebody
+          // typed, so it records its own doubt instead, and the features that
+          // cannot survive a wrong id sit those ones out.
+          try{
+            const vs=[m.title&&m.title.english,m.title&&m.title.romaji,m.title&&m.title.native].filter(Boolean);
+            if(vs.length&&!vs.some(n=>titleLooksRight(n,a.title))) a.idWeak=1; else delete a.idWeak;
+          }catch(e){}
           if(m.title)rememberNames(a,[m.title.english,m.title.romaji,m.title.native]);
           // A {malid} template built an address with a hole in it for every title on
           // the list, because this pass never asked for the id — it only arrived via

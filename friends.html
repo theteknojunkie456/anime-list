@@ -3465,11 +3465,23 @@ body.call-full{overflow:hidden;}
   .hbtn{width:35px;height:35px;}
   .nbtn small{font-size:10px;letter-spacing:.02em;}
 }
-@media(max-width:420px){
-  .party-call-bar{gap:6px;padding:10px 8px 9px 12px;flex-wrap:wrap;}
-  .party-call-bar #callStatus{font-size:13px;flex:1 0 100%;order:-1;margin-bottom:2px;}
-  .party-call-x{width:40px;height:40px;}
-}
+/* Nine controls never fit one row. The sheet caps its own width, so the bar tops
+   out around 500px however wide the window is — 820px overflowed by 25px, same
+   as a phone. This is not a narrow-screen case, so it is not a media query — and wrapping a flex row fills
+   the first line and strands the remainder, which is why the leave button sat
+   alone under eight others looking like a fault.
+   A five-column grid wraps them evenly instead, 5 then 4, centred. It reads as
+   a designed pad rather than a broken row, and it holds down to 320px. */
+.party-call-bar{display:grid;grid-template-columns:repeat(5,1fr);gap:7px 6px;
+  padding:10px 10px 11px;justify-items:center;align-items:center;}
+.party-call-bar #callStatus{grid-column:1/-1;justify-self:start;font-size:13px;margin:0 0 2px 2px;}
+/* The dot lived in the button row and cost a whole cell there. It belongs with
+   the words it qualifies. */
+.party-call-bar .live-dot{display:none;}
+.party-call-bar #callStatus::before{content:'';display:inline-block;width:7px;height:7px;border-radius:50%;
+  background:#3ecf7e;box-shadow:0 0 8px #3ecf7e;margin-right:7px;vertical-align:middle;
+  animation:livePulse 2s ease-in-out infinite;}
+.party-call-x{width:38px;height:38px;}
 /* With our own tiles the frame sizes to its content — the fixed height was for
    the embed, and left a black band under a single tile. */
 .party-call-frame{position:relative;background:transparent;border-radius:14px;margin:0;overflow:hidden;}
@@ -14522,6 +14534,18 @@ function switchToEmbedCall(){
 // putting your voice into the room to say it.
 let _handUp=false,_jitsiMyId='';
 function callToggleHand(){
+  // There are two calls behind this toolbar — Jitsi and the native one — and
+  // this only ever asked about Jitsi. In the native call it told you to join a
+  // call you were already in, which is how a working feature reads as broken.
+  if(!_jitsiApi&&nativeCallOn()){
+    _handUp=!_handUp;
+    const b=document.getElementById('callHandBtn'); if(b)b.classList.toggle('on',_handUp);
+    // The party already broadcasts reactions to everyone, so a hand needs no new
+    // protocol to be seen.
+    if(_handUp){try{partyReact('\u270B');}catch(e){}}
+    toast(_handUp?'Hand raised':'Hand lowered');
+    return;
+  }
   if(!_jitsiApi){toast('Join the call first');return;}
   _handUp=!_handUp;
   try{_jitsiApi.executeCommand('toggleRaiseHand');}catch(e){}
@@ -14532,6 +14556,10 @@ function callToggleHand(){
 // doing it ourselves would mean running a segmentation model on every frame in
 // the main thread, which is a lot of battery to spend on hiding a room.
 function callToggleBlur(){
+  // Blur belongs to whoever owns the video pipeline, and in the native call that
+  // is us — we do not run a segmentation model per frame. Say which call has it
+  // rather than claiming they are not in one.
+  if(!_jitsiApi&&nativeCallOn()){toast('Background blur is only in the reliable call');return;}
   if(!_jitsiApi){toast('Join the call first');return;}
   try{_jitsiApi.executeCommand('toggleVirtualBackgroundDialog');}
   catch(e){toast('This call server doesn\u2019t offer background blur');}

@@ -9262,12 +9262,20 @@ function libraryTotals(list){
 
 // Estimated minutes for the side films in a title's watch order (~110 min each).
 function filmMins(a){const n=(a.order||[]).filter(s=>/^movie:/i.test(s)).length;return n*110;}
+// The pixel font has no tilde worth the name — it draws one as a dash, so
+// "about five hours" reads as MINUS five hours on every card in retro. The
+// approximation is worth saying where the font can say it, and not worth saying
+// wrong where it cannot.
+function approx(v){
+  try{ if(document.documentElement.hasAttribute('data-retro'))return String(v); }catch(e){}
+  return '~'+v;
+}
 function fmtWatch(mins){
   if(!mins)return '';
-  if(mins<60)return `~${mins}m`;
+  if(mins<60)return approx(mins+'m');
   const h=Math.round(mins/60);
-  if(h<48)return `~${h}h`;
-  return `~${h}h · ${Math.round(h/24)}d`;
+  if(h<48)return approx(h+'h');
+  return approx(h+'h')+` · ${Math.round(h/24)}d`;
 }
 // per-title theming: user's own bg wins over AniList banner; accent follows the same source.
 // Your own background always wins and is always yours. An AniList banner is only
@@ -11815,6 +11823,17 @@ function wtPlace(){
   }
   left=Math.max(10,Math.min(innerWidth-cw-10,left));
   top=Math.max(10,Math.min(innerHeight-ch-10,top));
+  // Those two clamps keep the card on screen, and can put it straight back on
+  // top of the thing it is pointing at — which is what happens to a control near
+  // the bottom of a tall sheet: no room below, not enough above, clamped back
+  // over the ring. A step that hides its own target is worse than one placed
+  // awkwardly, so if it still overlaps, take the bigger of the two free bands
+  // and sit at that edge.
+  const overlaps=(t)=>!(t+ch<=r.top-pad||t>=r.bottom+pad);
+  if(overlaps(top)){
+    const above=r.top-pad-10, below=innerHeight-(r.bottom+pad)-10;
+    top=(above>=below)?Math.max(10,r.top-pad-ch-4):Math.min(innerHeight-ch-10,r.bottom+pad+4);
+  }
   card.style.left=Math.round(left)+'px';
   card.style.top=Math.round(top)+'px';
 }
@@ -19826,7 +19845,7 @@ function renderStatsSheet(){
       <div class="stat-card"><div class="stat-val">${anime.length}</div><div class="stat-lbl">Total titles</div></div>
       <div class="stat-card"><div class="stat-val">${counts.finished}</div><div class="stat-lbl">Finished</div></div>
       <div class="stat-card"><div class="stat-val">${epsWatched}</div><div class="stat-lbl">Episodes watched</div></div>
-      <div class="stat-card"><div class="stat-val">${hrs?'~'+hrs:'—'}</div><div class="stat-lbl">Hours watched</div></div>
+      <div class="stat-card"><div class="stat-val">${hrs?approx(hrs):'—'}</div><div class="stat-lbl">Hours watched</div></div>
       ${_T.chaps?`<div class="stat-card"><div class="stat-val">${_T.chaps}</div><div class="stat-lbl">Chapters read</div></div>`:''}
       <div class="stat-card"><div class="stat-val">${icon('star','fill')} ${avg}</div><div class="stat-lbl">Avg rating (${rated.length} rated)</div></div>
       <div class="stat-card"><div class="stat-val">${anime.filter(a=>a.fav).length}</div><div class="stat-lbl">Favorites</div></div>
@@ -21194,7 +21213,7 @@ function schedCountdown(sec,dayOnly,lagMin){
   if(d<=0){
     const lag=(lagMin||SUB_LAG_DEF)*60000;
     if(dayOnly||airStage(sec,lag)!=='sub')return 'out now';
-    return 'subs ~'+untilStr(sec*1000+lag-Date.now());
+    return 'subs '+approx(untilStr(sec*1000+lag-Date.now()));
   }
   if(dayOnly){
     // Calendar days, not 24-hour blocks — something landing tomorrow morning is

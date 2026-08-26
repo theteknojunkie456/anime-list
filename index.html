@@ -2570,7 +2570,21 @@ body.yt-open{overflow:hidden;touch-action:none;}
 /* None: keep the scanlines, the bevels and the pixel type; leave the pictures
    exactly as they are. */
 [data-retro][data-bits="off"] .pcard-img,[data-retro][data-bits="off"] .rz-img,[data-retro][data-bits="off"] .pk-cover,[data-retro][data-bits="off"] .dt-cover,[data-retro][data-bits="off"] .dt-banner-img,[data-retro][data-bits="off"] .hero-bg-img,[data-retro][data-bits="off"] .sd-art,[data-retro][data-bits="off"] .rtm-art,[data-retro][data-bits="off"] .ns-art img,[data-retro][data-bits="off"] .ns-vs-art img{filter:none;image-rendering:auto;}
-.sv-store-tiers{display:flex;gap:6px;margin-top:10px;}
+/* The storage slider. One control, its current value stated in words above it,
+   and the two ends labelled — a slider whose stops are unlabelled is a slider you
+   have to drag to understand. */
+.store-now{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin:2px 0 10px;}
+.store-now-v{font-family:var(--fd);font-size:26px;font-weight:800;letter-spacing:-.02em;color:var(--t1);}
+.store-now-k{font-size:13px;color:var(--t3);}
+.store-range{width:100%;-webkit-appearance:none;appearance:none;height:26px;background:transparent;}
+.store-range::-webkit-slider-runnable-track{height:6px;border-radius:99px;background:var(--bg4);border:1px solid var(--b2);}
+.store-range::-moz-range-track{height:6px;border-radius:99px;background:var(--bg4);border:1px solid var(--b2);}
+.store-range::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:26px;height:26px;margin-top:-11px;
+  border-radius:99px;background:var(--a);border:2px solid var(--bg);box-shadow:0 4px 14px -4px var(--glow);}
+.store-range::-moz-range-thumb{width:26px;height:26px;border:2px solid var(--bg);border-radius:99px;background:var(--a);}
+.store-range:focus-visible{outline:2px solid var(--a2);outline-offset:4px;border-radius:99px;}
+.store-ends{display:flex;justify-content:space-between;margin-top:2px;font-size:12px;color:var(--t3);}
+
 .bits-sw{flex:1;min-width:0;padding:9px 6px;border-radius:10px;font-size:12px;font-weight:800;
   background:var(--bg3);border:1px solid var(--bn2);color:var(--t3);cursor:pointer;white-space:nowrap;}
 .bits-sw.on{color:var(--t1);border-color:var(--a);background:var(--ag);}
@@ -5277,6 +5291,16 @@ body.recsel .pcard{position:relative;}
   </div>
   <p class="ai-desc">Turn off the bands you never use, and put the ones you do at the top. Your lists themselves always show.</p>
   <div id="homeLayoutBox"></div>
+</div>
+<div class="sheet" id="storageSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <div class="sheet-title"><i data-ic="inbox"></i> Storage</div>
+    <button class="sheet-cancel" onclick="closeAll()">Done</button>
+  </div>
+  <p class="ai-desc">Your list is text and weighs almost nothing. This is really about artwork you upload yourself \u2014 how much of this device WatchList may keep it in.</p>
+  <div id="storageBox"></div>
+  <p class="ai-desc" style="margin-top:12px">When it is full, uploading asks you to remove an image rather than taking more room. Nothing already saved is ever deleted for you.</p>
 </div>
 <div class="sheet" id="notifySheet">
   <div class="sheet-handle"></div>
@@ -15252,6 +15276,7 @@ function renderSettings(){
     {ic:'clipboard',h:'Import / Export',     p:'Paste a list in, or copy yours out', go:"openSheet('importSheet')"},
     {ic:'palette',  h:'Look',                p:'Themes and colours, over your list', go:"startPaint()"},
     {ic:'layers',   h:'Home screen',          p:homeLayoutLine(), go:"openHomeLayout()"},
+    {ic:'inbox',    h:'Storage',              p:storageLine(), go:"openStorageOptions()"},
   ];
   // Only once there is something in it — an empty Archive is a row that explains
   // a feature nobody has used yet, on a screen that is already long.
@@ -19966,18 +19991,60 @@ function _fmtMB(b){return (b/1048576).toFixed(b<1048576?2:1)+' MB';}
 // Per device on purpose: a phone and a desktop have nothing to say about each
 // other's free space, so this never syncs.
 const STORE_BUDGET_KEY='store_budget';
-const STORE_TIERS=[[400*1048576,'400 MB'],[1073741824,'1 GB'],[2147483648,'2 GB'],[0,'No limit']];
+// Stops on the slider, smallest first. Fifty is the default because a list of
+// titles is text and weighs almost nothing — the only thing that grows is
+// artwork somebody chose to upload, and that should be a decision rather than a
+// drift. Everything above it is there for the person who wants it.
+const STORE_TIERS=[[50*1048576,'50 MB'],[100*1048576,'100 MB'],[250*1048576,'250 MB'],
+                   [500*1048576,'500 MB'],[1073741824,'1 GB'],[2147483648,'2 GB'],[0,'No limit']];
+const STORE_DEFAULT=50*1048576;
 function storeBudget(){
-  try{const v=+localStorage.getItem(STORE_BUDGET_KEY);
-    if(v===0&&localStorage.getItem(STORE_BUDGET_KEY)==='0')return 0;   // 0 means no limit, deliberately chosen
-    return STORE_TIERS.some(t=>t[0]===v)&&v>0?v:400*1048576;
-  }catch(e){return 400*1048576;}
+  try{const raw=localStorage.getItem(STORE_BUDGET_KEY);
+    if(raw==='0')return 0;                       // 0 means no limit, deliberately chosen
+    const v=+raw;
+    return STORE_TIERS.some(t=>t[0]===v)&&v>0?v:STORE_DEFAULT;
+  }catch(e){return STORE_DEFAULT;}
+}
+function storeBudgetIdx(){
+  const b=storeBudget(); const i=STORE_TIERS.findIndex(t=>t[0]===b);
+  return i<0?0:i;
 }
 function setStoreBudget(v){
   try{localStorage.setItem(STORE_BUDGET_KEY,String(v));}catch(e){}
   try{renderStats();}catch(e){}
-  const lbl=(STORE_TIERS.find(t=>t[0]===+v)||[])[1]||'';
-  toast(+v===0?'WatchList can use as much as the browser allows':'WatchList will keep under '+lbl);
+  try{renderSettings();}catch(e){}
+}
+// Dragging fires continuously, so this only repaints the label — nothing is
+// announced until the finger comes off.
+function storeSlide(i){
+  const t=STORE_TIERS[Math.max(0,Math.min(STORE_TIERS.length-1,+i||0))];
+  const lbl=document.getElementById('storeSlideVal'); if(lbl&&t)lbl.textContent=t[1];
+}
+function storeSlideDone(i){
+  const t=STORE_TIERS[Math.max(0,Math.min(STORE_TIERS.length-1,+i||0))]; if(!t)return;
+  setStoreBudget(t[0]);
+  renderStorageUI();
+  toast(t[0]===0?'WatchList can use as much as the browser allows':'WatchList will keep under '+t[1]);
+}
+function storageLine(){
+  const b=storeBudget();
+  return b?('Up to '+storeBudgetLabel()+' on this device'):'No limit on this device';
+}
+function openStorageOptions(){ renderStorageUI(); openSheet('storageSheet'); }
+function renderStorageUI(){
+  const box=document.getElementById('storageBox'); if(!box)return;
+  const i=storeBudgetIdx();
+  box.innerHTML=
+    '<div class="store-now"><span id="storeSlideVal" class="store-now-v">'+storeBudgetLabel()+'</span>'+
+      '<span class="store-now-k" id="storeUsedNow">measuring\u2026</span></div>'+
+    '<input class="store-range" type="range" min="0" max="'+(STORE_TIERS.length-1)+'" step="1" value="'+i+'" '+
+      'aria-label="How much space WatchList may use" '+
+      'oninput="storeSlide(this.value)" onchange="storeSlideDone(this.value)">'+
+    '<div class="store-ends"><span>'+STORE_TIERS[0][1]+'</span><span>'+STORE_TIERS[STORE_TIERS.length-1][1]+'</span></div>';
+  storeUsed().then(function(u){
+    const el=document.getElementById('storeUsedNow'); if(!el)return;
+    el.textContent=(u<0)?'in use: unknown':(_fmtMB(u)+' in use');
+  });
 }
 function storeBudgetLabel(){
   const b=storeBudget();
@@ -20019,10 +20086,7 @@ function storageBarHTML(){
   return '<div class="sv-store"><div class="sv-store-top"><span class="sv-store-lbl">'+icon('inbox')+' Device storage</span>'+
     '<span class="sv-store-val" id="svStoreVal">'+_fmtMB(ls)+' stored</span></div>'+
     '<div class="sv-store-track"><div class="sv-store-fill" id="svStoreFill" style="width:0%"></div></div>'+
-    '<div class="sv-store-note" id="svStoreNote">Everything WatchList keeps on this device \u2014 your list, your settings, and any images you uploaded.</div>'+
-    '<div class="sv-store-tiers">'+STORE_TIERS.map(function(t){
-      return '<button class="bits-sw'+(storeBudget()===t[0]?' on':'')+'" onclick="setStoreBudget('+t[0]+')">'+t[1]+'</button>';
-    }).join('')+'</div></div>';
+    '<div class="sv-store-note" id="svStoreNote">Everything WatchList keeps on this device \u2014 your list, your settings, and any images you uploaded.</div>'+'</div>';
 }
 // Filled in once the browser answers. Kept separate so the panel paints straight
 // away — a storage figure is never worth waiting on.

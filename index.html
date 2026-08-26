@@ -12259,6 +12259,11 @@ function cropToRatio(img,tw,th){
 function bgFileChosen(inp){
   const f=inp.files&&inp.files[0];inp.value='';
   if(!f)return;
+  // Checked before the work, not after: compressing a photo and then refusing to
+  // keep it wastes the wait and tells you nothing you could have acted on.
+  storeRoomFor(f.size).then(ok=>{ if(ok)bgFileChosen_go(f); });
+}
+function bgFileChosen_go(f){
   const img=new Image();
   img.onload=()=>{
     try{
@@ -12294,6 +12299,11 @@ function bgFileChosen(inp){
 function coverFileChosen(inp){
   const f=inp.files&&inp.files[0];inp.value='';
   if(!f)return;
+  // Checked before the work, not after: compressing a photo and then refusing to
+  // keep it wastes the wait and tells you nothing you could have acted on.
+  storeRoomFor(f.size).then(ok=>{ if(ok)coverFileChosen_go(f); });
+}
+function coverFileChosen_go(f){
   const img=new Image();
   img.onload=()=>{
     // 2:3, and this one IS safe to bake in: measured, a poster is 0.703 on the
@@ -19942,6 +19952,32 @@ function svDrill(id,el){const d=document.getElementById('drill-'+id);if(!d)retur
 // cap), so the image-offload to IndexedDB is visible rather than a mystery.
 function _lsBytes(){let n=0;try{for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);n+=k.length+(localStorage.getItem(k)||'').length;}}catch(e){}return n*2;}
 function _fmtMB(b){return (b/1048576).toFixed(b<1048576?2:1)+' MB';}
+// A tracker has no business filling somebody's phone. The browser will happily
+// hand over gigabytes; that is the browser being permissive, not permission. The
+// app holds itself to a budget, and the budget is enforced at the only door
+// storage really grows through — uploading your own artwork — rather than being
+// a number printed under a bar.
+const STORE_BUDGET=400*1048576;   // 400 MB
+// Resolves to bytes in use, or -1 when the browser will not say. -1 means "do not
+// block": refusing an upload because we could not measure would be the app
+// getting in the way over its own uncertainty.
+async function storeUsed(){
+  try{
+    if(!navigator.storage||!navigator.storage.estimate)return -1;
+    const est=await navigator.storage.estimate();
+    const u=+(est&&est.usage);
+    return isFinite(u)?u:-1;
+  }catch(e){return -1;}
+}
+// `incoming` is the size of what is about to be stored. Answers true if it fits.
+async function storeRoomFor(incoming){
+  const used=await storeUsed();
+  if(used<0)return true;
+  if(used+(+incoming||0)<=STORE_BUDGET)return true;
+  const over=_fmtMB(used);
+  toast('WatchList is using '+over+' of its '+Math.round(STORE_BUDGET/1048576)+' MB — remove an uploaded image first');
+  return false;
+}
 function storageBarHTML(){
   // "9.5 MB / ~5 MB" — a meter reading past its own maximum, because the maximum
   // was a guess. Five megabytes is the number everyone quotes for localStorage
@@ -19965,16 +20001,19 @@ function storageBarFill(){
   try{
     if(!navigator.storage||!navigator.storage.estimate)return;
     navigator.storage.estimate().then(est=>{
-      const used=+(est&&est.usage)||0, quota=+(est&&est.quota)||0;
+      const used=+(est&&est.usage)||0;
       const val=document.getElementById('svStoreVal'), fill=document.getElementById('svStoreFill');
-      if(!val||!fill||!quota)return;
-      const pct=Math.max(0,Math.min(100,Math.round(used/quota*100)));
+      if(!val||!fill)return;
+      // Against the app's own budget, not the device's free space. The disk
+      // figure is the browser's permissiveness and says nothing about whether a
+      // tracker ought to be using that much.
+      const pct=Math.max(0,Math.min(100,Math.round(used/STORE_BUDGET*100)));
       const near=pct>=80;
       // A percentage that rounds to zero still deserves a visible sliver.
       fill.style.width=(pct<1&&used>0?1:pct)+'%';
       fill.classList.toggle('warn',near);
       val.classList.toggle('warn',near);
-      val.textContent=_fmtMB(used)+' of '+_fmtGB(quota);
+      val.textContent=_fmtMB(used)+' of '+Math.round(STORE_BUDGET/1048576)+' MB';
     }).catch(()=>{});
   }catch(e){}
 }

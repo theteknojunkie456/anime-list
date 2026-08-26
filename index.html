@@ -2570,6 +2570,7 @@ body.yt-open{overflow:hidden;touch-action:none;}
 /* None: keep the scanlines, the bevels and the pixel type; leave the pictures
    exactly as they are. */
 [data-retro][data-bits="off"] .pcard-img,[data-retro][data-bits="off"] .rz-img,[data-retro][data-bits="off"] .pk-cover,[data-retro][data-bits="off"] .dt-cover,[data-retro][data-bits="off"] .dt-banner-img,[data-retro][data-bits="off"] .hero-bg-img,[data-retro][data-bits="off"] .sd-art,[data-retro][data-bits="off"] .rtm-art,[data-retro][data-bits="off"] .ns-art img,[data-retro][data-bits="off"] .ns-vs-art img{filter:none;image-rendering:auto;}
+.sv-store-tiers{display:flex;gap:6px;margin-top:10px;}
 .bits-sw{flex:1;min-width:0;padding:9px 6px;border-radius:10px;font-size:12px;font-weight:800;
   background:var(--bg3);border:1px solid var(--bn2);color:var(--t3);cursor:pointer;white-space:nowrap;}
 .bits-sw.on{color:var(--t1);border-color:var(--a);background:var(--ag);}
@@ -7127,6 +7128,8 @@ function syncSkip(k){
   // leaving them out: each one is re-fetched by the pull that fills it.
   if(k==='recs_in'||k==='recs_passed'||k==='recs_echo'||k==='parties_in')return true;
   if(k==='rel_scan_at'||k==='upcoming_related')return true;
+  // How much room this device is willing to give is a fact about THIS device.
+  if(k==='store_budget')return true;
   // ai_model_* is which model you chose, not a credential, so it travels with
   // the rest of your settings. The KEY itself (anthropic_key) stays on the
   // device, as do the AniList tokens: a credential in cloud storage is a
@@ -19957,7 +19960,29 @@ function _fmtMB(b){return (b/1048576).toFixed(b<1048576?2:1)+' MB';}
 // app holds itself to a budget, and the budget is enforced at the only door
 // storage really grows through — uploading your own artwork — rather than being
 // a number printed under a bar.
-const STORE_BUDGET=400*1048576;   // 400 MB
+// 400 MB is the default, not a verdict. Somebody who wants their own artwork on
+// every card is not doing anything wrong, and the app should not be the one
+// deciding they have had enough — it should only decide what happens by default.
+// Per device on purpose: a phone and a desktop have nothing to say about each
+// other's free space, so this never syncs.
+const STORE_BUDGET_KEY='store_budget';
+const STORE_TIERS=[[400*1048576,'400 MB'],[1073741824,'1 GB'],[2147483648,'2 GB'],[0,'No limit']];
+function storeBudget(){
+  try{const v=+localStorage.getItem(STORE_BUDGET_KEY);
+    if(v===0&&localStorage.getItem(STORE_BUDGET_KEY)==='0')return 0;   // 0 means no limit, deliberately chosen
+    return STORE_TIERS.some(t=>t[0]===v)&&v>0?v:400*1048576;
+  }catch(e){return 400*1048576;}
+}
+function setStoreBudget(v){
+  try{localStorage.setItem(STORE_BUDGET_KEY,String(v));}catch(e){}
+  try{renderStats();}catch(e){}
+  const lbl=(STORE_TIERS.find(t=>t[0]===+v)||[])[1]||'';
+  toast(+v===0?'WatchList can use as much as the browser allows':'WatchList will keep under '+lbl);
+}
+function storeBudgetLabel(){
+  const b=storeBudget();
+  return (STORE_TIERS.find(t=>t[0]===b)||[])[1]||Math.round(b/1048576)+' MB';
+}
 // Resolves to bytes in use, or -1 when the browser will not say. -1 means "do not
 // block": refusing an upload because we could not measure would be the app
 // getting in the way over its own uncertainty.
@@ -19971,11 +19996,12 @@ async function storeUsed(){
 }
 // `incoming` is the size of what is about to be stored. Answers true if it fits.
 async function storeRoomFor(incoming){
+  const budget=storeBudget();
+  if(!budget)return true;                       // they said no limit; that is the answer
   const used=await storeUsed();
   if(used<0)return true;
-  if(used+(+incoming||0)<=STORE_BUDGET)return true;
-  const over=_fmtMB(used);
-  toast('WatchList is using '+over+' of its '+Math.round(STORE_BUDGET/1048576)+' MB — remove an uploaded image first');
+  if(used+(+incoming||0)<=budget)return true;
+  toast('WatchList is using '+_fmtMB(used)+' of its '+storeBudgetLabel()+' — remove an image, or allow more in Stats');
   return false;
 }
 function storageBarHTML(){
@@ -19993,7 +20019,10 @@ function storageBarHTML(){
   return '<div class="sv-store"><div class="sv-store-top"><span class="sv-store-lbl">'+icon('inbox')+' Device storage</span>'+
     '<span class="sv-store-val" id="svStoreVal">'+_fmtMB(ls)+' stored</span></div>'+
     '<div class="sv-store-track"><div class="sv-store-fill" id="svStoreFill" style="width:0%"></div></div>'+
-    '<div class="sv-store-note" id="svStoreNote">Everything WatchList keeps on this device \u2014 your list, your settings, and any images you uploaded.</div></div>';
+    '<div class="sv-store-note" id="svStoreNote">Everything WatchList keeps on this device \u2014 your list, your settings, and any images you uploaded.</div>'+
+    '<div class="sv-store-tiers">'+STORE_TIERS.map(function(t){
+      return '<button class="bits-sw'+(storeBudget()===t[0]?' on':'')+'" onclick="setStoreBudget('+t[0]+')">'+t[1]+'</button>';
+    }).join('')+'</div></div>';
 }
 // Filled in once the browser answers. Kept separate so the panel paints straight
 // away — a storage figure is never worth waiting on.
@@ -20007,13 +20036,19 @@ function storageBarFill(){
       // Against the app's own budget, not the device's free space. The disk
       // figure is the browser's permissiveness and says nothing about whether a
       // tracker ought to be using that much.
-      const pct=Math.max(0,Math.min(100,Math.round(used/STORE_BUDGET*100)));
+      const budget=storeBudget();
+      if(!budget){
+        fill.style.width='0%'; fill.classList.remove('warn'); val.classList.remove('warn');
+        val.textContent=_fmtMB(used)+' stored \u00b7 no limit';
+        return;
+      }
+      const pct=Math.max(0,Math.min(100,Math.round(used/budget*100)));
       const near=pct>=80;
       // A percentage that rounds to zero still deserves a visible sliver.
       fill.style.width=(pct<1&&used>0?1:pct)+'%';
       fill.classList.toggle('warn',near);
       val.classList.toggle('warn',near);
-      val.textContent=_fmtMB(used)+' of '+Math.round(STORE_BUDGET/1048576)+' MB';
+      val.textContent=_fmtMB(used)+' of '+storeBudgetLabel();
     }).catch(()=>{});
   }catch(e){}
 }

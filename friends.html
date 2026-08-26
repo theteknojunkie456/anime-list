@@ -19943,10 +19943,44 @@ function svDrill(id,el){const d=document.getElementById('drill-'+id);if(!d)retur
 function _lsBytes(){let n=0;try{for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);n+=k.length+(localStorage.getItem(k)||'').length;}}catch(e){}return n*2;}
 function _fmtMB(b){return (b/1048576).toFixed(b<1048576?2:1)+' MB';}
 function storageBarHTML(){
-  const ls=_lsBytes(),cap=5*1048576,pct=Math.min(100,Math.round(ls/cap*100)),near=pct>=80;
-  return '<div class="sv-store"><div class="sv-store-top"><span class="sv-store-lbl">'+icon('inbox')+' Device storage</span><span class="sv-store-val'+(near?' warn':'')+'">'+_fmtMB(ls)+' / ~5 MB</span></div>'+
-    '<div class="sv-store-track"><div class="sv-store-fill'+(near?' warn':'')+'" style="width:'+pct+'%"></div></div>'+
-    '<div class="sv-store-note" id="svStoreNote">Uploaded images move to extra storage automatically when this fills.</div></div>';
+  // "9.5 MB / ~5 MB" — a meter reading past its own maximum, because the maximum
+  // was a guess. Five megabytes is the number everyone quotes for localStorage
+  // and it is not a rule: browsers differ, and this one plainly allows more,
+  // which is how the used figure sailed past the cap it was being drawn against.
+  //
+  // So it no longer claims a cap it cannot know. It reports what is actually
+  // stored, and the browser's own quota fills in underneath when it will say —
+  // navigator.storage.estimate() knows the real figure for this origin. Until it
+  // answers there is a number and no bar, which is honest, rather than a bar
+  // measured against fiction.
+  const ls=_lsBytes();
+  return '<div class="sv-store"><div class="sv-store-top"><span class="sv-store-lbl">'+icon('inbox')+' Device storage</span>'+
+    '<span class="sv-store-val" id="svStoreVal">'+_fmtMB(ls)+' stored</span></div>'+
+    '<div class="sv-store-track"><div class="sv-store-fill" id="svStoreFill" style="width:0%"></div></div>'+
+    '<div class="sv-store-note" id="svStoreNote">Everything WatchList keeps on this device \u2014 your list, your settings, and any images you uploaded.</div></div>';
+}
+// Filled in once the browser answers. Kept separate so the panel paints straight
+// away — a storage figure is never worth waiting on.
+function storageBarFill(){
+  try{
+    if(!navigator.storage||!navigator.storage.estimate)return;
+    navigator.storage.estimate().then(est=>{
+      const used=+(est&&est.usage)||0, quota=+(est&&est.quota)||0;
+      const val=document.getElementById('svStoreVal'), fill=document.getElementById('svStoreFill');
+      if(!val||!fill||!quota)return;
+      const pct=Math.max(0,Math.min(100,Math.round(used/quota*100)));
+      const near=pct>=80;
+      // A percentage that rounds to zero still deserves a visible sliver.
+      fill.style.width=(pct<1&&used>0?1:pct)+'%';
+      fill.classList.toggle('warn',near);
+      val.classList.toggle('warn',near);
+      val.textContent=_fmtMB(used)+' of '+_fmtGB(quota);
+    }).catch(()=>{});
+  }catch(e){}
+}
+function _fmtGB(b){
+  if(b>=1073741824)return (b/1073741824).toFixed(1)+' GB';
+  return Math.round(b/1048576)+' MB';
 }
 function _fillStoreNote(){
   try{if(navigator.storage&&navigator.storage.estimate){navigator.storage.estimate().then(e=>{const extra=Math.max(0,(e&&e.usage||0)-_lsBytes());const el=document.getElementById('svStoreNote');if(el&&extra>102400)el.textContent='+ '+_fmtMB(extra)+' of images kept in extra storage (IndexedDB).';}).catch(()=>{});}}catch(e){}
@@ -19987,6 +20021,7 @@ function renderStats(){
     (topRated.length?'<div class="sv-sec"><div class="sv-h">Your top rated</div><div class="sv-drill on">'+topRated.map(a=>'<span class="sv-chip">'+schEsc(a.title)+' '+icon('star','fill')+a.rating+'</span>').join('')+'</div></div>':'');
   try{_fillStoreNote();}catch(e){}
   body.querySelectorAll('.sv-heronum .v[data-to]').forEach(el=>svCountUp(el,+el.getAttribute('data-to')));
+  try{storageBarFill();}catch(e){}   // real quota lands a moment after the panel does
 }
 function renderStatsSheet(){
   const counts={watching:0,plan:0,finished:0,dropped:0};

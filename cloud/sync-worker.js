@@ -785,6 +785,14 @@ export class PartyRoom {
         if (msg.on) room.members[uid].wait = false;   // saying you're ready cancels holding everyone up
         room.rev++; await this.save(); this.broadcast(); return;
       }
+      // A raised hand is a state, not a moment: it stays up until it comes down,
+      // and everyone can see whose it is. Reactions already fly past and vanish,
+      // which is the wrong shape for "pause, I have something to say".
+      case 'hand': {
+        room.members[uid].hand = !!msg.on;
+        this.sys(room, msg.on ? `${name} raised a hand` : `${name} lowered their hand`);
+        room.rev++; await this.save(); this.broadcast(); return;
+      }
       case 'wait': {
         room.members[uid].wait = !!msg.on;
         if (msg.on) room.members[uid].ready = false;
@@ -861,7 +869,7 @@ export class PartyRoom {
   view() {
     const r = this.room;
     return { code: r.code, host: r.host, title: r.title, animeId: r.animeId, ep: r.ep, img: r.img, playAt: r.playAt, paused: !!r.paused, sharing: r.sharing || '', queue: r.queue || [], voice: Object.keys(r.voice || {}),
-      members: Object.entries(r.members).map(([uid, m]) => ({ uid, name: m.name, ready: !!m.ready, wait: !!m.wait })), chat: r.chat, reacts: (r.reacts || []).filter(x => Date.now() - x.t < 8000), rev: r.rev };
+      members: Object.entries(r.members).map(([uid, m]) => ({ uid, name: m.name, ready: !!m.ready, wait: !!m.wait, hand: !!m.hand })), chat: r.chat, reacts: (r.reacts || []).filter(x => Date.now() - x.t < 8000), rev: r.rev };
   }
   // `now` rides along with every room update. The countdown is a wall-clock
   // deadline (playAt), and a device whose clock is a few seconds out starts that

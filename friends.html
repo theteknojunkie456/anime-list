@@ -3276,6 +3276,17 @@ textarea.ai-prompt-in{resize:none;line-height:1.45;display:block;}
 .pt-flag{display:inline-flex;margin-left:4px;}
 .pt-flag .ico{width:12px;height:12px;}
 .pt-flag.ok{color:var(--fin);}
+/* A hand stays up until it comes down, so it holds still — a raised hand that
+   pulses reads as an alarm rather than a request to speak. */
+.pt-flag.hand{color:var(--pln);}
+.pt-flag.hand .ico{width:13px;height:13px;}
+/* Talking is the opposite: it is true only while it is true, so it moves. */
+.pt-flag.talk{color:var(--fin);}
+.pt-flag.talk .ico{width:13px;height:13px;}
+@media (prefers-reduced-motion:no-preference){
+  .pt-flag.talk{animation:ptTalk 1.1s ease-in-out infinite;}
+  @keyframes ptTalk{0%,100%{opacity:1;transform:translateY(0)}50%{opacity:.55;transform:translateY(-1px)}}
+}
 .pt-flag.wait{color:var(--wat);}
 .pt-chip.ready .dot{background:var(--fin);}
 .pt-chip.waiting .dot{background:var(--wat);}
@@ -5351,6 +5362,11 @@ body.recsel .pcard{position:relative;}
 <script>
 // ─── ICONS — inline monochrome line icons (Feather/Lucide style, currentColor) ──
 const ICONS={
+// A raised hand, and a speech bubble for whoever is talking. Drawn in the same
+// 24-grid, single-weight stroke as the rest so they sit beside Feather's without
+// looking borrowed.
+hand:'<path d="M18 11V6a1.5 1.5 0 0 0-3 0"/><path d="M15 6V4.5a1.5 1.5 0 0 0-3 0V6"/><path d="M12 6V5.5a1.5 1.5 0 0 0-3 0V12"/><path d="M9 9.5a1.5 1.5 0 0 0-3 0v4a7 7 0 0 0 7 7h1a7 7 0 0 0 7-7v-3"/>',
+speech:'<path d="M21 12a8 8 0 0 1-8 8H8l-5 3 1.4-4.2A8 8 0 1 1 21 12z"/>',
 maximize:'<path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/>',
 minimize:'<path d="M8 3v3a2 2 0 0 1-2 2H3"/><path d="M21 8h-3a2 2 0 0 1-2-2V3"/><path d="M16 21v-3a2 2 0 0 1 2-2h3"/><path d="M3 16h3a2 2 0 0 1 2 2v3"/>',
 mic:'<path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v4M8 23h8"/>',
@@ -14689,21 +14705,35 @@ function callToggleHand(){
   if(!_jitsiApi&&nativeCallOn()){
     _handUp=!_handUp;
     const b=document.getElementById('callHandBtn'); if(b)b.classList.toggle('on',_handUp);
-    // The party already broadcasts reactions to everyone, so a hand needs no new
-    // protocol to be seen.
-    if(_handUp){try{partyReact('\u270B');}catch(e){}}
+    // A reaction flies past and is gone, which is the wrong shape for "pause, I
+    // have something". The room holds the hand up until it comes down, so it
+    // shows on your chip for everyone until you lower it.
+    try{wsSend({t:'hand',on:_handUp});}catch(e){}
     toast(_handUp?'Hand raised':'Hand lowered');
     return;
   }
   if(!_jitsiApi){toast('Join the call first');return;}
   _handUp=!_handUp;
   try{_jitsiApi.executeCommand('toggleRaiseHand');}catch(e){}
+  try{wsSend({t:'hand',on:_handUp});}catch(e){}   // and on the party's own chips
   const b=document.getElementById('callHandBtn'); if(b)b.classList.toggle('on',_handUp);
   toast(_handUp?'Hand raised':'Hand lowered');
 }
 // Background blur. Jitsi owns the picker because it owns the video pipeline;
 // doing it ourselves would mean running a segmentation model on every frame in
 // the main thread, which is a lot of battery to spend on hiding a room.
+// The call and the party keep separate id spaces — Jitsi hands out its own, and
+// the party keys members by uid — so there is no id to join on. The display name
+// is the one thing both sides carry, and it is what everyone in the room is
+// looking at anyway.
+function talkingNow(name){
+  try{
+    if(!name||!_callSpeaker)return false;
+    const who=_callNames&&_callNames[_callSpeaker];
+    if(!who)return false;
+    return String(who).trim().toLowerCase()===String(name).trim().toLowerCase();
+  }catch(e){return false;}
+}
 function callToggleBlur(){
   // Blur belongs to whoever owns the video pipeline, and in the native call that
   // is us — we do not run a segmentation model per frame. Say which call has it
@@ -14873,7 +14903,7 @@ function renderPartyInner(){
   const meUid=partyUid();
   const mAct=m=>(partyIsHost&&m.uid!==meUid&&m.uid!==r.host)?`<button class="pt-mact" onclick="partyMakeHost('${safeId(m.uid)}',this.dataset.n)" data-n="${escH(m.name)}" aria-label="Make host" title="Make host">${icon('star')}</button><button class="pt-mact pt-mact-x" onclick="partyKick('${safeId(m.uid)}',this.dataset.n)" data-n="${escH(m.name)}" aria-label="Remove" title="Remove">${icon('x')}</button>`:'';
   const vset=new Set(r.voice||[]);
-  const members=r.members.map(m=>`<span class="pt-chip${m.uid===r.host?' host':''}${m.wait?' waiting':''}${m.ready?' ready':''}"><span class="dot"></span><span class="pt-chip-n">${schEsc(m.name)}</span>${m.wait?`<span class="pt-flag wait" title="Needs a moment">${icon('clock')}</span>`:m.ready?`<span class="pt-flag ok" title="Ready">${icon('check')}</span>`:''}${m.uid===r.host?`<span class="pt-host">${icon('star')}</span>`:''}${vset.has(m.uid)?`<span class="pt-vmic" title="In voice chat">${icon('mic')}</span>`:''}${mAct(m)}</span>`).join('');
+  const members=r.members.map(m=>`<span class="pt-chip${m.uid===r.host?' host':''}${m.wait?' waiting':''}${m.ready?' ready':''}"><span class="dot"></span><span class="pt-chip-n">${schEsc(m.name)}</span>${m.wait?`<span class="pt-flag wait" title="Needs a moment">${icon('clock')}</span>`:m.ready?`<span class="pt-flag ok" title="Ready">${icon('check')}</span>`:''}${m.hand?`<span class="pt-flag hand" title="${schEsc(m.name)} has a hand up">${icon('hand')}</span>`:''}${talkingNow(m.name)?`<span class="pt-flag talk" title="${schEsc(m.name)} is talking">${icon('speech')}</span>`:''}${m.uid===r.host?`<span class="pt-host">${icon('star')}</span>`:''}${vset.has(m.uid)?`<span class="pt-vmic" title="In voice chat">${icon('mic')}</span>`:''}${mAct(m)}</span>`).join('');
   const voiceUI=`<div class="pt-voice">
     <button class="pt-voicebtn${voiceOn?' on':''}" onclick="toggleVoice()">${icon('mic')}<span>${voiceOn?'Leave voice':'Join voice chat'}</span>${vset.size?`<span class="pt-voice-n">${vset.size}</span>`:''}</button>
     ${voiceOn?`<button class="pt-mutebtn${voiceMuted?' muted':''}" onclick="toggleMute()">${icon(voiceMuted?'mic-off':'mic')}<span>${voiceMuted?'Muted':'Mute'}</span></button>`:''}

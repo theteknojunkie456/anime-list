@@ -9458,8 +9458,40 @@ function pxOne(img,n){
   // A failure here is not permanent: the mark is lifted so a later pass can try
   // again (a cold CDN, a dropped connection). It will not spin, because a pass
   // only runs on render and only twelve images at a time.
-  probe.onerror=()=>{ try{delete img.dataset.pxd;}catch(e){} };
+  // A host that sends no CORS headers at all cannot be read back, and giving up
+  // here is why one cover sat crisp in a grid of pixelated ones — retro looking
+  // broken on exactly the images it could not reach.
+  //
+  // But tainting only blocks READING a canvas. Drawing into one is fine, and so
+  // is showing it. So the fallback never reads: it draws the picture small and
+  // lets the browser blow the canvas itself back up with image-rendering set to
+  // pixelated. Same look, no pixel access, works on any host.
+  probe.onerror=()=>{ try{pxCanvasFallback(img,n);}catch(e){ try{delete img.dataset.pxd;}catch(_){} } };
   probe.src=bust;
+}
+function pxCanvasFallback(img,n){
+  const src=img.getAttribute('data-pxsrc')||img.getAttribute('src')||'';
+  if(!src||img.previousElementSibling&&img.previousElementSibling.dataset&&img.previousElementSibling.dataset.pxc==='1'){return;}
+  const raw=new Image();                                  // no crossOrigin: we never read it
+  raw.onload=()=>{
+    try{
+      if(!img.isConnected)return;
+      const w=Math.max(6,Math.round((raw.naturalWidth||100)/n));
+      const h=Math.max(6,Math.round((raw.naturalHeight||142)/n));
+      const c=document.createElement('canvas'); c.width=w; c.height=h;
+      const x=c.getContext('2d'); if(!x)return;
+      x.imageSmoothingEnabled=false;
+      x.drawImage(raw,0,0,w,h);
+      // Wears the image's own classes so it lands at exactly the same size and
+      // shape — the card has no idea it is looking at a canvas.
+      c.className=img.className; c.dataset.pxc='1';
+      c.style.imageRendering='pixelated';
+      img.parentNode.insertBefore(c,img);
+      img.style.display='none'; img.dataset.pxHidden='1';
+    }catch(e){ try{delete img.dataset.pxd;}catch(_){} }
+  };
+  raw.onerror=()=>{ try{delete img.dataset.pxd;}catch(e){} };
+  raw.src=src;
 }
 // Turning pixels off has to put the pictures back. A processed image is carrying a
 // data: URL in src and the original in data-pxsrc, and anything not redrawn by
@@ -9471,6 +9503,11 @@ function pxRestore(){
       if(orig)img.src=orig;
       img.removeAttribute('data-pxsrc');
       try{delete img.dataset.pxd;}catch(e){}
+    });
+    // The other kind: a stand-in canvas in front of a hidden picture.
+    document.querySelectorAll('canvas[data-pxc="1"]').forEach(c=>{ try{c.remove();}catch(e){} });
+    document.querySelectorAll('img[data-px-hidden="1"]').forEach(img=>{
+      img.style.display=''; try{delete img.dataset.pxHidden;delete img.dataset.pxd;}catch(e){}
     });
   }catch(e){}
 }

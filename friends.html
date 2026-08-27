@@ -7170,6 +7170,7 @@ function syncSkip(k){
   if(k==='rel_scan_at'||k==='upcoming_related')return true;
   // How much room this device is willing to give is a fact about THIS device.
   if(k==='store_budget')return true;
+  if(k===KEY_SELF)return true;              // "this device invented its own key" is about this device
   // ai_model_* is which model you chose, not a credential, so it travels with
   // the rest of your settings. The KEY itself (anthropic_key) stays on the
   // device, as do the AniList tokens: a credential in cloud storage is a
@@ -7550,8 +7551,16 @@ function ensureBackup(){
   if(appLocked||listUntrusted)return;       // never mint a code around a list we can't vouch for
   if(!anime.length)return;                  // nothing to back up yet
   setSyncCode(genCode());setSyncAt(0);
+  // Minted here, not entered. Backup on by default is right — nobody should be
+  // unprotected because they never found a setting — but doing it SILENTLY is
+  // how one person ends up as two accounts: a phone with its own key, a laptop
+  // with another, each backing up half a life and neither saying so.
+  try{localStorage.setItem(KEY_SELF,'1');}catch(e){}
   schedulePush();
 }
+const KEY_SELF='key_self_'+LSKEY;
+function keySelfMade(){try{return localStorage.getItem(KEY_SELF)==='1';}catch(e){return false;}}
+function clearKeySelf(){try{localStorage.removeItem(KEY_SELF);}catch(e){}}
 async function syncRestore(){
   // Strip ANY separator, not just spaces. Codes get written down, pasted out of
   // messages, and read aloud — hyphens and dots come back with them, and a
@@ -7608,7 +7617,7 @@ async function syncRestore(){
         renderSyncUI();renderLockUI();showLock();
         toast('Enter this list’s password to unlock');
       }else if(inner&&Array.isArray(inner)&&inner.length){
-        anime=migrate(inner);writeLocal();setSyncAt(res.updatedAt||Date.now());render();renderSyncUI();toast('Restored from cloud');
+        anime=migrate(inner);clearKeySelf();writeLocal();setSyncAt(res.updatedAt||Date.now());render();renderSyncUI();toast('Restored from cloud');
       }else if(!prevCode){
         // Nothing is stored under that code. Adopting it is still fine — this
         // device backs up here from now on — but SAY so. "Code linked. This
@@ -7662,7 +7671,10 @@ function renderSyncUI(){
       <p class="ai-desc">Both keys in one line, for your own devices. Paste it into the unlock box on a new device and it lets the device in <b>and</b> pulls your list down \u2014 one paste instead of two. <b style="color:#ff6b6b">Never share this one</b>: it contains your admin token, which approves people onto the whole app. The 20-character code above is the one you give friends.</p>
       <button class="parse-btn" onclick="copySetupKey()">${icon('clipboard')} Copy setup key</button>`:''}
       <div class="dt-label" style="margin-top:16px">${icon('refresh')} Bring another list here</div>
-      <p class="ai-desc">Restoring replaces what's on this device with the list saved under that code.</p>
+      <p class="ai-desc">Restoring replaces what's on this device with the list saved under that code.${
+        (typeof keySelfMade==='function'&&keySelfMade()&&realList().length)
+        ?' <b>This device has '+realList().length+' of its own.</b> If those are worth keeping, copy them out from Import / Export first \u2014 they are not merged in.'
+        :''}</p>
       <div style="display:flex;gap:8px;">
         <textarea class="ai-prompt-in urlin" rows="2" id="syncCodeIn" placeholder="paste a code to restore" autocomplete="off" autocapitalize="characters" spellcheck="false" onkeydown="if(event.key==='Enter'){event.preventDefault();syncRestore();}"></textarea>
         <button class="ai-run-btn" onclick="syncRestore()">Use code</button>
@@ -15399,11 +15411,19 @@ function nudgeHTML(){
   // Backing up automatically is only half of it. The code is what restores the
   // list on a new device, and a code nobody has ever seen restores nothing — so
   // say it once, plainly, until they've actually looked at it.
-  if(syncCode()&&!codeSeen()&&anime.length)
+  if(syncCode()&&!codeSeen()&&anime.length){
+    // Someone with friends has been using WatchList somewhere before, so a key
+    // this device invented for itself probably is not their only one — and two
+    // keys is two backups, each holding half of what they own. Same banner, the
+    // sentence that actually applies.
+    const split=keySelfMade()&&friendsList().length>0;
     return`<div class="nudge">${icon('cloud')}
-      <div class="nudge-t">Your list is backed up. Save your code; it's what restores it on a new device.</div>
-      <button class="nudge-go" onclick="openSheet('backupSheet');markCodeSeen()">Show code</button>
+      <div class="nudge-t">${split
+        ?'This device made its own cloud key. If you already have one, use that instead so all your devices share one backup.'
+        :'Your list is backed up. Save your code; it\'s what restores it on a new device.'}</div>
+      <button class="nudge-go" onclick="openSheet('backupSheet');markCodeSeen()">${split?'Sort it out':'Show code'}</button>
     </div>`;
+  }
   if(!shouldNudge())return'';
   return`<div class="nudge">${icon('cloud')}
     <div class="nudge-t">Backup is off, so this list only exists on this device.</div>

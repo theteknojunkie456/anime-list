@@ -6502,6 +6502,46 @@ async function offloadImages(){
   }
 }
 function _hasOffloaded(){return anime.some(a=>a&&(a.bgKey||a.imgKey));}
+// ── NOTHING EVER DELETED AN IMAGE ───────────────────────────────────────────
+// Uploaded artwork goes into IndexedDB under "<item id>:<field>" and stays there.
+// Deleting the title does not remove it; deleting a hundred titles does not
+// remove a hundred images. There was no delete on this store at all, so storage
+// only ever went up, which is exactly what it looked like from the outside.
+//
+// The rule is deliberately the strict one: an entry is removed only when it
+// matches the shape we write AND no item in the list points at it. A key we do
+// not recognise is left alone — being wrong here means deleting somebody's own
+// artwork, so unknown shapes are somebody else's business, not ours.
+function idbDel(k){return mediaDB().then(db=>new Promise((res,rej)=>{
+  const t=db.transaction('img','readwrite');t.objectStore('img').delete(k);
+  t.oncomplete=()=>res(true);t.onerror=()=>rej(t.error);}));}
+function idbKeys(){return mediaDB().then(db=>new Promise(res=>{
+  const t=db.transaction('img','readonly');const q=t.objectStore('img').getAllKeys();
+  q.onsuccess=()=>res(Array.isArray(q.result)?q.result:[]);q.onerror=()=>res([]);}));}
+let _sweepAt=0;
+async function sweepImages(force){
+  try{
+    if(!force&&Date.now()-_sweepAt<6*3600*1000)return 0;   // a housekeeping job, not a loop
+    _sweepAt=Date.now();
+    if(typeof appLocked!=='undefined'&&appLocked)return 0;         // the list is a placeholder; it points at nothing
+    if(typeof listUntrusted!=='undefined'&&listUntrusted)return 0; // and post-corruption defaults point at nothing either
+    const keys=await idbKeys();
+    if(!keys.length)return 0;
+    // Every key any item actually references, taken from the item rather than
+    // rebuilt from a pattern — the reference is the truth.
+    const live=new Set([IDB_LIST_KEY,IDB_CRED_KEY]);
+    anime.forEach(a=>{ if(!a)return; _IMG_FIELDS.forEach(pair=>{ const k=a[pair[1]]; if(k)live.add(String(k)); }); });
+    const mine=/^[A-Za-z0-9._:-]+:(img|bgImage)$/;
+    let gone=0;
+    for(const k of keys){
+      const key=String(k);
+      if(live.has(key))continue;
+      if(!mine.test(key))continue;                                  // not ours to delete
+      try{await idbDel(key);gone++;}catch(e){}
+    }
+    return gone;
+  }catch(e){return 0;}
+}
 // While an admin has titles renamed on this device the fake names live on
 // a.title and the real one on a._rt. Everything that leaves the app — local
 // storage, the encrypted envelope, the cloud push — goes through here, so a
@@ -8410,6 +8450,7 @@ function nsApply(){
   const moved=anime.filter(a=>ids.has(a.id));
   setArchive(archiveList().concat(moved));
   anime=anime.filter(a=>!ids.has(a.id));
+  try{setTimeout(()=>sweepImages(true),1200);}catch(e){}   // their artwork goes with them
   try{ids.forEach(id=>{try{tombstone(id);}catch(e){}});}catch(e){}
   save();render();closeAll();
   try{document.removeEventListener('keydown',nsKeys);}catch(e){}
@@ -10097,6 +10138,7 @@ function deleteUnlinked(){
       // Tombstone each, or the next sync pulls them back from another device.
       removed.forEach(a=>{try{tombstone(a.id);}catch(e){}});
       anime=anime.filter(a=>!ids.has(a.id));
+  try{setTimeout(()=>sweepImages(true),1200);}catch(e){}   // their artwork goes with them
       save();render();
       toast(`Deleted ${removed.length}`,7000,()=>{
         // Fresh ids on the way back: tombstones merge as a union across devices,
@@ -12592,6 +12634,7 @@ function doDelete(){
   if(!deleteId)return;
   tombstone(deleteId);          // or the next sync resurrects it from another device
   anime=anime.filter(a=>a.id!==deleteId);
+  try{setTimeout(()=>sweepImages(true),1200);}catch(e){}   // their artwork goes with them
   if(detailId===deleteId){detailId=null;closeAll();}
   save();closeConfirm();render();toast('Removed');
 }

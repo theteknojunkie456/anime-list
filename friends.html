@@ -6632,8 +6632,47 @@ function writeLocal(){
   catch(e){
     // Only worth offloading images when space is actually the problem.
     if(!isQuotaErr(e)){_saveFailed(e);return;}
-    offloadImages().then(()=>{try{const raw=JSON.stringify(_persistList());s.setItem(LSKEY,raw);backupLocal(s,raw);saveWarned=false;}catch(e2){_saveFailed(e2);}});
+    // Offloading images is the first move and it is often the whole answer. When
+    // it is not — the pictures are already in IndexedDB and localStorage is full
+    // of something else — the app used to give up and warn, which leaves the
+    // list unsaved. Forty-two of those in one day is somebody's data not being
+    // written while the app says it is fine.
+    //
+    // So it escalates, and it spends the cheapest thing first. Caches the app can
+    // rebuild from the network go before the copy of the list, and the spare copy
+    // of the list goes before the list itself fails to save. A backup you cannot
+    // write is not protecting anything.
+    offloadImages().then(()=>{
+      if(_trySave(s))return;
+      if(_dropDisposable()&&_trySave(s)){toast('Storage was full \u2014 cleared some cached data');return;}
+      if(_dropSpareCopy(s)&&_trySave(s)){toast('Storage was full \u2014 your list is saved, its spare copy was dropped');return;}
+      _saveFailed(new DOMException('quota','QuotaExceededError'));
+    }).catch(()=>{_saveFailed(new DOMException('quota','QuotaExceededError'));});
   }
+}
+// One attempt at writing the list. Returns whether it landed.
+function _trySave(s){
+  try{const raw=JSON.stringify(_persistList());s.setItem(LSKEY,raw);backupLocal(s,raw);saveWarned=false;return true;}
+  catch(e){return false;}
+}
+// Everything here is re-fetched by the thing that fills it, so losing it costs a
+// round trip and nothing else. Deliberately does NOT include settings, friends,
+// tombstones or anything a person chose — only what the app can rebuild alone.
+const _DISPOSABLE=['recs_in','recs_passed','recs_echo','parties_in','upcoming_related','rel_scan_at'];
+function _dropDisposable(){
+  let freed=false;
+  try{
+    const s=store()||localStorage;
+    _DISPOSABLE.forEach(k=>{ try{ if(s.getItem(k)!=null){s.removeItem(k);freed=true;} }catch(e){} });
+  }catch(e){}
+  return freed;
+}
+// The last thing to go before the list itself: its spare copy. It exists to
+// recover a corrupt primary, which is worth having right up until keeping it is
+// the reason the primary cannot be written.
+function _dropSpareCopy(s){
+  try{ if(s.getItem(LSKEY+'_bak')!=null){s.removeItem(LSKEY+'_bak');return true;} }catch(e){}
+  return false;
 }
 function save(){
   _popHave=null;   // the "do I have this?" index is rebuilt on next use
@@ -7403,6 +7442,19 @@ async function syncPush(){
   // backup that quietly stops.
   const fp=pushFingerprint(code);
   if(fp&&fp===lastPushFP()&&!pushState().n)return;
+  // Sixteen hundred and ninety consecutive failures, one every three seconds,
+  // all of them "Failed to fetch". Retrying instantly forever does not fix a
+  // network that is down; it just spends the battery and hammers the worker
+  // while it is down. After a few honest attempts the gap grows — a minute, two,
+  // four — to an hour, and any real change to the list still goes at the next
+  // scheduled push because the wait is on FAILURE, not on the data.
+  {
+    const st=pushState();
+    if(st.n>=3){
+      const wait=Math.min(3600000,60000*Math.pow(2,Math.min(6,st.n-3)));
+      if(Date.now()-(st.at||0)<wait)return;
+    }
+  }
   try{
     let list=realList();
     if(cryptoKey&&envWraps){list=await buildEnvelope();} // ciphertext (master-key envelope) to cloud

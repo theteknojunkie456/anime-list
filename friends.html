@@ -2390,17 +2390,25 @@ body.first-paint .pfill,body.content-in .pfill{animation:barGrow .62s cubic-bezi
 /* Ten numbers, not five stars. They fill left-to-right like a scale rather than
    sitting as ten separate choices, and the one you picked is the solid one — so
    a glance reads "seven" without counting anything. */
-.rate10{display:grid;grid-template-columns:repeat(10,1fr);gap:4px;margin-top:2px;}
-.rate-n{min-height:38px;border-radius:10px;border:1px solid var(--b2);background:var(--bg3);
-  color:var(--t3);font-family:var(--fd);font-size:13px;font-weight:800;
-  font-variant-numeric:tabular-nums;transition:transform .12s,background .15s,color .15s;}
-.rate-n.on{background:var(--ag);color:var(--a2);border-color:color-mix(in srgb,var(--a) 34%,transparent);}
-.rate-n.pick{background:var(--a);color:var(--aFg);border-color:var(--a);}
-.rate-n:active{transform:scale(.94);}
-.rate-out{font-family:var(--fd);font-weight:800;color:var(--a2);margin-left:6px;}
+/* The number leads and the control follows it: what you rated it is the thing
+   worth reading, and the slider is only how you change it. */
+.rate-row{display:flex;align-items:baseline;gap:6px;margin:2px 0 6px;}
+.rate-out{font-family:var(--fd);font-size:30px;font-weight:800;letter-spacing:-.02em;
+  color:var(--a2);font-variant-numeric:tabular-nums;line-height:1;}
+.rate-max{font-size:13px;color:var(--t3);}
+.rate-clear{margin-left:auto;font-size:12px;font-weight:700;color:var(--t3);
+  background:var(--bg3);border:1px solid var(--b2);border-radius:99px;padding:5px 11px;}
+.rate-clear:active{transform:scale(.96);}
+.rate-range{width:100%;-webkit-appearance:none;appearance:none;height:26px;background:transparent;}
+.rate-range::-webkit-slider-runnable-track{height:6px;border-radius:99px;background:var(--bg4);border:1px solid var(--b2);}
+.rate-range::-moz-range-track{height:6px;border-radius:99px;background:var(--bg4);border:1px solid var(--b2);}
+.rate-range::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:26px;height:26px;margin-top:-11px;
+  border-radius:99px;background:var(--a);border:2px solid var(--bg);box-shadow:0 4px 14px -4px var(--glow);}
+.rate-range::-moz-range-thumb{width:26px;height:26px;border:2px solid var(--bg);border-radius:99px;background:var(--a);}
+.rate-range:focus-visible{outline:2px solid var(--a2);outline-offset:4px;border-radius:99px;}
+.rate-ends{display:flex;justify-content:space-between;font-size:12px;color:var(--t3);margin-top:-2px;}
 .rate-was{margin-top:8px;}
 .stat-of{font-size:15px;color:var(--t3);margin-left:1px;}
-@media (max-width:380px){.rate-n{min-height:34px;font-size:12px;}.rate10{gap:3px;}}
 .stars{display:flex;gap:8px;justify-content:center;}
 .star{font-size:27px;color:var(--t3);transition:transform .12s;}
 .star.on{color:#f5c518;text-shadow:0 0 12px rgba(245,197,24,0.35);}
@@ -11195,11 +11203,21 @@ function renderDetail(){
     </div>`;
   // Out of ten, as numbers. Five stars asks "how many stars" and gets a shrug at
   // 3; a number is the thing people already say out loud about a show.
-  const _rv=a.rating||0;
-  const stars=`<div class="dt-label">Your rating${_rv?` <span class="rate-out">${_rv}/10</span>`:''}</div>`+
-    `<div class="rate10">${[1,2,3,4,5,6,7,8,9,10].map(n=>
-      `<button class="rate-n${_rv>=n?' on':''}${_rv===n?' pick':''}" onclick="setRating(${n})" aria-label="${n} out of 10">${n}</button>`).join('')}</div>`+
-    (a.r10from5?`<p class="ai-desc rate-was">Carried over from ${starWas(a)} out of five. Tap a number to say what it really is.</p>`:'');
+  // Ten buttons cannot say 8.5, and a half point is most of what a ten-point
+  // scale is for — the difference between "good" and "nearly great" is where
+  // people actually want the room. A slider carries decimals; half-point steps
+  // keep every stop big enough to hit on a phone, where 0.1 would be three
+  // pixels wide and land on 8.3 when you meant 8.
+  const _rv=+(a.rating||0);
+  const stars=`<div class="dt-label">Your rating</div>`+
+    `<div class="rate-row"><span class="rate-out" id="rateVal">${_rv?fmtRate(_rv):'\u2014'}</span>`+
+      `<span class="rate-max">/ 10</span>`+
+      `${_rv?`<button class="rate-clear" onclick="setRating(0)">Clear</button>`:''}</div>`+
+    `<input class="rate-range" type="range" min="0" max="10" step="0.5" value="${_rv}"
+       aria-label="Your rating out of 10"
+       oninput="rateSlide(this.value)" onchange="setRating(this.value)">`+
+    `<div class="rate-ends"><span>0</span><span>5</span><span>10</span></div>`+
+    (a.r10from5?`<p class="ai-desc rate-was">Carried over from ${starWas(a)} out of five. Move it to say what it really is.</p>`:'');
   const chips=(a.genre||'').split(',').map(g=>g.trim()).filter(Boolean).map(g=>`<span class="chip">${g}</span>`).join('');
   // A filled colour slab in front of every line, at the same weight whether the
   // line mattered or not, made this read as a table of labels rather than an
@@ -12394,10 +12412,18 @@ function bumpEp(d){
 }
 // The five-star value it came from, so the note can name it rather than saying
 // "some old rating".
+// 8, not 8.0 — and 8.5 when it is one. A trailing zero on a rating reads as
+// precision nobody claimed.
+function fmtRate(v){const n=Math.round((+v||0)*2)/2;return Number.isInteger(n)?String(n):n.toFixed(1);}
+// Dragging only repaints the number; the value is written when the finger lifts.
+function rateSlide(v){const el=document.getElementById('rateVal');if(el)el.textContent=(+v>0)?fmtRate(v):'\u2014';}
 function starWas(a){const v=Math.round((a&&a.rating||0)/2);return v?('\u2605'+v):'a star rating';}
 function setRating(n){
   const a=anime.find(x=>x.id===detailId);if(!a)return;
-  a.rating=a.rating===n?0:n;
+  // Clamped and snapped to the same half points the control offers, so a value
+  // arriving from anywhere else cannot put the slider between two stops.
+  const v=Math.max(0,Math.min(10,Math.round((+n||0)*2)/2));
+  a.rating=v;
   delete a.r10from5;                      // they have said what it is; stop asking
   touch(a);save();renderDetail();render();alPushItem(a);
 }
@@ -12821,8 +12847,9 @@ function _impLine(line,ctx){
   if(em)ep=parseInt(em[1],10)||0;
   // rating: "4/5", "★4", "8/10", "rated 4"
   let rating=0,rm=hay.match(/(?:★|rated?\s*)\s*(\d(?:\.\d)?)|(\d(?:\.\d)?)\s*(?:\/\s*5|★|stars?)/i);
-  if(rm)rating=Math.min(10,Math.round((parseFloat(rm[1]||rm[2])||0)*2));   // "4/5" and "★4" are out of five
-  else{const r10=hay.match(/\b(\d{1,2}(?:\.\d)?)\s*\/\s*10\b/);if(r10)rating=Math.min(10,Math.round(parseFloat(r10[1])||0));}
+  const _snap=v=>Math.max(0,Math.min(10,Math.round((+v||0)*2)/2));
+  if(rm)rating=_snap((parseFloat(rm[1]||rm[2])||0)*2);   // "4/5" and "★4" are out of five
+  else{const r10=hay.match(/\b(\d{1,2}(?:\.\d)?)\s*\/\s*10\b/);if(r10)rating=_snap(parseFloat(r10[1]));}
   // Scrub leftover attributes the split didn't peel off — a trailing "(finished)",
   // "★5", "9/10", "ep 12", or ": done" — while leaving numbers that belong to the
   // title (86, Gundam 00, Mob Psycho 100) intact, since those carry no ep/rating cue.

@@ -1,6 +1,6 @@
-// Ratings moved from five stars to a number out of ten. Everything already
-// rated has to survive the move and stay findable, because a four was never
-// necessarily an eight. run: node scripts/rating10-test.mjs
+// Ratings out of ten, with halves. Everything already rated has to survive the
+// move and stay findable, because a four was never necessarily an eight.
+// run: node scripts/rating10-test.mjs
 import {spawn} from 'node:child_process';
 const PORT=8951,DBG=9491;
 const srv=spawn('python3',['-m','http.server',String(PORT)],{cwd:process.cwd(),stdio:'ignore'});
@@ -56,26 +56,34 @@ t('"restar" lists the ones still carried over',
 
 // the picker
 const ui=await ev(`(()=>{openDetail('a2');
-  const btns=[...document.querySelectorAll('.rate-n')];
-  return {count:btns.length, labels:btns.map(b=>b.textContent).join(''),
-          lit:btns.filter(b=>b.classList.contains('on')).length,
-          picked:(btns.find(b=>b.classList.contains('pick'))||{}).textContent,
+  const r=document.querySelector('.rate-range');
+  return {slider:!!r, min:r&&+r.min, max:r&&+r.max, step:r&&+r.step, at:r&&+r.value,
+          shown:(document.getElementById('rateVal')||{}).textContent,
           note:!!document.querySelector('.rate-was'),
           stars:document.querySelectorAll('.stars .star').length};})()`);
 console.log('    picker:', JSON.stringify(ui));
-t('ten buttons, one to ten', ui.count===10&&ui.labels==='12345678910', true);
-t('no stars left', ui.stars, 0);
-t('the scale fills to the score', ui.lit, 8);
-t('and marks the exact one', ui.picked, '8');
+t('it is a slider, not stars', ui.slider&&ui.stars===0, true);
+t('running 0 to 10', [ui.min,ui.max], [0,10]);
+t('in half points, so decimals are possible', ui.step, 0.5);
+t('starting at the current rating', ui.at, 8);
+t('and showing it as a whole number', ui.shown, '8');
 t('a carried-over rating says so', ui.note, true);
 
-const after=await ev(`(()=>{setRating(7);
-  const a=anime.find(x=>x.id==='a2');
-  return {v:a.rating, still:!!a.r10from5, note:!!document.querySelector('.rate-was')};})()`);
-t('re-rating sets the new value', after.v, 7);
-t('and stops calling it carried over', after.still, false);
-t('and the note goes away', after.note, false);
-t('so it drops out of "restar"', await ev(`anime.filter(SRCH_TERMS.restar).map(a=>a.title)`), ['Monster','Frieren']);
+// decimals
+const dec=await ev(`(()=>{setRating(8.5);const a=anime.find(x=>x.id==='a2');
+  return {v:a.rating, shown:(document.getElementById('rateVal')||{}).textContent};})()`);
+t('a half point is kept', dec.v, 8.5);
+t('and printed as 8.5', dec.shown, '8.5');
+t('a whole number never prints a trailing zero', await ev(`fmtRate(8)`), '8');
+t('an odd decimal snaps to the nearest half', await ev(`(()=>{setRating(7.3);return anime.find(x=>x.id==='a2').rating;})()`), 7.5);
+t('out-of-range is clamped, not stored', await ev(`(()=>{setRating(99);return anime.find(x=>x.id==='a2').rating;})()`), 10);
+t('and zero clears it', await ev(`(()=>{setRating(0);return anime.find(x=>x.id==='a2').rating;})()`), 0);
+
+// dragging previews, releasing commits
+await ev(`(()=>{setRating(6);openDetail('a2');return 1;})()`);
+await ev(`rateSlide(9.5)`);
+t('dragging only repaints the number', await ev(`(document.getElementById('rateVal')||{}).textContent`), '9.5');
+t('and does not write it yet', await ev(`anime.find(x=>x.id==='a2').rating`), 6);
 
 // the rest of the system speaks out of ten
 t('AniList gets the score as-is', await ev(`(()=>{const a=anime.find(x=>x.id==='a1');
@@ -83,5 +91,7 @@ t('AniList gets the score as-is', await ev(`(()=>{const a=anime.find(x=>x.id==='
 t('a pasted "4/5" becomes 8', await ev(`(()=>{const r=_impLine('Naruto 4/5',{});return r&&r.rating;})()`), 8);
 t('a pasted "8/10" stays 8', await ev(`(()=>{const r=_impLine('Naruto 8/10',{});return r&&r.rating;})()`), 8);
 t('a pasted star rating doubles too', await ev(`(()=>{const r=_impLine('Naruto \u26053',{});return r&&r.rating;})()`), 6);
+t('a pasted "8.5/10" keeps its half', await ev(`(()=>{const r=_impLine('Naruto 8.5/10',{});return r&&r.rating;})()`), 8.5);
+t('a pasted "4.5/5" becomes 9', await ev(`(()=>{const r=_impLine('Naruto 4.5/5',{});return r&&r.rating;})()`), 9);
 console.log('\n'+pass+' passed, '+fail+' failed');
 ws.close();ch.kill();srv.kill();process.exit(fail?1:0);

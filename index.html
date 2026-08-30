@@ -21258,11 +21258,28 @@ function titleVariants(t){
 }
 const _flatT=t=>String(t||'').toLowerCase().replace(/[^a-z0-9]/g,'');
 // Same guard the MangaUpdates matcher uses: it has to actually resemble the ask.
+// What a sibling adds: a format, a season, or a number. Flattened, so "Season 2"
+// arrives as "season2" and "II" as "ii".
+const _SIBLING_MARK=/^(specials?|movies?|film|ova|ona|recap|season\d*|s\d+|part\d+|cour\d+|\d+|ii|iii|iv|vi{0,3}|ix|x|final|thefinalseason)$/;
 function titleLooksRight(candidate,typed){
   const c=_flatT(candidate), f=_flatT(typed);
   if(!c||f.length<4)return false;
   if(c===f)return true;
-  if(c.length>=6&&f.length>=6&&(c.includes(f)||f.includes(c)))return true;
+  // Containment is how a typo survives, and it is also how a show gets bound to
+  // its own Specials. "The Quintessential Quintuplets" is contained in "The
+  // Quintessential Quintuplets Specials", so the match was accepted and somebody's
+  // finished series ended up pointing at a two-episode special — twelve of two
+  // watched, the real series listed as "not on your list", and the seasons drawer
+  // confidently wrong about which row was theirs.
+  //
+  // The leftover decides it. If what one title adds to the other is a season or
+  // format word, they are siblings in a franchise, not two spellings of one
+  // thing. Anything else — a subtitle, a missing article — is still the same show.
+  if(c.length>=6&&f.length>=6&&(c.includes(f)||f.includes(c))){
+    const extra=(c.length>f.length?c.slice(f.length):f.slice(c.length))
+      ||(c.length>f.length?c.slice(0,c.length-f.length):f.slice(0,f.length-c.length));
+    return !_SIBLING_MARK.test(extra);
+  }
   // "extraacademysurvivalguide" vs "extrasacademysurvivalguide" — one edit apart.
   if(Math.abs(c.length-f.length)<=2){
     let i=0,j=0,diff=0;

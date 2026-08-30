@@ -5081,6 +5081,8 @@ body.recsel .pcard{position:relative;}
   </div>
   <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--b1);">
     <button class="parse-btn" style="margin-top:0" onclick="exportList()"><i data-ic="upload"></i> Copy my list to clipboard</button>
+    <button class="parse-btn" onclick="runLinkAudit(this)"><i data-ic="check"></i> Check my database matches</button>
+    <p class="ai-desc" style="margin-top:7px">Confirms every show on your list points at the right database entry. Anything that looks wrong is marked, and searching <b>weak</b> lists them.</p>
   </div>
 </div>
 
@@ -9870,6 +9872,7 @@ const SRCH_TERMS={
   unwatched:a=>!(a.ep>0), started:a=>(a.ep||0)>0,
   rated:a=>(a.rating||0)>0, unrated:a=>!(a.rating||0),
   restar:a=>!!a.r10from5, converted:a=>!!a.r10from5,
+  weak:a=>!!a.idWeak, mismatched:a=>!!a.idWeak,
 };
 function parseQuery(q){
   const out={terms:[],text:''};
@@ -21434,6 +21437,93 @@ async function fetchSequels(){
       await pause(700);
     }
   }finally{seqRunning=false;}
+}
+// The sibling rule governs matches made from here on, which does nothing for a
+// link that was already wrong when it was stored — and a wrong link is the kind
+// of bug that never announces itself. It shows up as "not on your list" about a
+// show you have finished, or twelve episodes out of two, and there is no reason a
+// person should have to notice that themselves.
+//
+// So this walks every stored link once, asks the database what each id actually
+// is, and re-runs the same check against the answer. It only ever sets doubt: the
+// features that cannot survive a wrong id already sit out when idWeak is set, and
+// nothing here edits a title, a status or a progress number. The repair is a
+// person choosing the right entry — this only tells them where to look.
+async function auditLinks(onProgress){
+  const out={checked:0,flagged:0,cleared:0,unknown:0,failed:false};
+  if(typeof appLocked!=='undefined'&&appLocked)return out;
+  if(typeof listUntrusted!=='undefined'&&listUntrusted)return out;
+  const items=(anime||[]).filter(a=>a&&+a.aniId>0);
+  if(!items.length)return out;
+  const byId=new Map();
+  items.forEach(a=>{const k=+a.aniId;if(!byId.has(k))byId.set(k,[]);byId.get(k).push(a);});
+  const ids=[...byId.keys()];
+  const Q=`query($ids:[Int]){Page(perPage:50){media(id_in:$ids,type:ANIME){id title{english romaji native}}}}`;
+  for(let i=0;i<ids.length;i+=50){
+    const slice=ids.slice(i,i+50);
+    let media=null;
+    try{
+      const r=await fetch('https://graphql.anilist.co',{method:'POST',
+        headers:{'Content-Type':'application/json','Accept':'application/json'},
+        body:JSON.stringify({query:Q,variables:{ids:slice}})});
+      if(r.ok){const j=await r.json();media=j&&j.data&&j.data.Page&&j.data.Page.media;}
+    }catch(e){}
+    // A batch that did not come back is unknown, not wrong. Leaving those alone is
+    // the whole point: a flaky network must never be able to mark a list doubtful.
+    if(!Array.isArray(media)){out.failed=true;out.unknown+=slice.length;
+      if(onProgress)onProgress(Math.min(i+50,ids.length),ids.length);
+      continue;}
+    const got=new Map(media.map(m=>[+m.id,m]));
+    slice.forEach(id=>{
+      const rows=byId.get(id)||[];
+      const m=got.get(id);
+      rows.forEach(a=>{
+        out.checked++;
+        if(!m){                       // the id resolves to nothing at all any more
+          if(!a.idWeak){a.idWeak=1;out.flagged++;}
+          return;
+        }
+        const vs=[m.title&&m.title.english,m.title&&m.title.romaji,m.title&&m.title.native].filter(Boolean);
+        // Checked against every name this item is known by, not just the current
+        // one, so an abbreviation somebody typed and a title they later edited
+        // both still count as a match.
+        const mine=[a.title].concat(Array.isArray(a.alt)?a.alt:[]).filter(Boolean);
+        const ok=vs.length&&vs.some(n=>mine.some(t=>titleLooksRight(n,t)));
+        if(ok){ if(a.idWeak){delete a.idWeak;out.cleared++;} }
+        else if(!a.idWeak){a.idWeak=1;out.flagged++;}
+      });
+    });
+    if(onProgress)onProgress(Math.min(i+50,ids.length),ids.length);
+    if(i+50<ids.length)await new Promise(r=>setTimeout(r,700));   // AniList is rate limited
+  }
+  try{save();}catch(e){}
+  return out;
+}
+// The button around it: says what it is doing while it runs, and what it found
+// when it stops. A count of zero is a real answer and gets said plainly.
+async function runLinkAudit(btn){
+  if(btn&&btn.dataset.busy)return; if(btn){btn.dataset.busy='1';}
+  const label=btn?btn.innerHTML:'';
+  const set=t=>{if(btn)btn.textContent=t;};
+  set('Checking\u2026');
+  let r;
+  try{ r=await auditLinks((done,total)=>set(`Checking ${done} of ${total}\u2026`)); }
+  catch(e){ r=null; }
+  if(btn){btn.innerHTML=label;delete btn.dataset.busy;try{drawIcons();}catch(e){}}
+  if(!r){toast('Could not check right now');return;}
+  if(!r.checked&&!r.unknown){toast('Nothing on your list is linked to the database yet');return;}
+  const bits=[];
+  if(r.flagged)bits.push(`${r.flagged} look wrong`);
+  if(r.cleared)bits.push(`${r.cleared} cleared`);
+  if(r.unknown)bits.push(`${r.unknown} could not be checked`);
+  if(r.flagged){
+    toast(`${bits.join(' \u00b7 ')} \u2014 search "weak" to see them`);
+  }else if(r.failed){
+    toast(bits.length?bits.join(' \u00b7 '):'Could not check right now');
+  }else{
+    toast(`Checked ${r.checked} \u2014 all matched`+(r.cleared?`, ${r.cleared} cleared`:''));
+  }
+  try{render();}catch(e){}
 }
 async function fetchCovers(){
   if(coverRunning)return;coverRunning=true;

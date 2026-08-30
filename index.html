@@ -11203,17 +11203,16 @@ function renderDetail(){
     </div>`;
   // Out of ten, as numbers. Five stars asks "how many stars" and gets a shrug at
   // 3; a number is the thing people already say out loud about a show.
-  // Ten buttons cannot say 8.5, and a half point is most of what a ten-point
-  // scale is for — the difference between "good" and "nearly great" is where
-  // people actually want the room. A slider carries decimals; half-point steps
-  // keep every stop big enough to hit on a phone, where 0.1 would be three
-  // pixels wide and land on 8.3 when you meant 8.
+  // Tenths. A phone-width track gives each stop about three pixels, so landing on
+  // a round number by aim alone is not realistic — which is why every whole
+  // number is a detent: the value snaps to it from within a tenth either side.
+  // You get 8 when you meant 8, and 8.3 when you meant 8.3.
   const _rv=+(a.rating||0);
   const stars=`<div class="dt-label">Your rating</div>`+
     `<div class="rate-row"><span class="rate-out" id="rateVal">${_rv?fmtRate(_rv):'\u2014'}</span>`+
       `<span class="rate-max">/ 10</span>`+
       `${_rv?`<button class="rate-clear" onclick="setRating(0)">Clear</button>`:''}</div>`+
-    `<input class="rate-range" type="range" min="0" max="10" step="0.5" value="${_rv}"
+    `<input class="rate-range" type="range" min="0" max="10" step="0.1" value="${_rv}"
        aria-label="Your rating out of 10"
        oninput="rateSlide(this.value)" onchange="setRating(this.value)">`+
     `<div class="rate-ends"><span>0</span><span>5</span><span>10</span></div>`+
@@ -12414,16 +12413,23 @@ function bumpEp(d){
 // "some old rating".
 // 8, not 8.0 — and 8.5 when it is one. A trailing zero on a rating reads as
 // precision nobody claimed.
-function fmtRate(v){const n=Math.round((+v||0)*2)/2;return Number.isInteger(n)?String(n):n.toFixed(1);}
+function fmtRate(v){const n=snapRate(v);return Number.isInteger(n)?String(n):n.toFixed(1);}
+// One tenth, clamped — and a whole number wins from within a tenth either side,
+// so the round values a person actually reaches for are the easy ones to hit.
+function snapRate(v){
+  let n=Math.max(0,Math.min(10,Math.round((+v||0)*10)/10));
+  const near=Math.round(n);
+  if(Math.abs(n-near)<=0.1)n=near;
+  return n;
+}
 // Dragging only repaints the number; the value is written when the finger lifts.
 function rateSlide(v){const el=document.getElementById('rateVal');if(el)el.textContent=(+v>0)?fmtRate(v):'\u2014';}
 function starWas(a){const v=Math.round((a&&a.rating||0)/2);return v?('\u2605'+v):'a star rating';}
 function setRating(n){
   const a=anime.find(x=>x.id===detailId);if(!a)return;
-  // Clamped and snapped to the same half points the control offers, so a value
-  // arriving from anywhere else cannot put the slider between two stops.
-  const v=Math.max(0,Math.min(10,Math.round((+n||0)*2)/2));
-  a.rating=v;
+  // Clamped and snapped exactly like the control, so a value arriving from
+  // anywhere else cannot sit between two stops the slider cannot return to.
+  a.rating=snapRate(n);
   delete a.r10from5;                      // they have said what it is; stop asking
   touch(a);save();renderDetail();render();alPushItem(a);
 }
@@ -12847,7 +12853,7 @@ function _impLine(line,ctx){
   if(em)ep=parseInt(em[1],10)||0;
   // rating: "4/5", "★4", "8/10", "rated 4"
   let rating=0,rm=hay.match(/(?:★|rated?\s*)\s*(\d(?:\.\d)?)|(\d(?:\.\d)?)\s*(?:\/\s*5|★|stars?)/i);
-  const _snap=v=>Math.max(0,Math.min(10,Math.round((+v||0)*2)/2));
+  const _snap=v=>snapRate(v);
   if(rm)rating=_snap((parseFloat(rm[1]||rm[2])||0)*2);   // "4/5" and "★4" are out of five
   else{const r10=hay.match(/\b(\d{1,2}(?:\.\d)?)\s*\/\s*10\b/);if(r10)rating=_snap(parseFloat(r10[1]));}
   // Scrub leftover attributes the split didn't peel off — a trailing "(finished)",

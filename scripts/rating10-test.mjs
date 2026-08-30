@@ -1,5 +1,5 @@
-// Ratings out of ten, with halves. Everything already rated has to survive the
-// move and stay findable, because a four was never necessarily an eight.
+// Ratings out of ten, in tenths, with whole numbers as detents. Everything
+// already rated has to survive the move and stay findable.
 // run: node scripts/rating10-test.mjs
 import {spawn} from 'node:child_process';
 const PORT=8951,DBG=9491;
@@ -64,7 +64,7 @@ const ui=await ev(`(()=>{openDetail('a2');
 console.log('    picker:', JSON.stringify(ui));
 t('it is a slider, not stars', ui.slider&&ui.stars===0, true);
 t('running 0 to 10', [ui.min,ui.max], [0,10]);
-t('in half points, so decimals are possible', ui.step, 0.5);
+t('in tenths', ui.step, 0.1);
 t('starting at the current rating', ui.at, 8);
 t('and showing it as a whole number', ui.shown, '8');
 t('a carried-over rating says so', ui.note, true);
@@ -75,7 +75,10 @@ const dec=await ev(`(()=>{setRating(8.5);const a=anime.find(x=>x.id==='a2');
 t('a half point is kept', dec.v, 8.5);
 t('and printed as 8.5', dec.shown, '8.5');
 t('a whole number never prints a trailing zero', await ev(`fmtRate(8)`), '8');
-t('an odd decimal snaps to the nearest half', await ev(`(()=>{setRating(7.3);return anime.find(x=>x.id==='a2').rating;})()`), 7.5);
+t('a tenth is kept exactly', await ev(`(()=>{setRating(7.3);return anime.find(x=>x.id==='a2').rating;})()`), 7.3);
+t('but a near-miss snaps to the whole number', await ev(`(()=>{setRating(7.95);return anime.find(x=>x.id==='a2').rating;})()`), 8);
+t('and so does the other side', await ev(`(()=>{setRating(8.08);return anime.find(x=>x.id==='a2').rating;})()`), 8);
+t('while a real tenth is left alone', await ev(`(()=>{setRating(8.4);return anime.find(x=>x.id==='a2').rating;})()`), 8.4);
 t('out-of-range is clamped, not stored', await ev(`(()=>{setRating(99);return anime.find(x=>x.id==='a2').rating;})()`), 10);
 t('and zero clears it', await ev(`(()=>{setRating(0);return anime.find(x=>x.id==='a2').rating;})()`), 0);
 
@@ -92,6 +95,7 @@ t('a pasted "4/5" becomes 8', await ev(`(()=>{const r=_impLine('Naruto 4/5',{});
 t('a pasted "8/10" stays 8', await ev(`(()=>{const r=_impLine('Naruto 8/10',{});return r&&r.rating;})()`), 8);
 t('a pasted star rating doubles too', await ev(`(()=>{const r=_impLine('Naruto \u26053',{});return r&&r.rating;})()`), 6);
 t('a pasted "8.5/10" keeps its half', await ev(`(()=>{const r=_impLine('Naruto 8.5/10',{});return r&&r.rating;})()`), 8.5);
+t('a pasted "7.3/10" keeps its tenth', await ev(`(()=>{const r=_impLine('Naruto 7.3/10',{});return r&&r.rating;})()`), 7.3);
 t('a pasted "4.5/5" becomes 9', await ev(`(()=>{const r=_impLine('Naruto 4.5/5',{});return r&&r.rating;})()`), 9);
 console.log('\n'+pass+' passed, '+fail+' failed');
 ws.close();ch.kill();srv.kill();process.exit(fail?1:0);

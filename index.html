@@ -2387,6 +2387,20 @@ body.first-paint .pfill,body.content-in .pfill{animation:barGrow .62s cubic-bezi
 }
 .prog-num span{color:var(--t3);font-weight:700;font-size:13px;}
 .prog-row .pbar{height:5px;margin-top:8px;}
+/* Ten numbers, not five stars. They fill left-to-right like a scale rather than
+   sitting as ten separate choices, and the one you picked is the solid one — so
+   a glance reads "seven" without counting anything. */
+.rate10{display:grid;grid-template-columns:repeat(10,1fr);gap:4px;margin-top:2px;}
+.rate-n{min-height:38px;border-radius:10px;border:1px solid var(--b2);background:var(--bg3);
+  color:var(--t3);font-family:var(--fd);font-size:13px;font-weight:800;
+  font-variant-numeric:tabular-nums;transition:transform .12s,background .15s,color .15s;}
+.rate-n.on{background:var(--ag);color:var(--a2);border-color:color-mix(in srgb,var(--a) 34%,transparent);}
+.rate-n.pick{background:var(--a);color:var(--aFg);border-color:var(--a);}
+.rate-n:active{transform:scale(.94);}
+.rate-out{font-family:var(--fd);font-weight:800;color:var(--a2);margin-left:6px;}
+.rate-was{margin-top:8px;}
+.stat-of{font-size:15px;color:var(--t3);margin-left:1px;}
+@media (max-width:380px){.rate-n{min-height:34px;font-size:12px;}.rate10{gap:3px;}}
 .stars{display:flex;gap:8px;justify-content:center;}
 .star{font-size:27px;color:var(--t3);transition:transform .12s;}
 .star.on{color:#f5c518;text-shadow:0 0 12px rgba(245,197,24,0.35);}
@@ -8105,6 +8119,29 @@ function clearCustomVars(){const st=document.documentElement.style;CUSTOM_VARS.f
 // with the treatment switched off: the mode goes on (unless they had already
 // said otherwise) and the theme falls back. Runs once — after this their stored
 // theme is no longer 'retro', so the branch never fires again.
+// Ratings were out of five and are now out of ten. Doubling is the only honest
+// automatic answer — it preserves the order and the relative distance, and it
+// never invents precision — but a four was never necessarily an eight, so every
+// converted rating is MARKED. The show says where its number came from and
+// invites a real one, and `restar` in the search box lists every one still
+// waiting. Nothing is lost either way: an untouched conversion is still a
+// reasonable rating.
+const RATE10_KEY='rating_scale10';
+function migrateRatings10(){
+  try{
+    if(localStorage.getItem(RATE10_KEY)==='1')return;
+    if(typeof appLocked!=='undefined'&&appLocked)return;         // not the real list
+    if(typeof listUntrusted!=='undefined'&&listUntrusted)return; // nor after corruption
+    let n=0;
+    (anime||[]).forEach(a=>{
+      if(!a)return;
+      const v=+a.rating||0;
+      if(v>0&&v<=5){a.rating=Math.min(10,Math.round(v*2));a.r10from5=1;n++;}
+    });
+    localStorage.setItem(RATE10_KEY,'1');
+    if(n){try{save();}catch(e){}}
+  }catch(e){}
+}
 function migrateRetroTheme(){
   try{
     const s=store(); if(!s)return;
@@ -9824,6 +9861,7 @@ const SRCH_TERMS={
   airing:a=>{try{return !!airingInfo(a);}catch(e){return false;}},
   unwatched:a=>!(a.ep>0), started:a=>(a.ep||0)>0,
   rated:a=>(a.rating||0)>0, unrated:a=>!(a.rating||0),
+  restar:a=>!!a.r10from5, converted:a=>!!a.r10from5,
 };
 function parseQuery(q){
   const out={terms:[],text:''};
@@ -11155,8 +11193,13 @@ function renderDetail(){
       </div>
       <button class="prog-btn" onpointerdown="epHoldStart(1,event)" onclick="event.preventDefault()" aria-label="One more episode">＋</button>
     </div>`;
-  const stars=`<div class="dt-label">Your rating</div><div class="stars">${[1,2,3,4,5].map(n=>
-    `<button class="star${(a.rating||0)>=n?' on':''}" onclick="setRating(${n})">${icon('star')}</button>`).join('')}</div>`;
+  // Out of ten, as numbers. Five stars asks "how many stars" and gets a shrug at
+  // 3; a number is the thing people already say out loud about a show.
+  const _rv=a.rating||0;
+  const stars=`<div class="dt-label">Your rating${_rv?` <span class="rate-out">${_rv}/10</span>`:''}</div>`+
+    `<div class="rate10">${[1,2,3,4,5,6,7,8,9,10].map(n=>
+      `<button class="rate-n${_rv>=n?' on':''}${_rv===n?' pick':''}" onclick="setRating(${n})" aria-label="${n} out of 10">${n}</button>`).join('')}</div>`+
+    (a.r10from5?`<p class="ai-desc rate-was">Carried over from ${starWas(a)} out of five. Tap a number to say what it really is.</p>`:'');
   const chips=(a.genre||'').split(',').map(g=>g.trim()).filter(Boolean).map(g=>`<span class="chip">${g}</span>`).join('');
   // A filled colour slab in front of every line, at the same weight whether the
   // line mattered or not, made this read as a table of labels rather than an
@@ -12349,9 +12392,13 @@ function bumpEp(d){
   if(!epStepOnce(a,d))return;
   commitEp(a);
 }
+// The five-star value it came from, so the note can name it rather than saying
+// "some old rating".
+function starWas(a){const v=Math.round((a&&a.rating||0)/2);return v?('\u2605'+v):'a star rating';}
 function setRating(n){
   const a=anime.find(x=>x.id===detailId);if(!a)return;
   a.rating=a.rating===n?0:n;
+  delete a.r10from5;                      // they have said what it is; stop asking
   touch(a);save();renderDetail();render();alPushItem(a);
 }
 function toggleFav(){
@@ -12774,8 +12821,8 @@ function _impLine(line,ctx){
   if(em)ep=parseInt(em[1],10)||0;
   // rating: "4/5", "★4", "8/10", "rated 4"
   let rating=0,rm=hay.match(/(?:★|rated?\s*)\s*(\d(?:\.\d)?)|(\d(?:\.\d)?)\s*(?:\/\s*5|★|stars?)/i);
-  if(rm)rating=Math.min(5,parseFloat(rm[1]||rm[2])||0);
-  else{const r10=hay.match(/\b(\d{1,2}(?:\.\d)?)\s*\/\s*10\b/);if(r10)rating=Math.round(parseFloat(r10[1])/2*10)/10;}
+  if(rm)rating=Math.min(10,Math.round((parseFloat(rm[1]||rm[2])||0)*2));   // "4/5" and "★4" are out of five
+  else{const r10=hay.match(/\b(\d{1,2}(?:\.\d)?)\s*\/\s*10\b/);if(r10)rating=Math.min(10,Math.round(parseFloat(r10[1])||0));}
   // Scrub leftover attributes the split didn't peel off — a trailing "(finished)",
   // "★5", "9/10", "ep 12", or ": done" — while leaving numbers that belong to the
   // title (86, Gundam 00, Mob Psycho 100) intact, since those carry no ep/rating cue.
@@ -13236,7 +13283,7 @@ function alPushItem(a){
   if(!alConnected()||!a||!a.aniId)return;
   if(kindOf(a)!=='watch'&&kindOf(a)!=='read')return;
   const vars={mediaId:a.aniId,progress:a.ep||0,status:toAniStatus(a.status)};
-  if(a.rating)vars.score=a.rating*2;   // our 0–5 → AniList 0–10
+  if(a.rating)vars.score=a.rating;     // both are 0–10 now
   alQueue=alQueue.then(async()=>{
     await alGQL('mutation($mediaId:Int,$progress:Int,$status:MediaListStatus,$score:Float){SaveMediaListEntry(mediaId:$mediaId,progress:$progress,status:$status,score:$score){id}}',vars);
     await pause(700);
@@ -15209,7 +15256,7 @@ function exportList(){
   const lines=anime.map(a=>{
     let l=a.title+' | '+a.status;
     if(a.ep)l+=` | ep ${a.ep}${a.epTotal?'/'+a.epTotal:''}`;
-    if(a.rating)l+=` | ★${a.rating}`;
+    if(a.rating)l+=` | ${a.rating}/10`;
     return l;
   }).join('\n');
   const done=()=>toast('List copied. Paste it anywhere');
@@ -15618,7 +15665,7 @@ function pkScore(a){
   if(a.status==='watching'&&(a.ep||0)>0)sc+=0.9;               // finish what you started
   if(prog(a)>=60)sc+=0.5;
   if(a.fav)sc+=0.6;
-  if(a.rating)sc+=a.rating*0.12;                                // your own stars, when you've given them
+  if(a.rating)sc+=a.rating*0.06;                                // your own rating, out of ten now, so half the old weight per point
   const days=(Date.now()-(a.upd||0))/86400000;
   if(days<14)sc+=0.35; else if(days>240)sc-=0.3;                // recent intent beats something parked for a year
   return sc;
@@ -22510,7 +22557,7 @@ try{if(_SR&&window.isSecureContext){const m=document.getElementById('chatMic');i
 
 // ─── INIT ───────────────────────────────────────────────────────────────────
 try{hydrateIcons();}catch{}
-load();try{_hadItemsAtLoad=anime.length>0;}catch{}try{restorePos();}catch(e){}
+load();try{_hadItemsAtLoad=anime.length>0;}catch{}try{migrateRatings10();}catch(e){}try{restorePos();}catch(e){}
 // Before anything asks this device who it is: put the keys back if localStorage
 // lost them, then ask to be exempt from the sweep that lost them. Both are async
 // and neither blocks the first paint — a device that still HAS its keys does no

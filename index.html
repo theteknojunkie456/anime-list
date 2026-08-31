@@ -8600,7 +8600,15 @@ const RETRO_KEY='retro_mode';
 //   64  a fine grid and a soft bloom instead of a screen door. Reads as the
 //       N64/PS1 era: still obviously a screen, but a good one.
 const RETRO_BITS_KEY='retro_bits';
-function retroBits(){ return '8'; }
+// This returned a constant, so setRetroBits wrote a value nothing read: the pane
+// offered three looks and every one of them rendered as 8 — the coarsest, the one
+// described up there as a screen you sat too close to. Reading the setting again,
+// and defaulting to the middle the notes call what this shipped as.
+function retroBits(){
+  try{const v=localStorage.getItem(RETRO_BITS_KEY);
+    if(v==='8'||v==='16'||v==='64'||v==='off')return v;}catch(e){}
+  return '16';
+}
 function setRetroBits(v){
   try{localStorage.setItem(RETRO_BITS_KEY,String(v));}catch(e){}
   // Changing the block size invalidates every image already resampled at the old
@@ -9553,9 +9561,11 @@ function fmtWatch(mins){
 function pxSrc(url){
   try{
     if(!retroMode())return url;
-    const b=retroBits();
-    if(b==='off'||b==='64')return url;   // full-size art when nothing is being resampled
-    return String(url||'').replace(/\/cover\/(?:extraLarge|large)\//,'/cover/medium/');
+    // Asking for the small file was the old way of throwing pixels away, and it is
+    // exactly what made the look depend on which size a cover happened to have.
+    // The block count is fixed now, so the source only decides how clean each
+    // block's colour is — more source per block is better, never worse.
+    return url;
   }catch(e){return url;}
 }
 // ─── REAL BLOCKS ────────────────────────────────────────────────────────────
@@ -9590,10 +9600,49 @@ const PX_MAX_PER_PASS=12;
 // The divisor: a /cover/medium/ source is about 100px, so 8-bit at 6 leaves a
 // ~17px picture to blow back up. Nine was past the point where a face survived
 // it, which reads as damage rather than as a low-resolution screen.
-function pxBlock(){ return 6; }   // the one coarseness retro has
+// How many source pixels collapse into one block. Bigger is blockier. Tied to the
+// setting above, because a control that reads back the same picture at every
+// position is not a control.
+// How wide one block lands ON SCREEN, in CSS pixels.
+//
+// This used to be a divisor on the source file, and that is the whole bug behind
+// "some covers are sharp": AniList serves the same art at several sizes, so a
+// cover fetched at 100px became ~17 blocks across and one fetched at 460px became
+// ~77 — the second is barely pixelated at all, sitting in a row of the first.
+// Nothing about the picture on screen decided that; the file it happened to come
+// in did. Measuring the block against the CARD instead makes every cover identical
+// whatever it was fetched at, which is the point of a look.
+function pxBlock(){
+  switch(retroBits()){
+    case 'off': return 0;      // nothing resampled
+    case '8':   return 6;      // coarse cells
+    case '64':  return 2;      // a fine grid
+    default:    return 3;      // 16: the middle, and what the covers match
+  }
+}
+// Blocks across this element, from how wide it actually is. Falls back to a
+// typical card when it has not been laid out yet, and never goes under 16 —
+// below that a cover stops being a picture.
+function pxCells(el,px,natW,natH){
+  let w=0;
+  try{w=el.clientWidth||el.getBoundingClientRect().width||0;}catch(e){}
+  if(!w)w=200;
+  const cells=Math.max(16,Math.round(w/Math.max(1,px)));
+  const ratio=(natW&&natH)?(natH/natW):1.42;
+  return {w:cells,h:Math.max(16,Math.round(cells*ratio))};
+}
 function pxOne(img,n){
   const src=img.getAttribute('data-pxsrc')||img.getAttribute('src')||'';
-  if(!src||src.slice(0,5)==='data:')return;
+  if(!src)return;
+  // Artwork somebody uploaded is a data: URL, and skipping those is why a row of
+  // pixelated covers had a sharp one sitting in the middle of it. There is no
+  // network and no CORS question here — it is already local — so it takes the
+  // canvas path directly, which is the same path a cross-origin cover ends up on.
+  if(src.slice(0,5)==='data:'){
+    img.dataset.pxd='1';
+    try{pxCanvasFallback(img,n);}catch(e){try{delete img.dataset.pxd;}catch(_){}}
+    return;
+  }
   img.dataset.pxd='1';                                   // never twice, whatever happens next
   const key=src+'|'+n;
   const hit=_pxCache.get(key);
@@ -9610,8 +9659,7 @@ function pxOne(img,n){
   const bust=src+(src.indexOf('?')>=0?'&':'?')+'wlpx=1';
   probe.onload=()=>{
     try{
-      const w=Math.max(6,Math.round((probe.naturalWidth||100)/n));
-      const h=Math.max(6,Math.round((probe.naturalHeight||142)/n));
+      const {w,h}=pxCells(img,n,probe.naturalWidth,probe.naturalHeight);
       const c=document.createElement('canvas'); c.width=w; c.height=h;
       const x=c.getContext('2d'); if(!x)return;
       x.imageSmoothingEnabled=false;
@@ -9644,8 +9692,7 @@ function pxCanvasFallback(img,n){
   raw.onload=()=>{
     try{
       if(!img.isConnected)return;
-      const w=Math.max(6,Math.round((raw.naturalWidth||100)/n));
-      const h=Math.max(6,Math.round((raw.naturalHeight||142)/n));
+      const {w,h}=pxCells(img,n,raw.naturalWidth,raw.naturalHeight);
       const c=document.createElement('canvas'); c.width=w; c.height=h;
       const x=c.getContext('2d'); if(!x)return;
       x.imageSmoothingEnabled=false;
@@ -9874,11 +9921,22 @@ const SRCH_TERMS={
   restar:a=>!!a.r10from5, converted:a=>!!a.r10from5,
   weak:a=>!!a.idWeak, mismatched:a=>!!a.idWeak,
 };
+// Said back in the sentence when a filter word matches nothing, so the answer
+// names what was asked rather than quoting the word back.
+const TERM_SAYS={
+  restar:'still carried over from a star rating', converted:'still carried over from a star rating',
+  weak:'doubtfully matched to the database', mismatched:'doubtfully matched to the database',
+  rated:'rated', unrated:'unrated', fav:'a favourite', favorite:'a favourite', favourite:'a favourite',
+  airing:'airing', unwatched:'unstarted', started:'started',
+  watching:'in progress', reading:'in progress', plan:'planned', planned:'planned',
+  dropped:'dropped', finished:'finished', done:'finished',
+};
 function parseQuery(q){
-  const out={terms:[],text:''};
+  const out={terms:[],text:'',words:[]};
   const keep=[];
   String(q||'').split(/\s+/).filter(Boolean).forEach(w=>{
     const fn=SRCH_TERMS[w];
+    if(fn)out.words.push(w);
     if(fn)out.terms.push(fn); else keep.push(w);
   });
   out.text=keep.join(' ').trim();
@@ -10921,7 +10979,16 @@ function renderHome(){
     // and every search result in the app. One-argument call.
     if(hits.length){el.innerHTML=gridHTML(hits)+bulkBarHTML();armGridMore();return;}
     const stLbl=filterStatus==='fav'?'Favorites':filterStatus==='rec'?'From Friends':filterStatus==='watching'?(isRead?'Reading':'Watching'):(STATUS_META[filterStatus]?STATUS_META[filterStatus].label:filterStatus);
-    const msg=q
+    // A filter word is not a title. Typing `restar` and being told there are no
+    // matches, above a button offering to ADD a show called "restar", is the app
+    // failing to recognise its own vocabulary out loud — the word did its job,
+    // filtered the list, and found nothing, which is an answer worth saying
+    // plainly. Only when the whole query is filter words: mix in real text and it
+    // is a search again.
+    const termOnly=!!q&&!_pq.text&&_pq.terms.length>0;
+    const msg=termOnly
+      ?`Nothing in your ${isRead?'reading':'watch'} list is ${TERM_SAYS[_pq.words&&_pq.words[0]]||'that'}`
+      :q
       ?`No matches for “${schEsc(q)}”${filterStatus!=='all'?` in ${stLbl}`:` in your ${isRead?'reading':'watch'} list`}`
       :`Nothing in ${stLbl} yet`;
     // Searching for something you don't have yet is the app's clearest statement
@@ -10929,7 +10996,7 @@ function renderHome(){
     // there and left you to open +, type the same words again, then search
     // again. The words are right here.
     const typed=(()=>{try{return document.getElementById('searchIn').value.trim();}catch(e){return q;}})()||q;
-    const addBtn=q?`<button class="hero-cta" onclick="addFromSearch(${JSON.stringify(typed).replace(/"/g,'&quot;')})">${icon('plus')} Add “${schEsc(typed)}”</button>`:'';
+    const addBtn=(q&&!termOnly)?`<button class="hero-cta" onclick="addFromSearch(${JSON.stringify(typed).replace(/"/g,'&quot;')})">${icon('plus')} Add “${schEsc(typed)}”</button>`:'';
     // The commonest reason a search finds nothing: it is in your OTHER list.
     // Saying "no matches" while the thing sits one tab away is just wrong.
     let otherBtn='';

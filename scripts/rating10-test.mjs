@@ -36,7 +36,7 @@ const t=(n,g,e)=>{const ok=JSON.stringify(g)===JSON.stringify(e);ok?pass++:fail+
 // Drive it directly: the harness re-seeds localStorage on any reload, which can
 // restore the pre-migration list while leaving the "already done" flag set.
 await ev(`(()=>{
-  localStorage.removeItem('rating_scale10');
+
   anime=[{id:'a1',title:'Monster',status:'finished',kind:'watch',ep:74,epTotal:74,aniId:19,rating:5},
          {id:'a2',title:'Vinland Saga',status:'finished',kind:'watch',ep:24,epTotal:24,aniId:101348,rating:4},
          {id:'a3',title:'Bocchi the Rock!',status:'watching',kind:'watch',ep:3,epTotal:12,aniId:130003,rating:0},
@@ -53,6 +53,28 @@ t('it never runs twice', await ev(`(()=>{migrateRatings10();return anime.map(a=>
 // finding them
 t('"restar" lists the ones still carried over',
   await ev(`anime.filter(SRCH_TERMS.restar).map(a=>a.title)`), ['Monster','Vinland Saga','Frieren']);
+
+// A list arriving from the cloud on the old scale must still be converted, even
+// though this browser already converted its own. That is the case the old
+// localStorage flag got wrong, and the reason the average read 4.9 out of ten.
+const synced=await ev(`(()=>{
+  migrateRatings10();                                  // this browser is "done"
+  anime=migrate([{id:'s1',title:'From Another Device',status:'finished',kind:'watch',ep:1,rating:5},
+                 {id:'s2',title:'Already Converted',status:'finished',kind:'watch',ep:1,rating:9,r10:1},
+                 {id:'s3',title:'A Low Score On The New Scale',status:'finished',kind:'watch',ep:1,rating:3,r10:1}]);
+  return anime.map(a=>a.rating);})()`);
+t('an old list pulled in later is still converted', synced[0], 10);
+t('one already on the new scale is left alone', synced[1], 9);
+t('and a genuinely low new score is never doubled', synced[2], 3);
+t('running it again changes nothing',
+  await ev(`(()=>{migrateRatings10();migrateRatings10();return anime.map(a=>a.rating);})()`), [10,9,3]);
+// That test replaced the list, so put the fixture back for everything below it.
+await ev(`(()=>{anime=migrate([
+  {id:'a1',title:'Monster',status:'finished',kind:'watch',ep:74,epTotal:74,aniId:19,rating:5},
+  {id:'a2',title:'Vinland Saga',status:'finished',kind:'watch',ep:24,epTotal:24,aniId:101348,rating:4},
+  {id:'a3',title:'Bocchi the Rock!',status:'watching',kind:'watch',ep:3,epTotal:12,aniId:130003,rating:0},
+  {id:'a4',title:'Frieren',status:'plan',kind:'watch',ep:0,epTotal:28,aniId:154587,rating:3}]);
+  render();return anime.length;})()`);
 
 // the picker
 const ui=await ev(`(()=>{openDetail('a2');

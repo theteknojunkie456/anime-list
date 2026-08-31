@@ -6436,6 +6436,28 @@ function deEnt(s){
   }
   return v;
 }
+// Ratings moved from five to ten, and the first version of this was a one-shot
+// guarded by a localStorage flag. That is wrong on a device that syncs: the flag
+// says "done" for this BROWSER, while the list it applies to can be replaced at
+// any moment by a copy pulled from the cloud, by an import, or by another device
+// that never ran it. The flag stays set, the old five-point ratings come back,
+// and the average reads 4.9 out of ten forever with nothing left to correct it.
+//
+// So the scale is a property of each RATING, not of the browser. An item carries
+// r10 once its rating is known to be out of ten — set when somebody rates it, and
+// set here when an old one is converted. Anything rated with no mark came from
+// before the change, wherever it just arrived from, and is converted exactly once.
+function normalizeRatings(list){
+  (list||[]).forEach(a=>{
+    if(!a)return;
+    const v=+a.rating||0;
+    if(!v){delete a.r10from5;a.r10=1;return;}   // nothing to convert, nothing to ask about
+    if(a.r10)return;                            // already out of ten
+    if(v>5){a.r10=1;return;}                    // could only have been out of ten
+    a.rating=Math.min(10,Math.round(v*2));a.r10=1;a.r10from5=1;
+  });
+  return list;
+}
 function migrate(list){
   // add `kind` to every item (existing items default to "watch"); airing cache fields start empty
   // banner/aniColor = AniList per-title art + dominant color; bgImage/bgAccent = user's own background + its extracted color
@@ -6450,7 +6472,7 @@ function migrate(list){
   // stays safe because every one of those surfaces still runs escH on the way out.
   mapped.forEach(a=>{a.title=deEnt(a.title);a.genre=deEnt(a.genre);a.notes=deEnt(a.notes);});
   mapped.forEach(a=>{a.img=safeImg(a.img);a.banner=safeImg(a.banner);a.bgImage=safeImg(a.bgImage);});
-  return dedupeList(mapped).kept;   // never load a list with duplicates
+  return normalizeRatings(dedupeList(mapped).kept);   // never load a list with duplicates, or one on the old rating scale
 }
 // Did the list we're holding come from a FAILURE rather than from the user?
 //
@@ -8151,20 +8173,22 @@ function clearCustomVars(){const st=document.documentElement.style;CUSTOM_VARS.f
 // invites a real one, and `restar` in the search box lists every one still
 // waiting. Nothing is lost either way: an untouched conversion is still a
 // reasonable rating.
-const RATE10_KEY='rating_scale10';
+// Kept as the name the boot path calls, but it is no longer a one-shot: the work
+// lives in normalizeRatings, which every list passes through on the way in. This
+// exists so a list already sitting in memory gets the same treatment, and running
+// it twice is a no-op because the mark is on the rating, not on the browser.
+//
+// The old localStorage flag is deliberately gone rather than checked. It could
+// only ever say "this browser has done it", which stops being true the moment a
+// list arrives from anywhere else — and while it was set, nothing would ever look
+// again.
 function migrateRatings10(){
   try{
-    if(localStorage.getItem(RATE10_KEY)==='1')return;
-    if(typeof appLocked!=='undefined'&&appLocked)return;         // not the real list
-    if(typeof listUntrusted!=='undefined'&&listUntrusted)return; // nor after corruption
-    let n=0;
-    (anime||[]).forEach(a=>{
-      if(!a)return;
-      const v=+a.rating||0;
-      if(v>0&&v<=5){a.rating=Math.min(10,Math.round(v*2));a.r10from5=1;n++;}
-    });
-    localStorage.setItem(RATE10_KEY,'1');
-    if(n){try{save();}catch(e){}}
+    if(typeof appLocked!=='undefined'&&appLocked)return;
+    if(typeof listUntrusted!=='undefined'&&listUntrusted)return;
+    const before=(anime||[]).filter(a=>a&&a.r10from5).length;
+    normalizeRatings(anime||[]);
+    if((anime||[]).filter(a=>a&&a.r10from5).length!==before){try{save();}catch(e){}}
   }catch(e){}
 }
 function migrateRetroTheme(){
@@ -12525,6 +12549,7 @@ function setRating(n){
   // Clamped and snapped exactly like the control, so a value arriving from
   // anywhere else cannot sit between two stops the slider cannot return to.
   a.rating=snapRate(n);
+  a.r10=1;                                // out of ten, by definition
   delete a.r10from5;                      // they have said what it is; stop asking
   touch(a);save();renderDetail();render();alPushItem(a);
 }
@@ -20354,7 +20379,7 @@ function autoMarkWatched(id,ep){
   });
 }
 function svCountUp(el,to){if(!el)return;const dur=850,t0=performance.now();const step=now=>{const p=Math.min(1,(now-t0)/dur),e=1-Math.pow(1-p,3);el.textContent=Math.round(to*e).toLocaleString();if(p<1)requestAnimationFrame(step);};requestAnimationFrame(step);}
-function svChips(list){return list.length?list.map(a=>'<span class="sv-chip">'+schEsc(a.title)+(a.rating?' '+icon('star','fill')+a.rating:'')+'</span>').join(''):'<span class="sv-chip">None yet</span>';}
+function svChips(list){return list.length?list.map(a=>'<span class="sv-chip">'+schEsc(a.title)+(a.rating?' '+fmtRate(a.rating):'')+'</span>').join(''):'<span class="sv-chip">None yet</span>';}
 function svBar(id,label,color,val,max,drill){return '<div class="sv-bar" onclick="svDrill(\''+id+'\',this)"><div class="lbl">'+label+'</div><div class="track"><div class="fill" style="width:'+Math.round(val/Math.max(1,max)*100)+'%;background:'+color+'"></div></div><div class="n">'+val+'</div><span class="chev">'+icon('chevron-right')+'</span></div><div class="sv-drill" id="drill-'+id+'">'+drill+'</div>';}
 function svDrill(id,el){const d=document.getElementById('drill-'+id);if(!d)return;el.classList.toggle('open',d.classList.toggle('on'));}
 // Storage meter — shows how full the ~5MB on-device localStorage is (the real
@@ -20533,7 +20558,7 @@ function renderStats(){
       (T.chaps?'<div class="sv-heronum"><div class="v" data-to="'+anime.length+'">0</div><div class="l">Titles</div></div>':'')+
       '<div class="sv-heronum"><div class="v" data-to="'+counts.finished+'">0</div><div class="l">Finished</div></div>'+
       '<div class="sv-heronum"><div class="v" data-to="'+anime.filter(a=>a.fav).length+'">0</div><div class="l">Favorites</div></div>'+
-      (T.chaps?'':'<div class="sv-heronum"><div class="v">'+icon('star','fill')+' '+avg+'</div><div class="l">Avg rating</div></div>')+'</div>'+
+      (T.chaps?'':'<div class="sv-heronum"><div class="v">'+avg+'<span class="stat-of">/10</span></div><div class="l">Avg rating</div></div>')+'</div>'+
     '<div class="sv-sec"><div class="sv-h">Status</div>'+statusBars+'</div>'+
     '<div class="sv-sec"><div class="sv-h">Top genres</div>'+genreBars+'</div>'+
     '<div class="sv-sec"><div class="sv-h">Ratings'+(rated.length?' \u2014 '+avg+' average across '+rated.length:'')+'</div>'+ratingBars+'</div>'+
@@ -20559,7 +20584,7 @@ function renderStatsSheet(){
       <div class="stat-card"><div class="stat-val">${epsWatched}</div><div class="stat-lbl">Episodes watched</div></div>
       <div class="stat-card"><div class="stat-val">${hrs?approx(hrs):'—'}</div><div class="stat-lbl">Hours watched</div></div>
       ${_T.chaps?`<div class="stat-card"><div class="stat-val">${_T.chaps}</div><div class="stat-lbl">Chapters read</div></div>`:''}
-      <div class="stat-card"><div class="stat-val">${icon('star','fill')} ${avg}</div><div class="stat-lbl">Avg rating (${rated.length} rated)</div></div>
+      <div class="stat-card"><div class="stat-val">${avg}<span class="stat-of">/10</span></div><div class="stat-lbl">Avg rating (${rated.length} rated)</div></div>
       <div class="stat-card"><div class="stat-val">${anime.filter(a=>a.fav).length}</div><div class="stat-lbl">Favorites</div></div>
     </div>
     <div class="dt-label" style="margin-top:18px">Breakdown</div>

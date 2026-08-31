@@ -11956,6 +11956,16 @@ function nextUpOf(a){
   if(a.idWeak)return null;            // including any stored before the link was doubted
   const n=a.nextUp;
   if(!n||!n.id)return null;
+  // A stored answer says nothing about the question it answered, and this one is
+  // derived from an id that can change under it — a title re-matched, edited or
+  // imported keeps whatever sequel the OLD id had. That is how a finished show
+  // ends up offering another show's next season, in full confidence, forever,
+  // because nothing ever asks the question a second time.
+  //
+  // So it carries the id it came from and is only shown while that still matches.
+  // One that cannot vouch for itself is not displayed and is queued to be asked
+  // again, which is a blank space for one pass rather than a wrong answer for good.
+  if(+n.from!==(+a.aniId||0))return null;
   if(anime.some(x=>x.aniId===n.id))return null;   // on the list already — seen it, or watching it
   try{if(nextDeclined().includes(n.id))return null;}catch(e){}   // told us no
   return n;
@@ -11988,7 +11998,7 @@ async function offerNextSeason(a){
   const title=(nxt.title&&(nxt.title.english||nxt.title.romaji))||'The next season';
   const soon=nxt.status==='NOT_YET_RELEASED';
   // Record it and repaint. No sheet, nothing to dismiss, nothing lost.
-  a.nextUp={id:nxt.id,title,img:(nxt.coverImage&&nxt.coverImage.large)||'',soon,eps:nxt.episodes||0,year:nxt.seasonYear||0};
+  a.nextUp={id:nxt.id,title,img:(nxt.coverImage&&nxt.coverImage.large)||'',soon,eps:nxt.episodes||0,year:nxt.seasonYear||0,from:+a.aniId||0};
   touch(a);save();render();
   if(detailId===a.id)renderDetail();
 }
@@ -21388,7 +21398,8 @@ function coverNeedy(){return anime.filter(a=>!a.adultChk||(!a.img&&!a.imgTried)|
 // Ten at a time lands around 360. It runs after covers, so nothing visible waits
 // on it, and a failure costs a marker rather than the artwork.
 const SEQ_BATCH=10;
-function seqNeedy(){return anime.filter(a=>kindOf(a)!=='read'&&a.aniId&&!a.seqTried);}
+function seqNeedy(){return anime.filter(a=>kindOf(a)!=='read'&&a.aniId&&
+  (!a.seqTried||(a.nextUp&&+a.nextUp.from!==(+a.aniId||0))));}
 let seqRunning=false;
 async function fetchSequels(){
   if(seqRunning)return; seqRunning=true;
@@ -21429,7 +21440,7 @@ async function fetchSequels(){
           if(e){const n=e.node;
             a.nextUp={id:n.id,title:(n.title&&(n.title.english||n.title.romaji))||'Next season',
               img:(n.coverImage&&n.coverImage.large)||'',soon:n.status==='NOT_YET_RELEASED',
-              eps:n.episodes||0,year:n.seasonYear||0};
+              eps:n.episodes||0,year:n.seasonYear||0,from:+a.aniId||0};
           }else if(a.nextUp)delete a.nextUp;  // AniList no longer lists one
         }catch(e){}
       });

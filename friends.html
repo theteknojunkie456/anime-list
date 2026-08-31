@@ -2323,7 +2323,22 @@ body.first-paint .pfill,body.content-in .pfill{animation:barGrow .62s cubic-bezi
 .dt-epbar span{flex:none;font-size:12px;font-weight:700;color:var(--t3);font-variant-numeric:tabular-nums;}
 
 /* Resume card — artwork, where you're going back to, one thing to press. */
-.resume-wrap{position:relative;display:flex;align-items:center;margin:9px 18px 0;}
+/* Stacks now, because the card can be followed by the other shows you are behind
+   on. The dismiss button is absolute, so it stays pinned to the card's corner. */
+.resume-wrap{position:relative;display:flex;flex-direction:column;align-items:stretch;margin:9px 18px 0;}
+.resume-more{align-self:flex-start;margin-top:6px;padding:6px 12px;border-radius:99px;
+  background:var(--bg3);border:1px solid var(--bn2);color:var(--t2);
+  font-family:var(--fd);font-size:12px;font-weight:700;}
+.resume-more:active{transform:scale(.97);}
+.resume-rest{display:flex;flex-direction:column;gap:6px;margin-top:7px;}
+.resume-row{display:flex;align-items:center;gap:10px;width:100%;text-align:left;
+  padding:7px 9px;border-radius:14px;background:var(--bg2);border:1px solid var(--bn2);}
+.resume-row:active{transform:scale(.995);}
+.resume-row-art{width:44px;height:30px;flex:0 0 44px;border-radius:6px;object-fit:cover;background:var(--bg4);}
+.resume-row-b{display:flex;flex-direction:column;min-width:0;flex:1;}
+.resume-row-t{font-size:13px;font-weight:700;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.resume-row-s{font-size:12px;font-weight:600;color:var(--t3);}
+.resume-row-go{flex:0 0 auto;color:var(--a2);display:flex;}
 .resume-x{position:absolute;right:6px;top:6px;width:26px;height:26px;border-radius:50%;
   display:flex;align-items:center;justify-content:center;color:var(--t3);
   background:color-mix(in srgb,var(--bg) 55%,transparent);border:0;cursor:pointer;transition:color .15s;}
@@ -15712,7 +15727,6 @@ function behindHTML(){
   const items=behindItems(); if(!items.length) return '';
   if(_resumeGone===(items[0].a.id+':'+items[0].behind))return '';
   const {a,behind}=items[0];
-  const more=items.length>1?` · +${items.length-1} more show${items.length>2?'s':''}`:'';
   // It was a sentence with a button on the end, and the sentence got longer the
   // further behind you were — "ONE PIECE — 1081 new episodes since you last
   // watched · +4 more shows" wrapped to three lines and told you nothing you
@@ -15730,11 +15744,36 @@ function behindHTML(){
     <span class="resume-body">
       <span class="resume-k">Pick up where you left off</span>
       <span class="resume-t">${schEsc(a.title)}</span>
-      <span class="resume-s">Episode ${next} · ${behind} waiting${more}</span>
+      <span class="resume-s">Episode ${next} · ${behind} waiting</span>
     </span>
     <span class="resume-go">${icon('play')}</span>
   </button>
-  <button class="resume-x" onclick="dismissResume(event)" aria-label="Dismiss">${icon('x')}</button></div>`;
+  <button class="resume-x" onclick="dismissResume(event)" aria-label="Dismiss">${icon('x')}</button>
+  ${(()=>{
+    // "+1 more show" was text inside the card's own button, so the only thing it
+    // could do was resume the first show — it named the others and then hid them.
+    // Its own control now, and pressing it shows them, each one a row you can
+    // start from directly. Nested buttons are not a thing, which is why it sits
+    // outside the card rather than inside the sentence.
+    const rest=items.slice(1);
+    if(!rest.length)return '';
+    const label=_resumeOpen?'Show less':`+${rest.length} more show${rest.length>1?'s':''}`;
+    return `<button class="resume-more" onclick="toggleResumeMore(event)" aria-expanded="${_resumeOpen?'true':'false'}">${label}</button>`+
+      (_resumeOpen?`<div class="resume-rest">${rest.map(({a:b,behind:bh})=>{
+        const bart=titleBg(b)||b.img; const bn=(b.ep||0)+1;
+        return `<button class="resume-row" onclick="resumeWatch('${b.id}')">
+          ${bart?`<img class="resume-row-art" decoding="async" loading="lazy" src="${escH(bart)}" alt="">`:`<span class="resume-row-art"></span>`}
+          <span class="resume-row-b"><span class="resume-row-t">${schEsc(b.title)}</span>
+          <span class="resume-row-s">Episode ${bn} · ${bh} waiting</span></span>
+          <span class="resume-row-go">${icon('play')}</span></button>`;}).join('')}</div>`:'');
+  })()}
+  </div>`;
+}
+let _resumeOpen=false;
+function toggleResumeMore(ev){
+  try{ev.stopPropagation();}catch(e){}
+  _resumeOpen=!_resumeOpen;
+  try{renderHome();}catch(e){}
 }
 
 // ─── STATS ──────────────────────────────────────────────────────────────────

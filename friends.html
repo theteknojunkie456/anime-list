@@ -21106,13 +21106,45 @@ function storeBudgetLabel(){
 // Resolves to bytes in use, or -1 when the browser will not say. -1 means "do not
 // block": refusing an upload because we could not measure would be the app
 // getting in the way over its own uncertainty.
+// WHAT THIS BUDGET IS ACTUALLY FOR.
+//
+// estimate().usage is everything this origin stores, and that includes the
+// service worker's cache of the app's own HTML, fonts and icons. Measuring that
+// against a budget the person set for THEIR IMAGES means the app counts its own
+// code against their allowance and then tells them they are out of room while the
+// meter plainly shows they are not. Changing the cache name on every deploy — as
+// it now does, so devices actually update — makes it worse, because each new
+// build briefly doubles that figure.
+//
+// So: the app's own cache is not the user's data and is not counted. Chrome
+// breaks the total down in usageDetails and the caches line is subtracted
+// directly. Where no breakdown exists, what is left is measured instead of
+// guessed: localStorage is countable exactly, and IndexedDB is reported on its
+// own in that same breakdown when it is there at all.
 async function storeUsed(){
   try{
     if(!navigator.storage||!navigator.storage.estimate)return -1;
     const est=await navigator.storage.estimate();
     const u=+(est&&est.usage);
-    return isFinite(u)?u:-1;
+    if(!isFinite(u))return -1;
+    const d=est&&est.usageDetails;
+    if(d){
+      const cacheBytes=+d.caches||0;
+      // caches is the service worker's copy of the app itself. Never the user's.
+      const mine=u-cacheBytes;
+      return mine>=0?mine:0;
+    }
+    // No breakdown (Safari). Count what can be counted rather than reporting a
+    // number that is mostly the app measuring itself.
+    const ls=(typeof _lsBytes==='function')?(_lsBytes()||0):0;
+    return Math.min(u,Math.max(ls,0)+idbBytesGuess());
   }catch(e){return -1;}
+}
+// Images are the only large thing the app puts in IndexedDB, and it already knows
+// how big each one was when it stored it. Falls back to zero rather than to a
+// made-up number — an unknown is better reported as nothing than as fiction.
+function idbBytesGuess(){
+  try{const v=+localStorage.getItem('wl_img_bytes');return isFinite(v)&&v>0?v:0;}catch(e){return 0;}
 }
 // `incoming` is the size of what is about to be stored. Answers true if it fits.
 async function storeRoomFor(incoming){

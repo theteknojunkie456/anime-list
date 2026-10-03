@@ -34,10 +34,10 @@ t('finishing is the heaviest and is a pattern', await ev(`Array.isArray(HAPTIC.d
 t('a tick is lighter than a tap', await ev(`HAPTIC.tick<HAPTIC.tap`), true);
 t('an unknown weight still does something', await ev(`(()=>{window.__buzz=[];tap('nonsense');return window.__buzz.length;})()`), 1);
 
-t('finishing a show asks for the heavy one',
-  await ev(`(()=>{openDetail('a');window.__buzz=[];setStatus('finished');return Array.isArray(window.__buzz[0]);})()`), true);
+t('finishing an unfinished show asks for the heavy one',
+  await ev(`(()=>{openDetail('a');window.__buzz=[];setDetailStatus('finished');return Array.isArray(window.__buzz[0]);})()`), true);
 t('and any other status is the light one',
-  await ev(`(()=>{openDetail('a');window.__buzz=[];setStatus('watching');return window.__buzz[0];})()`), 11);
+  await ev(`(()=>{openDetail('a');window.__buzz=[];setDetailStatus('watching');return window.__buzz[0];})()`), 11);
 t('a rating that does not move asks for nothing',
   await ev(`(()=>{openDetail('a');setRating(7);window.__buzz=[];setRating(7);return window.__buzz.length;})()`), 0);
 t('and one that lands on a whole number taps',

@@ -6221,6 +6221,44 @@ function renderUpdates(){
              :`<button class="parse-btn" id="updMoreBtn" style="margin-top:12px" onclick="updMore()">Load older</button>`);
 }
 let _memT=null;
+// Hand a member the setup they would otherwise have to be talked through.
+//
+// The admin already knows which sources this person should be on; the person
+// opening a blank app does not. This sends the CURRENT device's source settings
+// to theirs, to be applied the next time it checks in.
+//
+// It sends settings, never a list. There is no version of this that writes what
+// somebody is watching.
+function setupKeysFromHere(){
+  const out={};
+  const want=['wl_sources','wl_src_pref','wl_src_hidden','wl_my_services'];
+  try{
+    const st=store()||localStorage;
+    want.forEach(k=>{const v=st.getItem(k);if(typeof v==='string')out[k]=v;});
+  }catch(e){}
+  return out;
+}
+async function provisionMember(deviceId,name,btn){
+  const keys=setupKeysFromHere();
+  const n=Object.keys(keys).length;
+  if(!n){toast('This device has no sources set to copy');return;}
+  askConfirm({
+    title:'Set up '+(name||'this device')+'?',
+    msg:'Sends the '+n+' source setting'+(n===1?'':'s')+' from THIS device to theirs. '+
+        'It applies once, the next time their app checks in, and only if they have not already been set up. '+
+        'Their list is never touched.',
+    yes:'Send setup',
+    onYes:async()=>{
+      if(btn)btn.textContent='Sending\u2026';
+      try{
+        const r=await adminCall('/setup-set',{deviceId,keys});
+        toast(r&&r.ok?('Setup sent \u2014 '+(r.staged||n)+' settings waiting'):'Could not send that');
+      }catch(e){toast('Could not reach the network');}
+      if(btn)btn.textContent='Set up';
+      try{loadMembers();}catch(e){}
+    }
+  });
+}
 async function loadMembers(){
   const box=document.getElementById('adminMembers');if(!box)return;
   clearTimeout(_memT);
@@ -6296,6 +6334,10 @@ async function loadMembers(){
   };
   const ap=d=>`<button class="src-chip on" onclick="adminDecideAll('${jsq(ids(d))}','approve')">Approve</button>`;
   const dn=d=>`<button class="src-chip" onclick="adminDecideAll('${jsq(ids(d))}','deny')">Deny</button>`;
+  // Sends this device's source settings to theirs, to land the next time their
+  // app checks in. Offered on anyone approved, because the common case is exactly
+  // somebody who has just been let in and has not opened it yet.
+  const setup=d=>`<button class="src-chip" onclick="provisionMember('${jsq(d.id)}','${jsq(memberLabel(d)||'')}',this)">${icon('settings')} Set up</button>`;
   const rm=d=>`<button class="src-chip fr-danger" onclick="adminForgetAll('${jsq(ids(d))}')">Remove${(d._all&&d._all.length>1)?' all '+d._all.length:''}</button>`;
   // The roster already knows who these people are, so being friends with one of
   // them should not mean reading a code out over Messages and talking them
@@ -6322,7 +6364,7 @@ async function loadMembers(){
   box.innerHTML=
     `<div class="dt-label" style="margin-top:2px">${icon('users')} Everyone · ${pending.length+approved.length+denied.length}${devs.length!==(pending.length+approved.length+denied.length)?` · ${devs.length} devices`:''}${onl?` · ${onl} online`:''}</div>`
     +group('Waiting on you',pending,d=>back(d)+ap(d)+dn(d)+rm(d))
-    +group('Members',approved,d=>fr(d)+dn(d)+rm(d))
+    +group('Members',approved,d=>fr(d)+setup(d)+dn(d)+rm(d))
     +group('Denied',denied,d=>ap(d)+rm(d),true);
   // Presence only means anything if it's current, so the open panel refreshes
   // itself — and stops the moment it isn't on screen.
@@ -11609,7 +11651,46 @@ async function pollAdmin(){
   try{
     const j=await netCall('/status',{deviceId:wlDevice()});
     applyTitles((j&&j.titles)||null);
+    applySetup((j&&j.setup)||null);
   }catch(e){}
+}
+// Settings an admin left waiting before this device had ever been opened.
+//
+// Somebody invited here arrives at a blank app and has to be told which sources
+// to turn on before it does anything useful. This lets that be done for them in
+// advance: the first check-in picks the settings up and applies them.
+//
+// ONCE, and never the list. It is keyed on the stamp the admin set, so a device
+// that has already taken a given setup ignores it from then on — being handed a
+// configuration once is help; being handed it on every poll would mean your own
+// settings silently reverting every few minutes, forever, with no way to tell
+// why. Anything the person changes afterwards is theirs.
+const SETUP_SEEN='wl_setup_seen';
+function applySetup(su){
+  if(!su||!su.at||!su.keys||typeof su.keys!=='object')return;
+  let seen=0; try{seen=+localStorage.getItem(SETUP_SEEN)||0;}catch(e){}
+  if(+su.at<=seen)return;
+  // The same fixed list the worker enforces. Stated twice on purpose: the server
+  // decides what it will store, this decides what it will honour, and neither
+  // trusts the other to have got it right.
+  const ALLOW=['wl_sources','wl_src_pref','wl_src_hidden','wl_my_services',
+               'animetheme','retro_on','retro_bits','wl_kind'];
+  let n=0;
+  try{
+    const st=store()||localStorage;
+    Object.keys(su.keys).forEach(k=>{
+      if(ALLOW.indexOf(k)<0)return;
+      const v=su.keys[k];
+      if(typeof v!=='string')return;
+      try{st.setItem(k,v);n++;}catch(e){}
+    });
+    localStorage.setItem(SETUP_SEEN,String(su.at));
+  }catch(e){}
+  if(n){
+    try{loadTheme();}catch(e){}
+    try{render();}catch(e){}
+    toast('Your sources were set up for you');
+  }
 }
 // ─── Renamed titles ─────────────────────────────────────────────────────────
 // Purely what's on screen. The real title stays on _rt, which is what gets

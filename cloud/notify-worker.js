@@ -466,6 +466,8 @@ async function handleFetch(request, env) {
       return handleMuPin(body, env);
     case "/titles-set":
       return handleTitlesSet(body, env);
+    case "/setup-set":
+      return handleSetupSet(body, env);
     case "/rename":
       return handleRename(body, env);
     case "/approve":
@@ -866,13 +868,17 @@ async function handleStatus(body, env) {
   if (rec.prank || rec.pranked) { delete rec.prank; delete rec.pranked; dirty = true; }
   // Renamed titles ride along the same poll. Passive, so no trigger count — just
   // a clock, and the admin can put the real names back at any time.
+  // A staged setup rides the same poll renamed titles do. It is handed over as
+  // many times as the device asks; the device decides whether it has already
+  // applied this one, because only the device knows that.
+  const setup = rec.setup || null;
   let titles = null;
   if (rec.titles) {
     if (rec.titles.until && Date.now() > rec.titles.until) { delete rec.titles; dirty = true; }
     else titles = rec.titles;
   }
   if (dirty) await env.SUBS.put(devKey(body.deviceId), JSON.stringify(rec));
-  return json({ ok: true, status: rec.status, titles });
+  return json({ ok: true, status: rec.status, titles, setup });
 }
 
 // Public: how many chapters a series has, so the app can draw a chapter list.
@@ -954,6 +960,46 @@ async function handleMuList(body, env) {
 // Admin: rename the titles one device sees. `all` renames every title; `map`
 // renames specific ones by AniList id. Cosmetic only — the device keeps the real
 // names for storage, sync and watch links, so nothing it saves is corrupted.
+// Stage a device's SETTINGS before anybody has opened the app on it.
+//
+// Somebody invited to this list arrives at a blank app and has to be told which
+// sources to turn on before it is useful to them. The admin already knows the
+// answer, so they can leave it waiting: the next time that device checks in it
+// picks the settings up and applies them once.
+//
+// Settings only, and only from a fixed list of keys. This endpoint can never
+// write somebody's LIST, and a device that has already been set up this way
+// ignores a repeat of the same stamp — being handed a configuration once is
+// help, being handed it on every poll is the admin overruling you forever.
+const SETUP_KEYS = [
+  "wl_sources", "wl_src_pref", "wl_src_hidden", "wl_my_services",
+  "animetheme", "retro_on", "retro_bits", "wl_kind",
+];
+async function handleSetupSet(body, env) {
+  if (!adminOK(body, env)) return json({ ok: false, error: "unauthorized" }, 401);
+  const key = devKey(body.deviceId);
+  const raw = await env.SUBS.get(key);
+  if (!raw) return json({ ok: false, error: "not found" }, 404);
+  const rec = JSON.parse(raw);
+  if (body.clear) {
+    delete rec.setup;
+    await env.SUBS.put(key, JSON.stringify(rec));
+    return json({ ok: true, cleared: true });
+  }
+  const keys = {};
+  if (body.keys && typeof body.keys === "object") {
+    for (const k of Object.keys(body.keys)) {
+      if (SETUP_KEYS.indexOf(k) < 0) continue;            // not on the list, not written
+      const v = body.keys[k];
+      if (typeof v !== "string") continue;
+      keys[k] = v.slice(0, 4000);
+    }
+  }
+  if (!Object.keys(keys).length) return json({ ok: false, error: "nothing to set up" }, 400);
+  rec.setup = { at: Date.now(), keys };
+  await env.SUBS.put(key, JSON.stringify(rec));
+  return json({ ok: true, staged: Object.keys(keys).length });
+}
 async function handleTitlesSet(body, env) {
   if (!adminOK(body, env)) return json({ ok: false, error: "unauthorized" }, 401);
   const key = devKey(body.deviceId);

@@ -53,5 +53,25 @@ const txt=await ev(`(async()=>{document.body.insertAdjacentHTML('beforeend','<di
   await showSyncDiagnosis();return document.getElementById('syncDiagBox').textContent;})()`);
 t('and says so in words', /THIS device holds the newer edits/.test(txt), true);
 t('listing both counts', /Titles here1|Titles here\s*1/.test(txt.replace(/\s+/g,'')+txt), true);
+
+// An encrypted cloud copy must report "not readable", never "never". The first
+// version said "never", which reads as "the cloud has no edits" — a completely
+// different claim from "I could not open it", and the exact kind of confident
+// wrong number this screen exists to prevent.
+const enc = await ev(`(async()=>{
+  window.__cloud = JSON.stringify({v:2, ct:"nonsense", iv:"nope"});
+  cryptoKey = null;
+  const d = await syncDiagnose();
+  await showSyncDiagnosis();
+  const txt = document.getElementById("syncDiagBox").textContent;
+  return {unknown: !!d.cloudUnknown,
+          saysNever: /Newest edit in cloud\\s*never/i.test(txt),
+          saysUnreadable: /not readable here/.test(txt),
+          verdict: /cannot be compared/.test(txt)};})()`);
+console.log("    encrypted:", JSON.stringify(enc));
+t("an unreadable cloud copy is marked unknown", enc.unknown, true);
+t("and is never reported as never", enc.saysNever, false);
+t("it says plainly that it could not read it", enc.saysUnreadable, true);
+t("and refuses to claim a comparison", enc.verdict, true);
 console.log('\n'+pass+' passed, '+fail+' failed');
 ws.close();ch.kill();srv.kill();process.exit(fail?1:0);

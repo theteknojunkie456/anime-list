@@ -7623,11 +7623,27 @@ async function syncDiagnose(){
       out.cloudUpdatedAt=+res.updatedAt||0;
       const {inner}=unwrapSync(res.data);
       let arr=null;
-      try{arr=JSON.parse(inner);}catch(e){}
+      // An encrypted cloud copy is the normal case for anyone who set a password,
+      // and the first version of this just failed to parse the ciphertext and
+      // reported "locked" with a newest-edit of "never". "Never" and "I could not
+      // read it" are completely different answers, and the second one was being
+      // shown as the first — which is exactly the kind of confident wrong number
+      // this whole screen exists to stop.
+      //
+      // The app already holds the key whenever the list is unlocked, so use it.
+      // If it genuinely cannot be read, say THAT.
+      if(inner&&inner.v===2){
+        if(cryptoKey){
+          try{arr=JSON.parse(await decList(inner,cryptoKey));}
+          catch(e){out.cloudCount='could not decrypt';out.cloudUnknown=true;}
+        }else{out.cloudCount='locked \u2014 unlock to compare';out.cloudUnknown=true;}
+      }else if(Array.isArray(inner)){arr=inner;}
+      else{try{arr=JSON.parse(inner);}catch(e){}}
       if(Array.isArray(arr)){
         out.cloudCount=arr.length;
+        out.cloudUnknown=false;
         arr.forEach(a=>{const u=_upd(a);if(u>out.cloudNewest)out.cloudNewest=u;});
-      }else out.cloudCount='locked';
+      }else if(out.cloudCount===null){out.cloudCount='unreadable';out.cloudUnknown=true;}
     }else out.cloudCount=0;
   }catch(e){out.cloudCount='unreachable';}
   return out;
@@ -7646,7 +7662,7 @@ async function showSyncDiagnosis(btn){
   let verdict;
   if(d.cloudCount==='unreachable')verdict='The cloud could not be reached, so this device is on its own copy.';
   else if(d.cloudCount===0)verdict='The cloud holds nothing. This device has not managed a successful push.';
-  else if(d.cloudCount==='locked')verdict='The cloud copy is password-locked, so its contents cannot be counted here.';
+  else if(d.cloudUnknown)verdict='The cloud copy could not be read on this device, so the two sides cannot be compared here. Unlock the list and run this again.';
   else if(d.localNewest>d.cloudNewest)verdict='THIS device holds the newer edits \u2014 the cloud is behind it.';
   else if(d.cloudNewest>d.localNewest)verdict='THE CLOUD holds newer edits than this device.';
   else verdict='Both sides carry the same newest edit.';
@@ -7657,7 +7673,7 @@ async function showSyncDiagnosis(btn){
     +row('Titles here',d.localCount)
     +row('Titles in the cloud',d.cloudCount)
     +row('Newest edit here',fmtWhen(d.localNewest))
-    +row('Newest edit in cloud',fmtWhen(d.cloudNewest))
+    +row('Newest edit in cloud',d.cloudUnknown?'not readable here':fmtWhen(d.cloudNewest))
     +row('Cloud last written',fmtWhen(d.cloudUpdatedAt))
     +row('This device last synced',fmtWhen(d.lastSyncAt))
     +row('Deletions recorded here',d.tombs)

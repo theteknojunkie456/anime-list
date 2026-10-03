@@ -11104,6 +11104,39 @@ function gridHTML(list){
   const rest=_gridAll.length>_gridShown?'<div id="gridMore" aria-hidden="true"></div>':'';
   return `<div class="grid" id="gridEl">${_gridAll.slice(0,_gridShown).map(a=>posterCard(a)).join('')}</div>${rest}`;
 }
+// The images for a handful of cards, patched into those cards. No list-wide
+// scan, and no render() — rewriting the entire grid to show one late thumbnail
+// is how a scroll becomes a stutter.
+async function hydrateNewCards(items){
+  if(!items||!items.length)return;
+  const jobs=[];
+  for(const a of items){
+    if(!a)continue;
+    for(const pair of _IMG_FIELDS){
+      const f=pair[0],kf=pair[1];
+      if(a[kf]&&!a[f])jobs.push(idbGet(a[kf]).then(d=>{if(d)a[f]=d;}));
+    }
+  }
+  if(!jobs.length)return;                       // nothing offloaded → nothing to do
+  try{await Promise.all(jobs);}catch(e){}
+  // Patch the pictures straight into the cards that were just drawn.
+  // Not scoped to #gridEl: that element only exists in the grid view, and on the
+  // home screen these same cards live in the row rails — so scoping to it meant
+  // the function returned early and the picture never appeared, on the screen
+  // people actually look at.
+  const g=document;
+  items.forEach(a=>{
+    if(!a||!a.img)return;
+    try{
+      // A card with no picture renders a LETTER PLACEHOLDER, not an <img> — so
+      // there is no src to patch, which is why setting one silently did nothing.
+      // Redrawing the single card covers both cases and is still one card rather
+      // than the whole grid.
+      const el=g.querySelector('[data-gid="'+String(a.id).replace(/"/g,'')+'"]');
+      if(el)el.outerHTML=posterCard(a);
+    }catch(e){}
+  });
+}
 function armGridMore(){
   try{if(_gridIO){_gridIO.disconnect();_gridIO=null;}}catch(e){}
   const sentinel=document.getElementById('gridMore'); if(!sentinel)return;
@@ -11114,7 +11147,14 @@ function armGridMore(){
     if(next.length){
       g.insertAdjacentHTML('beforeend',next.map(a=>posterCard(a)).join(''));
       _gridShown+=next.length;
-      try{hydrateImages&&hydrateImages();}catch(e){}
+      // hydrateImages() walks the WHOLE list, waits on IndexedDB for every
+      // offloaded picture, and then calls render() — a full rebuild of the grid.
+      // Running that each time another forty-eight cards are appended is what
+      // made scrolling stall: measured at a 601ms frame, with twenty of
+      // forty-one frames dropped. Appending cards does not change which images
+      // are offloaded, so the whole-list pass has no business here. Only the
+      // cards just added can be missing a picture, and only those are fetched.
+      try{hydrateNewCards(next);}catch(e){}
       try{syncBulkUI&&syncBulkUI();}catch(e){}      // a card drawn late still shows it is selected
     }
     if(_gridShown>=_gridAll.length){
@@ -11179,7 +11219,9 @@ function posterCard(a,nSeas){
   const durBits=[twMins?fmtWatch(twMins):'',_nx?(_nx.soon?'S2 soon':'S2 out'):''].filter(Boolean);
   const durLine=durBits.length?`<div class="pcard-sub">${durBits.join(' \u00b7 ')}</div>`:'';
   const noteLine=noteHitHTML(a);
-  return`<div class="pcard${recSel&&recSel.has(a.id)?' sel':''}${bulkSel&&bulkSel.has(a.id)?' bulk':''}" onclick="pcTap('${a.id}',event)"
+  // data-gid so a late-arriving image can be patched into THIS card without
+  // rebuilding the grid around it.
+  return`<div class="pcard${recSel&&recSel.has(a.id)?' sel':''}${bulkSel&&bulkSel.has(a.id)?' bulk':''}" data-gid="${escH(a.id)}" onclick="pcTap('${a.id}',event)"
     oncontextmenu="pcMenu('${a.id}',event)" ontouchstart="pcHoldStart('${a.id}',event)" ontouchmove="pcHoldMove(event)" ontouchend="pcHoldEnd()" ontouchcancel="pcHoldEnd()">
     <div class="pcard-wrap">
       ${img}

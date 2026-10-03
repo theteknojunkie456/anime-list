@@ -5707,7 +5707,19 @@ async function keyUnlock(){
     setNetStatus('approved');
     hideJoinGate();
     if(err)err.textContent='';
-    toast('Welcome back \u2014 pulling your list down');
+    // The key is the credential and always was; this is the part that makes it
+    // read as signing in rather than redeeming a code. The server already sends
+    // back the name on the record it just matched, so the app can say whose list
+    // is coming down instead of a generic welcome.
+    //
+    // Deliberately NOT a second thing to get right: the name is shown, never
+    // checked. One account legitimately has several rows (rejoining leaves the
+    // old one in place, on purpose), so there is no single stored name to match
+    // against \u2014 and matching the wrong one would lock somebody out of their own
+    // library over a capital letter.
+    const who=String((r&&r.name)||'').trim();
+    if(who){try{if(!knownName())localStorage.setItem('party_name',who);}catch(e){}}
+    toast(who?('Welcome back, '+who+' \u2014 pulling your list down'):'Welcome back \u2014 pulling your list down');
     // The same path a normal launch takes: pull, decrypt if it is locked, adopt,
     // with all the empty-cloud guards already in it. No second implementation.
     try{await syncOnOpen();}catch(e){}

@@ -7580,6 +7580,8 @@ function forcePushList(){
     onYes:async()=>{
       preSyncBackup();
       try{
+        _adoptStamp=Date.now();     // tell every other device to take this one whole
+        setLastAdopt(_adoptStamp);  // including us, so we never adopt our own push back
         setLastPushFP('');          // defeat the "nothing changed" skip
         setPushState({n:0,at:0,why:''});   // and any backoff still in effect
         await syncPush();
@@ -7679,6 +7681,12 @@ async function showSyncDiagnosis(btn){
     +row('Deletions recorded here',d.tombs)
     +row('Pushes failing',d.pushFails);
 }
+let _adoptStamp=0;   // set only by forcePushList, consumed by the next push
+// A device honours any given adopt stamp once. Without this the same cloud copy
+// would replace the local list on every open, forever, and editing anything on
+// this device would feel like the app fighting you.
+function lastAdopt(){try{return +localStorage.getItem('wl_adopt_seen')||0;}catch(e){return 0;}}
+function setLastAdopt(t){try{localStorage.setItem('wl_adopt_seen',String(t||0));}catch(e){}}
 async function syncPush(){
   const code=syncCode();if(!code||!SYNC_URL)return;
   // This REPLACES the cloud copy, which is the recovery path for everything
@@ -7748,6 +7756,12 @@ async function syncPush(){
     if(cryptoKey&&envWraps){list=await buildEnvelope();} // ciphertext (master-key envelope) to cloud
     // v3 wrapper: the (maybe-encrypted) list + a plaintext extra bundle (themes + friends).
     const payload={v:3,list,extra:collectExtra()};
+    // "Use this device's list everywhere" replaced the CLOUD, and every other
+    // device then merged with it — so their extras flowed straight back and the
+    // thing you pressed did not mean what it said. One flag fixes that: a stamp
+    // saying THIS copy is to be adopted whole, not merged into. It rides one push
+    // only, is honoured once per device, and is never set by ordinary syncing.
+    if(_adoptStamp){payload.adopt=_adoptStamp;payload.adoptBy=String(wlDevice()||'');_adoptStamp=0;}
     const r=await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({op:'push',code,data:payload})});
     const d=await r.json();
     if(d&&d.ok){setSyncAt(d.updatedAt);notePushOK();setLastPushFP(fp);}
@@ -7867,6 +7881,25 @@ async function syncOnOpen(){
         try{arr=JSON.parse(await decList(inner,cryptoKey));}catch{return;} // wrong master / corrupt → leave local intact
         envWraps={pw:inner.pw||(envWraps&&envWraps.pw),rec:inner.rec||(envWraps&&envWraps.rec),pfk:inner.pfk||(envWraps&&envWraps.pfk)};
       }else if(Array.isArray(inner)){arr=inner;}
+      // Somebody pressed "use this device's list everywhere" on another device.
+      // Take it whole rather than merging, exactly once, and keep a restore point
+      // first because this is the one path that can remove titles this device
+      // holds and the cloud does not.
+      const _ad=+(inner&&inner.adopt)||+(res.data&&res.data.adopt)||0;
+      // Adopting deliberately bypasses the collapse guard — a smaller list is the
+      // POINT when somebody has chosen which device is right. Empty is different:
+      // no one has ever meant "make every device empty", and the push side already
+      // refuses it, so this is the second lock on the same door.
+      if(arr&&arr.length&&_ad&&_ad>lastAdopt()){
+        try{preSyncBackup();}catch(e){}
+        setLastAdopt(_ad);
+        anime=migrate(arr);
+        try{writeLocal();}catch(e){}
+        setSyncAt(res.updatedAt||Date.now());
+        try{render();}catch(e){}
+        toast('Took the list from your other device \u2014 '+arr.length+' titles');
+        return;
+      }
       if(arr){
         // Data-safety guard: never let auto-sync silently replace a non-empty local
         // list with an empty cloud copy. A fresh or half-initialized device can push

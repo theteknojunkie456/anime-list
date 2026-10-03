@@ -4073,6 +4073,20 @@ body.recsel .pcard{position:relative;}
 .sched-day-date{font-size:12px;font-weight:600;color:var(--t2);}
 .sched-today-pill{margin-left:auto;font-size:10px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:var(--a2);background:var(--ag);border:1px solid var(--a);padding:2.5px 9px;border-radius:99px;}
 .sched-day-body{display:flex;flex-direction:column;}
+/* The next thing to air is the one question this screen is actually asked, so it
+   is the one row that looks different: lit on the left, lifted off the ground,
+   and labelled. Everything else stays quiet so that it can be loud. */
+.sched-row.is-next{background:var(--ag);box-shadow:inset 3px 0 0 var(--a);border-radius:10px;}
+.sched-next-tag{margin-left:8px;padding:2px 8px;border-radius:99px;background:var(--a);color:var(--aFg);
+  font-family:var(--fd);font-size:10px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;
+  vertical-align:middle;white-space:nowrap;}
+/* A delay is a warning, not decoration, so it borrows the one colour nothing else
+   in this app uses for anything cheerful. */
+.sched-delay{margin-right:7px;padding:2px 7px;border-radius:6px;
+  background:rgba(255,77,79,0.14);color:#ff6b6b;border:1px solid rgba(255,77,79,0.32);
+  font-family:var(--fd);font-size:10px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;
+  vertical-align:middle;white-space:nowrap;}
+.sched-row.is-delayed .sched-row-sub{color:#ff8f8f;}
 .sched-row{display:flex;align-items:center;gap:11px;padding:9px 14px;min-height:44px;cursor:pointer;border-top:1px solid var(--bn2);transition:background .14s;}
 .sched-new{display:inline-block;margin-left:6px;padding:1px 6px;border-radius:6px;font-size:10px;font-weight:800;letter-spacing:.4px;background:var(--a);color:var(--aFg);vertical-align:middle;}
 .sched-row:active{background:var(--bg4);}
@@ -22349,7 +22363,16 @@ async function fetchSchedEpisodes(startSec,endSec){
       const r=await fetch('https://graphql.anilist.co',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({query:q})});
       if(r.status===429){await pause(1500);i-=50;continue;}
       const j=await r.json();const arr=(j&&j.data&&j.data.Page&&j.data.Page.airingSchedules)||[];
-      arr.forEach(s=>{const a=byAni[s.mediaId];if(!a)return;const k=s.mediaId+':'+s.episode;if(seen.has(k))return;seen.add(k);out.push({id:a.id,title:a.title,img:a.img,episode:s.episode,airingAt:s.airingAt,aniId:s.mediaId,lag:subLagMins(itemHost(a))});});
+      arr.forEach(s=>{const a=byAni[s.mediaId];if(!a)return;const k=s.mediaId+':'+s.episode;if(seen.has(k))return;seen.add(k);
+        // The one thing this screen can be wrong about without anyone noticing:
+        // it keeps showing a time that has quietly moved, and you find out by
+        // turning up to nothing. We already hold the time last known for this
+        // exact episode, so if the feed now says later, say so. Only later counts
+        // \u2014 an episode pulled forward is not a delay. Ten minutes of slack
+        // keeps feed jitter from crying wolf.
+        const known=(+a.airEp===+s.episode)?(+a.airAt||0):0;
+        const delayed=(known&&s.airingAt>known+600)?known:0;
+        out.push({id:a.id,title:a.title,img:a.img,episode:s.episode,airingAt:s.airingAt,aniId:s.mediaId,lag:subLagMins(itemHost(a)),delayed});});
     }catch(e){/* network hiccup — remaining chunks + airAt fallback still populate */}
     if(i+50<ids.length)await pause(700);
   }
@@ -22362,6 +22385,7 @@ function renderSchedDays(ws,eps){
   const notifSet=notifyOn()?new Set(notifyAnimeIds()):null;
   const notifSetR=notifyOn()&&typeof notifyMangaIds==='function'?new Set(notifyMangaIds()):null;
   const todayKey=schedDayKey(new Date());
+  let _nextDone=false;   // exactly one row in the week is the next to air
   let html='';
   for(let i=0;i<7;i++){
     const day=new Date(ws);day.setDate(day.getDate()+i);
@@ -22379,8 +22403,11 @@ function renderSchedDays(ws,eps){
         const bell=nset&&e.aniId&&nset.has(e.aniId)?'<span class="sched-bell" title="Notifications on">'+icon('bell')+'</span>':'';
         var _isRel=e.id&&(''+e.id).indexOf('rel:')===0;var _click=_isRel?("addRelatedSched('"+e.aniId+"')"):("openDetail('"+e.id+"')");var _newt=_isRel?'<span class="sched-new">NEW</span>':'';
         var _cd='<span class="sched-cd" data-at="'+e.airingAt+'" data-lag="'+(e.lag||0)+'"'+(e.read?' data-day="1"':'')+'>'+schedCountdown(e.airingAt,!!e.read,e.lag)+'</span>';
+        var _was=e.delayed?'<span class="sched-delay">Delayed</span>':'';
         var _sub=(e.read?('New chapter \u00b7 expected'):('Ep '+(e.episode||'?')+' \u00b7 '+t))+' \u00b7 '+_cd;
-        rows+='<div class="sched-row'+(e.read?' is-read':'')+'" onclick="'+_click+'">'+thumb+'<div class="sched-row-main"><div class="sched-row-title">'+schEsc(e.title)+_newt+bell+'</div><div class="sched-row-sub">'+_sub+'</div></div></div>';
+        var _next=(!_nextDone&&e.airingAt*1000>Date.now())?(_nextDone=true,' is-next'):'';
+        var _nx=_next?'<span class="sched-next-tag">Airing next</span>':'';
+        rows+='<div class="sched-row'+(e.read?' is-read':'')+_next+(e.delayed?' is-delayed':'')+'" onclick="'+_click+'">'+thumb+'<div class="sched-row-main"><div class="sched-row-title">'+_was+schEsc(e.title)+_newt+bell+_nx+'</div><div class="sched-row-sub">'+_sub+'</div></div></div>';
       });
     }else rows='<div class="sched-empty-day">—</div>';
     html+='<div class="'+cls+'"><div class="sched-day-head"><span class="sched-day-name">'+day.toLocaleDateString([],{weekday:'long'})+'</span><span class="sched-day-date">'+schedFmt(day)+'</span>'+pill+'</div><div class="sched-day-body">'+rows+'</div></div>';

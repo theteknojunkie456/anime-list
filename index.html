@@ -7590,6 +7590,79 @@ function forcePushList(){
     }
   });
 }
+// WHY IS THIS DEVICE DIFFERENT FROM THAT ONE.
+//
+// Two devices disagreeing about a list is the hardest thing in this app to
+// reason about from the outside, and guessing at it from the code has already
+// been wrong once. Every number that decides a merge is knowable, so this shows
+// them: what this device holds, what the cloud holds, when each last wrote, and
+// the newest edit stamp on either side. Read it on both devices and the
+// disagreement stops being a mystery and becomes a comparison.
+//
+// It reads. It never writes, never pushes, never pulls into the list — asking a
+// diagnostic question must not change the thing being diagnosed.
+async function syncDiagnose(){
+  const out={
+    build:(typeof RELEASE!=='undefined'&&RELEASE&&RELEASE.v)||'?',
+    device:(typeof wlDevice==='function'?String(wlDevice()).slice(0,8):'?'),
+    localCount:0,localNewest:0,localOldest:0,
+    cloudCount:null,cloudUpdatedAt:0,cloudNewest:0,
+    lastSyncAt:syncAt(),tombs:0,pushFails:0,
+  };
+  try{
+    const mine=realList();
+    out.localCount=mine.length;
+    mine.forEach(a=>{const u=_upd(a);if(u>out.localNewest)out.localNewest=u;
+      if(!out.localOldest||(u&&u<out.localOldest))out.localOldest=u;});
+  }catch(e){}
+  try{out.tombs=Object.keys(tombs()).length;}catch(e){}
+  try{out.pushFails=(pushState()||{}).n||0;}catch(e){}
+  try{
+    const res=await syncPull();
+    if(res&&res.data){
+      out.cloudUpdatedAt=+res.updatedAt||0;
+      const {inner}=unwrapSync(res.data);
+      let arr=null;
+      try{arr=JSON.parse(inner);}catch(e){}
+      if(Array.isArray(arr)){
+        out.cloudCount=arr.length;
+        arr.forEach(a=>{const u=_upd(a);if(u>out.cloudNewest)out.cloudNewest=u;});
+      }else out.cloudCount='locked';
+    }else out.cloudCount=0;
+  }catch(e){out.cloudCount='unreachable';}
+  return out;
+}
+function fmtWhen(ms){
+  if(!ms)return 'never';
+  const d=new Date(+ms);
+  return d.toLocaleDateString([],{day:'numeric',month:'short'})+' '+d.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
+}
+async function showSyncDiagnosis(btn){
+  const box=document.getElementById('syncDiagBox');
+  if(box)box.innerHTML='<p class="ai-desc">Checking\u2026</p>';
+  const d=await syncDiagnose();
+  // The comparison that matters is stated outright rather than left to be worked
+  // out from six numbers: whose copy is newer, and by how much.
+  let verdict;
+  if(d.cloudCount==='unreachable')verdict='The cloud could not be reached, so this device is on its own copy.';
+  else if(d.cloudCount===0)verdict='The cloud holds nothing. This device has not managed a successful push.';
+  else if(d.cloudCount==='locked')verdict='The cloud copy is password-locked, so its contents cannot be counted here.';
+  else if(d.localNewest>d.cloudNewest)verdict='THIS device holds the newer edits \u2014 the cloud is behind it.';
+  else if(d.cloudNewest>d.localNewest)verdict='THE CLOUD holds newer edits than this device.';
+  else verdict='Both sides carry the same newest edit.';
+  const row=(k,v)=>'<div style="display:flex;justify-content:space-between;gap:12px;padding:3px 0"><span class="ai-desc" style="margin:0">'+k+'</span><b style="font-family:var(--fd);font-size:12px">'+v+'</b></div>';
+  if(box)box.innerHTML='<p class="ai-desc" style="margin-bottom:6px"><b style="color:var(--a2)">'+verdict+'</b></p>'
+    +row('Build on this device',d.build)
+    +row('Device id',d.device)
+    +row('Titles here',d.localCount)
+    +row('Titles in the cloud',d.cloudCount)
+    +row('Newest edit here',fmtWhen(d.localNewest))
+    +row('Newest edit in cloud',fmtWhen(d.cloudNewest))
+    +row('Cloud last written',fmtWhen(d.cloudUpdatedAt))
+    +row('This device last synced',fmtWhen(d.lastSyncAt))
+    +row('Deletions recorded here',d.tombs)
+    +row('Pushes failing',d.pushFails);
+}
 async function syncPush(){
   const code=syncCode();if(!code||!SYNC_URL)return;
   // This REPLACES the cloud copy, which is the recovery path for everything
@@ -7957,6 +8030,12 @@ function renderSyncUI(){
         <button class="parse-btn" style="margin:0;flex:1" onclick="copySyncCode()">${icon('clipboard')} Copy code</button>
         <button class="imp-all" onclick="syncOff()">Turn off</button>
       </div>
+      <details class="dt-fold" style="margin-top:12px">
+        <summary>${icon('refresh')} Why is this device different?<span class="dt-fold-x">Check</span></summary>
+        <p class="ai-desc" style="font-size:12px;margin-top:4px">Reads this device and the cloud and shows every number a merge depends on. Changes nothing. Run it on both devices and compare.</p>
+        <button class="imp-all" style="width:100%;margin-top:8px" onclick="showSyncDiagnosis(this)">Check both sides</button>
+        <div id="syncDiagBox" style="margin-top:10px"></div>
+      </details>
       <details class="dt-fold" style="margin-top:12px">
         <summary>${icon('upload')} Use this device's list everywhere<span class="dt-fold-x">Open</span></summary>
         <p class="ai-desc" style="font-size:12px;margin-top:4px">Devices normally merge, newest edit per title winning. This ends that: the ${realList().length} titles on <b>this</b> device replace the cloud copy, and every other device takes this version. Anything held only on another device is lost. A restore point stays on this device.</p>

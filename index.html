@@ -4611,6 +4611,90 @@ body.recsel .pcard{position:relative;}
    drawing an eye to when it changes. */
 @keyframes epBump{0%{transform:none;}42%{transform:scale(1.14);}100%{transform:none;}}
 .ep-bumped{animation:epBump .26s cubic-bezier(.2,.75,.3,1);}
+
+/* ── MATERIAL ────────────────────────────────────────────────────────────────
+   The difference between a dark interface that looks designed and one that looks
+   generated is almost entirely whether its surfaces behave like surfaces. Flat
+   panels on a flat ground, all the same value, reads as a wireframe someone
+   filled in. What the reference does — and it is the only thing it really does —
+   is light everything from above: one hairline of light along the top edge of
+   every raised thing, one soft shadow beneath it, and a ground that is darker
+   than everything standing on it.
+
+   None of it costs anything to draw. No blur, no filter, no compositing layer —
+   an inset box-shadow and an outset one, which is the cheapest possible way to
+   buy depth and matters here because the open complaint is lag. */
+:root{
+  --lift-1:inset 0 1px 0 rgba(255,255,255,.055), 0 8px 20px -14px rgba(0,0,0,.85);
+  --lift-2:inset 0 1px 0 rgba(255,255,255,.075), 0 16px 34px -20px rgba(0,0,0,.9);
+  --edge-hi:inset 0 1px 0 rgba(255,255,255,.06);
+}
+/* Raised things: the decks, the cards, the panels that hold controls. */
+.dt-deck,.stat-card,.src-fold,.resume-card,.sv-heronum{box-shadow:var(--lift-1);}
+.sheet,.lock-card{box-shadow:var(--lift-2);}
+/* Artwork is already a picture, so it only wants the hairline — a shadow under a
+   cover competes with the cover. */
+.pcard-img,.rz-card{box-shadow:var(--edge-hi);}
+
+/* A section of the page is a surface too, not just a gap between headings. The
+   ground goes a step darker underneath so the shelves read as sitting ON it. */
+.rz-sec{background:linear-gradient(180deg,color-mix(in srgb,var(--bg2) 45%,transparent) 0%,transparent 72%);}
+
+/* ── A MARK OF THE HAND ──────────────────────────────────────────────────────
+   The dotted corner is the one piece of pure ornament the reference carries, and
+   it is why its panels look made rather than emitted. Two shapes, three percent
+   opacity, in the corner where nothing else ever goes — present enough to notice
+   on the second look, never enough to read as noise. */
+.dt-deck,.stat-card{position:relative;overflow:hidden;}
+.dt-deck::after,.stat-card::after{
+  content:"";position:absolute;right:9px;bottom:9px;width:30px;height:16px;
+  background-image:radial-gradient(currentColor .5px,transparent .5px);
+  background-size:5px 5px;opacity:.14;color:var(--t3);pointer-events:none;
+}
+/* The shelf mark gets the same treatment as everything else that is lit. */
+.rz-head::before{box-shadow:0 0 10px -2px var(--glow);}
+
+/* ── FINISHING SOMETHING ─────────────────────────────────────────────────────
+   A tracker has exactly one emotional peak and this is it. Everything else in
+   here is bookkeeping; this is the moment the bookkeeping was for. It gets more
+   care than it strictly needs, which is the only real difference between
+   software somebody made and software that was merely assembled.
+
+   A stamp lands: over-scaled and tilted, then settling square, the way a stamp
+   actually behaves when a hand brings it down. Two hundred and sixty
+   milliseconds, once, transform and opacity only. */
+@keyframes stampDown{
+  0%  {opacity:0;transform:translate(-50%,-50%) scale(1.9) rotate(-13deg);}
+  55% {opacity:1;transform:translate(-50%,-50%) scale(.94) rotate(2.5deg);}
+  100%{opacity:1;transform:translate(-50%,-50%) scale(1) rotate(-4deg);}
+}
+@keyframes stampGlow{from{opacity:.55;}to{opacity:0;}}
+.fin-stamp{
+  position:fixed;left:50%;top:50%;z-index:900;pointer-events:none;
+  font-family:var(--fd);font-size:40px;font-weight:800;letter-spacing:.08em;
+  color:var(--a);border:3px solid var(--a);border-radius:14px;padding:10px 22px;
+  background:color-mix(in srgb,var(--bg) 82%,transparent);
+  animation:stampDown .26s cubic-bezier(.2,.9,.3,1) forwards;
+  text-transform:uppercase;
+}
+.fin-stamp::after{
+  content:"";position:absolute;inset:-18px;border-radius:26px;
+  background:radial-gradient(closest-side,var(--glow),transparent);
+  animation:stampGlow .5s ease-out forwards;
+}
+.fin-stamp.go{animation:stampDown .26s cubic-bezier(.2,.9,.3,1) forwards, stampOut .22s ease-in .62s forwards;}
+@keyframes stampOut{to{opacity:0;transform:translate(-50%,-50%) scale(1.06) rotate(-4deg);}}
+
+/* The dot after the wordmark is the app's pulse. It beats while something is
+   actually being sent, and sits still the rest of the time — a status light that
+   means something, not decoration that is always moving. */
+.hdr-title::after{
+  content:"";display:inline-block;width:6px;height:6px;border-radius:50%;
+  background:var(--a);margin-left:5px;vertical-align:middle;
+  transition:opacity .3s;opacity:.85;
+}
+:root.syncing .hdr-title::after{animation:pulseDot 1.1s ease-in-out infinite;}
+@keyframes pulseDot{0%,100%{opacity:.3;transform:scale(.85);}50%{opacity:1;transform:scale(1.15);}}
 </style>
 </head>
 <body>
@@ -7805,8 +7889,17 @@ let _adoptStamp=0;   // set only by forcePushList, consumed by the next push
 // this device would feel like the app fighting you.
 function lastAdopt(){try{return +localStorage.getItem('wl_adopt_seen')||0;}catch(e){return 0;}}
 function setLastAdopt(t){try{localStorage.setItem('wl_adopt_seen',String(t||0));}catch(e){}}
+// The dot after the wordmark beats while this is in flight. A status light that
+// only moves when something is actually happening is worth having; one that is
+// always moving is just decoration, and you stop seeing it by the second day.
+function syncingOn(){try{document.documentElement.classList.add('syncing');}catch(e){}}
+function syncingOff(){try{document.documentElement.classList.remove('syncing');}catch(e){}}
 async function syncPush(){
   const code=syncCode();if(!code||!SYNC_URL)return;
+  syncingOn();
+  try{return await _syncPushInner(code);}finally{syncingOff();}
+}
+async function _syncPushInner(code){
   // This REPLACES the cloud copy, which is the recovery path for everything
   // else — so it must never run against a list that merely looks empty.
   //
@@ -12899,6 +12992,12 @@ function setDetailStatus(s){
   const a=anime.find(x=>x.id===detailId);if(!a)return;
   const was=a.status;
   a.status=s;
+  // The occasion, and only when it IS one: finishing something you had not
+  // finished. Pressing Done on something already done is not an achievement, and
+  // celebrating it would make the celebration meaningless the second time anybody
+  // saw it. `was` is already computed here for exactly this kind of question.
+  try{tap(s==='finished'&&was!=='finished'?'done':'tap');}catch(e){}
+  if(s==='finished'&&was!=='finished'){try{finishStamp();}catch(e){}}
   if(s==='finished'&&a.epTotal)a.ep=a.epTotal;
   touch(a);save();renderDetail();render();alPushItem(a);
   if(s==='finished'&&was!=='finished')offerNextSeason(a);
@@ -13215,9 +13314,23 @@ function coverFileChosen_go(f){
   img.onerror=()=>{URL.revokeObjectURL(img.src);toast('Could not read that image');};
   img.src=URL.createObjectURL(f);
 }
+// Lands a stamp in the middle of the screen, once, and takes itself away.
+// Nothing listens for it and nothing has to clean up after it.
+function finishStamp(){
+  try{
+    if(window.matchMedia&&matchMedia('(prefers-reduced-motion:reduce)').matches)return;
+    const el=document.createElement('div');
+    el.className='fin-stamp go';
+    el.textContent='Done';
+    document.body.appendChild(el);
+    setTimeout(()=>{try{el.remove();}catch(e){}},1000);
+  }catch(e){}
+}
 function setStatus(s){
-  // Finishing a show is the one moment in here that is actually an occasion.
-  try{tap(s==='finished'?'done':'tap');}catch(e){}
+  // This is the ADD FORM's status picker: it sets what a new entry will be, and
+  // changes nothing on the list. Worth a press, not an occasion — the occasion
+  // lives in setDetailStatus, which is the one that actually finishes a show.
+  try{tap('tick');}catch(e){}
   curStatus=s;
   Object.keys(STATUS_META).forEach(x=>{
     const b=document.getElementById(`sp-${x}`);

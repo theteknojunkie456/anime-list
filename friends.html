@@ -2361,7 +2361,12 @@ body.first-paint .pfill,body.content-in .pfill{animation:barGrow .62s cubic-bezi
   background:color-mix(in srgb,var(--bg) 55%,transparent);border:0;cursor:pointer;transition:color .15s;}
 .resume-x:hover{color:var(--t1);}
 .resume-x .ico{width:13px;height:13px;}
-.resume-card{display:flex;align-items:center;gap:13px;flex:1;min-width:0;padding:10px;
+/* The dismiss x is absolutely positioned at the wrap's top-right, and the play
+   circle is the last thing inside the card at ITS right — so the two sat on top
+   of one another, an x floating over a green button. The card keeps its right
+   edge clear instead, which fixes it at every width rather than nudging one of
+   them until it looks right on this screen. */
+.resume-card{display:flex;align-items:center;gap:13px;flex:1;min-width:0;padding:10px 42px 10px 10px;
   border-radius:18px;text-align:left;background:var(--bg2);
   border:0;cursor:pointer;transition:transform .12s,background-color .15s;}
 .resume-card:hover{background:var(--bg3);}
@@ -4507,48 +4512,46 @@ body.recsel .pcard{position:relative;}
    either keeps the bar it was designed around, and nothing above this line
    changes. */
 @media (min-width:1100px) and (min-height:600px){
+  /* A FLOATING CAPSULE, not a docked bar.
+     Two earlier passes kept the bar bolted to the window edge and only changed
+     what was inside it, which is why it kept reading as a phone bar turned on its
+     side. The shape was the problem. This is a pill that floats clear of the edge,
+     sized to its contents and centred vertically — so it sits ON the page instead
+     of walling it off, and the page keeps its own full-bleed background. */
   .nav{
-    /* The wide-screen rule above centres the bar with a translate; standing it up
-       on the left means undoing that, not fighting it with a bigger number. */
-    top:0;bottom:0;right:auto;left:0;width:72px;transform:none;max-width:none;height:auto;
-    grid-template-columns:1fr;
-    grid-auto-rows:max-content;
-    align-content:center;
-    gap:2px;
-    padding:16px 6px;
-    border-top:none;border-right:1px solid var(--bn2);
-    border-radius:0;
+    top:50%;bottom:auto;left:14px;right:auto;transform:translateY(-50%);
+    width:auto;max-width:none;height:auto;
+    grid-template-columns:1fr;grid-auto-rows:max-content;
+    gap:4px;padding:10px 8px;
+    background:var(--bg2);border:1px solid var(--bn2);border-radius:26px;
+    box-shadow:0 18px 44px -18px rgba(0,0,0,.7);
   }
-  /* The first pass just let the phone's buttons stack, and five track-wide pills
-     down the side read as a column of cards rather than a navigation: each one
-     filled the full 84px, the selected one became a large slab of accent, and the
-     + sat among them as a square the size of a tile.
-     A rail is icons first. The target stays large, but what you SEE is a small
-     circle that fills in when selected, with the label quiet underneath. */
-  .nav .nbtn{flex-direction:column;gap:5px;padding:7px 2px;border-radius:10px;background:none;}
-  .nav .nbtn>span{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  /* Icons only. The label was the other half of why it looked like a phone bar;
+     the name lives in a tooltip, which is what a pointer is for. */
+  .nav .nbtn{position:relative;flex-direction:column;gap:0;padding:0;border-radius:99px;background:none;width:44px;height:44px;}
+  .nav .nbtn small{display:none;}
+  .nav .nbtn>span{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;
     background:transparent;transition:background-color .16s;}
-  .nav .nbtn .ico{width:19px;height:19px;}
-  .nav .nbtn small{font-size:10px;font-weight:700;letter-spacing:.02em;opacity:.8;}
-  /* Selected is the circle, not the whole button. */
-  .nav .nbtn.on{background:none;color:var(--a2);}
-  .nav .nbtn.on>span{background:var(--ag);}
-  /* The + stays the one that looks different by being filled and round, at the
-     same scale as its neighbours rather than twice it. */
-  /* background:none on .nav .nbtn above has the same specificity as .nbtn.add and
-     comes later in the file, so it won the cascade and left the + as an empty
-     outline. It has to say the colour again rather than rely on inheriting it. */
-  .nav .nbtn.add{width:44px;height:44px;min-width:0;font-size:21px;margin:6px auto;border-radius:50%;
+  .nav .nbtn .ico{width:20px;height:20px;}
+  .nav .nbtn.on{color:var(--t1);}
+  .nav .nbtn.on>span{background:var(--bg4);}
+  /* The marker sits OUTSIDE the capsule, against the window edge, the way the
+     reference does it — the selected thing is announced by the rail rather than
+     by the button shouting. */
+  .nav .nbtn.on::before{content:"";position:absolute;left:-9px;top:50%;transform:translateY(-50%);
+    width:3px;height:18px;border-radius:2px;background:var(--a);}
+  /* One rule, two groups: the places you go, then the things you set. */
+  .nav .nbtn#nav-settings{margin-top:6px;padding-top:10px;border-top:1px solid var(--bn2);height:54px;border-radius:10px;}
+  .nav .nbtn.add{width:44px;height:44px;min-width:0;font-size:21px;margin:2px auto;border-radius:50%;
     background:var(--a);color:var(--aFg);}
-  /* Give the page back the space the bar used to take from the bottom, and keep
-     it clear of the rail on the left. */
-  #app{padding-left:72px;padding-bottom:0;}
+  /* Clear of the capsule: 14 of inset, about 60 of pill, and air after it. */
+  #app{padding-left:96px;padding-bottom:0;}
   .billboard,.rz-sec>.rz-head{margin-left:0;}
 }
-/* A desktop pointer gets a hover state; a thumb never did, so this was never
-   worth having until the rail existed. */
 @media (min-width:1100px) and (min-height:600px) and (hover:hover){
   .nav .nbtn:hover>span{background:var(--bg3);}
+  .nav .nbtn.on:hover>span{background:var(--bg4);}
+}
   .nav .nbtn.on:hover>span{background:var(--ag);}
 }
 </style>

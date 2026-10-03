@@ -31,8 +31,14 @@ async function shape(wpx,hpx){
   await cmd('Emulation.setDeviceMetricsOverride',{width:wpx,height:hpx,deviceScaleFactor:1,mobile:false});
   await wait(260);
   return await ev(`(()=>{const n=document.querySelector('.nav');const r=n.getBoundingClientRect();
-    // a rail is tall and narrow and pinned left; a bar is wide and short at the bottom
-    return (r.height>r.width && r.left<2 && r.top<2) ? 'rail' : 'bar';})()`);
+    // A rail is taller than it is wide and lives on the left. It is NOT necessarily
+    // pinned to the corner: the current one floats clear of the edge and is centred
+    // vertically, which this check used to call a bar purely because left and top
+    // were not zero. A bar is wider than it is tall and sits at the bottom.
+    const vertical = r.height > r.width;
+    const onTheLeft = r.left < innerWidth/3;
+    const atTheBottom = r.top > innerHeight/2;
+    return (vertical && onTheLeft && !atTheBottom) ? 'rail' : 'bar';})()`);
 }
 
 t('desktop 1440x900',            await shape(1440,900),  'rail');

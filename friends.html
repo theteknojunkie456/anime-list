@@ -4073,6 +4073,20 @@ body.recsel .pcard{position:relative;}
 .sched-day-date{font-size:12px;font-weight:600;color:var(--t2);}
 .sched-today-pill{margin-left:auto;font-size:10px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:var(--a2);background:var(--ag);border:1px solid var(--a);padding:2.5px 9px;border-radius:99px;}
 .sched-day-body{display:flex;flex-direction:column;}
+/* The next thing to air is the one question this screen is actually asked, so it
+   is the one row that looks different: lit on the left, lifted off the ground,
+   and labelled. Everything else stays quiet so that it can be loud. */
+.sched-row.is-next{background:var(--ag);box-shadow:inset 3px 0 0 var(--a);border-radius:10px;}
+.sched-next-tag{margin-left:8px;padding:2px 8px;border-radius:99px;background:var(--a);color:var(--aFg);
+  font-family:var(--fd);font-size:10px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;
+  vertical-align:middle;white-space:nowrap;}
+/* A delay is a warning, not decoration, so it borrows the one colour nothing else
+   in this app uses for anything cheerful. */
+.sched-delay{margin-right:7px;padding:2px 7px;border-radius:6px;
+  background:rgba(255,77,79,0.14);color:#ff6b6b;border:1px solid rgba(255,77,79,0.32);
+  font-family:var(--fd);font-size:10px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;
+  vertical-align:middle;white-space:nowrap;}
+.sched-row.is-delayed .sched-row-sub{color:#ff8f8f;}
 .sched-row{display:flex;align-items:center;gap:11px;padding:9px 14px;min-height:44px;cursor:pointer;border-top:1px solid var(--bn2);transition:background .14s;}
 .sched-new{display:inline-block;margin-left:6px;padding:1px 6px;border-radius:6px;font-size:10px;font-weight:800;letter-spacing:.4px;background:var(--a);color:var(--aFg);vertical-align:middle;}
 .sched-row:active{background:var(--bg4);}
@@ -4475,6 +4489,52 @@ body.recsel .pcard{position:relative;}
   .nbtn .ico{width:21px;height:21px;}
 }
 
+
+/* ── DESKTOP: the nav stands up ──────────────────────────────────────────────
+   Five equal columns stretched across fourteen hundred pixels is a phone's
+   bottom bar wearing a desktop's clothes: the targets end up a hand apart, the
+   labels float in space, and the whole thing reads as a layout that was never
+   asked about this screen. On a wide window the same five buttons become a rail
+   down the left — where every desktop app that has ever had one puts it — and
+   the page gets its width back.
+
+   Width is the obvious test and the wrong one on its own. A rail needs vertical
+   room for five stacked items: a phone in landscape is about 930 wide but only
+   430 tall, where a rail would cram and the bottom bar is genuinely the better
+   answer. A tablet in landscape — wide AND tall — should get the rail, and so
+   should a desktop window, but not one someone has squashed to a letterbox.
+   So the rule asks for both: 1100px across and 600px down. Anything short of
+   either keeps the bar it was designed around, and nothing above this line
+   changes. */
+@media (min-width:1100px) and (min-height:600px){
+  .nav{
+    /* The wide-screen rule above centres the bar with a translate; standing it up
+       on the left means undoing that, not fighting it with a bigger number. */
+    top:0;bottom:0;right:auto;left:0;width:84px;transform:none;max-width:none;height:auto;
+    grid-template-columns:1fr;
+    grid-auto-rows:max-content;
+    align-content:center;
+    gap:6px;
+    padding:18px 10px;
+    border-top:none;border-right:1px solid var(--bn2);
+    border-radius:0;
+  }
+  .nav .nbtn{flex-direction:column;padding:10px 4px;border-radius:14px;}
+  .nav .nbtn small{font-size:10px;}
+  /* The + keeps being the one that looks different, just not the one that is
+     twice the size of the rail it lives in. */
+  .nav .nbtn.add{font-size:26px;margin:4px 0;}
+  /* Give the page back the space the bar used to take from the bottom, and keep
+     it clear of the rail on the left. */
+  #app{padding-left:84px;padding-bottom:0;}
+  .billboard,.rz-sec>.rz-head{margin-left:0;}
+}
+/* A desktop pointer gets a hover state; a thumb never did, so this was never
+   worth having until the rail existed. */
+@media (min-width:1100px) and (min-height:600px) and (hover:hover){
+  .nav .nbtn:hover{background:var(--bg3);}
+  .nav .nbtn.on:hover{background:var(--ag);}
+}
 </style>
 </head>
 <body>
@@ -7484,6 +7544,52 @@ function storedCount(){
     return Array.isArray(v)?v.length:-1;
   }catch(e){return -1;}
 }
+// "Use this device's list everywhere." Every other path here is a merge: two
+// devices meet and the newest edit to each title wins, which is right almost
+// always and is why there is no button for this by default.
+//
+// Almost always is not always. When one device has been getting it wrong — an old
+// build that replaces the whole list instead of merging, a copy that drifted —
+// the person looking at the right list wants to end the argument, and no amount
+// of merging does that. So this says: this one, now, everywhere.
+//
+// It is the only deliberately destructive button in the app, so it behaves like
+// one. It writes a restore point first, it refuses outright on the lists it must
+// never overwrite anything with, and it says plainly what it is about to replace.
+function preSyncBackup(){
+  try{
+    const raw=JSON.stringify(_persistList());
+    localStorage.setItem('wl_prepush_backup',JSON.stringify({at:Date.now(),n:realList().length,list:raw}));
+    return true;
+  }catch(e){return false;}   // out of space is not a reason to block the push
+}
+function forcePushList(){
+  if(typeof appLocked!=='undefined'&&appLocked){toast('Unlock the list first');return;}
+  if(typeof listUntrusted!=='undefined'&&listUntrusted){toast('This list could not be read properly \u2014 not safe to send');return;}
+  if(!syncCode()){toast('Turn on cloud backup first');return;}
+  const n=realList().length;
+  // The guard that exists for a reason: an empty list replacing a full one is
+  // never what anybody meant, and KV keeps no history to undo it.
+  if(!n){toast('Nothing on this device to send');return;}
+  askConfirm({
+    title:'Use this list everywhere?',
+    msg:n+' titles from this device will replace the cloud copy, and every other '+
+        'device will take this version next time it opens. Anything that exists '+
+        'only on another device is lost. A restore point is kept on this device.',
+    yes:'Replace',
+    onYes:async()=>{
+      preSyncBackup();
+      try{
+        setLastPushFP('');          // defeat the "nothing changed" skip
+        setPushState({n:0,at:0,why:''});   // and any backoff still in effect
+        await syncPush();
+        const st=pushState();
+        toast(st&&st.n?('Could not send \u2014 '+(st.why||'try again')):('Sent \u2014 '+n+' titles are now the cloud copy'));
+      }catch(e){toast('Could not send right now');}
+      try{renderSyncUI();}catch(e){}   // the cloud panel, not the app-wide render scheduler
+    }
+  });
+}
 async function syncPush(){
   const code=syncCode();if(!code||!SYNC_URL)return;
   // This REPLACES the cloud copy, which is the recovery path for everything
@@ -7851,6 +7957,11 @@ function renderSyncUI(){
         <button class="parse-btn" style="margin:0;flex:1" onclick="copySyncCode()">${icon('clipboard')} Copy code</button>
         <button class="imp-all" onclick="syncOff()">Turn off</button>
       </div>
+      <details class="dt-fold" style="margin-top:12px">
+        <summary>${icon('upload')} Use this device's list everywhere<span class="dt-fold-x">Open</span></summary>
+        <p class="ai-desc" style="font-size:12px;margin-top:4px">Devices normally merge, newest edit per title winning. This ends that: the ${realList().length} titles on <b>this</b> device replace the cloud copy, and every other device takes this version. Anything held only on another device is lost. A restore point stays on this device.</p>
+        <button class="imp-all" style="width:100%;margin-top:8px" onclick="forcePushList()">Replace the cloud copy</button>
+      </details>
       <p class="ai-desc" style="margin-top:10px">On another device: install the app, open this panel, paste the code, tap <b>Use code</b>.</p>
       ${adminToken()?`<div class="dt-label" style="margin-top:16px">${icon('lock')} Your setup key</div>
       <p class="ai-desc">Both keys in one line, for your own devices. Paste it into the unlock box on a new device and it lets the device in <b>and</b> pulls your list down \u2014 one paste instead of two. <b style="color:#ff6b6b">Never share this one</b>: it contains your admin token, which approves people onto the whole app. The 20-character code above is the one you give friends.</p>
@@ -22368,7 +22479,16 @@ async function fetchSchedEpisodes(startSec,endSec){
       const r=await fetch('https://graphql.anilist.co',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({query:q})});
       if(r.status===429){await pause(1500);i-=50;continue;}
       const j=await r.json();const arr=(j&&j.data&&j.data.Page&&j.data.Page.airingSchedules)||[];
-      arr.forEach(s=>{const a=byAni[s.mediaId];if(!a)return;const k=s.mediaId+':'+s.episode;if(seen.has(k))return;seen.add(k);out.push({id:a.id,title:a.title,img:a.img,episode:s.episode,airingAt:s.airingAt,aniId:s.mediaId,lag:subLagMins(itemHost(a))});});
+      arr.forEach(s=>{const a=byAni[s.mediaId];if(!a)return;const k=s.mediaId+':'+s.episode;if(seen.has(k))return;seen.add(k);
+        // The one thing this screen can be wrong about without anyone noticing:
+        // it keeps showing a time that has quietly moved, and you find out by
+        // turning up to nothing. We already hold the time last known for this
+        // exact episode, so if the feed now says later, say so. Only later counts
+        // \u2014 an episode pulled forward is not a delay. Ten minutes of slack
+        // keeps feed jitter from crying wolf.
+        const known=(+a.airEp===+s.episode)?(+a.airAt||0):0;
+        const delayed=(known&&s.airingAt>known+600)?known:0;
+        out.push({id:a.id,title:a.title,img:a.img,episode:s.episode,airingAt:s.airingAt,aniId:s.mediaId,lag:subLagMins(itemHost(a)),delayed});});
     }catch(e){/* network hiccup — remaining chunks + airAt fallback still populate */}
     if(i+50<ids.length)await pause(700);
   }
@@ -22381,6 +22501,7 @@ function renderSchedDays(ws,eps){
   const notifSet=notifyOn()?new Set(notifyAnimeIds()):null;
   const notifSetR=notifyOn()&&typeof notifyMangaIds==='function'?new Set(notifyMangaIds()):null;
   const todayKey=schedDayKey(new Date());
+  let _nextDone=false;   // exactly one row in the week is the next to air
   let html='';
   for(let i=0;i<7;i++){
     const day=new Date(ws);day.setDate(day.getDate()+i);
@@ -22398,8 +22519,11 @@ function renderSchedDays(ws,eps){
         const bell=nset&&e.aniId&&nset.has(e.aniId)?'<span class="sched-bell" title="Notifications on">'+icon('bell')+'</span>':'';
         var _isRel=e.id&&(''+e.id).indexOf('rel:')===0;var _click=_isRel?("addRelatedSched('"+e.aniId+"')"):("openDetail('"+e.id+"')");var _newt=_isRel?'<span class="sched-new">NEW</span>':'';
         var _cd='<span class="sched-cd" data-at="'+e.airingAt+'" data-lag="'+(e.lag||0)+'"'+(e.read?' data-day="1"':'')+'>'+schedCountdown(e.airingAt,!!e.read,e.lag)+'</span>';
+        var _was=e.delayed?'<span class="sched-delay">Delayed</span>':'';
         var _sub=(e.read?('New chapter \u00b7 expected'):('Ep '+(e.episode||'?')+' \u00b7 '+t))+' \u00b7 '+_cd;
-        rows+='<div class="sched-row'+(e.read?' is-read':'')+'" onclick="'+_click+'">'+thumb+'<div class="sched-row-main"><div class="sched-row-title">'+schEsc(e.title)+_newt+bell+'</div><div class="sched-row-sub">'+_sub+'</div></div></div>';
+        var _next=(!_nextDone&&e.airingAt*1000>Date.now())?(_nextDone=true,' is-next'):'';
+        var _nx=_next?'<span class="sched-next-tag">Airing next</span>':'';
+        rows+='<div class="sched-row'+(e.read?' is-read':'')+_next+(e.delayed?' is-delayed':'')+'" onclick="'+_click+'">'+thumb+'<div class="sched-row-main"><div class="sched-row-title">'+_was+schEsc(e.title)+_newt+bell+_nx+'</div><div class="sched-row-sub">'+_sub+'</div></div></div>';
       });
     }else rows='<div class="sched-empty-day">—</div>';
     html+='<div class="'+cls+'"><div class="sched-day-head"><span class="sched-day-name">'+day.toLocaleDateString([],{weekday:'long'})+'</span><span class="sched-day-date">'+schedFmt(day)+'</span>'+pill+'</div><div class="sched-day-body">'+rows+'</div></div>';

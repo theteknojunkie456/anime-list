@@ -94,6 +94,11 @@
    belongs to the same night. */
 
 [data-theme=naruto]{--bg:#0b0908;--bg2:#12100e;--bg3:#1a1715;--bg4:#221e1b;--bg5:#2b2622;--b1:rgba(255,178,120,0.06);--b2:rgba(255,178,120,0.12);--b3:rgba(255,178,120,0.20);--t1:#f6efe8;--t2:#bdb2a8;--t3:#978d84;--aFg:#ffffff;--a:#c8500b;--a2:#ff8c3a;--ag:rgba(200,80,11,0.15);--glow:rgba(200,80,11,0.26);--fin:#4ade80;--finbg:rgba(74,222,128,0.11);--wat:#4fc3f7;--watbg:rgba(79,195,247,0.11);--pln:#a78bfa;--plnbg:rgba(167,139,250,0.11);--topgrad:linear-gradient(180deg,#221004 0%,#0b0908 100%);}
+/* Acid. Near-black ground, one electric green, and greys pulled a few degrees
+   toward it. The accent is bright enough that text ON it has to be dark, and
+   the status colours stay their usual selves so finished/watching/plan still
+   read as themselves rather than three shades of the same green. */
+[data-theme=acid]{--bg:#07070a;--bg2:#0c0d11;--bg3:#131519;--bg4:#1b1e23;--bg5:#24282e;--b1:rgba(180,255,57,0.07);--b2:rgba(180,255,57,0.14);--b3:rgba(180,255,57,0.22);--t1:#f2f6ea;--t2:#b4bcac;--t3:#8a9284;--aFg:#0a0f02;--a:#b4ff39;--a2:#cdff7a;--ag:rgba(180,255,57,0.13);--glow:rgba(180,255,57,0.24);--fin:#4ade80;--finbg:rgba(74,222,128,0.11);--wat:#4fc3f7;--watbg:rgba(79,195,247,0.11);--pln:#a78bfa;--plnbg:rgba(167,139,250,0.11);--topgrad:linear-gradient(180deg,#121b05 0%,#07070a 100%);}
 [data-theme=sasuke]{--aFg:#ffffff;--bg:#06060d;--bg2:#0b0b18;--bg3:#101022;--bg4:#16162c;--bg5:#1c1c36;--b1:rgba(130,90,255,0.06);--b2:rgba(130,90,255,0.13);--b3:rgba(130,90,255,0.24);--t1:#e6e2f8;--t2:#ada9c9;--t3:#8581aa;--a:#7730e8;--a2:#a07af8;--ag:rgba(119,48,232,0.15);--glow:rgba(119,48,232,0.28);--fin:#4ecba8;--finbg:rgba(78,203,168,0.11);--wat:#c084fc;--watbg:rgba(192,132,252,0.11);--pln:#818cf8;--plnbg:rgba(129,140,248,0.11);--topgrad:linear-gradient(180deg,#0a0420 0%,#06060d 100%);}
 [data-theme=luffy]{--aFg:#ffffff;--bg:#060c16;--bg2:#0b1420;--bg3:#101c2c;--bg4:#152438;--bg5:#1a2c44;--b1:rgba(210,50,50,0.06);--b2:rgba(210,50,50,0.13);--b3:rgba(210,50,50,0.24);--t1:#eeeae4;--t2:#b4bec8;--t3:#7996ac;--a:#d03838;--a2:#ff6060;--ag:rgba(208,56,56,0.13);--glow:rgba(208,56,56,0.22);--fin:#4ecb82;--finbg:rgba(78,203,130,0.11);--wat:#f5c842;--watbg:rgba(245,200,66,0.11);--pln:#3b9eff;--plnbg:rgba(59,158,255,0.11);--topgrad:linear-gradient(180deg,#140608 0%,#060c16 100%);}
 /* Sanji, rebuilt from the reference: the wine suit is the accent and the ground
@@ -1808,6 +1813,10 @@ img[data-fd="in"]{opacity:1;transition:opacity .18s ease-out;}
 .qp-chip:active{transform:scale(.95);}
 .qp-chip svg{width:15px;height:15px;color:var(--a);stroke-width:2.2;}
 .rz-sec{margin-top:18px;padding:16px 0 15px;border-top:1px solid var(--b1);border-bottom:1px solid var(--b1);animation:fadeUp .4s ease both;}
+/* A shelf announces itself with a mark, not just bigger text. Three pixels of
+   accent at the head of the row is the whole device, and it costs no space
+   because the row was already a flex line with a gap. */
+.rz-head::before{content:"";flex:0 0 3px;width:3px;height:19px;border-radius:2px;background:var(--a);}
 .rz-head{display:flex;align-items:center;gap:8px;padding:0 18px 12px;font-family:var(--fd);font-size:21px;font-weight:800;letter-spacing:-.045em;color:var(--t1);}
 
 
@@ -2418,6 +2427,7 @@ body.first-paint .pfill,body.content-in .pfill{animation:barGrow .62s cubic-bezi
 /* The number leads and the control follows it: what you rated it is the thing
    worth reading, and the slider is only how you change it. */
 .rate-row{display:flex;align-items:baseline;gap:6px;margin:2px 0 6px;}
+.rate-out.none{color:var(--t3);font-weight:600;}
 .rate-out{font-family:var(--fd);font-size:30px;font-weight:800;letter-spacing:-.02em;
   color:var(--a2);font-variant-numeric:tabular-nums;line-height:1;}
 .rate-max{font-size:13px;color:var(--t3);}
@@ -8072,6 +8082,10 @@ const THEMES=[
   {id:'sanji',   name:'Sanji',   emoji:'🔥', bg:'#170d14', accent:'#f0c92e'},
   {id:'zoro',    name:'Zoro',    emoji:'⚔️', bg:'#0a140c', accent:'#26a040'},
   {id:'chopper', name:'Chopper', emoji:'🦌', bg:'#150f1c', accent:'#d84872'},
+  // Near-black and one acid green. The ground goes darker than any other theme
+  // here because this accent only reads as electric against something close to
+  // off; on the usual #111 it just looks like a bright green.
+  {id:'acid',    name:'Acid',    emoji:'🧪', bg:'#07070a', accent:'#b4ff39'},
 ];
 function customThemes(){try{const s=store();return JSON.parse((s&&s.getItem('custom_themes'))||'[]');}catch{return[];}}
 function setCustomThemes(l){try{const s=store();if(s)s.setItem('custom_themes',JSON.stringify(l));}catch{}}
@@ -10754,6 +10768,50 @@ function untilStr(ms){
   const mins=Math.floor(ms/60000), h=Math.floor(mins/60), d=Math.floor(h/24);
   return d>0?`${d}d ${h%24}h`:h>0?`${h}h ${mins%60}m`:`${Math.max(1,mins)}m`;
 }
+// The same wait, said at the precision it deserves. A week away wants days and
+// hours; the last hour is the one worth watching tick, so it gets minutes and
+// seconds. Nothing in between pretends to a precision nobody asked for.
+function cdLong(ms){
+  if(ms<=0)return '';
+  const s=Math.floor(ms/1000), m=Math.floor(s/60), h=Math.floor(m/60), d=Math.floor(h/24);
+  if(d>0)return d+'d '+(h%24)+'h '+(m%60)+'m';
+  if(h>0)return h+'h '+(m%60)+'m';
+  return m+'m '+String(s%60).padStart(2,'0')+'s';
+}
+// A countdown that is a live element rather than a baked string. It carries the
+// instant it is counting to, so the ticker can refresh it without re-rendering
+// the sheet around it — repainting a whole detail view once a second is how a
+// nice touch turns into the lag you already complained about.
+function cdSpan(targetMs){
+  const at=+targetMs||0;
+  return '<span class="cd" data-at="'+at+'">'+cdLong(at-Date.now())+'</span>';
+}
+// ONE timer for every countdown on screen, not one each. It idles when nothing is
+// counting, when the tab is hidden, and when you are watching something; it only
+// ticks every second if something is inside the final hour, and once a minute
+// otherwise. Writing textContent on a handful of spans is cheap; the thing that
+// would not be cheap is the render it deliberately avoids.
+let _cdT=null;
+function cdTick(){
+  const els=document.querySelectorAll('.cd[data-at]');
+  if(!els.length||document.hidden){cdStop();return;}
+  let soon=false, live=0;
+  const now=Date.now();
+  els.forEach(el=>{
+    const at=+el.getAttribute('data-at')||0;
+    const left=at-now;
+    if(left<=0){el.textContent='';return;}
+    live++; if(left<3600000)soon=true;
+    const t=cdLong(left);
+    if(el.textContent!==t)el.textContent=t;
+  });
+  if(!live){cdStop();return;}
+  const want=soon?1000:60000;
+  if(_cdT&&_cdT.every!==want){cdStop();}
+  if(!_cdT){const h=setInterval(cdTick,want);_cdT={h,every:want};}
+}
+function cdStop(){if(_cdT){clearInterval(_cdT.h);_cdT=null;}}
+try{document.addEventListener('visibilitychange',()=>{document.hidden?cdStop():cdTick();});}catch(e){}
 function bbCountdown(a){
   if(kindOf(a)!=='watch'||!a.airAt)return '';
   const ms=a.airAt*1000-Date.now();
@@ -10764,7 +10822,7 @@ function bbCountdown(a){
       ?`<div class="bb-cd">${icon('clock')} Ep ${a.airEp||''} aired · subs ~${untilStr(left)}</div>`
       :`<div class="bb-cd is-out">${icon('play')} Ep ${a.airEp||''} out now</div>`;
   }
-  return `<div class="bb-cd">${icon('clock')} Ep ${a.airEp||''} \u00b7 ${untilStr(ms)}</div>`;
+  return `<div class="bb-cd">${icon('clock')} Ep ${a.airEp||''} \u00b7 ${cdSpan(a.airAt*1000)}</div>`;
 }
 // The same fact at the foot of the episode list, where you look when you've just
 // finished one and want to know whether there's another coming. Carries the real
@@ -10789,7 +10847,7 @@ function epNextHTML(a){
     }
     return `<div class="dt-ep-next is-out">${icon('play')} <b>Episode ${a.airEp||''}</b> is out \u00b7 <span>${schEsc(stamp)}</span></div>`;
   }
-  return `<div class="dt-ep-next">${icon('clock')} <b>Episode ${a.airEp||''}</b> in ${untilStr(ms)} \u00b7 <span>${schEsc(stamp)}</span></div>`;
+  return `<div class="dt-ep-next">${icon('clock')} <b>Episode ${a.airEp||''}</b> in ${cdSpan(a.airAt*1000)} \u00b7 <span>${schEsc(stamp)}</span></div>`;
 }
 function bbSlideHTML(a){
   const art=titleBg(a);
@@ -11188,6 +11246,7 @@ function renderHome(){
   }
   el.innerHTML=html+bulkBarHTML();bbSetup(spotlight);try{rzLoop();}catch{}if(beg)loadPopularShelf();
   try{setTimeout(tuneBackdrops,120);}catch(e){}   // after the images have had a chance to start loading
+  try{cdTick();}catch(e){}   // (re)arm any countdown this paint put on screen
 }
 
 // ─── DETAIL ─────────────────────────────────────────────────────────────────
@@ -11359,7 +11418,7 @@ function renderDetail(){
   // You get 8 when you meant 8, and 8.3 when you meant 8.3.
   const _rv=+(a.rating||0);
   const stars=`<div class="dt-label">Your rating</div>`+
-    `<div class="rate-row"><span class="rate-out" id="rateVal">${_rv?fmtRate(_rv):'\u2014'}</span>`+
+    `<div class="rate-row"><span class="rate-out${_rv?'':' none'}" id="rateVal">${_rv?fmtRate(_rv):'\u2014'}</span>`+
       `<span class="rate-max">/ 10</span>`+
       `${_rv?`<button class="rate-clear" onclick="setRating(0)">Clear</button>`:''}</div>`+
     `<input class="rate-range" type="range" min="0" max="10" step="0.1" value="${_rv}"
@@ -11547,6 +11606,7 @@ function renderDetail(){
   }
   if(kindOf(a)==='watch'&&a.aniId)loadRichDetail(a.aniId,a.id);
   if(read)loadChapters(a.aniId||0,a.id,a.title);
+  try{cdTick();}catch(e){}   // (re)arm any countdown this paint put on screen
 }
 // ─── CHAPTER LIST ───────────────────────────────────────────────────────────
 // The watch side gets an episode strip; reading had nothing, because AniList's
@@ -12583,7 +12643,12 @@ function snapRate(v){
   return n;
 }
 // Dragging only repaints the number; the value is written when the finger lifts.
-function rateSlide(v){const el=document.getElementById('rateVal');if(el)el.textContent=(+v>0)?fmtRate(v):'\u2014';}
+function rateSlide(v){
+  const el=document.getElementById('rateVal');if(!el)return;
+  const on=+v>0;
+  el.textContent=on?fmtRate(v):'\u2014';
+  el.classList.toggle('none',!on);
+}
 function starWas(a){const v=Math.round((a&&a.rating||0)/2);return v?('\u2605'+v):'a star rating';}
 function setRating(n){
   const a=anime.find(x=>x.id===detailId);if(!a)return;

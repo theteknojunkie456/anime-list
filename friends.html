@@ -4522,20 +4522,34 @@ body.recsel .pcard{position:relative;}
   .nav, :root.two-pane .nav{
     top:50%;bottom:auto;left:18px;right:auto;transform:translateY(-50%);
     width:max-content;min-width:0;max-width:none;height:auto;
-    grid-template-columns:max-content;grid-auto-rows:max-content;
+    grid-auto-rows:max-content;
     gap:2px;padding:10px 8px;
     background:var(--bg2);border:1px solid var(--bn2);border-radius:26px;
     box-shadow:inset 0 1px 0 rgba(255,255,255,.05), 0 20px 46px -22px rgba(0,0,0,.85);
     transition:transform .24s cubic-bezier(.2,.75,.3,1),opacity .2s;
   }
-  .nav .nbtn{position:relative;flex-direction:column;gap:0;padding:0;border-radius:99px;
-    background:none;width:46px;height:46px;}
+  /* Measured, after it looked wrong: the buttons were 78 wide and 46 tall while
+     the + was 46 square, so the selected circle sat inside a wider invisible
+     button and every hover lit a different-sized box. The base .nbtn carries
+     justify-self:stretch and width:100% for the phone bar, where filling an equal
+     track is exactly right; here it stretched each button to the column and left
+     width:46px losing an argument it looked like it had won.
+     So the column is pinned to the size of a button, and the button is pinned in
+     all three ways a grid item can be stretched. One square, one circle, nothing
+     behind either. */
+  .nav{grid-template-columns:46px;justify-items:center;}
+  .nav .nbtn{position:relative;flex-direction:column;gap:0;padding:0;border-radius:50%;
+    background:none;justify-self:center;align-self:center;
+    width:46px;min-width:46px;max-width:46px;height:46px;min-height:46px;}
   .nav .nbtn small{display:none;}
   .nav .nbtn>span{width:46px;height:46px;border-radius:50%;display:flex;align-items:center;justify-content:center;
     background:transparent;transition:background-color .16s,transform .2s cubic-bezier(.2,.75,.3,1);}
   .nav .nbtn .ico{width:21px;height:21px;}
   .nav .nbtn.on{color:var(--t1);}
-  .nav .nbtn.on>span{background:var(--bg4);transform:scale(1.04);}
+  /* No scale on the selected circle. At 1.04 it became 49px inside a 46px button,
+     which is three pixels of overhang on every edge — exactly the kind of thing
+     that reads as "wonky" without being nameable. The circle IS the button. */
+  .nav .nbtn.on>span{background:var(--bg4);}
   /* The marker against the capsule's inner edge, the way the reference marks its
      selected item — the rail says which one, the button does not shout it. */
   .nav .nbtn.on::before{content:"";position:absolute;left:-7px;top:50%;transform:translateY(-50%);
@@ -4609,8 +4623,8 @@ body.recsel .pcard{position:relative;}
 }
 
 /* The rail's selected circle grows into place instead of blinking on. */
-.nav .nbtn>span{transition:background-color .16s,transform .2s cubic-bezier(.2,.75,.3,1);}
-.nav .nbtn.on>span{transform:scale(1.06);}
+.nav .nbtn>span{transition:background-color .16s;}
+
 .nav .nbtn.on::before{animation:markIn .26s cubic-bezier(.2,.75,.3,1) backwards;}
 @keyframes markIn{from{opacity:0;transform:translateY(-50%) scaleY(.3);}to{opacity:1;transform:translateY(-50%) scaleY(1);}}
 

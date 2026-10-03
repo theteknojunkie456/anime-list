@@ -16427,6 +16427,17 @@ async function watchAnime(id,epArg){
   // custom source; else the default route. A pin/custom source with {ep} plays
   // in-frame; a bare preset opens in the browser.
   const src=effectiveSource(a);
+  // Same rule, the path that matters most: below here the web build may load the
+  // source inside pvFrame and inject a resume script into that page. The native
+  // build opens it in Safari instead and tracks progress by time away, exactly as
+  // every other external hand-off already does.
+  if(typeof IS_NATIVE!=='undefined'&&IS_NATIVE){
+    const u=findUrl(a);
+    if(!u){showNoSourcePrompt();return;}
+    try{armExternalWatch(a,(reqEp>0?reqEp:watchEpisode(a)||1));}catch(e){}
+    openExternal(u);
+    return;
+  }
   // Auto-routing now runs on BOTH builds. It used to be official-app only,
   // which left web users with a single hardcoded free-search default — no way to
   // reach their own services, and no inline player. Nothing here is native-only:
@@ -18556,6 +18567,14 @@ function embedTarget(url){
 }
 function openYT(target,label){
   const v=document.getElementById('ytView'),f=document.getElementById('ytFrame'),t=document.getElementById('ytTitle');
+  // THE OFFICIAL APP NEVER FRAMES ANOTHER SITE. embedTarget() can hand this a
+  // private host or an archive.org page, and a custom source is whatever somebody
+  // typed in. On the web that is a browser doing browser things. Shipped as an
+  // App Store binary it is the app presenting another site's video in its own
+  // chrome, which is what a review or a rights-holder complaint lands on. The
+  // native build hands off instead: same destination, their browser, their
+  // session. The web build is untouched.
+  if(typeof IS_NATIVE!=='undefined'&&IS_NATIVE&&target){ openExternal(target); return true; }
   if(!v||!f||!target)return false;
   if(t)t.textContent=label||'Watch';
   // Same sandbox the main player uses. embedTarget() can hand this a private

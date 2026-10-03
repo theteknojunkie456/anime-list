@@ -4522,7 +4522,7 @@ body.recsel .pcard{position:relative;}
     top:50%;bottom:auto;left:14px;right:auto;transform:translateY(-50%);
     width:auto;max-width:none;height:auto;
     grid-template-columns:1fr;grid-auto-rows:max-content;
-    gap:4px;padding:10px 8px;
+    gap:3px;padding:9px 7px;
     background:var(--bg2);border:1px solid var(--bn2);border-radius:26px;
     box-shadow:0 18px 44px -18px rgba(0,0,0,.7);
   }
@@ -4538,10 +4538,19 @@ body.recsel .pcard{position:relative;}
   /* The marker sits OUTSIDE the capsule, against the window edge, the way the
      reference does it — the selected thing is announced by the rail rather than
      by the button shouting. */
-  .nav .nbtn.on::before{content:"";position:absolute;left:-9px;top:50%;transform:translateY(-50%);
-    width:3px;height:18px;border-radius:2px;background:var(--a);}
-  /* One rule, two groups: the places you go, then the things you set. */
-  .nav .nbtn#nav-settings{margin-top:6px;padding-top:10px;border-top:1px solid var(--bn2);height:54px;border-radius:10px;}
+  /* Sat at -9px, which put it outside the capsule on the page background where it
+     read as nothing at all. Against the capsule's own inner edge it is actually a
+     marker. */
+  .nav .nbtn.on::before{content:"";position:absolute;left:-6px;top:50%;transform:translateY(-50%);
+    width:3px;height:20px;border-radius:2px;background:var(--a);
+    box-shadow:0 0 10px -1px var(--glow);}
+  /* The divider is a LINE, not a box. Putting border-top plus its own height and
+     radius on the button turned it into a bordered rectangle sitting among five
+     circles — the one element in the rail that looked like a mistake. The button
+     stays identical to its neighbours and the separation is drawn above it. */
+  .nav .nbtn#nav-settings{margin-top:11px;}
+  .nav .nbtn#nav-settings::after{content:"";position:absolute;top:-7px;left:50%;transform:translateX(-50%);
+    width:20px;height:1px;background:var(--bn2);}
   .nav .nbtn.add{width:44px;height:44px;min-width:0;font-size:21px;margin:2px auto;border-radius:50%;
     background:var(--a);color:var(--aFg);}
   /* Clear of the capsule: 14 of inset, about 60 of pill, and air after it. */
@@ -4554,6 +4563,49 @@ body.recsel .pcard{position:relative;}
 }
   .nav .nbtn.on:hover>span{background:var(--ag);}
 }
+
+/* ── SIGNS OF LIFE ───────────────────────────────────────────────────────────
+   Everything here moves transform or opacity only, which the compositor handles
+   without touching layout. That is not a detail: the complaint right before this
+   was lag, and an app that stutters while it animates feels worse than one that
+   never animated at all. Nothing here runs continuously — each thing happens
+   once, when something actually changed.
+
+   The global prefers-reduced-motion rule near the top already flattens all of it
+   for anyone who has asked for that. */
+
+/* A shelf deals itself out rather than appearing fully formed. The delay is tiny
+   and stops after the first handful — a twelfth card waiting a quarter second to
+   show up is not charm, it is lag with a bow on it. */
+@keyframes cardDeal{from{opacity:0;transform:translateY(9px) scale(.985);}to{opacity:1;transform:none;}}
+.pcard,.rz-card{animation:cardDeal .32s cubic-bezier(.2,.75,.3,1) backwards;}
+.pcard:nth-child(1),.rz-card:nth-child(1){animation-delay:0ms;}
+.pcard:nth-child(2),.rz-card:nth-child(2){animation-delay:22ms;}
+.pcard:nth-child(3),.rz-card:nth-child(3){animation-delay:44ms;}
+.pcard:nth-child(4),.rz-card:nth-child(4){animation-delay:66ms;}
+.pcard:nth-child(5),.rz-card:nth-child(5){animation-delay:88ms;}
+.pcard:nth-child(6),.rz-card:nth-child(6){animation-delay:110ms;}
+.pcard:nth-child(n+7),.rz-card:nth-child(n+7){animation-delay:130ms;}
+
+/* A pointer gets to feel the artwork lift toward it. A thumb never hovers, so
+   this costs phones nothing at all. */
+@media (hover:hover){
+  .pcard{transition:transform .18s cubic-bezier(.2,.75,.3,1);}
+  .pcard:hover{transform:translateY(-4px) scale(1.015);}
+  .rz-card{transition:transform .18s cubic-bezier(.2,.75,.3,1);}
+  .rz-card:hover{transform:translateY(-3px);}
+}
+
+/* The rail's selected circle grows into place instead of blinking on. */
+.nav .nbtn>span{transition:background-color .16s,transform .2s cubic-bezier(.2,.75,.3,1);}
+.nav .nbtn.on>span{transform:scale(1.06);}
+.nav .nbtn.on::before{animation:markIn .26s cubic-bezier(.2,.75,.3,1) backwards;}
+@keyframes markIn{from{opacity:0;transform:translateY(-50%) scaleY(.3);}to{opacity:1;transform:translateY(-50%) scaleY(1);}}
+
+/* The number you are counting toward is the one thing on the detail sheet worth
+   drawing an eye to when it changes. */
+@keyframes epBump{0%{transform:none;}42%{transform:scale(1.14);}100%{transform:none;}}
+.ep-bumped{animation:epBump .26s cubic-bezier(.2,.75,.3,1);}
 </style>
 </head>
 <body>
@@ -12883,6 +12935,8 @@ function commitEp(a){
 try{['pointerup','pointercancel'].forEach(t=>window.addEventListener(t,epHoldEnd,{passive:true}));}catch(e){}
 // Kept for every other caller, and for anyone driving the app by keyboard.
 function bumpEp(d){
+  // The most-repeated gesture in the app, so it is the one worth feeling.
+  try{tap('tick');const el=document.querySelector('.dt-count-n,.dt-epnum');if(el){el.classList.remove('ep-bumped');void el.offsetWidth;el.classList.add('ep-bumped');}}catch(e){}
   const a=anime.find(x=>x.id===detailId);if(!a)return;
   if(!epStepOnce(a,d))return;
   commitEp(a);
@@ -12912,7 +12966,11 @@ function setRating(n){
   const a=anime.find(x=>x.id===detailId);if(!a)return;
   // Clamped and snapped exactly like the control, so a value arriving from
   // anywhere else cannot sit between two stops the slider cannot return to.
+  const _wasR=a.rating||0;
   a.rating=snapRate(n);
+  // The whole numbers are detents, so they should feel like it — that is the
+  // entire reason for making them detents rather than just rounding.
+  if(a.rating!==_wasR)tap(Number.isInteger(a.rating)?'tap':'tick');
   a.r10=1;                                // out of ten, by definition
   delete a.r10from5;                      // they have said what it is; stop asking
   touch(a);save();renderDetail();render();alPushItem(a);
@@ -13072,6 +13130,8 @@ function coverFileChosen_go(f){
   img.src=URL.createObjectURL(f);
 }
 function setStatus(s){
+  // Finishing a show is the one moment in here that is actually an occasion.
+  try{tap(s==='finished'?'done':'tap');}catch(e){}
   curStatus=s;
   Object.keys(STATUS_META).forEach(x=>{
     const b=document.getElementById(`sp-${x}`);
@@ -22788,6 +22848,27 @@ function fyPlan(aniId,btn,kind){
 
 // 2.4s is right for "Saved" and far too short for a sentence that tells you
 // where a setting is. Anything that asks the reader to DO something gets longer.
+// ONE PLACE THAT TAPS BACK.
+//
+// There were already two scattered navigator.vibrate calls with a hardcoded 12,
+// which is both the wrong number for most of what it was used for and invisible
+// on iOS, where vibrate() does not exist at all. The official app CAN do real
+// haptics through the bridge it already uses for Face ID, so this asks for one
+// and lets the shell decide what it feels like.
+//
+// Three weights, deliberately few. A tick for passing something, a tap for
+// changing something, a thud for finishing something. Anything more and the
+// phone is buzzing at you for scrolling, which is the thing nobody wants.
+const HAPTIC={tick:6,tap:11,done:[14,30,16]};
+function tap(kind){
+  try{
+    if(typeof IS_NATIVE!=='undefined'&&IS_NATIVE){
+      window.webkit.messageHandlers.wl.postMessage({type:'haptic',kind:String(kind||'tap')});
+      return;
+    }
+    if(navigator.vibrate)navigator.vibrate(HAPTIC[kind]||HAPTIC.tap);
+  }catch(e){}
+}
 function toast(msg,ms,undo){
   const el=document.getElementById('toast');
   el.textContent=msg;

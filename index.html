@@ -4512,58 +4512,65 @@ body.recsel .pcard{position:relative;}
    either keeps the bar it was designed around, and nothing above this line
    changes. */
 @media (min-width:1100px) and (min-height:600px){
-  /* A FLOATING CAPSULE, not a docked bar.
-     Two earlier passes kept the bar bolted to the window edge and only changed
-     what was inside it, which is why it kept reading as a phone bar turned on its
-     side. The shape was the problem. This is a pill that floats clear of the edge,
-     sized to its contents and centred vertically — so it sits ON the page instead
-     of walling it off, and the page keeps its own full-bleed background. */
-  /* :root.two-pane .nav sets an explicit width when the detail sheet opens
-     alongside the list, which is correct for a bar spanning the pane and fatal
-     for a capsule: it inflated into a slab covering half the window the moment
-     a show was opened. The capsule is the width of its contents in both states,
-     so it has to say so louder than that rule does. */
+  /* THE RAIL, BUILT TO THE REFERENCE.
+     A capsule that floats clear of the window edge and is sized by its contents,
+     vertically centred. Icons in round slots, no labels — names live in tooltips,
+     which is what a pointer is for. Groups separated by a hairline rather than by
+     a gap, and a fold control at the foot, which is the one part of that rail
+     that is a control rather than decoration.
+     The accent is var(--a) throughout, so it is whatever theme is on. */
   .nav, :root.two-pane .nav{
-    top:50%;bottom:auto;left:14px;right:auto;transform:translateY(-50%);
+    top:50%;bottom:auto;left:18px;right:auto;transform:translateY(-50%);
     width:max-content;min-width:0;max-width:none;height:auto;
     grid-template-columns:max-content;grid-auto-rows:max-content;
-    gap:3px;padding:9px 7px;
+    gap:2px;padding:10px 8px;
     background:var(--bg2);border:1px solid var(--bn2);border-radius:26px;
-    box-shadow:0 18px 44px -18px rgba(0,0,0,.7);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.05), 0 20px 46px -22px rgba(0,0,0,.85);
+    transition:transform .24s cubic-bezier(.2,.75,.3,1),opacity .2s;
   }
-  /* Icons only. The label was the other half of why it looked like a phone bar;
-     the name lives in a tooltip, which is what a pointer is for. */
-  .nav .nbtn{position:relative;flex-direction:column;gap:0;padding:0;border-radius:99px;background:none;width:44px;height:44px;}
+  .nav .nbtn{position:relative;flex-direction:column;gap:0;padding:0;border-radius:99px;
+    background:none;width:46px;height:46px;}
   .nav .nbtn small{display:none;}
-  .nav .nbtn>span{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;
-    background:transparent;transition:background-color .16s;}
-  .nav .nbtn .ico{width:20px;height:20px;}
+  .nav .nbtn>span{width:46px;height:46px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    background:transparent;transition:background-color .16s,transform .2s cubic-bezier(.2,.75,.3,1);}
+  .nav .nbtn .ico{width:21px;height:21px;}
   .nav .nbtn.on{color:var(--t1);}
-  .nav .nbtn.on>span{background:var(--bg4);}
-  /* The marker sits OUTSIDE the capsule, against the window edge, the way the
-     reference does it — the selected thing is announced by the rail rather than
-     by the button shouting. */
-  /* Sat at -9px, which put it outside the capsule on the page background where it
-     read as nothing at all. Against the capsule's own inner edge it is actually a
-     marker. */
-  .nav .nbtn.on::before{content:"";position:absolute;left:-6px;top:50%;transform:translateY(-50%);
-    width:3px;height:20px;border-radius:2px;background:var(--a);
-    box-shadow:0 0 10px -1px var(--glow);}
-  /* The divider is a LINE, not a box. Putting border-top plus its own height and
-     radius on the button turned it into a bordered rectangle sitting among five
-     circles — the one element in the rail that looked like a mistake. The button
-     stays identical to its neighbours and the separation is drawn above it. */
-  .nav .nbtn#nav-settings{margin-top:11px;}
-  .nav .nbtn#nav-settings::after{content:"";position:absolute;top:-7px;left:50%;transform:translateX(-50%);
-    width:20px;height:1px;background:var(--bn2);}
-  .nav .nbtn.add{width:44px;height:44px;min-width:0;font-size:21px;margin:2px auto;border-radius:50%;
-    background:var(--a);color:var(--aFg);}
-  /* Clear of the capsule: 14 of inset, about 60 of pill, and air after it. */
-  #app{padding-left:96px;padding-bottom:0;}
+  .nav .nbtn.on>span{background:var(--bg4);transform:scale(1.04);}
+  /* The marker against the capsule's inner edge, the way the reference marks its
+     selected item — the rail says which one, the button does not shout it. */
+  .nav .nbtn.on::before{content:"";position:absolute;left:-7px;top:50%;transform:translateY(-50%);
+    width:3px;height:20px;border-radius:2px;background:var(--a);box-shadow:0 0 10px -1px var(--glow);}
+  /* Hairlines, not boxes. Two groups and then the fold. */
+  .nav .nbtn#nav-settings,.nav .nbtn.rail-fold{margin-top:10px;}
+  .nav .nbtn#nav-settings::after,.nav .nbtn.rail-fold::after{
+    content:"";position:absolute;top:-6px;left:50%;transform:translateX(-50%);
+    width:22px;height:1px;background:var(--bn2);}
+  .nav .nbtn.rail-fold{color:var(--t3);}
+  .nav .nbtn.rail-fold .ico{width:17px;height:17px;}
+  .nav .nbtn.add{width:46px;height:46px;min-width:0;font-size:21px;margin:2px auto;border-radius:50%;
+    background:var(--a);color:var(--aFg);box-shadow:0 8px 20px -8px var(--glow);}
+  #app{padding-left:104px;padding-bottom:0;}
   .billboard,.rz-sec>.rz-head{margin-left:0;}
+
+  /* Folded: the capsule SHRINKS to the chevron rather than sliding away.
+     The first attempt slid it off-screen and pinned the chevron back with
+     position:fixed, which does not work: .nav carries a transform for its own
+     vertical centring, and a transform makes an element the containing block for
+     any fixed descendant. So the tab travelled with the rail it was supposed to
+     escape and ended up at x:-87 — a sidebar that vanishes with no way back,
+     which is the one thing the comment above it said not to build.
+     Shrinking needs no trick and cannot strand the control. */
+  :root.rail-folded .nav .nbtn:not(.rail-fold){display:none;}
+  :root.rail-folded .nav{padding:7px;gap:0;}
+  :root.rail-folded .nav .nbtn.rail-fold{margin-top:0;}
+  :root.rail-folded .nav .nbtn.rail-fold::after{display:none;}
+  :root.rail-folded .nav .nbtn.rail-fold .ico{transform:rotate(180deg);}
+  :root.rail-folded #app{padding-left:84px;}
 }
 @media (min-width:1100px) and (min-height:600px) and (hover:hover){
   .nav .nbtn:hover>span{background:var(--bg3);}
+  .nav .nbtn.on:hover>span{background:var(--bg4);}
+}
   .nav .nbtn.on:hover>span{background:var(--bg4);}
 }
   .nav .nbtn.on:hover>span{background:var(--ag);}
@@ -4834,6 +4841,7 @@ body.recsel .pcard{position:relative;}
   <button class="nbtn add" id="nav-add" onclick="openSheet_add()">＋</button>
   <button class="nbtn" id="nav-settings" onclick="openSheet('settingsSheet')"><span><i data-ic="settings"></i></span><small>Settings</small></button>
   <button class="nbtn" id="nav-sources" onclick="openSheet('sourceSheet')"><span><i data-ic="play"></i></span><small>Sources</small></button>
+  <button class="nbtn rail-fold" id="nav-fold" onclick="toggleRail()" aria-label="Collapse the sidebar" title="Collapse"><span><i data-ic="chevron-left"></i></span></button>
 </div>
 
 <!-- AI SUMMON — edges glow while two fingers are held, then the AI opens -->
@@ -11064,6 +11072,20 @@ function openSortMenu(e){
 }
 function pickSort(m){sortMode=m;const menu=document.getElementById('sortMenu'),btn=document.getElementById('sortBtn');if(menu)menu.classList.remove('on');if(btn)btn.classList.remove('on');render();}
 function setFilter(f){filterStatus=f;renderFiltRow();renderSortRow();renderHome();document.getElementById('pageEl').scrollTo({top:0,behavior:_scrollBehavior()});}
+// The rail folds away, which is the one thing in the reference that is a control
+// rather than a decoration. Collapsed it leaves a slim tab holding the chevron,
+// so there is always something to press to bring it back — a sidebar that can
+// vanish with no way back is a trapdoor.
+const RAIL_FOLD='wl_rail_folded';
+function railFolded(){try{return localStorage.getItem(RAIL_FOLD)==='1';}catch(e){return false;}}
+function applyRailFold(){
+  try{document.documentElement.classList.toggle('rail-folded',railFolded());}catch(e){}
+}
+function toggleRail(){
+  try{localStorage.setItem(RAIL_FOLD,railFolded()?'0':'1');}catch(e){}
+  applyRailFold();
+  try{tap('tick');}catch(e){}
+}
 function goHome(){document.getElementById('searchIn').value='';filterStatus='all';render();document.getElementById('pageEl').scrollTo({top:0,behavior:_scrollBehavior()});}
 
 // nSeas>1 → this card stands in for a whole series (multiple seasons collapsed
@@ -23540,7 +23562,7 @@ try{if(_SR&&window.isSecureContext){const m=document.getElementById('chatMic');i
 
 // ─── INIT ───────────────────────────────────────────────────────────────────
 try{hydrateIcons();}catch{}
-load();try{_hadItemsAtLoad=anime.length>0;}catch{}try{migrateRatings10();}catch(e){}try{restorePos();}catch(e){}
+load();try{_hadItemsAtLoad=anime.length>0;}catch{}try{applyRailFold();}catch(e){}try{migrateRatings10();}catch(e){}try{restorePos();}catch(e){}
 // Before anything asks this device who it is: put the keys back if localStorage
 // lost them, then ask to be exempt from the sweep that lost them. Both are async
 // and neither blocks the first paint — a device that still HAS its keys does no

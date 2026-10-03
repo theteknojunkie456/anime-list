@@ -4510,30 +4510,46 @@ body.recsel .pcard{position:relative;}
   .nav{
     /* The wide-screen rule above centres the bar with a translate; standing it up
        on the left means undoing that, not fighting it with a bigger number. */
-    top:0;bottom:0;right:auto;left:0;width:84px;transform:none;max-width:none;height:auto;
+    top:0;bottom:0;right:auto;left:0;width:72px;transform:none;max-width:none;height:auto;
     grid-template-columns:1fr;
     grid-auto-rows:max-content;
     align-content:center;
-    gap:6px;
-    padding:18px 10px;
+    gap:2px;
+    padding:16px 6px;
     border-top:none;border-right:1px solid var(--bn2);
     border-radius:0;
   }
-  .nav .nbtn{flex-direction:column;padding:10px 4px;border-radius:14px;}
-  .nav .nbtn small{font-size:10px;}
-  /* The + keeps being the one that looks different, just not the one that is
-     twice the size of the rail it lives in. */
-  .nav .nbtn.add{font-size:26px;margin:4px 0;}
+  /* The first pass just let the phone's buttons stack, and five track-wide pills
+     down the side read as a column of cards rather than a navigation: each one
+     filled the full 84px, the selected one became a large slab of accent, and the
+     + sat among them as a square the size of a tile.
+     A rail is icons first. The target stays large, but what you SEE is a small
+     circle that fills in when selected, with the label quiet underneath. */
+  .nav .nbtn{flex-direction:column;gap:5px;padding:7px 2px;border-radius:12px;background:none;}
+  .nav .nbtn>span{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    background:transparent;transition:background-color .16s;}
+  .nav .nbtn .ico{width:19px;height:19px;}
+  .nav .nbtn small{font-size:10px;font-weight:700;letter-spacing:.02em;opacity:.8;}
+  /* Selected is the circle, not the whole button. */
+  .nav .nbtn.on{background:none;color:var(--a2);}
+  .nav .nbtn.on>span{background:var(--ag);}
+  /* The + stays the one that looks different by being filled and round, at the
+     same scale as its neighbours rather than twice it. */
+  /* background:none on .nav .nbtn above has the same specificity as .nbtn.add and
+     comes later in the file, so it won the cascade and left the + as an empty
+     outline. It has to say the colour again rather than rely on inheriting it. */
+  .nav .nbtn.add{width:44px;height:44px;min-width:0;font-size:22px;margin:6px auto;border-radius:50%;
+    background:var(--a);color:var(--aFg);}
   /* Give the page back the space the bar used to take from the bottom, and keep
      it clear of the rail on the left. */
-  #app{padding-left:84px;padding-bottom:0;}
+  #app{padding-left:72px;padding-bottom:0;}
   .billboard,.rz-sec>.rz-head{margin-left:0;}
 }
 /* A desktop pointer gets a hover state; a thumb never did, so this was never
    worth having until the rail existed. */
 @media (min-width:1100px) and (min-height:600px) and (hover:hover){
-  .nav .nbtn:hover{background:var(--bg3);}
-  .nav .nbtn.on:hover{background:var(--ag);}
+  .nav .nbtn:hover>span{background:var(--bg3);}
+  .nav .nbtn.on:hover>span{background:var(--ag);}
 }
 </style>
 </head>

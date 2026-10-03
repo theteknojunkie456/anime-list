@@ -7544,6 +7544,52 @@ function storedCount(){
     return Array.isArray(v)?v.length:-1;
   }catch(e){return -1;}
 }
+// "Use this device's list everywhere." Every other path here is a merge: two
+// devices meet and the newest edit to each title wins, which is right almost
+// always and is why there is no button for this by default.
+//
+// Almost always is not always. When one device has been getting it wrong — an old
+// build that replaces the whole list instead of merging, a copy that drifted —
+// the person looking at the right list wants to end the argument, and no amount
+// of merging does that. So this says: this one, now, everywhere.
+//
+// It is the only deliberately destructive button in the app, so it behaves like
+// one. It writes a restore point first, it refuses outright on the lists it must
+// never overwrite anything with, and it says plainly what it is about to replace.
+function preSyncBackup(){
+  try{
+    const raw=JSON.stringify(_persistList());
+    localStorage.setItem('wl_prepush_backup',JSON.stringify({at:Date.now(),n:realList().length,list:raw}));
+    return true;
+  }catch(e){return false;}   // out of space is not a reason to block the push
+}
+function forcePushList(){
+  if(typeof appLocked!=='undefined'&&appLocked){toast('Unlock the list first');return;}
+  if(typeof listUntrusted!=='undefined'&&listUntrusted){toast('This list could not be read properly \u2014 not safe to send');return;}
+  if(!syncCode()){toast('Turn on cloud backup first');return;}
+  const n=realList().length;
+  // The guard that exists for a reason: an empty list replacing a full one is
+  // never what anybody meant, and KV keeps no history to undo it.
+  if(!n){toast('Nothing on this device to send');return;}
+  askConfirm({
+    title:'Use this list everywhere?',
+    msg:n+' titles from this device will replace the cloud copy, and every other '+
+        'device will take this version next time it opens. Anything that exists '+
+        'only on another device is lost. A restore point is kept on this device.',
+    yes:'Replace',
+    onYes:async()=>{
+      preSyncBackup();
+      try{
+        setLastPushFP('');          // defeat the "nothing changed" skip
+        setPushState({n:0,at:0,why:''});   // and any backoff still in effect
+        await syncPush();
+        const st=pushState();
+        toast(st&&st.n?('Could not send \u2014 '+(st.why||'try again')):('Sent \u2014 '+n+' titles are now the cloud copy'));
+      }catch(e){toast('Could not send right now');}
+      try{renderSyncUI();}catch(e){}   // the cloud panel, not the app-wide render scheduler
+    }
+  });
+}
 async function syncPush(){
   const code=syncCode();if(!code||!SYNC_URL)return;
   // This REPLACES the cloud copy, which is the recovery path for everything
@@ -7911,6 +7957,11 @@ function renderSyncUI(){
         <button class="parse-btn" style="margin:0;flex:1" onclick="copySyncCode()">${icon('clipboard')} Copy code</button>
         <button class="imp-all" onclick="syncOff()">Turn off</button>
       </div>
+      <details class="dt-fold" style="margin-top:12px">
+        <summary>${icon('upload')} Use this device's list everywhere<span class="dt-fold-x">Open</span></summary>
+        <p class="ai-desc" style="font-size:12px;margin-top:4px">Devices normally merge, newest edit per title winning. This ends that: the ${realList().length} titles on <b>this</b> device replace the cloud copy, and every other device takes this version. Anything held only on another device is lost. A restore point stays on this device.</p>
+        <button class="imp-all" style="width:100%;margin-top:8px" onclick="forcePushList()">Replace the cloud copy</button>
+      </details>
       <p class="ai-desc" style="margin-top:10px">On another device: install the app, open this panel, paste the code, tap <b>Use code</b>.</p>
       ${adminToken()?`<div class="dt-label" style="margin-top:16px">${icon('lock')} Your setup key</div>
       <p class="ai-desc">Both keys in one line, for your own devices. Paste it into the unlock box on a new device and it lets the device in <b>and</b> pulls your list down \u2014 one paste instead of two. <b style="color:#ff6b6b">Never share this one</b>: it contains your admin token, which approves people onto the whole app. The 20-character code above is the one you give friends.</p>

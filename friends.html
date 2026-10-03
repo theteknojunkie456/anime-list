@@ -4498,9 +4498,15 @@ body.recsel .pcard{position:relative;}
    down the left — where every desktop app that has ever had one puts it — and
    the page gets its width back.
 
-   Scoped to 1100px and up so phones and tablets in landscape keep the bar they
-   were designed around. Nothing above this line changes. */
-@media (min-width:1100px){
+   Width is the obvious test and the wrong one on its own. A rail needs vertical
+   room for five stacked items: a phone in landscape is about 930 wide but only
+   430 tall, where a rail would cram and the bottom bar is genuinely the better
+   answer. A tablet in landscape — wide AND tall — should get the rail, and so
+   should a desktop window, but not one someone has squashed to a letterbox.
+   So the rule asks for both: 1100px across and 600px down. Anything short of
+   either keeps the bar it was designed around, and nothing above this line
+   changes. */
+@media (min-width:1100px) and (min-height:600px){
   .nav{
     /* The wide-screen rule above centres the bar with a translate; standing it up
        on the left means undoing that, not fighting it with a bigger number. */
@@ -4525,7 +4531,7 @@ body.recsel .pcard{position:relative;}
 }
 /* A desktop pointer gets a hover state; a thumb never did, so this was never
    worth having until the rail existed. */
-@media (min-width:1100px) and (hover:hover){
+@media (min-width:1100px) and (min-height:600px) and (hover:hover){
   .nav .nbtn:hover{background:var(--bg3);}
   .nav .nbtn.on:hover{background:var(--ag);}
 }

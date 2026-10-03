@@ -459,8 +459,11 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 .ns-vs-art img{position:relative;z-index:1;width:100%;height:100%;object-fit:cover;display:block;}
 .ns-vs-body{padding:9px 10px 11px;flex:1;display:flex;flex-direction:column;}
 .ns-vs-title{font-family:var(--fd);font-size:15px;font-weight:700;line-height:1.25;color:var(--t1);}
+/* Same height on both cards so the pair reads even, and a long one fades out at
+   the bottom instead of scrolling or stopping mid-sentence. */
 .ns-vs-syn{margin-top:7px;font-size:12px;line-height:1.5;color:var(--t2);
-  max-height:clamp(70px,14vh,130px);overflow-y:auto;overscroll-behavior:contain;}
+  height:clamp(72px,13vh,108px);overflow:hidden;
+  -webkit-mask-image:linear-gradient(180deg,#000 70%,transparent);mask-image:linear-gradient(180deg,#000 70%,transparent);}
 .ns-vs-pick{margin-top:auto;padding:10px;border-radius:10px;font-size:12px;font-weight:800;
   display:flex;align-items:center;justify-content:center;gap:5px;
   background:var(--a);color:var(--aFg);text-align:center;box-shadow:0 6px 16px -8px var(--glow);}
@@ -495,9 +498,14 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 .ns-act.drop{color:#ff6b6b;border-color:rgba(255,107,107,.45);}
 .ns-done{text-align:center;padding:18px 4px 6px;}
 .ns-list{margin:10px 0 4px;max-height:34vh;overflow-y:auto;}
-.ns-row{display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:1px solid var(--bn2);}
+.ns-row{display:flex;align-items:center;gap:9px;padding:7px 0;border:0;border-bottom:1px solid var(--bn2);width:100%;background:none;text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent;font:inherit;}
 .ns-row img{width:34px;height:48px;object-fit:cover;border-radius:6px;flex:none;background:var(--bg4);}
 .ns-row .t{flex:1;min-width:0;font-size:13px;color:var(--t1);}
+.ns-row-x{flex:none;display:flex;align-items:center;justify-content:center;width:26px;height:26px;color:var(--t3);}
+.ns-row-x svg{width:15px;height:15px;}
+.ns-row.off{opacity:.5;}
+.ns-row.off .t{text-decoration:line-through;color:var(--t3);}
+.ns-row.off img{filter:grayscale(1);}
 @media (prefers-reduced-motion:reduce){ .ns-card{transition:none!important;} }
 /* ── RETRO CHROME ───────────────────────────────────────────────────────────
    The look reached the artwork and stopped. Everything AROUND the artwork was
@@ -2356,6 +2364,8 @@ body.first-paint .pfill,body.content-in .pfill{animation:barGrow .62s cubic-bezi
 .resume-t{font-family:var(--fd);font-size:15px;font-weight:800;color:var(--t1);letter-spacing:-.02em;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .resume-s{font-size:12px;font-weight:600;color:var(--t2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.resume-n{color:var(--a2);font-weight:800;}
+.resume-row-s .resume-n{color:var(--a2);}
 .resume-go{display:flex;align-items:center;justify-content:center;width:40px;height:40px;flex:none;
   border-radius:50%;background:var(--a);color:var(--aFg);box-shadow:0 6px 16px -6px var(--glow);}
 .resume-go .ico{width:17px;height:17px;}
@@ -8325,7 +8335,7 @@ function arDelete(){
 // end. A gesture that removes a title the instant it lands is a gesture that
 // removes a title you meant to keep, and this list is the one thing in the app
 // that must not be lost. Leaving early keeps everything.
-let _nsQueue=[], _nsDrop=[], _nsIdx=0;
+let _nsQueue=[], _nsDrop=[], _nsIdx=0, _nsExclude=new Set();
 // Two ways through the same list. One at a time asks "do you want this?", which
 // is the honest question but a slow one on a hundred titles. Head to head asks
 // "which of these two?", which is easier to answer — a comparison needs no
@@ -8349,7 +8359,7 @@ function openNatural(){
   // being spread evenly through a long session.
   const slop=a=>(a.aniId?0:4)+(a.img?0:2)+(a.epTotal?0:1);
   _nsQueue=pool.slice().sort((x,y)=>slop(y)-slop(x));
-  _nsDrop=[]; _nsIdx=0;
+  _nsDrop=[]; _nsIdx=0; _nsExclude=new Set();
   try{document.removeEventListener('keydown',nsKeys);document.addEventListener('keydown',nsKeys);}catch(e){}
   openSheet('nsSheet');
   renderNatural();
@@ -8570,19 +8580,31 @@ function renderNaturalDone(){
       <button class="dt-watch" style="margin-top:14px" onclick="closeAll()">Done</button></div>`;
     return;
   }
+  // Every row here is a title you set aside, but a fast pass makes wrong calls \u2014
+  // so each one is a toggle. Tap it to keep it after all; it stays visible, struck
+  // through, and the count and the Archive button track what's still selected.
+  const active=_nsDrop.filter(a=>!_nsExclude.has(a.id));
+  const n=active.length;
   box.innerHTML=`<div class="ns-done" style="text-align:left">
-      <div class="ns-title">Archive ${_nsDrop.length} ${_nsDrop.length===1?'title':'titles'}?</div>
-      <p class="ai-desc" style="margin-top:6px">They move to the Archive, not the bin \u2014 you can bring any of them back later. Nothing has moved yet.</p>
-      <div class="ns-list">${_nsDrop.map(a=>`<div class="ns-row">${a.img?`<img src="${escH(a.img)}" alt="">`:''}<span class="t">${escH(a.title)}</span></div>`).join('')}</div>
+      <div class="ns-title">${n?`Archive ${n} ${n===1?'title':'titles'}?`:'Nothing to archive'}</div>
+      <p class="ai-desc" style="margin-top:6px">${n?'They move to the Archive, not the bin \u2014 you can bring any of them back later. Tap one to keep it instead. Nothing has moved yet.':'You kept all of them \u2014 nothing will move.'}</p>
+      <div class="ns-list">${_nsDrop.map((a,i)=>{const off=_nsExclude.has(a.id);return `<button type="button" class="ns-row${off?' off':''}" onclick="nsToggleDrop(${i})" aria-pressed="${off?'false':'true'}">${a.img?`<img src="${escH(a.img)}" alt="">`:''}<span class="t">${escH(a.title)}</span><span class="ns-row-x">${icon(off?'rotate-ccw':'x')}</span></button>`;}).join('')}</div>
       <div class="ns-acts" style="margin-top:12px">
         <button class="ns-act" onclick="closeAll()">${icon('x')} Keep all</button>
-        <button class="ns-act drop" onclick="nsApply()">${icon('layers')} Archive ${_nsDrop.length}</button>
+        ${n?`<button class="ns-act drop" onclick="nsApply()">${icon('layers')} Archive ${n}</button>`:''}
       </div></div>`;
   try{hydrateIcons(document.getElementById('nsSheet'));}catch(e){}
 }
+// Tap a row in the confirm list to spare that title, or tap it again to put it back.
+function nsToggleDrop(i){
+  const a=_nsDrop[i]; if(!a)return;
+  if(_nsExclude.has(a.id))_nsExclude.delete(a.id); else _nsExclude.add(a.id);
+  renderNaturalDone();
+}
 function nsApply(){
-  const ids=new Set(_nsDrop.map(a=>a.id));
+  const ids=new Set(_nsDrop.filter(a=>!_nsExclude.has(a.id)).map(a=>a.id));
   const n=ids.size;
+  if(!n){ closeAll(); try{document.removeEventListener('keydown',nsKeys);}catch(e){} _nsQueue=[];_nsDrop=[];_nsIdx=0;_nsExclude=new Set(); return; }
   // Set aside, not destroyed. Going through a hundred titles quickly means some
   // of these calls are wrong, and the Archive is where that gets corrected.
   const moved=anime.filter(a=>ids.has(a.id));
@@ -8593,7 +8615,7 @@ function nsApply(){
   save();render();closeAll();
   try{document.removeEventListener('keydown',nsKeys);}catch(e){}
   toast(`Moved ${n} to Archive`);
-  _nsQueue=[];_nsDrop=[];_nsIdx=0;
+  _nsQueue=[];_nsDrop=[];_nsIdx=0;_nsExclude=new Set();
 }
 // ─── COVERS AS PIXELS — REMOVED ─────────────────────────────────────────────
 // The effect is gone. It cost more than it was worth: every image the page had
@@ -11069,12 +11091,20 @@ function renderHome(){
   // (one O(n log n) instead of one per section: spotlight ×4, rows ×4, favs, genres).
   const S=sorted(pool);
   const watching=S.filter(a=>a.status==='watching');
+  // The resume banner below surfaces the airing shows you're behind on. Decide now
+  // which those are, so the billboard can skip them — otherwise the show you're most
+  // behind on shows up as both the compact banner AND the first billboard slide,
+  // stacked, which is the duplication that made the top of home feel doubled.
+  const nudge=nudgeHTML();
+  const bannerIds=new Set();
+  if(!nudge&&!isRead){ try{ const bi=behindItems(); if(bi.length&&_resumeGone!==(bi[0].a.id+':'+bi[0].behind)) bi.forEach(x=>bannerIds.add(x.a.id)); }catch(e){} }
   // spotlight billboard: watching-with-art, then favorites-with-art, then any watching, then any-with-art (max 5)
-  const seen=new Set(),spot=[];const addSpot=a=>{if(a&&!seen.has(a.id)){seen.add(a.id);spot.push(a);}};
-  S.filter(a=>a.status==='watching'&&titleBg(a)).forEach(addSpot);
-  S.filter(a=>a.fav&&titleBg(a)).forEach(addSpot);
-  watching.forEach(addSpot);
-  S.filter(a=>titleBg(a)).forEach(addSpot);
+  const seen=new Set(),spot=[];const addSpot=(a,force)=>{if(a&&!seen.has(a.id)&&(force||!bannerIds.has(a.id))){seen.add(a.id);spot.push(a);}};
+  const fillSpot=f=>{S.filter(a=>a.status==='watching'&&titleBg(a)).forEach(a=>addSpot(a,f));S.filter(a=>a.fav&&titleBg(a)).forEach(a=>addSpot(a,f));watching.forEach(a=>addSpot(a,f));S.filter(a=>titleBg(a)).forEach(a=>addSpot(a,f));};
+  fillSpot(false);
+  // If every billboard-worthy title was one the banner already covers, don't leave
+  // the billboard blank — let them back in rather than show nothing.
+  if(!spot.length){seen.clear();fillSpot(true);}
   const spotlight=spot.slice(0,5),spotSet=new Set(spotlight.map(a=>a.id));
   heroAmb=spotlight[0]?titleAccent(spotlight[0]):'';setAmbient(heroAmb);
   // Continue-watching rail: the ONE watching surface on home — every watching
@@ -11089,7 +11119,6 @@ function renderHome(){
   // the only thing standing between a silently broken backup and someone finding
   // out when their device is gone, and it had never once been shown. Ask the
   // function, then fall back.
-  const nudge=nudgeHTML();
   const topBanner=nudge||(isRead?'':behindHTML());
   // A brand-new user who's started adding still sees the beginner shelf (up top) so
   // they can keep stacking titles — it rides above their small list until dismissed.
@@ -15726,15 +15755,18 @@ function nudgeHTML(){
     <button class="nudge-x" onclick="dismissNudge()" aria-label="Dismiss">${icon('x')}</button>
   </div>`;
 }
-// "You're N episodes behind" — for a show you're watching, how many aired episodes
-// you haven't seen. airEp is the NEXT episode to air, so episodes 1..airEp-1 exist.
-// Only currently-airing anime carry airEp, which is exactly where "behind" matters.
+// "You're N episodes behind" — for a show you're watching, how many episodes you
+// could watch right now but haven't. For an airing show that's aired-minus-seen
+// (airEp is the NEXT episode to air, so 1..airEp-1 exist); for one that has finished
+// airing it's total-minus-seen — a show you're mid-binge on is just as much "where
+// you left off" as one with a new episode waiting, and leaving it out meant the
+// banner went quiet the moment a season ended. Airing shows (genuinely fresh
+// episodes) still rank first; the back-catalog binges fill in behind them.
 function behindItems(){
-  const now=Date.now();
-  return anime.filter(a=>kindOf(a)==='watch'&&a.status==='watching'&&a.aniId&&a.airEp)
-    .map(a=>({a, behind:(a.airEp-1)-(a.ep||0)}))
+  return anime.filter(a=>kindOf(a)==='watch'&&a.status==='watching'&&a.aniId)
+    .map(a=>{ const avail=a.airEp?(a.airEp-1):(a.epTotal||0); return {a, behind:avail-(a.ep||0)}; })
     .filter(x=>x.behind>=1)
-    .sort((x,y)=>y.behind-x.behind);
+    .sort((x,y)=>{ const ax=x.a.airEp?1:0, ay=y.a.airEp?1:0; if(ax!==ay)return ay-ax; return y.behind-x.behind; });
 }
 // Dismissable, because "pick up where you left off" is a suggestion and a
 // suggestion you cannot decline is a demand. It comes back when the situation
@@ -15769,7 +15801,7 @@ function behindHTML(){
     <span class="resume-body">
       <span class="resume-k">Pick up where you left off</span>
       <span class="resume-t">${schEsc(a.title)}</span>
-      <span class="resume-s">Episode ${next} · ${behind} waiting</span>
+      <span class="resume-s">Episode ${next} · <b class="resume-n">${behind} waiting</b></span>
     </span>
     <span class="resume-go">${icon('play')}</span>
   </button>
@@ -15789,7 +15821,7 @@ function behindHTML(){
         return `<button class="resume-row" onclick="resumeWatch('${b.id}')">
           ${bart?`<img class="resume-row-art" decoding="async" loading="lazy" src="${escH(bart)}" alt="">`:`<span class="resume-row-art"></span>`}
           <span class="resume-row-b"><span class="resume-row-t">${schEsc(b.title)}</span>
-          <span class="resume-row-s">Episode ${bn} · ${bh} waiting</span></span>
+          <span class="resume-row-s">Episode ${bn} · <b class="resume-n">${bh} waiting</b></span></span>
           <span class="resume-row-go">${icon('play')}</span></button>`;}).join('')}</div>`:'');
   })()}
   </div>`;
@@ -16242,9 +16274,11 @@ async function watchAnime(id,epArg){
     // something it should manage; a bot check that refuses to run in a frame is
     // a decision the site made, and knowing that is the difference between a
     // fault you keep retrying and a fact you stop fighting.
+    // This is an explanation, not a status blip — it has to outlast a glance, so
+    // it holds ~8s instead of the default ~2s a "saved" toast gets.
     toast(challengeHost(_vh)
-      ? `${sourceName()} runs a bot check that can't work inside another site — opening it`
-      : `${sourceName()} won't play inside the app — opening it`);
+      ? `${sourceName()} runs a bot check that can't work inside another site — opening it in a tab`
+      : `${sourceName()} won't play inside the app — opening it in a tab`, 8000);
     return;
   }
   if(!_own&&!embedTarget(streamURL(a,ep0).url||src)){
@@ -22489,12 +22523,17 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-08-14.54',
-  title:'Let yourself in',
-  push:'No more waiting to be approved on your own device.',
+  v:'2026-10-02.55',
+  title:'Out of ten',
+  push:'Ratings are out of ten, and the covers all pixelate the same.',
   notes:[
-    'If you are the owner you can now let your own device in from the join screen \u2014 paste your admin token and it is approved on the spot, and remembered, so it is the last time that device asks. Clearing your browser data makes the app treat you as somebody new, which is why it kept happening.',
-    'Turning Retro on does the whole list up front with a progress bar at the bottom, showing how far it has got and roughly how long is left based on how fast your device is actually going.',
+    'Ratings are out of ten now, in tenths, with the whole numbers easy to land on. Anything you rated in stars was carried over at double, marked as carried over, and searching \u2018restar\u2019 lists every one still waiting for a real score.',
+    'Retro pixelates every cover to the same size. It used to depend on which resolution each cover happened to be fetched at, so some sat sharp in a row of blocky ones.',
+    'Artwork from shows you removed is cleared out. Nothing ever deleted it before, so storage only ever went up.',
+    'When storage is full the list still saves \u2014 rebuildable caches are dropped first, and what you chose is never touched.',
+    'Check my database matches, under Import, re-checks every show against the database and flags any that look wrong.',
+    'A show can no longer be matched to its own specials or movie, which is what made a finished series read as \u201cnot on your list\u201d.',
+    'The shows you are behind on open from the banner instead of just being counted.',
   ],
 };
 // The rows animate in once, on the first paint of a session. render() runs on

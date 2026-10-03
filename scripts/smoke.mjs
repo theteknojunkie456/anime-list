@@ -131,7 +131,13 @@ try {
   dom = spawnSync(CHROME, ['--headless=new', '--disable-gpu', '--no-sandbox', '--virtual-time-budget=12000',
     '--window-size=1200,900', '--dump-dom', `http://127.0.0.1:${PORT}/.preview/smoke.html`],
     { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).stdout || '';
-} finally { process.kill(-server.pid); rmSync('.preview', { recursive: true, force: true }); }
+} finally {
+  // Killing a server that never started throws ESRCH and buries the real reason
+  // (here: python3 refusing to run until an Xcode licence is accepted). Report the
+  // cause instead of dying on the cleanup.
+  try { process.kill(-server.pid); } catch (e) { if (e.code !== 'ESRCH') throw e; }
+  rmSync('.preview', { recursive: true, force: true });
+}
 
 const m = /<pre id="__smoke">([\s\S]*?)<\/pre>/.exec(dom);
 if (!m) { console.error('smoke: the app did not report — it may not have booted'); process.exit(1); }

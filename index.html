@@ -4814,8 +4814,25 @@ body.recsel .pcard{position:relative;}
   animation:wlcRing 1.5s cubic-bezier(.16,.9,.3,1) .78s forwards;pointer-events:none;}
 @keyframes wlcRing{35%{opacity:.5;}to{opacity:0;transform:scale(1.9);}}
 
+/* REDUCED MOTION GETS THE CEREMONY, NOT THE MOVEMENT.
+   The global rule near the top of this file flattens every animation to nothing,
+   which is right for a card sliding in and wrong here: it collapsed the whole
+   sequence into one frame, so the overlay appeared at opacity zero with the line
+   already at its end position and the screen looked like nothing had happened.
+   Which is exactly what it looked like.
+   Asking for less motion means less MOTION. A logo that fades up, holds, and
+   fades out has none — nothing travels, nothing scales — so the opening still
+   happens, just without anything moving across the screen. */
 @media(prefers-reduced-motion:reduce){
-  .wlc,.wlc-line,.wlc-mark,.wlc-who,.wlc-ring{animation-duration:.001ms!important;animation-delay:0ms!important;}
+  .wlc{animation:wlcFadeOut .4s ease 1.5s forwards!important;}
+  @keyframes wlcFadeOut{to{opacity:0;visibility:hidden;}}
+  .wlc-line{display:none!important;}
+  .wlc-ring{display:none!important;}
+  .wlc-mark{transform:none!important;opacity:0;
+    animation:wlcFadeIn .45s ease .1s forwards!important;}
+  .wlc-who{transform:none!important;opacity:0;
+    animation:wlcFadeIn .45s ease .5s forwards!important;}
+  @keyframes wlcFadeIn{to{opacity:1;}}
 }
 </style>
 </head>

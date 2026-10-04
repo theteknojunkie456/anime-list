@@ -2642,7 +2642,16 @@ body.yt-open{overflow:hidden;touch-action:none;}
   filter:url(#wl-pal6) saturate(1.06);
 }
 /* The small source has to be drawn as squares, not smoothed back into a blur. */
-[data-retro] .pcard-img,[data-retro] .rz-img,[data-retro] .pk-cover,[data-retro] .dt-cover,[data-retro] .dt-banner-img,[data-retro] .hero-bg-img,[data-retro] .sd-art,[data-retro] .rtm-art,[data-retro] .ns-art img,[data-retro] .ns-vs-art img{image-rendering:pixelated;}
+/* The canvas pass can only touch an <img>. Character portraits, episode stills,
+   recommendation covers and the hero are painted as background-image, so they
+   take the CSS route instead — same look, no canvas, and it costs nothing. */
+[data-retro] .pcard-img,[data-retro] .rz-img,[data-retro] .pk-cover,[data-retro] .dt-cover,
+[data-retro] .dt-banner-img,[data-retro] .hero-bg-img,[data-retro] .sd-art,[data-retro] .rtm-art,
+[data-retro] .ns-art img,[data-retro] .ns-vs-art img,
+[data-retro] .fy-img,[data-retro] .pick-img,[data-retro] .ptrail-art,[data-retro] .rc-note-img,
+[data-retro] .resume-art,[data-retro] .resume-row-art,[data-retro] .sched-thumb,
+[data-retro] .dt-char-img,[data-retro] .dt-ep-img,[data-retro] .dt-rec-img,
+[data-retro] .hero-bg,[data-retro] .pop-cover{image-rendering:pixelated;}
 /* None: keep the scanlines, the bevels and the pixel type; leave the pictures
    exactly as they are. */
 [data-retro][data-bits="off"] .pcard-img,[data-retro][data-bits="off"] .rz-img,[data-retro][data-bits="off"] .pk-cover,[data-retro][data-bits="off"] .dt-cover,[data-retro][data-bits="off"] .dt-banner-img,[data-retro][data-bits="off"] .hero-bg-img,[data-retro][data-bits="off"] .sd-art,[data-retro][data-bits="off"] .rtm-art,[data-retro][data-bits="off"] .ns-art img,[data-retro][data-bits="off"] .ns-vs-art img{filter:none;image-rendering:auto;}
@@ -10203,7 +10212,14 @@ function pxSrc(url){
 // while the grid below it was blocky, because this list lived in two forms — a
 // selector for the canvas pass and a different one for the colour filter — and
 // they drifted. One list, both consumers.
-const PX_ART=['.pcard-img','.rz-img','.pk-cover','.dt-cover','.dt-banner-img','.hero-bg-img','.sd-art','.rtm-art'];
+// EVERY picture, not most of them. Eight classes were listed and the app draws
+// artwork in fifteen, so the schedule thumbnails, the For You rail, the resume
+// card, the recommendation notes and the trail all stayed smooth while
+// everything around them went to pixels — which reads as the effect failing
+// rather than as a choice.
+const PX_ART=['.pcard-img','.rz-img','.pk-cover','.dt-cover','.dt-banner-img','.hero-bg-img',
+  '.sd-art','.rtm-art','.fy-img','.pick-img','.ptrail-art','.rc-note-img',
+  '.resume-art','.resume-row-art','.sched-thumb'];
 const _pxCache=new Map();
 const PX_MAX_PER_PASS=12;
 // 64-bit used to return 0 — no canvas, no blocks — on the theory that it was the
@@ -19593,7 +19609,13 @@ function friendRecRowHTML(){
   // so title-only recs (no id) also drop out after you add them.
   const inList=it=>(it.aniId&&mineAni.has(it.aniId))||mineTitle.has(normTitle(it.title));
   const gone=recDismissed();
-  const keys=Object.keys(map).filter(k=>{const it=map[k].item;const kind=it.kind==='read'?'read':'watch';return kind===viewKind && !inList(it) && !gone[k];});
+  // Hidden under EITHER identity counts as hidden. Same reason as above: a show
+  // that was turned down once should not reappear because a different friend
+  // happened to send it without an id attached.
+  const isGone=(k,it)=>!!(gone[k]
+    ||(it&&it.aniId&&gone['a'+it.aniId])
+    ||(it&&it.title&&gone['t'+String(it.title).toLowerCase()]));
+  const keys=Object.keys(map).filter(k=>{const it=map[k].item;const kind=it.kind==='read'?'read':'watch';return kind===viewKind && !inList(it) && !isGone(k,it);});
   if(!keys.length)return '';
   keys.sort((x,y)=>Math.max(0,...map[y].senders.map(s=>s.at))-Math.max(0,...map[x].senders.map(s=>s.at)));
   return `<div class="row-sec"><div class="row-head"><div class="row-title" style="--rc:var(--a2)">Friends recommend</div><div class="row-count">${keys.length}</div></div><div class="row-scroll">${keys.map(k=>recCard(k,map[k])).join('')}</div></div>`;
@@ -19613,7 +19635,19 @@ function dismissRec(k,ev){
   try{ev.stopPropagation();ev.preventDefault();}catch(e){}
   const key=decodeURIComponent(String(k||'')); if(!key)return;
   const rec=recByAni()[key];
-  const m=recDismissed(); m[key]=Date.now();
+  // A recommendation is keyed 'a'+aniId when it has an id and 't'+title when it
+  // does not, so the SAME show arriving both ways produces two different keys —
+  // and turning down one left the other free to come back wearing the other hat.
+  // "Never again" has to mean never, so both identities are written down.
+  const m=recDismissed(); const now=Date.now();
+  m[key]=now;
+  try{
+    const it=rec&&rec.item;
+    if(it){
+      if(it.aniId)m['a'+it.aniId]=now;
+      const t=normTitle(it.title||''); if(t)m['t'+String(it.title||'').toLowerCase()]=now;
+    }
+  }catch(e){}
   try{localStorage.setItem(RECX_KEY,JSON.stringify(m));}catch(e){}
   try{render();}catch(e){}
   const who=rec?recSenderLabel(rec):'';

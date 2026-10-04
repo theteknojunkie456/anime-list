@@ -4770,59 +4770,82 @@ body.recsel .pcard{position:relative;}
 :root.syncing .hdr-title::after{animation:pulseDot 1.1s ease-in-out infinite;}
 @keyframes pulseDot{0%,100%{opacity:.3;transform:scale(.85);}50%{opacity:1;transform:scale(1.15);}}
 
-/* ── SIGNING BACK IN ─────────────────────────────────────────────────────────
-   Consoles make coming back feel like an event, and that is the one thing a
-   tracker never does: you paste a key and a list appears. This is the ceremony —
-   WatchList's own, not a copy of anyone's: a line of light drawn across the dark,
-   blooming into the wordmark, your name under it, then the whole thing lifting
-   away to reveal the app.
+/* ── THE OPENING ─────────────────────────────────────────────────────────────
+   The first version had three beats in two seconds and read as a loading screen
+   with ambitions. What makes a console boot feel like hardware is PATIENCE: a
+   long dark, one light that behaves like it has mass, a climax that overexposes,
+   and a held beat before it lets you go. Nearly five seconds, and the logo is the
+   payoff rather than the middle.
 
-   Transform and opacity only, one timeline, about two and a half seconds, and it
-   can be cut short by touching it. It runs on a RETURNING sign-in and nowhere
-   else — a ceremony you see every launch is a loading screen. */
-.wlc{position:fixed;inset:0;z-index:999;display:flex;flex-direction:column;
-  align-items:center;justify-content:center;gap:18px;
-  background:var(--bg);animation:wlcOut .55s cubic-bezier(.4,0,.2,1) 2.0s forwards;}
-@keyframes wlcOut{to{opacity:0;transform:scale(1.04);visibility:hidden;}}
+   The spark, the sweep and the bloom are three elements and a glow. Everything
+   moves on transform and opacity; the one filter is on a single 120px element at
+   the climax, which is the cheapest place in the whole app to afford one. */
+.wlc{position:fixed;inset:0;z-index:999;overflow:hidden;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;
+  background:#000;
+  animation:wlcOut .75s cubic-bezier(.4,0,.2,1) 4.05s forwards;}
+@keyframes wlcOut{to{opacity:0;transform:scale(1.06);visibility:hidden;}}
 
-/* The line: a hairline that draws out from nothing, holds, then opens up. */
-.wlc-line{width:min(74vw,460px);height:2px;border-radius:2px;background:var(--a);
-  transform:scaleX(0);transform-origin:50% 50%;
-  box-shadow:0 0 22px 2px var(--glow);
-  animation:wlcDraw .62s cubic-bezier(.16,.9,.3,1) forwards, wlcLift .5s ease-in .95s forwards;}
-@keyframes wlcDraw{to{transform:scaleX(1);}}
-@keyframes wlcLift{to{transform:scaleX(1) translateY(-34px);opacity:0;}}
+/* 1. A point of light, holding in the dark long enough to be noticed. */
+.wlc-spark{position:absolute;width:5px;height:5px;border-radius:50%;
+  background:#fff;box-shadow:0 0 18px 5px var(--glow),0 0 50px 14px var(--ag);
+  opacity:0;transform:scale(.2);
+  animation:wlcSpark 1.5s cubic-bezier(.16,.9,.3,1) .25s forwards;}
+@keyframes wlcSpark{
+  30%{opacity:1;transform:scale(1);}
+  72%{opacity:1;transform:scale(.82);}
+  100%{opacity:1;transform:scale(1.05);}
+}
 
-/* The wordmark resolves where the line was. */
-.wlc-mark{font-family:var(--fd);font-size:34px;font-weight:800;letter-spacing:-.02em;
-  color:var(--t1);opacity:0;transform:translateY(10px) scale(.97);
-  animation:wlcMark .62s cubic-bezier(.16,.9,.3,1) .78s forwards;}
+/* 2. It draws out into a beam — fast out, slow settle, like something released. */
+.wlc-sweep{position:absolute;height:2px;width:min(86vw,620px);border-radius:2px;
+  background:linear-gradient(90deg,transparent,var(--a) 18%,#fff 50%,var(--a) 82%,transparent);
+  box-shadow:0 0 26px 3px var(--glow);
+  opacity:0;transform:scaleX(0);
+  animation:wlcSweep 1.1s cubic-bezier(.12,.85,.25,1) 1.55s forwards;}
+@keyframes wlcSweep{
+  0%{opacity:0;transform:scaleX(0);}
+  22%{opacity:1;}
+  70%{opacity:1;transform:scaleX(1);}
+  100%{opacity:0;transform:scaleX(1) scaleY(26);}
+}
+
+/* 3. The overexposure the beam collapses into. One filter, 120px, once. */
+.wlc-bloom{position:absolute;width:120px;height:120px;border-radius:50%;
+  background:radial-gradient(closest-side,#fff,var(--a) 42%,transparent 72%);
+  filter:blur(8px);opacity:0;transform:scale(.3);
+  animation:wlcBloom 1.25s cubic-bezier(.2,.8,.25,1) 2.25s forwards;}
+@keyframes wlcBloom{
+  18%{opacity:.95;transform:scale(2.6);}
+  100%{opacity:0;transform:scale(5.5);}
+}
+
+/* 4. The wordmark arrives out of the flare, wearing the chromatic edge the app
+      uses as its signature exactly once — on this. */
+.wlc-mark{position:relative;font-family:var(--fd);font-size:40px;font-weight:800;
+  letter-spacing:-.02em;color:var(--t1);opacity:0;transform:scale(1.14);
+  animation:wlcMark 1.0s cubic-bezier(.16,.95,.26,1) 2.45s forwards;}
 .wlc-mark b{color:var(--t1);} .wlc-mark i{font-style:normal;color:var(--t3);}
 .wlc-mark u{text-decoration:none;color:var(--a);}
-@keyframes wlcMark{to{opacity:1;transform:none;}}
+@keyframes wlcMark{
+  0%{opacity:0;transform:scale(1.14);text-shadow:-6px 0 var(--a),6px 0 #4af;filter:blur(3px);}
+  55%{opacity:1;}
+  100%{opacity:1;transform:scale(1);text-shadow:none;filter:none;}
+}
 
-/* Then who it is. */
+/* 5. The name, last, after the logo has been allowed to stand on its own. */
 .wlc-who{font-family:var(--fd);font-size:15px;font-weight:700;letter-spacing:.02em;
-  color:var(--t2);opacity:0;transform:translateY(8px);
-  animation:wlcWho .5s cubic-bezier(.16,.9,.3,1) 1.18s forwards;}
+  color:var(--t2);opacity:0;transform:translateY(7px);
+  animation:wlcWho .6s cubic-bezier(.16,.9,.3,1) 3.25s forwards;}
 @keyframes wlcWho{to{opacity:1;transform:none;}}
 
-/* A ring that breathes out behind the mark, once. */
-.wlc-ring{position:absolute;width:260px;height:260px;border-radius:50%;
-  border:1px solid color-mix(in srgb,var(--a) 42%,transparent);
-  opacity:0;transform:scale(.6);
-  animation:wlcRing 1.5s cubic-bezier(.16,.9,.3,1) .78s forwards;pointer-events:none;}
-@keyframes wlcRing{35%{opacity:.5;}to{opacity:0;transform:scale(1.9);}}
+/* A ring leaving the bloom, so the flare has somewhere to go. */
+.wlc-ring{position:absolute;width:150px;height:150px;border-radius:50%;
+  border:1px solid color-mix(in srgb,var(--a) 55%,transparent);
+  opacity:0;transform:scale(.5);
+  animation:wlcRing 1.7s cubic-bezier(.16,.9,.3,1) 2.4s forwards;pointer-events:none;}
+@keyframes wlcRing{22%{opacity:.6;}to{opacity:0;transform:scale(4.2);}}
 
-/* REDUCED MOTION GETS THE CEREMONY, NOT THE MOVEMENT.
-   The global rule near the top of this file flattens every animation to nothing,
-   which is right for a card sliding in and wrong here: it collapsed the whole
-   sequence into one frame, so the overlay appeared at opacity zero with the line
-   already at its end position and the screen looked like nothing had happened.
-   Which is exactly what it looked like.
-   Asking for less motion means less MOTION. A logo that fades up, holds, and
-   fades out has none — nothing travels, nothing scales — so the opening still
-   happens, just without anything moving across the screen. */
 @media(prefers-reduced-motion:reduce){
   .wlc{animation:wlcFadeOut .4s ease 1.5s forwards!important;}
   @keyframes wlcFadeOut{to{opacity:0;visibility:hidden;}}
@@ -11285,8 +11308,11 @@ function bootSequence(){
     const el=document.createElement('div');
     el.className='wlc';
     el.setAttribute('aria-hidden','true');
-    el.innerHTML='<div class="wlc-ring"></div>'
-      +'<div class="wlc-line"></div>'
+    // Order matters only for stacking: the flare sits behind the wordmark.
+    el.innerHTML='<div class="wlc-spark"></div>'
+      +'<div class="wlc-sweep"></div>'
+      +'<div class="wlc-bloom"></div>'
+      +'<div class="wlc-ring"></div>'
       +'<div class="wlc-mark"><b>Watch</b><i>list</i><u>.</u></div>'
       +'<div class="wlc-who" id="wlcWho"></div>';
     document.body.appendChild(el);
@@ -11299,7 +11325,11 @@ function bootSequence(){
     }catch(e){}
     const kill=()=>{try{el.remove();}catch(e){}};
     el.addEventListener('pointerdown',kill,{once:true});
-    setTimeout(kill,2700);
+    // The sequence runs to about 4.8s and the fade-out is the last 0.75s of it.
+    // A kill timer shorter than the animation does not shorten the animation, it
+    // amputates it — the first version cut at 2.7s, which would now remove the
+    // overlay while the wordmark was still arriving.
+    setTimeout(kill,5000);
   }catch(e){}
 }
 function applyRailFold(){

@@ -11322,75 +11322,86 @@ function bootSound(){
     if(!AC)return;
     ctx=new AC();
   }catch(e){return;}
-  // Every browser blocks audio until the page has been interacted with. If this
-  // is a cold load the context stays suspended, and the honest thing is to stay
-  // silent rather than fire the whole cue into a muted output and call it done.
   if(ctx.state==='suspended'){ try{ctx.resume();}catch(e){} }
   if(ctx.state==='suspended'){ try{ctx.close();}catch(e){} return; }
   const t0=ctx.currentTime+0.02;
   const out=ctx.createGain();
-  out.gain.value=0.18;
+  out.gain.value=0.2;
   out.connect(ctx.destination);
+  // A little room on the end of everything. Dry synthesis is what made the first
+  // version sound like a toy: real openings are recorded in a space, and the tail
+  // is most of what makes a sound feel expensive rather than plastic.
+  let tail=out;
+  try{
+    const cv=ctx.createConvolver(), len=Math.floor(ctx.sampleRate*2.2);
+    const b=ctx.createBuffer(2,len,ctx.sampleRate);
+    for(let c=0;c<2;c++){
+      const d=b.getChannelData(c);
+      for(let k=0;k<len;k++)d[k]=(Math.random()*2-1)*Math.pow(1-k/len,2.6);
+    }
+    cv.buffer=b;
+    const wet=ctx.createGain(); wet.gain.value=0.3;
+    cv.connect(wet).connect(ctx.destination);
+    tail=ctx.createGain(); tail.gain.value=1; tail.connect(out); tail.connect(cv);
+  }catch(e){}
 
-  // 1. the drone under the dark — a fifth, drifting up
-  [55,82.4].forEach((f,i)=>{
+  // 1. A low swell under the dark. Stacked sines on one note and its octave —
+  //    no glide, because a rising pitch is the single most cartoonish thing a
+  //    synthesiser can do and it was most of why the first attempt was funny.
+  [36.7,73.4,110.0].forEach((f,i)=>{
     const o=ctx.createOscillator(), g=ctx.createGain();
-    o.type='sine'; o.frequency.setValueAtTime(f,t0);
-    o.frequency.linearRampToValueAtTime(f*1.18,t0+2.25);
+    o.type='sine'; o.frequency.value=f;
+    o.detune.value=(i-1)*4;                      // just enough width to not sound synthetic
     g.gain.setValueAtTime(0.0001,t0);
-    g.gain.exponentialRampToValueAtTime(i?0.22:0.4,t0+1.6);
-    g.gain.exponentialRampToValueAtTime(0.0001,t0+3.1);
-    o.connect(g).connect(out); o.start(t0); o.stop(t0+3.2);
+    g.gain.exponentialRampToValueAtTime(0.5/(i+1),t0+2.1);
+    g.gain.exponentialRampToValueAtTime(0.0001,t0+3.4);
+    o.connect(g).connect(tail); o.start(t0); o.stop(t0+3.5);
   });
 
-  // 2. the sweep — pitch and filter opening together as the beam draws out
+  // 2. Air moving, instead of a riser. Filtered noise opening slowly: it reads as
+  //    something approaching rather than something sliding up a scale.
   {
-    const o=ctx.createOscillator(), g=ctx.createGain(), lp=ctx.createBiquadFilter();
-    lp.type='lowpass';
-    lp.frequency.setValueAtTime(240,t0+1.5);
-    lp.frequency.exponentialRampToValueAtTime(5200,t0+2.3);
-    o.type='sawtooth';
-    o.frequency.setValueAtTime(110,t0+1.5);
-    o.frequency.exponentialRampToValueAtTime(440,t0+2.3);
-    g.gain.setValueAtTime(0.0001,t0+1.5);
-    g.gain.exponentialRampToValueAtTime(0.30,t0+2.2);
-    g.gain.exponentialRampToValueAtTime(0.0001,t0+2.6);
-    o.connect(lp).connect(g).connect(out); o.start(t0+1.5); o.stop(t0+2.7);
+    const len=Math.floor(ctx.sampleRate*2.6);
+    const b=ctx.createBuffer(1,len,ctx.sampleRate);
+    const d=b.getChannelData(0);
+    for(let k=0;k<len;k++)d[k]=(Math.random()*2-1);
+    const n=ctx.createBufferSource(), g=ctx.createGain(), lp=ctx.createBiquadFilter();
+    n.buffer=b; lp.type='lowpass';
+    lp.frequency.setValueAtTime(180,t0);
+    lp.frequency.exponentialRampToValueAtTime(2600,t0+2.25);
+    g.gain.setValueAtTime(0.0001,t0+0.1);
+    g.gain.exponentialRampToValueAtTime(0.16,t0+2.2);
+    g.gain.exponentialRampToValueAtTime(0.0001,t0+2.9);
+    n.connect(lp).connect(g).connect(tail); n.start(t0);
   }
 
-  // 3. the impact — a low thump and a short burst of air, together
+  // 3. The impact. Deep, short, and left to decay into the room rather than
+  //    clicking off — the tail is the whole point of it.
   {
     const o=ctx.createOscillator(), g=ctx.createGain();
     o.type='sine';
-    o.frequency.setValueAtTime(180,t0+2.25);
-    o.frequency.exponentialRampToValueAtTime(42,t0+2.65);
-    g.gain.setValueAtTime(0.9,t0+2.25);
-    g.gain.exponentialRampToValueAtTime(0.0001,t0+2.9);
-    o.connect(g).connect(out); o.start(t0+2.25); o.stop(t0+2.95);
-
-    const len=Math.floor(ctx.sampleRate*0.5);
-    const buf=ctx.createBuffer(1,len,ctx.sampleRate);
-    const d=buf.getChannelData(0);
-    for(let i=0;i<len;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/len,3);
-    const n=ctx.createBufferSource(), ng=ctx.createGain(), bp=ctx.createBiquadFilter();
-    n.buffer=buf; bp.type='bandpass'; bp.frequency.value=1700; bp.Q.value=0.8;
-    ng.gain.setValueAtTime(0.5,t0+2.25);
-    ng.gain.exponentialRampToValueAtTime(0.0001,t0+2.85);
-    n.connect(bp).connect(ng).connect(out); n.start(t0+2.25);
+    o.frequency.setValueAtTime(90,t0+2.25);
+    o.frequency.exponentialRampToValueAtTime(33,t0+2.9);
+    g.gain.setValueAtTime(0.0001,t0+2.25);
+    g.gain.exponentialRampToValueAtTime(1.0,t0+2.3);
+    g.gain.exponentialRampToValueAtTime(0.0001,t0+3.4);
+    o.connect(g).connect(tail); o.start(t0+2.25); o.stop(t0+3.5);
   }
 
-  // 4. the shimmer as the wordmark lands — a fifth, struck and left to ring
-  [587.33,880].forEach((f,i)=>{
-    const o=ctx.createOscillator(), g=ctx.createGain();
-    o.type='triangle'; o.frequency.value=f;
-    const at=t0+2.5+i*0.09;
+  // 4. The chord the wordmark lands on. A major triad held and released slowly,
+  //    not two bright notes struck one after the other — that was the doorbell.
+  [220,277.18,329.63,440].forEach((f,i)=>{
+    const o=ctx.createOscillator(), g=ctx.createGain(), lp=ctx.createBiquadFilter();
+    o.type='sine'; o.frequency.value=f; o.detune.value=(i%2?5:-5);
+    lp.type='lowpass'; lp.frequency.value=2400;
+    const at=t0+2.42;
     g.gain.setValueAtTime(0.0001,at);
-    g.gain.exponentialRampToValueAtTime(i?0.16:0.24,at+0.05);
-    g.gain.exponentialRampToValueAtTime(0.0001,at+1.5);
-    o.connect(g).connect(out); o.start(at); o.stop(at+1.6);
+    g.gain.exponentialRampToValueAtTime(0.2/(1+i*0.35),at+0.55);   // slow in, no attack transient
+    g.gain.exponentialRampToValueAtTime(0.0001,at+2.0);
+    o.connect(lp).connect(g).connect(tail); o.start(at); o.stop(at+2.1);
   });
 
-  try{setTimeout(()=>{try{ctx.close();}catch(e){}},5200);}catch(e){}
+  try{setTimeout(()=>{try{ctx.close();}catch(e){}},6000);}catch(e){}
 }
 function toggleBootSfx(){
   setBootSfx(!bootSfxOn());

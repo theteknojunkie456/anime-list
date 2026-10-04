@@ -33,7 +33,7 @@ const t=(n,g,e)=>{const ok=JSON.stringify(g)===JSON.stringify(e);ok?pass++:fail+
 
 // watch what the cue builds, rather than trying to listen to it
 const spy=await ev(`(()=>{
-  const log={osc:[],noise:0,nodes:[],peak:0,closed:false};
+  const log={osc:[],noise:0,nodes:[],gains:[],closed:false};
   const AC=window.AudioContext;
   window.AudioContext=function(){
     const ctx=new AC();
@@ -47,8 +47,12 @@ const spy=await ev(`(()=>{
     // code sets its real type on the next line, so reading .type at creation
     // records the default every time and says nothing about the cue.
     ctx.createBiquadFilter=()=>{const f=cf();log.nodes.push(f);return f;};
+    // Record gains IN ORDER rather than taking the maximum. The first one built is
+    // the master that feeds the destination; the ones after it are internal
+    // routing and a send, and those are supposed to sit at 1.0. Taking a max
+    // across all of them measured the plumbing and called it the volume.
     ctx.createGain=()=>{const g=cg();
-      Object.defineProperty(g.gain,'value',{set(v){log.peak=Math.max(log.peak,v);},get(){return 0;},configurable:true});
+      Object.defineProperty(g.gain,'value',{set(v){log.gains.push(v);},get(){return 0;},configurable:true});
       return g;};
     ctx.close=()=>{log.closed=true;return cl();};
     return ctx;
@@ -58,14 +62,15 @@ const spy=await ev(`(()=>{
   return {state:'ran'};})()`);
 await wait(300);
 const log=await ev(`(()=>{const l=window.__sfx;
-  return {osc:l.osc,noise:l.noise,peak:l.peak,filters:l.nodes.map(f=>f.type).sort()};})()`);
+  return {osc:l.osc,noise:l.noise,master:l.gains[0],gains:l.gains,
+          filters:l.nodes.map(f=>f.type).sort()};})()`);
 console.log('    graph:', JSON.stringify(log));
-t('it schedules oscillators', (log.osc||[]).length>=5, true);
-t('including the saw that sweeps', (log.osc||[]).includes('sawtooth'), true);
-t('and the triangles that ring', (log.osc||[]).includes('triangle'), true);
+t('it schedules a stack of sines', (log.osc||[]).filter(x=>x==='sine').length>=7, true);
+t('no sawtooth riser — that was the cartoon boing', (log.osc||[]).includes('sawtooth'), false);
+t('no struck triangles — that was the doorbell', (log.osc||[]).includes('triangle'), false);
 t('a noise burst for the impact', log.noise>=1, true);
-t('a lowpass opening and a bandpass', (log.filters||[]).sort(), ['bandpass','lowpass']);
-t('output stays quiet', log.peak<=0.2, true);
+t('lowpass filters only now', (log.filters||[]).every(f=>f==='lowpass'), true);
+t('the master output stays quiet', log.master<=0.2, true);
 
 // the preference
 t('muting it stops the cue',

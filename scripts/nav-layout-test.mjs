@@ -43,10 +43,10 @@ async function shape(wpx,hpx){
 
 t('desktop 1440x900',            await shape(1440,900),  'rail');
 t('tablet landscape 1180x820',   await shape(1180,820),  'rail');
-t('phone landscape 932x430',     await shape(932,430),   'bar');
-t('phone portrait 430x932',      await shape(430,932),   'bar');
-t('squashed window 1400x500',    await shape(1400,500),  'bar');
-t('tablet portrait 820x1180',    await shape(820,1180),  'bar');
+t('phone landscape 932x430',     await shape(932,430),   'rail');   // asked for: a phone on its side gets the desktop layout
+t('phone portrait 430x932',      await shape(430,932),   'bar');   // too narrow for anything beside it
+t('squashed window 1400x500',    await shape(1400,500),  'rail');  // 500 is still taller than the 304 a rail needs
+t('tablet portrait 820x1180',    await shape(820,1180),  'rail');  // wide AND tall, so it qualifies on both counts
 t('back to desktop still a rail',await shape(1440,900),  'rail');
 console.log('\n'+pass+' passed, '+fail+' failed');
 ws.close();ch.kill();srv.kill();process.exit(fail?1:0);

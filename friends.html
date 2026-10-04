@@ -21230,24 +21230,37 @@ function renderSource(){
   // a setup screen you have to get through, when in fact there is nothing to do.
   // So: say what tapping Watch does right now, then offer the choices, and keep
   // the custom-site flow folded away for people who actually want it.
-  const nowOpens = noSourceMode() ? 'ask you which site to use'
-                 : custom ? ('open '+escH(host(custom)))
-                 : (freeDefault()? ('search '+escH(freeDefault().name)) : 'have nowhere to go yet');
+  // This line and the one under it used to disagree with each other: the banner
+  // said Watch had "nowhere to go yet" while the sentence directly beneath it
+  // said "that already works — nothing to set up". Both were generated, neither
+  // knew what the other had decided, and a reader had to work out which was
+  // lying. One decision now, stated once, with the caption following from it.
+  const _free=freeDefault();
+  const nowOpensShort = noSourceMode() ? 'nothing \u2014 it asks you'
+                      : custom ? escH(host(custom))
+                      : (_free ? escH(_free.name) : 'nothing yet');
+  const srcNowSub = noSourceMode()
+      ? 'Every Watch button brings you here to choose. Pick a site below to stop being asked.'
+    : custom
+      ? 'Your own site. Change it below whenever you like.'
+    : _free
+      ? 'Already set up \u2014 there is nothing you need to do. Pick a different site below if you would rather.'
+      : 'Nothing is set, so Watch has nowhere to send you. Pick one below.';
   box.innerHTML=tabs+`
     <div class="src-now">
-      <div class="src-now-t">${icon('play')} Tap <b>Watch</b> on any show and it'll ${nowOpens}.</div>
-      <div class="src-now-s">${custom||noSourceMode()?'Change it below whenever you like.':'That already works — nothing to set up. Pick a different site below if you\'d rather.'}</div>
+      <div class="src-now-t">${icon('play')} Watch opens <b>${nowOpensShort}</b></div>
+      <div class="src-now-s">${srcNowSub}</div>
     </div>
 
     <div class="dt-label">${icon('play')} Where Watch opens</div>
     <button class="src-opt${!custom&&!noSourceMode()?' on':''}" onclick="setSource('')">
-      <div class="src-name">Free search <span class="src-tag">Default</span></div>
-      <div class="src-sub">${freeDefault()?`Looks it up on ${escH(freeDefault().name)} — no account needed`:'Nothing to fall back on — set a site above'}</div>
+      <div class="src-name">${_free?escH(_free.name):'No site set'}${_free?' <span class="src-tag">Default</span>':''}</div>
+      <div class="src-sub">${_free?'Looks the show up there \u2014 no account needed':'Choose one of the sites below, or add your own'}</div>
     </button>
     ${chips?`<div class="src-picks" style="margin-top:9px">${chips}</div>`:''}
     <button class="src-opt${noSourceMode()?' on':''}" onclick="setNoSource()" style="margin-top:9px">
-      <div class="src-name">${icon('x')} Ask me each time <span class="src-tag">No source</span></div>
-      <div class="src-sub">Watch stays put and brings you here instead</div>
+      <div class="src-name">${icon('x')} Ask me each time</div>
+      <div class="src-sub">Watch brings you here to choose, every time</div>
     </button>
 
     <details class="src-fold" data-fold="own" style="margin-top:16px"${O('own')}>
@@ -21259,7 +21272,7 @@ function renderSource(){
     </details>
 
     <details class="src-fold" data-fold="settings"${O('settings')} style="margin-top:16px">
-      <summary>${icon('settings')} Everything else</summary>
+      <summary>${icon('settings')} Manage the list of sites</summary>
 
       <div class="dt-label" style="margin-top:14px">Your sources</div>
       <label class="ct-dk">Only the sites I added<span class="ct-tgl"><input type="checkbox" id="onlyMineTgl" ${onlyMine()?'checked':''} onchange="setOnlyMine(this.checked)"><span class="ct-tgl-track"></span></span></label>
@@ -23658,7 +23671,26 @@ let _bootVer=null,_updateReady=false,_updSnap=null;
 // once, and if the response wasn't a 206 the whole approach is abandoned for the
 // session rather than repeated forever.
 let _verMode='head';        // 'head' → 'range' → 'off'
+// 'off' USED TO BE FOREVER, AND THAT IS WHY A PHONE FELL BEHIND.
+//
+// One Range request that did not come back 206 disabled version checking for the
+// whole session. The reasoning was sound — do not re-download a 900KB bundle to
+// learn there is no new version — but the conclusion was too strong, because that
+// request goes through the service worker, which is network-first. A single
+// flaky moment on mobile serves it from Cache Storage as a 200, the check reads
+// that as "this server ignores Range", and the app stops looking for updates
+// until it is force-quit. Which is exactly what it looked like from the outside:
+// a device that quietly stayed on an old build for no reason anyone could see.
+//
+// So giving up is temporary now. It backs off for ten minutes rather than for
+// good, and coming back online clears it immediately — a network that just
+// changed is the single best moment to try again.
+let _verOffUntil=0;
+function _verGiveUp(){ _verMode='off'; _verOffUntil=Date.now()+600000; }
+function _verRevive(){ if(_verMode==='off'&&Date.now()>=_verOffUntil){_verMode='head';_verOffUntil=0;} }
+try{window.addEventListener('online',()=>{_verMode='head';_verOffUntil=0;});}catch(e){}
 async function _liveVer(){
+  _verRevive();
   if(_verMode==='off')return '';
   const u='./?_ck='+Date.now();
   const readV=r=>r.headers.get('etag')||r.headers.get('last-modified')||'';
@@ -23669,9 +23701,9 @@ async function _liveVer(){
     if(_verMode==='range'){
       const r=await fetch(u,{cache:'no-store',headers:{Range:'bytes=0-0'}});
       v=readV(r);
-      if(r.status!==206){_verMode='off';return '';}   // Range ignored — don't pull the bundle to find out again
+      if(r.status!==206){_verGiveUp();return '';}     // Range ignored, or the worker answered from cache — stand down, briefly
       if(v)return v;
-      _verMode='off';
+      _verGiveUp();
     }
     return '';
   }catch(e){return '';}

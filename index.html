@@ -11403,6 +11403,25 @@ function bootSound(){
 
   try{setTimeout(()=>{try{ctx.close();}catch(e){}},6000);}catch(e){}
 }
+async function checkUpdateNow(btn){
+  const was=btn?btn.querySelector('.set-p'):null;
+  if(was)was.textContent='Checking\u2026';
+  let v='';
+  try{v=await _liveVer();}catch(e){}
+  if(!v){ if(was)was.textContent='Could not reach the server'; return; }
+  // _bootVer is what this page loaded with. A difference means the server is
+  // serving something else, whatever the automatic path has or has not noticed.
+  if(_bootVer&&v!==_bootVer){
+    if(was)was.textContent='Newer build found \u2014 reloading';
+    try{tap('tap');}catch(e){}
+    _updateReady=true;
+    setTimeout(()=>{try{safeReload();}catch(e){location.reload();}},450);
+    return;
+  }
+  if(!_bootVer)_bootVer=v;
+  if(was)was.textContent='This is the latest build';
+  try{tap('tick');}catch(e){}
+}
 function toggleBootSfx(){
   setBootSfx(!bootSfxOn());
   try{tap('tick');}catch(e){}
@@ -16733,7 +16752,20 @@ function renderSettings(){
       p:`${probs.length} on this build · last ${when} — tap to copy`,
       go:'copyProblems()',warn:true});
   }
-  // The opening makes a noise, so there has to be somewhere to stop it making a
+  // WHICH BUILD IS THIS, AND IS IT THE LATEST.
+  //
+  // The app updates itself — ETag poll, focus, online, pageshow — and all of that
+  // is invisible, which is fine until a device falls behind. Then there is no way
+  // to tell whether you are on the new build, the old one, or something in
+  // between, and the only move left is reloading and hoping.
+  //
+  // So the version is stated, and there is a button that asks the server directly
+  // and reloads if the answer differs. Nothing here replaces the automatic path;
+  // it just makes it answerable.
+  rows.push({ic:'refresh',h:'Version '+((typeof RELEASE!=='undefined'&&RELEASE&&RELEASE.v)||'?'),
+    p:'Tap to check for a newer build',
+    go:'checkUpdateNow(this)'});
+    // The opening makes a noise, so there has to be somewhere to stop it making a
   // noise. A sound you cannot switch off is not a feature of the app, it is
   // something the app does to you.
   rows.push({ic:'speech',h:'Startup sound',

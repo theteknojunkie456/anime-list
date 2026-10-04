@@ -2058,6 +2058,12 @@ body.first-paint .pfill,body.content-in .pfill{animation:barGrow .62s cubic-bezi
   transition:transform .12s,background-color .16s,color .16s;
 }
 .nbtn:active{transform:scale(0.88);}
+/* The fold belongs to the RAIL and nothing else. The bar is a five-column grid
+   and this is a sixth child, so on a phone it wrapped onto a row of its own
+   beneath the tab bar — a stray chevron under everything, which then toggled a
+   rail that does not exist at that width and so appeared to do nothing at all.
+   Shown again inside the rail's own media query, and nowhere else. */
+.nbtn.rail-fold{display:none;}
 .nbtn small{font-size:clamp(8px,2.4vw,9px);font-weight:800;letter-spacing:0.04em;
   white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis;}
 /* The active one is its own pill inside the bar — colour alone was doing all the
@@ -4606,7 +4612,7 @@ body.recsel .pcard{position:relative;}
      edge so it needs no element at all. */
   .nav .nbtn#nav-settings,.nav .nbtn.rail-fold{
     box-shadow:0 -6px 0 -5px var(--bn2);}
-  .nav .nbtn.rail-fold{color:var(--t3);}
+  .nav .nbtn.rail-fold{display:flex;color:var(--t3);}
   .nav .nbtn.rail-fold .ico{width:17px;height:17px;}
   .nav .nbtn.add{width:46px;height:46px;min-width:0;font-size:21px;margin:2px auto;border-radius:50%;
     background:var(--a);color:var(--aFg);box-shadow:0 8px 20px -8px var(--glow);}

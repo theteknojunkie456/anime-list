@@ -11299,6 +11299,105 @@ function railFolded(){try{return localStorage.getItem(RAIL_FOLD)==='1';}catch(e)
 // seconds, once per launch, and a touch anywhere cuts it short — the second time
 // you see something like this you already want it gone, and an animation you
 // cannot skip is a toll.
+// THE SOUND OF IT STARTING.
+//
+// Synthesised rather than sampled: four oscillators, a noise burst and two
+// filters, generated at runtime. That means no audio files to ship, no second
+// request on boot, and a sound that is built to this sequence's timings rather
+// than trimmed to fit them — each cue is scheduled against the same clock the
+// CSS is using.
+//
+// A drone that rises under the dark, a filtered sweep as the beam releases, an
+// impact when the flare blows out, and a two-note shimmer as the wordmark lands.
+// Quiet: peak gain is 0.18, because an opening that makes somebody reach for the
+// volume key has failed no matter how good it sounds.
+const SFX_KEY='wl_boot_sfx';
+function bootSfxOn(){try{return localStorage.getItem(SFX_KEY)!=='0';}catch(e){return true;}}
+function setBootSfx(on){try{localStorage.setItem(SFX_KEY,on?'1':'0');}catch(e){}}
+function bootSound(){
+  if(!bootSfxOn())return;
+  let ctx;
+  try{
+    const AC=window.AudioContext||window.webkitAudioContext;
+    if(!AC)return;
+    ctx=new AC();
+  }catch(e){return;}
+  // Every browser blocks audio until the page has been interacted with. If this
+  // is a cold load the context stays suspended, and the honest thing is to stay
+  // silent rather than fire the whole cue into a muted output and call it done.
+  if(ctx.state==='suspended'){ try{ctx.resume();}catch(e){} }
+  if(ctx.state==='suspended'){ try{ctx.close();}catch(e){} return; }
+  const t0=ctx.currentTime+0.02;
+  const out=ctx.createGain();
+  out.gain.value=0.18;
+  out.connect(ctx.destination);
+
+  // 1. the drone under the dark — a fifth, drifting up
+  [55,82.4].forEach((f,i)=>{
+    const o=ctx.createOscillator(), g=ctx.createGain();
+    o.type='sine'; o.frequency.setValueAtTime(f,t0);
+    o.frequency.linearRampToValueAtTime(f*1.18,t0+2.25);
+    g.gain.setValueAtTime(0.0001,t0);
+    g.gain.exponentialRampToValueAtTime(i?0.22:0.4,t0+1.6);
+    g.gain.exponentialRampToValueAtTime(0.0001,t0+3.1);
+    o.connect(g).connect(out); o.start(t0); o.stop(t0+3.2);
+  });
+
+  // 2. the sweep — pitch and filter opening together as the beam draws out
+  {
+    const o=ctx.createOscillator(), g=ctx.createGain(), lp=ctx.createBiquadFilter();
+    lp.type='lowpass';
+    lp.frequency.setValueAtTime(240,t0+1.5);
+    lp.frequency.exponentialRampToValueAtTime(5200,t0+2.3);
+    o.type='sawtooth';
+    o.frequency.setValueAtTime(110,t0+1.5);
+    o.frequency.exponentialRampToValueAtTime(440,t0+2.3);
+    g.gain.setValueAtTime(0.0001,t0+1.5);
+    g.gain.exponentialRampToValueAtTime(0.30,t0+2.2);
+    g.gain.exponentialRampToValueAtTime(0.0001,t0+2.6);
+    o.connect(lp).connect(g).connect(out); o.start(t0+1.5); o.stop(t0+2.7);
+  }
+
+  // 3. the impact — a low thump and a short burst of air, together
+  {
+    const o=ctx.createOscillator(), g=ctx.createGain();
+    o.type='sine';
+    o.frequency.setValueAtTime(180,t0+2.25);
+    o.frequency.exponentialRampToValueAtTime(42,t0+2.65);
+    g.gain.setValueAtTime(0.9,t0+2.25);
+    g.gain.exponentialRampToValueAtTime(0.0001,t0+2.9);
+    o.connect(g).connect(out); o.start(t0+2.25); o.stop(t0+2.95);
+
+    const len=Math.floor(ctx.sampleRate*0.5);
+    const buf=ctx.createBuffer(1,len,ctx.sampleRate);
+    const d=buf.getChannelData(0);
+    for(let i=0;i<len;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/len,3);
+    const n=ctx.createBufferSource(), ng=ctx.createGain(), bp=ctx.createBiquadFilter();
+    n.buffer=buf; bp.type='bandpass'; bp.frequency.value=1700; bp.Q.value=0.8;
+    ng.gain.setValueAtTime(0.5,t0+2.25);
+    ng.gain.exponentialRampToValueAtTime(0.0001,t0+2.85);
+    n.connect(bp).connect(ng).connect(out); n.start(t0+2.25);
+  }
+
+  // 4. the shimmer as the wordmark lands — a fifth, struck and left to ring
+  [587.33,880].forEach((f,i)=>{
+    const o=ctx.createOscillator(), g=ctx.createGain();
+    o.type='triangle'; o.frequency.value=f;
+    const at=t0+2.5+i*0.09;
+    g.gain.setValueAtTime(0.0001,at);
+    g.gain.exponentialRampToValueAtTime(i?0.16:0.24,at+0.05);
+    g.gain.exponentialRampToValueAtTime(0.0001,at+1.5);
+    o.connect(g).connect(out); o.start(at); o.stop(at+1.6);
+  });
+
+  try{setTimeout(()=>{try{ctx.close();}catch(e){}},5200);}catch(e){}
+}
+function toggleBootSfx(){
+  setBootSfx(!bootSfxOn());
+  try{tap('tick');}catch(e){}
+  toast(bootSfxOn()?'Startup sound on':'Startup sound off');
+  try{renderSettings();}catch(e){}
+}
 function bootSequence(){
   try{
     if(sessionStorage.getItem('wl_booted')==='1')return;   // once per launch, not per render
@@ -11323,6 +11422,7 @@ function bootSequence(){
       const who=document.getElementById('wlcWho');
       if(who)who.textContent=n?('Welcome back, '+n):'';
     }catch(e){}
+    try{bootSound();}catch(e){}
     const kill=()=>{try{el.remove();}catch(e){}};
     el.addEventListener('pointerdown',kill,{once:true});
     // The sequence runs to about 4.8s and the fade-out is the last 0.75s of it.
@@ -16622,6 +16722,12 @@ function renderSettings(){
       p:`${probs.length} on this build · last ${when} — tap to copy`,
       go:'copyProblems()',warn:true});
   }
+  // The opening makes a noise, so there has to be somewhere to stop it making a
+  // noise. A sound you cannot switch off is not a feature of the app, it is
+  // something the app does to you.
+  rows.push({ic:'speech',h:'Startup sound',
+    p:bootSfxOn()?'On — plays once when the app opens':'Off',
+    go:'toggleBootSfx()'});
   el.innerHTML=rows.map(r=>
     `<button class="set-row${r.warn?' warn':''}" onclick="${r.go}">
       <div class="set-ico">${icon(r.ic)}</div>

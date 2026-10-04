@@ -6,7 +6,7 @@
 // current, but an installed iOS app that has been offline or backgrounded can
 // hold an old bundle for a long time — and "the fix didn't work" has looked
 // exactly like that more than once.
-const CACHE = 'animelist-94f6397c3d';
+const CACHE = 'animelist-9bbd708e48';
 // The typeface lives on a THIRD-PARTY origin, and the fetch handler below only
 // ever touched same-origin requests — so it was never stored. Two consequences,
 // both real: an installed app that goes offline renders in system fonts, losing

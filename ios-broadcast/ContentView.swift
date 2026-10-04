@@ -1,5 +1,6 @@
 import SwiftUI
 import WebKit
+import UIKit   // UIImpactFeedbackGenerator / UINotificationFeedbackGenerator
 import ReplayKit
 import UserNotifications
 import Security
@@ -382,6 +383,30 @@ struct WatchListShell: UIViewRepresentable {
                 if let pw = body["pw"] as? String, !pw.isEmpty { PWStore.save(pw); NSLog("WatchList: password saved to Keychain (Face ID armed for next launch)") }
             case "faceid":
                 DispatchQueue.main.async { self.triggerFaceID() }
+            // The web side has been asking for haptics and nothing was listening.
+            // navigator.vibrate does not exist on iOS at all, so the bridge is the
+            // only way a tap can be felt here — and without this case the message
+            // arrived, matched nothing, and was dropped silently.
+            //
+            // Three weights, matching the three the web side sends: a tick for
+            // passing something, a tap for changing something, and a success
+            // notification for finishing something, which is the one moment in the
+            // app that is actually an occasion.
+            case "haptic":
+                let kind = body["kind"] as? String ?? "tap"
+                DispatchQueue.main.async {
+                    switch kind {
+                    case "tick":
+                        let g = UIImpactFeedbackGenerator(style: .light)
+                        g.prepare(); g.impactOccurred()
+                    case "done":
+                        let g = UINotificationFeedbackGenerator()
+                        g.prepare(); g.notificationOccurred(.success)
+                    default:
+                        let g = UIImpactFeedbackGenerator(style: .medium)
+                        g.prepare(); g.impactOccurred()
+                    }
+                }
             case "openurl":
                 // These sites refuse to be FRAMED — that's all X-Frame-Options and
                 // frame-ancestors say. Neither restricts a top-level load, so a site

@@ -1900,15 +1900,29 @@ img[data-fd="in"]{opacity:1;transition:opacity .18s ease-out;}
   font-size:34px;font-weight:800;color:var(--t3);letter-spacing:-1px;
 }
 .pcard-wrap{position:relative;}
+/* A MARK, NOT A LABEL.
+   The badge was the word — DONE, WATCHING, PLAN — in a pill that ran most of the
+   way across the artwork it was sitting on. Three of them in a row and the shelf
+   reads as a list of statuses with some pictures behind it, which is backwards:
+   the artwork is the thing you are scanning, and the status is one bit of
+   information about it.
+   A glyph in the status colour says the same bit in a fifth of the space: a tick
+   for done, a clipboard for planned, a play for watching. The word is still in
+   the markup for anything reading the page aloud — it is hidden from sight, not
+   removed. */
 .pcard-badge{
-  position:absolute;top:0;left:0;display:inline-flex;align-items:center;gap:5px;
-  font-size:10px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;
-  padding:6px 9px 7px 8px;border-radius:14px 0 12px 0;
-  background:rgba(8,8,11,0.84);
+  position:absolute;top:7px;left:7px;
+  display:inline-flex;align-items:center;justify-content:center;
+  width:25px;height:25px;padding:0;border-radius:50%;
+  background:rgba(8,8,11,0.72);
+  border:1px solid currentColor;
+  box-shadow:0 2px 10px -3px rgba(0,0,0,.9), inset 0 1px 0 rgba(255,255,255,.07);
+  backdrop-filter:saturate(1.2) blur(3px);
 }
-.pcard-badge::before{content:'';width:5px;height:5px;border-radius:50%;background:currentColor;}
-.pcard-badge .ico{display:none;}
-.pcard-badge{max-width:calc(100% - 14px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.pcard-badge .ico{display:block;width:13px;height:13px;}
+/* Present for a screen reader, gone for an eye. */
+.sr{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;
+  clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;border:0;}
 /* The note that matched, under the title, with your words marked. Two lines at
    most — it is a reason, not the note itself. */
 .pcard-note{display:flex;gap:5px;margin-top:4px;font-size:12px;line-height:1.4;color:var(--t3);}
@@ -2782,29 +2796,25 @@ body.yt-open{overflow:hidden;touch-action:none;}
 .dt-season-t{font-family:var(--fd);font-size:15px;font-weight:700;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .dt-season-s{font-size:12px;color:var(--t3);margin-top:2px;}
 .dt-season .ico{width:16px;height:16px;color:var(--t3);flex-shrink:0;}
-.dt-next{display:flex;align-items:center;gap:9px;margin:12px 18px 0;padding:9px 10px 9px 13px;border-radius:14px;
+.dt-next{display:flex;align-items:center;gap:10px;margin:0 0 12px;padding:10px 10px 10px 14px;border-radius:14px;
   background:var(--bg3);border:1px solid var(--bn2);}
-.dt-next-k{flex:0 0 auto;font-size:12px;font-weight:700;color:var(--t3);white-space:nowrap;}
-.dt-next-t{flex:1;min-width:0;font-size:13px;font-weight:600;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+/* Label over title, not beside it. Side by side, a phone had to drop the label to
+   fit, and what was left was a clipped title with no reason to be there. Stacked,
+   both fit and the title gets two lines before it clips. */
+.dt-next-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;}
+.dt-next-k{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--t3);}
+.dt-next-t{font-size:13px;font-weight:600;line-height:1.3;color:var(--t1);
+  display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;}
 /* Filled in the accent, this was a second primary button sitting directly above
    the real one — two solid calls to action, four lines apart, and the louder of
    the two was the smaller job. It states its offer quietly now and lets Start
    Watching be the thing you press. */
-.dt-next-go{flex:0 0 auto;padding:5px 11px;border-radius:99px;background:transparent;
+.dt-next-go{flex:0 0 auto;padding:7px 12px;border-radius:99px;background:transparent;
   border:1px solid color-mix(in srgb,var(--a) 55%,transparent);color:var(--a2);
   font-size:12px;font-weight:700;transition:background-color .15s;}
 .dt-next-go:active{background:var(--ag);}
 .dt-next-x{flex:0 0 auto;display:flex;color:var(--t3);padding:3px;}
 .dt-next-x .ico{width:14px;height:14px;}
-/* Stacking this fixed the clipping and made a one-line hint 130px tall, which is
-   its own kind of wrong. The label is the expendable part — you're on the show's
-   own page and the button says what it does — so on a phone it goes and the
-   title takes the space it was using. One row, nothing clipped, 49px. */
-@media(max-width:430px){
-  .dt-next{gap:8px;padding:9px 9px 9px 12px;}
-  .dt-next-k{display:none;}
-  .dt-next-go{padding:7px 11px;font-size:12px;}
-}
 
 .dt-season-here{font-size:12px;font-weight:800;color:var(--a2);flex-shrink:0;}
 /* Marks a row that will put itself on your list when tapped, so the difference
@@ -6787,6 +6797,26 @@ function deEnt(s){
 // r10 once its rating is known to be out of ten — set when somebody rates it, and
 // set here when an old one is converted. Anything rated with no mark came from
 // before the change, wherever it just arrived from, and is converted exactly once.
+// A show marked "plan" with every episode watched is not a plan, and the detail
+// sheet said so in two different voices at once: the facts read "Finished · ~11h
+// watched" while the status row still highlighted Plan and the button offered to
+// Continue Watching something there was none of.
+//
+// commitEp already handles this when you step to the last episode. The ways it
+// gets missed are the ways a count arrives without stepping: an import, an
+// AniList sync, or "All seen" in the seasons drawer. So it is settled here, where
+// every list enters, rather than at each of those doors.
+//
+// Only from "plan". Finishing a rewatch leaves you on "watching" with a full
+// count quite legitimately, and that is not a contradiction to fix.
+function normalizeFinished(list){
+  (list||[]).forEach(a=>{
+    if(!a)return;
+    const total=+a.epTotal||0, seen=+a.ep||0;
+    if(total>0&&seen>=total&&a.status==='plan')a.status='finished';
+  });
+  return list;
+}
 function normalizeRatings(list){
   (list||[]).forEach(a=>{
     if(!a)return;
@@ -6812,7 +6842,7 @@ function migrate(list){
   // stays safe because every one of those surfaces still runs escH on the way out.
   mapped.forEach(a=>{a.title=deEnt(a.title);a.genre=deEnt(a.genre);a.notes=deEnt(a.notes);});
   mapped.forEach(a=>{a.img=safeImg(a.img);a.banner=safeImg(a.banner);a.bgImage=safeImg(a.bgImage);});
-  return normalizeRatings(dedupeList(mapped).kept);   // never load a list with duplicates, or one on the old rating scale
+  return normalizeFinished(normalizeRatings(dedupeList(mapped).kept));   // no duplicates, no old rating scale, no "plan" that is actually finished
 }
 // Did the list we're holding come from a FAILURE rather than from the user?
 //
@@ -11263,7 +11293,7 @@ function posterCard(a,nSeas){
     oncontextmenu="pcMenu('${a.id}',event)" ontouchstart="pcHoldStart('${a.id}',event)" ontouchmove="pcHoldMove(event)" ontouchend="pcHoldEnd()" ontouchcancel="pcHoldEnd()">
     <div class="pcard-wrap">
       ${img}
-      <span class="pcard-badge b-${a.status}">${statusTag(a)}</span>
+      <span class="pcard-badge b-${a.status}">${(STATUS_META[a.status]||STATUS_META.plan).icon}<i class="sr">${statusTag(a)}</i></span>
       ${(()=>{
         // Netflix, Crunchyroll and miruro all answer "what should I put on" before
         // you ask, and they answer it the same way: the tile says what is WAITING,
@@ -12131,8 +12161,10 @@ function renderDetail(){
       // wrapped and the title clipped to "Ove…". Full width, one line, below the
       // header — the same information with room to be read.
       return `<div class="dt-next">
-        <span class="dt-next-k">${n.soon?'Next season, not out yet':'Next season'}</span>
-        <span class="dt-next-t">${schEsc(n.title)}</span>
+        <span class="dt-next-info">
+          <span class="dt-next-k">${n.soon?'Next season · not out yet':'Next season'}</span>
+          <span class="dt-next-t">${schEsc(n.title)}</span>
+        </span>
         <button class="dt-next-go" onclick="addNextUp('${escH(a.id)}',event)">${n.soon?'Plan it':'Watch it'}</button>
         <button class="dt-next-x" onclick="clearNextUp('${escH(a.id)}',event)" aria-label="Not interested">${icon('x')}</button>
       </div>`;})()}
@@ -12141,7 +12173,8 @@ function renderDetail(){
     ${(kindOf(a)==='watch')?`
     ${notOutYet(a)
       ? `<button class="dt-watch" disabled aria-disabled="true">${icon('calendar')} ${(()=>{const air=airingInfo(a);return air&&air.when?`Episode 1 airs ${schEsc(air.when)}`:'Not out yet';})()}</button>`
-      : `<button class="dt-watch" onclick="watchAnime('${a.id}')">${icon('play')} ${(_res&&canResumeHere(a))?`Resume Ep ${a.posEp} at ${fmtPos(_res)}`:((a.ep||0)>0?'Continue Watching':'Start Watching')}</button>`}
+      : `<button class="dt-watch" onclick="watchAnime('${a.id}')">${icon('play')} ${(_res&&canResumeHere(a))?`Resume Ep ${a.posEp} at ${fmtPos(_res)}`:(((a.epTotal&&(a.ep||0)>=a.epTotal)||a.status==='finished')?'Rewatch'
+      :((a.ep||0)>0?'Continue Watching':'Start Watching'))}</button>`}
     ${kindOf(a)==='watch'?`<button class="dt-together" onclick="watchTogether('${a.id}')">${icon('users')} ${partyActive()?'Watch this in the party':'Watch together'}</button>`:''}
     ${progHTML}
     ${titleWatchPickerHTML(a)}

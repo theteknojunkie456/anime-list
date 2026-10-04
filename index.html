@@ -4402,11 +4402,14 @@ body.recsel .pcard{position:relative;}
 .bulk-mi:hover{background:var(--bg3);}
 .bulk-mi .ico{width:15px;height:15px;color:var(--t3);flex:none;}
 .bulk-rate{display:flex;gap:2px;padding:4px 7px 6px;}
-.bulk-star{flex:1;padding:6px 0;border:0;background:none;color:var(--t3);cursor:pointer;transition:color .12s;}
-.bulk-star:hover,.bulk-star:hover~.bulk-star{color:var(--t3);}
-.bulk-rate:hover .bulk-star{color:#ffd85e;}
-.bulk-star:hover~.bulk-star{color:var(--t3);}
-.bulk-star .ico{width:17px;height:17px;}
+/* These were stars, and stars light up to the one you are pointing at — that
+   cascade is the whole reason a five-star row reads as a value rather than five
+   buttons. Numbers do not work that way: eight is not "one through eight", it is
+   eight. So each is its own target and only the one under the pointer responds. */
+.bulk-star{flex:1;padding:6px 0;border:0;background:none;color:var(--t2);cursor:pointer;
+  font-family:var(--fd);font-size:13px;font-weight:800;font-variant-numeric:tabular-nums;
+  border-radius:10px;transition:color .12s,background-color .12s;}
+.bulk-star:hover{color:var(--aFg);background:var(--a);}
 .bulk-bar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--safe-b) + 96px);z-index:61;
   display:flex;align-items:center;gap:8px;padding:9px 10px 9px 14px;border-radius:99px;
   background:color-mix(in srgb,var(--bg3) 92%,transparent);border:1px solid var(--bn2);
@@ -4530,7 +4533,15 @@ body.recsel .pcard{position:relative;}
    So the rule asks for both: 1100px across and 600px down. Anything short of
    either keeps the bar it was designed around, and nothing above this line
    changes. */
-@media (min-width:1100px) and (min-height:600px){
+/* Asked for: a phone on its side gets the desktop layout.
+   I had argued a landscape phone was too short for a rail, and that was wrong —
+   measured rather than assumed, six 46px buttons with their gaps and padding come
+   to about 304px, and a landscape iPhone is 430 tall. It fits with room to spare.
+   The thresholds are what the rail actually NEEDS: enough width for content
+   beside it, and enough height for the stack. 820 by 380 is that, and it takes in
+   every landscape phone, every tablet either way up, and every desktop window
+   that is not a letterbox. */
+@media (min-width:820px) and (min-height:380px){
   /* THE RAIL, BUILT TO THE REFERENCE.
      A capsule that floats clear of the window edge and is sized by its contents,
      vertically centred. Icons in round slots, no labels — names live in tooltips,
@@ -4619,7 +4630,7 @@ body.recsel .pcard{position:relative;}
   :root.rail-folded .nav .nbtn.rail-fold .ico{transform:rotate(180deg);}
   :root.rail-folded #app{padding-left:84px;}
 }
-@media (min-width:1100px) and (min-height:600px) and (hover:hover){
+@media (min-width:820px) and (min-height:380px) and (hover:hover){
   .nav .nbtn:hover>span{background:var(--bg3);}
   .nav .nbtn.on:hover>span{background:var(--bg4);}
   /* The label slides out from under the icon as it appears. A tooltip that simply
@@ -10378,6 +10389,32 @@ function fadeArtIn(){
 }
 let _pxT=0;
 function pixelateCovers(){
+  // A COVER THAT HAS ALREADY BEEN PIXELATED SHOULD NEVER APPEAR SMOOTH AGAIN.
+  //
+  // Switching to Watching or Plan re-renders the grid, which means new <img>
+  // elements for covers that were pixelated seconds ago. They then queued behind
+  // a 120ms debounce and a twelve-at-a-time batch — so the shelf arrived smooth
+  // and popped to pixels a beat later, every single time, for artwork that was
+  // already sitting in the cache.
+  //
+  // The expensive part is the fetch and the canvas. Reusing a result that is
+  // already in memory costs a string assignment, so it does not belong behind any
+  // of that: every cache hit is applied now, synchronously, before anything is
+  // scheduled. Only the genuinely new covers go through the batching below.
+  try{
+    if(retroMode()&&pxBlock()&&_pxCache.size){
+      const n=pxBlock();
+      document.querySelectorAll(PX_ART.map(c=>'img'+c+':not([data-pxd])').join(',')).forEach(img=>{
+        const src=img.getAttribute('data-pxsrc')||img.getAttribute('src')||'';
+        if(!src)return;
+        const hit=_pxCache.get(src+'|'+n);
+        if(!hit)return;
+        img.dataset.pxd='1';
+        img.setAttribute('data-pxsrc',src);
+        img.src=hit;
+      });
+    }
+  }catch(e){}
   clearTimeout(_pxT);
   _pxT=setTimeout(()=>{
     try{
@@ -20448,7 +20485,7 @@ function openBulkMenu(x,y,singleId){
     +(one&&kindOf(one)==='watch'?`<button class="bulk-mi" onclick="openSeasonsDrawer('${one.id}')">${icon('layers')}<span>View all seasons\u2026</span></button>`:'')
     +(one?`<div class="bulk-menu-d"></div><button class="bulk-mi" onclick="startSelect('${one.id}')">${icon('check')}<span>Select more\u2026</span></button>`:'')
     +`<div class="bulk-menu-d"></div>`
-    +`<div class="bulk-rate">${[1,2,3,4,5].map(r=>`<button class="bulk-star" onclick="bulkRate(${r})" aria-label="Rate ${r}">${icon('star')}</button>`).join('')}</div>`;
+    +`<div class="bulk-rate">${[2,4,6,8,10].map(r=>`<button class="bulk-star" onclick="bulkRate(${r})" aria-label="Rate ${r} out of 10">${r}</button>`).join('')}</div>`
   document.body.appendChild(el);
   // Placed where you clicked, then pulled back inside the window — a menu that
   // opens half off-screen is worse than one that opens somewhere predictable.
@@ -20476,9 +20513,14 @@ function bulkFav(on){
   _menuDone(n,`${n} ${on?'favourited':'unfavourited'}`);
 }
 function bulkRate(r){
+  // This wrote 1-5 straight onto a scale that runs to ten, so rating a selection
+  // "5" from here meant five OUT OF TEN while the same five stars in the old UI
+  // had meant full marks. Snapped and marked like every other path that sets a
+  // rating, so a bulk rating and a hand-set one mean the same thing.
+  const v=snapRate(r);
   const ids=menuTargets();if(!ids.length)return;let n=0;
-  ids.forEach(id=>{const a=anime.find(x=>x.id===id);if(a&&a.rating!==r){a.rating=r;touch(a);n++;}});
-  _menuDone(n,`${n} rated ${r}\u2605`);
+  ids.forEach(id=>{const a=anime.find(x=>x.id===id);if(a&&a.rating!==v){a.rating=v;a.r10=1;delete a.r10from5;touch(a);n++;}});
+  _menuDone(n,`${n} rated ${fmtRate(v)}/10`);
 }
 // Long-press is the phone's right-click. It starts a selection with the card you
 // held and opens the same menu, so nothing about the feature is desktop-only.
@@ -21389,8 +21431,23 @@ function renderStats(){
   const gc={};anime.forEach(a=>(a.genre||'').split(',').map(g=>g.trim()).filter(Boolean).forEach(g=>gc[g]=(gc[g]||0)+1));
   const topG=Object.entries(gc).sort((a,b)=>b[1]-a[1]).slice(0,8);const maxG=topG.length?topG[0][1]:1;
   const genreBars=topG.length?topG.map(([g,n],i)=>svBar('g-'+i,schEsc(g),'var(--a)',n,maxG,svChips(anime.filter(a=>(a.genre||'').split(',').map(x=>x.trim()).includes(g))))).join(''):'<p class="ai-desc">Add genres (via Autofill) to see this.</p>';
-  const rd=[5,4,3,2,1].map(r=>({r,items:anime.filter(a=>Math.round(a.rating)===r)}));const maxR=Math.max(1,...rd.map(x=>x.items.length));
-  const ratingBars=rated.length?rd.map(x=>svBar('r-'+x.r,x.r+' '+icon('star','fill'),'var(--a)',x.items.length,maxR,svChips(x.items))).join(''):'<p class="ai-desc">Rate some titles to see this.</p>';
+  // RATINGS ARE OUT OF TEN, AND THIS WAS STILL COUNTING IN FIVES.
+  //
+  // It bucketed by Math.round(rating) against 5,4,3,2,1 — so after the move to a
+  // ten-point scale every rating above five fell outside every bucket and the
+  // chart read 0, 11, 0, 11, 0 on a library with a hundred ratings in it. Not a
+  // layout problem: it was counting the wrong thing and drawing the answer
+  // confidently.
+  //
+  // Five bands of two, high to low, which is how people actually talk about a
+  // ten-point score — "nines and tens" is a category, "exactly 7" is not.
+  const RBANDS=[[9,10],[7,8],[5,6],[3,4],[1,2]];
+  const rd=RBANDS.map(([lo,hi])=>({
+    r:lo===hi?String(lo):(lo+'\u2013'+hi),
+    items:anime.filter(a=>{const v=+a.rating||0;return v>=lo&&v<hi+1&&v>0;})
+  }));
+  const maxR=Math.max(1,...rd.map(x=>x.items.length));
+  const ratingBars=rated.length?rd.map(x=>svBar('r-'+x.r,x.r+' <span class="sv-of">/10</span>','var(--a)',x.items.length,maxR,svChips(x.items))).join(''):'<p class="ai-desc">Rate some titles to see this.</p>';
   const topRated=[...rated].sort((a,b)=>b.rating-a.rating).slice(0,8);
   body.innerHTML=
     storageBarHTML()+

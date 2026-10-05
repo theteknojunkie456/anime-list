@@ -4884,6 +4884,26 @@ body.recsel .pcard{position:relative;}
 /* Removing somebody is the one thing on this screen that cannot be undone, so it
    stands apart from the rest instead of sitting in the middle of them. */
 .adm-acts .fr-danger{margin-left:auto;}
+
+/* ── SOURCES: THE ANSWER IS VISIBLE ──────────────────────────────────────────
+   A filled mark on the live choice. Without one, a column of options is a column
+   of suggestions and the screen cannot answer its own question. */
+.src-choice{display:block;width:100%;text-align:left;border-radius:14px;
+  background:var(--bg2);border:1px solid var(--bn2);margin-top:9px;overflow:hidden;
+  transition:border-color .16s,background-color .16s;}
+.src-choice.on{border-color:color-mix(in srgb,var(--a) 52%,transparent);background:var(--ag);}
+.src-choice-top{display:flex;align-items:flex-start;gap:11px;width:100%;
+  padding:12px 13px;background:none;border:0;text-align:left;}
+.src-choice-solo{display:flex;align-items:flex-start;gap:11px;padding:12px 13px;}
+.src-mark{flex:0 0 auto;width:18px;height:18px;margin-top:2px;border-radius:50%;
+  border:2px solid var(--t3);transition:border-color .16s,box-shadow .16s;}
+.src-choice.on .src-mark{border-color:var(--a);box-shadow:inset 0 0 0 3px var(--a);}
+.src-choice-txt{display:flex;flex-direction:column;gap:2px;min-width:0;}
+.src-choice .src-name{font-size:15px;font-weight:700;color:var(--t1);}
+.src-choice .src-sub{font-size:12px;color:var(--t3);}
+/* The sites belong to the choice they configure, so they sit inside it rather
+   than floating between the two and belonging to neither. */
+.src-choice-body{padding:0 13px 12px 42px;margin:0;}
 </style>
 </head>
 <body>
@@ -21335,20 +21355,32 @@ function renderSource(){
       ? 'Already set up \u2014 there is nothing you need to do. Pick a different site below if you would rather.'
       : 'Nothing is set, so Watch has nowhere to send you. Pick one below.';
   box.innerHTML=tabs+`
-    <div class="src-now">
-      <div class="src-now-t">${icon('play')} Watch opens <b>${nowOpensShort}</b></div>
-      <div class="src-now-s">${srcNowSub}</div>
+    <!-- ONE SETTING, SHOWN AS ONE SETTING.
+         There was a banner saying what Watch does, a card directly beneath
+         saying it again, and between the two choices a row of site chips with
+         nothing to say which choice they belonged to — three elements describing
+         one setting, and no filled control anywhere to show which answer was
+         currently true. The mark is the point: a list of options with nothing
+         filled in is a list of suggestions. -->
+    <div class="dt-label">${icon('play')} When you tap Watch</div>
+
+    <div class="src-choice${!custom&&!noSourceMode()?' on':''}">
+      <button class="src-choice-top" onclick="setSource('')">
+        <span class="src-mark"></span>
+        <span class="src-choice-txt">
+          <span class="src-name">Open a site</span>
+          <span class="src-sub">${custom?escH(host(custom)):(_free?('Goes straight to '+escH(_free.name)):'Pick one below first')}</span>
+        </span>
+      </button>
+      ${chips?`<div class="src-picks src-choice-body">${chips}</div>`:''}
     </div>
 
-    <div class="dt-label">${icon('play')} Where Watch opens</div>
-    <button class="src-opt${!custom&&!noSourceMode()?' on':''}" onclick="setSource('')">
-      <div class="src-name">${_free?escH(_free.name):'No site set'}${_free?' <span class="src-tag">Default</span>':''}</div>
-      <div class="src-sub">${_free?'Looks the show up there \u2014 no account needed':'Choose one of the sites below, or add your own'}</div>
-    </button>
-    ${chips?`<div class="src-picks" style="margin-top:9px">${chips}</div>`:''}
-    <button class="src-opt${noSourceMode()?' on':''}" onclick="setNoSource()" style="margin-top:9px">
-      <div class="src-name">${icon('x')} Ask me each time</div>
-      <div class="src-sub">Watch brings you here to choose, every time</div>
+    <button class="src-choice src-choice-solo${noSourceMode()?' on':''}" onclick="setNoSource()">
+      <span class="src-mark"></span>
+      <span class="src-choice-txt">
+        <span class="src-name">Ask me each time</span>
+        <span class="src-sub">Watch brings you here to choose, every time</span>
+      </span>
     </button>
 
     <details class="src-fold" data-fold="own" style="margin-top:16px"${O('own')}>

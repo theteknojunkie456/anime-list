@@ -7529,6 +7529,14 @@ let _lockTapH=null;
 function showLock(){
   appLocked=true;lockRecMode=false;forgetSessionKey();
   const el=document.getElementById('lockScreen');if(!el)return;
+  // Locking is immediate; SHOWING the lock waits for the boot film to start its
+  // dissolve, so the film plays on black and hands over to the lock card instead
+  // of sharing the screen with it. On a reload (film already seen this session)
+  // afterBoot runs inline and nothing is delayed.
+  afterBoot(()=>_revealLock(el));
+}
+function _revealLock(el){
+  if(!appLocked)return;   // unlocked while the film was still running — nothing to show
   el.classList.add('on');
   const i=document.getElementById('lockPw');if(i)i.value='';
   setLockMode(false);   // sets Face ID vs password emphasis, and focuses only when it should
@@ -7545,7 +7553,9 @@ function showLock(){
   // button is right there for anyone who wants it. Coarse pointer = the phone.
   const _touch=(()=>{try{return matchMedia('(pointer:coarse)').matches;}catch(e){return false;}})();
   if(faceIDOn()&&_touch&&!(typeof IS_NATIVE!=='undefined'&&IS_NATIVE)){
-    setTimeout(()=>{try{tryUnlockFaceID(true);}catch{}},300);
+    // Not until the overlay is actually gone: a passkey get() raises a full
+    // system sheet, and firing it mid-film buries the animation under iOS chrome.
+    afterBootDone(()=>setTimeout(()=>{try{tryUnlockFaceID(true);}catch{}},300));
     _lockTapH=function(ev){
       const t=ev.target;
       if(t&&(t.id==='lockPw'||t.id==='lockBtn'||t.id==='lockFace'||(t.closest&&t.closest('#lockAlt'))))return;
@@ -11512,6 +11522,17 @@ function toggleBootSfx(){
   toast(bootSfxOn()?'Startup sound on':'Startup sound off');
   try{renderSettings();}catch(e){}
 }
+// The boot film owns the screen for its first few seconds. Anything that wants
+// the screen too — the lock gate, and especially the system Face ID sheet it
+// raises — has to wait its turn, or iOS slams a passkey dialog over the top of
+// the animation and the lock card ghosts through the fade. Two moments matter:
+// the HANDOFF (the film starts dissolving — reveal what's underneath, so the
+// dissolve lands on the lock instead of on the bare app) and DONE (the overlay
+// is gone — only now is it fair to raise a system sheet).
+let _bootLive=false,_bootQ=[],_bootDoneQ=[];
+function _bootFlush(q){const a=q.splice(0,q.length);a.forEach(f=>{try{f();}catch(e){}});}
+function afterBoot(fn){if(!_bootLive){try{fn();}catch(e){}return;}_bootQ.push(fn);}
+function afterBootDone(fn){if(!_bootLive){try{fn();}catch(e){}return;}_bootDoneQ.push(fn);}
 function bootSequence(){
   try{
     if(sessionStorage.getItem('wl_booted')==='1')return;   // once per launch, not per render
@@ -11537,13 +11558,19 @@ function bootSequence(){
       if(who)who.textContent=n?('Welcome back, '+n):'';
     }catch(e){}
     try{bootSound();}catch(e){}
-    const kill=()=>{try{el.remove();}catch(e){}};
+    _bootLive=true;
+    const kill=()=>{try{el.remove();}catch(e){}_bootLive=false;_bootFlush(_bootQ);_bootFlush(_bootDoneQ);};
     el.addEventListener('pointerdown',kill,{once:true});
     // The sequence runs to about 4.8s and the fade-out is the last 0.75s of it.
     // A kill timer shorter than the animation does not shorten the animation, it
     // amputates it — the first version cut at 2.7s, which would now remove the
     // overlay while the wordmark was still arriving.
-    setTimeout(kill,5000);
+    // Reduced motion runs a much shorter film (fade out at 1.5s), so both beats
+    // move with it — otherwise the lock would sit hidden behind a screen that
+    // has already gone blank.
+    let _rm=false;try{_rm=matchMedia('(prefers-reduced-motion:reduce)').matches;}catch(e){}
+    setTimeout(()=>_bootFlush(_bootQ),_rm?1450:4000);   // handoff: the dissolve begins
+    setTimeout(kill,_rm?2000:5000);
   }catch(e){}
 }
 function applyRailFold(){

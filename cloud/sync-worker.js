@@ -102,20 +102,87 @@ export default {
     let body;
     try { body = await request.json(); } catch { return json({ error: 'bad json' }, 400, cors); }
     const op = String(body.op || '');
-    if (op === 'pull' || op === 'push') {
+    // WHICH DEVICE IS RIGHT.
+    //
+    // "Use this device's list everywhere" stamped an `adopt` marker INSIDE the
+    // blob, and the blob is replaced wholesale by the next push from anybody.
+    // So the first device to publish before it had caught up erased the marker,
+    // its stale titles merged back into everyone, and the device that had been
+    // declared right quietly reverted. That is one push of bad luck undoing a
+    // deliberate decision, every time.
+    //
+    // The marker now lives on the RECORD, beside the blob, and only ever moves
+    // forward. A push carries `adoptSeen` — the last marker that device honoured
+    // — and a device that has not caught up is not allowed to publish over the
+    // copy that overruled it. It pulls, adopts, and pushes again.
+    //
+    // `devs` keeps the last blob each device published, which is what makes
+    // "make the Mac the main one" answerable FROM the phone: the phone can read
+    // the Mac's copy instead of needing the Mac in hand. Snapshots are a
+    // convenience and are dropped before the record is ever allowed to fail.
+    const DEV_KEEP = 5;
+    const okDev = d => /^[A-Za-z0-9_-]{4,64}$/.test(d);
+    if (op === 'pull' || op === 'push' || op === 'devices' || op === 'pull_dev') {
       const code = String(body.code || '');
       if (!/^[A-Za-z0-9]{10,64}$/.test(code)) return json({ error: 'bad code' }, 400, cors);
       const key = 'list:' + code;
+      let prev = null;
+      try { const s = await env.LISTS.get(key); if (s) prev = JSON.parse(s); } catch {}
       if (op === 'pull') {
-        const stored = await env.LISTS.get(key);
-        return json(stored ? JSON.parse(stored) : { data: null, updatedAt: 0 }, 200, cors);
+        if (!prev) return json({ data: null, updatedAt: 0 }, 200, cors);
+        // Snapshots are for the picker only. Shipping them on an ordinary pull
+        // would hand every device five copies of the list on every open.
+        const { devs, ...rest } = prev;
+        return json(rest, 200, cors);
       }
-      const payload = JSON.stringify({ data: body.data ?? null, updatedAt: Date.now() });
+      if (op === 'devices') {
+        const devs = (prev && prev.devs) || {};
+        const list = Object.keys(devs).map(id => ({
+          id, name: String(devs[id].name || ''), at: +devs[id].at || 0, n: +devs[id].n || 0,
+        })).sort((a, b) => b.at - a.at);
+        return json({ ok: true, devices: list, adopt: +(prev && prev.adopt) || 0, adoptBy: (prev && prev.adoptBy) || '' }, 200, cors);
+      }
+      if (op === 'pull_dev') {
+        const dev = String(body.dev || '');
+        const rec = prev && prev.devs && prev.devs[dev];
+        if (!okDev(dev) || !rec) return json({ error: 'no such device' }, 404, cors);
+        return json({ ok: true, data: rec.data ?? null, at: +rec.at || 0, name: String(rec.name || ''), n: +rec.n || 0 }, 200, cors);
+      }
+      const prevAdopt = +(prev && prev.adopt) || 0;
+      const inAdopt = +body.adopt || 0;
+      const seen = +body.adoptSeen || 0;
+      // Behind the current decision and not making a new one → this copy is the
+      // one that was overruled. Say so plainly; the client pulls and retries.
+      if (prevAdopt && inAdopt < prevAdopt && seen < prevAdopt) {
+        return json({ ok: false, error: 'stale-adopt', adopt: prevAdopt, adoptBy: (prev && prev.adoptBy) || '',
+                      updatedAt: +(prev && prev.updatedAt) || 0 }, 409, cors);
+      }
+      const now = Date.now();
+      const adopt = Math.max(prevAdopt, inAdopt);
+      const adoptBy = (inAdopt && inAdopt >= prevAdopt) ? String(body.adoptBy || '').slice(0, 64) : ((prev && prev.adoptBy) || '');
+      const dev = String(body.dev || '');
+      let devs = (prev && prev.devs && typeof prev.devs === 'object') ? prev.devs : {};
+      if (okDev(dev)) {
+        devs[dev] = { data: body.data ?? null, at: now, name: String(body.devName || '').slice(0, 40),
+                      n: Math.max(0, Math.min(1_000_000, +body.n || 0)) };
+        // The device that just wrote is never the one evicted, whatever the clock
+        // says — two pushes inside the same millisecond would otherwise drop the
+        // newer of the pair purely on insertion order.
+        const ids = Object.keys(devs).sort((a, b) =>
+          (a === dev ? -1 : b === dev ? 1 : 0) || ((+devs[b].at || 0) - (+devs[a].at || 0)));
+        for (const id of ids.slice(DEV_KEEP)) delete devs[id];
+      }
+      const rec = { data: body.data ?? null, updatedAt: now, adopt, adoptBy, devs };
+      let payload = JSON.stringify(rec);
       // The blob now carries the whole setup (list + themes + friends + settings), not
       // just titles, so give it real room. Cloudflare KV allows 25 MB/value; keep headroom.
+      // Snapshots go overboard first — a backup that fails is worse than a picker
+      // that has forgotten one device.
+      if (payload.length > 20_000_000) { rec.devs = okDev(dev) ? { [dev]: devs[dev] } : {}; payload = JSON.stringify(rec); }
+      if (payload.length > 20_000_000) { rec.devs = {}; payload = JSON.stringify(rec); }
       if (payload.length > 20_000_000) return json({ error: 'too big' }, 413, cors);
       await env.LISTS.put(key, payload);
-      return json({ ok: true, updatedAt: Date.now() }, 200, cors);
+      return json({ ok: true, updatedAt: now, adopt }, 200, cors);
     }
 
     // ── who's around ────────────────────────────────────────────────────────

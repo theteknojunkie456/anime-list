@@ -4007,6 +4007,19 @@ body.recsel .pcard{position:relative;}
 .bulk-row .pseg{padding:8px 0;font-size:10px;}
 .import-actions{display:flex;gap:8px;margin-top:6px;}
 .imp-all{flex:0 0 auto;padding:12px 15px;border-radius:14px;border:1px solid var(--b2);background:var(--bg4);color:var(--t2);font-size:12px;font-weight:800;}
+/* The device picker: one row per device that has backed up, so "make the Mac the
+   main one" is a thing you can point at rather than a thing you go and do. */
+.dev-list{display:flex;flex-direction:column;gap:8px;margin-top:8px;}
+.dev-row{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;
+  background:var(--bg3);border:1px solid var(--bd);}
+.dev-row.me{border-color:var(--a);background:var(--ag);}
+.dev-id{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;}
+.dev-id b{font-size:13px;color:var(--t1);font-weight:700;}
+.dev-id span{font-size:12px;color:var(--t3);}
+.dev-me{font-size:10px;font-weight:700;color:var(--a2);letter-spacing:.04em;text-transform:uppercase;}
+.dev-pick{flex:none;border:0;border-radius:99px;padding:7px 13px;font-size:12px;font-weight:700;
+  font-family:inherit;cursor:pointer;background:var(--a);color:var(--aFg);}
+.dev-pick:active{transform:scale(.96);}
 .synccode{font-family:ui-monospace,Menlo,monospace;font-size:17px;font-weight:700;letter-spacing:2px;text-align:center;background:var(--bg4);border:1px solid var(--b2);border-radius:14px;padding:12px;color:var(--a2);user-select:all;-webkit-user-select:all;word-break:break-all;}
 
 /* ── STATS ── */
@@ -8062,6 +8075,91 @@ function forcePushList(){
     }
   });
 }
+// ─── WHICH DEVICE IS RIGHT ──────────────────────────────────────────────────
+// "Use this device's list everywhere" only ever worked from the device you
+// wanted to win. If the Mac is right and you are holding the phone, that is the
+// wrong device to be holding, and the honest answer was "go find the Mac".
+//
+// Every device already publishes its own copy, so the cloud can keep the last
+// one from each. Then the question is answerable from anywhere: read the Mac's
+// copy on the phone, take it whole, and publish it as the decision. From that
+// point the two are the same list and ordinary two-way merging resumes.
+async function syncDevices(){
+  const code=syncCode();if(!code||!SYNC_URL)return null;
+  const r=await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({op:'devices',code})});
+  return await r.json();
+}
+// The rows carry the device ID only, and the ID is the one field the worker
+// validates. Names come from the cache instead of through an attribute, so a
+// device calling itself  x" onclick="  is a label, not a hole.
+let _devCache=[];
+function _devRow(d,me){
+  const mine=d.id===me;
+  const when=d.at?relTime(d.at):'never';
+  const n=d.n?(d.n+' title'+(d.n===1?'':'s')):'unknown size';
+  return `<div class="dev-row${mine?' me':''}">
+    <div class="dev-id">
+      <b>${escH(d.name||'A device')}${mine?' <span class="dev-me">this one</span>':''}</b>
+      <span>${escH(n)} \u00b7 last backed up ${escH(when)}</span>
+    </div>
+    <button class="dev-pick" onclick="${mine?'forcePushList()':"adoptFromDevice('"+escH(d.id)+"')"}">Use this one</button>
+  </div>`;
+}
+async function loadDeviceList(btn){
+  const box=document.getElementById('devPickBox');if(!box)return;
+  if(btn){btn.disabled=true;btn.textContent='Reading\u2026';}
+  try{
+    const res=await syncDevices();
+    const list=(res&&res.devices)||[];
+    const me=String(wlDevice()||'');
+    if(!list.length){box.innerHTML='<p class="ai-desc">No device has backed up yet under this code.</p>';return;}
+    // A device that has never published can still be chosen — it is this one.
+    const rows=list.some(d=>d.id===me)?list:[{id:me,name:deviceLabel(),at:0,n:realList().length},...list];
+    _devCache=rows;
+    box.innerHTML='<div class="dev-list">'+rows.map(d=>_devRow(d,me)).join('')+'</div>'
+      +'<p class="ai-desc" style="font-size:12px;margin-top:8px">Only the five most recent devices are kept. Choosing one replaces every other device\u2019s list with it, once \u2014 after that they merge normally again.</p>';
+  }catch(e){box.innerHTML='<p class="ai-desc">Could not reach the cloud just now.</p>';}
+  finally{if(btn){btn.disabled=false;btn.textContent='Show my devices';}}
+}
+async function adoptFromDevice(id){
+  if(appLocked){toast('Unlock the list first');return;}
+  if(!syncCode()){toast('Turn on cloud backup first');return;}
+  const d0=_devCache.find(x=>x.id===id)||{};
+  const label=d0.name||'that device',n=+d0.n||0;
+  askConfirm({
+    title:'Make '+(label||'that device')+' the main list?',
+    msg:(n?n+' titles from ':'The list from ')+(label||'that device')+' becomes the list on every device, including this one. '+
+        'Anything held only somewhere else is lost. A restore point is kept on this device.',
+    yes:'Use it',
+    onYes:async()=>{
+      try{
+        const r=await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({op:'pull_dev',code:syncCode(),dev:id})});
+        const d=await r.json();
+        if(!d||!d.ok||!d.data){toast('That device\u2019s copy could not be read');return;}
+        const {inner,extra}=unwrapSync(d.data);
+        let arr=null;
+        if(inner&&inner.v===2){
+          if(!cryptoKey){toast('Unlock the list first');return;}
+          try{arr=JSON.parse(await decList(inner,cryptoKey));}catch(e){toast('That copy is locked with a different password');return;}
+        }else if(Array.isArray(inner)){arr=inner;}
+        // Empty is never what anybody meant, and there is no undo at the far end.
+        if(!arr||!arr.length){toast('That device\u2019s copy is empty \u2014 left things alone');return;}
+        preSyncBackup();
+        if(extra)applyExtra(extra);
+        anime=migrate(arr);
+        writeLocal();
+        // Publish it as the decision, so every other device takes it too.
+        _adoptStamp=Date.now();setLastAdopt(_adoptStamp);
+        setLastPushFP('');setPushState({n:0,at:0,why:''});
+        await syncPush();
+        try{render();}catch(e){}
+        const st=pushState();
+        toast(st&&st.n?('Took '+arr.length+' titles, but could not publish it yet'):('Every device now uses '+(label||'that device')+' \u2014 '+arr.length+' titles'));
+      }catch(e){toast('Could not do that right now');}
+      try{renderSyncUI();}catch(e){}
+    }
+  });
+}
 // WHY IS THIS DEVICE DIFFERENT FROM THAT ONE.
 //
 // Two devices disagreeing about a list is the hardest thing in this app to
@@ -8240,12 +8338,42 @@ async function _syncPushInner(code){
     // thing you pressed did not mean what it said. One flag fixes that: a stamp
     // saying THIS copy is to be adopted whole, not merged into. It rides one push
     // only, is honoured once per device, and is never set by ordinary syncing.
-    if(_adoptStamp){payload.adopt=_adoptStamp;payload.adoptBy=String(wlDevice()||'');_adoptStamp=0;}
-    const r=await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({op:'push',code,data:payload})});
+    if(_adoptStamp){payload.adopt=_adoptStamp;payload.adoptBy=String(wlDevice()||'');}
+    // The same stamp also rides OUTSIDE the blob, because the blob is what the
+    // next push replaces. `adoptSeen` is this device's claim to be caught up;
+    // the worker refuses a publish from a device that is behind the current
+    // decision, which is what stopped the overruled copy creeping back.
+    // `dev`/`devName`/`n` are what the "which device is right?" picker reads.
+    const body={op:'push',code,data:payload,
+      adopt:_adoptStamp||0,adoptBy:_adoptStamp?String(wlDevice()||''):'',
+      adoptSeen:lastAdopt(),dev:String(wlDevice()||''),devName:deviceLabel(),n:realList().length};
+    _adoptStamp=0;
+    const r=await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
     const d=await r.json();
     if(d&&d.ok){setSyncAt(d.updatedAt);notePushOK();setLastPushFP(fp);}
+    else if(d&&d.error==='stale-adopt'){
+      // Not a failure and not worth a backoff: another device was chosen while
+      // this one was offline. Take that copy now; the push happens after.
+      setLastPushFP('');notePushOK();
+      try{await syncOnOpen();}catch(e){}
+    }
     else {setLastPushFP('');notePushFail((d&&(d.error||d.ignored))||('HTTP '+r.status));}
   }catch(e){setLastPushFP('');notePushFail((e&&e.message)||'no connection');}
+}
+// A name a person can pick out of a list. The device ID is random by design, so
+// this is the only thing that makes "the Mac" findable from the phone.
+function deviceLabel(){
+  try{
+    if(typeof IS_NATIVE!=='undefined'&&IS_NATIVE)return 'iPhone app';
+    const ua=navigator.userAgent||'',plat=navigator.platform||'',mt=navigator.maxTouchPoints||0;
+    if(/iPhone|iPod/.test(ua))return 'iPhone';
+    if(/iPad/.test(ua)||(plat==='MacIntel'&&mt>1))return 'iPad';
+    if(/Android/.test(ua))return 'Android';
+    if(/Mac/i.test(plat)||/Macintosh/.test(ua))return 'Mac';
+    if(/Win/i.test(plat)||/Windows/.test(ua))return 'Windows PC';
+    if(/Linux/i.test(plat))return 'Linux';
+    return 'Device';
+  }catch(e){return 'Device';}
 }
 // Every push failure used to be swallowed by an empty catch. That was survivable
 // while backup was opt-in and advisory. It is not now that it is the default
@@ -8351,7 +8479,12 @@ async function syncOnOpen(){
     // or if the stored copy is lost at the far end. Push now rather than wait for
     // the next edit, which might be after the device is gone.
     if(res&&!res.data&&realList().length&&!listUntrusted){syncPush();return;}
-    if(res&&res.data&&res.updatedAt>syncAt()){ // another device wrote a newer copy
+    // A fresh decision about which device is right has to be seen even when this
+    // device already holds the newest write — otherwise the device that pushed
+    // last is the one that never hears it was overruled, which is the device
+    // that most needs to.
+    const _newer=!!(res&&res.updatedAt>syncAt());
+    if(res&&res.data&&(_newer||(+(res.adopt)||0)>lastAdopt())){
       const {inner,extra}=unwrapSync(res.data);
       if(extra)applyExtra(extra);              // themes + friends are plaintext — apply even if the list stays locked
       let arr=null;
@@ -8364,7 +8497,9 @@ async function syncOnOpen(){
       // Take it whole rather than merging, exactly once, and keep a restore point
       // first because this is the one path that can remove titles this device
       // holds and the cloud does not.
-      const _ad=+(inner&&inner.adopt)||+(res.data&&res.data.adopt)||0;
+      // Record first, blob second. The in-blob copy only survives until somebody
+      // else pushes, which is exactly the case this has to keep working.
+      const _ad=+(res&&res.adopt)||+(inner&&inner.adopt)||+(res.data&&res.data.adopt)||0;
       // Adopting deliberately bypasses the collapse guard — a smaller list is the
       // POINT when somebody has chosen which device is right. Empty is different:
       // no one has ever meant "make every device empty", and the push side already
@@ -8380,6 +8515,7 @@ async function syncOnOpen(){
         return;
       }
       if(arr){
+        if(!_newer)return;   // only here for the adopt check, and there wasn't one
         // Data-safety guard: never let auto-sync silently replace a non-empty local
         // list with an empty cloud copy. A fresh or half-initialized device can push
         // [] (before its real list loads) and win on timestamp — that would wipe a
@@ -8565,9 +8701,9 @@ function renderSyncUI(){
         <div id="syncDiagBox" style="margin-top:10px"></div>
       </details>
       <details class="dt-fold" style="margin-top:12px">
-        <summary>${icon('upload')} Use this device's list everywhere<span class="dt-fold-x">Open</span></summary>
-        <p class="ai-desc" style="font-size:12px;margin-top:4px">Devices normally merge, newest edit per title winning. This ends that: the ${realList().length} titles on <b>this</b> device replace the cloud copy, and every other device takes this version. Anything held only on another device is lost. A restore point stays on this device.</p>
-        <button class="imp-all" style="width:100%;margin-top:8px" onclick="forcePushList()">Replace the cloud copy</button>
+        <summary>${icon('upload')} Which device's list is right?<span class="dt-fold-x">Open</span></summary>
+        <p class="ai-desc" style="font-size:12px;margin-top:4px">Devices normally merge, newest edit per title winning. If one of them has drifted, pick the one that's correct and every device takes that list — once. After that they merge normally again. You can do this from any device, not just the one you're picking. Anything held only somewhere else is lost; a restore point stays on this device.</p>
+        <div id="devPickBox"><button class="imp-all" style="width:100%;margin-top:8px" onclick="loadDeviceList(this)">Show my devices</button></div>
       </details>
       <p class="ai-desc" style="margin-top:10px">On another device: install the app, open this panel, paste the code, tap <b>Use code</b>.</p>
       ${adminToken()?`<div class="dt-label" style="margin-top:16px">${icon('lock')} Your setup key</div>

@@ -1747,6 +1747,103 @@ img[data-fd="in"]{opacity:1;transition:opacity .18s ease-out;}
 .sv-drill.on{display:flex;animation:fadeUp .3s ease both;}
 .sv-chip{font-size:12px;font-weight:600;padding:6px 11px;border-radius:99px;background:var(--bg4);border:1px solid var(--b2);color:var(--t2);display:inline-flex;align-items:center;gap:4px;}
 .sv-chip .ico{width:11px;height:11px;fill:currentColor;color:var(--a2);}
+
+/* ── STATS, REDRAWN ─────────────────────────────────────────────────────────
+   The old screen opened on a storage meter and then drew eleven identical bars.
+   Three different questions — what you are watching, how you rate, what you
+   like — were all answered with the same shape, so none of them stood out and
+   the page read as a form. And a library full of artwork showed none of it.
+
+   So: the posters are the branding, one number leads, and each question gets
+   the chart its shape actually wants — a ring for parts of a whole, columns for
+   a distribution, weighted type for a ranking. Storage is maintenance and now
+   lives at the bottom, folded away. */
+
+/* The hero. The mosaic behind it is the person's own library, which is the only
+   artwork this app has any business putting on a page about them. */
+.sv-face{position:relative;margin:10px 18px 0;border-radius:26px;overflow:hidden;
+  border:1px solid var(--bn2);background:linear-gradient(160deg,var(--bg3),var(--bg2));
+  box-shadow:var(--elev1);isolation:isolate;}
+.sv-mosaic{position:absolute;inset:0;display:flex;gap:3px;padding:3px;z-index:0;
+  filter:saturate(.9);opacity:.5;
+  -webkit-mask-image:linear-gradient(105deg,#000 0%,rgba(0,0,0,.45) 54%,transparent 86%);
+  mask-image:linear-gradient(105deg,#000 0%,rgba(0,0,0,.45) 54%,transparent 86%);}
+.sv-mosaic i{flex:1;min-width:0;border-radius:6px;background-position:center;background-size:cover;
+  opacity:0;animation:svTile .5s ease forwards;}
+@keyframes svTile{to{opacity:1;}}
+.sv-face-in{position:relative;z-index:1;padding:20px 18px 18px;
+  background:linear-gradient(100deg,color-mix(in srgb,var(--bg2) 88%,transparent),color-mix(in srgb,var(--bg2) 30%,transparent));}
+.sv-big{font-family:var(--fd);font-size:52px;font-weight:800;letter-spacing:-2px;line-height:.92;color:var(--a2);
+  text-shadow:0 2px 20px var(--glow);}
+.sv-big-u{font-size:17px;font-weight:800;letter-spacing:-.2px;color:var(--t2);margin-left:6px;}
+.sv-big-sub{font-size:13px;font-weight:600;color:var(--t2);margin-top:6px;}
+.sv-mini{display:flex;gap:18px;margin-top:16px;flex-wrap:wrap;}
+.sv-mini div{display:flex;flex-direction:column;gap:2px;}
+.sv-mini b{font-family:var(--fd);font-size:21px;font-weight:800;letter-spacing:-.6px;color:var(--t1);line-height:1;}
+.sv-mini span{font-size:10px;font-weight:700;color:var(--t3);letter-spacing:.03em;text-transform:uppercase;}
+
+/* Parts of a whole, drawn as parts of a whole. */
+.sv-ring-wrap{display:flex;align-items:center;gap:18px;}
+.sv-ring{width:132px;height:132px;flex-shrink:0;transform:rotate(-90deg);}
+.sv-ring circle{fill:none;stroke-width:15;stroke-linecap:butt;
+  transition:stroke-dashoffset .9s cubic-bezier(.2,1,.3,1),opacity .2s;}
+.sv-ring-mid{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;}
+.sv-ring-box{position:relative;width:132px;height:132px;flex-shrink:0;}
+.sv-ring-n{font-family:var(--fd);font-size:30px;font-weight:800;letter-spacing:-1px;line-height:1;color:var(--t1);}
+.sv-ring-l{font-size:10px;font-weight:700;color:var(--t3);letter-spacing:.04em;text-transform:uppercase;margin-top:3px;}
+.sv-key{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;}
+.sv-keyrow{display:flex;align-items:center;gap:9px;padding:7px 8px;border-radius:10px;min-height:44px;cursor:pointer;
+  transition:background .16s;}
+.sv-keyrow:active{background:var(--bg3);}
+.sv-keyrow i{width:10px;height:10px;border-radius:99px;flex-shrink:0;}
+.sv-keyrow b{flex:1;font-size:13px;font-weight:700;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.sv-keyrow u{text-decoration:none;font-family:var(--fd);font-size:15px;font-weight:800;color:var(--t2);}
+.sv-keyrow em{font-style:normal;font-size:10px;font-weight:700;color:var(--t3);width:34px;text-align:right;}
+.sv-keyrow .chev{color:var(--t3);display:inline-flex;transition:transform .22s;}
+.sv-keyrow .chev .ico{width:15px;height:15px;}
+.sv-keyrow.open .chev{transform:rotate(90deg);}
+.sv-keyrow.open{background:var(--bg3);}
+
+/* A distribution, drawn as a distribution. */
+.sv-hist{display:flex;align-items:flex-end;gap:7px;height:116px;margin-top:4px;}
+.sv-col{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:6px;height:100%;cursor:pointer;}
+.sv-col .bar{width:100%;border-radius:10px 10px 2px 2px;background:linear-gradient(180deg,var(--a2),var(--a));
+  min-height:3px;height:0;transition:height .8s cubic-bezier(.2,1,.3,1),filter .16s;}
+.sv-col:active .bar{filter:brightness(1.25);}
+.sv-col .cn{font-family:var(--fd);font-size:13px;font-weight:800;color:var(--t2);line-height:1;}
+.sv-col .cl{font-size:10px;font-weight:700;color:var(--t3);}
+.sv-col.dim .bar{background:var(--bg4);}
+
+/* A ranking, drawn with weight instead of eight bars of the same length. */
+.sv-cloud{display:flex;flex-wrap:wrap;gap:8px;align-items:baseline;}
+.sv-tag{display:inline-flex;align-items:baseline;gap:6px;padding:7px 13px;border-radius:99px;
+  background:var(--bg3);border:1px solid var(--bn2);color:var(--t2);font-weight:700;font-size:12px;cursor:pointer;
+  transition:transform .14s,border-color .16s,background .16s;}
+.sv-tag:active{transform:scale(.95);}
+.sv-tag s{text-decoration:none;font-family:var(--fd);font-size:10px;font-weight:800;color:var(--t3);}
+.sv-tag.t1{font-size:17px;padding:10px 17px;color:var(--aFg);background:var(--a);border-color:transparent;}
+.sv-tag.t1 s{color:var(--aFg);opacity:.72;}
+.sv-tag.t2{font-size:13px;padding:8px 15px;color:var(--a2);background:var(--ag);border-color:color-mix(in srgb,var(--a) 34%,transparent);}
+.sv-tag.t2 s{color:var(--a2);opacity:.7;}
+
+/* Storage is maintenance, so it reads like maintenance and sits at the end. */
+.sv-fold{margin:22px 18px 0;}
+.sv-fold>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:8px;
+  font-family:var(--fd);font-size:13px;font-weight:600;color:var(--t3);padding:10px 0;}
+.sv-fold>summary::-webkit-details-marker{display:none;}
+.sv-fold>summary .ico{width:14px;height:14px;}
+.sv-fold>summary b{margin-left:auto;font-size:12px;font-weight:700;color:var(--t3);}
+.sv-fold .sv-store{margin:0;}
+
+/* Sections arrive rather than appear, one after another. Nothing moves for
+   anybody who has asked the system for less motion. */
+.sv-sec,.sv-face{opacity:0;transform:translateY(10px);animation:svIn .5s cubic-bezier(.2,1,.3,1) forwards;}
+@keyframes svIn{to{opacity:1;transform:none;}}
+@media(prefers-reduced-motion:reduce){
+  .sv-sec,.sv-face{animation:none!important;opacity:1;transform:none;}
+  .sv-mosaic i{animation:none!important;opacity:1;}
+  .sv-ring circle,.sv-col .bar{transition:none!important;}
+}
 /* A scrim is there to make text readable, not to set a mood. This one started
    dimming at the very top and reached 0.93 — so most of the picture was under
    shade to protect a title sitting in the bottom third. It now stays clear until
@@ -2650,7 +2747,8 @@ body.yt-open{overflow:hidden;touch-action:none;}
 [data-retro] .fy-img,[data-retro] .pick-img,[data-retro] .ptrail-art,[data-retro] .rc-note-img,
 [data-retro] .resume-art,[data-retro] .resume-row-art,[data-retro] .sched-thumb,
 [data-retro] .dt-char-img,[data-retro] .dt-ep-img,[data-retro] .dt-rec-img,
-[data-retro] .hero-bg,[data-retro] .pop-cover{image-rendering:pixelated;}
+[data-retro] .hero-bg,[data-retro] .pop-cover,
+[data-retro] .sv-mosaic i{image-rendering:pixelated;}
 /* None: keep the scanlines, the bevels and the pixel type; leave the pictures
    exactly as they are. */
 [data-retro][data-bits="off"] .pcard-img,[data-retro][data-bits="off"] .rz-img,[data-retro][data-bits="off"] .pk-cover,[data-retro][data-bits="off"] .dt-cover,[data-retro][data-bits="off"] .dt-banner-img,[data-retro][data-bits="off"] .hero-bg-img,[data-retro][data-bits="off"] .sd-art,[data-retro][data-bits="off"] .rtm-art,[data-retro][data-bits="off"] .ns-art img,[data-retro][data-bits="off"] .ns-vs-art img{filter:none;image-rendering:auto;}
@@ -13669,7 +13767,7 @@ function toggleSeasonSeen(idx){
   const mine=franchiseMine(s);
   if(mine){
     if(mine.status==='finished'){mine.status='plan';mine.ep=0;}
-    else{mine.status='finished';if(mine.epTotal)mine.ep=mine.epTotal;}
+    else{mine.status='finished';mine.finAt=mine.finAt||Date.now();if(mine.epTotal)mine.ep=mine.epTotal;}
     touch(mine);alPushItem&&alPushItem(mine);
   }else anime.unshift(seasonToItem(s,'finished'));
   save();renderDetail();render();
@@ -13679,7 +13777,7 @@ function markFranchiseSeen(){
   const seasons=(curFranchise||[]).filter(s=>!isExtra(s));if(!seasons.length)return;
   seasons.forEach(s=>{
     const mine=franchiseMine(s);
-    if(mine){if(mine.status!=='finished'){mine.status='finished';if(mine.epTotal)mine.ep=mine.epTotal;touch(mine);alPushItem&&alPushItem(mine);}}
+    if(mine){if(mine.status!=='finished'){mine.status='finished';mine.finAt=Date.now();if(mine.epTotal)mine.ep=mine.epTotal;touch(mine);alPushItem&&alPushItem(mine);}}
     else anime.unshift(seasonToItem(s,'finished'));
   });
   save();renderDetail();render();
@@ -13695,7 +13793,12 @@ function setDetailStatus(s){
   // celebrating it would make the celebration meaningless the second time anybody
   // saw it. `was` is already computed here for exactly this kind of question.
   try{tap(s==='finished'&&was!=='finished'?'done':'tap');}catch(e){}
-  if(s==='finished'&&was!=='finished'){try{finishStamp();}catch(e){}}
+  // The moment itself, recorded. Stats used to have no sense of time at all,
+  // because the only date on an item is `upd` — which is overwritten by any edit
+  // and so says nothing about when anything was finished. This fills in from
+  // here forward rather than guessing backwards from the wrong field.
+  if(s==='finished'&&was!=='finished'){a.finAt=Date.now();try{finishStamp();}catch(e){}}
+  if(s!=='finished')delete a.finAt;   // un-finishing it un-finishes the date too
   if(s==='finished'&&a.epTotal)a.ep=a.epTotal;
   touch(a);save();renderDetail();render();alPushItem(a);
   if(s==='finished'&&was!=='finished')offerNextSeason(a);
@@ -13799,7 +13902,7 @@ function epHoldEnd(){
 }
 function commitEp(a){
   let _justFinished=false;
-  if(a.epTotal&&a.ep===a.epTotal&&a.status!=='finished'){a.status='finished';toast('Marked as finished!');_justFinished=true;}
+  if(a.epTotal&&a.ep===a.epTotal&&a.status!=='finished'){a.status='finished';a.finAt=Date.now();toast('Marked as finished!');_justFinished=true;}
   else if(a.ep>0&&a.status==='plan'){a.status='watching';}
   touch(a);save();renderDetail();render();alPushItem(a);
   // Finishing something is the payoff of the whole app and nothing happened. One
@@ -21783,7 +21886,7 @@ function applyWatched(id,ep){
   // point for it or anything before it is now a lie.
   if(a.posEp&&a.posEp<=ep){delete a.pos;delete a.posOf;delete a.posEp;delete a.posAt;try{_posClear();}catch(e){}}
   a.ep=a.epTotal?Math.min(ep,a.epTotal):ep;
-  if(a.epTotal&&a.ep===a.epTotal&&a.status!=='finished')a.status='finished';
+  if(a.epTotal&&a.ep===a.epTotal&&a.status!=='finished'){a.status='finished';a.finAt=Date.now();}
   else if(a.status==='plan')a.status='watching';
   touch(a);save();render();alPushItem(a);
   if(detailId===id)renderDetail();
@@ -21997,6 +22100,33 @@ function _fmtGB(b){
 function _fillStoreNote(){
   try{if(navigator.storage&&navigator.storage.estimate){navigator.storage.estimate().then(e=>{const extra=Math.max(0,(e&&e.usage||0)-_lsBytes());const el=document.getElementById('svStoreNote');if(el&&extra>102400)el.textContent='+ '+_fmtMB(extra)+' of images kept in extra storage (IndexedDB).';}).catch(()=>{});}}catch(e){}
 }
+// The stats screen is a portrait of somebody's library, so it is built out of
+// their library: their posters behind the headline number, their four status
+// colours in the ring, their ratings as an actual distribution. Three different
+// questions used to be answered with three identical rows of bars, which is why
+// none of them read as an answer.
+function svMosaic(list){
+  const pics=list.map(a=>a&&safeImg(a.img)).filter(Boolean).slice(0,14);
+  if(pics.length<4)return '';   // a half-empty strip looks broken, not sparse
+  return '<div class="sv-mosaic" aria-hidden="true">'+pics.map((u,i)=>
+    '<i style="background-image:url('+u+');animation-delay:'+(i*45)+'ms"></i>').join('')+'</div>';
+}
+// One circle per slice, each offset by everything before it. Drawn with plain
+// dash arithmetic rather than arc paths, which keeps it readable and keeps the
+// animation to one property.
+function svRing(parts,total){
+  const R=52,C=2*Math.PI*R;let at=0;
+  const arcs=parts.filter(p=>p.n>0).map(p=>{
+    const len=C*(p.n/Math.max(1,total)),off=at;at+=len;
+    return '<circle cx="66" cy="66" r="'+R+'" stroke="'+p.color+'" '+
+      'stroke-dasharray="'+len.toFixed(2)+' '+(C-len).toFixed(2)+'" '+
+      'stroke-dashoffset="'+(-off).toFixed(2)+'" data-seg="'+p.key+'"></circle>';
+  }).join('');
+  return '<div class="sv-ring-box"><svg class="sv-ring" viewBox="0 0 132 132" aria-hidden="true">'+
+    '<circle cx="66" cy="66" r="'+R+'" stroke="var(--bg4)" stroke-dasharray="'+C.toFixed(2)+' 0"></circle>'+
+    arcs+'</svg><div class="sv-ring-mid"><div class="sv-ring-n" data-to="'+total+'">0</div>'+
+    '<div class="sv-ring-l">Titles</div></div></div>';
+}
 function renderStats(){
   const body=document.getElementById('statsViewBody');if(!body)return;
   const counts={watching:0,plan:0,finished:0,dropped:0};
@@ -22004,50 +22134,105 @@ function renderStats(){
   const rated=anime.filter(a=>a.rating>0);
   const avg=rated.length?(rated.reduce((s,a)=>s+a.rating,0)/rated.length).toFixed(1):'—';
   const T=libraryTotals(anime), eps=T.eps, hrs=T.hrs;
-  const maxStatus=Math.max(1,...Object.values(counts));
-  const statusBars=['watching','plan','finished','dropped'].map(st=>svBar('st-'+st,(STATUS_META[st]?STATUS_META[st].label:st),(STATUS_META[st]?STATUS_META[st].color:'var(--a)'),counts[st],maxStatus,svChips(anime.filter(a=>a.status===st)))).join('');
-  const gc={};anime.forEach(a=>(a.genre||'').split(',').map(g=>g.trim()).filter(Boolean).forEach(g=>gc[g]=(gc[g]||0)+1));
-  const topG=Object.entries(gc).sort((a,b)=>b[1]-a[1]).slice(0,8);const maxG=topG.length?topG[0][1]:1;
-  const genreBars=topG.length?topG.map(([g,n],i)=>svBar('g-'+i,schEsc(g),'var(--a)',n,maxG,svChips(anime.filter(a=>(a.genre||'').split(',').map(x=>x.trim()).includes(g))))).join(''):'<p class="ai-desc">Add genres (via Autofill) to see this.</p>';
-  // RATINGS ARE OUT OF TEN, AND THIS WAS STILL COUNTING IN FIVES.
-  //
-  // It bucketed by Math.round(rating) against 5,4,3,2,1 — so after the move to a
-  // ten-point scale every rating above five fell outside every bucket and the
-  // chart read 0, 11, 0, 11, 0 on a library with a hundred ratings in it. Not a
-  // layout problem: it was counting the wrong thing and drawing the answer
-  // confidently.
-  //
-  // Five bands of two, high to low, which is how people actually talk about a
-  // ten-point score — "nines and tens" is a category, "exactly 7" is not.
-  const RBANDS=[[9,10],[7,8],[5,6],[3,4],[1,2]];
+  const total=anime.length;
+
+  // ── the face of it ────────────────────────────────────────────────────────
+  // Hours leads because it is the number that means something out loud. The
+  // reader's own covers sit behind it; a library with no artwork yet just gets
+  // the gradient rather than a row of grey rectangles.
+  const lead=hrs?{v:hrs,u:'hours',sub:(T.days>=1?T.days+' days of your life, give or take':'watched so far')}
+                :{v:T.chaps,u:'chapters',sub:'read so far'};
+  const face='<div class="sv-face">'+svMosaic(anime)+'<div class="sv-face-in">'+
+    '<div><span class="sv-big" data-to="'+lead.v+'">0</span><span class="sv-big-u">'+lead.u+'</span></div>'+
+    '<div class="sv-big-sub">'+escH(lead.sub)+'</div>'+
+    '<div class="sv-mini">'+
+      '<div><b data-to="'+eps+'">0</b><span>Episodes</span></div>'+
+      (T.chaps&&hrs?'<div><b data-to="'+T.chaps+'">0</b><span>Chapters</span></div>':'')+
+      '<div><b data-to="'+counts.finished+'">0</b><span>Finished</span></div>'+
+      '<div><b data-to="'+anime.filter(a=>a.fav).length+'">0</b><span>Favourites</span></div>'+
+      (rated.length?'<div><b>'+avg+'</b><span>Avg rating</span></div>':'')+
+    '</div></div></div>';
+
+  // ── status: parts of a whole ──────────────────────────────────────────────
+  const order=['watching','plan','finished','dropped'];
+  const parts=order.map(k=>({key:k,n:counts[k],color:(STATUS_META[k]||{}).color||'var(--a)',
+                             label:(STATUS_META[k]||{}).label||k}));
+  const keys=parts.map(p=>'<div class="sv-keyrow" onclick="svDrill(\'st-'+p.key+'\',this)">'+
+      '<i style="background:'+p.color+'"></i><b>'+escH(p.label)+'</b>'+
+      '<em>'+(total?Math.round(p.n/total*100):0)+'%</em><u>'+p.n+'</u>'+
+      '<span class="chev">'+icon('chevron-right')+'</span></div>').join('');
+  const statusSec=total?'<div class="sv-sec"><div class="sv-h">Where everything stands</div>'+
+    '<div class="sv-ring-wrap">'+svRing(parts,total)+'<div class="sv-key">'+keys+'</div></div>'+
+    parts.map(p=>'<div class="sv-drill" id="drill-st-'+p.key+'">'+svChips(anime.filter(a=>a.status===p.key))+'</div>').join('')+
+    '</div>':'';
+
+  // ── ratings: a distribution ───────────────────────────────────────────────
+  const RBANDS=[[1,2],[3,4],[5,6],[7,8],[9,10]];
   const rd=RBANDS.map(([lo,hi])=>({
-    r:lo===hi?String(lo):(lo+'\u2013'+hi),
-    items:anime.filter(a=>{const v=+a.rating||0;return v>=lo&&v<hi+1&&v>0;})
+    r:lo+'\u2013'+hi,
+    items:anime.filter(a=>{const v=+a.rating||0;return v>=lo&&v<=hi&&v>0;})
   }));
   const maxR=Math.max(1,...rd.map(x=>x.items.length));
-  const ratingBars=rated.length?rd.map(x=>svBar('r-'+x.r,x.r+' <span class="sv-of">/10</span>','var(--a)',x.items.length,maxR,svChips(x.items))).join(''):'<p class="ai-desc">Rate some titles to see this.</p>';
+  const hist=rated.length?'<div class="sv-hist">'+rd.map(x=>
+      '<div class="sv-col'+(x.items.length?'':' dim')+'" onclick="svDrill(\'r-'+x.r+'\',this)">'+
+        '<div class="cn">'+x.items.length+'</div>'+
+        '<div class="bar" data-h="'+Math.round(x.items.length/maxR*100)+'"></div>'+
+        '<div class="cl">'+x.r+'</div></div>').join('')+'</div>'+
+    rd.map(x=>'<div class="sv-drill" id="drill-r-'+x.r+'">'+svChips(x.items)+'</div>').join('')
+    :'<p class="ai-desc">Rate a few titles and the shape of your taste shows up here.</p>';
+  const ratingSec='<div class="sv-sec"><div class="sv-h">How you rate'+
+    (rated.length?' \u2014 '+avg+' average across '+rated.length:'')+'</div>'+hist+'</div>';
+
+  // ── genres: a ranking, weighted ───────────────────────────────────────────
+  const gc={};anime.forEach(a=>(a.genre||'').split(',').map(g=>g.trim()).filter(Boolean).forEach(g=>gc[g]=(gc[g]||0)+1));
+  const topG=Object.entries(gc).sort((a,b)=>b[1]-a[1]).slice(0,12);
+  // Rank alone is not a reason to crown something. If the top two are level,
+  // calling one of them your genre is the chart inventing a result — so the
+  // emphasis only appears when there is a real gap to report.
+  const gLead=topG.length>1&&topG[0][1]>topG[1][1];
+  const gTier=(n,i)=>i===0&&gLead?'t1':(i<3&&n>topG[Math.min(3,topG.length-1)][1])?'t2':'';
+  const cloud=topG.length?'<div class="sv-cloud">'+topG.map(([g,n],i)=>
+      '<span class="sv-tag '+gTier(n,i)+'" onclick="svDrill(\'g-'+i+'\',this)">'+
+        schEsc(g)+'<s>'+n+'</s></span>').join('')+'</div>'+
+    topG.map(([g,n],i)=>'<div class="sv-drill" id="drill-g-'+i+'">'+
+      svChips(anime.filter(a=>(a.genre||'').split(',').map(x=>x.trim()).includes(g)))+'</div>').join('')
+    :'<p class="ai-desc">Run Autofill on a few titles and your genres show up here.</p>';
+  const genreSec='<div class="sv-sec"><div class="sv-h">What you actually go for</div>'+cloud+'</div>';
+
+  // ── finished over time ────────────────────────────────────────────────────
+  // Only once there is something to draw. finAt is stamped from the moment a
+  // title is marked done, so this fills in going forward rather than guessing
+  // backwards from an edit timestamp that means something else.
+  const fin=anime.filter(a=>+a.finAt>0).sort((a,b)=>a.finAt-b.finAt);
+  let timeSec='';
+  if(fin.length>=3){
+    const months=[],now=new Date();
+    for(let i=11;i>=0;i--){const d=new Date(now.getFullYear(),now.getMonth()-i,1);months.push({d,n:0});}
+    fin.forEach(a=>{const d=new Date(+a.finAt);
+      const m=months.find(x=>x.d.getFullYear()===d.getFullYear()&&x.d.getMonth()===d.getMonth());
+      if(m)m.n++;});
+    const maxM=Math.max(1,...months.map(m=>m.n));
+    timeSec='<div class="sv-sec"><div class="sv-h">Finished, month by month</div><div class="sv-hist">'+
+      months.map(m=>'<div class="sv-col'+(m.n?'':' dim')+'">'+
+        '<div class="cn">'+(m.n||'')+'</div><div class="bar" data-h="'+Math.round(m.n/maxM*100)+'"></div>'+
+        '<div class="cl">'+'JFMAMJJASOND'[m.d.getMonth()]+'</div></div>').join('')+'</div></div>';
+  }
+
+  // ── top rated ─────────────────────────────────────────────────────────────
   const topRated=[...rated].sort((a,b)=>b.rating-a.rating).slice(0,8);
-  body.innerHTML=
-    storageBarHTML()+
-    // Hours first, and a plain-language second line under it — "14 days" means
-    // something to a person in a way "336" never does. Chapters only appear for
-    // someone who reads; an always-there zero is just a reminder of a feature.
-    '<div class="sv-hero"><div class="sv-heronum"><div class="v" data-to="'+hrs+'">0</div><div class="l">Hours watched</div>'+
-        (T.days>=1?'<div class="l2">'+T.days+' days of it</div>':'')+'</div>'+
-      '<div class="sv-heronum"><div class="v" data-to="'+eps+'">0</div><div class="l">Episodes</div></div>'+
-      (T.chaps?'<div class="sv-heronum"><div class="v" data-to="'+T.chaps+'">0</div><div class="l">Chapters</div></div>'
-              :'<div class="sv-heronum"><div class="v" data-to="'+anime.length+'">0</div><div class="l">Titles</div></div>')+'</div>'+
-    '<div class="sv-hero">'+
-      (T.chaps?'<div class="sv-heronum"><div class="v" data-to="'+anime.length+'">0</div><div class="l">Titles</div></div>':'')+
-      '<div class="sv-heronum"><div class="v" data-to="'+counts.finished+'">0</div><div class="l">Finished</div></div>'+
-      '<div class="sv-heronum"><div class="v" data-to="'+anime.filter(a=>a.fav).length+'">0</div><div class="l">Favorites</div></div>'+
-      (T.chaps?'':'<div class="sv-heronum"><div class="v">'+avg+'<span class="stat-of">/10</span></div><div class="l">Avg rating</div></div>')+'</div>'+
-    '<div class="sv-sec"><div class="sv-h">Status</div>'+statusBars+'</div>'+
-    '<div class="sv-sec"><div class="sv-h">Top genres</div>'+genreBars+'</div>'+
-    '<div class="sv-sec"><div class="sv-h">Ratings'+(rated.length?' \u2014 '+avg+' average across '+rated.length:'')+'</div>'+ratingBars+'</div>'+
-    (topRated.length?'<div class="sv-sec"><div class="sv-h">Your top rated</div><div class="sv-drill on">'+topRated.map(a=>'<span class="sv-chip">'+schEsc(a.title)+' '+icon('star','fill')+a.rating+'</span>').join('')+'</div></div>':'');
+  const topSec=topRated.length?'<div class="sv-sec"><div class="sv-h">Your best of</div>'+
+    '<div class="sv-drill on">'+topRated.map(a=>'<span class="sv-chip">'+schEsc(a.title)+' '+icon('star','fill')+a.rating+'</span>').join('')+'</div></div>':'';
+
+  body.innerHTML=face+statusSec+ratingSec+genreSec+timeSec+topSec+
+    '<details class="sv-fold"><summary>'+icon('inbox')+' Device storage<b>Check</b></summary>'+storageBarHTML()+'</details>';
+
+  // Sections arrive in order rather than all at once, which is the difference
+  // between a page that loads and a page that opens.
+  body.querySelectorAll('.sv-face,.sv-sec').forEach((el,i)=>{el.style.animationDelay=(60+i*70)+'ms';});
+  body.querySelectorAll('[data-to]').forEach(el=>svCountUp(el,+el.getAttribute('data-to')));
+  // Height is set after a frame so the transition has something to run from.
+  requestAnimationFrame(()=>{try{body.querySelectorAll('.sv-col .bar[data-h]').forEach(b=>{b.style.height=b.getAttribute('data-h')+'%';});}catch(e){}});
   try{_fillStoreNote();}catch(e){}
-  body.querySelectorAll('.sv-heronum .v[data-to]').forEach(el=>svCountUp(el,+el.getAttribute('data-to')));
   try{storageBarFill();}catch(e){}   // real quota lands a moment after the panel does
 }
 function renderStatsSheet(){

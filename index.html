@@ -11415,7 +11415,16 @@ async function checkUpdateNow(btn){
     if(was)was.textContent='Newer build found \u2014 reloading';
     try{tap('tap');}catch(e){}
     _updateReady=true;
-    setTimeout(()=>{try{safeReload();}catch(e){location.reload();}},450);
+    // location.reload() is allowed to come straight back out of the HTTP cache,
+    // which inside a web view is exactly where the stale copy is. Navigating to a
+    // URL the cache has never seen cannot be answered from it, so this is the one
+    // reload that is guaranteed to reach the server.
+    setTimeout(()=>{
+      try{
+        const u=location.pathname+'?_fresh='+Date.now()+location.hash;
+        location.replace(u);
+      }catch(e){ try{location.reload();}catch(_){} }
+    },450);
     return;
   }
   if(!_bootVer)_bootVer=v;

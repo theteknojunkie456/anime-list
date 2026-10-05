@@ -47,12 +47,26 @@ async function run(ua,port,dbg,profile){
     return {out:window.__sent.some(m=>m.type==='openurl'||m.type==='window.open'),
             framed:!!(f&&f.src&&f.src!=='about:blank'),
             playerOpen:document.getElementById('playerView').classList.contains('on')};})()`);
+  // reading must follow the same rule watching does
+  const read=await ev(`(()=>{window.__sent=[];
+    const f=document.getElementById('pvFrame'); if(f)f.src='about:blank';
+    // A reading source must be SET for a hand-off to be the right outcome. With
+    // none, the official app deliberately prompts instead — it ships no reading
+    // default, which is the other half of this change.
+    anime.push({id:'r1',title:'Some Manga',status:'watching',kind:'read',ep:3,aniId:555,
+      srcUrl:'https://example.com/read/{slug}',upd:Date.now()});
+    // readManga awaits readerCodes(), and this harness stubs fetch to never
+    // resolve — so without this the function hangs before it reaches the handoff.
+    window.readerCodes=async()=>({});
+    try{readManga('r1',4);}catch(e){}
+    return new Promise(r=>setTimeout(()=>r({out:window.__sent.some(m=>m.type==='openurl'||m.type==='window.open'),
+            framed:!!(f&&f.src&&f.src!=='about:blank')}),600));})()`);
   const yt=await ev(`(()=>{window.__sent=[];const f=document.getElementById('ytFrame');f.innerHTML='';
     openYT('https://archive.org/embed/whatever','x');
     return {out:window.__sent.some(m=>m.type==='openurl'||m.type==='window.open'),
             iframe:/iframe/i.test(f.innerHTML)};})()`);
   ws.close();ch.kill();srv.kill();
-  return {isNative,watch,yt};
+  return {isNative,watch,yt,read};
 }
 
 const app=await run(NATIVE_UA,8965,9505,'wl-nat');
@@ -62,6 +76,8 @@ t('Watch hands the link out', app.watch.out, true);
 t('and never loads it in the player frame', app.watch.framed, false);
 t('and does not open the in-app player', app.watch.playerOpen, false);
 t('an embed is handed out too', app.yt.out, true);
+t('reading hands off as well', app.read.out, true);
+t('and does not frame the reader', app.read.framed, false);
 t('and no iframe is created for it', app.yt.iframe, false);
 
 const web=await run('',8966,9506,'wl-web');

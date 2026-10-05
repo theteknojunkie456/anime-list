@@ -4857,6 +4857,33 @@ body.recsel .pcard{position:relative;}
     animation:wlcFadeIn .45s ease .5s forwards!important;}
   @keyframes wlcFadeIn{to{opacity:1;}}
 }
+
+/* ── THE ROSTER ──────────────────────────────────────────────────────────────
+   A list of people, not a wall of buttons. The actions for a member live on that
+   member's row and appear when you ask for them, which is also what stops two
+   sets of Remove buttons being on screen at the same time. */
+.adm-row{padding:11px 12px;}
+.adm-head{display:flex;align-items:center;gap:10px;}
+.adm-who{flex:1;min-width:0;cursor:pointer;}
+.adm-who .src-sub{margin-top:2px;}
+/* The affordance is quiet until it is useful: it only lifts on hover, and it is
+   the one thing on the row that is not the person's name. */
+.adm-more{flex:0 0 auto;width:32px;height:32px;border-radius:10px;
+  display:flex;align-items:center;justify-content:center;
+  background:transparent;border:1px solid var(--bn2);color:var(--t3);
+  transition:background-color .15s,color .15s;}
+.adm-more .ico{width:15px;height:15px;}
+.adm-more:active{transform:scale(.94);}
+@media (hover:hover){.adm-more:hover{background:var(--bg3);color:var(--t1);}}
+.adm-row.open .adm-more{background:var(--bg4);color:var(--t1);border-color:transparent;}
+/* Closed by default, and laid out properly when open rather than wrapping into
+   the row above it. */
+.adm-acts{display:none;flex-wrap:wrap;gap:7px;margin-top:10px;padding-top:10px;
+  border-top:1px solid var(--bn2);}
+.adm-row.open .adm-acts{display:flex;}
+/* Removing somebody is the one thing on this screen that cannot be undone, so it
+   stands apart from the rest instead of sitting in the middle of them. */
+.adm-acts .fr-danger{margin-left:auto;}
 </style>
 </head>
 <body>
@@ -6506,6 +6533,17 @@ async function provisionMember(deviceId,name,btn){
     }
   });
 }
+// One row open at a time. Opening a second closes the first, because two sets of
+// Remove buttons on screen is the thing this was meant to stop.
+function admRowToggle(id,ev){
+  try{ev.stopPropagation();}catch(e){}
+  const el=document.getElementById('amr-'+id);
+  if(!el)return;
+  const was=el.classList.contains('open');
+  try{document.querySelectorAll('.adm-row.open').forEach(r=>r.classList.remove('open'));}catch(e){}
+  if(!was)el.classList.add('open');
+  try{tap('tick');}catch(e){}
+}
 async function loadMembers(){
   const box=document.getElementById('adminMembers');if(!box)return;
   clearTimeout(_memT);
@@ -6562,8 +6600,25 @@ async function loadMembers(){
   const pending=byPerson(devs.filter(d=>d.status==='pending')),
         approved=byPerson(devs.filter(d=>d.status==='approved')),
         denied=byPerson(devs.filter(d=>d.status==='denied'));
-  const row=(d,actions)=>`<div class="src-opt adm-row">
-    <div class="adm-who" onclick="adminRenameDevice('${jsq(d.id)}','${jsq(memberLabel(d))}')"><div class="src-name">${presDot(d)}${escH(memberLabel(d)||'Unnamed \u00b7 tap to name')}${d.alias&&realMemberName(d.name)&&d.alias!==d.name?` <span class="src-tag">${escH(d.name)}</span>`:''}</div><div class="src-sub">${presText(d)}${d.joinedAt?' · '+when(d.joinedAt):''}${(d._all&&d._all.length>1)?` · ${d._all.length} devices`:''}${d.source?' · heard: '+escH(d.source):''}${d.invite?' · invite':''}</div></div><div class="adm-acts">${actions}</div></div>`;
+  // SEVENTEEN ROWS, FOUR BUTTONS EACH, AND TWO OF THEM DESTRUCTIVE.
+  //
+  // Every action was on screen for every member at once, which made the roster a
+  // wall of buttons rather than a list of people — and put "Remove all 3" at the
+  // same weight as everything else, seventeen times over. A list you have to read
+  // past to find anyone is not a list.
+  //
+  // The row is a person now: who they are, and one line of plain fact about them.
+  // The actions are one tap away, on the row you actually meant. The dates said
+  // "4h ago · 60d ago" with nothing to say which was which, so they say it.
+  const row=(d,actions)=>`<div class="src-opt adm-row" id="amr-${escH(d.id)}">
+    <div class="adm-head">
+      <div class="adm-who" onclick="adminRenameDevice('${jsq(d.id)}','${jsq(memberLabel(d))}')">
+        <div class="src-name">${presDot(d)}${escH(memberLabel(d)||'Unnamed · tap to name')}${d.alias&&realMemberName(d.name)&&d.alias!==d.name?` <span class="src-tag">${escH(d.name)}</span>`:''}</div>
+        <div class="src-sub">${presText(d)}${d.joinedAt?' · joined '+when(d.joinedAt):''}${(d._all&&d._all.length>1)?` · ${d._all.length} devices`:''}${d.source?' · heard: '+escH(d.source):''}${d.invite?' · invite':''}</div>
+      </div>
+      <button class="adm-more" onclick="admRowToggle('${jsq(d.id)}',event)" aria-label="Actions for this member">${icon('settings')}</button>
+    </div>
+    <div class="adm-acts">${actions}</div></div>`;
   // A person is their devices. Removing one row of three leaves them on the
   // roster twice and looks like the button did nothing, so every action takes
   // the whole set.
@@ -17802,6 +17857,17 @@ function readURL(a,chArg){
   // the time is worse than a search that always lands, so unless this exact
   // series' name has been learned, search.
   if(!src){
+    // THE OFFICIAL APP SHIPS NO READING DEFAULT.
+    //
+    // With nothing chosen this fell back to building AsuraScans links, which
+    // means an App Store binary sending somebody to a scanlation site they never
+    // picked, as its out-of-the-box behaviour. On the web that is a default
+    // somebody can change; shipped in a signed app it is the app's own choice,
+    // and it is not one worth defending to a reviewer or a rights holder.
+    //
+    // So the native build has no default: no source set means no link, and the
+    // caller asks which site to use. The web build is unchanged.
+    if(typeof IS_NATIVE!=='undefined'&&IS_NATIVE)return '';
     const learned=(a&&a.srcSlug&&String(a.srcSlug).trim())||learnedSlugFor(a)||'';
     if(learned)return `${READ_DEFAULT}/comics/${learned}`;
     const code=asuraSuffix();
@@ -17827,6 +17893,19 @@ async function readManga(id,chArg){
   // this costs nothing on every subsequent tap.
   try{await readerCodes();}catch(e){}
   const url=readURL(a,ch);
+  // Same rule watching already follows: the official app hands the destination to
+  // the browser rather than presenting someone else's pages inside its own
+  // chrome. This path was missed when watchAnime was fixed — reading framed the
+  // site exactly as watching used to.
+  if(typeof IS_NATIVE!=='undefined'&&IS_NATIVE){
+    if(!url){showNoSourcePrompt();return;}
+    pvWatchEp=ch||((a.ep||0)+1);
+    pvOpenTime=Date.now();
+    try{armExternalWatch(a,pvWatchEp);}catch(e){}
+    openExternal(url);
+    return;
+  }
+  if(!url){showNoSourcePrompt();return;}
   pvOpenTime=Date.now();                       // reading never had a clock — nothing was ever banked
   _pvReadFrom={ep:a.ep||0,status:a.status};    // where this sitting started, so one Undo covers all of it
   document.getElementById('pvTitle').innerHTML=escH(a.title)+(ch?` <span class="pv-ep">Ch ${ch}</span>`:'');

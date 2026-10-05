@@ -82,7 +82,12 @@ struct WatchListShell: UIViewRepresentable {
         broadcaster.picker.alpha = 0.01
         wv.addSubview(broadcaster.picker)   // must be in the hierarchy to fire
 
-        wv.load(URLRequest(url: Self.siteURL))
+        // URLRequest's default policy is .useProtocolCachePolicy, which lets
+        // WKWebView serve index.html straight out of its own HTTP cache without
+        // asking the server anything. The page can then be weeks old while every
+        // update mechanism inside it — the service worker, the version poll —
+        // is working perfectly on a document that never arrived. Revalidate.
+        wv.load(URLRequest(url: Self.siteURL, cachePolicy: .reloadRevalidatingCacheData, timeoutInterval: 30))
         return wv
     }
 
@@ -229,9 +234,12 @@ struct WatchListShell: UIViewRepresentable {
             NSLog("WatchList: web content process was terminated (likely memory) — reloading")
             pageLoaded = false
             if webView.url != nil {
-                webView.reload()
+                // reload() re-uses the cache; reloadFromOrigin() revalidates. Coming
+                // back from a terminated content process is exactly when the app
+                // should return with the current build rather than the old one.
+                webView.reloadFromOrigin()
             } else {
-                webView.load(URLRequest(url: WatchListShell.siteURL))
+                webView.load(URLRequest(url: WatchListShell.siteURL, cachePolicy: .reloadRevalidatingCacheData, timeoutInterval: 30))
             }
         }
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {

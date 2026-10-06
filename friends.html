@@ -17681,7 +17681,15 @@ async function watchAnime(id,epArg){
   // page — that's the browser refusing, not something we can code around — so the
   // player watches for a frame that never paints and offers the browser then.
   // Only the built-in presets (which we know refuse framing) go straight out.
-  const _own=!!(a.srcUrl&&String(a.srcUrl).trim())||!!streamSource();
+  // "Own" has to mean a site the PERSON supplied, not merely a source being set.
+  // Selecting one of the built-in services wrote its URL into the same setting,
+  // which flipped this true — so the app then tried to frame Peacock or Plex,
+  // sites the comment directly below already says refuse framing. The result was
+  // a blank rectangle, an eight-second wait, and then the browser anyway. A
+  // preset is a preset whether or not it happens to be the active one.
+  const _preset=u=>{const t=String(u||'').trim();
+    return !!t&&(WATCH_PRESETS.some(x=>x.url===t)||(typeof PAID_SERVICES!=='undefined'&&PAID_SERVICES.some(x=>x.url===t)));};
+  const _own=!!String(src||'').trim()&&!_preset(src);
   // Your own source still gets the player — that's where the sandbox is. But if
   // THIS host has already proved twice that it refuses to be framed, opening it
   // there only buys you a blank rectangle and an eight-second wait, so it goes
@@ -21610,16 +21618,12 @@ function renderSource(){
   // knew what the other had decided, and a reader had to work out which was
   // lying. One decision now, stated once, with the caption following from it.
   const _free=freeDefault();
-  const nowOpensShort = noSourceMode() ? 'nothing \u2014 it asks you'
-                      : custom ? escH(host(custom))
-                      : (_free ? escH(_free.name) : 'nothing yet');
-  const srcNowSub = noSourceMode()
-      ? 'Every Watch button brings you here to choose. Pick a site below to stop being asked.'
-    : custom
-      ? 'Your own site. Change it below whenever you like.'
-    : _free
-      ? 'Already set up \u2014 there is nothing you need to do. Pick a different site below if you would rather.'
-      : 'Nothing is set, so Watch has nowhere to send you. Pick one below.';
+  // A site the PERSON supplied, as opposed to one of the built-ins. This is the
+  // distinction the whole screen turns on and it was never drawn: picking a
+  // built-in wrote its URL into the same setting as a custom one, so the panel
+  // could not tell you which of the two situations you were in — and they behave
+  // completely differently when you press Watch.
+  const _mine=!!custom&&!WATCH_PRESETS.some(x=>x.url===custom);
   box.innerHTML=tabs+`
     <!-- ONE SETTING, SHOWN AS ONE SETTING.
          There was a banner saying what Watch does, a card directly beneath
@@ -21630,15 +21634,37 @@ function renderSource(){
          filled in is a list of suggestions. -->
     <div class="dt-label">${icon('play')} When you tap Watch</div>
 
-    <div class="src-choice${!custom&&!noSourceMode()?' on':''}">
+    <div class="src-choice${!_mine&&!noSourceMode()?' on':''}">
       <button class="src-choice-top" onclick="setSource('')">
         <span class="src-mark"></span>
         <span class="src-choice-txt">
           <span class="src-name">Open a site</span>
-          <span class="src-sub">${custom?escH(host(custom)):(_free?('Goes straight to '+escH(_free.name)):'Pick one below first')}</span>
+          <span class="src-sub">${_free||custom
+            ? ('Goes to '+escH(_free?_free.name:host(custom))+', in a new tab')
+            : 'Pick one below first'}</span>
         </span>
       </button>
       ${chips?`<div class="src-picks src-choice-body">${chips}</div>`:''}
+    </div>
+
+    <!-- THE ANSWER TO "WHY DOES NOTHING OPEN IN WATCHLIST".
+         It always opened a tab, and the screen never said why: the big services
+         send a header that forbids any other page from displaying them, which is
+         the browser refusing, not something this app can code around. The one
+         route that does play in-app is a site you supply yourself — and that was
+         buried in a fold called "Use a site of your own", under a headline
+         telling you there was nothing to set up. It is a choice now, beside the
+         other choices, saying what it gets you. -->
+    <div class="src-choice${_mine?' on':''}">
+      <button class="src-choice-top" onclick="openOwnSource()">
+        <span class="src-mark"></span>
+        <span class="src-choice-txt">
+          <span class="src-name">Play inside WatchList</span>
+          <span class="src-sub">${_mine
+            ? escH(host(custom))+' — plays in the app'
+            : 'Needs a site of your own. Paste one episode link and it works out the rest.'}</span>
+        </span>
+      </button>
     </div>
 
     <button class="src-choice src-choice-solo${noSourceMode()?' on':''}" onclick="setNoSource()">
@@ -21737,6 +21763,16 @@ function noSourceMode(){try{return localStorage.getItem('no_source')==='1';}catc
 function setNoSource(){try{localStorage.setItem('no_source','1');localStorage.removeItem('stream_src');}catch{}renderSource();toast('No source yet. Watch will ask you to set one');}
 function showNoSourcePrompt(){toast('Set a source first');try{openSheet('sourceSheet');}catch(e){}}
 // Select one of the user's own custom services (by id) as the active source.
+// Open the one route that actually plays in-app, and put the cursor where the
+// work is. Scrolled into view because the fold sits below two other choices and
+// a silent expansion off-screen reads as the button doing nothing.
+function openOwnSource(){
+  try{
+    const d=document.querySelector('.src-fold[data-fold="own"]');
+    if(d){d.open=true;try{d.scrollIntoView({block:'center',behavior:_scrollBehavior?_scrollBehavior():'smooth'});}catch(e){d.scrollIntoView();}}
+    setTimeout(()=>{try{const i=document.getElementById('srcQuickIn');if(i)i.focus({preventScroll:true});}catch(e){}},260);
+  }catch(e){}
+}
 function setSourceById(id){const s=customServices().find(x=>x.id===id);if(s&&s.url)setSource(s.url);}
 // Tap-to-insert token builder for the custom source URL — drop a token at the cursor.
 function insertSrcToken(tok){

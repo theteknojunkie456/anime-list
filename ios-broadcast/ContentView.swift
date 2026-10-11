@@ -585,13 +585,20 @@ final class InAppWebController: UIViewController {
         web.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(web)
 
-        let close = UIButton(type: .system)
-        close.setTitle("Done", for: .normal)
-        close.titleLabel?.font = .systemFont(ofSize: 16, weight: .semibold)
-        close.tintColor = .white
+        // contentEdgeInsets has been ignored since iOS 15 for any button that has
+        // a UIButtonConfiguration, so the padding here was doing nothing. The
+        // whole button is described by the configuration now — title and font
+        // included, because setting a configuration makes UIKit ignore the
+        // legacy setTitle/titleLabel pair and the label would simply vanish.
+        var cfg = UIButton.Configuration.plain()
+        cfg.contentInsets = NSDirectionalEdgeInsets(top: 6, leading: 14, bottom: 6, trailing: 14)
+        cfg.baseForegroundColor = .white
+        cfg.attributedTitle = AttributedString("Done", attributes: AttributeContainer([
+            .font: UIFont.systemFont(ofSize: 16, weight: .semibold),
+        ]))
+        let close = UIButton(configuration: cfg)
         close.backgroundColor = UIColor(white: 0, alpha: 0.55)
         close.layer.cornerRadius = 16
-        close.contentEdgeInsets = UIEdgeInsets(top: 6, left: 14, bottom: 6, right: 14)
         close.addTarget(self, action: #selector(done), for: .touchUpInside)
         close.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(close)

@@ -1,0 +1,62 @@
+# DOES THE OFFICIAL APP STILL BUILD.
+#
+# The Swift half of WatchList had no automated check at all: it was committed,
+# and whether it compiled was discovered the next time somebody opened Xcode —
+# which, for a stretch of this project, was weeks. The web half deploys itself on
+# every push and the app loads that live, so the only thing a broken native build
+# costs you is the ability to ship a new binary at all, and you find out when you
+# are trying to.
+#
+# macOS runners are free on a public repository, so this runs on every push that
+# touches the app and nowhere else.
+name: iOS app
+
+on:
+  push:
+    branches: [main]
+    paths: ['ios-broadcast/**', '.github/workflows/ios.yml']
+  pull_request:
+    paths: ['ios-broadcast/**', '.github/workflows/ios.yml']
+  workflow_dispatch:
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      # The project file is committed AND generated, so it can drift from the
+      # sources it is supposed to describe. It already had: the committed project
+      # built as build 1 while project.yml said 2. This fails the run rather than
+      # letting the two disagree quietly.
+      - name: Xcode project matches project.yml
+        run: sh scripts/ios-sync.sh --check
+
+      # Signing needs a provisioning profile and the certificates that go with it;
+      # neither belongs in CI for a free Apple ID. Compiling is the question being
+      # asked here, so compiling is all this does.
+      - name: Build
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project ios-broadcast/WatchListParty.xcodeproj \
+            -scheme WatchListParty \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            CODE_SIGNING_ALLOWED=NO \
+            -derivedDataPath "$RUNNER_TEMP/dd" \
+            | tee "$RUNNER_TEMP/build.log" \
+            | grep -E 'error:|BUILD (SUCCEEDED|FAILED)' || true
+
+      # pipefail above carries xcodebuild's status through the pipe, but `|| true`
+      # on the grep would swallow it — so the verdict is read back from the log.
+      - name: Verdict
+        run: grep -q '\*\* BUILD SUCCEEDED \*\*' "$RUNNER_TEMP/build.log"

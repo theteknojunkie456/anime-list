@@ -23,7 +23,7 @@ packages:
 settings:
   base:
     MARKETING_VERSION: "1.0"
-    CURRENT_PROJECT_VERSION: "2"
+    CURRENT_PROJECT_VERSION: "3"
     SWIFT_VERSION: "5.0"
     GENERATE_INFOPLIST_FILE: "NO"
     CODE_SIGN_STYLE: Automatic
@@ -31,8 +31,13 @@ settings:
     # (the default) does NOT load when the app is installed outside Xcode (e.g.
     # via devicectl), so the app launches to a black screen. Keep this NO.
     ENABLE_DEBUG_DYLIB: "NO"
-    # DEVELOPMENT_TEAM is intentionally left blank — pick your Apple ID team in
-    # Xcode → target → Signing & Capabilities (do it for BOTH targets).
+    # The team lives HERE, not only in the generated project. It used to be set
+    # by hand in Xcode and stored nowhere else, so regenerating the project threw
+    # it away and the next build failed to sign until somebody remembered to pick
+    # it again — which is the whole reason regenerating was never automated.
+    # A Team ID is an account identifier, not a secret: it ships inside every
+    # signed build and was already committed in project.pbxproj.
+    DEVELOPMENT_TEAM: NGEK7NY2X4
 
 targets:
   WatchListParty:

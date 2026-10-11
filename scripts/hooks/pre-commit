@@ -1,0 +1,26 @@
+#!/bin/sh
+# Auto-sync friends.html with index.html.
+# friends.html is a generated twin of index.html — identical except the
+# localStorage key — so the public tracker and the Friends-identity build never
+# drift. Whenever index.html is part of a commit, regenerate friends.html and
+# stage it so both go up together. (See ARCHITECTURE.md §3.)
+if git diff --cached --name-only | grep -qx 'index.html'; then
+  sed "s/const LSKEY='animelist_v4'/const LSKEY='animelist_friends_v4'/" index.html > friends.html
+  git add friends.html
+  echo "pre-commit: friends.html regenerated from index.html"
+  # The service worker cache name is stamped from index.html content, so any change
+  # to the app installs a new worker and drops every older cache. Without this sw.js
+  # never changes, no device installs a new worker, and phones keep serving a cache
+  # from months ago.
+  node scripts/stamp-sw.mjs && git add sw.js
+fi
+
+# The official app's Xcode project is generated from project.yml and the loose
+# Swift files, and it is also committed — so the two drifted silently (the
+# committed project built as build 1 while project.yml said 2). Any staged change
+# to the native app regenerates it, bumps the build number, and stages both, the
+# same way index.html regenerates friends.html. XcodeGen is idempotent, so this
+# adds no diff when nothing native changed.
+if git diff --cached --name-only | grep -q '^ios-broadcast/.*\.\(swift\|yml\|plist\)$'; then
+  sh scripts/ios-sync.sh && git add ios-broadcast/project.yml ios-broadcast/WatchListParty.xcodeproj/project.pbxproj
+fi

@@ -3790,6 +3790,20 @@ body.no-party #partyPill:not(.on){display:none!important;}
 body.no-party .friend-only{display:flex;}
 /* Friends-recommend cards + notes, tinted in the sender's colour (--fc). */
 .rec-card .rec-wrap{outline:2px solid var(--fc);outline-offset:-2px;border-radius:14px;position:relative;}
+/* Two layers in the same box: the title's initial underneath, the cover over it,
+   fading in when it actually arrives. Nothing here is a spinner — a poster-shaped
+   tile with the initial IS the loading state, and it stays as the permanent state
+   for a cover that never loads.
+
+   The WRAP carries the size. Sizing it from its children instead looked fine in
+   the row and came apart anywhere the wrap was stretched: the absolute cover
+   grew with the box while the letter stayed 104px, so the two layers no longer
+   described the same card. */
+.rec-card .rec-wrap{width:var(--card-w,104px);height:calc(var(--card-w,104px) * 1.42);}
+.rec-card .rec-ph,.rec-card .rec-img{position:absolute;inset:0;width:100%;height:100%;}
+.rec-card .rec-img{opacity:0;transition:opacity .22s ease;}
+.rec-card .rec-img.on{opacity:1;}
+@media(prefers-reduced-motion:reduce){.rec-card .rec-img{transition:none;}}
 .rec-flag{position:absolute;top:6px;left:6px;width:22px;height:22px;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#fff;box-shadow:0 2px 6px rgba(0,0,0,.35);}
 .rec-flag .ico{width:13px;height:13px;}
 .rec-by{font-size:12px;font-weight:800;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
@@ -20387,7 +20401,19 @@ function tellPassed(rec){
 }
 function recCard(k,rec){
   const it=rec.item,s0=rec.senders[0],col=friendColor(s0.code);
-  const img=it.img?`<img class="pcard-img" decoding="async" src="${escH(it.img)}" loading="lazy" alt="" onerror="artFallback(this,${JSON.stringify(String(it.title||'?')).replace(/"/g,'&quot;')},'pcard-ph')">`:`<div class="pcard-ph">${escH(((it.title||'?').trim()[0]||'?').toUpperCase())}</div>`;
+  // This cover arrives from ANOTHER PERSON, and safeImg's own comment names
+  // friend recommendations as the reason it exists — but this call site, the
+  // actual recommendation card, was the one that skipped it and interpolated the
+  // raw value. The party now-playing and queue thumbnails next door both use it.
+  const u=safeImg(it.img);
+  // The letter is always drawn, and the cover sits on top of it and fades in.
+  // Before this a card with a cover still in flight was a flat var(--bg4)
+  // rectangle with a coloured outline and a dismiss button floating in it, which
+  // does not read as "loading", it reads as broken — which is exactly how it was
+  // reported. A cover that never arrives now settles back to the letter instead
+  // of leaving the hole behind.
+  const ph=`<div class="pcard-ph rec-ph">${escH(((it.title||'?').trim()[0]||'?').toUpperCase())}</div>`;
+  const img=u?`${ph}<img class="pcard-img rec-img" decoding="async" src="${escH(u)}" loading="lazy" alt="" onload="this.classList.add('on')" onerror="this.remove()">`:ph;
   const more=rec.senders.length>1?` +${rec.senders.length-1}`:'';
   return `<div class="pcard rec-card" style="--fc:${col}" onclick="openRecsToMe('in')">
     <div class="pcard-wrap rec-wrap">${img}<span class="rec-flag" style="background:${col}">${icon('users')}</span>

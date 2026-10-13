@@ -185,9 +185,9 @@ Two API quirks are load-bearing. `releases/search` **ignores `series_id`** and
 lets `orderby` override the query — the only parameter it honours is `search`,
 so releases are fetched by name and every row is checked against `names` before
 it's kept (fuzzy search alone once matched "Lore Olympus" to "Olimpos"). And
-readers like AsuraScans stamp a **rotating site-wide code** onto every series
-URL, so the code is scraped each run rather than hardcoded; the constant in
-`index.html` is only a fallback.
+some readers stamp a **rotating site-wide code** onto every series URL, so the
+code is scraped each run rather than hardcoded — there is no constant in
+`index.html` to go stale, because there is no built-in reader to hold one.
 
 Cadence is deliberately **not** a median gap between releases. A gap is measured
 between the rows the harvest happened to catch, so one miss reads a weekly series
@@ -212,10 +212,6 @@ is precise; that is exactly the row an anchor needs, and the ±1 day relative
 dates carry is absorbed by the weekday snap. Chapter alerts fire on
 `max(chapter, readChapter)`: if a chapter is already sitting on the reader,
 "it's out" is true whether or not the database agrees yet.
-
-A note on domains: **`asuratoons.com` is no longer Asura** — it redirects to an
-ad-campaign tracker (`anast-nch.com/zokvisitor/…`) and must not be read from.
-`asuracomic.net` redirects to `asurascans.com`, which is the live site.
 
 `feedRec(a)` is the app's lookup into this file — by AniList id, falling back to
 alias matching for items that don't have one yet. `feedSlug()` (deep links) and

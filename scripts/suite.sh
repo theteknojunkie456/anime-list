@@ -13,7 +13,13 @@ cd "$(dirname "$0")/.."
 # crashed test took twenty-five healthy ones down with it that way, and the
 # report blamed the app. Sweep before starting and after each file, so a crash
 # costs exactly one result.
-sweep(){ pkill -f 'remote-debugging-port=9' 2>/dev/null; pkill -f 'python3 -m http.server' 2>/dev/null; sleep 1; }
+# The pattern has to match the COMMAND LINE as it actually appears. These show up
+# as "…/Python -m http.server 8995" — the interpreter resolves to its real path,
+# so a pattern of 'python3 -m http.server' matched nothing and the sweep quietly
+# swept nothing. Two suites kept failing on a port that was never released.
+sweep(){ pkill -f 'remote-debugging-port=9' 2>/dev/null
+         pkill -f '-m http.server' 2>/dev/null
+         sleep 1; }
 sweep
 trap sweep EXIT INT TERM
 

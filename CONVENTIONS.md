@@ -33,6 +33,16 @@ lint runs automatically after every edit; never commit if it fails.
 - `git push origin main` → GitHub Pages goes live in ~1 min. A broken push is a
   broken live app — verify first.
 
+## Tests
+- `sh scripts/suite.sh` runs every browser suite. It judges by **exit status**,
+  and sweeps stray Chrome/http.server processes between files — a crashed test
+  otherwise holds its port and takes every later test down with it.
+- **Never assert after a fixed sleep.** Poll for the condition with a deadline.
+  A flat `wait(1200)` passes on an idle machine and reports a false failure when
+  forty browsers are running, and a suite that cries wolf stops being read.
+- A test that writes a persisted setting must clear it first, or its second run
+  starts where the first left off. Each test gets its own `--user-data-dir`.
+
 ## Don't
 - Do NOT add in-app streaming from scraper/torrent sources (anikoto, consumet,
   megaplay, gogoanime, Torrentio…). It cannot work in a browser (CORS + Referer

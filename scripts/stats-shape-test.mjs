@@ -153,5 +153,25 @@ t('the chart lines up with the words above it', wide.alignedToHeading, true);
 t('the ring keeps its legend within reading distance', wide.ring<=520, true);
 await cmd('Emulation.clearDeviceMetricsOverride');
 
+// ── and in Retro ────────────────────────────────────────────────────────────
+// Every other screen takes the notch and the lit edge. This one was rebuilt
+// afterwards and nothing in the retro sheet knew about its parts, so it stayed
+// fully rounded while the screen you arrived from was milled. A screen that opts
+// out of the look is more conspicuous than one that never had it.
+await ev(`setRetroMode(true)`);
+await wait(500);
+const retro=await ev(`(()=>{const cp=s=>getComputedStyle(document.querySelector(s)).clipPath;
+  const br=s=>getComputedStyle(document.querySelector(s)).borderRadius;
+  return {face:cp('.sv-face')!=='none', tag:cp('.sv-cloud .sv-tag')!=='none',
+          bar:br('.sv-col .bar'), ring:cp('.sv-ring'),
+          dot:br('.sv-keyrow i')};})()`);
+t('retro: the hero card is milled like everything else', retro.face, true);
+t('retro: so are the genre tags', retro.tag, true);
+t('retro: the bars square off', /^2px 2px 0(px)? 0/.test(retro.bar), true);
+t('retro: and the legend dots', retro.dot, '0px');
+t('retro: but the ring is left round, because a circle is not a missed corner',
+  retro.ring, 'none');
+await ev(`setRetroMode(false)`);
+
 console.log('\n'+pass+' passed, '+fail+' failed');
 ws.close();ch.kill();srv.kill();process.exit(fail?1:0);

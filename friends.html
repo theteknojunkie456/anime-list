@@ -4181,6 +4181,41 @@ body.recsel .pcard{position:relative;}
 .toast.on{opacity:1;transform:translateX(-50%) translateY(0);}
 .toast-link{color:var(--a2);font-weight:800;text-decoration:underline;text-underline-offset:2px;margin-left:4px;}
 
+/* The send-off. Rises, catches a light across the cover, and goes — about a
+   second and a half, over a screen you are on your way out of. pointer-events
+   stays off throughout: it is a farewell, not a dialog, and it must never eat
+   the tap that follows it. */
+.lfx{position:fixed;inset:0;z-index:94;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;
+  pointer-events:none;
+  animation:lfxOut .42s cubic-bezier(.4,0,1,1) 1.06s forwards;}
+/* Without this the card and its caption sat straight on top of whatever was
+   behind them, crossing other text, and read as debris rather than as a moment.
+   The dim is what makes it deliberate. */
+.lfx::before{content:'';position:absolute;inset:0;
+  background:radial-gradient(closest-side at 50% 50%,rgba(0,0,0,.72),rgba(0,0,0,.88));
+  animation:lfxDim .32s ease both;}
+.lfx-card{position:relative;z-index:1;width:86px;height:122px;border-radius:14px;overflow:hidden;
+  box-shadow:0 18px 40px -12px rgba(0,0,0,.8),0 0 0 1px rgba(255,255,255,.07);
+  animation:lfxRise .5s cubic-bezier(.16,1,.3,1) both;}
+.lfx-art{position:absolute;inset:0;background-size:cover;background-position:center;}
+.lfx-art-ph{display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(160deg,var(--bg4),var(--bg3));color:var(--t3);
+  font-family:var(--fd);font-size:34px;font-weight:800;}
+.lfx-sweep{position:absolute;top:0;bottom:0;width:60%;
+  background:linear-gradient(100deg,transparent,rgba(255,255,255,.34),transparent);
+  transform:translateX(-180%);animation:lfxSweep .72s cubic-bezier(.3,0,.2,1) .16s both;}
+.lfx-txt{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;gap:2px;text-align:center;
+  animation:lfxRise .5s cubic-bezier(.16,1,.3,1) .06s both;}
+.lfx-txt b{font-family:var(--fd);font-size:15px;font-weight:800;color:var(--t1);
+  max-width:74vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.lfx-txt span{font-size:12px;font-weight:700;color:var(--a2);}
+@keyframes lfxRise{from{opacity:0;transform:translateY(16px) scale(.94);}to{opacity:1;transform:none;}}
+@keyframes lfxSweep{to{transform:translateX(280%);}}
+@keyframes lfxDim{from{opacity:0;}to{opacity:1;}}
+@keyframes lfxOut{to{opacity:0;transform:translateY(-10px) scale(1.03);}}
+@media(prefers-reduced-motion:reduce){.lfx{display:none;}}
+
 /* ── KIND VIEW SWITCH (Watch / Read) — docked beside the search field ── */
 .kind-seg{display:flex;gap:2px;flex-shrink:0;padding:3px;border-radius:14px;background:var(--bg3);border:1px solid var(--bn);}
 .kseg{
@@ -17675,8 +17710,10 @@ async function watchAnime(id,epArg){
   if(typeof IS_NATIVE!=='undefined'&&IS_NATIVE){
     const u=findUrl(a);
     if(!u){showNoSourcePrompt();return;}
-    try{armExternalWatch(a,(reqEp>0?reqEp:watchEpisode(a)||1));}catch(e){}
+    const _ep=(reqEp>0?reqEp:watchEpisode(a)||1);
+    try{armExternalWatch(a,_ep);}catch(e){}
     openExternal(u);
+    try{tap('tap');launchFX(a,_ep,sourceName());}catch(e){}
     return;
   }
   // Auto-routing now runs on BOTH builds. It used to be official-app only,
@@ -17718,6 +17755,7 @@ async function watchAnime(id,epArg){
   if(_refuses){
     armExternalWatch(a,ep0||1);
     openExternal(streamURL(a,ep0).url||launchURL(a,ep0));
+    try{tap('tap');launchFX(a,ep0,sourceName());}catch(e){}
     // Name the reason. "Won't play inside the app" reads as the app failing at
     // something it should manage; a bot check that refuses to run in a frame is
     // a decision the site made, and knowing that is the difference between a
@@ -17732,6 +17770,7 @@ async function watchAnime(id,epArg){
   if(!_own&&!embedTarget(streamURL(a,ep0).url||src)){
     armExternalWatch(a,ep0||1);
     openExternal(launchURL(a,ep0));
+    try{tap('tap');launchFX(a,ep0,sourceName());}catch(e){}
     toast(`Opening ${sourceName()} for “${a.title}”`);
     return;
   }
@@ -21942,6 +21981,36 @@ function offerHideSource(name){
     if(!isHiddenSrc(name))toggleHiddenSrc(name);
     if(sitePref()===String(name).toLowerCase())setSitePref('');
   });
+}
+// THE MOMENT THE APP HANDS OVER.
+//
+// You press Watch and, from inside WatchList, nothing happens: no sound, no
+// motion, no acknowledgement. A tab appears somewhere else a second later and
+// that is the whole event. It is the deadest moment in the app, and it is the
+// one people press most.
+//
+// So the app says goodbye properly — the cover rises, a light runs across it,
+// the title and the service it is going to are named. It is decoration over a
+// screen you are probably leaving, which is exactly why it has to be quick and
+// must never be in the way: the hand-off has already happened by the time this
+// is called. Blocking on it would be worse than not having it, because the tab
+// has to open inside the gesture or the browser refuses it.
+function launchFX(a,ep,where){
+  try{
+    if(matchMedia('(prefers-reduced-motion:reduce)').matches)return;
+    const old=document.getElementById('launchFX');if(old)old.remove();
+    const img=(typeof safeImg==='function'&&safeImg(a&&a.img))||'';
+    const el=document.createElement('div');
+    el.id='launchFX';el.className='lfx';el.setAttribute('aria-hidden','true');
+    el.innerHTML='<div class="lfx-card">'
+      +(img?'<div class="lfx-art" style="background-image:url('+img+')"></div>'
+           :'<div class="lfx-art lfx-art-ph">'+escH(((a&&a.title||'?').trim()[0]||'?').toUpperCase())+'</div>')
+      +'<div class="lfx-sweep"></div></div>'
+      +'<div class="lfx-txt"><b>'+escH(a&&a.title||'')+'</b>'
+      +'<span>'+escH((ep?('Episode '+ep+' '):'')+(where?('\u2192 '+where):''))+'</span></div>';
+    document.body.appendChild(el);
+    setTimeout(()=>{try{el.remove();}catch(e){}},1500);
+  }catch(e){}
 }
 function armExternalWatch(a,ep){
   if(!a||kindOf(a)!=='watch'||!ep)return;

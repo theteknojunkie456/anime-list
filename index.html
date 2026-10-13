@@ -4179,6 +4179,7 @@ body.recsel .pcard{position:relative;}
   box-shadow:0 8px 24px rgba(0,0,0,0.45);
 }
 .toast.on{opacity:1;transform:translateX(-50%) translateY(0);}
+.toast-link{color:var(--a2);font-weight:800;text-decoration:underline;text-underline-offset:2px;margin-left:4px;}
 
 /* ── KIND VIEW SWITCH (Watch / Read) — docked beside the search field ── */
 .kind-seg{display:flex;gap:2px;flex-shrink:0;padding:3px;border-radius:14px;background:var(--bg3);border:1px solid var(--bn);}
@@ -21432,7 +21433,42 @@ function openExternal(url){
   // custom schemes — could run in-page or exfiltrate, so it never leaves here.
   if(!/^https?:\/\//i.test(url)){toast('That link can’t be opened');return;}
   if(typeof IS_NATIVE!=='undefined'&&IS_NATIVE){try{window.webkit.messageHandlers.wl.postMessage({type:'openurl',url});return;}catch(e){}}
-  try{window.open(url,'_blank','noopener');}catch(e){location.href=url;}
+  // NOTHING HERE IS ALLOWED TO TAKE THE APP AWAY.
+  //
+  // The old line ended `catch(e){location.href=url}` — so the one case it was
+  // written for, the hand-off failing, navigated WatchList itself to the
+  // streaming site. You did not get a tab, you lost the app: your place in the
+  // list, the sheet you had open, the lot, with the back button as the only way
+  // home. A hand-off that cannot open a tab must leave you exactly where you
+  // were standing.
+  //
+  // An anchor click is also the more reliable opener of the two. The browser
+  // treats it as a navigation you asked for, so it survives pop-up blocking that
+  // window.open does not — and openInSafari below already records why that
+  // matters: window.open does nothing at all from a home-screen app, which is
+  // how this is used on a phone.
+  let opened=false;
+  try{
+    const a=document.createElement('a');
+    a.href=url;a.target='_blank';a.rel='noopener noreferrer';
+    a.style.display='none';
+    document.body.appendChild(a);a.click();a.remove();
+    opened=true;
+  }catch(e){}
+  // Only reached if the anchor could not even be clicked. window.open returns
+  // null when it is blocked rather than throwing, which is why the old catch
+  // never ran and a blocked hand-off looked like the button doing nothing.
+  if(!opened){try{opened=!!window.open(url,'_blank','noopener');}catch(e){opened=false;}}
+  if(!opened){
+    // Detectable failure, so say so and hand over something tappable instead of
+    // failing silently. The link is the only thing that can still work here.
+    toast('Your browser blocked that tab',9000,{href:url,label:'Open it'});
+    return;
+  }
+  // Where the browser allows it, stay on WatchList. Chrome and Safari will take
+  // the focus anyway; this costs nothing and keeps you here in the ones that do
+  // not insist.
+  try{window.focus();}catch(e){}
 }
 // This used to be a second, weaker copy of fillSourceTokens that understood
 // three tokens out of eighteen. A template using {slug_}, {anilistid}, {ep2} or
@@ -24161,6 +24197,17 @@ function toast(msg,ms,undo){
     b.className='toast-undo'; b.type='button'; b.textContent='Undo';
     b.onclick=()=>{ try{undo();}catch(e){} el.classList.remove('on'); clearTimeout(toastT); };
     el.appendChild(b);
+  }
+  // A link, for the one case where the only thing left IS a link: the browser
+  // refused to open a tab, and printing an address nobody can tap would be a
+  // worse answer than none. Built as an element, like the Undo button, so the
+  // escaping above still stands.
+  else if(undo&&typeof undo==='object'&&/^https?:\/\//i.test(String(undo.href||''))){
+    const a=document.createElement('a');
+    a.className='toast-link'; a.href=String(undo.href);
+    a.target='_blank'; a.rel='noopener noreferrer';
+    a.textContent=String(undo.label||'Open');
+    el.appendChild(a);
   }
   el.classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>el.classList.remove('on'),ms||2200);}
 

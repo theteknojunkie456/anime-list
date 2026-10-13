@@ -31,7 +31,16 @@ localStorage.setItem('animelist_v4',JSON.stringify([
 localStorage.setItem('wl_net_status','approved');
 sessionStorage.setItem('wl_booted','1');
 window.__opened=[];
-window.open=u=>{window.__opened.push(String(u));return null;};
+window.open=u=>{window.__opened.push(String(u));return {};};
+// The hand-off clicks a real anchor, so recording window.open alone recorded
+// nothing and the row read as "never opened".
+document.addEventListener('DOMContentLoaded',()=>{
+  const real=HTMLAnchorElement.prototype.click;
+  HTMLAnchorElement.prototype.click=function(){
+    if(this.target==='_blank'){window.__opened.push(String(this.href));return;}
+    return real.call(this);
+  };
+});
 window.fetch=()=>new Promise(()=>{});`});
 await cmd('Page.navigate',{url:`http://localhost:${PORT}/index.html?cb=`+Math.random()});
 await wait(4200);
@@ -68,7 +77,7 @@ t('Sources offers playing inside the app as a choice, not a buried fold',
     return [...document.querySelectorAll('#sourceBody .src-choice .src-name')].map(x=>x.textContent);})()`),
   ['Open a site','Play inside WatchList','Ask me each time']);
 t('and says plainly that a built-in opens a tab, naming it',
-  await ev(`(()=>{toggleHiddenSrc('Peacock');setSource('');renderSource();
+  await ev(`(()=>{if(isHiddenSrc('Peacock'))toggleHiddenSrc('Peacock');setSource('');renderSource();
     const txt=document.querySelector('#sourceBody .src-choice .src-sub').textContent;
     return txt;})()`), 'Goes to Peacock, in a new tab');
 t('every built-in starts hidden, so nothing is chosen on your behalf',

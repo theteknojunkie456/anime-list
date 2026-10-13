@@ -32,7 +32,17 @@ window.fetch=()=>new Promise(()=>{});`});
 let pass=0,fail=0;
 const t=(n,g,e)=>{const ok=JSON.stringify(g)===JSON.stringify(e);ok?pass++:fail++;
   console.log((ok?'ok  ':'FAIL')+'  '+n.padEnd(54)+JSON.stringify(g)+(ok?'':'  (want '+JSON.stringify(e)+')'));};
-const load=async()=>{await cmd('Page.navigate',{url:`http://localhost:${PORT}/index.html?cb=`+Math.random()});await wait(900);};
+// Poll, never sleep. A flat 900ms assumed the app had booted by then; behind
+// forty other browser launches it had not, so the very first assertion looked at
+// a page with no film on it yet and everything after it fell over in sympathy.
+const until=async(expr,ms=12000)=>{const t0=Date.now();
+  for(;;){const v=await ev(expr);if(v)return v;
+    if(Date.now()-t0>ms)return null;await wait(60);}};
+const load=async()=>{
+  await cmd('Page.navigate',{url:`http://localhost:${PORT}/index.html?cb=`+Math.random()});
+  // the app is up when its own code is defined AND the film it opens with exists
+  await until(`typeof showLock==='function'&&!!document.querySelector('.wlc')`);
+};
 
 // ── the film is up ──────────────────────────────────────────────────────────
 await load();
@@ -48,9 +58,6 @@ t('but the app knows it is locked', await ev(`appLocked===true`), true);
 // window the film is dissolving in, and a correct app reports a failure. Wait
 // for the beat instead, and read everything else in the SAME evaluation so
 // nothing can move between the check and the assertion.
-const until=async(expr,ms=9000)=>{const t0=Date.now();
-  for(;;){const v=await ev(expr);if(v)return v;
-    if(Date.now()-t0>ms)return null;await wait(60);}};
 const atHandoff=await until(`(()=>{
   if(window.__q.join(',')!=='boot')return null;
   return {q:window.__q.join(','),

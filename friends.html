@@ -13107,7 +13107,7 @@ async function loadChapters(aniId,forId,title){
   try{
     await readerCodes();
     const rec=_it?feedRec(_it):null;
-    const host=srcHost(effectiveReadSource(_it||{})||READ_DEFAULT);
+    const host=srcHost(effectiveReadSource(_it||{}));
     const mine=rec&&rec.readBy&&rec.readBy[host];
     // Keyed by host as well: the same series has a different count on a
     // different reader, so caching it under the series alone would serve the
@@ -18237,17 +18237,19 @@ function pvWatchBlocked(f){
     show();
   },6000);
 }
-// Reading source (AsuraScans by default). AsuraScans series live at
-// /comics/<slug>-<suffix>, where the suffix is a CONSTANT site-wide token (not a
-// per-series hash), so we can deep-link straight to the title. If a slug ever
-// misses, the site shows its own 404-with-search — and the ⤴ button opens search.
-const READ_DEFAULT='https://asurascans.com';
-// The site stamps every series URL with the same code — and ROTATES it. This
-// constant was 1d35e5bd; the site moved to 00dcbf97 and every deep link built
-// from the old one started 404ing, which is what a hardcoded value guarantees
-// eventually. It's only the fallback now: the chapters feed carries whatever the
-// site is using today, scraped by the Action, and that wins.
-const ASURA_SUFFIX='1d35e5bd';
+// THERE IS NO BUILT-IN READING SOURCE.
+//
+// There used to be one, hardcoded, with a rotating per-site token this file had
+// to keep guessing at — a constant that went stale the moment the site changed
+// it, which a hardcoded value guarantees eventually. The official app had
+// already stopped shipping it: sending somebody to a site they never picked is
+// the app making a choice on their behalf, and that is not a choice worth
+// defending to anyone who asks.
+//
+// Now neither build ships one. Read opens the reader YOU set; with none set it
+// asks which, once, and remembers. Everything underneath — learned slugs, the
+// chapters feed, per-site URL shapes — is keyed by host and never cared which
+// host it was, so dropping the default removed a default and nothing else.
 let _readerCodes=null,_feedSeries=null,_frameVerdicts=null;
 // The Action commits chapter refreshes with [skip ci], which skips every
 // workflow for that commit — the Pages build included. So the copy served
@@ -18281,7 +18283,7 @@ async function readerCodes(){
 }
 // The name THIS reader uses for this series, worked out by the Action from every
 // alias AniList and MangaUpdates publish. It beats anything derived from the
-// title: "The Patron of Villains" is raising-villains-the-right-way on Asura,
+// title: "The Patron of Villains" is raising-villains-the-right-way on one reader,
 // and no amount of slugifying gets you there.
 function feedRec(a){
   try{
@@ -18301,10 +18303,6 @@ function feedSlug(a,host){
   const rec=feedRec(a);
   return (rec&&rec.readSlug&&rec.readSlug[host])||'';
 }
-function asuraSuffix(){
-  try{const c=_readerCodes&&_readerCodes['asurascans.com'];if(c&&c.suffix)return c.suffix;}catch(e){}
-  return ASURA_SUFFIX;
-}
 // Warm it early so the first Read of a session already has today's code.
 setTimeout(()=>{try{readerCodes();}catch(e){}},1800);
 function readSource(){try{return localStorage.getItem('read_src')||'';}catch{return'';}}
@@ -18321,32 +18319,10 @@ function readHasChapter(a){
 function readURL(a,chArg){
   const src=effectiveReadSource(a);
   const ch=(chArg>0?chArg:(a.ep||0)+1);
-  // No source set. The old guess was READ_DEFAULT + title + a "site-wide" code,
-  // but that code is per-series: /comics/the-patron-of-villains-1d35e5bd is a
-  // 404 while /comics/solo-leveling-1d35e5bd resolves. A guess that fails half
-  // the time is worse than a search that always lands, so unless this exact
-  // series' name has been learned, search.
-  if(!src){
-    // THE OFFICIAL APP SHIPS NO READING DEFAULT.
-    //
-    // With nothing chosen this fell back to building AsuraScans links, which
-    // means an App Store binary sending somebody to a scanlation site they never
-    // picked, as its out-of-the-box behaviour. On the web that is a default
-    // somebody can change; shipped in a signed app it is the app's own choice,
-    // and it is not one worth defending to a reviewer or a rights holder.
-    //
-    // So the native build has no default: no source set means no link, and the
-    // caller asks which site to use. The web build is unchanged.
-    if(typeof IS_NATIVE!=='undefined'&&IS_NATIVE)return '';
-    const learned=(a&&a.srcSlug&&String(a.srcSlug).trim())||learnedSlugFor(a)||'';
-    if(learned)return `${READ_DEFAULT}/comics/${learned}`;
-    const code=asuraSuffix();
-    // What the site itself calls it, resolved for us, beats a guess from the title.
-    const known=feedSlug(a,'asurascans.com');
-    if(known)return `${READ_DEFAULT}/comics/${known}${code?'-'+code:''}`;
-    if(code)return `${READ_DEFAULT}/comics/${streamSlug(slugTitle(a))}-${code}`;
-    return `${READ_DEFAULT}/?s=${encodeURIComponent(slugTitle(a).replace(/-/g,' '))}`;
-  }
+  // Nothing set means no link, on both builds. readManga answers an empty string
+  // by asking which reader to use, which is the honest reply to a question the
+  // app has not been told the answer to.
+  if(!src)return '';
   if(SRC_TOKEN_RE.test(src)) return fillSourceTokens(src,a,ch);   // {slug}/{query}/{titleRomaji}…; {ch}=the chapter
   return src;
 }
@@ -18355,7 +18331,7 @@ async function readManga(id,chArg){
   if(kindOf(a)!=='read'){toast('Read is for your reading list');return;}
   pvReturnId=id;
   const ch=(chArg>0?chArg:0);
-  // The feed carries what the READER calls this series — Asura serves
+  // The feed carries what the READER calls this series — one serves
   // /comics/star-embracing-swordmaster, not /comics/the-stellar-swordmaster —
   // and without it the URL falls back to a slug made from the title, which
   // 404s. That fallback fired whenever a chapter was tapped before the feed
@@ -18382,7 +18358,7 @@ async function readManga(id,chArg){
   const ext=document.getElementById('pvExt');
   // Same 404 recovery as watch: load the reading site IN-FRAME so its own search is
   // one tap away, rather than kicking out to a new tab and typing the title again.
-  const findRead=(usingDefaultReadSource()||!/\{title\}|\{slug\}/.test(readSource()))?(readSource()||READ_DEFAULT):readSource().replace(/\{title\}/g,encodeURIComponent(a.title)).replace(/\{slug\}/g,streamSlug(a.title));
+  const findRead=(usingDefaultReadSource()||!/\{title\}|\{slug\}/.test(readSource()))?readSource():readSource().replace(/\{title\}/g,encodeURIComponent(a.title)).replace(/\{slug\}/g,streamSlug(a.title));
   ext.onclick=()=>{document.getElementById('pvFrame').src=findRead;};
   document.getElementById('pvFrame').src=url;
   document.getElementById('playerView').classList.add('on');
@@ -18412,7 +18388,7 @@ function episodeURL(a,ep){
 }
 // ── "I'm on this one" ──────────────────────────────────────────────────────
 // The follow-along above only fires when the frame NAVIGATES. Sites whose player
-// swaps episodes in place (AniNeko among them) never do, so the header can read
+// swaps episodes in place never do, so the header can read
 // Ep 2 while Episode 4 is playing, and every later auto-mark is measured from the
 // wrong number. Nothing in the frame can tell us — but the person is looking
 // straight at the real number, and one tap is cheaper than any heuristic.
@@ -19311,7 +19287,7 @@ function refreshSrcExNote(){const n=document.getElementById('srcExNote');if(n)n.
 // can be synced and handed to someone else — rather than only on the list item.
 //
 // Keyed by SITE, because a slug is only true for the site it was learned on:
-// anineko may call it initial-d-first-stage where another site says initial_d.
+// one site may call it initial-d-first-stage where another says initial_d.
 // Applying one site's names to a different site would break working links.
 const SLUG_MAP_KEY='site_slugs';
 // ─── WHICH SITES ACTUALLY FRAME ─────────────────────────────────────────────
@@ -21664,22 +21640,22 @@ function readSourceHTML(rcustom){
   const host=u=>{try{return new URL(String(u).replace(/\{[^}]+\}/g,'x')).hostname.replace(/^www\./,'');}catch{return String(u).slice(0,32);}};
   // Same fix as the anime tab: a newcomer met the paste-your-own-reader form
   // before anything said Read already works, which reads as required setup.
-  const readsNow = rcustom ? ('open '+escH(host(rcustom))) : 'open AsuraScans';
+  // There is no built-in reader any more, so this stops claiming there is
+  // "nothing to set up" — there is exactly one thing, said once, with the box to
+  // do it in directly below rather than folded away under a different name.
   return `
     <div class="src-now">
-      <div class="src-now-t">${icon('book')} Tap <b>Read</b> on any series and it'll ${readsNow}.</div>
-      <div class="src-now-s">Manga, manhwa, manhua, webtoons and light novels all use this${rcustom?'':' — nothing to set up'}. Kept separate from anime: changing one never touches the other.</div>
+      <div class="src-now-t">${icon('book')} ${rcustom
+        ? `Tap <b>Read</b> on any series and it'll open ${escH(host(rcustom))}.`
+        : `Tap <b>Read</b> and WatchList will ask which reader to use.`}</div>
+      <div class="src-now-s">Manga, manhwa, manhua, webtoons and light novels all use this. Kept separate from anime: changing one never touches the other.</div>
     </div>
 
     <div class="dt-label">${icon('book')} Where Read opens</div>
-    <button class="src-opt${!rcustom?' on':''}" onclick="setReadSource('')">
-      <div class="src-name">AsuraScans <span class="src-tag">Built-in</span></div>
-      <div class="src-sub">Jumps straight to the series, no setup</div>
-    </button>
     ${rcustom?`<div class="src-opt on">
       <div class="src-name">${escH(host(rcustom))} <span class="src-tag">Yours</span></div>
       <div class="src-sub">${escH(String(rcustom).slice(0,72))}</div>
-    </div>`:''}
+    </div>`:`<p class="ai-desc" style="margin:0 0 4px">Nothing set yet. Open the reader you already use, go to any chapter, and paste that address below \u2014 that one link is the whole setup.</p>`}
 
     ${isAdminDevice()?`<details class="src-fold" data-fold="mualerts" style="margin-top:16px" ontoggle="if(this.open)loadMuList()">
       <summary>${icon('bell')} Chapter alerts \u2014 what each series matched</summary>
@@ -21692,7 +21668,7 @@ function readSourceHTML(rcustom){
       <p class="ai-desc" style="margin:9px 0 11px;font-size:13px">Open your reader, go to <b>any</b> chapter of <b>any</b> series, and paste that page's address. That one link is the whole setup — WatchList works out the pattern and uses it for everything you read.</p>
       <textarea class="ai-prompt-in urlin" rows="2" id="rsrcQuickIn" placeholder="paste that chapter's address" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url" oninput="readQuickSetup()" onkeydown="if(event.key==='Enter')event.preventDefault();"></textarea>
       <div id="rsrcQuickOut" class="src-quick-out" style="display:none"></div>
-      ${rcustom?`<button class="src-quick-share" onclick="setReadSource('')" style="margin-top:10px">${icon('x')} Go back to AsuraScans<span>${escH(host(rcustom))} is set right now</span></button>`:''}
+      ${rcustom?`<button class="src-quick-share" onclick="setReadSource('')" style="margin-top:10px">${icon('x')} Clear it<span>${escH(host(rcustom))} is set right now</span></button>`:''}
     </details>
 
     <details class="src-fold" data-fold="readmore" style="margin-top:16px">
@@ -21718,13 +21694,13 @@ function readQuickSetup(){
   // Readers are mostly SERIES pages — /comics/<name>, /manga/<name>, /series/<name>
   // — with no chapter in the address at all, so the episode-shaped templatiser
   // finds nothing to hold on to. The last path segment IS the series name here,
-  // so take it. Many readers append a fixed token to every slug (AsuraScans ends
+  // so take it. Many readers append a fixed token to every slug (some end
   // them all with the same short hex); that stays in the template, or every other
   // series would resolve to a 404.
   if(!/\{(query|slug|ch)\}/.test(tpl)){
     try{
       const u=new URL(url), segs=u.pathname.split('/').filter(Boolean);
-      // The whole segment is the slug, code and all. Sites like AsuraScans append
+      // The whole segment is the slug, code and all. Some readers append
       // a per-series code — verified: -059be resolves for one series and 404s on
       // the next — so keeping it in the template poisons every other series. The
       // per-series name is learned instead, which is what {slug} is for.
@@ -21962,7 +21938,7 @@ function setReadSource(v){
   if(v&&!/^https?:\/\//i.test(String(v).trim())){toast('That doesn\u2019t look like a website address');return;}
   try{if(v)localStorage.setItem('read_src',v);else localStorage.removeItem('read_src');}catch{}
   renderSource();
-  toast(v?'Reading source set':'Back to AsuraScans');
+  toast(v?'Reading source set':'Reader cleared \u2014 Read will ask next time');
 }
 // Accept what people actually type: bare domains ("hianime.to"), with or without
 // www, get an https:// prefix so the paste just works instead of being rejected.

@@ -184,7 +184,7 @@ async function trackedSeries() {
 }
 
 /**
- * Readers that stamp every series URL with the same rotating code — AsuraScans
+ * Readers that stamp every series URL with the same rotating code — some
  * puts /comics/<name>-<code> on all of them — silently break every deep link the
  * day they rotate it. The app shipped 1d35e5bd hardcoded; the site is on
  * 00dcbf97 now, which is exactly why some series 404 and others redirect.
@@ -193,7 +193,7 @@ async function trackedSeries() {
  * with the chapter data. The app reads it instead of its own stale constant.
  */
 /**
- * What does the READER call this series? Nothing can derive it — AsuraScans
+ * What does the READER call this series? Nothing can derive it — a reader
  * calls "The Patron of Villains" raising-villains-the-right-way — but every
  * alias is published somewhere: AniList synonyms and MangaUpdates associated
  * names. Try each as a slug and keep the one the site actually serves.
@@ -201,7 +201,6 @@ async function trackedSeries() {
 // Readers this resolves for. Adding one is a line: its host, the path series
 // live under, and whether it stamps a rotating code onto every slug.
 const READERS = [
-  { host: 'asurascans.com', path: 'comics', code: true },
   { host: 'reaperscans.com', path: 'series', code: false },
   { host: 'flamecomics.xyz', path: 'series', code: false },
 ];
@@ -257,7 +256,7 @@ async function resolveReaderSlug(reader, code, names) {
  * What the READER itself says — the source of truth for what the app links to.
  *
  * MangaUpdates' release feed indexes one scanlation stream and lags badly (it
- * had The Patron of Villains at ch 32 while Asura was serving 46), so anchoring
+ * had The Patron of Villains at ch 32 while the reader was serving 46), so anchoring
  * a projection on it drifts. The reader's own chapter list doesn't lag: it IS
  * what the user opens.
  *
@@ -457,7 +456,7 @@ if (EXTRA_READERS.length) {
 const FRAME_HOSTS = [
   ...READERS.map((r) => r.host),
   'miruro.tv', 'pluto.tv', 'therokuchannel.roku.com', 'www.peacocktv.com',
-  'www.retrocrush.tv', 'watch.plex.tv', 'anineko.to',
+  'www.retrocrush.tv', 'watch.plex.tv',
   ...SHARED_HOSTS,
 ];
 for (const h of [...new Set(FRAME_HOSTS)]) {
@@ -544,7 +543,7 @@ for (const [aniId, names] of work) {
     if (known.weekday != null) out.series[aniId].weekday = known.weekday;
   }
 
-  // What does the READER call it? Nothing can derive that — AsuraScans calls
+  // What does the READER call it? Nothing can derive that — one reader calls
   // "The Patron of Villains" raising-villains-the-right-way — but every alias is
   // published somewhere, and now they're all in allNames. Try each as a slug and
   // keep the one the site actually serves. Done once, then remembered.

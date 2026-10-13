@@ -59,9 +59,15 @@ t('storage is still there, folded away at the end',
     const f=k[k.length-1];return f.tagName==='DETAILS'&&!f.open&&!!f.querySelector('.sv-store');})()`), true);
 
 // ── one number leads ────────────────────────────────────────────────────────
-t('hours leads, and it counted up to the real figure',
-  await ev(`(()=>{const el=document.querySelector('.sv-big');
-    return el.textContent.replace(/,/g,'')===String(libraryTotals(anime).hrs);})()`), true);
+// The number animates up over ~850ms. A flat wait before reading it is fine on
+// an idle machine and reports a false failure under load, so wait for it to
+// arrive instead — with a deadline, so a number that never arrives still fails.
+const arrives=async(expr,ms=6000)=>{const t0=Date.now();
+  for(;;){if(await ev(expr))return true;
+    if(Date.now()-t0>ms)return false;await wait(80);}};
+t('hours leads, counting up to the real figure',
+  await arrives(`(()=>{const el=document.querySelector('.sv-big');
+    return el&&el.textContent.replace(/,/g,'')===String(libraryTotals(anime).hrs);})()`), true);
 
 // ── the covers are the branding ─────────────────────────────────────────────
 t('it is built out of the reader’s own covers', await Q('.sv-mosaic i'), 14);

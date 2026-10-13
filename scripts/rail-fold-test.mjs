@@ -18,10 +18,17 @@ const ev=async x=>(await cmd('Runtime.evaluate',{expression:x,returnByValue:true
 await cmd('Page.enable');await cmd('Runtime.enable');
 await cmd('Page.addScriptToEvaluateOnNewDocument',{source:`
 localStorage.setItem('animelist_v4','[]');localStorage.setItem('wl_net_status','approved');
+// The rail's folded state persists, and this test toggles it. Without clearing
+// it the second run against the same browser profile starts from where the
+// first one left off and reports a failure the app had nothing to do with.
+localStorage.removeItem('wl_rail_folded');
 window.fetch=()=>new Promise(()=>{});`});
 await cmd('Emulation.setDeviceMetricsOverride',{width:1440,height:900,deviceScaleFactor:1,mobile:false});
 await cmd('Page.navigate',{url:`http://localhost:${PORT}/index.html?cb=`+Math.random()});
-await wait(4200);
+// Poll for the app rather than guessing how long it needs to boot.
+{const t0=Date.now();
+ for(;;){ if(await ev(`typeof toggleRail==='function'`))break;
+   if(Date.now()-t0>12000)break; await wait(80);} }
 let pass=0,fail=0;
 const t=(n,g,e)=>{const ok=JSON.stringify(g)===JSON.stringify(e);ok?pass++:fail++;
   console.log((ok?'ok  ':'FAIL')+'  '+n.padEnd(46)+JSON.stringify(g)+(ok?'':'  (want '+JSON.stringify(e)+')'));};

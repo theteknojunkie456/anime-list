@@ -162,16 +162,43 @@ await ev(`setRetroMode(true)`);
 await wait(500);
 const retro=await ev(`(()=>{const cp=s=>getComputedStyle(document.querySelector(s)).clipPath;
   const br=s=>getComputedStyle(document.querySelector(s)).borderRadius;
+  const teeth=document.querySelector('.sv-ring-teeth');
   return {face:cp('.sv-face')!=='none', tag:cp('.sv-cloud .sv-tag')!=='none',
           bar:br('.sv-col .bar'), ring:cp('.sv-ring'),
+          teeth:!!teeth&&getComputedStyle(teeth).display!=='none',
           dot:br('.sv-keyrow i')};})()`);
 t('retro: the hero card is milled like everything else', retro.face, true);
 t('retro: so are the genre tags', retro.tag, true);
-t('retro: the bars square off', /^2px 2px 0(px)? 0/.test(retro.bar), true);
+t('retro: the bars square off completely', /^0(px)?( 0(px)?){0,3}$/.test(retro.bar.trim()), true);
+t('retro: and the ring becomes a stepped gauge rather than a smooth stroke',
+  retro.teeth, true);
 t('retro: and the legend dots', retro.dot, '0px');
 t('retro: but the ring is left round, because a circle is not a missed corner',
   retro.ring, 'none');
 await ev(`setRetroMode(false)`);
+
+// ── the chart has a floor, and the numbers belong to their bars ─────────────
+// An empty band used to be drawn as a three-pixel stub just to prove it existed,
+// which reads as a broken bar rather than a zero; and the counts sat in the
+// column's normal flow, so the box below pushed every one of them to the
+// ceiling in a row, each a long way from the bar it was counting.
+await ev(`setRetroMode(false)`);
+await ev(`(()=>{anime.forEach((a,i)=>{a.rating=i<4?0:10;});renderStats();})()`);
+await wait(1100);
+const bars=await ev(`(()=>{
+  const cols=[...document.querySelectorAll('.sv-sec .sv-hist')][0].querySelectorAll('.sv-col');
+  const zero=cols[0], tall=cols[cols.length-1];
+  const r=e=>e.getBoundingClientRect();
+  return {axis:getComputedStyle(zero.querySelector('.barbox')).borderBottomStyle,
+          zeroBarHeight:Math.round(r(zero.querySelector('.bar')).height),
+          zeroLabel:zero.querySelector('.cn').textContent,
+          countsRideBars:Math.abs(r(tall.querySelector('.cn')).bottom-r(tall.querySelector('.bar')).top)<16,
+          notAllOnOneLine:Math.abs(r(zero.querySelector('.cn')).top-r(tall.querySelector('.cn')).top)>20};})()`);
+t('every column stands on an axis', bars.axis, 'solid');
+t('an empty band draws no bar at all', bars.zeroBarHeight, 0);
+t('…but still says zero', bars.zeroLabel, '0');
+t('each count sits on its own bar', bars.countsRideBars, true);
+t('…rather than all of them along the top', bars.notAllOnOneLine, true);
 
 console.log('\n'+pass+' passed, '+fail+' failed');
 ws.close();ch.kill();srv.kill();process.exit(fail?1:0);

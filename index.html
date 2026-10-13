@@ -601,8 +601,12 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
    The ring is left alone on purpose. A circle drawn as a circle is not a missed
    corner — notching it would be the costume this theme's own notes warn about. */
 [data-retro] .sv-face{border-radius:2px;clip-path:var(--cut);--notch:14px;}
+/* The gauge. Hidden everywhere else: outside this theme the ring is a ring. */
+[data-retro] .sv-ring-teeth{display:block;}
+/* Fully square, with the lit lip this theme puts on every raised edge. */
+[data-retro] .sv-col .bar{border-radius:0;box-shadow:inset 0 2px 0 0 color-mix(in srgb,var(--edge) 58%,transparent);}
+[data-retro] .sv-col .barbox{border-bottom-color:color-mix(in srgb,var(--edge) 42%,transparent);}
 [data-retro] .sv-mosaic i{border-radius:0;}
-[data-retro] .sv-col .bar{border-radius:2px 2px 0 0;}
 [data-retro] .sv-tag{border-radius:2px;clip-path:var(--cut);--notch:7px;}
 [data-retro] .sv-chip{border-radius:2px;}
 [data-retro] .sv-keyrow{border-radius:2px;}
@@ -1817,6 +1821,7 @@ img[data-fd="in"]{opacity:1;transition:opacity .18s ease-out;}
 .sv-ring{width:132px;height:132px;flex-shrink:0;transform:rotate(-90deg);}
 .sv-ring circle{fill:none;stroke-width:15;stroke-linecap:butt;
   transition:stroke-dashoffset .9s cubic-bezier(.2,1,.3,1),opacity .2s;}
+.sv-ring-teeth{display:none;transition:none;}
 .sv-ring-mid{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;}
 .sv-ring-box{position:relative;width:132px;height:132px;flex-shrink:0;}
 .sv-ring-n{font-family:var(--fd);font-size:30px;font-weight:800;letter-spacing:-1px;line-height:1;color:var(--t1);}
@@ -1835,12 +1840,27 @@ img[data-fd="in"]{opacity:1;transition:opacity .18s ease-out;}
 .sv-keyrow.open{background:var(--bg3);}
 
 /* A distribution, drawn as a distribution. */
-.sv-hist{display:flex;align-items:flex-end;gap:7px;height:116px;margin-top:4px;}
+/* The tallest bar's count sits above it, so the chart has to own that space or
+   the number lands in the heading of the section above. */
+.sv-hist{display:flex;align-items:flex-end;gap:7px;height:116px;margin-top:20px;}
 .sv-col{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:6px;height:100%;cursor:pointer;}
-.sv-col .bar{width:100%;border-radius:10px 10px 2px 2px;background:linear-gradient(180deg,var(--a2),var(--a));
-  min-height:3px;height:0;transition:height .8s cubic-bezier(.2,1,.3,1),filter .16s;}
+/* A chart needs a floor. Without one the bars hung in space and an empty band
+   had to be drawn as a stub three pixels tall just to show it was there — which
+   reads as a broken bar, not as a zero. The axis says zero; the column then
+   simply has nothing above it. */
+.sv-col .barbox{position:relative;flex:1;width:100%;display:flex;align-items:flex-end;
+  border-bottom:1px solid var(--bn2);}
+/* The count belongs to its bar, so it rides on top of it. Left in the column's
+   normal flow it was pushed to the ceiling by the box below it, and five
+   numbers sat in a row along the top of the chart, each one a long way from the
+   bar it was counting. */
+.sv-col .cn{position:absolute;left:0;right:0;text-align:center;margin-bottom:5px;
+  transition:bottom .8s cubic-bezier(.2,1,.3,1);}
+.sv-col .bar{width:100%;border-radius:10px 10px 0 0;background:linear-gradient(180deg,var(--a2),var(--a));
+  height:0;transition:height .8s cubic-bezier(.2,1,.3,1),filter .16s;}
+.sv-col.dim .bar{height:0!important;}
 .sv-col:active .bar{filter:brightness(1.25);}
-.sv-col .cn{font-family:var(--fd);font-size:13px;font-weight:800;color:var(--t2);line-height:1;}
+.sv-col .cn{font-family:var(--fd);font-size:13px;font-weight:800;color:var(--t2);line-height:1;pointer-events:none;}
 .sv-col .cl{font-size:10px;font-weight:700;color:var(--t3);}
 .sv-col.dim .bar{background:var(--bg4);}
 
@@ -22395,9 +22415,24 @@ function svRing(parts,total){
       'stroke-dasharray="'+len.toFixed(2)+' '+(C-len).toFixed(2)+'" '+
       'stroke-dashoffset="'+(-off).toFixed(2)+'" data-seg="'+p.key+'"></circle>';
   }).join('');
+  // RETRO GETS A GAUGE, NOT A PIE.
+  //
+  // This was left round on the grounds that a circle is not a missed corner, and
+  // that still holds — notching it would be a costume. But a smooth anti-aliased
+  // stroke sitting among milled panels and pixel readouts is the one piece that
+  // never joined the theme. The HUD answer is not to square the circle, it is to
+  // STEP it: a gauge reads in discrete segments, the way an in-game meter does.
+  //
+  // So the arcs are drawn exactly as before and a dashed ring in the page colour
+  // is laid over the top to cut them into ticks. The period has to divide the
+  // circumference a whole number of times or the pattern fails to close and
+  // leaves a seam at twelve o'clock.
+  const TICKS=44, period=C/TICKS;
+  const teeth='<circle class="sv-ring-teeth" cx="66" cy="66" r="'+R+'" stroke="var(--bg)" '+
+    'stroke-width="17" stroke-dasharray="'+(period*0.26).toFixed(3)+' '+(period*0.74).toFixed(3)+'"></circle>';
   return '<div class="sv-ring-box"><svg class="sv-ring" viewBox="0 0 132 132" aria-hidden="true">'+
     '<circle cx="66" cy="66" r="'+R+'" stroke="var(--bg4)" stroke-dasharray="'+C.toFixed(2)+' 0"></circle>'+
-    arcs+'</svg><div class="sv-ring-mid"><div class="sv-ring-n" data-to="'+total+'">0</div>'+
+    arcs+teeth+'</svg><div class="sv-ring-mid"><div class="sv-ring-n" data-to="'+total+'">0</div>'+
     '<div class="sv-ring-l">Titles</div></div></div>';
 }
 function renderStats(){
@@ -22448,8 +22483,8 @@ function renderStats(){
   const maxR=Math.max(1,...rd.map(x=>x.items.length));
   const hist=rated.length?'<div class="sv-hist">'+rd.map(x=>
       '<div class="sv-col'+(x.items.length?'':' dim')+'" onclick="svDrill(\'r-'+x.r+'\',this)">'+
-        '<div class="cn">'+x.items.length+'</div>'+
-        '<div class="bar" data-h="'+Math.round(x.items.length/maxR*100)+'"></div>'+
+        '<div class="barbox"><div class="cn" style="bottom:'+Math.round(x.items.length/maxR*100)+'%">'+x.items.length+'</div>'+
+        '<div class="bar" data-h="'+Math.round(x.items.length/maxR*100)+'"></div></div>'+
         '<div class="cl">'+x.r+'</div></div>').join('')+'</div>'+
     rd.map(x=>'<div class="sv-drill" id="drill-r-'+x.r+'">'+svChips(x.items)+'</div>').join('')
     :'<p class="ai-desc">Rate a few titles and the shape of your taste shows up here.</p>';
@@ -22492,7 +22527,8 @@ function renderStats(){
     const maxM=Math.max(1,...months.map(m=>m.n));
     timeSec='<div class="sv-sec"><div class="sv-h">Finished, month by month</div><div class="sv-hist">'+
       months.map(m=>'<div class="sv-col'+(m.n?'':' dim')+'">'+
-        '<div class="cn">'+(m.n||'')+'</div><div class="bar" data-h="'+Math.round(m.n/maxM*100)+'"></div>'+
+        '<div class="barbox"><div class="cn" style="bottom:'+Math.round(m.n/maxM*100)+'%">'+(m.n||'')+'</div>'+
+        '<div class="bar" data-h="'+Math.round(m.n/maxM*100)+'"></div></div>'+
         '<div class="cl">'+'JFMAMJJASOND'[m.d.getMonth()]+'</div></div>').join('')+'</div></div>';
   }
 

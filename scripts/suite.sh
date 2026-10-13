@@ -17,9 +17,17 @@ cd "$(dirname "$0")/.."
 # as "…/Python -m http.server 8995" — the interpreter resolves to its real path,
 # so a pattern of 'python3 -m http.server' matched nothing and the sweep quietly
 # swept nothing. Two suites kept failing on a port that was never released.
+# Killing Chrome leaves a SingletonLock behind in its profile, and the next
+# launch against that profile refuses to start — which surfaces as ECONNREFUSED
+# on the debug port and a crash banner, test after test, with nothing to say the
+# cause was a lock file. The profiles are disposable, so they go with the
+# processes; that also means no test can inherit state from its own last run,
+# which is the other way this suite used to lie.
 sweep(){ pkill -f 'remote-debugging-port=9' 2>/dev/null
          pkill -f '-m http.server' 2>/dev/null
-         sleep 1; }
+         sleep 1
+         rm -rf "${TMPDIR:-/tmp}"/wl-* 2>/dev/null
+         return 0; }
 sweep
 trap sweep EXIT INT TERM
 

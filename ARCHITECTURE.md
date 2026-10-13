@@ -265,6 +265,42 @@ Bindings (`sync-wrangler.toml`):
 > Free-plan Durable Objects require `new_sqlite_classes` in the migration (not
 > `new_classes`).
 
+### Which device is right
+
+Devices normally **merge**: union by id, newest `upd` per item wins. That is the
+right default and the wrong one for a device that has drifted, so there is a way
+to say "this one is correct, everywhere".
+
+It used to be a flag written *inside* the synced blob — and the blob is what the
+next `push` from anybody replaces, so the first device to publish before it had
+caught up erased the decision, its stale titles merged back into everyone, and
+the device that had been declared right quietly reverted.
+
+The marker lives on the **record**, beside the blob, and only moves forward:
+
+| field | meaning |
+|---|---|
+| `adopt` | the decision's timestamp. Monotonic; a later one supersedes an earlier one. |
+| `adoptBy` | the device that made it. |
+| `devs{}` | the last blob each device published, five most recent, never evicting the device currently writing. |
+
+Every `push` carries `adoptSeen` — the last decision that device honoured. A
+device behind the current decision is refused with **409 `stale-adopt`**; the
+client answers by pulling, adopting, and pushing again, and does not count it as
+a backup failure. The pull side evaluates `adopt` even when this device already
+holds the newest write, because that device is precisely the one that overruled
+everyone and so the one that most needs to hear it.
+
+`devs{}` is what makes the choice answerable from a device that is *not* the one
+being chosen: the phone reads the Mac's copy (`op:'pull_dev'`) rather than
+needing the Mac in hand. Snapshots are dropped before the record is ever allowed
+to exceed the size cap — a backup that fails is worse than a picker that has
+forgotten a device — and `op:'pull'` strips them, so an ordinary open does not
+download five copies of the list.
+
+Ops: `pull` · `push` · `devices` · `pull_dev`. Covered by
+`cloud/adopt-sync.test.mjs` and `scripts/device-dominance-test.mjs`.
+
 ### The write budget
 
 KV bills per write **operation**, not per byte: a 50-byte change and a 2 MB list

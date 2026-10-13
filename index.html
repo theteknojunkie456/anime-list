@@ -5078,6 +5078,15 @@ body.recsel .pcard{position:relative;}
 /* The sites belong to the choice they configure, so they sit inside it rather
    than floating between the two and belonging to neither. */
 .src-choice-body{padding:0 13px 12px 42px;margin:0;}
+/* The setup for "play inside WatchList" sits in that choice, so it reads as its
+   detail rather than as a rival option — and stays out of the way until the
+   choice is the one being made. Open by default it was taller than the other two
+   options put together, which is a strange amount of room for the option you had
+   not picked. */
+.src-own{display:none;border-top:1px solid var(--bn2);padding-top:12px;margin-top:4px;}
+.src-choice.on .src-own,.src-choice.show-own .src-own{display:block;animation:fadeUp .26s ease both;}
+.src-own .urlin{width:100%;box-sizing:border-box;}
+@media(prefers-reduced-motion:reduce){.src-choice.on .src-own,.src-choice.show-own .src-own{animation:none;}}
 </style>
 </head>
 <body>
@@ -21834,6 +21843,17 @@ function renderSource(){
             : 'Needs a site of your own. Paste one episode link and it works out the rest.'}</span>
         </span>
       </button>
+      <!-- The setup lives INSIDE the choice it belongs to. It used to be a
+           separate fold below, headed "Use a site of your own": the same job
+           reachable two ways, one of them presented as a choice and one as a
+           drawer, with nothing to say they were the same thing. One control
+           now, and the thing it asks for sits directly under it. -->
+      <div class="src-choice-body src-own">
+          <p class="ai-desc" style="margin:9px 0 11px;font-size:13px">Open your site, start <b>any</b> episode of <b>any</b> show, and paste that page's address. That one link is the whole setup — WatchList works out the pattern and uses it for every show.</p>
+          <textarea class="ai-prompt-in urlin" rows="2" id="srcQuickIn" placeholder="paste that episode's address" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url" oninput="quickSetup()" onkeydown="if(event.key==='Enter')event.preventDefault();"></textarea>
+          <div id="srcQuickOut" class="src-quick-out" style="display:none"></div>
+          <button class="src-quick-share" id="shareMineBtn" onclick="shareMine()">${icon('send')} Share mine<span>${custom?escH(host(custom)):'anyone can use your setup'}</span></button>
+      </div>
     </div>
 
     <button class="src-choice src-choice-solo${noSourceMode()?' on':''}" onclick="setNoSource()">
@@ -21844,13 +21864,6 @@ function renderSource(){
       </span>
     </button>
 
-    <details class="src-fold" data-fold="own" style="margin-top:16px"${O('own')}>
-      <summary>${icon('edit')} Use a site of your own</summary>
-      <p class="ai-desc" style="margin:9px 0 11px;font-size:13px">Open your site, start <b>any</b> episode of <b>any</b> show, and paste that page's address. That one link is the whole setup — WatchList works out the pattern and uses it for every show.</p>
-      <textarea class="ai-prompt-in urlin" rows="2" id="srcQuickIn" placeholder="paste that episode's address" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url" oninput="quickSetup()" onkeydown="if(event.key==='Enter')event.preventDefault();"></textarea>
-      <div id="srcQuickOut" class="src-quick-out" style="display:none"></div>
-      <button class="src-quick-share" id="shareMineBtn" onclick="shareMine()">${icon('send')} Share mine<span>${custom?escH(host(custom)):'anyone can use your setup'}</span></button>
-    </details>
 
     <details class="src-fold" data-fold="settings"${O('settings')} style="margin-top:16px">
       <summary>${icon('settings')} Manage the list of sites</summary>
@@ -21937,9 +21950,13 @@ function showNoSourcePrompt(){toast('Set a source first');try{openSheet('sourceS
 // a silent expansion off-screen reads as the button doing nothing.
 function openOwnSource(){
   try{
-    const d=document.querySelector('.src-fold[data-fold="own"]');
-    if(d){d.open=true;try{d.scrollIntoView({block:'center',behavior:_scrollBehavior?_scrollBehavior():'smooth'});}catch(e){d.scrollIntoView();}}
-    setTimeout(()=>{try{const i=document.getElementById('srcQuickIn');if(i)i.focus({preventScroll:true});}catch(e){}},260);
+    const i=document.getElementById('srcQuickIn');
+    if(!i)return;
+    // Reveal it first: it is hidden until this is the choice being made, and
+    // focusing something that is display:none does nothing at all.
+    const row=i.closest('.src-choice'); if(row)row.classList.add('show-own');
+    try{row?row.scrollIntoView({block:'center',behavior:_scrollBehavior?_scrollBehavior():'smooth'}):i.scrollIntoView();}catch(e){}
+    setTimeout(()=>{try{i.focus({preventScroll:true});}catch(e){}},240);
   }catch(e){}
 }
 function setSourceById(id){const s=customServices().find(x=>x.id===id);if(s&&s.url)setSource(s.url);}

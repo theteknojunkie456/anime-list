@@ -94,9 +94,31 @@ t('selecting a built-in does NOT claim in-app playback',
   await ev(`(()=>{setSource(WATCH_PRESETS[0].url);renderSource();
     return [...document.querySelectorAll('#sourceBody .src-choice.on .src-name')].map(x=>x.textContent);})()`),
   ['Open a site']);
-t('the choice opens the paste box rather than doing nothing',
-  await ev(`(()=>{renderSource();openOwnSource();
-    return !!document.querySelector('.src-fold[data-fold="own"]').open;})()`), true);
+// The paste box used to live in a separate fold headed "Use a site of your own",
+// reachable both from that fold and from this choice: one job, two doors. It is
+// inside the choice now, so there is nothing to open — it is simply there, and
+// the choice puts the cursor in it.
+t('the setup sits inside the choice it belongs to, not in a second place',
+  await ev(`(()=>{renderSource();
+    const own=[...document.querySelectorAll('#sourceBody .src-choice')]
+      .find(c=>/Play inside WatchList/.test(c.textContent));
+    return {inside:!!(own&&own.querySelector('#srcQuickIn')),
+            folds:document.querySelectorAll('#sourceBody .src-fold[data-fold=\"own\"]').length};})()`),
+  {inside:true,folds:0});
+t('it stays out of the way until that choice is the one being made',
+  await ev(`(()=>{setSource('');renderSource();
+    const own=[...document.querySelectorAll('#sourceBody .src-choice')]
+      .find(c=>/Play inside WatchList/.test(c.textContent));
+    return getComputedStyle(own.querySelector('.src-own')).display;})()`), 'none');
+t('and is simply there once it is',
+  await ev(`(()=>{setSource('https://my-own-site.example/watch/{slug}/ep-{ep}');renderSource();
+    const own=[...document.querySelectorAll('#sourceBody .src-choice')]
+      .find(c=>/Play inside WatchList/.test(c.textContent));
+    return getComputedStyle(own.querySelector('.src-own')).display;})()`), 'block');
+t('and the choice puts the cursor in it',
+  await ev(`(async()=>{setSource('');renderSource();openOwnSource();
+    await new Promise(r=>setTimeout(r,400));
+    return document.activeElement&&document.activeElement.id;})()`), 'srcQuickIn');
 t('"Ask me each time" still wins the mark when it is on',
   await ev(`(()=>{setNoSource();renderSource();
     return [...document.querySelectorAll('#sourceBody .src-choice.on .src-name')].map(x=>x.textContent);})()`),

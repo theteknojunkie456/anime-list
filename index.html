@@ -591,6 +591,28 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 }
 [data-retro] .nbtn.add,[data-retro] .paint-save,
 [data-retro] .resume-card{border-radius:2px;clip-path:var(--cut);}
+/* THE STATS SCREEN, IN RETRO.
+   Everything else in the app takes the notch and the lit edge; the stats screen
+   was rebuilt afterwards and nothing here knew about its parts, so it stayed
+   fully rounded while the screen you came from was milled. "Make it for
+   everything" means the parts added later too, and a screen that opts out of the
+   look is more conspicuous than one that never had it.
+
+   The ring is left alone on purpose. A circle drawn as a circle is not a missed
+   corner — notching it would be the costume this theme's own notes warn about. */
+[data-retro] .sv-face{border-radius:2px;clip-path:var(--cut);--notch:14px;}
+[data-retro] .sv-mosaic i{border-radius:0;}
+[data-retro] .sv-col .bar{border-radius:2px 2px 0 0;}
+[data-retro] .sv-tag{border-radius:2px;clip-path:var(--cut);--notch:7px;}
+[data-retro] .sv-chip{border-radius:2px;}
+[data-retro] .sv-keyrow{border-radius:2px;}
+[data-retro] .sv-keyrow i{border-radius:0;}
+[data-retro] .sv-store,[data-retro] .sv-store-track,[data-retro] .sv-store-fill{border-radius:2px;}
+[data-retro] .sv-back{border-radius:2px;clip-path:var(--cut);--notch:8px;}
+/* The readouts are furniture, so they take the display face like every other
+   number in this theme. The labels under them stay readable. */
+[data-retro] .sv-big,[data-retro] .sv-ring-n,[data-retro] .sv-mini b,
+[data-retro] .sv-col .cn,[data-retro] .sv-keyrow u{font-family:var(--fd);}
 /* Not everything is treated the same way, and that contrast is still the point —
    but it is no longer round-versus-cut. A round pill is the one shape none of
    these machines could draw: panels are CUT, controls are SQUARE and bevelled,

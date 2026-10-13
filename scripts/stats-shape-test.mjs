@@ -131,5 +131,27 @@ t('an empty list renders without falling over',
   await ev(`(()=>{const keep=anime;anime=[];let err='';try{renderStats();}catch(e){err=e.message;}
     anime=keep;renderStats();return err;})()`), '');
 
+// ── and on the screen he actually uses ───────────────────────────────────────
+// Everything above was built against a phone and had no upper bound, so at 1440
+// the ring sat at the far left with its legend stretched most of the window away
+// from it, and five rating columns became slabs 280px across.
+await cmd('Emulation.setDeviceMetricsOverride',{width:1440,height:900,deviceScaleFactor:1,mobile:false});
+await ev(`renderStats()`);
+await wait(500);
+const wide=await ev(`(()=>{
+  const r=s=>document.querySelector(s).getBoundingClientRect();
+  const sec=r('.sv-sec'), col=r('.sv-hist .sv-col'), ring=r('.sv-ring-wrap');
+  const key=document.querySelector('.sv-keyrow');
+  return {sec:Math.round(sec.width), col:Math.round(col.width), ring:Math.round(ring.width),
+          centred:Math.abs((sec.left)-(1440-sec.right))<4,
+          alignedToHeading:Math.abs(r('.sv-hist').left-r('.sv-h').left)<2,
+          keyRun:Math.round(key.getBoundingClientRect().width)};})()`);
+t('the column stops before it runs the width of the window', wide.sec<=860, true);
+t('…and is centred in it', wide.centred, true);
+t('a rating bar stays a bar, not a slab', wide.col<=92, true);
+t('the chart lines up with the words above it', wide.alignedToHeading, true);
+t('the ring keeps its legend within reading distance', wide.ring<=520, true);
+await cmd('Emulation.clearDeviceMetricsOverride');
+
 console.log('\n'+pass+' passed, '+fail+' failed');
 ws.close();ch.kill();srv.kill();process.exit(fail?1:0);

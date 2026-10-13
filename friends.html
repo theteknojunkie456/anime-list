@@ -4198,6 +4198,29 @@ body.recsel .pcard{position:relative;}
    second and a half, over a screen you are on your way out of. pointer-events
    stays off throughout: it is a farewell, not a dialog, and it must never eat
    the tap that follows it. */
+/* STATS ON A WIDE SCREEN.
+   Everything here was built against a phone and had no upper bound, so at 1440
+   the ring sat at the far left with its own legend stretched thirteen hundred
+   pixels away from it, and five rating columns became slabs two hundred and
+   eighty pixels across. A distribution drawn that wide stops reading as a
+   distribution. The app already bounds its wide layouts at 900px and centres
+   them; this follows that. The header bar keeps its full width so the blur
+   still spans the window, and only its contents are brought in to meet the
+   column. */
+@media (min-width:900px){
+  .sv-top{padding-left:max(18px,calc((100% - 860px) / 2));
+          padding-right:max(18px,calc((100% - 860px) / 2));}
+  .sv-face,.sv-sec,.sv-fold{max-width:860px;margin-left:auto;margin-right:auto;}
+  /* A bar is a bar, not a billboard. Capped, and starting at the same left edge
+     as the heading above it — centred, the chart floated away from the words
+     that introduce it and the pair stopped looking related. */
+  .sv-hist{justify-content:flex-start;}
+  .sv-col{max-width:92px;}
+  /* The ring, and the numbers explaining it, within reading distance of each
+     other. Given the full column the count ended up four hundred pixels from
+     the label it belonged to. */
+  .sv-ring-wrap{max-width:520px;}
+}
 .lfx{position:fixed;inset:0;z-index:94;
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;
   pointer-events:none;

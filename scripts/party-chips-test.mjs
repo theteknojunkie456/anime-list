@@ -4,7 +4,7 @@ import {spawn} from 'node:child_process';
 const PORT=8935,DBG=9475;
 const srv=spawn('python3',['-m','http.server',String(PORT)],{cwd:process.cwd(),stdio:'ignore'});
 const ch=spawn('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
- ['--headless=new','--remote-debugging-port='+DBG,`--user-data-dir=${(process.env.TMPDIR||'/tmp')}/wl-hand`,
+ ['--headless=new','--remote-debugging-port='+DBG,`--user-data-dir=${(process.env.TMPDIR||'/tmp')}/wl-chips`,
   '--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE localhost','--no-first-run','about:blank'],{stdio:'ignore'});
 const wait=ms=>new Promise(r=>setTimeout(r,ms));
 await wait(3200);

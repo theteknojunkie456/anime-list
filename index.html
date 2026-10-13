@@ -134,6 +134,14 @@ input,textarea{user-select:text;-webkit-user-select:text;}
    ghost with it. */
 .pcard,.pcard *{-webkit-touch-callout:none;-webkit-user-drag:none;user-select:none;-webkit-user-select:none;}
 button{font-family:inherit;border:none;background:none;color:inherit;cursor:pointer;}
+/* Buttons got this and the fields next to them did not. A form control does not
+   inherit the page's font on its own, so every input, select and textarea that
+   had not remembered to say font-family:inherit itself was rendering in the
+   browser's Arial — including the password box on the lock screen, which is the
+   first thing anybody sees of this app. Most rules did remember; the ones that
+   forgot were invisible precisely because they looked like a normal text field.
+   A class that genuinely wants a different face still wins on specificity. */
+input,select,textarea{font-family:inherit;}
 img{-webkit-user-drag:none;}
 ::-webkit-scrollbar{display:none;}
 ::selection{background:var(--ag);color:var(--t1);}
@@ -2275,6 +2283,11 @@ body.first-paint .pfill,body.content-in .pfill{animation:barGrow .62s cubic-bezi
 .oa-msg b{color:var(--t1);font-weight:800;}
 .oa-msg em{display:block;margin-top:3px;color:var(--t3);font-style:italic;}
 .oa-msg.you{background:var(--ag);border-color:color-mix(in srgb,var(--a) 26%,transparent);margin-left:22px;}
+/* Its opposite number carried the class and no rule, so only one side of the
+   exchange leaned. Two bubbles that both sit flush read as a list; two that lean
+   away from each other read as a conversation, which is the entire point of the
+   picture. */
+.oa-msg.them{margin-right:22px;}
 @media (max-height:680px){
   .onb-art{margin-bottom:14px;} .onb-card.wide{padding-top:56px;}
   .onb-task{padding:10px 12px;} .onb-task-s{display:none;}

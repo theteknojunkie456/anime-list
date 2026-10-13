@@ -43,15 +43,29 @@ t('the lock stays hidden behind it', await ev(`document.getElementById('lockScre
 t('but the app knows it is locked', await ev(`appLocked===true`), true);
 
 // ── the dissolve ────────────────────────────────────────────────────────────
-await wait(3500);   // ~4.4s in: past the 4.0s handoff, inside the fade
-t('the handoff has fired', await ev(`window.__q.join(',')`), 'boot');
-t('the lock is now showing', await ev(`document.getElementById('lockScreen').classList.contains('on')`), true);
-t('the film is still dissolving over it', await ev(`!!document.querySelector('.wlc')`), true);
+// Sleeping a fixed 3.5s and then looking assumed the machine was idle. Run this
+// behind forty other browser launches and the sleep lands outside the 0.75s
+// window the film is dissolving in, and a correct app reports a failure. Wait
+// for the beat instead, and read everything else in the SAME evaluation so
+// nothing can move between the check and the assertion.
+const until=async(expr,ms=9000)=>{const t0=Date.now();
+  for(;;){const v=await ev(expr);if(v)return v;
+    if(Date.now()-t0>ms)return null;await wait(60);}};
+const atHandoff=await until(`(()=>{
+  if(window.__q.join(',')!=='boot')return null;
+  return {q:window.__q.join(','),
+          lock:document.getElementById('lockScreen').classList.contains('on'),
+          film:!!document.querySelector('.wlc')};})()`);
+t('the handoff has fired', atHandoff&&atHandoff.q, 'boot');
+t('the lock is showing by the time it does', atHandoff&&atHandoff.lock, true);
+t('and the film is still over it, handing across', atHandoff&&atHandoff.film, true);
 
 // ── overlay gone ────────────────────────────────────────────────────────────
-await wait(1200);   // ~5.6s in
-t('the film is gone', await ev(`!!document.querySelector('.wlc')`), false);
-t('only now does the system-sheet beat run', await ev(`window.__q.join(',')`), 'boot,done');
+const atEnd=await until(`(()=>{
+  if(document.querySelector('.wlc'))return null;
+  return {q:window.__q.join(',')};})()`);
+t('the film goes', !!atEnd, true);
+t('only then does the system-sheet beat run', atEnd&&atEnd.q, 'boot,done');
 t('once it is over, later callers are not delayed',
   await ev(`(()=>{let n=0;afterBoot(()=>n++);afterBootDone(()=>n++);return n;})()`), 2);
 

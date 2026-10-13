@@ -8,6 +8,15 @@
 // run: node scripts/party-live.test.mjs      (needs network — it talks to the live worker)
 const BASE='wss://watchlist-sync.muhammad-dac.workers.dev';
 const wait=ms=>new Promise(r=>setTimeout(r,ms));
+// Every "send it, sleep, look" in here assumed an idle machine. Run the file
+// behind forty browser launches and the sleep lands before the room has caught
+// up, and a working app reports a failure — which is worse than a real one,
+// because a suite that cries wolf stops being read. This waits for the thing to
+// become true, up to a deadline, and is only for assertions of that shape.
+// Anything checking that something did NOT happen keeps its flat sleep.
+const until=async(pred,ms=4000)=>{const t0=Date.now();
+  for(;;){try{if(pred())return true;}catch(e){}
+    if(Date.now()-t0>ms)return false;await wait(50);}};
 let pass=0,fail=0;
 const t=(n,g,e)=>{const ok=JSON.stringify(g)===JSON.stringify(e);ok?pass++:fail++;
   console.log((ok?'ok  ':'FAIL')+'  '+n+(ok?'':'  -> '+JSON.stringify(g)+' (want '+JSON.stringify(e)+')'));};
@@ -150,9 +159,11 @@ function mkClient(ROOM){
   tt('and cannot force the room onto the next item', H.room().title==='Frieren', 'title='+H.room().title);
   
   // ── the host can do all of it ─────────────────────────────────────────────
-  H.send({t:'host-set',to:'uidG'}); await wait(700);
+  H.send({t:'host-set',to:'uidG'});
+  await until(()=>H.room().host==='uidG');
   tt('the host can hand the room over', H.room().host==='uidG', 'host='+H.room().host);
-  G.send({t:'pause'}); await wait(600);
+  G.send({t:'pause'});
+  await until(()=>G.room().paused===true);
   tt('and the new host has the controls', G.room().paused===true, 'paused='+G.room().paused);
   G.send({t:'host-set',to:'uidH'}); await wait(600);
   
@@ -173,10 +184,12 @@ function mkClient(ROOM){
   tt('the room is still answering after a flood', !!H.room().title, 'title='+H.room().title);
   
   // ── dropping and coming back ──────────────────────────────────────────────
-  G.ws.close(); await wait(1200);
+  G.ws.close();
+  await until(()=>!(H.room().members||[]).some(m=>m.uid==='uidG'));
   tt('a leaver is removed from the roster', !(H.room().members||[]).some(m=>m.uid==='uidG'),
      JSON.stringify((H.room().members||[]).map(m=>m.uid)));
-  const G2=client('Guest','uidG'); await G2.ready(); await wait(900);
+  const G2=client('Guest','uidG'); await G2.ready();
+  await until(()=>G2.room().title==='Frieren');
   tt('and can rejoin to the same room, still playing', G2.room().title==='Frieren', 'title='+G2.room().title);
   tt('without duplicating themselves', (G2.room().members||[]).filter(m=>m.uid==='uidG').length===1,
      JSON.stringify((G2.room().members||[]).map(m=>m.uid)));

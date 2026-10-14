@@ -7,12 +7,17 @@ const PORT=8792, DIR=process.cwd();   // run from the repo root: node scripts/pu
 const srv=spawn('python3',['-m','http.server',String(PORT)],{cwd:DIR,stdio:'ignore'});
 const CHROME='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const prof=(process.env.TMPDIR||'/tmp')+'/wl-push-budget-profile';
-const ch=spawn(CHROME,['--headless=new','--remote-debugging-port=9334',`--user-data-dir=${prof}`,
+// 9334 was already taken on this machine — by an ssh tunnel belonging to another
+// project. The CDP handshake connected to that instead of to this test's own
+// browser, so every command drove something that could not see the local server;
+// the page sat on a Chrome error screen and the run reported "2 passed, 10
+// failed" with not one of the failures about the app. Moved clear of it.
+const ch=spawn(CHROME,['--headless=new','--remote-debugging-port=9581',`--user-data-dir=${prof}`,
   '--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE localhost','--no-first-run',
   '--disable-background-timer-throttling','about:blank'],{stdio:'ignore'});
 const wait=ms=>new Promise(r=>setTimeout(r,ms));
 await wait(2500);
-const list=await (await fetch('http://127.0.0.1:9334/json/list')).json();
+const list=await (await fetch('http://127.0.0.1:9581/json/list')).json();
 const ws=new WebSocket(list.find(t=>t.type==='page').webSocketDebuggerUrl);
 await new Promise(r=>ws.onopen=r);
 let id=0; const waiters={};

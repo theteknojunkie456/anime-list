@@ -613,6 +613,39 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 [data-retro] .sv-keyrow i{border-radius:0;}
 [data-retro] .sv-store,[data-retro] .sv-store-track,[data-retro] .sv-store-fill{border-radius:2px;}
 [data-retro] .sv-back{border-radius:2px;clip-path:var(--cut);--notch:8px;}
+
+/* EVERYTHING ELSE THE THEME WAS STILL MISSING.
+   The bars and the ring were reported; they were two instances of one gap, so
+   this is the rest of it. Found by rendering seven screens in retro and listing
+   every visible box still carrying a soft radius, rather than by reading the
+   sheet and hoping — static reading had put the count at 179, most of them
+   already covered by an ancestor or never drawn at all. The real number was
+   fourteen.
+
+   Grouped by what each thing IS, because that is what decides the treatment:
+   panels take the notch, buttons take a smaller one, housings and segments just
+   go square. */
+
+/* Panels. */
+[data-retro] .hub-card{border-radius:2px;clip-path:var(--cut);--notch:14px;}
+[data-retro] .src-choice{border-radius:2px;clip-path:var(--cut);--notch:12px;}
+[data-retro] .src-fold{border-radius:2px;}
+[data-retro] .nudge{border-radius:2px;clip-path:var(--cut);--notch:12px;}
+
+/* Buttons. */
+[data-retro] .nudge-go,[data-retro] .sheet-cancel,
+[data-retro] .sched-arrow,[data-retro] .src-tab,
+[data-retro] .hub-strip{border-radius:2px;clip-path:var(--cut);--notch:7px;}
+
+/* Housings and segmented controls: square, no notch. A notch on a 28px icon
+   tile is not a bevel, it is a chipped corner. */
+[data-retro] .hub-ico,[data-retro] .set-ico,
+[data-retro] .kind-seg,[data-retro] .kseg{border-radius:2px;}
+
+/* The cover housing already got its carved lip and four rivets, under a comment
+   saying "all hard-edged" — on a box that was still rounded 18px. The comment
+   was right about the intent and the corners never followed. */
+[data-retro] .dt-cover-wrap{border-radius:0;}
 /* The readouts are furniture, so they take the display face like every other
    number in this theme. The labels under them stay readable. */
 [data-retro] .sv-big,[data-retro] .sv-ring-n,[data-retro] .sv-mini b,
@@ -23703,7 +23736,20 @@ async function fetchCovers(){
       if(rejected){
         if(batchSize>1){batchSize=Math.max(1,Math.floor(batchSize/2));await pause(400);continue;}
         const bad=batch[0];
-        if(bad){bad.scoreTried=1;bad.detTried=true;bad.bannerTried=true;bad.adultChk=1;if(!bad.img)bad.imgTried=true;if(kindOf(bad)!=='read')bad.airChk=Date.now();}
+        // AND `idTried`. Everything else here was stamped and that one was not,
+        // so an item with no aniId stayed needy no matter how many times it was
+        // retired: coverNeedy() asks `!a.aniId && !a.idTried`, the loop picked
+        // the same title again, stamped the same five fields, called save(), and
+        // came straight back round. Forever — a save every two seconds for as
+        // long as the tab is open, and because save() re-arms the push debounce
+        // each time, the 10s debounce could never fire and the 45s ceiling
+        // pushed instead. An idle tab wrote to the cloud ~1,900 times a day on a
+        // free quota of 1,000.
+        //
+        // The success path two hundred lines down already stamps it, with the
+        // reason written out: "a title AniList doesn't carry shouldn't be asked
+        // about forever". This is that same case, reached by the other door.
+        if(bad){bad.scoreTried=1;bad.detTried=true;bad.bannerTried=true;bad.adultChk=1;bad.idTried=1;if(!bad.img)bad.imgTried=true;if(kindOf(bad)!=='read')bad.airChk=Date.now();}
         batchSize=25;save();await pause(400);continue;
       }
       if(failed||!data){ // network hiccup: back off, retry a few times, then leave the rest for next launch (don't mark tried)

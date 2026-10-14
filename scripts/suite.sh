@@ -21,14 +21,44 @@ cd "$(dirname "$0")/.."
 # launch against that profile refuses to start — which surfaces as ECONNREFUSED
 # on the debug port and a crash banner, test after test, with nothing to say the
 # cause was a lock file. The profiles are disposable, so they go with the
-# processes; that also means no test can inherit state from its own last run,
-# which is the other way this suite used to lie.
-sweep(){ pkill -f 'remote-debugging-port=9' 2>/dev/null
-         pkill -f '-m http.server' 2>/dev/null
-         sleep 1
-         rm -rf "${TMPDIR:-/tmp}"/wl-* 2>/dev/null
-         return 0; }
+# processes; that also means no test can inherit state from its own last run.
+#
+# NARROWLY. The first version of this ran `pkill -f '-m http.server'`, which on
+# this machine would also have killed two servers belonging to a different
+# project running in another session. A cleanup that reaches outside its own
+# suite is not a cleanup. Chrome is matched on OUR profile directory, and the
+# servers only by the ports these tests actually declare.
+# Both kinds of port these tests claim: the local web server, and the CDP debug
+# port. The debug port matters just as much — one of them was already taken by an
+# ssh tunnel from another project, so the handshake connected to THAT, every
+# command drove a browser that could not see the local server, and the run
+# reported "2 passed, 10 failed" with not one failure about the app.
+ports(){ grep -ho 'PORT *= *[0-9]\+\|DBG *= *[0-9]\+\|remote-debugging-port=[0-9]\+' \
+           scripts/*.mjs cloud/*.mjs 2>/dev/null \
+         | grep -o '[0-9]\+' | sort -u; }
+sweep(){
+  pkill -f 'user-data-dir=[^ ]*/wl-' 2>/dev/null
+  for p in $(ports); do
+    for pid in $(lsof -nP -iTCP:$p -sTCP:LISTEN -t 2>/dev/null); do kill -9 "$pid" 2>/dev/null; done
+  done
+  sleep 1
+  rm -rf "${TMPDIR:-/tmp}"/wl-* 2>/dev/null
+  return 0; }
+
+# A test whose server cannot bind navigates to a Chrome error page, finds none of
+# the app defined, and reports every "expect 0" check as a pass — 2 passed, 10
+# failed, and not one of them about the app. Refuse to start in that state.
+busy=""
+for p in $(ports); do
+  lsof -nP -iTCP:$p -sTCP:LISTEN -t >/dev/null 2>&1 && busy="$busy $p"
+done
+
 sweep
+if [ -n "$busy" ]; then
+  echo "suite: ports busy after sweep:$busy" >&2
+  echo "suite: something outside this suite is holding them; not running." >&2
+  exit 2
+fi
 trap sweep EXIT INT TERM
 
 PASS=0; FAIL=0; FAILED=""

@@ -54,7 +54,20 @@ await wait(4500);
 
 let pass=0,fail=0;
 await ev(`window.__hooked=localStorage.setItem`);
-const zero=()=>ev(`(()=>{window.__pushes=[];window.__bytes=[];return 1;})()`);
+// Drain, THEN reset. Resetting the counter alone left any push the previous
+// step had already armed still pending, so under load it landed inside the next
+// step's window and that step counted one write too many — "re-saving identical
+// content adds no write -> 2". Nothing to do with the budget; the scenarios were
+// bleeding into each other. Flush, wait for quiet, then zero.
+const zero=async()=>{
+  await ev(`(async()=>{flushPush();await new Promise(r=>setTimeout(r,120));return 1;})()`);
+  for(let i=0;i<40;i++){
+    const before=await ev(`window.__pushes.length`);
+    await ev(`new Promise(r=>setTimeout(r,120))`);
+    if(await ev(`window.__pushes.length`)===before)break;
+  }
+  return ev(`(()=>{window.__pushes=[];window.__bytes=[];return 1;})()`);
+};
 const flush=()=>ev(`(async()=>{flushPush();await new Promise(r=>setTimeout(r,250));return 1;})()`);
 const n=()=>ev(`window.__pushes.length`);
 const check=(name,got,want)=>{const o=got===want;o?pass++:fail++;console.log((o?'ok  ':'FAIL')+'  '+name+'  -> '+got+(o?'':' (want '+want+')'));};

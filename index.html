@@ -10622,6 +10622,20 @@ function resumeItems(pool,isRead){
     .sort((a,b)=>{const ba=behindMap[a.id]||0,bb=behindMap[b.id]||0;return ba!==bb?bb-ba:(b.upd||0)-(a.upd||0);});
   return collapseSeries(list).map(c=>c.a);
 }
+// A RAIL IS NOT A CATALOGUE.
+//
+// Both of these build one card per eligible title, uncapped, into a horizontal
+// strip that shows about three at a time. On a 3,000-title library that is 1,490
+// cards and roughly 15,000 elements of markup nobody will ever scroll to —
+// measured at 939 KB of home-page HTML and 448 ms per renderHome, against 145 KB
+// and 43 ms for the same page at 100 titles. The card count was never the thing
+// that grew; these two rails were.
+//
+// Resume is sorted most-behind-first and Airing by air time, so the cap keeps
+// exactly the end anyone reaches for, and every filtered view still shows the
+// lot. Generous enough that nobody meets it by accident: past about twenty
+// swipes a strip has stopped being a way to find anything.
+const RAIL_CAP=24;
 function resumeRailHTML(items,isRead){
   // Reading was excluded because it "has no episode deep-link". That stopped
   // being true when chapter links landed — readManga(id, chapter) opens a
@@ -12432,6 +12446,8 @@ function airingThisWeek(){
 }
 function airingRailHTML(items){
   if(!items||!items.length)return '';
+  // Chronological, so a cap trims the far end of the week rather than the middle.
+  items=items.slice(0,RAIL_CAP*2);
   const card=a=>{
     const inf=airingInfo(a),art=titleBg(a)||a.img;
     const ch=((a.title||'?').trim()[0]||'?').toUpperCase().replace(/['"<&]/g,'?');
@@ -12644,7 +12660,7 @@ function renderHome(){
   heroAmb=spotlight[0]?titleAccent(spotlight[0]):'';setAmbient(heroAmb);
   // Continue-watching rail: the ONE watching surface on home — every watching
   // title, minus anything already up in the billboard so nothing appears twice.
-  const railItems=resumeItems(pool,isRead).filter(a=>!spotSet.has(a.id));
+  const railItems=resumeItems(pool,isRead).filter(a=>!spotSet.has(a.id)).slice(0,RAIL_CAP);
   // one banner at most: backup warning (critical) wins; otherwise the behind nudge
   // nudgeHTML() decides for itself which of its three banners applies, and its
   // LAST branch is the one that calls shouldNudge(). Gating the call on

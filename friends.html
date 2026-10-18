@@ -8408,8 +8408,17 @@ async function loadDeviceList(btn){
     // A device that has never published can still be chosen — it is this one.
     const rows=list.some(d=>d.id===me)?list:[{id:me,name:deviceLabel(),at:0,n:realList().length},...list];
     _devCache=rows;
+    // A picker for choosing BETWEEN devices, showing one device, with nothing
+    // said about the absence. The whole feature looks broken at exactly the
+    // moment somebody opens it to fix a drifting device — and the reason is
+    // mundane and fixable: the other device has not backed up since this was
+    // added, so the cloud has never heard of it. Say that, and say what to do.
+    const others=rows.filter(d=>d.id!==me).length;
+    const note=others
+      ? 'Only the five most recent devices are kept. Choosing one replaces every other device\u2019s list with it, once \u2014 after that they merge normally again.'
+      : 'No other device has backed up under this code yet, so there is nothing to choose between. Open WatchList once on the other device and it will appear here within a minute \u2014 it has to publish a copy before this one can offer it to you.';
     box.innerHTML='<div class="dev-list">'+rows.map(d=>_devRow(d,me)).join('')+'</div>'
-      +'<p class="ai-desc" style="font-size:12px;margin-top:8px">Only the five most recent devices are kept. Choosing one replaces every other device\u2019s list with it, once \u2014 after that they merge normally again.</p>';
+      +'<p class="ai-desc" style="font-size:12px;margin-top:8px">'+note+'</p>';
   }catch(e){box.innerHTML='<p class="ai-desc">Could not reach the cloud just now.</p>';}
   finally{if(btn){btn.disabled=false;btn.textContent='Show my devices';}}
 }
@@ -8466,6 +8475,18 @@ async function adoptFromDevice(id){
 async function syncDiagnose(){
   const out={
     build:(typeof RELEASE!=='undefined'&&RELEASE&&RELEASE.v)||'?',
+    // RELEASE.v is the release NOTES version — it moves when there is something
+    // to tell somebody, which is rarely, and it gates the What's-new sheet. It
+    // sat at 2026-10-03.56 through nineteen shipped changes, so this row — whose
+    // entire job is answering "is this device current?" — reported the same
+    // string on a device fifteen days behind as on one updated a minute ago.
+    //
+    // The service worker's cache name is stamped from the content of index.html
+    // on every commit, so it changes when the app changes and never otherwise.
+    // Reading it back from caches.keys() reports what this device is ACTUALLY
+    // running, which is the only honest answer to the question, and comparing it
+    // between two devices says instantly whether one is stale.
+    running:await runningBuild(),
     device:(typeof wlDevice==='function'?String(wlDevice()).slice(0,8):'?'),
     localCount:0,localNewest:0,localOldest:0,
     cloudCount:null,cloudUpdatedAt:0,cloudNewest:0,
@@ -8510,6 +8531,18 @@ async function syncDiagnose(){
   }catch(e){out.cloudCount='unreachable';}
   return out;
 }
+// What this device is actually serving, read from the installed worker rather
+// than from a constant in the file. '(not installed)' is a real answer too: no
+// worker means every load comes off the network.
+async function runningBuild(){
+  try{
+    if(!('caches' in window))return '(no cache api)';
+    const keys=await caches.keys();
+    const mine=keys.filter(k=>/^animelist-/.test(k)).sort();
+    if(!mine.length)return '(not installed)';
+    return mine[mine.length-1].replace(/^animelist-/,'');
+  }catch(e){return '(unreadable)';}
+}
 function fmtWhen(ms){
   if(!ms)return 'never';
   const d=new Date(+ms);
@@ -8528,9 +8561,20 @@ async function showSyncDiagnosis(btn){
   else if(d.localNewest>d.cloudNewest)verdict='THIS device holds the newer edits \u2014 the cloud is behind it.';
   else if(d.cloudNewest>d.localNewest)verdict='THE CLOUD holds newer edits than this device.';
   else verdict='Both sides carry the same newest edit.';
+  // A panel whose whole job is to say whether something is wrong painted every
+  // answer in the accent — so "both sides agree", which means there is nothing
+  // to do, arrived in the same alarm colour as "the cloud could not be reached".
+  // It read as an error. The colour now follows the verdict.
+  const tone = d.cloudCount==='unreachable'||d.cloudCount===0 ? 'var(--drp)'
+             : d.cloudUnknown                                 ? 'var(--wat)'
+             : d.localNewest!==d.cloudNewest                  ? 'var(--wat)'
+             : 'var(--fin)';
+  const calm = tone==='var(--fin)';
   const row=(k,v)=>'<div style="display:flex;justify-content:space-between;gap:12px;padding:3px 0"><span class="ai-desc" style="margin:0">'+k+'</span><b style="font-family:var(--fd);font-size:12px">'+v+'</b></div>';
-  if(box)box.innerHTML='<p class="ai-desc" style="margin-bottom:6px"><b style="color:var(--a2)">'+verdict+'</b></p>'
-    +row('Build on this device',d.build)
+  if(box)box.innerHTML='<p class="ai-desc" style="margin-bottom:6px"><b style="color:'+tone+'">'+escH(verdict)+'</b>'
+    +(calm?'<br><span style="font-size:12px">Nothing to fix here.</span>':'')+'</p>'
+    +row('Build running here',escH(String(d.running||'?')))
+    +row('Release notes version',d.build)
     +row('Device id',d.device)
     +row('Titles here',d.localCount)
     +row('Titles in the cloud',d.cloudCount)

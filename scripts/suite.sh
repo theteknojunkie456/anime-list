@@ -48,9 +48,34 @@ sweep(){
 # A test whose server cannot bind navigates to a Chrome error page, finds none of
 # the app defined, and reports every "expect 0" check as a pass — 2 passed, 10
 # failed, and not one of them about the app. Refuse to start in that state.
+# Ports on this machine that belong to other projects. OG Game keeps an ssh
+# tunnel up to the Mac mini — `ssh -N -L 9333 -L 9334 -R 8766` — restarted by a
+# wrapper, so these come back even after something kills them. 8766 is OG's own
+# game server coming back the other way, which is exactly the server an earlier
+# version of the sweep here would have killed. A WatchList test must never claim
+# one of these: binding fails or, far worse, a CDP handshake succeeds against
+# the wrong browser and the suite reports confident nonsense.
+RESERVED="9333 9334 8766 8768"
+for p in $(ports); do
+  case " $RESERVED " in *" $p "*)
+    echo "suite: test port $p belongs to another project (OG Game's mini tunnel). Pick another." >&2
+    exit 2 ;;
+  esac
+done
+
+# Sweep kills, but a killed Chrome does not release its sockets instantly — it
+# has a tree of child processes to take down first. Checking one second later
+# caught our OWN dying processes and refused to run, naming ports that were free
+# a moment afterwards. A preflight that cries wolf is the same failure as a
+# suite that lies, so it waits for release before calling a port foreign.
 busy=""
 for p in $(ports); do
-  lsof -nP -iTCP:$p -sTCP:LISTEN -t >/dev/null 2>&1 && busy="$busy $p"
+  held=1
+  for _ in 1 2 3 4 5 6 7 8 9 10 11 12; do
+    lsof -nP -iTCP:$p -sTCP:LISTEN -t >/dev/null 2>&1 || { held=0; break; }
+    sleep 1
+  done
+  [ "$held" = 1 ] && busy="$busy $p"
 done
 
 sweep

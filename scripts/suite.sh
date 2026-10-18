@@ -63,9 +63,19 @@ for p in $(ports); do
   esac
 done
 
+# Sweep kills, but a killed Chrome does not release its sockets instantly — it
+# has a tree of child processes to take down first. Checking one second later
+# caught our OWN dying processes and refused to run, naming ports that were free
+# a moment afterwards. A preflight that cries wolf is the same failure as a
+# suite that lies, so it waits for release before calling a port foreign.
 busy=""
 for p in $(ports); do
-  lsof -nP -iTCP:$p -sTCP:LISTEN -t >/dev/null 2>&1 && busy="$busy $p"
+  held=1
+  for _ in 1 2 3 4 5 6 7 8 9 10 11 12; do
+    lsof -nP -iTCP:$p -sTCP:LISTEN -t >/dev/null 2>&1 || { held=0; break; }
+    sleep 1
+  done
+  [ "$held" = 1 ] && busy="$busy $p"
 done
 
 sweep

@@ -60,11 +60,14 @@ await ev(`window.__hooked=localStorage.setItem`);
 // content adds no write -> 2". Nothing to do with the budget; the scenarios were
 // bleeding into each other. Flush, wait for quiet, then zero.
 const zero=async()=>{
-  await ev(`(async()=>{flushPush();await new Promise(r=>setTimeout(r,120));return 1;})()`);
-  for(let i=0;i<40;i++){
-    const before=await ev(`window.__pushes.length`);
-    await ev(`new Promise(r=>setTimeout(r,120))`);
-    if(await ev(`window.__pushes.length`)===before)break;
+  // Wait on the thing that actually decides whether a write is coming — the
+  // pending flag — rather than on the counter going quiet. A push armed by the
+  // previous step sits silent for the whole 10s debounce, so a "no writes for
+  // 120ms" check reads as settled and then the write lands inside the next
+  // step's window and is counted against it.
+  for(let i=0;i<30;i++){
+    await ev(`(async()=>{flushPush();await new Promise(r=>setTimeout(r,80));return 1;})()`);
+    if(!await ev(`_pushPending`))break;
   }
   return ev(`(()=>{window.__pushes=[];window.__bytes=[];return 1;})()`);
 };
@@ -72,7 +75,15 @@ const flush=()=>ev(`(async()=>{flushPush();await new Promise(r=>setTimeout(r,250
 const n=()=>ev(`window.__pushes.length`);
 const check=(name,got,want)=>{const o=got===want;o?pass++:fail++;console.log((o?'ok  ':'FAIL')+'  '+name+'  -> '+got+(o?'':' (want '+want+')'));};
 
-// Settle: get one confirmed push on record so the fingerprint is current.
+// Settle: get one confirmed push on record so the fingerprint is current — and
+// warm the recs cache first. The FIRST pullRecs legitimately writes, because it
+// is populating a cache that was empty; the property being measured below is
+// that pulls which change nothing cost nothing, not that the very first one is
+// free. Leaving that first write inside the measurement window made the result
+// depend on whether it happened to land before or after the settle, which is
+// why this test passed alone and failed under load on whichever assertion the
+// stray write drifted into.
+await ev(`(async()=>{try{await pullRecs();}catch(e){}return 1;})()`);
 await ev(`(async()=>{const a=anime.find(x=>x.id==='a1');a.ep=5;save();flushPush();await new Promise(r=>setTimeout(r,300));return 1;})()`);
 
 // 1. Pulls that change nothing must cost nothing. This is the loop that was

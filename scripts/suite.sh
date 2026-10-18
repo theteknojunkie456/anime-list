@@ -48,6 +48,21 @@ sweep(){
 # A test whose server cannot bind navigates to a Chrome error page, finds none of
 # the app defined, and reports every "expect 0" check as a pass — 2 passed, 10
 # failed, and not one of them about the app. Refuse to start in that state.
+# Ports on this machine that belong to other projects. OG Game keeps an ssh
+# tunnel up to the Mac mini — `ssh -N -L 9333 -L 9334 -R 8766` — restarted by a
+# wrapper, so these come back even after something kills them. 8766 is OG's own
+# game server coming back the other way, which is exactly the server an earlier
+# version of the sweep here would have killed. A WatchList test must never claim
+# one of these: binding fails or, far worse, a CDP handshake succeeds against
+# the wrong browser and the suite reports confident nonsense.
+RESERVED="9333 9334 8766 8768"
+for p in $(ports); do
+  case " $RESERVED " in *" $p "*)
+    echo "suite: test port $p belongs to another project (OG Game's mini tunnel). Pick another." >&2
+    exit 2 ;;
+  esac
+done
+
 busy=""
 for p in $(ports); do
   lsof -nP -iTCP:$p -sTCP:LISTEN -t >/dev/null 2>&1 && busy="$busy $p"

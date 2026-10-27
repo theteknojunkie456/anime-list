@@ -6850,7 +6850,12 @@ async function loadMembers(){
   clearTimeout(_memT);
   let r;try{r=await adminCall('/members');}catch{box.innerHTML='<p class="ai-desc">Couldn’t reach the network.</p>';return;}
   if(!r||!r.ok){box.innerHTML='<p class="ai-desc" style="color:var(--danger,#ff6b6b)">'+(r&&r.error==='unauthorized'?'Wrong admin token.':'Error loading members')+'</p>';if(r&&r.error==='unauthorized'){setAdminToken('');setTimeout(renderAdmin,900);}return;}
-  const cnt=document.getElementById('adminCount');if(cnt)cnt.textContent=`${r.approved}/${r.cap}`;
+  // The badge sits under a heading that says Members and the roster below it is
+  // headed Members too — but these are different numbers. `approved` counts
+  // DEVICES, and so does the cap that rejects the next join, while the roster is
+  // one row per person. So an admin read "Members 27/50" above "Members (21)" and
+  // had no way to tell which one the cap was about. It is about devices: say so.
+  const cnt=document.getElementById('adminCount');if(cnt)cnt.textContent=`${r.approved}/${r.cap} devices`;
   const cap=document.getElementById('capIn');if(cap&&!cap.value)cap.value=r.cap;
   const devs=r.devices||[];
   // ONE ROW PER PERSON, not per device. Rejoining deliberately leaves the old
@@ -11913,7 +11918,7 @@ function railFolded(){try{return localStorage.getItem(RAIL_FOLD)==='1';}catch(e)
 const SFX_KEY='wl_boot_sfx';
 function bootSfxOn(){try{return localStorage.getItem(SFX_KEY)!=='0';}catch(e){return true;}}
 function setBootSfx(on){try{localStorage.setItem(SFX_KEY,on?'1':'0');}catch(e){}}
-function bootSound(){
+async function bootSound(){
   if(!bootSfxOn())return;
   let ctx;
   try{
@@ -11921,8 +11926,21 @@ function bootSound(){
     if(!AC)return;
     ctx=new AC();
   }catch(e){return;}
-  if(ctx.state==='suspended'){ try{ctx.resume();}catch(e){} }
-  if(ctx.state==='suspended'){ try{ctx.close();}catch(e){} return; }
+  // resume() is asynchronous and the try/catch around it could never have caught
+  // anything: a rejected promise is not a thrown exception. So the old pair of
+  // lines did two wrong things at once. ctx.state is still 'suspended' on the
+  // line after resume() is called — always, whatever the outcome — so the
+  // context was closed immediately every time, which rejected the resume() that
+  // was still in flight ("AudioContext closed before a pending resume() could
+  // complete") with nothing attached to catch it. And because it returned right
+  // after, the boot sound never played at all when the context started
+  // suspended, which is the ordinary case: browsers start it suspended until a
+  // user gesture, so the one path this code exists to rescue was the one it
+  // guaranteed to fail. Wait for the answer before acting on it.
+  if(ctx.state==='suspended'){
+    try{ await ctx.resume(); }catch(e){}
+    if(ctx.state==='suspended'){ await closeCtx(ctx); return; }
+  }
   const t0=ctx.currentTime+0.02;
   const out=ctx.createGain();
   out.gain.value=0.2;
@@ -12000,7 +12018,17 @@ function bootSound(){
     o.connect(lp).connect(g).connect(tail); o.start(at); o.stop(at+2.1);
   });
 
-  try{setTimeout(()=>{try{ctx.close();}catch(e){}},6000);}catch(e){}
+  try{setTimeout(()=>{closeCtx(ctx);},6000);}catch(e){}
+}
+// close() is a promise too, and rejects if the context is already closed — which
+// is exactly what a second close attempt does. Swallow it in the place that can
+// actually see it rather than in a sync catch that never will.
+function closeCtx(ctx){
+  try{
+    if(!ctx||ctx.state==='closed')return Promise.resolve();
+    const p=ctx.close();
+    return (p&&p.catch)?p.catch(()=>{}):Promise.resolve();
+  }catch(e){return Promise.resolve();}
 }
 async function checkUpdateNow(btn){
   const was=btn?btn.querySelector('.set-p'):null;
@@ -12071,7 +12099,7 @@ function bootSequence(){
       const who=document.getElementById('wlcWho');
       if(who)who.textContent=n?('Welcome back, '+n):'';
     }catch(e){}
-    try{bootSound();}catch(e){}
+    try{const _bs=bootSound(); if(_bs&&_bs.catch)_bs.catch(()=>{});}catch(e){}
     _bootLive=true;
     const kill=()=>{try{el.remove();}catch(e){}_bootLive=false;_bootFlush(_bootQ);_bootFlush(_bootDoneQ);};
     el.addEventListener('pointerdown',kill,{once:true});

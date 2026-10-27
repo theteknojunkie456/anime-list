@@ -23,7 +23,7 @@ packages:
 settings:
   base:
     MARKETING_VERSION: "1.0"
-    CURRENT_PROJECT_VERSION: "3"
+    CURRENT_PROJECT_VERSION: "5"
     SWIFT_VERSION: "5.0"
     GENERATE_INFOPLIST_FILE: "NO"
     CODE_SIGN_STYLE: Automatic
@@ -70,6 +70,15 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     dependencies:
       - target: BroadcastExt
+      # WebRTC is declared on the extension, which is the target whose code uses
+      # it — but an app extension cannot carry its own copy of a dynamic
+      # framework. It resolves @rpath/WebRTC.framework against the HOST APP's
+      # Frameworks directory, and nothing was putting it there: the build
+      # succeeded, left WebRTC.framework in Build/Products, and shipped a bundle
+      # with no Frameworks directory at all. Starting a broadcast would have
+      # failed to load the dylib every time. Declaring it here too is what
+      # embeds it in the app, where the extension can actually find it.
+      - package: WebRTC
 
   BroadcastExt:
     type: app-extension

@@ -13,6 +13,8 @@ const src = [
   grab(/function rememberOfficialLinks\(a,d\)\{[\s\S]*?\n\}/),
   grab(/function officialWatch\(a,ep\)\{[\s\S]*?\n\}/),
 ].join('\n');
+const looksOpaque = new Function(
+  (/function looksOpaqueSeg\(x\)\{[\s\S]*?\n\}/.exec(h) || ['']) [0] + '; return looksOpaqueSeg;')();
 const ctx = { srcHost: u => { try { return new URL(u).hostname; } catch { return ''; } },
               effectiveSource: a => (a && a.srcUrl) || 'https://www.crunchyroll.com/search?q={title}' };
 const { rememberOfficialLinks, officialWatch } =
@@ -113,6 +115,42 @@ rememberOfficialLinks(b, {
 });
 check('a show link arrives over https', b.svc['hulu.com'], 'https://www.hulu.com/bleach');
 check('an episode link arrives over https', b.epUrl[3], 'https://www.crunchyroll.com/watch/X/3');
+
+// ── reading a real episode address, from three sites that differ ──────────
+// All three are addresses the user was actually on. The first is why Watch kept
+// opening a homepage: the opaque-id test only knew about digits, so miruro's
+// id was mistaken for the show name and the REAL show name was left in the
+// template as a literal — every other show then built an address with Bleach
+// still in it. The third is the easy shape and must keep working with no setup.
+const tmpl = [
+  grab(/const SEARCH_PARAMS=[\s\S]*?;/),
+  grab(/const SRC_TOKEN_RE=[^\n]*/),
+  grab(/function looksOpaqueSeg\(x\)\{[\s\S]*?\n\}/),
+  grab(/function templatizeSearchURL\(raw\)\{[\s\S]*?\n\}/),
+  grab(/function slugFromURL\(url,tpl\)\{[\s\S]*?\n\}/),
+].join('\n');
+const { templatizeSearchURL: T, slugFromURL: S } =
+  new Function(tmpl + '; return {templatizeSearchURL,slugFromURL};')();
+
+const MIRURO = 'https://www.miruro.tv/watch/tsBNvEVjxHOc9c180Uofl1l8b0FjbExW/bleach-sennen-kessen-hen-kashin-tan?ep=2';
+const REANIME = 'https://reanime.to/watch/hyouka-gv8xca?ep=2&lang=sub&server=HD-2';
+const KAI = 'https://animekai.be/watch/daemons-of-the-shadow-realm/ep-1';
+
+check('an opaque id is not mistaken for the show name',
+  T(MIRURO), 'https://www.miruro.tv/watch/{slug}?ep={ep}');
+check('and no single show\u2019s name is baked into the template',
+  /bleach/i.test(T(MIRURO)), false);
+check('the learned address keeps BOTH segments, id and name',
+  S(MIRURO, T(MIRURO)), 'tsBNvEVjxHOc9c180Uofl1l8b0FjbExW/bleach-sennen-kessen-hen-kashin-tan');
+check('a slug carrying a random suffix is learned whole',
+  S(REANIME, T(REANIME)), 'hyouka-gv8xca');
+check('an episode in the query is recognised as the episode',
+  T(REANIME), 'https://reanime.to/watch/{slug}?ep={ep}&lang=sub&server=HD-2');
+check('the straightforward shape still needs no setup at all',
+  T(KAI), 'https://animekai.be/watch/{slug}/ep-{ep}');
+check('a plain word is not called an id', looksOpaque('daemons-of-the-shadow-realm'), false);
+check('a long mixed-case token is', looksOpaque('tsBNvEVjxHOc9c180Uofl1l8b0FjbExW'), true);
+check('and so is a bare number', looksOpaque('118541'), true);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

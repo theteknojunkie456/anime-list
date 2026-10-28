@@ -17920,6 +17920,10 @@ function fillSourceTokens(template,a,ep){
   return String(template||'').replace(/\{(\w+)\}/g,(m,k)=>{
     const key=k.toLowerCase();
     if(key in raw)return String(raw[key]);
+    // A slug learned from a real page can span path segments, and encoding its
+    // separator turns /watch/id/name into /watch/id%2Fname — a 404 built out of
+    // an address that worked. Encode each segment, keep the separators.
+    if(key==='slug'||key==='slug_')return String(txt[key]).split('/').map(enc).join('/');
     if(key in txt)return enc(txt[key]);
     return m;   // unknown token → leave it untouched (don't silently blank it)
   });
@@ -18305,7 +18309,14 @@ function slugFromURL(url,tpl){
   let idx=-1;
   for(let i=0;i<tSegs.length;i++)if(/\{(slug|slug_)\}/i.test(decodeURIComponent(tSegs[i]))){idx=i;break;}
   let out='';
-  if(idx>=0&&path[idx])out=path[idx];
+  // {slug} may stand for SEVERAL segments — a site that addresses a show by an
+  // id AND a name needs both, and returning only the first stores half an
+  // address that cannot load.
+  if(idx>=0&&path[idx]){
+    const tail=tSegs.length-idx-1;
+    const end=Math.max(idx+1,path.length-tail);
+    out=path.slice(idx,end).join('/');
+  }
   else{
     // Shape doesn't line up — take the segment that isn't structural or an episode.
     const STRUCT=/^(watch|anime|series|video|tv|show|title|play|stream|v|w|en|sub|dub)$/i;
@@ -19491,6 +19502,19 @@ function removeCustomService(id){
 // pastes it — we find the query parameter and swap its value for {query}.
 // Already-templated URLs pass through untouched.
 const SEARCH_PARAMS=['q','query','keyword','keywords','search','searchword','searchWord','phrase','term','text','title','wd','kw','k','s'];
+// Is this path segment something a title could never produce? A run of digits,
+// or a long mixed-case token with no word breaks — an id, in other words. Said
+// plainly rather than inline, because getting it wrong in either direction is
+// expensive: miss one and the template hardcodes one show's name into every
+// address; call a real slug opaque and a site that needed no setup suddenly
+// does.
+function looksOpaqueSeg(x){
+  const t=String(x||'');
+  if(/^\d{3,}$/.test(t))return true;                       // 118541
+  if(t.length>=10&&/[a-z]/.test(t)&&/[A-Z]/.test(t)&&/\d/.test(t)&&!/[-_]/.test(t))return true;  // tsBNvEVjxHOc9c180Uofl1l8b0FjbExW
+  if(t.length>=16&&/\d/.test(t)&&!/[-_]/.test(t))return true;
+  return false;
+}
 function templatizeSearchURL(raw){
   if(SRC_TOKEN_RE.test(raw))return raw;             // already a template
   let u; try{u=new URL(raw);}catch{return raw;}
@@ -19515,9 +19539,29 @@ function templatizeSearchURL(raw){
       // a title, so a template built around it would send every show to this one.
       // Left alone here; quickSetup explains it rather than producing a link that
       // 404s on everything else.
-      const opaque=segs.some(x=>/^\d{3,}$/.test(x));
+      // An id is not always digits. miruro addresses a show as
+      //   /watch/tsBNvEVjxHOc9c180Uofl1l8b0FjbExW/bleach-sennen-kessen-hen-kashin-tan?ep=2
+      // and the numeric-only test did not see that first segment as an id, so it
+      // templatized THAT as {slug} and left the real show name sitting in the
+      // path as a literal. Every other show then built an address with Bleach's
+      // name still in it: a guaranteed 404, on everything, forever.
+      //
+      // When a show's path carries something underivable, no amount of cleverness
+      // reconstructs it from a title. The whole run of show segments becomes one
+      // {slug}, which the per-show learning already fills in from a page that
+      // actually loaded — so one visit teaches this show, and ?ep= gives every
+      // episode of it for free.
+      const firstShow=segs.findIndex(x=>!STRUCTURAL.test(x));
+      const show=firstShow>=0?segs.slice(firstShow):[];
+      const underivable=show.some(x=>looksOpaqueSeg(x));
+      if(underivable&&show.length){
+        const head=segs.slice(0,firstShow);
+        u.pathname='/'+head.concat('{slug}').join('/');
+        u.searchParams.set(epKey,'__WLEP__');
+        return decodeURIComponent(u.toString()).replace(/__WLEP__/g,'{ep}');
+      }
       const si=segs.findIndex(x=>!STRUCTURAL.test(x)&&!/^\d{3,}$/.test(x)&&/[a-z]/i.test(x));
-      if(!opaque&&si>=0){
+      if(si>=0){
         segs[si]='{slug}';
         u.pathname='/'+segs.join('/');
         u.searchParams.set(epKey,'__WLEP__');

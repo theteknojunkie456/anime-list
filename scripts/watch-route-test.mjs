@@ -14,8 +14,19 @@ const ch=spawn('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
  ['--headless=new','--remote-debugging-port='+DBG,`--user-data-dir=${(process.env.TMPDIR||'/tmp')}/wl-route`,
   '--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE localhost','--no-first-run','about:blank'],{stdio:'ignore'});
 const wait=ms=>new Promise(r=>setTimeout(r,ms));
-await wait(3200);
-const tabs=await (await fetch('http://127.0.0.1:'+DBG+'/json/list')).json();
+// Poll for the debugger instead of guessing how long Chrome needs. A fixed
+// sleep made this report ECONNREFUSED on a loaded machine — a failure about the
+// harness, dressed as a failure about the app, which is the worst kind to read
+// at the bottom of a test run.
+let tabs=null;
+for(let i=0;i<40;i++){
+  await wait(500);
+  try{ tabs=await (await fetch('http://127.0.0.1:'+DBG+'/json/list')).json(); if(tabs&&tabs.length)break; }catch(e){ tabs=null; }
+}
+if(!tabs||!tabs.length){
+  console.log('could not reach the test browser after 20s — port '+DBG+' busy, or a stale profile lock');
+  try{ch.kill();}catch(e){} try{srv.kill();}catch(e){} process.exit(1);
+}
 const ws=new WebSocket(tabs.find(t=>t.type==='page').webSocketDebuggerUrl);
 await new Promise(r=>ws.onopen=r);
 let id=0;const w={};

@@ -24028,7 +24028,58 @@ async function fetchCovers(){
       await pause(1000); // stay comfortably under AniList's per-minute limit
     }
     if(adultRemoved)toast(`Blocked ${adultRemoved} adult title${adultRemoved!==1?'s':''} — not allowed`);
-  }finally{coverRunning=false;try{await fixUnmatchedTitles();}catch(e){}try{checkResumedDone();}catch(e){}try{scanUpcomingRelated();}catch(e){}}
+  }finally{coverRunning=false;try{await fixUnmatchedTitles();}catch(e){}try{checkResumedDone();}catch(e){}try{scanUpcomingRelated();}catch(e){}try{await fetchWatchLinks();}catch(e){}}
+}
+// WHERE EVERY SHOW STREAMS, NOT JUST THE ONE BEING LOOKED AT.
+//
+// externalLinks is this show's own page on each service, published by the
+// service — the difference between Watch opening the show and Watch opening a
+// search for its name. It was only ever fetched when a detail sheet happened to
+// be open, so the library knew nothing about anything you had not tapped.
+//
+// It does not fit in the enrichment batch above: measured against AniList,
+// adding it there takes a batch of 25 from inside the complexity budget to 675
+// against a limit of 500, so every cycle would spend a rejected request and
+// halve the batch before getting anywhere. This asks for the links ALONE, which
+// is cheap enough to do 50 at a time, and uses Page(id_in:) rather than 50
+// aliases because one id AniList does not carry fails a whole aliased query
+// ("Not Found") while Page just leaves it out.
+//
+// streamingEpisodes — the per-episode URLs — stays out of both: it returns an
+// object per episode, so one long-running show drags a four-figure list into a
+// batch query. The detail sheet fetches those for the show being opened, which
+// is the one whose episodes you are about to watch.
+function linksNeedy(){
+  try{return anime.filter(a=>a&&a.aniId&&!a.svcTried&&kindOf(a)!=='read');}catch(e){return [];}
+}
+async function fetchWatchLinks(){
+  const need=linksNeedy(); if(!need.length)return;
+  const q='query($ids:[Int]){Page(perPage:50){media(id_in:$ids,type:ANIME){id externalLinks{site url type}}}}';
+  for(let i=0;i<need.length;i+=50){
+    const batch=need.slice(i,i+50);
+    let data=null;
+    try{
+      const r=await fetch('https://graphql.anilist.co',{method:'POST',
+        headers:{'Content-Type':'application/json','Accept':'application/json'},
+        body:JSON.stringify({query:q,variables:{ids:batch.map(a=>+a.aniId)}})});
+      if(!r.ok)return;                       // rate-limited or down: leave it for the next launch
+      data=await r.json();
+      if(data&&data.errors)return;
+    }catch(e){return;}
+    const ms=((((data||{}).data||{}).Page)||{}).media||[];
+    const byId=new Map(ms.map(m=>[+m.id,m]));
+    let changed=false;
+    batch.forEach(a=>{
+      const m=byId.get(+a.aniId);
+      // Stamped either way. Plenty of titles genuinely stream nowhere AniList
+      // knows about, and asking after those on every launch forever is how the
+      // cover fetcher ended up writing to disk every two seconds.
+      a.svcTried=1; changed=true;
+      if(m)try{ rememberOfficialLinks(a,m); }catch(e){}
+    });
+    if(changed)save();
+    await pause(1000);                        // stay under AniList's per-minute limit
+  }
 }
 // ─── AUTOFILL ───────────────────────────────────────────────────────────────
 // Searching used to take the first hit from the first API that answered. Jikan

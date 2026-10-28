@@ -51,5 +51,34 @@ check('the service the user chose wins over the others',
 check('a show we know nothing about asks for no link', officialWatch({ id: 'x', title: 'Unknown' }, 3), null);
 check('re-storing identical data reports no change', rememberOfficialLinks(a, d), false);
 
+// ── the background pass that fills the whole library ───────────────────────
+// Two things here have bitten this app before. A needy-list predicate that
+// never stops being true is how the cover fetcher ended up saving every two
+// seconds for days, so the stamp has to go on whether or not AniList had
+// anything to give. And the query has to survive an id AniList does not carry:
+// an aliased batch fails whole ("Not Found") where Page(id_in:) just omits it.
+const body = h.slice(h.indexOf('async function fetchWatchLinks'), h.indexOf('async function fetchWatchLinks') + 1800);
+const needy = /function linksNeedy\(\)\{[\s\S]*?\n\}/.exec(h)[0];
+const linksNeedy = new Function('anime', 'kindOf',
+  needy.replace('function linksNeedy()', 'return (function linksNeedy()') + ')();');
+const kindOf = a => (a && a.kind) === 'read' ? 'read' : 'watch';
+
+check('a show with links already stored is not asked about again',
+  linksNeedy([{ id: '1', aniId: 5, svcTried: 1 }], kindOf).length, 0);
+check('a show AniList had nothing for is still not asked again',
+  linksNeedy([{ id: '1', aniId: 5, svcTried: 1 }], kindOf).length, 0);
+check('a show never asked about is picked up',
+  linksNeedy([{ id: '1', aniId: 5 }], kindOf).length, 1);
+check('a title with no AniList id is skipped, not queried with a blank',
+  linksNeedy([{ id: '1' }], kindOf).length, 0);
+check('reading titles are left out — this is where to WATCH',
+  linksNeedy([{ id: '1', aniId: 5, kind: 'read' }], kindOf).length, 0);
+check('the pass stamps every title in the batch, hit or miss',
+  /a\.svcTried=1;\s*changed=true;/.test(body), true);
+check('it asks via Page(id_in:), which tolerates an id AniList lacks',
+  /Page\(perPage:50\)\{media\(id_in:\$ids/.test(body), true);
+check('it does not drag per-episode lists into a batch query',
+  /streamingEpisodes/.test(body), false);
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

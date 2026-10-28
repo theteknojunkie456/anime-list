@@ -76,8 +76,9 @@
      13, 14 and 15 all doing the same job in different places. A 1px difference
      is too small to read as a decision and just large enough to make everything
      feel slightly misaligned. Five steps, each far enough from the next to be a
-     choice: 6 tags · 10 controls · 14 cards · 18 panels · 22/26 sheets and bars
-     · 99 pills. Add to the scale, don't add between it. */
+     choice: 6 tags and poster art · 10 controls and wide art · 14 cards · 18
+     panels · 22/26 sheets and bars · 99 pills. Add to the scale, don't add
+     between it. */
   --r:14px;--r2:10px;
   /* neutral, theme-independent hairlines + soft depth (kept out of the per-theme accent tint) */
   --bn:rgba(255,255,255,0.09);--bn2:rgba(255,255,255,0.055);
@@ -629,6 +630,8 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 /* Panels. */
 [data-retro] .hub-card{border-radius:2px;clip-path:var(--cut);--notch:14px;}
 [data-retro] .src-choice{border-radius:2px;clip-path:var(--cut);--notch:12px;}
+[data-retro] .src-opt{border-radius:2px;}
+[data-retro] .lnk-url{border-radius:2px;}
 [data-retro] .src-fold{border-radius:2px;}
 [data-retro] .nudge{border-radius:2px;clip-path:var(--cut);--notch:12px;}
 
@@ -1000,8 +1003,11 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 :root[data-retro] .topbar{
   border-radius:2px;
 }
-/* Progress steps rather than slides, and the track is a cut channel. */
-[data-retro] .pbar{border-radius:2px;background:rgba(0,0,0,.6);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--edge) 22%,transparent);}
+/* Progress steps rather than slides, and the track is a cut channel. Retro keeps
+   the four-pixel track the rest of the app gave up: a channel needs a wall, and
+   at two pixels the inset edge IS the track. The default hairline and this are
+   two different languages on purpose. */
+[data-retro] .pbar{height:4px;border-radius:2px;background:rgba(0,0,0,.6);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--edge) 22%,transparent);}
 [data-retro] .pfill{
   border-radius:2px;
   background:repeating-linear-gradient(90deg,var(--a) 0 5px,transparent 5px 7px);
@@ -1384,15 +1390,15 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
    the CONTENT (a mask, not a painted scrim) means posters dissolve into whatever
    is behind them — which is a per-title ambient gradient, so a solid scrim would
    have been a visible band of the wrong colour. */
-.page{flex:1;overflow-y:auto;overscroll-behavior:none;padding-bottom:calc(var(--safe-b) + 96px);}
+.page{flex:1;overflow-y:auto;overscroll-behavior:none;padding-bottom:calc(var(--safe-b) + 96px);counter-reset:shelf;}
 
 /* ── HEADER ── */
 .hdr{padding:calc(var(--safe-t) + 12px) 18px 0;display:flex;align-items:center;justify-content:space-between;}
-.hdr-title{font-size:21px;font-weight:800;letter-spacing:-0.6px;display:flex;align-items:baseline;
+.hdr-title{font-size:21px;font-weight:800;letter-spacing:-0.6px;font-variation-settings:'opsz' 30,'wght' 800;display:flex;align-items:baseline;
   min-width:0;overflow:hidden;flex:0 1 auto;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;}
 .hdr-title b{font-weight:800;}
 .hdr-title i{font-style:normal;font-weight:400;color:var(--t2);letter-spacing:-0.3px;}
-.hdr-title::after{content:'';width:5px;height:5px;border-radius:50%;background:var(--a);margin-left:3px;align-self:center;box-shadow:0 0 10px var(--glow);}
+.hdr-title::after{content:'';width:5px;height:5px;border-radius:50%;background:var(--a);margin-left:3px;align-self:center;}
 /* 36px buttons six pixels apart, five in a row, is under the 44px a fingertip
    actually needs — which reads as the bar being unreliable rather than small.
    The button stays compact (the header has a title to fit next to it) and grows
@@ -1405,7 +1411,7 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 .hbtn::after{content:'';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:44px;height:44px;}
 .hbtn:focus-visible{outline:2px solid var(--a2);outline-offset:2px;}
 .hbtn:active{transform:scale(0.9);}
-.hbtn.bell-on{background:color-mix(in srgb,var(--a) 22%,var(--bg3));border-color:transparent;color:var(--a2);box-shadow:0 4px 14px -6px var(--glow);}
+.hbtn.bell-on{background:color-mix(in srgb,var(--a) 22%,var(--bg3));border-color:transparent;color:var(--a2);}
 .hdr-actions{display:flex;align-items:center;gap:7px;flex:0 0 auto;}
 /* Shown only where the two-finger hold is impossible. On a touch screen the
    gesture is the way in and a sixth button is just clutter. */
@@ -1939,7 +1945,8 @@ img[data-fd="in"]{opacity:1;transition:opacity .18s ease-out;}
 [data-art=cinematic] .hero-bg-img,[data-art=cinematic] .hero-bg{filter:saturate(1.08);}
 .hero-body{position:relative;padding:16px 18px;width:100%;}
 .hero-kicker{font-size:12px;font-weight:600;color:rgba(255,255,255,.72);margin-bottom:7px;}
-.hero-title{font-size:clamp(24px,5.2vw,34px);font-weight:800;letter-spacing:-0.04em;line-height:1.05;
+.hero-title{font-size:clamp(24px,5.2vw,34px);font-weight:800;letter-spacing:-0.045em;line-height:1.02;
+  font-variation-settings:'opsz' 72,'wght' 800;
   text-wrap:balance;text-shadow:0 2px 14px rgba(0,0,0,.6);}
 .hero-meta{font-size:12px;color:rgba(255,255,255,0.75);font-weight:600;margin-top:5px;}
 .hero-prog{margin-top:10px;display:flex;align-items:center;gap:10px;}
@@ -1978,8 +1985,11 @@ img[data-fd="in"]{opacity:1;transition:opacity .18s ease-out;}
   border:1px solid rgba(255,255,255,.13);font-variant-numeric:tabular-nums;}
 .bb-count span{opacity:.6;font-weight:600;}
 .bb-dots{position:absolute;bottom:15px;right:16px;z-index:4;display:flex;gap:6px;}
-.bb-dot{width:7px;height:7px;border-radius:99px;background:rgba(255,255,255,0.42);transition:width .35s cubic-bezier(.2,1,.3,1),background-color .35s cubic-bezier(.2,1,.3,1),opacity .35s;cursor:pointer;}
-.bb-dot.on{background:#fff;width:20px;}
+/* Dots under a carousel are the stock gesture. These are the same information
+   as a row of measures: equal segments, the one you are on inked. */
+.bb-dots{gap:5px;}
+.bb-dot{width:16px;height:2px;border-radius:0;background:rgba(255,255,255,0.34);transition:background-color .35s cubic-bezier(.2,1,.3,1),opacity .35s;cursor:pointer;}
+.bb-dot.on{background:#fff;}
 .row-div{font-family:var(--fd);font-size:13px;font-weight:600;color:var(--t3);padding:26px 18px 4px;}
 
 /* ── CONTINUE WATCHING RAIL ── */
@@ -1995,16 +2005,16 @@ img[data-fd="in"]{opacity:1;transition:opacity .18s ease-out;}
 .qp-chip:active{transform:scale(.95);}
 .qp-chip svg{width:15px;height:15px;color:var(--a);stroke-width:2.2;}
 .rz-sec{margin-top:18px;padding:16px 0 15px;border-top:1px solid var(--b1);border-bottom:1px solid var(--b1);animation:fadeUp .4s ease both;}
-/* A shelf announces itself with a mark, not just bigger text. Three pixels of
-   accent at the head of the row is the whole device, and it costs no space
-   because the row was already a flex line with a gap. */
-.rz-head::before{content:"";flex:0 0 3px;width:3px;height:19px;border-radius:2px;background:var(--a);}
-.rz-head{display:flex;align-items:center;gap:8px;padding:0 18px 12px;font-family:var(--fd);font-size:21px;font-weight:800;letter-spacing:-.045em;color:var(--t1);}
+/* Same index entry as every other shelf — it used to wear a three-pixel accent
+   bar of its own, which meant the two kinds of shelf on one page announced
+   themselves in two different languages. */
+.rz-head{display:flex;align-items:center;gap:9px;padding:0 18px 13px;font-family:var(--fd);font-size:21px;font-weight:800;letter-spacing:-.045em;color:var(--t1);
+  font-variation-settings:'opsz' 34,'wght' 800;}
 
 
 .rz-scroll{display:flex;gap:13px;overflow-x:auto;padding:0 18px 2px;scrollbar-width:none;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;}
 .rz-scroll::-webkit-scrollbar{display:none;}
-.rz-card{flex:0 0 clamp(212px,60vw,264px);scroll-snap-align:center;position:relative;aspect-ratio:16/9;border-radius:18px;overflow:hidden;background:var(--bg4);box-shadow:0 10px 26px -12px rgba(0,0,0,.7);text-align:left;}
+.rz-card{flex:0 0 clamp(212px,60vw,264px);scroll-snap-align:center;position:relative;aspect-ratio:16/9;border-radius:10px;overflow:hidden;background:var(--bg4);box-shadow:0 10px 26px -12px rgba(0,0,0,.7);text-align:left;}
 .rz-card:active{transform:scale(.98);}
 .rz-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
 .rz-ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--fd);font-size:40px;font-weight:800;color:var(--t3);background:linear-gradient(135deg,var(--bg4),var(--bg2));}
@@ -2038,14 +2048,39 @@ img[data-fd="in"]{opacity:1;transition:opacity .18s ease-out;}
    individual cards, which live inside horizontal rails that need their real
    widths. */
 .row-sec{margin-top:16px;content-visibility:auto;contain-intrinsic-size:auto 420px;}
-.row-head{display:flex;align-items:baseline;gap:9px;padding:0 18px 12px;}
-/* A section head is the only landmark on a long scrolling page, and at 16px/800
-   it was the same visual weight as a card title four pixels below it. Bigger,
-   tighter, and paired with a count that recedes instead of competing — the
-   contrast between them is what makes it read as a heading rather than a label. */
-.row-title{font-family:var(--fd);font-size:21px;font-weight:800;letter-spacing:-0.045em;white-space:nowrap;}
+/* ── THE INDEX ───────────────────────────────────────────────────────────────
+   A shelf head was a big bold name with a small number beside it, which is how
+   every streaming grid in the world announces a row. This is a list you keep,
+   not a storefront, so a shelf announces itself the way an entry in a catalogue
+   does: the number it was given, its name, then a rule running out to the
+   margin with the count sitting on the end of it.
 
-.row-count{font-family:var(--fd);font-size:13px;font-weight:700;color:var(--t3);font-variant-numeric:tabular-nums;letter-spacing:0;align-self:center;}
+   The rule is not trim. Where a shelf has progress in it, it is FILLED to how
+   far through that shelf you are — so the one line organising the page is also
+   the one measuring it, and the ornament is the data. A shelf with nothing
+   watched in it simply gets a plain hairline, which is the honest answer. */
+.row-head{display:flex;align-items:baseline;gap:10px;padding:0 18px 13px;}
+.row-head::after,.rz-head::after{
+  content:'';order:2;flex:1 1 auto;min-width:16px;height:1px;align-self:center;
+  background:linear-gradient(90deg,color-mix(in srgb,var(--rc,var(--a)) 76%,transparent) 0 var(--fill,0%),var(--bn) var(--fill,0%) 100%);
+}
+.row-title{order:1;font-family:var(--fd);font-size:21px;font-weight:800;letter-spacing:-0.045em;white-space:nowrap;
+  /* Bricolage carries an optical-size axis and nothing was using it. A display
+     face cut for 34pt has tighter joins and finer hairlines than the same face
+     cut for 14 — which is the difference between type that was set and type
+     that was merely sized. */
+  font-variation-settings:'opsz' 34,'wght' 800;}
+/* The index mark. Body face, tabular, in the shelf's own colour and small
+   enough to be a mark rather than a second heading. */
+.row-title::before,.rz-head::before{
+  content:counter(shelf,decimal-leading-zero);order:0;flex:none;
+  font-family:var(--fb);font-size:11px;font-weight:700;letter-spacing:0.08em;
+  font-variant-numeric:tabular-nums;font-variation-settings:normal;
+  color:var(--rc,var(--a));opacity:.8;
+}
+.row-title::before{margin-right:9px;vertical-align:1.5px;}
+.row-sec,.rz-sec{counter-increment:shelf;}
+.row-count{order:3;font-family:var(--fb);font-size:12px;font-weight:700;color:var(--t3);font-variant-numeric:tabular-nums;letter-spacing:0.02em;align-self:center;}
 
 .row-scroll{display:flex;gap:10px;overflow-x:auto;padding:2px 18px 6px;scroll-padding:18px;}
 .pcard{flex:0 0 var(--card-w,104px);cursor:pointer;transition:transform .18s cubic-bezier(.32,.72,.28,1);}
@@ -2062,7 +2097,12 @@ img[data-fd="in"]{opacity:1;transition:opacity .18s ease-out;}
 }
 .pcard-img{
   /* 1:1.42, the poster ratio the covers are cropped to. */
-  width:var(--card-w,104px);height:calc(var(--card-w,104px) * 1.42);border-radius:14px;object-fit:cover;display:block;
+  /* Six, not fourteen. A 104px cover with a 14px corner is a phone icon; the
+     same picture with a 6px corner is a printed plate, and the difference is
+     most of what separates a catalogue from an app grid. Artwork in a row is a
+     print and takes the tag step of the scale; artwork that fills the screen
+     (hero, billboard) stays a soft frame. That contrast is the system. */
+  width:var(--card-w,104px);height:calc(var(--card-w,104px) * 1.42);border-radius:6px;object-fit:cover;display:block;
   background:var(--bg4);box-shadow:0 10px 26px -10px rgba(0,0,0,.75);
   transition:box-shadow .18s,border-color .18s;
 }
@@ -2073,11 +2113,10 @@ img[data-fd="in"]{opacity:1;transition:opacity .18s ease-out;}
   padding:3px 8px;border-radius:99px;
   font-size:10px;font-weight:800;letter-spacing:.01em;line-height:1.5;
   background:var(--a);color:var(--aFg);
-  box-shadow:0 4px 13px -3px var(--glow),0 0 0 1px rgba(0,0,0,.35);
   font-variant-numeric:tabular-nums;
 }
 .pcard-ph{
-  width:var(--card-w,104px);height:calc(var(--card-w,104px) * 1.42);border-radius:14px;background:linear-gradient(160deg,var(--bg4),var(--bg3));
+  width:var(--card-w,104px);height:calc(var(--card-w,104px) * 1.42);border-radius:6px;background:linear-gradient(160deg,var(--bg4),var(--bg3));
   display:flex;align-items:center;justify-content:center;
   font-size:34px;font-weight:800;color:var(--t3);letter-spacing:-1px;
 }
@@ -2089,7 +2128,7 @@ img[data-fd="in"]{opacity:1;transition:opacity .18s ease-out;}
 .pcard-badge{
   position:absolute;top:0;left:0;display:inline-flex;align-items:center;gap:5px;
   font-size:10px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;
-  padding:6px 9px 7px 8px;border-radius:14px 0 12px 0;
+  padding:6px 9px 7px 8px;border-radius:6px 0 10px 0;
   background:rgba(8,8,11,0.84);
 }
 .pcard-badge::before{content:'';width:5px;height:5px;border-radius:50%;background:currentColor;}
@@ -2106,6 +2145,8 @@ img[data-fd="in"]{opacity:1;transition:opacity .18s ease-out;}
 .pcard-note mark{background:var(--ag);color:var(--a2);border-radius:2px;padding:0 2px;font-weight:700;}
 .pcard-sub{font-size:12px;font-weight:600;color:var(--t3);margin-top:4px;font-variant-numeric:tabular-nums;}
 .pcard-sub{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+/* The figures lead the line they are on: everything else there is an estimate. */
+.pc-ep{color:var(--t2);font-weight:700;}
 .pcard-fav{position:absolute;top:5px;right:7px;font-size:13px;text-shadow:0 1px 6px rgba(0,0,0,0.6);}
 /* Small and square, sitting in the corner of the artwork. It is a second target
    on a card whose whole face is already a target, so it stays quiet until the
@@ -2143,14 +2184,21 @@ img[data-fd="in"]{opacity:1;transition:opacity .18s ease-out;}
   /* A title is a name, not a caption. The body face at 11.5/600 gave every show
      the weight of a footnote; the display face at 13/700 with tight tracking
      makes the artwork and its name feel like one object. */
-  font-family:var(--fd);font-size:13px;font-weight:700;letter-spacing:-0.015em;line-height:1.28;margin-top:8px;color:var(--t1);
+  font-family:var(--fd);font-size:13px;font-weight:700;letter-spacing:-0.012em;line-height:1.28;margin-top:8px;color:var(--t1);
+  /* The opposite end of the same axis: a title four pixels tall wants the
+     sturdier cut, not the display one. */
+  font-variation-settings:'opsz' 14,'wght' 700;
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
   /* Reserve both lines always: a one-line title next to a two-line one left the
      row's cards at different heights and the strip read as ragged. */
   min-height:calc(2 * 1.28em);
 }
-.pbar{height:4px;border-radius:99px;background:rgba(255,255,255,0.13);overflow:hidden;}
-.pfill{height:100%;border-radius:99px;background:linear-gradient(90deg,var(--a),var(--a2));transition:width .4s cubic-bezier(.32,.72,.28,1);}
+/* A rounded four-pixel track with a gradient running through it is the single
+   most generated-looking object a dark UI can own. A measurement is a line:
+   two pixels, square ends, one flat colour, and the number itself carried in
+   tabular figures on the card where it can actually be read. */
+.pbar{height:2px;border-radius:0;background:rgba(255,255,255,0.14);overflow:hidden;}
+.pfill{height:100%;border-radius:0;background:var(--a);transition:width .4s cubic-bezier(.32,.72,.28,1);}
 /* On a fresh set of cards the bar grows to where you are instead of arriving
    already full — the one number on the card that is about you, drawn. */
 body.first-paint .pfill,body.content-in .pfill{animation:barGrow .62s cubic-bezier(.2,1,.3,1) backwards;animation-delay:.14s;}
@@ -2168,7 +2216,7 @@ body.first-paint .pfill,body.content-in .pfill{animation:barGrow .62s cubic-bezi
 .empty{text-align:center;padding:64px 34px;color:var(--t2);animation:fadeUp .4s ease both;}
 .empty-icon{font-size:52px;margin-bottom:16px;opacity:0.9;filter:drop-shadow(0 6px 16px var(--glow));}
 .empty p{font-size:15px;line-height:1.65;}
-.empty .hero-cta{margin-top:20px;background:var(--a);color:var(--aFg);box-shadow:0 8px 22px var(--glow);}
+.empty .hero-cta{margin-top:20px;background:var(--a);color:var(--aFg);}
 /* Secondary to Import, not a rival to it: quiet until you need it, which is
    exactly the moment you realise the list you're looking at isn't gone. */
 .empty-alt{display:inline-flex;align-items:center;gap:8px;margin-top:12px;padding:9px 16px;border-radius:99px;
@@ -3356,6 +3404,10 @@ textarea.ai-prompt-in{resize:none;line-height:1.45;display:block;}
 .imp-divider::before,.imp-divider::after{content:'';flex:1;height:1px;background:var(--b1);}
 /* streaming source — quiet cards, the active one lit with the accent */
 .src-opt{display:block;width:100%;text-align:left;padding:14px 16px;margin-top:11px;border-radius:14px;background:var(--bg3);border:1px solid var(--b1);transition:border-color .15s,background .15s;}
+/* The address Watch is going to open, set as the machine reads it. An inline
+   style here was unreachable by the theme, which is how Retro ended up with two
+   soft boxes on an otherwise square screen. */
+.lnk-url{margin-top:8px;padding:9px 11px;border-radius:10px;background:var(--bg2);color:var(--t2);font:12px/1.45 ui-monospace,Menlo,monospace;word-break:break-all;}
 .src-opt.on{border-color:var(--a);background:var(--ag);}
 .src-opt:active{transform:scale(.99);}
 .src-name{font-family:var(--fd);font-size:15px;font-weight:800;color:var(--t1);display:flex;align-items:center;gap:8px;}
@@ -4102,7 +4154,7 @@ body.recsel .recsel-bar{display:flex;}
 .recsel-count{font-family:var(--fd);font-weight:800;font-size:13px;color:var(--t1);white-space:nowrap;}
 .recsel-cancel{background:none;border:0;color:var(--t2);font-weight:700;font-size:13px;padding:6px 8px;}
 .recsel-done{background:var(--a);color:var(--aFg,#fff);border:0;border-radius:99px;padding:9px 18px;font-family:var(--fd);font-weight:800;font-size:13px;}
-.pcard.sel .pcard-wrap{outline:3px solid var(--a);outline-offset:-3px;border-radius:14px;}
+.pcard.sel .pcard-wrap{outline:3px solid var(--a);outline-offset:-3px;border-radius:6px;}
 .pcard.sel::after{content:"";position:absolute;top:8px;right:8px;width:22px;height:22px;border-radius:50%;background:var(--a);box-shadow:0 0 0 2px var(--bg,#0b0b0f);z-index:2;}
 body.recsel .pcard{position:relative;}
 /* per-show note rows in the compose sheet */
@@ -4277,7 +4329,12 @@ body.recsel .pcard{position:relative;}
 .confirm-btns{display:flex;gap:8px;margin-top:14px;}
 .cbtn{flex:1;padding:12px 0;border-radius:14px;font-size:13px;font-weight:800;}
 .cbtn.cancel{background:var(--bg4);border:1px solid var(--b2);color:var(--t1);}
+/* Red is a warning, not a yes. Every confirm in the app wore the delete colour
+   — "Move to Watching" and "Join party" included — which spends the one signal
+   reserved for losing something, and left a red button sitting on a theme with
+   no red in it. Destructive asks still get it; the rest agree in the accent. */
 .cbtn.del{background:#d73a3f;color:#fff;}  /* darkened: white label was 3.9:1 */
+.cbtn.go{background:var(--a);color:var(--aFg);}
 .toast{
   position:fixed;left:50%;bottom:calc(var(--safe-b) + 96px);transform:translateX(-50%) translateY(20px);
   background:var(--bg5);border:1px solid var(--b3);color:var(--t1);
@@ -5016,8 +5073,6 @@ body.recsel .pcard{position:relative;}
   background-image:radial-gradient(currentColor .5px,transparent .5px);
   background-size:5px 5px;opacity:.14;color:var(--t3);pointer-events:none;
 }
-/* The shelf mark gets the same treatment as everything else that is lit. */
-.rz-head::before{box-shadow:0 0 10px -2px var(--glow);}
 
 /* ── FINISHING SOMETHING ─────────────────────────────────────────────────────
    A tracker has exactly one emotional peak and this is it. Everything else in
@@ -7843,7 +7898,7 @@ async function regenRecovery(){                       // issue a fresh recovery 
   showRecovery(rec,'Your new recovery key');
 }
 function removeAppPassword(){
-  askConfirm({title:'Remove password?',msg:'Your list will be stored unencrypted again — on this device and in the cloud.',yes:'Remove',onYes:()=>{
+  askConfirm({danger:true,title:'Remove password?',msg:'Your list will be stored unencrypted again — on this device and in the cloud.',yes:'Remove',onYes:()=>{
     cryptoKey=null;envWraps=null;
     try{localStorage.removeItem(ENCFLAG);}catch{}
     writeLocal();schedulePush();
@@ -8395,6 +8450,7 @@ function forcePushList(){
   // never what anybody meant, and KV keeps no history to undo it.
   if(!n){toast('Nothing on this device to send');return;}
   askConfirm({
+    danger:true,
     title:'Use this list everywhere?',
     msg:n+' titles from this device will replace the cloud copy, and every other '+
         'device will take this version next time it opens. Anything that exists '+
@@ -8476,6 +8532,7 @@ async function adoptFromDevice(id){
   const d0=_devCache.find(x=>x.id===id)||{};
   const label=d0.name||'that device',n=+d0.n||0;
   askConfirm({
+    danger:true,
     title:'Make '+(label||'that device')+' the main list?',
     msg:(n?n+' titles from ':'The list from ')+(label||'that device')+' becomes the list on every device, including this one. '+
         'Anything held only somewhere else is lost. A restore point is kept on this device.',
@@ -9089,7 +9146,7 @@ async function syncRestore(){
       }
     }catch{restorePrev();toast('Couldn’t reach the cloud. Try again');}
   };
-  if(anime.length)askConfirm({title:'Restore from backup?',msg:"This replaces this device's list with the backup for that code.",yes:'Replace',onYes:proceed});
+  if(anime.length)askConfirm({danger:true,title:'Restore from backup?',msg:"This replaces this device's list with the backup for that code.",yes:'Replace',onYes:proceed});
   else proceed();
 }
 function syncOff(){setSyncCode('');setBackupDeclined(true);renderSyncUI();try{render();}catch(e){}toast('Backup off. Your list stays on this device');}
@@ -10806,7 +10863,7 @@ function resumeRailHTML(items,isRead){
   // scroll forever, wrapping seamlessly at the seam (see rzLoop).
   const loop=items.length>=3;
   const cards=(loop?items.concat(items):items).map(card).join('');
-  return `<div class="rz-sec"><div class="rz-head">Continue watching</div>
+  return `<div class="rz-sec"><div class="rz-head" style="--fill:${shelfFill(items)}">Continue watching</div>
     <div class="rz-scroll" id="rzScroll"${loop?' data-loop="1"':''}>${cards}</div></div>`;
 }
 // Seamless infinite horizontal loop. The items are rendered twice; when the
@@ -10859,6 +10916,15 @@ function sorted(list){
   return l;
 }
 function prog(a){return a.status==='finished'?1:(a.epTotal?Math.max(0,Math.min(1,(a.ep||0)/a.epTotal)):0);}
+// How far through a whole shelf you are: the mean of its titles' progress. The
+// hairline at the head of each shelf is filled to this, so the rule that
+// separates the heading from its count is also reporting something. A shelf
+// with nothing started returns 0% and the rule is simply a rule.
+function shelfFill(items){
+  if(!items||!items.length)return '0%';
+  let t=0;for(const a of items)t+=prog(a);
+  return Math.round(t/items.length*100)+'%';
+}
 // Total minutes to watch every episode. Uses the real per-episode runtime (a.dur,
 // filled from AniList) × episode count; falls back to the stored "~N hrs" string,
 // then to a 24-min TV estimate — so every title has a sortable, showable duration.
@@ -11729,6 +11795,7 @@ function deleteUnlinked(){
   const shown=unmatched.slice(0,4).map(a=>a.title).filter(Boolean);
   const rest=unmatched.length-shown.length;
   askConfirm({
+    danger:true,
     title:`Delete ${unmatched.length} unlinked ${unmatched.length===1?'title':'titles'}?`,
     msg:shown.join(', ')+(rest>0?`, and ${rest} more`:'')+'. These never matched a database entry. You can undo straight after.',
     yes:'Delete',
@@ -11881,7 +11948,7 @@ function fixKeep(id){
 function fixDelete(id){
   const a=anime.find(x=>x.id===id); if(!a)return;
   const title=a.title||'this one';
-  askConfirm({title:'Delete “'+title+'”?',msg:'It comes off your list on every device. This is not the same as Keep as is, which leaves it alone.',
+  askConfirm({danger:true,title:'Delete “'+title+'”?',msg:'It comes off your list on every device. This is not the same as Keep as is, which leaves it alone.',
     yes:'Delete',onYes:function(){
       const i=anime.findIndex(x=>x.id===id); if(i<0)return;
       anime.splice(i,1);
@@ -12337,7 +12404,11 @@ function posterCard(a,nSeas){
   // louder than the title — on every card in a scrolling list. It's a clause on
   // the line that already exists instead: no new row, no colour, no wrap.
   const _nx=nextUpOf(a);
-  const durBits=[twMins?fmtWatch(twMins):'',_nx?(_nx.soon?'S2 soon':'S2 out'):''].filter(Boolean);
+  // The bar under the cover is two pixels now, which is right for an ornament
+  // and useless as a reading. The figures say it instead — first on the line,
+  // tabular, so a column of cards lines up on the slash.
+  const frac=(a.status==='watching'&&a.epTotal)?`<b class="pc-ep">${a.ep||0}/${a.epTotal}</b>`:'';
+  const durBits=[frac,twMins?fmtWatch(twMins):'',_nx?(_nx.soon?'S2 soon':'S2 out'):''].filter(Boolean);
   const durLine=durBits.length?`<div class="pcard-sub">${durBits.join(' \u00b7 ')}</div>`:'';
   const noteLine=noteHitHTML(a);
   // data-gid so a late-arriving image can be patched into THIS card without
@@ -12859,11 +12930,11 @@ function renderHome(){
     if(st==='watching')items=items.filter(a=>!spotSet.has(a.id));
     if(!items.length)continue;
     const cells=collapseSeries(items);
-    html+=`<div class="row-sec" data-amb="${items[0]?titleAccent(items[0]):''}"><div class="row-head"><div class="row-title" style="--rc:${rc}">${label}</div><div class="row-count">${cells.length}</div></div>
+    html+=`<div class="row-sec" data-amb="${items[0]?titleAccent(items[0]):''}"><div class="row-head" style="--rc:${rc};--fill:${shelfFill(items)}"><div class="row-title">${label}</div><div class="row-count">${cells.length}</div></div>
       ${railScroll(cells)}</div>`;
   }
   const favs=homeOn('favorites')?S.filter(a=>a.fav):[];
-  if(favs.length){const fc=collapseSeries(favs);html+=`<div class="row-sec" data-amb="${favs[0]?titleAccent(favs[0]):''}"><div class="row-head"><div class="row-title" style="--rc:var(--a2)">Favorites</div><div class="row-count">${fc.length}</div></div>
+  if(favs.length){const fc=collapseSeries(favs);html+=`<div class="row-sec" data-amb="${favs[0]?titleAccent(favs[0]):''}"><div class="row-head" style="--rc:var(--a2);--fill:${shelfFill(favs)}"><div class="row-title">Favorites</div><div class="row-count">${fc.length}</div></div>
     ${railScroll(fc)}</div>`;}
   // genre collections — browse your list by its most-common genres (Netflix-style lens)
   // Build from S (already sorted) so each genre bucket is in sort order — no re-sort.
@@ -12880,7 +12951,7 @@ function renderHome(){
     html+=`<div class="row-div">Browse your list by genre</div>`;
     for(const g of topGenres){
       const items=gmap[g],gc=collapseSeries(items);
-      html+=`<div class="row-sec" data-amb="${items[0]?titleAccent(items[0]):''}"><div class="row-head"><div class="row-title">${g}</div><div class="row-count">${gc.length}</div></div>
+      html+=`<div class="row-sec" data-amb="${items[0]?titleAccent(items[0]):''}"><div class="row-head" style="--fill:${shelfFill(items)}"><div class="row-title">${g}</div><div class="row-count">${gc.length}</div></div>
         ${railScroll(gc)}</div>`;
     }
   }
@@ -14689,7 +14760,7 @@ function askConfirm(opts){
   const t=document.getElementById('confirmTitle');if(t)t.textContent=opts.title||'Are you sure?';
   document.getElementById('confirmMsg').textContent=opts.msg||'';
   const yb=document.getElementById('confirmYesBtn');
-  if(yb){yb.textContent=opts.yes||'Confirm';yb.className='cbtn del';}
+  if(yb){yb.textContent=opts.yes||'Confirm';yb.className='cbtn '+(opts.danger?'del':'go');}
   deleteId=null;
   _confirmCb=typeof opts.onYes==='function'?opts.onYes:null;
   box.classList.add('on');
@@ -15950,7 +16021,7 @@ function partyQueuePlayAt(i){
 function partyQueueMove(qid,dir){if(!partyIsHost)return;wsSend({t:'queue-move',qid,dir});}
 function partyQueueVote(qid){wsSend({t:'queue-vote',qid});}   // anyone can vote; host reorders using the counts
 function partyMakeHost(uid,name){if(!partyIsHost)return;askConfirm({title:'Make host?',msg:`Hand the party over to ${name||'this member'}? They’ll control what everyone watches.`,yes:'Make host',onYes:()=>wsSend({t:'host-set',to:uid})});}
-function partyKick(uid,name){if(!partyIsHost)return;askConfirm({title:'Remove member?',msg:`Remove ${name||'this member'} from the party?`,yes:'Remove',onYes:()=>wsSend({t:'kick',uid})});}
+function partyKick(uid,name){if(!partyIsHost)return;askConfirm({danger:true,title:'Remove member?',msg:`Remove ${name||'this member'} from the party?`,yes:'Remove',onYes:()=>wsSend({t:'kick',uid})});}
 function partyCopyCode(){try{navigator.clipboard.writeText(partyCode);toast('Code copied');}catch{toast(partyCode);}}
 // A tapped invite link — watchlist://party/CODE opened via the app, or ?party=CODE — lands here.
 window.wlJoinParty=function(code){
@@ -19893,6 +19964,7 @@ function pvAllowMore(){
     return;
   }
   askConfirm({
+    danger:true,
     title:`Give ${host} more room?`,
     msg:`WatchList plays sites inside a protected frame. Some players need to open their own dialogs and won't start without them.\n\nThis allows that, and nothing else: ${host} still cannot open a browser tab and still cannot navigate away from your list. If the screen stays blank the site is refusing to be framed at all, and "Open in your browser" is the way through. Undo this in Sources.`,
     yes:'Give it more room',
@@ -20984,7 +21056,7 @@ function friendRecRowHTML(){
   const keys=Object.keys(map).filter(k=>{const it=map[k].item;const kind=it.kind==='read'?'read':'watch';return kind===viewKind && !inList(it) && !isGone(k,it);});
   if(!keys.length)return '';
   keys.sort((x,y)=>Math.max(0,...map[y].senders.map(s=>s.at))-Math.max(0,...map[x].senders.map(s=>s.at)));
-  return `<div class="row-sec"><div class="row-head"><div class="row-title" style="--rc:var(--a2)">Friends recommend</div><div class="row-count">${keys.length}</div></div><div class="row-scroll">${keys.map(k=>recCard(k,map[k])).join('')}</div></div>`;
+  return `<div class="row-sec"><div class="row-head" style="--rc:var(--a2)"><div class="row-title">Friends recommend</div><div class="row-count">${keys.length}</div></div><div class="row-scroll">${keys.map(k=>recCard(k,map[k])).join('')}</div></div>`;
 }
 // Turning one down is an answer too. Dismissals are keyed the same way the recs
 // are, and they sync with everything else, so a shrug on the phone is a shrug on
@@ -22350,7 +22422,7 @@ function linkPreviewHTML(){
     <div class="src-opt" style="display:block">
       <div class="src-name">${escH(a.title||'A show')} · episode ${ep}${pinned?' <span class="src-tag">pinned link</span>':''}</div>
       <div class="src-sub" style="color:${col};margin-top:3px">${what}</div>
-      <div style="margin-top:8px;padding:9px 11px;border-radius:10px;background:var(--bg2);color:var(--t2);font:12px/1.45 ui-monospace,Menlo,monospace;word-break:break-all">${escH(url||'—')}</div>
+      <div class="lnk-url">${escH(url||'—')}</div>
       <div style="display:flex;gap:8px;margin-top:9px;flex-wrap:wrap">
         ${titles.length>1?`<button class="src-chip" onclick="cycleLinkSample()">Another show</button>`:''}
         ${url?`<button class="src-chip" onclick="testLinkSample()">Open it</button>`:''}
@@ -25154,10 +25226,13 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-10-18.57',
-  title:'Faster, and no longer busy doing nothing',
-  push:'A background loop that never stopped is gone, and the home screen no longer slows down as your list grows.',
+  v:'2026-10-18.58',
+  title:'A catalogue, not a storefront',
+  push:'Watch opens the episode you pressed on the source you set \u2014 and the whole app has been redrawn as something you keep rather than something you browse.',
   notes:[
+    'Press an episode and that is the episode that opens. A link you pinned was stored exactly as you pasted it, so every episode of that show went to the one you pasted \u2014 press 2, get 1. And when the app works a site out for you, it now has to rebuild your own address from its answer before it is allowed to keep it.',
+    'The home screen is laid out as an index: each shelf numbered, named, and followed by a rule out to its count. Where a shelf has progress in it, that rule is filled to how far through it you are \u2014 so the line dividing the page is also measuring it.',
+    'Covers are printed rather than tiled. Crisper corners, a flat two\u2011pixel measure under the ones in progress, and the episode you are on set in figures on the card instead of only drawn as a bar.',
     'A title the database could not identify put the app into a loop it never left \u2014 saving every two seconds and backing up every forty-five, all day, on every device with WatchList open. Nothing looked wrong, which is why it ran for so long. It is gone, and so is the battery and data it was quietly spending.',
     'The home screen no longer gets slower as your list grows. The two shelves that scroll sideways were building a card for every single title behind them, so a long list meant a heavy page; they now build what you can actually reach.',
     'Watch never takes the app away with it. If your browser blocks the tab you get a link to tap instead of losing your place, and Sources now says plainly where Watch is going to send you \u2014 and which choice plays inside WatchList rather than in a tab.',

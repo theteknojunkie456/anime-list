@@ -16,8 +16,21 @@ const ch=spawn(CHROME,['--headless=new','--remote-debugging-port=9581',`--user-d
   '--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE localhost','--no-first-run',
   '--disable-background-timer-throttling','about:blank'],{stdio:'ignore'});
 const wait=ms=>new Promise(r=>setTimeout(r,ms));
-await wait(2500);
-const list=await (await fetch('http://127.0.0.1:9581/json/list')).json();
+// Poll for the debugger rather than guessing how long Chrome needs to come
+// up. A fixed sleep is why this reported ECONNREFUSED on a loaded machine —
+// a failure about the harness, wearing the clothes of a failure about the
+// app, which is the worst kind to read at the bottom of a run.
+let list=null;
+for(let _i=0;_i<120;_i++){
+  await wait(500);
+  try{ list=await (await fetch('http://127.0.0.1:9581/json/list')).json(); if(list&&list.length)break; }catch(e){ list=null; }
+}
+if(!list||!list.length){ console.log('could not reach the test browser after 60s');
+  // Take the server and the browser down with it. Exiting without this
+  // leaks both, and the next run's preflight refuses to start because the
+  // ports it needs are held by the run that already gave up.
+  try{srv&&srv.kill();}catch(e){} try{ch&&ch.kill();}catch(e){}
+  process.exit(1); }
 const ws=new WebSocket(list.find(t=>t.type==='page').webSocketDebuggerUrl);
 await new Promise(r=>ws.onopen=r);
 let id=0; const waiters={};

@@ -152,5 +152,25 @@ check('a plain word is not called an id', looksOpaque('daemons-of-the-shadow-rea
 check('a long mixed-case token is', looksOpaque('tsBNvEVjxHOc9c180Uofl1l8b0FjbExW'), true);
 check('and so is a bare number', looksOpaque('118541'), true);
 
+// ── pasting episode 1 must not pin you to episode 1 ───────────────────────
+// What a person pastes is the page they are standing on, and it names one
+// episode. That was stored verbatim, and streamURL has a branch for an address
+// with no tokens — "open it as-is" — so pressing episode 2 opened episode 1,
+// every time, with nothing to say why.
+const savePin = h.slice(h.indexOf('function savePin(id)'), h.indexOf('function clearPin(id)'));
+check('a pinned address is read, not just stored',
+  /templatizeSearchURL\(v\)/.test(savePin), true);
+check('and what the site calls this show is learned from it',
+  /slugFromURL\(v,tpl\)/.test(savePin) && /setLearnedSlug\(a,sl,tpl\)/.test(savePin), true);
+check('a link that already carries tokens is left alone',
+  /tpl!==v&&SRC_TOKEN_RE\.test\(tpl\)/.test(savePin), true);
+
+const OVERLORD = 'https://www.miruro.tv/watch/xwihANStirjP8A22XOxxXqqCddztkM7X/overlord?ep=1';
+const otpl = T(OVERLORD), oslug = S(OVERLORD, otpl);
+check('episode 1 pasted becomes an episode-shaped template',
+  otpl, 'https://www.miruro.tv/watch/{slug}?ep={ep}');
+check('with the id and name kept together as the show',
+  oslug, 'xwihANStirjP8A22XOxxXqqCddztkM7X/overlord');
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

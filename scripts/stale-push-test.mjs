@@ -24,11 +24,11 @@ const bye=c=>{try{ws&&ws.close();}catch(e){}try{ch.kill();}catch(e){}try{srv.kil
 // A fixed sleep is the reason this reported "could not reach the test browser"
 // on a loaded machine, which says nothing about the thing under test.
 let ws,tabs=null;
-for(let i=0;i<40;i++){
+for(let i=0;i<120;i++){
   await wait(500);
   try{ tabs=await (await fetch('http://127.0.0.1:9583/json/list')).json(); if(tabs&&tabs.length)break; }catch(e){ tabs=null; }
 }
-if(!tabs||!tabs.length){console.log('could not reach the test browser after 20s');bye(1);}
+if(!tabs||!tabs.length){console.log('could not reach the test browser after 60s');bye(1);}
 try{ ws=new WebSocket(tabs.find(t=>t.type==='page').webSocketDebuggerUrl); }
 catch(e){console.log('could not open a CDP socket:',e.message);bye(1);}
 await new Promise(r=>ws.onopen=r);

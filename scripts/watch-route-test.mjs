@@ -19,12 +19,12 @@ const wait=ms=>new Promise(r=>setTimeout(r,ms));
 // harness, dressed as a failure about the app, which is the worst kind to read
 // at the bottom of a test run.
 let tabs=null;
-for(let i=0;i<40;i++){
+for(let i=0;i<120;i++){
   await wait(500);
   try{ tabs=await (await fetch('http://127.0.0.1:'+DBG+'/json/list')).json(); if(tabs&&tabs.length)break; }catch(e){ tabs=null; }
 }
 if(!tabs||!tabs.length){
-  console.log('could not reach the test browser after 20s — port '+DBG+' busy, or a stale profile lock');
+  console.log('could not reach the test browser after 60s — port '+DBG+' busy, or a stale profile lock');
   try{ch.kill();}catch(e){} try{srv.kill();}catch(e){} process.exit(1);
 }
 const ws=new WebSocket(tabs.find(t=>t.type==='page').webSocketDebuggerUrl);

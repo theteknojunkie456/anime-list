@@ -8613,7 +8613,11 @@ async function showSyncDiagnosis(btn){
   // answer in the accent — so "both sides agree", which means there is nothing
   // to do, arrived in the same alarm colour as "the cloud could not be reached".
   // It read as an error. The colour now follows the verdict.
-  const tone = d.cloudCount==='unreachable'||d.cloudCount===0 ? 'var(--drp)'
+  // --drp is the muted grey a dropped title wears, not a warning: using it for
+  // "the cloud could not be reached" painted the most serious line on the panel
+  // the quietest colour on it. The palette has no danger token, so the literal
+  // the rest of the app already falls back to is used directly.
+  const tone = d.cloudCount==='unreachable'||d.cloudCount===0 ? '#ff6b6b'
              : d.cloudUnknown                                 ? 'var(--wat)'
              : d.localNewest!==d.cloudNewest                  ? 'var(--wat)'
              : 'var(--fin)';
@@ -17898,11 +17902,35 @@ function slugTitle(a){const p=slugPref();if(p==='romaji'&&a&&a.titleRo)return a.
 function togglePin(){const el=document.getElementById('dtPin');if(el)el.style.display=(el.style.display==='none'||!el.style.display)?'block':'none';}
 function savePin(id){
   const a=anime.find(x=>x.id===id);if(!a)return;
-  const v=((document.getElementById('dtPinIn')||{}).value||'').trim();
+  let v=((document.getElementById('dtPinIn')||{}).value||'').trim();
   if(v&&!/^https?:\/\//i.test(v)){toast('That doesn\u2019t look like a website address');return;}
+  // PASTE EPISODE 1, GET EVERY EPISODE.
+  //
+  // What people paste is an address they are standing on, and it names one
+  // episode: .../overlord?ep=1. That was stored exactly as typed, and streamURL
+  // has a branch for an address with no tokens in it — "open it as-is". So
+  // pressing episode 2, or 5, or 40, opened episode 1 every time, and the only
+  // hint was a sentence further down the panel asking for {ep} to be typed by
+  // hand.
+  //
+  // The app already knows how to read an address: it is the same recogniser the
+  // one-paste setup uses. Run the pin through it, so ?ep=1 becomes ?ep={ep} and
+  // the episode follows. A link that already carries tokens is returned
+  // untouched, so somebody who did write {ep} themselves is not second-guessed.
+  if(v){
+    const tpl=templatizeSearchURL(v);
+    if(tpl&&tpl!==v&&SRC_TOKEN_RE.test(tpl)){
+      // Whatever stood where {slug} now is, is what this SITE calls this show —
+      // learned from a page that demonstrably loaded, which beats anything
+      // derived from a title.
+      try{const sl=slugFromURL(v,tpl); if(sl){a.srcSlug=sl; setLearnedSlug(a,sl,tpl);}}catch(e){}
+      v=tpl;
+    }
+  }
   if(v)a.srcUrl=v; else delete a.srcUrl;
   touch(a);save();renderDetail();
-  toast(v?'Direct link pinned for this show':'Link cleared');
+  if(!v){toast('Link cleared');return;}
+  toast(/\{ep\}/i.test(v)?'Pinned — every episode follows from it':'Pinned for this show');
 }
 function clearPin(id){const a=anime.find(x=>x.id===id);if(!a)return;delete a.srcUrl;touch(a);save();renderDetail();toast('Link cleared');}
 function testPin(id){
@@ -20144,6 +20172,52 @@ async function quickTryIdTemplate(url){
   if(epKey)u.searchParams.set(epKey,'__WLEP__');
   return decodeURIComponent(u.toString()).replace(/__WLEP__/g,'{ep}');
 }
+// ASKING THE AI TO READ AN ADDRESS, AND THEN CHECKING ITS HOMEWORK.
+//
+// The deterministic recogniser handles the shapes it knows. When it cannot read
+// a page's address the remaining options were: type {ep} by hand into a URL, or
+// give up. An AI is genuinely good at "which part of this string is the show and
+// which is the episode" — it is a structure question about text that is right in
+// front of it.
+//
+// What it is NOT good at, and is never asked here, is inventing an address for a
+// site from memory. That produces a plausible URL that 404s, which is worse than
+// no answer: the person follows it, lands on an error, and has no idea whether
+// the site changed or the app is broken. The only input is an address they are
+// standing on.
+//
+// And the answer is checked rather than trusted. A template is accepted only if
+// it is the same site, carries an episode token, and — the one that matters —
+// rebuilds the exact address it was given when filled back in with that address's
+// own values. A template that cannot reproduce its own example is wrong, however
+// confident the prose around it was.
+function epFromURL(u){
+  try{
+    const url=new URL(u);
+    for(const k of ['ep','episode','e','epi','episodio']){
+      const v=url.searchParams.get(k);
+      if(v!==null&&/^\d+$/.test(v))return +v;
+    }
+    const m=/\/(?:ep|episode|e)[-_]?(\d{1,4})(?:\/|$)/i.exec(url.pathname);
+    if(m)return +m[1];
+  }catch(e){}
+  return 0;
+}
+function aiTemplateProblem(tpl,url){
+  if(!tpl)return 'it did not return an address';
+  if(!SRC_TOKEN_RE.test(tpl))return 'it came back with no {ep} or {slug} in it';
+  let th='',uh='';
+  try{th=new URL(tpl.replace(/\{[^}]+\}/g,'x')).hostname.replace(/^www\./,'');}catch(e){return 'what it returned is not a web address';}
+  try{uh=new URL(url).hostname.replace(/^www\./,'');}catch(e){return 'that is not a web address';}
+  if(th.toLowerCase()!==uh.toLowerCase())return 'it pointed at '+th+' instead of '+uh;
+  const ep=epFromURL(url);
+  if(!ep)return 'there is no episode number in the address you pasted';
+  let rebuilt='';
+  try{rebuilt=fillSourceTokens(tpl,{title:'x',srcSlug:slugFromURL(url,tpl)},ep);}catch(e){return 'it could not be filled back in';}
+  const norm=x=>String(x||'').replace(/\/+$/,'');
+  if(norm(rebuilt)!==norm(url))return 'it does not rebuild the address you pasted';
+  return '';
+}
 function quickSetup(){
   const inp=document.getElementById('srcQuickIn'),out=document.getElementById('srcQuickOut');
   if(!inp||!out)return;
@@ -20286,6 +20360,34 @@ https://example.com/watch/{slug}/episode-{ep}`;
     const m=out.match(/https?:\/\/\S+/);
     if(!m){toast('The AI didn’t return a link, try wording it differently');return;}
     const learned=m[0].replace(/[\s"'`)\].,]+$/,'').replace(/\\/g,'');
+    // CHECK ITS HOMEWORK.
+    //
+    // Whatever came back was the first URL-shaped thing in the reply, and it was
+    // used as-is. Nothing asked whether it pointed at the same site, whether it
+    // had an episode in it, or whether it worked — so a confident wrong answer
+    // was indistinguishable from a right one until every show started 404ing,
+    // by which time the template was saved and the original address forgotten.
+    //
+    // When the person pasted a real address there IS something to check against:
+    // filled back in with that address's own show and episode, a correct
+    // template reproduces it exactly. One that cannot reproduce its own example
+    // is wrong, however well the prose around it read. Refuse it and say which
+    // part failed, rather than saving it and letting them find out.
+    //
+    // Only when there is an example to check. Someone who typed a wish instead of
+    // pasting a link gets the old behaviour, because there is nothing to verify
+    // against and pretending otherwise would be its own kind of lie.
+    if(raw&&/^https?:\/\//i.test(normSrc(raw))&&epFromURL(normSrc(raw))){
+      const bad=aiTemplateProblem(learned,normSrc(raw));
+      if(bad){
+        const o=document.getElementById('srcQuickOut');
+        if(o){o.style.display='block';
+          o.innerHTML='<div class="src-quick-bad">'+icon('search')+' The AI answered, but '+escH(bad)+
+            '. Nothing was saved \u2014 a pattern that can\u2019t rebuild the very address it was shown would send every show somewhere wrong.</div>';}
+        else toast('That answer didn\u2019t check out \u2014 nothing saved');
+        return;
+      }
+    }
     if(raw)addSrcExample(raw,note);
     refreshSrcExNote();
     if(document.getElementById('srcQuickIn')===site){
@@ -22196,6 +22298,66 @@ function insertReadToken(t){
   el.value=el.value.slice(0,a)+t+el.value.slice(b);
   el.focus();el.setSelectionRange(a+t.length,a+t.length);
 }
+// WHAT WILL WATCH ACTUALLY OPEN?
+//
+// Every part of this was knowable and none of it was shown. A source with no
+// episode in it can only ever open a homepage; a template built around an id
+// the app cannot derive sends every show to whichever one taught it; an
+// address published by the service beats both. The person pressing Watch found
+// out which of those they had by pressing Watch and looking at where they
+// landed — and if it was wrong, nothing said why, or which of the three
+// different problems it was.
+//
+// So: name a real show from the list, resolve the address exactly as Watch
+// will, and show it. Being able to read the thing before you tap it is most of
+// what "control over links" means.
+let _lnkIdx=0;
+function linkSampleTitles(){
+  try{
+    const all=(anime||[]).filter(a=>a&&kindOf(a)==='watch'&&a.aniId);
+    const rank=a=>a.status==='watching'?0:(a.status==='plan'?1:2);
+    return all.sort((x,y)=>rank(x)-rank(y)).slice(0,12);
+  }catch(e){return [];}
+}
+function cycleLinkSample(){ _lnkIdx++; try{renderSource();}catch(e){} }
+function testLinkSample(){
+  const t=linkSampleTitles(); if(!t.length)return;
+  const a=t[_lnkIdx%t.length];
+  let u=''; try{u=(streamURL(a,watchEpisode(a)||1)||{}).url||'';}catch(e){}
+  if(!u){toast('No address to open yet');return;}
+  try{openExternal(u);}catch(e){}
+}
+function linkPreviewHTML(){
+  const titles=linkSampleTitles();
+  if(!titles.length)return '';
+  const a=titles[_lnkIdx%titles.length];
+  const ep=(typeof watchEpisode==='function'&&watchEpisode(a))||1;
+  const src=effectiveSource(a)||'';
+  let url=''; try{url=(streamURL(a,ep)||{}).url||'';}catch(e){}
+  let off=null; try{off=officialWatch(a,ep);}catch(e){}
+  const pinned=!!(a.srcUrl&&String(a.srcUrl).trim());
+  // Four genuinely different situations, told apart rather than blurred into
+  // "it opens something".
+  let what,tone;
+  if(!url){ what='Nothing to open — no source is set for this show'; tone='bad'; }
+  else if(off&&off.url===url&&off.exact){ what='The exact episode, as published by the service'; tone='good'; }
+  else if(off&&off.url===url){ what='This show\u2019s own page. No episode address is published for it'; tone='ok'; }
+  else if(SRC_TOKEN_RE.test(src)){ what='Built from your template'; tone='ok'; }
+  else { what='Your source has no episode in it, so Watch can only open the site itself'; tone='bad'; }
+  const col=tone==='good'?'var(--fin)':(tone==='bad'?'#ff6b6b':'var(--wat)');
+  return `
+    <div class="dt-label" style="margin-top:18px">${icon('external')} What Watch will open</div>
+    <div class="src-opt" style="display:block">
+      <div class="src-name">${escH(a.title||'A show')} · episode ${ep}${pinned?' <span class="src-tag">pinned link</span>':''}</div>
+      <div class="src-sub" style="color:${col};margin-top:3px">${what}</div>
+      <div style="margin-top:8px;padding:9px 11px;border-radius:10px;background:var(--bg2);color:var(--t2);font:12px/1.45 ui-monospace,Menlo,monospace;word-break:break-all">${escH(url||'—')}</div>
+      <div style="display:flex;gap:8px;margin-top:9px;flex-wrap:wrap">
+        ${titles.length>1?`<button class="src-chip" onclick="cycleLinkSample()">Another show</button>`:''}
+        ${url?`<button class="src-chip" onclick="testLinkSample()">Open it</button>`:''}
+      </div>
+      ${tone==='bad'&&src?`<p class="ai-desc" style="font-size:12px;margin-top:9px">Paste one episode address into the box above and the rest follow — these sites put the episode in the address, so teaching it one show teaches it every episode of that show.</p>`:''}
+    </div>`;
+}
 function renderSource(){
   const box=document.getElementById('sourceBody'); if(!box) return;
   // Hiding/renaming rebuilds this whole sheet, which would snap open folds shut
@@ -22296,6 +22458,8 @@ function renderSource(){
       </span>
     </button>
 
+
+    ${linkPreviewHTML()}
 
     <details class="src-fold" data-fold="settings"${O('settings')} style="margin-top:16px">
       <summary>${icon('settings')} Manage the list of sites</summary>

@@ -23,10 +23,19 @@ if(!tabs||!tabs.length){ console.log('could not reach the test browser after 60s
   try{srv&&srv.kill();}catch(e){} try{ch&&ch.kill();}catch(e){}
   process.exit(1); }
 const ws=new WebSocket(tabs.find(t=>t.type==='page').webSocketDebuggerUrl);
-await new Promise(r=>ws.onopen=r);
+// onopen alone never fires if the socket errors or closes instead, which is the
+// same infinite wait one line earlier.
+await new Promise((r,j)=>{const k=setTimeout(()=>j(new Error('the test browser never accepted a connection')),20000);
+  ws.onopen=()=>{clearTimeout(k);r();};ws.onerror=()=>{clearTimeout(k);j(new Error('the test browser refused the connection'));};});
 let id=0;const w={};
 ws.onmessage=e=>{const m=JSON.parse(e.data);if(m.id&&w[m.id])w[m.id](m);};
-const cmd=(m,p={})=>new Promise(r=>{const i=++id;w[i]=r;ws.send(JSON.stringify({id:i,method:m,params:p}));});
+// A command the browser never answers makes this promise wait forever, and
+// every poll in the file is built on it — so one stalled socket is not a slow
+// test, it is a test that never ends. Deadline, then say which command died.
+const _bail=(why)=>{console.log(why);try{srv&&srv.kill();}catch(e){}try{ch&&ch.kill();}catch(e){}process.exit(1);};
+const cmd=(m,p={})=>new Promise(r=>{const i=++id;
+  const k=setTimeout(()=>{if(w[i]){delete w[i];_bail('the test browser stopped answering ('+m+')');}},45000);
+  w[i]=v=>{clearTimeout(k);r(v);};ws.send(JSON.stringify({id:i,method:m,params:p}));});
 const ev=async x=>{const r=await cmd('Runtime.evaluate',{expression:x,returnByValue:true,awaitPromise:true});
   if(r.result?.exceptionDetails)return{__err:(r.result.exceptionDetails.exception?.description||'').split('\n')[0]};
   return r.result?.result?.value;};

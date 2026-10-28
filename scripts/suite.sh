@@ -93,7 +93,20 @@ for f in scripts/*-test.mjs scripts/*.test.mjs; do
   # Judge by exit status, not by parsing the summary line. Four suites print
   # their result in a different shape and the first version of this called all
   # four of them broken, which is a worse failure than the one it was looking for.
-  log=$(node "$f" 2>&1); rc=$?
+  # A hard cap per test. Every one of these drives Chrome over a socket, and a
+  # CDP command that is never answered waits forever — boot-lock-handoff sat
+  # there for two hours and forty minutes and took the whole suite with it,
+  # which is worse than any failure it could have reported. The watchdog is a
+  # background sleep that kills the test outright, so the cost of a hang is one
+  # result instead of the run. 240s is ~6x the slowest honest test.
+  out_f=$(mktemp -t wl-suite); node "$f" >"$out_f" 2>&1 & np=$!
+  ( sleep ${SUITE_CAP:-240}; kill -9 $np 2>/dev/null ) & wp=$!
+  wait $np; rc=$?
+  kill $wp 2>/dev/null; wait $wp 2>/dev/null
+  log=$(cat "$out_f"); rm -f "$out_f"
+  # 137 is the watchdog's own SIGKILL. Say so, or a hang reads as a crash.
+  [ $rc -eq 137 ] && log="$log
+hung: no result after ${SUITE_CAP:-240}s, killed"
   sweep
   out=$(printf '%s' "$log" | grep -Eo '[0-9]+ passed(, [0-9]+ failed)?' | tail -1)
   [ -z "$out" ] && out=$(printf '%s' "$log" | tail -1 | cut -c1-60)

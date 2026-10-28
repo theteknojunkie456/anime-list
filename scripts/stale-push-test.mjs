@@ -31,7 +31,10 @@ for(let i=0;i<120;i++){
 if(!tabs||!tabs.length){console.log('could not reach the test browser after 60s');bye(1);}
 try{ ws=new WebSocket(tabs.find(t=>t.type==='page').webSocketDebuggerUrl); }
 catch(e){console.log('could not open a CDP socket:',e.message);bye(1);}
-await new Promise(r=>ws.onopen=r);
+// onopen alone never fires if the socket errors or closes instead, which is the
+// same infinite wait one line earlier.
+await new Promise((r,j)=>{const k=setTimeout(()=>j(new Error('the test browser never accepted a connection')),20000);
+  ws.onopen=()=>{clearTimeout(k);r();};ws.onerror=()=>{clearTimeout(k);j(new Error('the test browser refused the connection'));};});
 let id=0; const waiters={};
 ws.onmessage=e=>{const m=JSON.parse(e.data); if(m.id&&waiters[m.id])waiters[m.id](m);};
 const cmd=(m,p={})=>new Promise(r=>{const i=++id;waiters[i]=r;ws.send(JSON.stringify({id:i,method:m,params:p}));});

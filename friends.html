@@ -18120,6 +18120,23 @@ async function ensureEpisodeLinks(a,ep){
     if(ch)save();
   }catch(e){}
 }
+// Where a hand-off actually lands, said accurately, because the two builds do
+// genuinely different things and the copy described only the worse one.
+//
+// A site behind a bot check, or one sending X-Frame-Options, cannot be an
+// IFRAME — that is the site's position and no amount of trying changes it. But
+// neither restriction touches a TOP-LEVEL load, and that is what the official
+// app does: openExternal hands the address to the native bridge, which opens a
+// full-screen web view inside WatchList, carrying the same cookies and sign-ins
+// as the main view. Nothing leaves. Telling somebody it "won't play inside the
+// app" while it plays inside the app is how a working feature reads as broken.
+//
+// On the web there is no equivalent and there cannot be: a page cannot host a
+// site that refuses to be framed, so a tab is the browser's answer, not ours.
+function handoffWord(){
+  return (typeof IS_NATIVE!=='undefined'&&IS_NATIVE)?'in a tab inside WatchList':'in a new tab';
+}
+function framesHere(){ return !(typeof IS_NATIVE!=='undefined'&&IS_NATIVE); }
 async function watchAnime(id,epArg){
   const a=anime.find(x=>x.id===id); if(!a) return;
   if(kindOf(a)!=='watch'||!a.aniId){toast('Watch is for anime only');return;}
@@ -18192,8 +18209,8 @@ async function watchAnime(id,epArg){
     // This is an explanation, not a status blip — it has to outlast a glance, so
     // it holds ~8s instead of the default ~2s a "saved" toast gets.
     toast(challengeHost(_vh)
-      ? `${sourceName()} runs a bot check that can't work inside another site — opening it in a tab`
-      : `${sourceName()} won't play inside the app — opening it in a tab`, 8000);
+      ? `${sourceName()} runs a bot check that can't work in an embedded frame — opening it ${handoffWord()}`
+      : `${sourceName()} refuses to be embedded — opening it ${handoffWord()}`, 8000);
     return;
   }
   if(!_own&&!embedTarget(streamURL(a,ep0).url||src)){
@@ -22186,7 +22203,7 @@ function renderSource(){
         <span class="src-choice-txt">
           <span class="src-name">Open a site</span>
           <span class="src-sub">${_free||custom
-            ? ('Goes to '+escH(_free?_free.name:host(custom))+', in a new tab')
+            ? ('Goes to '+escH(_free?_free.name:host(custom))+', '+handoffWord())
             : 'Pick one below first'}</span>
         </span>
       </button>

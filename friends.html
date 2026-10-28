@@ -17942,7 +17942,10 @@ function rememberOfficialLinks(a,d){
     if(!(l&&l.url))return;
     if(l.type&&l.type!=='STREAMING')return;
     let h=''; try{h=new URL(l.url).hostname.replace(/^www\./,'');}catch(e){return;}
-    if(h&&!svc[h])svc[h]=l.url;
+    // AniList still carries http:// for some of these. Handing a plain-http
+    // address to a service that only answers on https is a redirect at best and
+    // a blocked load at worst, and it costs nothing to ask for the right one.
+    if(h&&!svc[h])svc[h]=String(l.url).replace(/^http:\/\//i,'https://');
   });
   if(Object.keys(svc).length&&JSON.stringify(svc)!==JSON.stringify(a.svc||{})){a.svc=svc;changed=true;}
   const eu={};
@@ -17950,7 +17953,7 @@ function rememberOfficialLinks(a,d){
     if(!(e&&e.url&&e.title))return;
     // "Episode 12 - The Night Sky" / "Ep. 12" / "E12"
     const m=/(?:episode|ep\.?|e)\s*(\d{1,4})\b/i.exec(String(e.title));
-    if(m)eu[+m[1]]=e.url;
+    if(m)eu[+m[1]]=String(e.url).replace(/^http:\/\//i,'https://');
   });
   if(Object.keys(eu).length&&JSON.stringify(eu)!==JSON.stringify(a.epUrl||{})){a.epUrl=eu;changed=true;}
   return changed;
@@ -17960,16 +17963,22 @@ function rememberOfficialLinks(a,d){
 // which decides whether coming back should offer to mark it watched.
 function officialWatch(a,ep){
   if(!a)return null;
+  // THE SOURCE THAT IS SET IS THE SOURCE.
+  //
+  // This used to fall back to "any official page we happen to know", which in
+  // practice meant Crunchyroll, because that is who publishes most of these
+  // links. So a person who had deliberately chosen where to watch pressed Watch
+  // and was sent somewhere else entirely. A better address is only better if it
+  // is the same service they picked; anywhere else is not an improvement, it is
+  // the app overruling a setting. Same rule for the per-episode URLs, which are
+  // nearly all Crunchyroll's: worth using when that IS the source, and never
+  // otherwise.
+  let want=''; try{want=String(srcHost(effectiveSource(a))||'').replace(/^www\./,'');}catch(e){}
+  if(!want)return null;
+  const here=u=>{try{return String(new URL(u).hostname||'').replace(/^www\./,'').toLowerCase()===want.toLowerCase();}catch(e){return false;}};
   const eu=a.epUrl&&a.epUrl[ep];
-  if(eu)return {url:eu,exact:true};
-  if(a.svc){
-    // Prefer the service they chose for this show, so the choice still means
-    // something; otherwise any official page beats a search for the title.
-    let h=''; try{h=String(srcHost(effectiveSource(a))||'').replace(/^www\./,'');}catch(e){}
-    if(h&&a.svc[h])return {url:a.svc[h],exact:false};
-    const first=Object.keys(a.svc)[0];
-    if(first)return {url:a.svc[first],exact:false};
-  }
+  if(eu&&here(eu))return {url:eu,exact:true};
+  if(a.svc&&a.svc[want])return {url:a.svc[want],exact:false};
   return null;
 }
 function streamURL(a,epOverride){
@@ -18054,11 +18063,67 @@ function watchEpAt(id,ep){
   }
   watchAnime(id,ep);
 }
+// THE EPISODE, NOT JUST THE SHOW.
+//
+// streamingEpisodes carries the service's own URL for each episode, and for an
+// ordinary show it is complete — Attack on Titan 25 of 25, Demon Slayer 26 of
+// 26. It cannot ride along with the library-wide links pass, because it returns
+// an object per episode and one long-running show would drag a four-figure list
+// into a query covering fifty titles. But for ONE show, at the moment somebody
+// has actually decided to watch it, it is a single cheap request.
+//
+// So the first Watch on a show buys its episode list once, and every Watch
+// after that is already answered. Very long shows are partial at the far end —
+// AniList holds 69 of One Piece's thousand-plus — and those fall back to the
+// show's own page, which is still the show rather than a search for its name.
+async function ensureEpisodeLinks(a,ep){
+  if(!a||!a.aniId)return;
+  if(a.epUrl&&a.epUrl[ep])return;        // this one is already known
+  if(a.epTried)return;                   // asked once; the answer does not change per press
+  try{
+    const q='query($id:Int){Media(id:$id,type:ANIME){id externalLinks{site url type} streamingEpisodes{title site url}}}';
+    // NOTHING HERE IS ALLOWED TO HOLD UP THE TAP.
+    //
+    // This runs between pressing Watch and anything happening, so a request that
+    // hangs is a Watch button that does nothing — on a bad connection, or behind
+    // a captive portal, the press would simply be swallowed. A better address is
+    // worth a moment; it is not worth the action. Two and a half seconds, then
+    // open with what we already know.
+    // Aborting is asked for, but not relied on: abort only helps if whatever is
+    // answering honours the signal, and a request that never settles at all is
+    // exactly the case this guards. So the wait is a race — after 2.5s we carry
+    // on regardless of what the other side is doing.
+    const ctl=(typeof AbortController!=='undefined')?new AbortController():null;
+    let bail;
+    const timeout=new Promise(res=>{bail=setTimeout(()=>{try{ctl&&ctl.abort();}catch(e){}res(null);},2500);});
+    let r;
+    try{
+      r=await Promise.race([
+        fetch('https://graphql.anilist.co',{method:'POST',
+          headers:{'Content-Type':'application/json','Accept':'application/json'},
+          body:JSON.stringify({query:q,variables:{id:+a.aniId}}),
+          signal:ctl?ctl.signal:undefined}),
+        timeout]);
+    }finally{clearTimeout(bail);}
+    if(!r||!r.ok)return;                 // down, slow or rate-limited: unstamped, so the next press retries
+    const d=await r.json();
+    if(d&&d.errors)return;
+    const m=d&&d.data&&d.data.Media;
+    // Stamped only on an answer. A show AniList lists no episodes for is a real
+    // answer and must not be re-asked on every press; a failed request is not.
+    a.epTried=1;
+    let ch=true; try{ rememberOfficialLinks(a,m); }catch(e){ ch=false; }
+    if(ch)save();
+  }catch(e){}
+}
 async function watchAnime(id,epArg){
   const a=anime.find(x=>x.id===id); if(!a) return;
   if(kindOf(a)!=='watch'||!a.aniId){toast('Watch is for anime only');return;}
   if((noSourceMode()||!effectiveSource(a)&&!freeDefault())&&!(a.srcUrl&&String(a.srcUrl).trim())){showNoSourcePrompt();return;}   // no source chosen (and no per-title pin) → prompt
   const reqEp=(epArg>0?epArg:0);   // a specific episode (from the episode list) or 0 = "next up"
+  // One request, the first time this show is watched, so the address below can
+  // name the episode instead of the series.
+  try{ await ensureEpisodeLinks(a,(reqEp||watchEpisode(a)||1)); }catch(e){}
   // Source resolution: a per-title pinned link (a.srcUrl) wins; else the global
   // custom source; else the default route. A pin/custom source with {ep} plays
   // in-frame; a bare preset opens in the browser.

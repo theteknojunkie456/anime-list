@@ -49,6 +49,18 @@ check('the service the user chose wins over the others',
   (officialWatch({ ...a, svc: a.svc, srcUrl: 'https://www.netflix.com/search?q={title}' }, 7) || {}).url,
   'https://www.netflix.com/title/81234567');
 check('a show we know nothing about asks for no link', officialWatch({ id: 'x', title: 'Unknown' }, 3), null);
+// The whole point of a source setting is that it decides. An episode URL on a
+// service the person did not choose is not a better address, it is a different
+// place — and nearly every published episode URL is Crunchyroll's, so without
+// this the setting was being quietly overruled on almost every show.
+check('an episode URL on another service is NOT used when a source is set',
+  (officialWatch({ ...a, srcUrl: 'https://hidive.com/search?q={title}' }, 12) || {}).url, undefined);
+check('and nor is some other service\u2019s show page',
+  officialWatch({ id: 'z', title: 'T', svc: { 'crunchyroll.com': 'https://www.crunchyroll.com/series/X' },
+                  srcUrl: 'https://hidive.com/search?q={title}' }, 4), null);
+check('the chosen service still gets its exact episode',
+  (officialWatch({ ...a, srcUrl: 'https://www.crunchyroll.com/search?q={title}' }, 12) || {}).url,
+  'https://www.crunchyroll.com/watch/E12/beneath-the-sky');
 check('re-storing identical data reports no change', rememberOfficialLinks(a, d), false);
 
 // ── the background pass that fills the whole library ───────────────────────
@@ -79,6 +91,28 @@ check('it asks via Page(id_in:), which tolerates an id AniList lacks',
   /Page\(perPage:50\)\{media\(id_in:\$ids/.test(body), true);
 check('it does not drag per-episode lists into a batch query',
   /streamingEpisodes/.test(body), false);
+
+// ── buying one show's episode list at the moment it is watched ─────────────
+const ens = h.slice(h.indexOf('async function ensureEpisodeLinks'),
+                    h.indexOf('async function watchAnime'));
+check('a request that failed is not stamped, so the next press retries',
+  /if\(!r\|\|!r\.ok\)return;[\s\S]*?a\.epTried=1/.test(ens), true);
+check('and the lookup cannot hold up the tap for more than a moment',
+  /Promise\.race\(\[[\s\S]*?timeout\]\)/.test(ens) && /,2500\)/.test(ens), true);
+check('an answer IS stamped, so a show with no episode list is asked once',
+  /a\.epTried=1/.test(ens), true);
+check('an episode already known costs no request',
+  /if\(a\.epUrl&&a\.epUrl\[ep\]\)return;/.test(ens), true);
+check('it asks for one show, not a batch', /Media\(id:\$id,type:ANIME\)/.test(ens), true);
+
+// ── http:// is never handed to a service that answers on https ─────────────
+const b = { id: 'b', title: 'Bleach', aniId: 269 };
+rememberOfficialLinks(b, {
+  externalLinks: [{ site: 'Hulu', type: 'STREAMING', url: 'http://www.hulu.com/bleach' }],
+  streamingEpisodes: [{ title: 'Episode 3 - Foo', url: 'http://www.crunchyroll.com/watch/X/3' }],
+});
+check('a show link arrives over https', b.svc['hulu.com'], 'https://www.hulu.com/bleach');
+check('an episode link arrives over https', b.epUrl[3], 'https://www.crunchyroll.com/watch/X/3');
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

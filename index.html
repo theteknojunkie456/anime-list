@@ -6296,6 +6296,10 @@ function captureGateTest(){try{
 // allowed to put the real one back over it (and only over it).
 const _mintedNow=new Set();
 function wlDevice(){try{let d=localStorage.getItem(NET_KEY);if(!d){d='d'+Math.random().toString(36).slice(2)+Date.now().toString(36);localStorage.setItem(NET_KEY,d);_mintedNow.add(NET_KEY);}return d;}catch{return 'd'+Date.now();}}
+// Devices that were already members before any of this existed hold their
+// identity only in localStorage. One call on launch copies it somewhere durable,
+// so the protection applies to them too rather than only to devices set up after.
+try{setTimeout(()=>{try{saveIdentityNative();}catch(e){}},1500);}catch(e){}
 function netStatus(){try{return localStorage.getItem(NET_STATUS)||'';}catch{return '';}}
 function setNetStatus(s){try{s?localStorage.setItem(NET_STATUS,s):localStorage.removeItem(NET_STATUS);}catch{}}
 // Capture ?invite=CODE from a shared link, remember it, and clean the URL.
@@ -8152,9 +8156,28 @@ function recStageCheck(a){
 }
 
 // ─── CLOUD SYNC (Cloudflare Worker + KV) ────────────────────────────────────
+// Hand the identity to the native side, which keeps it in the Keychain — the
+// one place on iOS that is not thrown away when a home-screen app's localStorage
+// is evicted. That eviction is why a device that has been a member for weeks
+// comes back as a stranger and has to ask to join again.
+//
+// Nothing here on the web build, which has no equivalent: a browser that clears
+// site data has cleared everything there is.
+function saveIdentityNative(opts){
+  try{
+    if(typeof IS_NATIVE==='undefined'||!IS_NATIVE)return;
+    const msg={type:'saveid'};
+    if(opts&&opts.clear)msg.clear=true;
+    else{ msg.sync=syncCode()||''; msg.device=(localStorage.getItem(NET_KEY)||''); if(!msg.sync&&!msg.device)return; }
+    window.webkit.messageHandlers.wl.postMessage(msg);
+  }catch(e){}
+}
 function syncCode(){try{return localStorage.getItem('sync_'+LSKEY)||'';}catch{return'';}}
 function setSyncCode(c){try{if(c)localStorage.setItem('sync_'+LSKEY,c);else localStorage.removeItem('sync_'+LSKEY);}catch{}
-  try{if(c)mirrorCreds();else idbSet(IDB_CRED_KEY,'').catch(()=>{});}catch(e){}}
+  try{if(c)mirrorCreds();else idbSet(IDB_CRED_KEY,'').catch(()=>{});}catch(e){}
+  // Clearing the code is a decision, not an accident — the Keychain copy has to
+  // go with it or the next launch quietly puts it back.
+  try{saveIdentityNative(c?null:{clear:true});}catch(e){}}
 let _reconciling=false;   // guards the pull-before-push against re-entering itself
 function syncAt(){try{return +localStorage.getItem('syncat_'+LSKEY)||0;}catch{return 0;}}
 function setSyncAt(t){try{localStorage.setItem('syncat_'+LSKEY,String(t||0));}catch{}}

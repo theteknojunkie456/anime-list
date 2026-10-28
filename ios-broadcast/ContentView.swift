@@ -54,6 +54,19 @@ struct WatchListShell: UIViewRepresentable {
         ucc.addUserScript(WKUserScript(source: Self.probeSource(resumeAt: 0),
                                        injectionTime: .atDocumentEnd,
                                        forMainFrameOnly: false))
+        // Put the identity back before the page's first line runs. atDocumentStart
+        // because the app reads the device id and cloud key during boot — at
+        // documentEnd it has already decided it is new and minted a fresh id.
+        //
+        // mainFrameOnly, and the script checks its own origin too. This same
+        // configuration is handed to presentInApp, so without that check the cloud
+        // key would be written into the localStorage of whatever streaming site was
+        // opened. It is this app's identity and it stays on this app's origin.
+        if let seed = IDStore.seedScript() {
+            ucc.addUserScript(WKUserScript(source: seed,
+                                           injectionTime: .atDocumentStart,
+                                           forMainFrameOnly: true))
+        }
         context.coordinator.ucc = ucc
         cfg.userContentController = ucc
 
@@ -387,6 +400,17 @@ struct WatchListShell: UIViewRepresentable {
                 DispatchQueue.main.async { self.broadcaster.start() }
             case "notify":
                 if let items = body["items"] as? [[String: Any]] { Notifier.schedule(items) }
+            // The web side hands its identity over whenever it changes, so the
+            // copy that survives eviction is never the stale one.
+            case "saveid":
+                // An explicit sign-out has to reach here too. Without it the
+                // Keychain would hand the old cloud key straight back on the next
+                // launch, and clearing it would look like it had not worked.
+                if (body["clear"] as? Bool) == true { IDStore.clear() }
+                else {
+                    IDStore.save(sync: (body["sync"] as? String) ?? "",
+                                 device: (body["device"] as? String) ?? "")
+                }
             case "savepw":
                 if let pw = body["pw"] as? String, !pw.isEmpty { PWStore.save(pw); NSLog("WatchList: password saved to Keychain (Face ID armed for next launch)") }
             case "faceid":
@@ -445,6 +469,84 @@ struct WatchListShell: UIViewRepresentable {
             default: break
             }
         }
+    }
+}
+
+// The device's identity — its id on the network and the cloud key — kept where
+// iOS will not delete it.
+//
+// The device id and the cloud key live in localStorage, and iOS throws a
+// home-screen app's localStorage away: on eviction, after a stretch of not
+// opening the app, when storage is cleared. The app then looks like a stranger
+// — new id, no cloud key — so /join cannot recognise it and files another
+// request for somebody who has been a member for weeks. That is where a roster
+// of anonymous pending rows comes from, not from new people.
+//
+// Deliberately NOT guarded by Face ID, unlike PWStore. This is read before the
+// page's first line runs, with nobody looking at the screen and nothing to
+// prompt against; a biometric gate here would mean it never loads at all. It is
+// also not the same kind of secret: the cloud key addresses a list that is
+// itself encrypted with a separate password whenever one has been set.
+//
+// AfterFirstUnlock so it survives a reboot and is readable at launch;
+// ThisDeviceOnly so it never leaves this phone in an iCloud backup.
+enum IDStore {
+    private static let service = "com.humblezone.watchlist.identity"
+    private static let account = "identity"
+    private static func base() -> [String: Any] {
+        [kSecClass as String: kSecClassGenericPassword,
+         kSecAttrService as String: service, kSecAttrAccount as String: account]
+    }
+    static func save(sync: String, device: String) {
+        // Never overwrite a real identity with an empty one. A page still booting,
+        // or one that cleared storage before writing it back, would otherwise
+        // erase the only copy that survived the thing this exists to survive.
+        guard !sync.isEmpty || !device.isEmpty else { return }
+        var merged = read() ?? [:]
+        if !sync.isEmpty { merged["sync"] = sync }
+        if !device.isEmpty { merged["device"] = device }
+        guard let data = try? JSONSerialization.data(withJSONObject: merged) else { return }
+        SecItemDelete(base() as CFDictionary)
+        var q = base()
+        q[kSecValueData as String] = data
+        q[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+        let st = SecItemAdd(q as CFDictionary, nil)
+        NSLog("WatchList: IDStore.save status=%d (sync=%@ device=%@)",
+              Int(st), sync.isEmpty ? "-" : "set", device.isEmpty ? "-" : "set")
+    }
+    static func clear() {
+        let st = SecItemDelete(base() as CFDictionary)
+        NSLog("WatchList: IDStore.clear status=%d", Int(st))
+    }
+    static func read() -> [String: String]? {
+        var q = base()
+        q[kSecReturnData as String] = true
+        var out: CFTypeRef?
+        guard SecItemCopyMatching(q as CFDictionary, &out) == errSecSuccess,
+              let d = out as? Data,
+              let o = (try? JSONSerialization.jsonObject(with: d)) as? [String: String] else { return nil }
+        return o
+    }
+    /// A script that puts the identity back BEFORE the page looks for it, and
+    /// only ever on this app's own origin.
+    static func seedScript() -> String? {
+        guard let id = read() else { return nil }
+        let sync = id["sync"] ?? "", device = id["device"] ?? ""
+        if sync.isEmpty && device.isEmpty { return nil }
+        func esc(_ v: String) -> String {
+            var o = v.replacingOccurrences(of: "\\", with: "\\\\")
+            o = o.replacingOccurrences(of: "'", with: "\\'")
+            return o
+        }
+        // Only ever ADDS what is missing: if the page already holds an identity,
+        // that one is live and this is a stale copy of it.
+        return "(function(){try{"
+            + "var h=location.hostname||'';"
+            + "if(!(h==='theteknojunkie456.github.io'||h==='localhost'||h==='127.0.0.1'))return;"
+            + "var s='" + esc(sync) + "', d='" + esc(device) + "';"
+            + "if(s&&!localStorage.getItem('sync_animelist_v4'))localStorage.setItem('sync_animelist_v4',s);"
+            + "if(d&&!localStorage.getItem('wl_device'))localStorage.setItem('wl_device',d);"
+            + "}catch(e){}})();"
     }
 }
 

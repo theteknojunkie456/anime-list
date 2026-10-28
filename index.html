@@ -20121,8 +20121,13 @@ function quickSetup(){
     // other show to this one. Say that, rather than "I can't read it", and point
     // at the thing that does work.
     const opaqueId=(()=>{try{
+      // Same test as the template builder, for the same reason it had to change
+      // there: an id is not always digits. miruro's is a 32-character mixed-case
+      // token, so a digits-only check called it a show name — the builder then
+      // hardcoded one show into the template, and this explanation told the
+      // person nothing was wrong. One definition, used by both.
       const segs=new URL(url).pathname.split('/').filter(Boolean);
-      return segs.some(x=>/^\d{3,}$/.test(x))&&segs.some(x=>/[a-z]{3,}/i.test(x));
+      return segs.some(x=>looksOpaqueSeg(x))&&segs.some(x=>/[a-z]{3,}/i.test(x));
     }catch(e){return false;}})();
     // Before giving up: that number may not be the site's own at all. Aggregators
     // very often address shows by their AniList or MyAnimeList id — miruro does —

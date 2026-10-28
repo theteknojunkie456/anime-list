@@ -8155,6 +8155,7 @@ function recStageCheck(a){
 function syncCode(){try{return localStorage.getItem('sync_'+LSKEY)||'';}catch{return'';}}
 function setSyncCode(c){try{if(c)localStorage.setItem('sync_'+LSKEY,c);else localStorage.removeItem('sync_'+LSKEY);}catch{}
   try{if(c)mirrorCreds();else idbSet(IDB_CRED_KEY,'').catch(()=>{});}catch(e){}}
+let _reconciling=false;   // guards the pull-before-push against re-entering itself
 function syncAt(){try{return +localStorage.getItem('syncat_'+LSKEY)||0;}catch{return 0;}}
 function setSyncAt(t){try{localStorage.setItem('syncat_'+LSKEY,String(t||0));}catch{}}
 // One sync code should carry your WHOLE setup, not just the titles. `extra` is a flat
@@ -8654,6 +8655,43 @@ async function _syncPushInner(code){
   // failed the fingerprint is cleared, so a retry is never mistaken for a
   // no-op — the failure mode of this guard has to be an extra write, never a
   // backup that quietly stops.
+  // RECONCILE BEFORE REPLACING.
+  //
+  // Everything above guards against publishing a list that is EMPTY or has
+  // COLLAPSED. Nothing guarded against publishing one that is simply OLD, and a
+  // stale list trips none of those checks: it is the right size and full of real
+  // titles, it is just missing whatever happened elsewhere since this device
+  // last looked. A push replaces the cloud copy outright, so one device opening
+  // with a day-old list and saving anything at all republishes that day-old list
+  // over everyone's newer one. Every other device then merges the old copy back
+  // in and the whole list walks backwards — which is exactly what it did.
+  //
+  // Per-title newest-wins cannot save you here, because it only runs on the
+  // devices that PULL. The device doing the overwriting never consulted it.
+  //
+  // So: look first. If the cloud carries writes this device has never merged,
+  // do not replace it. Hand over to the pull path, which merges properly and
+  // schedules a push of the merged result — that copy contains the newest of
+  // both sides, which is what "the newest version wins" has to mean. And if the
+  // merge cannot run (list locked, cloud unreadable), this device simply does
+  // not publish. Declining to back up is recoverable; overwriting good data is
+  // not.
+  if(!_reconciling){
+    let far=null;
+    try{ far=await syncPull(); }catch(e){ far=null; }
+    if(far&&far.data&&(+far.updatedAt||0)>syncAt()){
+      _reconciling=true;
+      try{ await syncOnOpen(); }
+      catch(e){}
+      finally{ _reconciling=false; }
+      // syncOnOpen schedules its own push once it has merged. If it could not
+      // merge, syncAt is unchanged and we must not publish over the newer copy.
+      if((+far.updatedAt||0)>syncAt()){
+        try{logProblem('sync','declined to publish over a newer cloud copy',String(far.updatedAt));}catch(e){}
+        return;
+      }
+    }
+  }
   const fp=pushFingerprint(code);
   if(fp&&fp===lastPushFP()&&!pushState().n)return;
   // Sixteen hundred and ninety consecutive failures, one every three seconds,

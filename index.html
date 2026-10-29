@@ -1747,13 +1747,23 @@ body.first-paint .row-sec,body.content-in .row-sec{animation:fadeUp .5s cubic-be
 /* Calm, uniform icons — a settings list should read as one quiet surface, not six
    competing colours. Colour is reserved for a row that actually needs attention
    (see .set-row.warn below), so it stands out instead of getting lost in the noise. */
-.set-ico{width:36px;height:36px;flex-shrink:0;border-radius:10px;background:color-mix(in srgb,var(--sc,var(--t2)) 15%,var(--bg3));border:1px solid color-mix(in srgb,var(--sc,var(--t2)) 24%,transparent);display:flex;align-items:center;justify-content:center;color:var(--sc,var(--t2));}
-.set-ico .ico{width:16px;height:16px;}
+/* Fourteen rounded tiles down one column read as a grid of buttons rather than
+   a list of settings, and every one of them was a box drawn around a shape that
+   was already legible. The icon stays — it is how you find the row you want
+   without reading — and its container goes. */
+.set-ico{width:22px;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:var(--sc,var(--t3));}
+.set-ico .ico{width:18px;height:18px;}
+/* A group head is the section label the rest of the app already uses, so
+   Settings is built out of the same parts as everything else. Tighter above
+   the first row than the default, because the rule IS the separation. */
+.set-grp{margin:22px 0 4px;}
+.set-grp:first-child{margin-top:4px;}
+.set-grp+.set-row{border-top:none;}
 .set-txt{flex:1;min-width:0;}
 .set-h{font-size:15px;font-weight:700;color:var(--t1);letter-spacing:-.2px;}
 .set-p{font-size:13px;color:var(--t3);margin-top:2px;line-height:1.4;}
 .set-p.warn{color:var(--a2);font-weight:700;}
-.set-row.warn .set-ico{background:color-mix(in srgb,var(--a) 20%,var(--bg3));border-color:transparent;}
+.set-row.warn .set-ico{color:var(--a2);}
 .set-chev{flex-shrink:0;color:var(--t3);display:flex;}
 .set-chev .ico{width:16px;height:16px;}
 /* ── "How do I get a key" walkthrough ── */
@@ -17866,18 +17876,23 @@ function renderSettings(){
   const el=document.getElementById('settingsBody');if(!el)return;
   const backedUp=!!syncCode();
   const rows=[
+    {grp:'Getting your bearings'},
     {ic:'compass',  h:'Show me around',      p:wtSeen()?'Run the walkthrough again':'A guided walkthrough of the real app', go:'wtStart()'},
     {ic:'bulb',     h:'How WatchList works', p:'The written version, if you prefer reading', go:'openTutorial()'},
+    {grp:'Not losing it'},
     {ic:'cloud',    h:'Cloud backup',        p:backupStatusLine(),
      go:"openSheet('backupSheet')", warn:!backedUp||backupFailing()},
     {ic:'lock',     h:'Password',            p:encEnabled()?'On — your list is encrypted':'Off', go:"openSheet('securitySheet')"},
     {ic:'bell',     h:'Notifications',       p:notifyOn()?'On — you\'ll be told when an episode airs':'Off', go:'openNotifySheet()'},
-    {ic:'sparkles', h:'AI & chat key',       p:getKey()?'On — '+(keyProvider(getKey())||'key')+' connected':'Off — add a free key to unlock chat', go:"openAIChat()"},
+    {grp:'Where Watch goes'},
     {ic:'play',     h:'Sources', p:'Where Watch now / Read now open', go:"openSheet('sourceSheet')"},
     {ic:'refresh',  h:'AniList sync',        p:alConnected()?'On — '+alUser()+' · progress syncs both ways':'Off — connect to sync progress everywhere', go:"openSheet('anilistSheet')"},
-    {ic:'clipboard',h:'Import / Export',     p:'Paste a list in, or copy yours out', go:"openSheet('importSheet')"},
+    {ic:'sparkles', h:'AI & chat key',       p:getKey()?'On — '+(keyProvider(getKey())||'key')+' connected':(aiBorrowed()?'On — using the key you were lent':'Off — add a free key to unlock chat'), go:"openAIChat()"},
+    {grp:'How it looks'},
     {ic:'palette',  h:'Look',                p:'Themes and colours, over your list', go:"startPaint()"},
     {ic:'layers',   h:'Home screen',          p:homeLayoutLine(), go:"openHomeLayout()"},
+    {grp:'This device'},
+    {ic:'clipboard',h:'Import / Export',     p:'Paste a list in, or copy yours out', go:"openSheet('importSheet')"},
     {ic:'inbox',    h:'Storage',              p:storageLine(), go:"openStorageOptions()"},
   ];
   // Only once there is something in it — an empty Archive is a row that explains
@@ -17925,7 +17940,12 @@ function renderSettings(){
   rows.push({ic:'speech',h:'Startup sound',
     p:bootSfxOn()?'On — plays once when the app opens':'Off',
     go:'toggleBootSfx()'});
+  // Fourteen identical rows is a wall, and a wall is read by nobody — every row
+  // the same weight means no row is findable. They go in named groups, under
+  // the same hairline label the rest of the app uses for a section, so Settings
+  // is four short lists instead of one long one.
   el.innerHTML=rows.map(r=>
+    r.grp?`<div class="dt-label set-grp">${escH(r.grp)}</div>`:
     `<button class="set-row${r.warn?' warn':''}" onclick="${r.go}">
       <div class="set-ico">${icon(r.ic)}</div>
       <div class="set-txt"><div class="set-h">${r.h}</div><div class="set-p${r.warn?' warn':''}">${r.p}</div></div>

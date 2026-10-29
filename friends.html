@@ -6516,7 +6516,14 @@ function kitApply(p){
     }catch(e){}
   }
   if(p.onboard){
-    try{localStorage.setItem('onboarded_'+LSKEY,'1');localStorage.setItem('tut_seen_'+LSKEY,'1');}catch(e){}
+    // Marks the EXPLAINING as done, not the setup. Three cards describing what
+    // the app is are exactly what somebody who was handed it by a friend does
+    // not need. The checklist is a different thing: two of its rows are jobs a
+    // link physically cannot do — adding to the Home Screen, which the browser
+    // owns and which on iPhone is the only way an alert ever arrives, and the
+    // notification permission, which needs their own tap. Skipping those in
+    // the name of "everything is set up" would mean no alerts, in a tab.
+    try{localStorage.setItem('tut_seen_'+LSKEY,'1');}catch(e){}
     try{localStorage.setItem(CODE_SEEN,'1');}catch(e){}
   }
   try{_applyExtraRepaint();}catch(e){}
@@ -6559,7 +6566,13 @@ function kitScreen(o){
   el.classList.add('on');
 }
 function kitClose(){const el=document.getElementById('kitGate');if(el)el.classList.remove('on');}
-function kitDecline(){clearPendingKit();kitClose();try{render();}catch(e){}}
+function kitDecline(){
+  clearPendingKit();kitClose();
+  try{render();}catch(e){}
+  // They said they would rather set it up themselves, and this is a fresh
+  // install, so give them the thing that does that instead of an empty app.
+  try{setTimeout(()=>{try{maybeShowTutorial();}catch(e){}},300);}catch(e){}
+}
 async function kitAccept(){
   const id=pendingKit();if(!id){kitClose();return;}
   const note=document.getElementById('kitNote');
@@ -6578,6 +6591,10 @@ async function kitAccept(){
   if(res.joined==='approved'){try{setNetStatus('approved');}catch(e){}}
   kitClose();
   try{render();renderSyncUI&&renderSyncUI();}catch(e){}
+  // Straight to the last card — the two things left are theirs to do.
+  if((res.payload||{}).onboard){
+    try{onbIdx=ONB.length-1;setTimeout(()=>{try{showOnb();}catch(e){}},420);}catch(e){}
+  }
   // Notifications need a tap of their own — a permission prompt cannot be
   // carried in a link, and should not be.
   if((res.payload||{}).notify){
@@ -17620,6 +17637,12 @@ function tutGo(id){closeTutorial();setTimeout(()=>openSheet(id),280);}
 // Anyone with a stored list has been here before and is never interrupted.
 function maybeShowTutorial(){
   if(tutSeen()||appLocked)return;
+  // Someone arriving on a setup link is a brand-new install by every test here,
+  // so without this they get card one of the welcome opening underneath the
+  // invite — two first-run screens stacked, in the wrong order. The invite
+  // answers first; it brings the welcome back itself, at the card that still
+  // has something left to do.
+  try{if(pendingKit())return;}catch(e){}
   let fresh=false;try{fresh=!store()||!store().getItem(LSKEY);}catch{}
   if(!fresh){markTutSeen();return;}
   showOnb();   // brand-new install → the swipeable welcome + setup flow
@@ -17724,7 +17747,28 @@ function onbNext(){
   if(onbIdx>=ONB.length-1){finishOnb();return;}
   onbIdx++; track.scrollTo({left:onbIdx*track.clientWidth,behavior:_scrollBehavior()}); updOnbDots();
 }
-function onbCTA(sheet){ if(sheet==='notifySheet')openNotifySheet(); else openSheet(sheet); }   // opens on top of onboarding
+// A checklist where every row opens a sheet is a checklist that sends you
+// somewhere else four times, and each trip is a chance to not come back. Two
+// of these rows contain no decision at all — turn backup on, allow alerts — so
+// they happen where you tapped, and the row ticks itself.
+//
+// The other two still open something, on purpose: choosing a password is a
+// real decision and deserves its own screen, and Add to Home Screen belongs to
+// the browser, which will not be talked into it from here.
+async function onbCTA(sheet){
+  if(sheet==='backupSheet'){
+    try{if(!syncCode())syncEnableNew();}catch(e){}
+    try{toast('Backup on \u2014 your code is in Settings, save it');}catch(e){}
+    refreshOnbTasks();return;
+  }
+  if(sheet==='notifySheet'){
+    // The tap IS the gesture a permission prompt requires, which is why this
+    // can be asked here and could not be asked a second later on a timer.
+    try{await enableNotify();}catch(e){}
+    refreshOnbTasks();return;
+  }
+  openSheet(sheet);
+}
 // Coming back from a setup sheet has to tick the box you just ticked, or the
 // checklist is a picture of a checklist.
 function refreshOnbTasks(){
@@ -17739,7 +17783,9 @@ function showOnb(){
   renderOnb();
   const v=document.getElementById('onb'); if(v)v.classList.add('on');
   markTutSeen();   // don't also pop the old text tutorial
-  try{localStorage.setItem('onboarded_'+LSKEY,'1');}catch{}
+  // 'onboarded_'+LSKEY used to be written here and was read by nothing — one
+  // writer, no readers, in a key named clearly enough that seeds and tests
+  // kept setting it believing it decided something. tutSeen() is the gate.
 }
 function finishOnb(){
   const v=document.getElementById('onb'); if(v)v.classList.remove('on');

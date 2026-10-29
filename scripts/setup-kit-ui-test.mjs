@@ -118,6 +118,8 @@ const until=async(expr,ms=9000)=>{const t0=Date.now();
 t('the welcome appears', await until(`!!document.querySelector('#kitGate.on')`), true);
 t('and names who sent it', /Muhammad set WatchList up for you/.test(await ev(`(document.querySelector('.kit-title')||{}).textContent||''`)), true);
 t('nothing is applied before you agree', await ev(`localStorage.getItem('animetheme')`), 'default');
+t('and the ordinary welcome is not stacked underneath it',
+  await ev(`!document.querySelector('#onb.on')`), true);
 t('and nothing has been claimed yet', await ev(`window.__claims`), 0);
 
 await ev(`kitAccept()`);
@@ -125,7 +127,18 @@ await wait(1200);
 t('accepting applies the look', await ev(`localStorage.getItem('animetheme')`), 'zoro');
 t('and paints it', await ev(`document.documentElement.getAttribute('data-theme')`), 'zoro');
 t('the sender is in their friends', await ev(`friendsList().some(f=>f.code==='SENDERFRIEND1')`), true);
-t('the setup steps are marked done', await ev(`localStorage.getItem('onboarded_'+LSKEY)`), '1');
+// NOT "onboarding is marked done". A kit skips the three cards explaining what
+// the app is — which is exactly what somebody handed it by a friend does not
+// need — and then shows the checklist, because two of its rows are jobs no
+// link can do: adding to the Home Screen, which the browser owns and which on
+// iPhone is the only way an alert ever arrives, and the notification
+// permission, which needs their own tap. Calling those done would mean "fully
+// set up" quietly meant no alerts, in a tab.
+t('the explaining cards are skipped', await ev(`localStorage.getItem('tut_seen_'+LSKEY)`), '1');
+t('but the checklist is shown, not skipped', await until(`!!document.querySelector('#onb.on')`), true);
+t('open at the last card, where the jobs are', await ev(`onbIdx===ONB.length-1`), true);
+t('with the two it cannot do for them still to do',
+  await ev(`JSON.stringify(onbTasks().filter(t=>!t.done).map(t=>t.k).sort())`), '["alerts","backup","install","lock"]');
 t('the borrowed AI budget is switched on', await ev(`localStorage.getItem('wl_ai_borrowed')`), '1');
 t('the welcome is gone', await ev(`!document.querySelector('#kitGate.on')`), true);
 t('and the kit is not left pending', await ev(`pendingKit()`), '');

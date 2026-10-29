@@ -1957,6 +1957,36 @@ img[data-fd="in"]{opacity:1;transition:opacity .18s ease-out;}
   background:rgba(255,255,255,0.94);color:#0a0a0c;font-size:13px;font-weight:800;
   padding:9px 16px;border-radius:99px;min-height:38px;
 }
+/* ── THE SETUP-KIT WELCOME ──────────────────────────────────────────────────
+   Somebody else prepared this app for the person reading it, and the screen
+   should feel like being handed something rather than like a dialog box.
+   One card, centred, nothing else on screen to do. */
+.kit-gate{position:fixed;inset:0;z-index:120;display:none;align-items:center;justify-content:center;
+  padding:calc(var(--safe-t) + 24px) 22px calc(var(--safe-b) + 24px);
+  background:var(--bg);}
+.kit-gate.on{display:flex;}
+.kit-card{width:100%;max-width:420px;text-align:left;animation:fadeUp .42s cubic-bezier(.2,1,.3,1) both;}
+.kit-mark{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;
+  background:color-mix(in srgb,var(--a) 18%,var(--bg3));color:var(--a2);margin-bottom:18px;}
+.kit-mark .ico{width:20px;height:20px;}
+.kit-title{font-family:var(--fd);font-size:26px;font-weight:800;letter-spacing:-0.04em;line-height:1.1;
+  font-variation-settings:'opsz' 48,'wght' 800;margin-bottom:10px;}
+.kit-body{font-size:14px;line-height:1.6;color:var(--t2);margin-bottom:22px;}
+.kit-go{width:100%;padding:14px 0;border-radius:12px;background:var(--a);color:var(--aFg);
+  font-family:var(--fd);font-size:15px;font-weight:800;letter-spacing:-0.01em;}
+.kit-go:active{transform:scale(.99);}
+.kit-alt{width:100%;padding:12px 0;margin-top:9px;border-radius:12px;background:transparent;
+  color:var(--t3);font-size:13px;font-weight:600;}
+.kit-note{margin-top:14px;font-size:12px;color:var(--t3);min-height:16px;}
+/* What the link will actually carry, listed from the payload itself rather
+   than written out by hand — a summary maintained separately from the thing
+   it summarises is a summary that goes stale and starts lying. */
+.kit-mirror{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 12px;}
+.kit-mirror span{font-size:11px;font-weight:700;letter-spacing:.01em;padding:5px 9px;border-radius:6px;
+  background:var(--bg3);border:1px solid var(--bn2);color:var(--t2);}
+[data-retro] .kit-mirror span{border-radius:2px;}
+[data-retro] .kit-go,[data-retro] .kit-alt,[data-retro] .kit-mark{border-radius:2px;}
+
 /* ── BILLBOARD (auto-rotating spotlight) ── */
 .billboard{position:relative;margin:14px 18px 6px;border-radius:26px;overflow:hidden;min-height:240px;box-shadow:0 18px 44px -14px rgba(0,0,0,.72);animation:fadeUp .4s ease both;}
 .bb-track{display:flex;min-height:240px;transition:transform .45s cubic-bezier(.22,1,.28,1);}
@@ -5810,6 +5840,9 @@ body.recsel .pcard{position:relative;}
   <div id="watchBody"></div>
 </div>
 
+<!-- The setup-kit welcome. Full screen on purpose: it is the first thing a new
+     person sees and it is asking a yes/no question, not offering a setting. -->
+<div class="kit-gate" id="kitGate"></div>
 <div class="sheet" id="adminSheet">
   <div class="sheet-handle"></div>
   <div class="sheet-header">
@@ -6387,6 +6420,220 @@ try{setTimeout(()=>{try{saveIdentityNative();}catch(e){}},1500);}catch(e){}
 function netStatus(){try{return localStorage.getItem(NET_STATUS)||'';}catch{return '';}}
 function setNetStatus(s){try{s?localStorage.setItem(NET_STATUS,s):localStorage.removeItem(NET_STATUS);}catch{}}
 // Capture ?invite=CODE from a shared link, remember it, and clean the URL.
+// ─── SETUP KITS ─────────────────────────────────────────────────────────────
+// A link prepared for one person that leaves their app already set up: the
+// look, where Watch goes, you as a friend, notifications armed, AI working.
+//
+// An ALLOW-LIST, never a deny-list. collectExtra() exists and is tempting —
+// it is exactly this bag of settings — but it is built for your own backup,
+// where carrying your cloud code is harmless. In a kit that would hand the
+// recipient the key to your list. So a kit travels only what is named here,
+// and a setting added to the app later has to be added here on purpose
+// rather than leaking by default.
+const KIT_KEYS=[
+  // the look
+  'animetheme','retro_on','glow_mode','accent_override','card_density',
+  'home_layout','status_colors','art_focal',
+  // where Watch goes, and what it offers
+  'my_services','stream_src','read_src','site_pref','no_source','admin_sources',
+];
+// Deliberately NOT in that list, and each for its own reason: sync_* and
+// syncat_* (your list), anthropic_key (see the AI proxy in the worker),
+// friends (yours to know, not theirs to inherit), wl_device / friend_code /
+// wl_admin_token (identity — a kit that cloned those would make two devices
+// the same device), party_* and chat_hist (conversations), al_* (your AniList
+// account), LSKEY and its backup (your titles).
+function kitCollect(opts){
+  opts=opts||{};
+  const look={};
+  for(const k of KIT_KEYS){
+    try{const v=localStorage.getItem(k); if(v!=null)look[k]=v;}catch(e){}
+  }
+  const p={v:1,look};
+  // A friend code is an address rather than a secret, so it is the one thing
+  // of the sender's that belongs in here — it is what makes the app social on
+  // first open instead of empty.
+  if(opts.friend!==false){
+    try{p.fromCode=myFriendCode();}catch(e){}
+    try{p.fromName=(localStorage.getItem('friend_name')||localStorage.getItem('party_name')||'').slice(0,40);}catch(e){}
+  }
+  if(opts.onboard!==false)p.onboard=true;
+  if(opts.notify!==false)p.notify=true;
+  if(opts.note)p.note=String(opts.note).slice(0,200);
+  return p;
+}
+// What a kit will do, in words, so the person making one can see it before
+// anybody else gets it. A summary generated from the payload rather than
+// written by hand cannot drift from what actually travels.
+function kitSummary(p){
+  const out=[];
+  const look=(p&&p.look)||{};
+  const th=look.animetheme?('the '+look.animetheme+' theme'):'the default theme';
+  out.push(look.retro_on==='1'?(th+', in Retro'):th);
+  const srcs=(()=>{try{return JSON.parse(look.my_services||'[]').length;}catch(e){return 0;}})();
+  if(srcs)out.push(srcs+' source'+(srcs===1?'':'s')+' already set up');
+  if(look.admin_sources)out.push('your recommended sites');
+  if(p.fromCode)out.push('you added as a friend');
+  if(p.notify)out.push('notifications offered on first open');
+  if(p.onboard)out.push('setup steps skipped');
+  return out;
+}
+const KIT_PEND='wl_kit_pending';
+function captureKit(){
+  try{
+    const u=new URL(location.href),k=u.searchParams.get('kit');
+    if(k&&/^[a-z0-9]{8,24}$/.test(k)){
+      localStorage.setItem(KIT_PEND,k);
+      // Out of the address bar immediately. A setup link sitting in history is
+      // one back-button away from being handed to the next person on the
+      // machine, and it is the kind of thing people paste without reading.
+      u.searchParams.delete('kit');history.replaceState(null,'',u.pathname+u.search+u.hash);
+    }
+  }catch(e){}
+}
+function pendingKit(){try{return localStorage.getItem(KIT_PEND)||'';}catch{return '';}}
+function clearPendingKit(){try{localStorage.removeItem(KIT_PEND);}catch(e){}}
+
+async function kitPost(path,body){
+  const r=await fetch(NOTIFY_URL+path,{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify(Object.assign({dev:wlDevice()},body||{}))});
+  return await r.json();
+}
+// Applying is deliberately not "write everything and hope". Each group is
+// tried on its own so one bad value cannot cost the rest of the setup.
+function kitApply(p){
+  if(!p||typeof p!=='object')return;
+  const look=p.look||{};
+  for(const k of KIT_KEYS){
+    if(!(k in look))continue;
+    try{if(typeof look[k]==='string')localStorage.setItem(k,look[k]);}catch(e){}
+  }
+  if(p.fromCode){
+    try{
+      const have=friendsList();
+      if(!have.some(f=>f&&f.code===p.fromCode))
+        saveFriends([{code:p.fromCode,name:p.fromName||'Friend',at:Date.now()}].concat(have));
+    }catch(e){}
+  }
+  if(p.onboard){
+    try{localStorage.setItem('onboarded_'+LSKEY,'1');localStorage.setItem('tut_seen_'+LSKEY,'1');}catch(e){}
+    try{localStorage.setItem(CODE_SEEN,'1');}catch(e){}
+  }
+  try{_applyExtraRepaint();}catch(e){}
+}
+// The welcome. Shown before anything is claimed, because a link that changes
+// your app the instant you tap it is a link nobody can decline.
+async function kitWelcome(){
+  const id=pendingKit();if(!id)return false;
+  let info=null;
+  try{info=await kitPost('/kit-peek',{id});}catch(e){info=null;}
+  if(!info||!info.ok){clearPendingKit();return false;}
+  if(info.expired||info.used){
+    // Say which of the two it was. "Doesn't work" sends somebody back to the
+    // person who sent it with nothing useful to report.
+    kitScreen({title:info.expired?'This invite has expired':'This invite has already been used',
+      body:info.expired
+        ?'Links are set to run out so an old one cannot be used by someone you did not mean to invite. Ask '+(info.from||'whoever sent it')+' for a new one.'
+        :'It was set up for one device and another has already opened it. If that was not you, ask '+(info.from||'whoever sent it')+' for one of your own.',
+      cta:'Set it up myself',onCta:'kitDecline()'});
+    clearPendingKit();return true;
+  }
+  const who=info.from?escH(info.from):'Someone';
+  kitScreen({
+    title:who+' set WatchList up for you',
+    body:'Everything is chosen already — the look, where Watch opens, '+who+' added as a friend. Nothing is on your phone until you tap below, and it works on this device only.',
+    cta:'Set up my app',onCta:'kitAccept()',
+    alt:'No thanks, I will set it up myself',onAlt:'kitDecline()'});
+  return true;
+}
+function kitScreen(o){
+  const el=document.getElementById('kitGate');if(!el)return;
+  el.innerHTML=`<div class="kit-card">
+    <div class="kit-mark">${icon('send')}</div>
+    <div class="kit-title">${o.title}</div>
+    <p class="kit-body">${o.body}</p>
+    <button class="kit-go" onclick="${o.onCta}">${o.cta}</button>
+    ${o.alt?`<button class="kit-alt" onclick="${o.onAlt}">${o.alt}</button>`:''}
+    <div class="kit-note" id="kitNote"></div>
+  </div>`;
+  el.classList.add('on');
+}
+function kitClose(){const el=document.getElementById('kitGate');if(el)el.classList.remove('on');}
+function kitDecline(){clearPendingKit();kitClose();try{render();}catch(e){}}
+async function kitAccept(){
+  const id=pendingKit();if(!id){kitClose();return;}
+  const note=document.getElementById('kitNote');
+  if(note)note.textContent='Setting up…';
+  let res=null;
+  try{res=await kitPost('/kit-claim',{id,name:(localStorage.getItem('friend_name')||'').slice(0,40)});}catch(e){res=null;}
+  if(!res||!res.ok){
+    if(note)note.textContent=res&&res.error==='used'?'Another device claimed this one first.':'Could not reach the network. Try again in a moment.';
+    return;
+  }
+  clearPendingKit();
+  kitApply(res.payload);
+  if(res.aiCap>0){try{localStorage.setItem('wl_ai_borrowed','1');}catch(e){}}
+  // Approved by the claim itself, so the gate this device would otherwise sit
+  // behind is already open.
+  if(res.joined==='approved'){try{setNetStatus('approved');}catch(e){}}
+  kitClose();
+  try{render();renderSyncUI&&renderSyncUI();}catch(e){}
+  // Notifications need a tap of their own — a permission prompt cannot be
+  // carried in a link, and should not be.
+  if((res.payload||{}).notify){
+    try{toast('You are set up. Turn on episode alerts in Settings whenever you like');}catch(e){}
+  }else{try{toast('You are set up');}catch(e){}}
+}
+
+// ── making one ──────────────────────────────────────────────────────────────
+let _kitLast='';
+function kitLinkFor(id){try{return location.origin+location.pathname+'?kit='+id;}catch(e){return '?kit='+id;}}
+async function kitCreate(){
+  const label=((document.getElementById('kitLabel')||{}).value||'').trim();
+  const cap=parseInt(((document.getElementById('kitAi')||{}).value||'0'),10)||0;
+  const days=parseInt(((document.getElementById('kitDays')||{}).value||'30'),10)||30;
+  const out=document.getElementById('kitOut');
+  if(out)out.innerHTML='<p class="ai-desc">Making it…</p>';
+  const payload=kitCollect({});
+  let res=null;
+  try{res=await kitPost('/kit-new',{token:adminToken(),label,payload,aiCap:cap,days});}catch(e){res=null;}
+  if(!res||!res.ok){if(out)out.innerHTML='<p class="ai-desc">'+escH((res&&res.error)||'Could not reach the network')+'</p>';return;}
+  _kitLast=kitLinkFor(res.id);
+  if(out)out.innerHTML=`<div class="lnk-url">${escH(_kitLast)}</div>
+    <div style="display:flex;gap:8px;margin-top:9px;flex-wrap:wrap">
+      <button class="src-chip" onclick="kitCopy()">Copy link</button>
+      <button class="src-chip" onclick="kitLoad()">See all invites</button>
+    </div>
+    <p class="ai-desc" style="font-size:12px;margin-top:8px">One device only. Whoever opens it first keeps it, and everyone else is turned away. Runs out in ${days} day${days===1?'':'s'} if nobody uses it.</p>`;
+  kitLoad();
+}
+function kitCopy(){
+  if(!_kitLast)return;
+  const done=()=>toast('Invite link copied');
+  if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(_kitLast).then(done).catch(()=>{try{prompt('Copy this:',_kitLast);}catch(e){}});
+  else{try{prompt('Copy this:',_kitLast);}catch(e){}}
+}
+async function kitLoad(){
+  const box=document.getElementById('kitList');if(!box)return;
+  box.innerHTML='<p class="ai-desc">Reading…</p>';
+  let res=null;
+  try{res=await kitPost('/kit-list',{token:adminToken()});}catch(e){res=null;}
+  if(!res||!res.ok){box.innerHTML='<p class="ai-desc">Could not reach the network.</p>';return;}
+  const ks=res.kits||[];
+  if(!ks.length){box.innerHTML='<p class="ai-desc">No invites yet.</p>';return;}
+  box.innerHTML=ks.map(k=>{
+    const when=k.claimed?('used '+relTime(k.claimedAt)):'not used yet';
+    const gone=Date.now()>k.expiresAt;
+    return `<div class="dev-row">
+      <div class="dev-id"><b>${escH(k.label||'Invite')}</b>
+        <span>${gone?'expired':escH(when)}${k.aiCap?' · '+k.aiCap+' AI requests':''}</span></div>
+      ${k.claimed||gone?'':`<button class="dev-pick" onclick="kitRevoke('${escH(k.id)}')">Cancel</button>`}
+    </div>`;}).join('');
+}
+async function kitRevoke(id){
+  try{await kitPost('/kit-revoke',{token:adminToken(),id});}catch(e){}
+  toast('Invite cancelled');kitLoad();
+}
 function captureInvite(){
   try{const u=new URL(location.href),c=u.searchParams.get('invite');
     if(c){localStorage.setItem(NET_INVITE,c.slice(0,40));u.searchParams.delete('invite');history.replaceState(null,'',u.pathname+u.search+u.hash);}
@@ -6740,6 +6987,25 @@ function renderAdmin(){
       <button class="src-chip" onclick="adminSetCap()">Set</button>
     </div>
     <div id="adminMembers"><p class="ai-desc">Loading…</p></div>
+
+    <details class="src-fold" style="margin-top:18px">
+      <summary>${icon('send')} Set someone up</summary>
+      <p class="ai-desc" style="margin-top:8px">Makes a link that carries your setup. Whoever opens it first gets your theme, your sources and you as a friend, and is let in without you approving anything. One device only — everyone after them is turned away.</p>
+      <div class="kit-mirror">${kitSummary(kitCollect({})).map(x=>`<span>${escH(x)}</span>`).join('')}</div>
+      <input class="ai-prompt-in" id="kitLabel" placeholder="Who is it for? (just so you can tell them apart)" style="margin-bottom:8px">
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+        <span class="ai-desc" style="margin:0;flex:1">AI requests on your key</span>
+        <input class="ai-prompt-in" id="kitAi" inputmode="numeric" value="200" style="flex:0 0 80px;text-align:center;padding:8px">
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+        <span class="ai-desc" style="margin:0;flex:1">Runs out after (days)</span>
+        <input class="ai-prompt-in" id="kitDays" inputmode="numeric" value="30" style="flex:0 0 80px;text-align:center;padding:8px">
+      </div>
+      <p class="ai-desc" style="font-size:12px">Those requests are spent on the server, so your key never reaches their phone and the number is a real ceiling rather than a promise. When it runs out they are asked for a key of their own.</p>
+      <button class="parse-btn" style="margin-top:8px" onclick="kitCreate()">Make the link</button>
+      <div id="kitOut" style="margin-top:10px"></div>
+      <div id="kitList" style="margin-top:12px"></div>
+    </details>
 
     <details class="src-fold" style="margin-top:18px">
       <summary>${icon('bell')} Broadcast a notification</summary>
@@ -23427,8 +23693,27 @@ async function callOpenAICompat(url,key,models,prompt){
 function unknownKeyErr(){
   const e=new Error('unrecognised key');e.unknownKey=true;return e;
 }
+// A borrowed budget, spent where the key is. Someone who arrived through a
+// setup kit has AI working without ever having been given a key — the prompt
+// goes to the worker, the worker holds the sender's key and the count, and the
+// moment the budget is gone this falls through to the normal path and asks for
+// a key of their own. Their OWN key always wins: once they have one, this is
+// never consulted again and the call goes straight to the provider as before.
+function aiBorrowed(){try{return localStorage.getItem('wl_ai_borrowed')==='1';}catch{return false;}}
+function aiBorrowStop(){try{localStorage.removeItem('wl_ai_borrowed');}catch(e){}}
+async function callAIBorrowed(prompt){
+  const r=await fetch(NOTIFY_URL+'/ai',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({dev:wlDevice(),prompt})});
+  const d=await r.json().catch(()=>null);
+  if(d&&d.ok)return d.text||'No response.';
+  // Out of requests is not an error to retry — it is the end of the loan, and
+  // the app should stop pretending it has AI until they bring a key.
+  if(d&&(d.error==='spent'||d.error==='no budget')){aiBorrowStop();throw NO_KEY;}
+  throw new Error((d&&d.error)||'The shared AI is not answering right now.');
+}
 async function callAI(prompt){
   const key=getKey();
+  if(!key&&aiBorrowed())return callAIBorrowed(prompt);
   if(!key)throw NO_KEY;
   const prov=aiProvider();
   if(!prov)throw unknownKeyErr();
@@ -25611,8 +25896,13 @@ loadTheme();try{seedHiddenDefaults();}catch{}try{_restoreUpd();}catch{}render();
 try{setTimeout(maybeShowWhatsNew,900);}catch{}
 // Invite-only network (no-op unless NETWORK_GATE is on). Capture any invite from
 // the link first, then run the gate — it overlays the app for unapproved devices.
-try{captureGateTest();captureInvite();}catch{}
+try{captureGateTest();captureInvite();captureKit();}catch{}
 (async()=>{try{await networkGate();}catch{}})();
+// A kit is offered AFTER the gate, never before: the gate is what decides
+// whether this device may talk to the network at all, and claiming is a thing
+// you do on a network. It also waits a beat so the welcome lands on a drawn
+// app rather than over a half-painted one.
+try{if(pendingKit())setTimeout(()=>{try{kitWelcome();}catch(e){}},1200);}catch{}
 // Admin on-screen card: fetch on load and when the app regains focus.
 try{setTimeout(fetchAdminCard,1400);window.addEventListener('focus',()=>{try{fetchAdminCard();}catch{}});}catch{}
 try{setTimeout(fetchAdminSources,1600);window.addEventListener('focus',()=>{try{fetchAdminSources();}catch{}});}catch{}

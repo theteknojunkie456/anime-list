@@ -59,17 +59,28 @@ let pass=0,fail=0;
 const t=(n,g,e)=>{const ok=JSON.stringify(g)===JSON.stringify(e);ok?pass++:fail++;
   console.log((ok?'ok  ':'FAIL')+'  '+n+'  -> '+JSON.stringify(g)+(ok?'':' (want '+JSON.stringify(e)+')'));};
 
-const before=await ev(`JSON.stringify({n:realList().length,pushes:window.__pushes,at:syncAt()})`);
-const d=await ev(`(async()=>{const d=await syncDiagnose();return {lc:d.localCount,cc:d.cloudCount,
-  newerHere:d.localNewest>d.cloudNewest, build:d.build, fails:d.pushFails};})()`);
+const before=await ev(`JSON.stringify({n:realList().length,at:syncAt()})`);
+// Opening the app merges a cloud copy that differs from this device's, and
+// that merge pushes — correctly. Counting pushes across a window that happened
+// to contain it made this test pass or fail on whether a 10-second timer landed
+// before or after a line, which is a coin toss wearing a test's clothes. The
+// pending push is cleared and the count is taken either side of the call, so
+// what is measured is what THIS call did.
+const d=await ev(`(async()=>{
+  try{clearTimeout(pushT);_pushPending=false;_pushSince=0;}catch(e){}
+  const p0=window.__pushes;
+  const d=await syncDiagnose();
+  return {lc:d.localCount,cc:d.cloudCount,
+  newerHere:d.localNewest>d.cloudNewest, build:d.build, fails:d.pushFails, pushed:window.__pushes-p0};})()`);
 console.log('    ', JSON.stringify(d));
 t('it counts this device', d.lc, 1);
 t('and counts the cloud copy', d.cc, 2);
 t('and says which side is newer', d.newerHere, true);
 t('and reports the build', typeof d.build==='string'&&d.build.length>3, true);
 
-const after=await ev(`JSON.stringify({n:realList().length,pushes:window.__pushes,at:syncAt()})`);
+const after=await ev(`JSON.stringify({n:realList().length,at:syncAt()})`);
 t('it changed nothing it looked at', after, before);
+t('and sent nothing while it looked', d.pushed, 0);
 
 const txt=await ev(`(async()=>{document.body.insertAdjacentHTML('beforeend','<div id="syncDiagBox"></div>');
   await showSyncDiagnosis();return document.getElementById('syncDiagBox').textContent;})()`);
@@ -95,5 +106,45 @@ t("an unreadable cloud copy is marked unknown", enc.unknown, true);
 t("and is never reported as never", enc.saysNever, false);
 t("it says plainly that it could not read it", enc.saysUnreadable, true);
 t("and refuses to claim a comparison", enc.verdict, true);
+// ── the panel has to FIT ────────────────────────────────────────────────────
+// The folds in here inset their contents, and for a while they did it with
+// margin — so a child asking for width:100% measured the full content box and
+// then added the inset outside it, and overflow:hidden cut the difference off.
+// What you saw was the right end of "Check both sides", "Show my devices" and
+// the "Use this one" rows missing, on a screen with room to spare. Nothing in
+// the panel announced it; you had to notice the button was a button-and-a-bit.
+// So this asks the only question that matters and asks it of EVERY box: does
+// anything stick out past the thing that contains it.
+// The panel lives inside Settings, so it has to be ON SCREEN before any of
+// this means anything — a box of zero width overflows nothing, and a check
+// that cannot fail is worse than no check. Hence the width guard: if the panel
+// is not actually laid out, this reports that instead of a clean bill.
+const overflow=async()=>ev(`(()=>{
+  try{closeAll()}catch(e){} try{openSheet('settingsSheet')}catch(e){}
+  try{renderSyncUI()}catch(e){}
+  const box=document.getElementById('syncBox'); if(!box)return 'no panel';
+  if(box.getBoundingClientRect().width<100)return 'the panel never opened, so nothing was measured';
+  box.querySelectorAll('details.dt-fold').forEach(d=>d.open=true);
+  const dp=document.getElementById('devPickBox');
+  if(dp&&typeof _devRow==='function')
+    dp.innerHTML=_devRow({id:'d1',name:'A device with a name long enough to crowd the row',n:283,at:Date.now()},'d1');
+  const out=[];
+  const walk=el=>{
+    const r=el.getBoundingClientRect(); if(r.width<4)return;
+    if(el.scrollWidth-el.clientWidth>1)out.push((el.className||el.tagName)+' clips '+(el.scrollWidth-el.clientWidth)+'px');
+    for(const c of el.children){
+      if(c.getBoundingClientRect().right-r.right>0.5)
+        out.push(((c.className||c.tagName)+'').split(' ')[0]+' sticks out of '+((el.className||el.tagName)+'').split(' ')[0]);
+      walk(c);
+    }
+  };
+  walk(box); return out.slice(0,6);})()`);
+
+for(const [label,w] of [['on a phone',390],['on a laptop',1280]]){
+  await cmd('Emulation.setDeviceMetricsOverride',{width:w,height:900,deviceScaleFactor:1,mobile:w<700});
+  await wait(350);
+  t('nothing in the cloud panel is cut off '+label, await overflow(), []);
+}
+
 console.log('\n'+pass+' passed, '+fail+' failed');
 ws.close();ch.kill();srv.kill();process.exit(fail?1:0);

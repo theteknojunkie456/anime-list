@@ -56,10 +56,18 @@ await ev(`(()=>{try{localStorage.removeItem('codeseen_'+LSKEY);}catch(e){}
 t('a device with a list mints a key on its own', await ev(`!!syncCode()`), true);
 t('and records that it invented it', await ev(`keySelfMade()`), true);
 
-t('with no friends it just says to save the code',
-  (await banner(`localStorage.setItem('friends','[]')`)).slice(0,26), 'Your list is backed up. Sa');
-t('with friends it names the split instead',
-  /already have one/.test(await banner(`localStorage.setItem('friends','[{"code":"bbbbbbbbbb2","name":"Rin"}]')`)), true);
+// These two used to assert that the warning appeared only once a friend had
+// been added — which was the bug, written down as an expectation: having a
+// friend says nothing about whether your devices share a key. The banner now
+// says both things whoever you know, because nothing on the device can tell a
+// split account from an ordinary first one, and it must not be wrong for
+// either. What is still worth holding is that it does not go quiet.
+t('a minted key is named as one, with no friends',
+  /made up its own cloud code/.test(await banner(`localStorage.setItem('friends','[]')`)), true);
+t('and it still says to save the code, which is the other half',
+  /Save your code/.test(await banner(`localStorage.setItem('friends','[]')`)), true);
+t('having a friend changes nothing about it',
+  /made up its own cloud code/.test(await banner(`localStorage.setItem('friends','[{"code":"bbbbbbbbbb2","name":"Rin"}]')`)), true);
 
 // the backup sheet must say what switching costs
 const sheet=await ev(`(()=>{renderSyncUI&&renderSyncUI();

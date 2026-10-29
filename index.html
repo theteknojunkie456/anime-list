@@ -2763,7 +2763,17 @@ body.first-paint .pfill,body.content-in .pfill{animation:barGrow .62s cubic-bezi
 .dt-fold>summary .ico{width:15px;height:15px;color:var(--t3);flex:0 0 auto;}
 .dt-fold-x{margin-left:auto;font-size:12px;font-weight:700;color:var(--a2);}
 .dt-fold[open]>summary{border-bottom:1px solid var(--b1);}
-.dt-fold>*:not(summary){margin-left:14px;margin-right:14px;}
+/* The inset used to be margin, which quietly broke every full-width child in
+   here: a button asking for width:100% measured the fold's whole content box
+   and then added 28px of margin OUTSIDE it, and overflow:hidden cut that 28px
+   off — taking the right end of "Check both sides", "Show my devices" and the
+   "Use this one" rows with it. box-sizing cannot help, because margins are not
+   part of the box. So the fold holds the inset as padding, where a child's 100%
+   is 100% of what is actually left, and the head reaches back out to the edges
+   it is supposed to span. */
+.dt-fold{padding:0 14px;}
+.dt-fold>summary{margin-left:-14px;margin-right:-14px;}
+.dt-fold>*:not(summary){margin-left:0;margin-right:0;}
 .dt-fold>*:last-child{margin-bottom:14px;}
 .dt-chs{display:flex;flex-wrap:wrap;gap:7px;padding:2px 0 4px;}
 .dt-ch{min-width:44px;height:38px;padding:0 10px;border-radius:10px;background:var(--bg3);border:1px solid var(--b1);color:var(--t2);font-family:var(--fd);font-size:13px;font-weight:800;transition:background-color .14s,border-color .14s,color .14s;}
@@ -8520,7 +8530,14 @@ async function loadDeviceList(btn){
     const others=rows.filter(d=>d.id!==me).length;
     const note=others
       ? 'Only the five most recent devices are kept. Choosing one replaces every other device\u2019s list with it, once \u2014 after that they merge normally again.'
-      : 'No other device has backed up under this code yet, so there is nothing to choose between. Open WatchList once on the other device and it will appear here within a minute \u2014 it has to publish a copy before this one can offer it to you.';
+      : (keySelfMade()
+        // Telling someone to "open the app on the other device and wait" is
+        // false comfort when this device invented its own code: the other one
+        // is backing up under a code of its own and will never appear here,
+        // however long they wait. The honest version names the cause and the
+        // one move that fixes it.
+        ? 'Nothing else has backed up under this code \u2014 and it never will on its own, because this device made this code up rather than being given one. Your other devices will each have made their own. Pick whichever has the fullest list, copy ITS code, and paste that into every other device under \u201cBring another list here\u201d. They all join one backup from then on.'
+        : 'No other device has backed up under this code yet, so there is nothing to choose between. Open WatchList once on the other device and it will appear here within a minute \u2014 it has to publish a copy before this one can offer it to you.');
     box.innerHTML='<div class="dev-list">'+rows.map(d=>_devRow(d,me)).join('')+'</div>'
       +'<p class="ai-desc" style="font-size:12px;margin-top:8px">'+note+'</p>';
   }catch(e){box.innerHTML='<p class="ai-desc">Could not reach the cloud just now.</p>';}
@@ -17629,12 +17646,22 @@ function nudgeHTML(){
     // this device invented for itself probably is not their only one — and two
     // keys is two backups, each holding half of what they own. Same banner, the
     // sentence that actually applies.
-    const split=keySelfMade()&&friendsList().length>0;
+    // This used to require friendsList().length>0 before it would warn, which
+    // tied "your devices are on different keys" to "you have added a friend" —
+    // two unrelated facts, and somebody with no friends added never learned
+    // that this device had invented a key of its own.
+    //
+    // But warning everyone whose key was minted is wrong too: that is every
+    // new single-device user, and "use your other one instead" is nonsense to
+    // someone who has no other one. Nothing on the device can tell the two
+    // apart, so the banner stops guessing and says both things at once —
+    // neither of which is false either way.
+    const split=keySelfMade();
     return`<div class="nudge">${icon('cloud')}
       <div class="nudge-t">${split
-        ?'This device made its own cloud key. If you already have one, use that instead so all your devices share one backup.'
+        ?'This device made up its own cloud code. Save your code \u2014 and if your other devices made their own, paste this one into them so they share one backup instead of keeping three.'
         :'Your list is backed up. Save your code; it\'s what restores it on a new device.'}</div>
-      <button class="nudge-go" onclick="openSheet('backupSheet');markCodeSeen()">${split?'Sort it out':'Show code'}</button>
+      <button class="nudge-go" onclick="openSheet('backupSheet');markCodeSeen()">Show code</button>
     </div>`;
   }
   if(!shouldNudge())return'';
@@ -25232,6 +25259,7 @@ const RELEASE={
   notes:[
     'Press an episode and that is the episode that opens. A link you pinned was stored exactly as you pasted it, so every episode of that show went to the one you pasted \u2014 press 2, get 1. And when the app works a site out for you, it now has to rebuild your own address from its answer before it is allowed to keep it.',
     'The home screen is laid out as an index: each shelf numbered, named, and followed by a rule out to its count. Where a shelf has progress in it, that rule is filled to how far through it you are \u2014 so the line dividing the page is also measuring it.',
+    'When a device turns on cloud backup by itself it makes up a code, and nothing said so plainly enough \u2014 so devices that each did it were each backing up alone, under a code of their own, and the device picker told you to wait for one that could never arrive. It now names what happened and what to do about it.',
     'Covers are printed rather than tiled. Crisper corners, a flat two\u2011pixel measure under the ones in progress, and the episode you are on set in figures on the card instead of only drawn as a bar.',
     'A title the database could not identify put the app into a loop it never left \u2014 saving every two seconds and backing up every forty-five, all day, on every device with WatchList open. Nothing looked wrong, which is why it ran for so long. It is gone, and so is the battery and data it was quietly spending.',
     'The home screen no longer gets slower as your list grows. The two shelves that scroll sideways were building a card for every single title behind them, so a long list meant a heavy page; they now build what you can actually reach.',

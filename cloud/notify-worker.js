@@ -476,6 +476,20 @@ async function handleFetch(request, env) {
       return handleDecide(body, env, "denied");
     case "/invite":
       return handleInvite(body, env);
+    case "/kit-new":
+      return handleKitNew(body, env);
+    case "/kit-peek":
+      return handleKitPeek(body, env);
+    case "/kit-claim":
+      return handleKitClaim(body, env);
+    case "/kit-list":
+      return handleKitList(body, env);
+    case "/kit-revoke":
+      return handleKitRevoke(body, env);
+    case "/ai":
+      return handleAiProxy(body, env);
+    case "/ai-budget":
+      return handleAiBudget(body, env);
     case "/forget":
       return handleForget(body, env);
     case "/admin-register":
@@ -1113,6 +1127,221 @@ async function handleInvite(body, env) {
   };
   await env.SUBS.put("inv:" + code, JSON.stringify(inv));
   return json({ ok: true, code, mode: inv.mode });
+}
+
+// ---------------------------------------------------------------------------
+// SETUP KITS — a link that arrives already configured
+// ---------------------------------------------------------------------------
+// Handing someone this app used to mean a call: let them in, read them a code,
+// talk them through the theme, the sources, notifications, the AI key. Every
+// step is one the person inviting them already knows the answer to, which is
+// the definition of work that should not be happening on a call.
+//
+// A kit is that answer set, stored once and claimed once. It carries no
+// secrets of the sender's: not their sync code (their list is theirs), and not
+// their AI key — see handleAiProxy for why that one is a server matter.
+//
+// SINGLE USE, BOUND ON FIRST CLAIM. A link cannot know who will open it, and
+// pretending otherwise would be a lie told in a UI. So the first device to
+// claim one takes it, the kit records that device, and every other device is
+// refused. The claiming device may re-claim as many times as it likes — the
+// same person reopening the link, or finishing a reinstall, is not an attack.
+const KIT_RE = /^[a-z0-9]{8,24}$/;
+const kitKey = id => "kit:" + id;
+// Device ids arrive the same way everywhere in here: sanitised on the way in,
+// never trusted as sent. Kits and the AI proxy accept `dev` as well as
+// `deviceId` because the client calls them from code that already had it under
+// the shorter name.
+const devIdOf = b => String(b.deviceId || b.dev || "").replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 64);
+
+async function handleKitNew(body, env) {
+  if (!adminOK(body, env)) return json({ ok: false, error: "unauthorized" }, 401);
+  const payload = body.payload && typeof body.payload === "object" ? body.payload : null;
+  if (!payload) return json({ ok: false, error: "nothing to set up" }, 400);
+  const enc = JSON.stringify(payload);
+  // A kit is a handful of settings. Anything this size is a list, and a list
+  // belongs to its owner, not in an invite.
+  if (enc.length > 100_000) return json({ ok: false, error: "kit too big" }, 413);
+  const id = (Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 6)).replace(/[^a-z0-9]/g, "").slice(0, 14);
+  if (!KIT_RE.test(id)) return json({ ok: false, error: "could not mint an id" }, 500);
+  const days = Math.max(1, Math.min(365, Number(body.days) || 30));
+  const rec = {
+    id,
+    label: String(body.label || "").slice(0, 60),
+    payload,
+    aiCap: Math.max(0, Math.min(100000, Number(body.aiCap) || 0)),
+    createdAt: Date.now(),
+    expiresAt: Date.now() + days * 86400000,
+    claimedBy: "",
+    claimedAt: 0,
+  };
+  // expirationTtl lets the store forget a kit nobody used, so an unclaimed link
+  // is not a thing that works forever because everyone forgot about it.
+  await env.SUBS.put(kitKey(id), JSON.stringify(rec), { expirationTtl: days * 86400 });
+  return json({ ok: true, id, label: rec.label, expiresAt: rec.expiresAt });
+}
+
+// Public, and deliberately says nothing about what is inside. Enough to draw an
+// honest welcome screen before anyone commits to claiming.
+async function handleKitPeek(body, env) {
+  const id = String(body.id || "");
+  if (!KIT_RE.test(id)) return json({ ok: false, error: "no such invite" }, 404);
+  const raw = await env.SUBS.get(kitKey(id));
+  if (!raw) return json({ ok: false, error: "no such invite" }, 404);
+  const k = JSON.parse(raw);
+  const dev = String(body.dev || "");
+  const mine = !!k.claimedBy && k.claimedBy === dev;
+  return json({
+    ok: true, label: k.label, from: k.payload && k.payload.fromName ? String(k.payload.fromName) : "",
+    used: !!k.claimedBy && !mine, mine,
+    expired: Date.now() > k.expiresAt,
+  });
+}
+
+async function handleKitClaim(body, env) {
+  const id = String(body.id || "");
+  if (!KIT_RE.test(id)) return json({ ok: false, error: "no such invite" }, 404);
+  const dev = devIdOf(body);
+  if (!dev) return json({ ok: false, error: "no device id" }, 400);
+  const raw = await env.SUBS.get(kitKey(id));
+  if (!raw) return json({ ok: false, error: "no such invite" }, 404);
+  const k = JSON.parse(raw);
+  if (Date.now() > k.expiresAt) return json({ ok: false, error: "expired" }, 410);
+  if (k.claimedBy && k.claimedBy !== dev) return json({ ok: false, error: "used" }, 409);
+
+  if (!k.claimedBy) {
+    k.claimedBy = dev;
+    k.claimedAt = Date.now();
+    const left = Math.max(1, Math.ceil((k.expiresAt - Date.now()) / 1000));
+    await env.SUBS.put(kitKey(id), JSON.stringify(k), { expirationTtl: left });
+    // The budget is written once, at claim, and belongs to the DEVICE rather
+    // than the kit — a kit is spent, a person keeps using the app.
+    if (k.aiCap > 0) await env.SUBS.put("aib:" + dev, JSON.stringify({ cap: k.aiCap, used: 0, kit: id, at: Date.now() }));
+  }
+
+  // Claiming is also joining: the whole point is that nobody has to be let in
+  // by hand afterwards. Still counted against the cap, and the admin is still
+  // told, because a member who appears without a trace is how a roster becomes
+  // a mystery.
+  const name = String(body.name || "").trim().slice(0, 40);
+  let joined = "pending";
+  try {
+    const mkey = devKey(dev);
+    const had = await env.SUBS.get(mkey);
+    if (had) {
+      const rec = JSON.parse(had);
+      if (rec.status !== "approved" && (await countApproved(env)) < (await getCap(env))) {
+        rec.status = "approved"; rec.decidedAt = Date.now();
+        await env.SUBS.put(mkey, JSON.stringify(rec));
+      }
+      joined = rec.status;
+    } else if ((await countApproved(env)) < (await getCap(env))) {
+      await env.SUBS.put(mkey, JSON.stringify({
+        id: dev, status: "approved", name: name || (k.label || "Invited"),
+        source: "invite", invite: id, joinedAt: Date.now(), decidedAt: Date.now(),
+      }));
+      joined = "approved";
+    } else {
+      joined = "full";   // the cap is the cap; say so rather than silently approving
+    }
+  } catch { joined = "pending"; }
+
+  try {
+    const aep = await env.SUBS.get("admin:endpoint");
+    if (aep) await sendPush(JSON.parse(aep), {
+      title: "Invite used",
+      body: (name || k.label || "Someone") + " opened the link you sent and is set up.",
+      url: "/?admin=members", tag: "wl-kit-" + id,
+    }, env);
+  } catch {}
+
+  return json({ ok: true, payload: k.payload, aiCap: k.aiCap, joined });
+}
+
+async function handleKitList(body, env) {
+  if (!adminOK(body, env)) return json({ ok: false, error: "unauthorized" }, 401);
+  const out = [];
+  let cursor;
+  do {
+    const page = await env.SUBS.list({ prefix: "kit:", cursor });
+    for (const k of page.keys) {
+      const raw = await env.SUBS.get(k.name);
+      if (!raw) continue;
+      const v = JSON.parse(raw);
+      out.push({ id: v.id, label: v.label, createdAt: v.createdAt, expiresAt: v.expiresAt,
+                 claimedAt: v.claimedAt, claimed: !!v.claimedBy, aiCap: v.aiCap });
+    }
+    cursor = page.list_complete ? null : page.cursor;
+  } while (cursor);
+  out.sort((a, b) => b.createdAt - a.createdAt);
+  return json({ ok: true, kits: out });
+}
+
+async function handleKitRevoke(body, env) {
+  if (!adminOK(body, env)) return json({ ok: false, error: "unauthorized" }, 401);
+  const id = String(body.id || "");
+  if (!KIT_RE.test(id)) return json({ ok: false, error: "no such invite" }, 404);
+  await env.SUBS.delete(kitKey(id));
+  return json({ ok: true });
+}
+
+// ---------------------------------------------------------------------------
+// BORROWED AI — the sender's key, spent on the server, counted per person
+// ---------------------------------------------------------------------------
+// The app calls Anthropic and Gemini straight from the browser, which is right
+// for a key somebody typed in themselves: it is theirs, it never touches us.
+// It is exactly wrong for a key handed out in an invite. Ship that key to the
+// browser and it is in the recipient's developer tools in five seconds, and
+// any limit counted in their localStorage is a number they can edit. A cap is
+// either enforced where the key lives or it is decoration.
+//
+// So a borrowed key never leaves the worker. The client sends a prompt and its
+// device id; the budget is read, spent and written here. When it runs out the
+// answer says so, and the app asks the person for a key of their own — which
+// then goes back to being a direct browser call, as it should be.
+async function handleAiProxy(body, env) {
+  const dev = devIdOf(body);
+  if (!dev) return json({ ok: false, error: "no device id" }, 400);
+  if (!env.AI_KEY) return json({ ok: false, error: "no shared key configured" }, 503);
+  const braw = await env.SUBS.get("aib:" + dev);
+  if (!braw) return json({ ok: false, error: "no budget" }, 403);
+  const b = JSON.parse(braw);
+  if (!(b.cap > 0) || b.used >= b.cap) return json({ ok: false, error: "spent", used: b.used, cap: b.cap }, 429);
+  const prompt = String(body.prompt || "").slice(0, 8000);
+  if (!prompt) return json({ ok: false, error: "nothing to ask" }, 400);
+
+  // Counted BEFORE the call, not after. A reply that fails to arrive still cost
+  // the upstream request, and counting on the way back is how a loop of failing
+  // calls spends a budget that says it is untouched.
+  b.used = (b.used || 0) + 1;
+  await env.SUBS.put("aib:" + dev, JSON.stringify(b));
+
+  const model = String(env.AI_MODEL || "claude-haiku-5-5");
+  let r, text = "";
+  try {
+    r = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-api-key": env.AI_KEY, "anthropic-version": "2023-06-01" },
+      body: JSON.stringify({ model, max_tokens: 900, messages: [{ role: "user", content: prompt }] }),
+    });
+    if (!r.ok) return json({ ok: false, error: "upstream " + r.status, used: b.used, cap: b.cap }, 502);
+    const d = await r.json();
+    text = (d.content && d.content[0] && d.content[0].text) || "";
+  } catch (e) {
+    return json({ ok: false, error: "upstream unreachable", used: b.used, cap: b.cap }, 502);
+  }
+  return json({ ok: true, text, used: b.used, cap: b.cap });
+}
+
+// How much of a borrowed budget is left, for the app to show and for the admin
+// to read back. Costs no upstream call and no write.
+async function handleAiBudget(body, env) {
+  const dev = devIdOf(body);
+  if (!dev) return json({ ok: false, error: "no device id" }, 400);
+  const braw = await env.SUBS.get("aib:" + dev);
+  if (!braw) return json({ ok: true, has: false });
+  const b = JSON.parse(braw);
+  return json({ ok: true, has: true, used: b.used || 0, cap: b.cap || 0 });
 }
 
 // Admin raises/lowers the member cap live.

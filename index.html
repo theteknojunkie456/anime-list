@@ -44,33 +44,61 @@
      .ambient as a literal rgba, so no setting could reach it — "Glow off" left it
      burning and a black theme was never black. Now it is a colour like any other:
      applyAmbient() blanks it when the glow is off. */
-  --uv:#7c5cff;
+  /* Was a violet. A fixed purple haze across the top of every screen is the
+     most recognisable thing a generated dark UI wears, and it tinted the
+     chrome of an app whose only real colour is supposed to come from the
+     artwork. It is a near-neutral slate now: present enough to stop the top of
+     the page being a flat void, not a colour anybody has to live with. */
+  --uv:#6b7280;
   /* Neutral, not near-neutral. These five carried a blue cast (#0a0a0c is bluer
      than it is dark) which, under the violet wash above, made "black" read as
      lit. Grey is grey now; the colour on screen comes from the accent and the
      artwork, which is where colour was supposed to come from. */
-  --bg:#0a0a0a;--bg2:#111111;--bg3:#181818;--bg4:#202020;--bg5:#282828;
+  /* Ink, with the faintest blue in it. Dead neutral greys read as a switched
+     off screen; a degree or two of cool makes the same darkness read as a
+     surface that is deliberately dark, and gives warm artwork something to sit
+     against. Five steps, each separable without a border doing the work. */
+  --bg:#0b0b0d;--bg2:#121215;--bg3:#17171b;--bg4:#1e1e23;--bg5:#26262c;
   --b1:rgba(255,255,255,0.05);--b2:rgba(255,255,255,0.09);--b3:rgba(255,255,255,0.16);
   /* Text ramp: three tiers that are all WCAG AA (≥4.5:1) on every surface they
      land on, and still visibly distinct from each other (t1→t2→t3 step ~1.8×).
      The old ramp failed both: t2 hit 3.9:1 on bg5 and t3 was 2.0:1 on bg —
      effectively invisible. Nudging t3 alone to 4.5 collapsed it into t2, so the
      whole ramp is rebuilt rather than patched. */
-  --t1:#f0ecea;--t2:#bcb7c3;--t3:#918e99;
+  /* Measured on every surface in the ramp: worst case is t3 on bg5 at 4.55,
+     so even the dimmest label on the lightest panel clears AA. */
+  --t1:#edeef0;--t2:#b4b6bd;--t3:#8b8d96;
   /* Accent darkened just enough (4.2:1 → 4.5:1) that white button text passes AA.
      ~3% darker: the coral reads the same, the labels are legible. */
-  --aFg:#ffffff;   /* foreground for text sitting ON --a; bright themes override to near-black */
-  --a:#da374f;--a2:#ff6070;--ag:rgba(218,55,79,0.14);--glow:rgba(218,55,79,0.18);
+  /* THE ACCENT. It was an alarm red, and it was doing decoration as well as
+     action: the chip, the rule, the dot, the play button, the waiting count and
+     the confirm button were all the same shout. Red is the colour for "you are
+     about to lose something", and when everything is red nothing is.
+
+     Jade reads calm, sits cool against artwork that is overwhelmingly warm, and
+     collides with none of the status colours. Measured: 7.95 as text on the
+     ground, and white on it fails at 2.48 — so the label on a filled button is
+     a deep teal-black, which is also simply better looking than white on teal. */
+  --aFg:#05201b;   /* foreground for text sitting ON --a; never white on this one */
+  --a:#2fb8a0;--a2:#56d6bd;--ag:rgba(47,184,160,0.13);--glow:rgba(47,184,160,0.16);
   /* Display face carries titles; body face carries everything else. Splitting the
      two is what gives type a voice — one family at one weight range is what makes
      a UI read as generic. */
   --fd:'Bricolage Grotesque','Manrope',-apple-system,sans-serif;
   --fb:'Manrope',-apple-system,sans-serif;
-  --fin:#34c472;--finbg:rgba(52,196,114,0.12);
-  --wat:#f5a623;--watbg:rgba(245,166,35,0.12);
-  --pln:#5b9cf6;--plnbg:rgba(91,156,246,0.12);
-  --drp:#9a97a4;--drpbg:rgba(154,151,164,0.14);
-  --topgrad:linear-gradient(180deg,#16070b 0%,#0a0a0c 100%);
+  /* Four states, pulled back from full saturation. They are labels on a card,
+     not signals in a cockpit, and at full strength four vivid hues in one grid
+     argue with the artwork and with each other. All four still clear AA. */
+  --fin:#54c08a;--finbg:rgba(84,192,138,0.11);
+  --wat:#d9a441;--watbg:rgba(217,164,65,0.11);
+  --pln:#6f9fe0;--plnbg:rgba(111,159,224,0.11);
+  --drp:#8e9099;--drpbg:rgba(142,144,153,0.13);
+  /* The top of every screen used to sit under a maroon fog — a near-black with
+     the accent mixed into it, which stained the search field, the filters and
+     the header of every page in the app. The wash is neutral now and barely
+     there; the colour at the top of the page comes from the artwork behind it,
+     which is what --amb was always for. */
+  --topgrad:linear-gradient(180deg,#131318 0%,#0b0b0d 100%);
   --safe-t:env(safe-area-inset-top,0px);--safe-b:env(safe-area-inset-bottom,0px);
   /* THE RADIUS SCALE. There were 23 distinct corner values in this file — 12,
      13, 14 and 15 all doing the same job in different places. A 1px difference
@@ -1424,21 +1452,25 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
    a bordered panel is three boxes deep, which is what "weird looking" means in
    practice. The panel holds the edge; the parts inside are divided by a hairline. */
 .topbar{
-  position:relative;z-index:5;margin:10px 14px 0;padding:9px;border-radius:26px;
+  position:relative;z-index:5;margin:10px 14px 0;padding:9px;border-radius:18px;
   display:flex;flex-direction:column;gap:9px;
   background:var(--bg3);border:1px solid var(--bn2);
-  box-shadow:0 12px 30px -16px rgba(0,0,0,.8);
 }
 /* Same trap as the + button: WebKit clips descendants to the border box of any
    element with backdrop-filter, and the sort menu is a descendant of this one.
    The blur goes on a layer behind, so the menu can hang below the bar. */
+/* Two blurred, bordered, drop-shadowed slabs stacked above the list was three
+   effects doing one job — separating the controls from the content — and a
+   hairline does that job on its own. What is left is a surface and an edge.
+   The blur stays only where it earns itself: behind a bar that content scrolls
+   under, so the edge reads instead of smearing. */
 @supports ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
   .topbar{background:transparent;border-color:transparent;box-shadow:none;}
   .topbar::before{
     content:'';position:absolute;inset:0;border-radius:inherit;z-index:-1;
-    background:color-mix(in srgb,var(--bg3) 74%,transparent);
-    border:1px solid var(--bn2);box-shadow:0 12px 30px -16px rgba(0,0,0,.8);
-    backdrop-filter:blur(22px) saturate(1.3);-webkit-backdrop-filter:blur(22px) saturate(1.3);
+    background:color-mix(in srgb,var(--bg3) 62%,transparent);
+    border:1px solid var(--bn2);
+    backdrop-filter:blur(18px) saturate(1.2);-webkit-backdrop-filter:blur(18px) saturate(1.2);
   }
 }
 .topbar .search-row,.topbar .ctrl-row{padding:0;}
@@ -2331,9 +2363,21 @@ body.first-paint .pfill,body.content-in .pfill{animation:barGrow .62s cubic-bezi
 .nbtn.rail-fold{display:none;}
 .nbtn small{font-size:clamp(8px,2.4vw,9px);font-weight:800;letter-spacing:0.04em;
   white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis;}
-/* The active one is its own pill inside the bar — colour alone was doing all the
-   work of saying where you are, and at 9px it wasn't enough. */
-.nbtn.on{color:var(--a2);background:color-mix(in srgb,var(--a) 16%,transparent);}
+/* Where you are is marked the same way a shelf is: with a rule. A tinted
+   lozenge behind the active tab is the single most copied object in mobile
+   design, and it was doing the job by shading a box rather than by pointing at
+   anything. Two pixels of accent across the top of the track says the same
+   thing in the app's own language, and leaves the icon to be an icon. */
+.nbtn{position:relative;}
+.nbtn.on{color:var(--a2);background:transparent;}
+.nbtn.on:not(.add)::before{
+  content:'';position:absolute;top:0;left:22%;right:22%;height:2px;
+  background:var(--a);
+}
+@media(prefers-reduced-motion:no-preference){
+  .nbtn.on:not(.add)::before{animation:navMark .34s cubic-bezier(.2,1,.3,1) both;}
+  @keyframes navMark{from{transform:scaleX(.25);opacity:0;}to{transform:none;opacity:1;}}
+}
 .nbtn.add{
   justify-self:center;width:auto;    /* a circle, not a track-wide pill */
   /* It used to break the top edge of the bar. That silhouette never sat right —
@@ -2344,11 +2388,15 @@ body.first-paint .pfill,body.content-in .pfill{animation:barGrow .62s cubic-bezi
   /* min-width:52px on .nbtn was beating width:44px, so this was 52 wide by 44
      tall — a circle stretched into an ellipse. A round button has to opt out of
      the shared sizing, not inherit half of it. */
-  width:60px;height:60px;min-width:0;flex:none;align-self:center;border-radius:50%;background:var(--a);color:var(--aFg);font-size:30px;line-height:1;
-  justify-content:center;padding:0;box-shadow:0 6px 18px -5px var(--glow);
-  border:1px solid rgba(255,255,255,0.16);
+  /* Square, not round. A filled accent circle with a plus in it is the stock
+     mobile button — every app has one and none of them chose it. A key with the
+     same corner as the app's own controls belongs to this app instead, and
+     being the only filled thing in the bar is already all the emphasis it
+     needs, without a halo underneath it. */
+  width:56px;height:46px;min-width:0;flex:none;align-self:center;border-radius:12px;background:var(--a);color:var(--aFg);font-size:26px;line-height:1;
+  justify-content:center;padding:0;border:none;
 }
-.nbtn.add:active{transform:scale(0.9) rotate(90deg);}
+.nbtn.add:active{transform:scale(.93);}
 .nbtn.add.on{background:var(--a);}
 
 /* ── HOME LAYOUT ── */
@@ -4731,7 +4779,12 @@ body.recsel .pcard{position:relative;}
 .search-ico .ico{width:1.15em;height:1.15em;vertical-align:middle;}
 .star .ico{width:1em;height:1em;vertical-align:middle;}
 .star.on .ico{fill:currentColor;}
-.pcard-fav{color:#ff5a6e;}
+/* A hardcoded pink, from back when the accent was a red and one more warm
+   thing in the corner went unnoticed. On a calm ground it became the single
+   loudest object on the screen — louder than the artwork it sits on, for a
+   state that means "I like this" rather than "look here". It belongs to the
+   accent like everything else the person marked themselves. */
+.pcard-fav{color:var(--a2);}
 .pcard-fav .ico{fill:currentColor;}
 .dt-fav.on .ico{fill:currentColor;}
 .empty-icon .ico{width:1em;height:1em;vertical-align:-0.08em;}
@@ -6441,12 +6494,16 @@ function setNetStatus(s){try{s?localStorage.setItem(NET_STATUS,s):localStorage.r
 // and a setting added to the app later has to be added here on purpose
 // rather than leaking by default.
 const KIT_KEYS=[
-  // the look
-  'animetheme','retro_on','glow_mode','accent_override','card_density',
-  'home_layout','status_colors','art_focal',
   // where Watch goes, and what it offers
   'my_services','stream_src','read_src','site_pref','no_source','admin_sources',
 ];
+// The LOOK deliberately does not travel. A kit used to carry the theme, retro,
+// the accent, density and the home layout, and handing those over means the
+// first thing somebody sees of their own app is somebody else's taste —
+// arriving as a setting they did not choose and may never find the switch for.
+// The setup that is worth inheriting is the part that is tedious and has one
+// right answer: where Watch opens, who you already know, being let in. Choosing
+// how it looks is the fun part, and it is theirs.
 // Deliberately NOT in that list, and each for its own reason: sync_* and
 // syncat_* (your list), anthropic_key (see the AI proxy in the worker),
 // friends (yours to know, not theirs to inherit), wl_device / friend_code /
@@ -6478,8 +6535,6 @@ function kitCollect(opts){
 function kitSummary(p){
   const out=[];
   const look=(p&&p.look)||{};
-  const th=look.animetheme?('the '+look.animetheme+' theme'):'the default theme';
-  out.push(look.retro_on==='1'?(th+', in Retro'):th);
   const srcs=(()=>{try{return JSON.parse(look.my_services||'[]').length;}catch(e){return 0;}})();
   if(srcs)out.push(srcs+' source'+(srcs===1?'':'s')+' already set up');
   if(look.admin_sources)out.push('your recommended sites');
@@ -6558,7 +6613,7 @@ async function kitWelcome(){
   const who=info.from?escH(info.from):'Someone';
   kitScreen({
     title:who+' set WatchList up for you',
-    body:'Everything is chosen already — the look, where Watch opens, '+who+' added as a friend. Nothing is on your phone until you tap below, and it works on this device only.',
+    body:'The fiddly part is done — where Watch opens, '+who+' added as a friend, and you are already let in. How it looks is still yours to pick. Nothing is on your phone until you tap below, and it works on this device only.',
     cta:'Set up my app',onCta:'kitAccept()',
     alt:'No thanks, I will set it up myself',onAlt:'kitDecline()'});
   return true;
@@ -7017,7 +7072,7 @@ function renderAdmin(){
 
     <details class="src-fold" style="margin-top:18px">
       <summary>${icon('send')} Set someone up</summary>
-      <p class="ai-desc" style="margin-top:8px">Makes a link that carries your setup. Whoever opens it first gets your theme, your sources and you as a friend, and is let in without you approving anything. One device only — everyone after them is turned away.</p>
+      <p class="ai-desc" style="margin-top:8px">Makes a link that carries the tedious half of the setup: your sources, you as a friend, and being let in without you approving anything. Not the look \u2014 picking that is the fun part and it stays theirs. One device only; everyone after them is turned away.</p>
       <div class="kit-mirror">${kitSummary(kitCollect({})).map(x=>`<span>${escH(x)}</span>`).join('')}</div>
       <input class="ai-prompt-in" id="kitLabel" placeholder="Who is it for? (just so you can tell them apart)" style="margin-bottom:8px">
       <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
@@ -10448,6 +10503,38 @@ function _contrast(a,b){const x=_lum(a),y=_lum(b);return (Math.max(x,y)+0.05)/(M
 function _lighten(hex,amt){const[r,g,b]=_hex2rgb(hex);
   const f=v=>Math.round(v+(255-v)*amt);
   return '#'+[f(r),f(g),f(b)].map(v=>v.toString(16).padStart(2,'0')).join('');}
+// YOU PICK THE HUE; THE APP PICKS HOW FAR TO TAKE IT.
+//
+// A free colour picker over a dark UI can produce a navy nobody can read, a
+// neon that buzzes against the artwork, or a brown that just looks like a
+// mistake — and the person choosing has no way to tell which of those they got
+// until their app is ugly. Hue is the part worth choosing and the part people
+// actually mean when they say they want a different colour. Saturation and
+// lightness are a craft judgement with a narrow right answer on a dark ground,
+// so they are clamped into that band, and then the result is measured against
+// the darkest surface it has to be legible on and lifted until it clears AA.
+//
+// The tamed colour is what gets STORED, not just what gets painted, so the
+// swatch shows what you will actually see and every other device inherits the
+// same good value rather than re-deriving it.
+// Uses the app's own _rgb2hsl / _hsl2hex, which take RGB numbers and degrees.
+// The first version of this declared a second pair with the same names and a
+// different signature; the later declaration won at runtime, every call got a
+// string where it wanted three numbers, and the accent came out as the literal
+// text "#nannannan". Two functions with one name is not a near miss, it is a
+// coin toss decided by source order.
+function tameAccent(hex){
+  if(!/^#?[0-9a-f]{3}([0-9a-f]{3})?$/i.test(String(hex||'')))return '';
+  const [h,sat,l]=_rgb2hsl(..._hex2rgb(hex));
+  // Below .40 a colour reads as grey and the app looks broken rather than
+  // themed; above .74 it buzzes next to artwork. Lightness under .46 cannot
+  // carry dark text on a fill, over .70 it washes out on the pale surfaces.
+  let S=Math.min(0.74,Math.max(0.40,sat));
+  let L=Math.min(0.70,Math.max(0.46,l));
+  let out=_hsl2hex(h,S,L);
+  for(let i=0;i<16&&_contrast(out,'#0b0b0d')<4.5;i++){L=Math.min(0.88,L+0.03);out=_hsl2hex(h,S,L);}
+  return out;
+}
 function applyAccent(){
   forgetAccent();
   const el=document.documentElement, hex=accentOverride();
@@ -10474,6 +10561,7 @@ function applyAccent(){
 // closes. The glow picker already carried this fix — I wrote three more pickers
 // without it.
 function setAccent(hex,redraw){
+  if(hex){const t=tameAccent(hex);if(t)hex=t;}
   try{hex?localStorage.setItem(ACCENT_KEY,hex):localStorage.removeItem(ACCENT_KEY);}catch(e){}
   applyAccent();try{applyAmbient();}catch(e){}
   if(redraw!==false)renderAccentRow();
@@ -25604,10 +25692,12 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-10-18.58',
-  title:'A catalogue, not a storefront',
+  v:'2026-10-18.59',
+  title:'Calmer, and harder to make ugly',
   push:'Watch opens the episode you pressed on the source you set \u2014 and the whole app has been redrawn as something you keep rather than something you browse.',
   notes:[
+    'The app is calmer. The top of every screen used to sit under a dark red wash \u2014 a gradient nobody chose, staining the search field and the header of every page \u2014 and the accent that was supposed to mark what you can press was also marking everything else. The wash is neutral now, the colour at the top of the page comes from the artwork behind it, and the accent is a jade that sits back instead of shouting.',
+    'Picking your own colour cannot make it ugly any more. You choose the hue \u2014 the part you actually mean \u2014 and the app takes care of how far to push it, then checks the result is still readable on a dark screen and fixes it if it is not. A colour too dark to read comes back as the same colour, readable.',
     'Press an episode and that is the episode that opens. A link you pinned was stored exactly as you pasted it, so every episode of that show went to the one you pasted \u2014 press 2, get 1. And when the app works a site out for you, it now has to rebuild your own address from its answer before it is allowed to keep it.',
     'The home screen is laid out as an index: each shelf numbered, named, and followed by a rule out to its count. Where a shelf has progress in it, that rule is filled to how far through it you are \u2014 so the line dividing the page is also measuring it.',
     'When a device turns on cloud backup by itself it makes up a code, and nothing said so plainly enough \u2014 so devices that each did it were each backing up alone, under a code of their own, and the device picker told you to wait for one that could never arrive. It now names what happened and what to do about it.',

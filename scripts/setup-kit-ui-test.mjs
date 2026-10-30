@@ -66,8 +66,11 @@ const t=(n,g,e)=>{const ok=JSON.stringify(g)===JSON.stringify(e);ok?pass++:fail+
 const kit=await ev(`JSON.stringify(kitCollect({}))`);
 const K=JSON.parse(kit||'{}');
 const keys=Object.keys(K.look||{});
-t('the look travels', [K.look.animetheme,K.look.retro_on], ['sasuke','1']);
-t('and the sources with it', !!K.look.my_services, true);
+// The look deliberately does NOT travel: arriving in an app wearing somebody
+// else's taste, as a setting you did not pick, is not a gift. What travels is
+// the tedious half — where Watch opens, who you know, being let in.
+t('the look does not travel', [K.look.animetheme,K.look.retro_on], [undefined,undefined]);
+t('the sources do', !!K.look.my_services, true);
 t('the sender is offered as a friend, which is an address not a secret', K.fromCode, 'SENDERFRIEND1');
 t('under their name', K.fromName, 'Muhammad');
 
@@ -81,7 +84,7 @@ t('and the whole payload mentions none of those values',
   /SENDERSCODE123456789|sk-ant-secret|admintoken|sender-device/.test(kit||''), false);
 
 t('the summary is generated from the payload, so it cannot drift',
-  (await ev(`JSON.stringify(kitSummary(kitCollect({})))`)).includes('sasuke'), true);
+  (await ev(`JSON.stringify(kitSummary(kitCollect({})))`)).includes('source'), true);
 
 // ── the link is taken out of the address bar ────────────────────────────────
 await cmd('Page.navigate',{url:`http://localhost:${PORT}/index.html?kit=abcd1234ef&cb=`+Math.random()});
@@ -124,8 +127,8 @@ t('and nothing has been claimed yet', await ev(`window.__claims`), 0);
 
 await ev(`kitAccept()`);
 await wait(1200);
-t('accepting applies the look', await ev(`localStorage.getItem('animetheme')`), 'zoro');
-t('and paints it', await ev(`document.documentElement.getAttribute('data-theme')`), 'zoro');
+t('a theme smuggled into a payload is still ignored on the way in',
+  await ev(`localStorage.getItem('animetheme')`), 'default');
 t('the sender is in their friends', await ev(`friendsList().some(f=>f.code==='SENDERFRIEND1')`), true);
 // NOT "onboarding is marked done". A kit skips the three cards explaining what
 // the app is — which is exactly what somebody handed it by a friend does not

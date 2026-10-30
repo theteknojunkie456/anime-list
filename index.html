@@ -8,9 +8,9 @@
 <!-- NOT black-translucent: it shifts the standalone viewport up by the status-bar
      height on iOS, stranding a dead band at the bottom below the fixed nav. -->
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
-<meta name="theme-color" content="#0a0a0c">
+<meta name="theme-color" content="#0b0b0d">
 <link rel="manifest" href="manifest.json">
-<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/icon-180.png">
 <!-- Without this the browser hunts for /favicon.ico at the domain root and 404s
      on every first load — and the tab shows a blank page icon. -->
 <link rel="icon" href="icons/icon-192.png" type="image/png">
@@ -1426,7 +1426,11 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
   min-width:0;overflow:hidden;flex:0 1 auto;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;}
 .hdr-title b{font-weight:800;}
 .hdr-title i{font-style:normal;font-weight:400;color:var(--t2);letter-spacing:-0.3px;}
-.hdr-title::after{content:'';width:5px;height:5px;border-radius:50%;background:var(--a);margin-left:3px;align-self:center;}
+/* The dot beside the wordmark was a circle, from when every corner in here
+   was round. It is a small square now — the same crisp corner the covers, the
+   keys and the mark itself carry, so the logo belongs to the app rather than
+   sitting next to it. */
+.hdr-title::after{content:'';width:6px;height:6px;border-radius:1px;background:var(--a);margin-left:5px;align-self:center;}
 /* 36px buttons six pixels apart, five in a row, is under the 44px a fingertip
    actually needs — which reads as the bar being unreliable rather than small.
    The button stays compact (the header has a title to fit next to it) and grows
@@ -2312,8 +2316,10 @@ body.first-paint .pfill,body.content-in .pfill{animation:barGrow .62s cubic-bezi
   /* Equal columns, not space-around. Distributing the leftover space meant the
      two wider labels ("Settings", "Sources") pushed their neighbours: measured
      centre-to-centre gaps of 88.3 / 88.3 / 91.5 / 94.5, and the + landed 6.2px
-     left of the bar's own centre. Five identical tracks put it exactly on it. */
-  display:grid;grid-template-columns:repeat(5,minmax(0,1fr));align-items:center;
+     left of the bar's own centre. Identical tracks put every one where it
+     belongs. Six of them now — backup is the one setting with a consequence if
+     you never find it, and it was four taps deep behind a settings list. */
+  display:grid;grid-template-columns:repeat(6,minmax(0,1fr));align-items:center;
   /* The + is the tallest thing in here, so the padding is what guarantees it has
      room. overflow is spelled out because this button has been clipped before. */
   padding:11px 10px calc(var(--safe-b) + 11px);
@@ -5035,9 +5041,14 @@ body.recsel .pcard{position:relative;}
   /* The marker lives at the WINDOW edge, outside the capsule entirely — the rail
      says which one is selected, and it says it from the side of the screen. The
      capsule is inset 18px and padded 9, so -28 puts this flush against the edge. */
-  .nav .nbtn.on::before{content:"";position:absolute;left:-27px;top:50%;transform:translateY(-50%);
-    width:3px;height:22px;border-radius:0 2px 2px 0;background:var(--a);
-    box-shadow:0 0 12px -1px var(--glow);}
+  /* The bar marks the active tab with a rule across the top of its track; a
+     rail is vertical, so the same idea turns on its side and sits against the
+     window edge. right:auto and the explicit height undo the bar's rule rather
+     than fighting it — both set left, and an over-constrained box is decided by
+     writing direction, which is not a thing to leave to chance. */
+  .nav .nbtn.on::before,.nav .nbtn.on:not(.add)::before{content:"";position:absolute;left:-27px;right:auto;top:50%;transform:translateY(-50%);
+    width:3px;height:22px;border-radius:0 2px 2px 0;background:var(--a);animation:none;}
+  .nav .nbtn.add.on::before{display:none;}
 
   /* A label that appears beside the icon, instead of the browser's own tooltip —
      which arrives a second late, in the system font, wherever it likes. This is
@@ -5060,8 +5071,11 @@ body.recsel .pcard{position:relative;}
     box-shadow:0 -6px 0 -5px var(--bn2);}
   .nav .nbtn.rail-fold{display:flex;color:var(--t3);}
   .nav .nbtn.rail-fold .ico{width:17px;height:17px;}
-  .nav .nbtn.add{width:46px;height:46px;min-width:0;font-size:21px;margin:2px auto;border-radius:50%;
-    background:var(--a);color:var(--aFg);box-shadow:0 8px 20px -8px var(--glow);}
+  /* The rail had its own circle, so squaring the + in the bar left this one
+     round — the same control with two shapes depending on how wide the window
+     happened to be. Same key, same corner, either way. */
+  .nav .nbtn.add{width:46px;height:40px;min-width:0;font-size:21px;margin:3px auto;border-radius:12px;
+    background:var(--a);color:var(--aFg);box-shadow:none;}
   #app{padding-left:104px;padding-bottom:0;}
   .billboard,.rz-sec>.rz-head{margin-left:0;}
 
@@ -5499,6 +5513,7 @@ body.recsel .pcard{position:relative;}
   <button class="nbtn on" id="nav-home" data-tip="Home" onclick="goHome()"><span><i data-ic="home"></i></span><small>Home</small></button>
   <button class="nbtn" id="nav-stats" data-tip="Stats" onclick="openStats()"><span><i data-ic="chart"></i></span><small>Stats</small></button>
   <button class="nbtn add" id="nav-add" data-tip="Add a title" onclick="openSheet_add()">＋</button>
+  <button class="nbtn" id="nav-cloud" data-tip="Cloud backup" onclick="openSheet('backupSheet')"><span><i data-ic="cloud"></i></span><small>Cloud</small></button>
   <button class="nbtn" id="nav-settings" data-tip="Settings" onclick="openSheet('settingsSheet')"><span><i data-ic="settings"></i></span><small>Settings</small></button>
   <button class="nbtn" id="nav-sources" data-tip="Sources" onclick="openSheet('sourceSheet')"><span><i data-ic="play"></i></span><small>Sources</small></button>
   <button class="nbtn rail-fold" id="nav-fold" data-tip="Collapse" onclick="toggleRail()" aria-label="Collapse the sidebar"><span><i data-ic="chevron-left"></i></span></button>
@@ -25692,10 +25707,11 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-10-18.59',
+  v:'2026-10-18.60',
   title:'Calmer, and harder to make ugly',
   push:'Watch opens the episode you pressed on the source you set \u2014 and the whole app has been redrawn as something you keep rather than something you browse.',
   notes:[
+    'Cloud backup has its own button in the bar now. It is the one setting with a real consequence if you never find it, and it was four taps deep behind a settings list.',
     'The app is calmer. The top of every screen used to sit under a dark red wash \u2014 a gradient nobody chose, staining the search field and the header of every page \u2014 and the accent that was supposed to mark what you can press was also marking everything else. The wash is neutral now, the colour at the top of the page comes from the artwork behind it, and the accent is a jade that sits back instead of shouting.',
     'Picking your own colour cannot make it ugly any more. You choose the hue \u2014 the part you actually mean \u2014 and the app takes care of how far to push it, then checks the result is still readable on a dark screen and fixes it if it is not. A colour too dark to read comes back as the same colour, readable.',
     'Press an episode and that is the episode that opens. A link you pinned was stored exactly as you pasted it, so every episode of that show went to the one you pasted \u2014 press 2, get 1. And when the app works a site out for you, it now has to rebuild your own address from its answer before it is allowed to keep it.',

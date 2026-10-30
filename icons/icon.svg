@@ -1,10 +1,28 @@
+<!-- The mark was already the right idea: a play, a title, and a line part-filled
+     to say how far through you are. It was drawn on a hot orange-to-magenta
+     gradient that belongs to nothing else in the app, in soft pill shapes from
+     a time when every corner was rounded. Same composition, redrawn in the
+     language the app actually speaks now: ink, crisp rules, and one jade
+     measure — the decoration is the data, which is the whole idea downstairs. -->
 <svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
-  <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-    <stop offset="0" stop-color="#ff9a5a"/><stop offset="1" stop-color="#d23b6e"/></linearGradient></defs>
-  <rect width="512" height="512" fill="url(#g)"/>
-  <path d="M150 150l52 30-52 30z" fill="#fff"/>
-  <rect x="224" y="158" width="140" height="44" rx="22" fill="#fff"/>
-  <rect x="150" y="242" width="212" height="40" rx="20" fill="#fff" fill-opacity="0.35"/>
-  <rect x="150" y="242" width="138" height="40" rx="20" fill="#fff"/>
-  <rect x="150" y="322" width="150" height="40" rx="20" fill="#fff" fill-opacity="0.55"/>
+  <defs>
+    <linearGradient id="ink" x1="0" y1="0" x2="0.4" y2="1">
+      <stop offset="0" stop-color="#1b1f24"/><stop offset="1" stop-color="#0c0e11"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#ink)"/>
+  <!-- The marks were drawn at 41% of the canvas, which is a logo floating in a
+       box rather than an icon. Scaled about the centre to ~70%, the proportion
+       a home-screen icon wants. -->
+  <g transform="translate(256 256) scale(1.66) translate(-256 -256)">
+  <!-- the play, in the accent: the one thing you press -->
+  <path d="M150 148l56 32-56 32z" fill="#56d6bd"/>
+  <!-- the title line -->
+  <rect x="226" y="158" width="136" height="42" rx="6" fill="#edeef0"/>
+  <!-- the measure: a track, and how far through it you are -->
+  <rect x="150" y="248" width="212" height="38" rx="6" fill="#edeef0" fill-opacity="0.18"/>
+  <rect x="150" y="248" width="132" height="38" rx="6" fill="#56d6bd"/>
+  <!-- the one after it, waiting -->
+  <rect x="150" y="330" width="158" height="38" rx="6" fill="#edeef0" fill-opacity="0.46"/>
+  </g>
 </svg>

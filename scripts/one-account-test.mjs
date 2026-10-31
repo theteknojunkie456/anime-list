@@ -73,8 +73,14 @@ t('having a friend changes nothing about it',
 const sheet=await ev(`(()=>{renderSyncUI&&renderSyncUI();
   const b=document.getElementById('syncBox')||document.body;
   return b.textContent||'';})()`);
-t('the backup screen warns the local list is not merged', /not merged in/.test(sheet), true);
-t('and counts what would be lost', /has 1 of its own/.test(sheet), true);
+// It used to say the local list "is not merged in", which was true when the
+// only options were replace or nothing. There is a merge now, so the warning
+// points at it instead — a screen that still said your titles cannot be kept
+// would be the app lying about its own feature.
+t('the backup screen still counts what replacing would cost', /has 1 of its own/.test(sheet), true);
+t('and points at the merge rather than calling it impossible', /Merge it in/.test(sheet), true);
+t('and the merge is actually on the screen, not just named in prose',
+  await ev(`!!document.querySelector('#syncBox button[onclick*="mergeFromCode"]')`), true);
 
 // entering somebody's key means this device joined rather than started
 await ev(`clearKeySelf()`);

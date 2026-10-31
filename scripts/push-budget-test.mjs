@@ -117,9 +117,31 @@ await flush();
 check('5 rapid edits collapse into one write', await n(), 1);
 
 // 3. A real change still gets through; an identical save after it does not.
+// Wait for the LIST to stop moving first. Background enrichment writes onto
+// items after load — link probing stamps its result, covers fill in — and any
+// of that landing inside this window makes the second save genuinely new
+// content, which is the app behaving correctly and the scenario being void.
+// Measured: the list grew 612 -> 706 characters mid-push on a failing run.
+const settle=async()=>{
+  let last=-1;
+  for(let i=0;i<40;i++){
+    const nowLen=await ev(`JSON.stringify(realList()).length`);
+    if(nowLen===last)return true;
+    last=nowLen; await wait(150);
+  }
+  return false;
+};
+await settle();
 await zero();
 await ev(`(()=>{const a=anime.find(x=>x.id==='a2');a.ep=7;save();return 1;})()`);
 await flush();
+// Wait for the push to be RECORDED, not merely sent. The "nothing changed"
+// guard compares against a fingerprint that is written when the response
+// lands, so an identical save before that point legitimately looks like new
+// content and writes again — which is the scenario this test is NOT about.
+// A fixed 250ms sleep made that a coin toss: this assertion failed about one
+// run in three, with nothing wrong in the app.
+for(let i=0;i<40;i++){ if(await ev(`!!lastPushFP()`))break; await wait(50); }
 const real=await n();
 await ev(`(()=>{save();return 1;})()`);
 await flush();

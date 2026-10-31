@@ -78,5 +78,40 @@ t('and a show nobody passed on is not hidden',
 
 t('the dismissal survives a reload', await ev(`!!JSON.parse(localStorage.getItem('recs_dismissed')||'{}')['a101348']`), true);
 t('and it is not on the disposable list', await ev(`_DISPOSABLE.indexOf('recs_dismissed')`), -1);
+
+// ── and the list that shows it ──────────────────────────────────────────────
+// Writing the dismissal was never the part that failed. The "To you" panel
+// built its rows straight from the mailbox and never asked whether any of them
+// had been turned down, so pressing "Not for me" wrote the pass, said "Hidden"
+// in a toast, and then drew the row again — with the waiting count still
+// counting it. The rule now lives in recIsGone() and both lists ask it.
+await ev(`(()=>{localStorage.removeItem('recs_dismissed');
+  recsIn=[{from:{code:'FRIEND1',name:'A'},at:Date.now(),items:[
+    {aniId:101348,title:'Vinland Saga',kind:'watch'},
+    {aniId:20605,title:'Tokyo Ghoul',kind:'watch'}]}];
+  return 1;})()`);
+t('both are waiting before anyone passes',
+  await ev(`recsToMeRows(1).filter(r=>r.kind==='new').length`), 2);
+t('and the badge agrees', await ev(`recsWaiting()`), 2);
+
+await ev(`rtmPass(encodeURIComponent('a101348'))`);
+await wait(400);
+t('the one you turned down leaves the list',
+  await ev(`recsToMeRows(1).filter(r=>r.kind==='new').map(r=>r.title)`), ['Tokyo Ghoul']);
+t('and the waiting count drops with it', await ev(`recsWaiting()`), 1);
+t('undo brings it back rather than losing it',
+  await ev(`(()=>{const m=JSON.parse(localStorage.getItem('recs_dismissed')||'{}');
+    delete m['a101348'];delete m['tvinland saga'];
+    localStorage.setItem('recs_dismissed',JSON.stringify(m));
+    return recsToMeRows(1).filter(r=>r.kind==='new').length;})()`), 2);
+
+// A show already on your list is a different row and must NOT be hidden by a
+// pass — that section is history, not an inbox.
+await ev(`(()=>{anime=[{id:'x1',title:'Tokyo Ghoul',aniId:20605,kind:'watch',status:'plan',ep:0,
+  recFrom:[{code:'FRIEND1',name:'A',at:Date.now()}],upd:Date.now()}];
+  const m=JSON.parse(localStorage.getItem('recs_dismissed')||'{}');
+  m['a20605']=Date.now();localStorage.setItem('recs_dismissed',JSON.stringify(m));return 1;})()`);
+t('something already on your list stays visible even if its key was passed',
+  await ev(`recsToMeRows(1).some(r=>r.kind==='mine'&&r.title==='Tokyo Ghoul')`), true);
 console.log('\n'+pass+' passed, '+fail+' failed');
 ws.close();ch.kill();srv.kill();process.exit(fail?1:0);

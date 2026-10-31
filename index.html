@@ -8752,6 +8752,9 @@ const PUSH_WAIT=10000;
 // waiting PUSH_MAX, the next scheduling attempt fires instead of deferring.
 const PUSH_MAX=45000;
 let _pushPending=false,_pushSince=0;
+// Whether a push is in the air, and whether anything asked for another while it
+// was. See the guard in the push itself for why both are needed.
+let _pushInFlight=false,_pushAgain=false;
 function schedulePush(){
   if(!syncCode()||!SYNC_URL)return;
   const now=Date.now();
@@ -8776,9 +8779,30 @@ try{
 // the payload we send. An encrypted envelope carries a fresh random IV every
 // time, so hashing the ciphertext would differ on every call and this guard
 // would never once fire for exactly the people who most rely on the backup.
+// Bookkeeping the enrichers stamp on an item to remember they already tried:
+// imgTried, detTried, bannerTried, idTried, scoreTried, adultChk — and airChk,
+// which is a TIMESTAMP refreshed every time the airing data is re-checked.
+//
+// They belong in the payload, so another device does not repeat the lookups.
+// They do not belong in the FINGERPRINT. Hashed, they meant that merely
+// checking something counted as a change: an enrichment pass with no new
+// information still moved the hash and armed a push, so the app spent a KV
+// write to report that it had looked. On a plan whose thousand daily writes
+// are already gone, that is the difference between syncing when your list
+// changes and syncing because a timer fired.
+const PUSH_FP_IGNORE=['imgTried','detTried','bannerTried','idTried','scoreTried','adultChk','airChk','svcTried'];
+function fpList(){
+  return realList().map(a=>{
+    let copy=null;
+    for(const k of PUSH_FP_IGNORE){
+      if(a&&a[k]!==undefined){ if(!copy)copy=Object.assign({},a); delete copy[k]; }
+    }
+    return copy||a;
+  });
+}
 function pushFingerprint(code){
   let str;
-  try{str=code+'|'+JSON.stringify(realList())+'|'+JSON.stringify(collectExtra());}catch(e){return '';}
+  try{str=code+'|'+JSON.stringify(fpList())+'|'+JSON.stringify(collectExtra());}catch(e){return '';}
   let h=5381;
   for(let i=0;i<str.length;i++)h=((h<<5)+h+str.charCodeAt(i))|0;
   return str.length+':'+(h>>>0).toString(36);
@@ -9177,6 +9201,19 @@ async function _syncPushInner(code){
   }
   const fp=pushFingerprint(code);
   if(fp&&fp===lastPushFP()&&!pushState().n)return;
+  // ONE PUSH AT A TIME.
+  //
+  // The "nothing changed" guard above compares against a fingerprint that is
+  // only written once the response comes back, so a second push fired while
+  // the first is still in the air sees the OLD fingerprint, decides the content
+  // is new, and writes the same bytes again. Nothing in here stopped two from
+  // overlapping — there was no in-flight flag at all — and on a plan whose
+  // thousand daily writes are already spent, a duplicate is not free.
+  //
+  // Coalesce rather than drop: if something asks for a push while one is
+  // running, remember that and schedule one after it lands. Returning silently
+  // would be the other bug, where a real edit made mid-flight never ships.
+  if(_pushInFlight){_pushAgain=true;return;}
   // Sixteen hundred and ninety consecutive failures, one every three seconds,
   // all of them "Failed to fetch". Retrying instantly forever does not fix a
   // network that is down; it just spends the battery and hammers the worker
@@ -9190,6 +9227,12 @@ async function _syncPushInner(code){
       if(Date.now()-(st.at||0)<wait)return;
     }
   }
+  // Claimed HERE, immediately before the try that releases it, and not one line
+  // earlier. Set above the backoff check, a single backed-off push returned
+  // with the flag still raised and every later push bailed on it forever — a
+  // flag whose release lives in a finally has to be taken inside the try it
+  // belongs to, or an early return between the two is a permanent outage.
+  _pushInFlight=true;
   try{
     let list=realList();
     if(cryptoKey&&envWraps){list=await buildEnvelope();} // ciphertext (master-key envelope) to cloud
@@ -9221,6 +9264,10 @@ async function _syncPushInner(code){
     }
     else {setLastPushFP('');notePushFail((d&&(d.error||d.ignored))||('HTTP '+r.status));}
   }catch(e){setLastPushFP('');notePushFail((e&&e.message)||'no connection');}
+  finally{
+    _pushInFlight=false;
+    if(_pushAgain){_pushAgain=false;try{schedulePush();}catch(e){}}
+  }
 }
 // A name a person can pick out of a list. The device ID is random by design, so
 // this is the only thing that makes "the Mac" findable from the phone.
@@ -9451,6 +9498,58 @@ function ensureBackup(){
 const KEY_SELF='key_self_'+LSKEY;
 function keySelfMade(){try{return localStorage.getItem(KEY_SELF)==='1';}catch(e){return false;}}
 function clearKeySelf(){try{localStorage.removeItem(KEY_SELF);}catch(e){}}
+// BRING A LIST IN WITHOUT LOSING THIS ONE.
+//
+// "Use code" replaces, and it has to: adopting a code means this device backs
+// up there from now on, and two lists cannot both be the backup. But that is a
+// poor answer to the question people actually have, which is "my phone and my
+// laptop each made their own code and I want one list".
+//
+// Export/Import nearly does it and quietly costs you things: doImport carries
+// title, status, episode and rating, and blanks notes and favourites. This
+// keeps them, because it merges the entries rather than re-adding them.
+//
+// It cannot merge by id. mergeLists() matches on a.id, and two devices that
+// minted their own codes generated their own uid() for the same show — every
+// shared title would arrive as a stranger and double. dedupeList matches the
+// way the rest of the app matches (AniList id, then normalised title) and folds
+// the two copies field by field: the further episode, the stronger status, both
+// sets of notes, either favourite. Local goes in FIRST so the kept copy is this
+// device's and the other one fills the gaps.
+//
+// This device keeps its own code. Nothing about where it backs up changes.
+async function mergeFromCode(){
+  if(appLocked){toast('Unlock the list first');return;}
+  const el=document.getElementById('syncCodeIn');
+  const raw=((el&&el.value)||'').replace(/[^A-Za-z0-9]/g,'').toUpperCase();
+  if(!/^[A-Z0-9]{10,64}$/.test(raw)){toast('That code looks off. Check it');return;}
+  if(raw===syncCode()){toast('That is this device\u2019s own code');return;}
+  toast('Reading that list\u2026');
+  let res=null;
+  try{
+    const r=await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({op:'pull',code:raw})});
+    res=await r.json();
+  }catch(e){res=null;}
+  if(!res){toast('Could not reach the cloud just now');return;}
+  const {inner}=unwrapSync(res.data);
+  if(inner&&isEnvelope(inner)){toast('That list has a password on it \u2014 unlock it on its own device and back it up again first');return;}
+  if(!Array.isArray(inner)||!inner.length){toast('Nothing is stored under that code');return;}
+  // A restore point before anything is touched, in the same slot a push uses,
+  // so the recovery is the one that already exists rather than a new one.
+  try{localStorage.setItem('wl_prepush_backup',JSON.stringify(anime));}catch(e){}
+  const before=anime.length;
+  const r=dedupeList(anime.concat(migrate(inner)));
+  anime=r.kept;
+  const added=anime.length-before, folded=Math.max(0,inner.length-added);
+  writeLocal();
+  try{render();}catch(e){}
+  try{renderSyncUI();}catch(e){}
+  try{schedulePush();}catch(e){}
+  toast(added?`Added ${added} \u00b7 ${folded} already here, merged`
+             :`Nothing new \u2014 all ${folded} were already here`);
+  try{setTimeout(fetchCovers,500);}catch(e){}
+}
 async function syncRestore(){
   // Strip ANY separator, not just spaces. Codes get written down, pasted out of
   // messages, and read aloud — hyphens and dots come back with them, and a
@@ -9574,12 +9673,14 @@ function renderSyncUI(){
       <div class="dt-label" style="margin-top:16px">${icon('refresh')} Bring another list here</div>
       <p class="ai-desc">Restoring replaces what's on this device with the list saved under that code.${
         (typeof keySelfMade==='function'&&keySelfMade()&&realList().length)
-        ?' <b>This device has '+realList().length+' of its own.</b> If those are worth keeping, copy them out from Import / Export first \u2014 they are not merged in.'
+        ?' <b>This device has '+realList().length+' of its own.</b> If those are worth keeping, use <b>Merge it in</b> below instead \u2014 that keeps both.'
         :''}</p>
       <div style="display:flex;gap:8px;">
         <textarea class="ai-prompt-in urlin" rows="2" id="syncCodeIn" placeholder="paste a code to restore" autocomplete="off" autocapitalize="characters" spellcheck="false" onkeydown="if(event.key==='Enter'){event.preventDefault();syncRestore();}"></textarea>
         <button class="ai-run-btn" onclick="syncRestore()">Use code</button>
-      </div>`;
+      </div>
+      <button class="parse-btn" style="margin-top:8px;width:100%" onclick="mergeFromCode()">${icon('layers')} Merge it in instead</button>
+      <p class="ai-desc" style="font-size:12px;margin-top:6px"><b>Use code</b> replaces this list and backs up there from now on. <b>Merge it in</b> keeps both \u2014 anything that code has and this device hasn't is added, anything you both have is folded together (the further episode, the stronger status, both sets of notes), and this device keeps its own code. That is the one to use when your devices each made a code of their own.</p>`;
   }else{
     box.innerHTML=`<div class="dt-label">${icon('cloud')} Cloud backup · OFF</div>${meter}
       <p class="ai-desc">Back up your list to the cloud so it survives losing your phone and syncs across your devices. Private — only someone with your secret code can open it.</p>
@@ -21508,14 +21609,7 @@ function friendRecRowHTML(){
   // once a rec is on your list it leaves this row — matched by AniList id OR title,
   // so title-only recs (no id) also drop out after you add them.
   const inList=it=>(it.aniId&&mineAni.has(it.aniId))||mineTitle.has(normTitle(it.title));
-  const gone=recDismissed();
-  // Hidden under EITHER identity counts as hidden. Same reason as above: a show
-  // that was turned down once should not reappear because a different friend
-  // happened to send it without an id attached.
-  const isGone=(k,it)=>!!(gone[k]
-    ||(it&&it.aniId&&gone['a'+it.aniId])
-    ||(it&&it.title&&gone['t'+String(it.title).toLowerCase()]));
-  const keys=Object.keys(map).filter(k=>{const it=map[k].item;const kind=it.kind==='read'?'read':'watch';return kind===viewKind && !inList(it) && !isGone(k,it);});
+  const keys=Object.keys(map).filter(k=>{const it=map[k].item;const kind=it.kind==='read'?'read':'watch';return kind===viewKind && !inList(it) && !recIsGone(k,it);});
   if(!keys.length)return '';
   keys.sort((x,y)=>Math.max(0,...map[y].senders.map(s=>s.at))-Math.max(0,...map[x].senders.map(s=>s.at)));
   return `<div class="row-sec"><div class="row-head" style="--rc:var(--a2)"><div class="row-title">Friends recommend</div><div class="row-count">${keys.length}</div></div><div class="row-scroll">${keys.map(k=>recCard(k,map[k])).join('')}</div></div>`;
@@ -21525,6 +21619,21 @@ function friendRecRowHTML(){
 // the desktop.
 const RECX_KEY='recs_dismissed';
 function recDismissed(){try{const v=JSON.parse(localStorage.getItem(RECX_KEY)||'{}');return (v&&typeof v==='object')?v:{};}catch(e){return{};}}
+// Hidden under EITHER identity counts as hidden: a recommendation is keyed
+// 'a'+aniId when it has an id and 't'+title when it does not, so a show turned
+// down once must not reappear because a different friend sent it without an id.
+//
+// This lived inline inside the home-screen row and nowhere else, which is
+// exactly how the "To you" list ended up showing rows it had already been told
+// to hide — pressing "Not for me" wrote the dismissal, said so in a toast, and
+// then rendered the row again. One list knowing a rule is one list; a function
+// is every list.
+function recIsGone(k,it){
+  const gone=recDismissed();
+  return !!(gone[k]
+    ||(it&&it.aniId&&gone['a'+it.aniId])
+    ||(it&&it.title&&gone['t'+String(it.title).toLowerCase()]));
+}
 // The X sits on the card, which makes it easy to catch by accident — and since
 // dismissing now tells the sender you passed, a mis-tap sends a false signal to
 // a person. So the signal is DELAYED: the card hides at once, and the friend is
@@ -21673,6 +21782,9 @@ function recsToMeRows(peek){
           replies:Array.isArray(mine.recSaidNotes)?mine.recSaidNotes:[],told:mine.recSaid||{},key:k});
         return;
       }
+      // Turned down is turned down. Without this the row survived its own
+      // dismissal, and the count beside "Waiting on you" counted it too.
+      if(recIsGone(k,it))return;
       rows.push({kind:'new',key:k,item:it,title:it.title,img:it.img,senders:rec.senders||[],
         at:Math.max(...(rec.senders||[]).map(x=>x.at||0),0),status:'',replies:[],told:{}});
     });
@@ -25707,10 +25819,12 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-10-18.60',
+  v:'2026-10-18.62',
   title:'Calmer, and harder to make ugly',
   push:'Watch opens the episode you pressed on the source you set \u2014 and the whole app has been redrawn as something you keep rather than something you browse.',
   notes:[
+    'If your devices each made their own cloud code, you can finally put them back together. Paste another device\u2019s code and press <b>Merge it in</b>: anything it has and this one hasn\u2019t is added, anything you both have is folded into one \u2014 the further episode, the stronger status, both sets of notes \u2014 and this device keeps its own code. Copying a list out and importing it back used to be the only way, and that quietly dropped your notes and favourites.',
+    '\u201cNot for me\u201d now actually takes it off the list. It was recording that you had passed, and telling you so, and then drawing the row again \u2014 with the waiting count still counting it.',
     'Cloud backup has its own button in the bar now. It is the one setting with a real consequence if you never find it, and it was four taps deep behind a settings list.',
     'The app is calmer. The top of every screen used to sit under a dark red wash \u2014 a gradient nobody chose, staining the search field and the header of every page \u2014 and the accent that was supposed to mark what you can press was also marking everything else. The wash is neutral now, the colour at the top of the page comes from the artwork behind it, and the accent is a jade that sits back instead of shouting.',
     'Picking your own colour cannot make it ugly any more. You choose the hue \u2014 the part you actually mean \u2014 and the app takes care of how far to push it, then checks the result is still readable on a dark screen and fixes it if it is not. A colour too dark to read comes back as the same colour, readable.',

@@ -579,6 +579,66 @@ can't.
    and the neutral user-configured custom-source field. See §10.
 2. **No adult content.** Enforced by the gate in §7 — don't weaken it.
 
+## Setup kits — a link that arrives configured
+
+Handing someone this app used to mean a call: let them in, read them a code,
+walk them through the sources, notifications, the AI key. Every one of those
+steps has an answer the sender already knows, which is the definition of work
+that should not happen on a call.
+
+A kit is that answer set, stored once and claimed once. Endpoints on the notify
+worker: `/kit-new` and `/kit-list` / `/kit-revoke` (admin-gated), `/kit-peek`
+(public, says who it is from and whether it is spent, never the payload), and
+`/kit-claim`.
+
+**Single use, bound on first claim.** A link cannot know who will open it, and
+pretending otherwise would be a lie told in a UI — so the first device to claim
+one takes it and every other device is refused. The claiming device may re-claim
+freely: the same person reopening the link, or finishing a reinstall, is not an
+attack. Claiming also *joins* — that is the whole point — but it still counts
+against the member cap and still notifies the admin, because a member who
+appears without a trace is how a roster becomes a mystery.
+
+**What a kit carries is an allow-list, never a deny-list.** `collectExtra()`
+already exists and is exactly this shape — it is the settings bag sync sends —
+and reusing it would have been one line. It also carries the sender's cloud
+code, which in a backup of your own is harmless and in an invite is the keys to
+your list. So `KIT_KEYS` names what travels: the source setup and the
+recommended sites. Not `sync_*`, not `anthropic_key`, not `friends`, not
+`wl_device` / `friend_code` / the admin token, not the list.
+
+**The look deliberately does not travel.** Theme, retro, accent, density and
+home layout were in the first version, and handing those over means the first
+thing somebody sees of their own app is somebody else's taste, arriving as a
+setting they did not choose. The setup worth inheriting is the part that is
+tedious and has one right answer.
+
+**A kit does not claim to have finished setting anyone up.** It skips the three
+cards explaining what the app is and lands on the checklist, because two of its
+rows are jobs a link physically cannot do: Add to Home Screen, which the browser
+owns and which on iPhone is the only way an alert ever arrives, and the
+notification permission, which needs their own tap.
+
+## Borrowed AI — the sender's key, spent on the server
+
+`callAI` goes straight from the browser to Anthropic or Gemini, which is right
+for a key somebody typed in themselves and exactly wrong for one handed out in
+an invite: ship that key to the browser and it is in the recipient's developer
+tools in five seconds, and any limit counted in their localStorage is a number
+they can edit. **A cap is either enforced where the key lives or it is
+decoration.**
+
+So a borrowed key never leaves the worker. `/ai` takes a prompt and a device id,
+reads the budget written at claim time (`aib:<dev>`), spends it **before** the
+upstream call — a reply that fails to arrive still cost the request, and
+counting on the way back makes a loop of failing calls free — and forwards using
+`env.AI_KEY`. When it runs out the app asks for a key of their own, which goes
+back to being a direct browser call. `/ai-budget` reads the remainder without
+spending anything.
+
+The write cost is bounded by the cap itself: a 200-request budget can cost at
+most 200 KV writes, ever.
+
 ## Your own AI endpoint
 
 The four built-in providers are recognised by the **shape of the key** — `gsk_`

@@ -6,8 +6,12 @@ identity preservation wins over any generic default.
 
 ## Shape
 
-**The radius scale.** 6 tags · 10 controls · 14 cards · 18 panels · 22/26 sheets
-and bars · 99 pills. There were **23 distinct corner values** in this file — 12,
+**The radius scale.** 6 tags and poster art · 10 controls and wide art · 14
+cards · 18 panels · 22/26 sheets and bars · 99 pills. Poster artwork was moved
+*down* the scale on purpose: a 104px cover with a 14px corner is a phone icon,
+and the same picture at 6px is a printed plate. Artwork in a row is a print;
+artwork that fills the screen stays a soft frame, and that contrast is the
+system rather than an inconsistency. There were **23 distinct corner values** in this file — 12,
 13, 14 and 15 all doing the same job in different places. A 1px difference is too
 small to read as a decision and just large enough to make everything feel
 slightly misaligned. Add *to* the scale, never *between* it.
@@ -24,20 +28,43 @@ Dark ground, one accent, semantic status colours. All tokens are CSS custom
 properties on `:root`, re-declared per theme.
 
 ```
---bg   #0a0a0c   --bg2 #111114   --bg3 #18181c   --bg4 #202025   --bg5 #28282e
---t1   #f0ecea   --t2  #bcb7c3   --t3  #918e99          text ramp, all ≥4.5:1
---a    #da374f   --a2  #ff6070   --ag / --glow          accent + its washes
---aFg  #ffffff                                          text ON the accent
+--bg   #0b0b0d   --bg2 #121215   --bg3 #17171b   --bg4 #1e1e23   --bg5 #26262c
+--t1   #edeef0   --t2  #b4b6bd   --t3  #8b8d96          text ramp, worst pair 4.55
+--a    #2fb8a0   --a2  #56d6bd   --ag / --glow          accent + its washes
+--aFg  #05201b                                          text ON the accent
+--fin  #54c08a   --wat #d9a441   --pln #6f9fe0  --drp #8e9099
+--uv   #6b7280                                          the wash at the top of a screen
 --b1/--b2/--b3                                          accent-tinted hairlines
 --bn/--bn2                                              neutral hairlines
---r 16px  --r2 12px  --elev1  --elev2
+--r 14px  --r2 10px  --elev1  --elev2
 ```
+
+**The accent was an alarm red and is now a jade.** Red is the colour for "you
+are about to lose something", and it was also doing the filter chip, the shelf
+rule, the wordmark dot, the play button, the waiting count and the confirm
+button — when everything is red, nothing is. Jade sits cool against artwork
+that is overwhelmingly warm and collides with none of the four status colours.
+
+**The top of every screen used to sit under a maroon fog.** `--topgrad` was a
+near-black with the accent mixed into it, so the search field, the filters and
+the header of every page were stained by a gradient nobody had chosen. It is
+neutral now; the colour at the top of a page comes from the artwork, through
+`--amb`, which is what that token was always for. `--uv` was a fixed violet —
+the most recognisable thing a generated dark UI wears — and is a near-neutral
+slate.
+
+**The status colours are pulled back from full saturation.** They are labels on
+a card, not signals in a cockpit, and four vivid hues in one grid argue with the
+artwork and with each other. All four still clear AA.
 
 Two things that look redundant and are not:
 
-- **`--aFg`** exists because bright themes (Sanji yellow, Naruto orange) need
-  near-black text on the accent while dark ones need white. Never hardcode
-  `#fff` on an accent surface.
+- **`--aFg`** exists because an accent's legible foreground depends on the
+  accent. On the default jade, **white fails at 2.48** — so the label on a
+  filled button is a deep teal-black. On the bright themes (Sanji yellow,
+  Naruto orange) it is near-black for the same reason. Never hardcode `#fff` on
+  an accent surface; it is wrong on the default theme before you reach the
+  loud ones.
 - **`--bn` / `--bn2`** are neutral hairlines held out of the per-theme accent
   tint, so borders don't turn orange in the Naruto theme.
 
@@ -519,6 +546,63 @@ value moved at most 1px, so nothing reflowed. Weights went 6 → 3 (600 · 700 �
 22px that sat between 18 and 26 making three large radii read as one wrong one.
 
 `smoke.mjs` fails on any size or radius off the scale, so this holds.
+
+## The rule that measures
+
+A shelf head used to be a big bold name with a small number beside it, which is
+how every streaming grid in the world announces a row. This is a list you keep,
+so a shelf announces itself the way an entry in a catalogue does: the number it
+was given, its name, then a rule running out to the margin with the count
+sitting on the end of it.
+
+The rule is not trim. Where a shelf has progress in it, it is **filled to how
+far through that shelf you are** — `shelfFill()` is the mean of its titles'
+progress, written onto the head as `--fill`. The line that organises the page is
+also the one measuring it, and a shelf with nothing started gets a plain
+hairline, which is the honest answer rather than a decorative one.
+
+The same language runs downward:
+
+- **Progress is a two-pixel flat line, not a lozenge.** A rounded four-pixel
+  track with a gradient through it is the single most generated-looking object a
+  dark UI can own. The number it was approximating is now set in figures on the
+  card (`8/25`), tabular, leading the line it shares with the runtime estimate.
+- **The active tab is a rule, not a tinted pill.** A lozenge behind the current
+  tab does its job by shading a box. Two pixels of accent across the top of the
+  track says the same thing in the app's own language. In the rail the same idea
+  turns on its side against the window edge.
+- **Settings is five named groups under the same hairline label** the detail
+  sheet and Sources already use, rather than fourteen identical rows.
+
+Retro keeps the four-pixel cut channel it always had. A channel needs a wall,
+and at two pixels the inset edge *is* the track — the two are different
+languages on purpose.
+
+## You pick the hue; the app picks how far to take it
+
+There is a colour picker for the accent. A free picker over a dark UI can
+produce a navy nobody can read, a neon that buzzes against the artwork, or a
+brown that just looks like a mistake — and the person choosing has no way to
+tell which of those they got until their app is ugly.
+
+Hue is the part worth choosing and the part people mean when they say they want
+a different colour. Saturation and lightness are a craft judgement with a narrow
+right answer on a dark ground, so `tameAccent()` clamps them into it
+(**S 0.40–0.74, L 0.46–0.70**), then measures the result against the darkest
+surface and lifts it until it clears AA. An unreadable `#0a1038` comes back as
+`#6374e3` — same hue, legible.
+
+The tamed value is what gets **stored**, not just what gets painted, so the
+swatch cannot lie and other devices inherit the same good colour rather than
+re-deriving their own. `scripts/accent-taming-test.mjs` holds one case per way
+it used to go wrong.
+
+A caution learned the hard way: the app already had `_rgb2hsl` and `_hsl2hex`,
+taking RGB numbers and degrees. A second pair was written with the same names
+and different signatures; the later declaration won, every call got a string
+where it wanted three numbers, and the accent came out as the literal text
+`#nannannan`. Two functions with one name is a coin toss decided by source
+order.
 
 ## Eyebrows
 

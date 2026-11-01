@@ -297,6 +297,44 @@ download five copies of the list.
 Ops: `pull` · `push` · `devices` · `pull_dev`. Covered by
 `cloud/adopt-sync.test.mjs` and `scripts/device-dominance-test.mjs`.
 
+### Putting two devices back together
+
+`ensureBackup()` mints a sync code on any device that has titles and no code.
+That is the right behaviour for a device nobody has set up — and it means two
+devices that were each used before either was pointed at the other end up
+**each backing up alone, under a code of its own**. Neither is broken, nothing
+failed, and the device picker offers nothing to pick, because from either side
+there genuinely is no other device.
+
+"Use code" cannot fix it. Adopting a code means this device backs up there from
+now on, and two lists cannot both be the backup — so the one you did not adopt
+is simply dropped. Export/Import nearly works and quietly costs you things:
+`doImport()` carries title, status, episode and rating, and blanks **notes and
+favourites**.
+
+`mergeFromCode()` is the third door: pull another code's list, fold it into this
+one, change nothing about where this device backs up.
+
+The implementation detail that matters: it **cannot merge by id**. `mergeLists()`
+matches on `a.id`, and two devices that minted their own codes also generated
+their own `uid()` for the same show — so every shared title would arrive as a
+stranger and the list would double. It goes through
+`dedupeList(anime.concat(migrate(inner)))` instead, which matches the way the
+rest of the app matches
+(AniList id, then normalised title) and folds the pair field by field: the
+further episode, the stronger status, both sets of notes, either favourite.
+Local goes in **first**, so the copy that survives is this device's and the
+other one fills the gaps.
+
+Before anything is touched it writes `wl_prepush_backup` — the same slot a push
+already uses, so the recovery route is the one that exists rather than a second
+one to maintain. A password-locked list is refused rather than merged as
+garbage, this device's own code is refused, and a malformed code never reaches
+the network.
+
+Merging the same code twice is a no-op, because the second pass dedupes against
+a list that already contains it. Covered by `scripts/merge-code-test.mjs`.
+
 ### The write budget
 
 KV bills per write **operation**, not per byte: a 50-byte change and a 2 MB list
@@ -329,6 +367,29 @@ an encrypted envelope carries a fresh IV each time, so hashing what goes on the
 wire would differ on every call and the guard would never fire for exactly the
 people relying on it most. A failed push clears the fingerprint, so the failure
 mode is an extra write, never a backup that quietly stops.
+
+**What the fingerprint is allowed to see.** A guard that hashes everything is
+not a guard. The enrichers stamp bookkeeping on each item to remember they
+already tried — `imgTried`, `detTried`, `bannerTried`, `idTried`, `scoreTried`,
+`svcTried`, `adultChk`, and `airChk`, which is a **timestamp** refreshed every
+time the airing data is re-checked. Those belong in the payload, so another
+device does not repeat the lookups. They do not belong in the hash: inside it,
+merely *checking* something counted as a change, so an enrichment pass that
+learned nothing still moved the fingerprint and armed a push — the app spending
+a KV write to record that it had looked. `PUSH_FP_IGNORE` + `fpList()` strip
+them for hashing only. On a plan whose thousand daily writes are already gone,
+this is the difference between syncing when your list changes and syncing
+because a timer fired. It was also the real cause of a long-standing test flake:
+the list grew mid-push, which is exactly what it looks like from outside.
+
+**One push at a time.** There was no overlap protection at all. The fingerprint
+is written when the response comes back, so two pushes started inside each
+other's round trip both saw the old fingerprint and both wrote — identical bytes,
+twice, two writes. `_pushInFlight` holds the door and `_pushAgain` re-schedules
+whatever arrived while it was shut, so nothing is dropped. The flag is set
+**after** the backoff check, not before: setting it above that `return` leaves it
+stuck true the first time the network is down, which permanently disables syncing
+for that session. `scripts/quota-backoff-test.mjs` is what caught that.
 
 Timing is a debounce **with a ceiling** (`PUSH_WAIT` 10s, `PUSH_MAX` 45s). The
 ceiling is not decoration: a plain debounce is starved by anything that writes

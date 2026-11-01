@@ -2317,9 +2317,22 @@ body.first-paint .pfill,body.content-in .pfill{animation:barGrow .62s cubic-bezi
      two wider labels ("Settings", "Sources") pushed their neighbours: measured
      centre-to-centre gaps of 88.3 / 88.3 / 91.5 / 94.5, and the + landed 6.2px
      left of the bar's own centre. Identical tracks put every one where it
-     belongs. Six of them now — backup is the one setting with a consequence if
-     you never find it, and it was four taps deep behind a settings list. */
-  display:grid;grid-template-columns:repeat(6,minmax(0,1fr));align-items:center;
+     belongs.
+
+     The COUNT is odd on purpose, and that is the whole argument. The + is the
+     only filled, accented object in the bar, so the eye goes to it first and
+     measures the bar from it. In an even number of tracks there is no middle
+     track to put it in: adding Cloud made six, the + sat in track 3 of 6 with
+     two items to its left and three to its right, and the bar's true centre
+     fell on the gap beside it. Nothing was misaligned by a pixel — it was the
+     arrangement that was lopsided, which is worse, because there is nothing to
+     nudge. Five tracks, two either side, + in the middle.
+
+     Cloud stays (it is the one setting with a real consequence if you never
+     find it). Sources is what left, and it costs nothing: it already has a row
+     in Settings, the player's "Change source" opens it, and so does the prompt
+     you get when Watch has nowhere to go. */
+  display:grid;grid-template-columns:repeat(5,minmax(0,1fr));align-items:center;
   /* The + is the tallest thing in here, so the padding is what guarantees it has
      room. overflow is spelled out because this button has been clipped before. */
   padding:11px 10px calc(var(--safe-b) + 11px);
@@ -2399,9 +2412,15 @@ body.first-paint .pfill,body.content-in .pfill{animation:barGrow .62s cubic-bezi
      same corner as the app's own controls belongs to this app instead, and
      being the only filled thing in the bar is already all the emphasis it
      needs, without a halo underneath it. */
-  width:56px;height:46px;min-width:0;flex:none;align-self:center;border-radius:12px;background:var(--a);color:var(--aFg);font-size:26px;line-height:1;
+  /* The mark inside it was the character ＋, which is the one thing in this row
+     not drawn by the icon set. Set in the UI font it came out with thick square
+     terminals beside four Feather glyphs at stroke-width 2 and round caps, so
+     the key read as heavier and slightly cruder than its neighbours without it
+     being obvious why. Same icon system as everything else now. */
+  width:56px;height:46px;min-width:0;flex:none;align-self:center;border-radius:12px;background:var(--a);color:var(--aFg);line-height:1;
   justify-content:center;padding:0;border:none;
 }
+.nbtn.add .ico{width:24px;height:24px;stroke-width:2.25;}
 .nbtn.add:active{transform:scale(.93);}
 .nbtn.add.on{background:var(--a);}
 
@@ -5512,10 +5531,9 @@ body.recsel .pcard{position:relative;}
 <div class="nav">
   <button class="nbtn on" id="nav-home" data-tip="Home" onclick="goHome()"><span><i data-ic="home"></i></span><small>Home</small></button>
   <button class="nbtn" id="nav-stats" data-tip="Stats" onclick="openStats()"><span><i data-ic="chart"></i></span><small>Stats</small></button>
-  <button class="nbtn add" id="nav-add" data-tip="Add a title" onclick="openSheet_add()">＋</button>
+  <button class="nbtn add" id="nav-add" data-tip="Add a title" aria-label="Add a title" onclick="openSheet_add()"><i data-ic="plus"></i></button>
   <button class="nbtn" id="nav-cloud" data-tip="Cloud backup" onclick="openSheet('backupSheet')"><span><i data-ic="cloud"></i></span><small>Cloud</small></button>
   <button class="nbtn" id="nav-settings" data-tip="Settings" onclick="openSheet('settingsSheet')"><span><i data-ic="settings"></i></span><small>Settings</small></button>
-  <button class="nbtn" id="nav-sources" data-tip="Sources" onclick="openSheet('sourceSheet')"><span><i data-ic="play"></i></span><small>Sources</small></button>
   <button class="nbtn rail-fold" id="nav-fold" data-tip="Collapse" onclick="toggleRail()" aria-label="Collapse the sidebar"><span><i data-ic="chevron-left"></i></span></button>
 </div>
 
@@ -14529,7 +14547,7 @@ const WT_STEPS=[
    b:'Open <b>Your code &amp; adding friends</b>. Send someone your code, or paste theirs. Then you can recommend shows to each other and see what they thought.',
    need:()=>{try{return (friendsList()||[]).length>0||(friendsOut()||[]).length>0;}catch(e){return true;}},
    needMsg:'Add one friend, or send one request, and this step is done.'},
-  {sel:'#nav-sources', open:()=>openSheet('sourceSheet'),
+  {sel:'#nav-settings', open:()=>openSheet('sourceSheet'),
    t:'Where you actually watch',
    b:'Pick the services you use and <b>Watch</b> opens straight to them. A friend can hand you their whole setup instead, if that is easier.'},
   {sel:'#notifyBell', open:()=>{try{openNotifySheet();}catch(e){}},

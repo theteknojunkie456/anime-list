@@ -87,7 +87,14 @@ fi
 trap sweep EXIT INT TERM
 
 PASS=0; FAIL=0; FAILED=""
-for f in scripts/*-test.mjs scripts/*.test.mjs; do
+# cloud/*.test.mjs are in here for a reason. They used to be run by hand, which
+# means they were run when somebody remembered — and two of them (rec-pass,
+# rec-echo) had been failing for a release against a worker that was correct:
+# mailbox reads were locked down so a friend code alone no longer returns your
+# notes, and the tests still asked the old way. A test outside the suite is a
+# test that reports to nobody. These are plain node, no browser, so they cost
+# about a second between them.
+for f in scripts/*-test.mjs scripts/*.test.mjs cloud/*.test.mjs; do
   [ -f "$f" ] || continue
   n=$(basename "$f" .mjs)
   # Judge by exit status, not by parsing the summary line. Four suites print

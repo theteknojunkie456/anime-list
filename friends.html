@@ -9568,6 +9568,136 @@ async function mergeFromCode(){
              :`Nothing new \u2014 all ${folded} were already here`);
   try{setTimeout(fetchCovers,500);}catch(e){}
 }
+// ─── PAIRING: ADD A DEVICE TO THIS KEY ──────────────────────────────────────
+//
+// Everything above this line assumes you can get a 20-character key from one
+// device to another. In practice nobody does: you do not read twenty characters
+// off a laptop into a phone, and the button that accepted them REPLACED the
+// list, so the one person who tried had to gamble their library on typing it
+// right. Both devices then kept the key they minted for themselves and backed
+// up alone, forever, with nothing on screen saying so.
+//
+// A pairing code is a short-lived bearer of the real key: eight characters,
+// ten minutes, one device. And joining through it MERGES — which is the half
+// that matters, because "this will replace your list" is why the door nobody
+// walked through was built that way in the first place.
+let _pairTick=0,_pairCode='';
+function pairBox(){return document.getElementById('pairBox');}
+function pairStop(){ if(_pairTick){clearInterval(_pairTick);_pairTick=0;} }
+async function pairOffer(btn){
+  const code=syncCode();
+  if(!code){toast('Turn on cloud backup first');return;}
+  if(appLocked){toast('Unlock the list first');return;}
+  const box=pairBox(); if(!box)return;
+  if(btn)btn.disabled=true;
+  box.innerHTML='<p class="ai-desc" style="margin:8px 0 0">Asking the cloud for a code…</p>';
+  let r=null;
+  try{
+    const res=await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({op:'pair_new',code,dev:wlDevice()})});
+    r=await res.json();
+  }catch(e){r=null;}
+  if(btn)btn.disabled=false;
+  if(!r||!r.ok){
+    box.innerHTML='<p class="ai-desc" style="margin:8px 0 0">'+
+      (r&&r.error==='that key has no backup yet'
+        ? 'This device has not finished its first backup yet. Give it a moment and try again.'
+        : 'Could not reach the cloud just now.')+'</p>';
+    return;
+  }
+  _pairCode=r.pair;
+  const until=+r.expiresAt||0;
+  const paint=()=>{
+    const left=Math.max(0,Math.round((until-Date.now())/1000));
+    const el=document.getElementById('pairLeft');
+    if(left<=0){ pairStop();
+      if(pairBox())pairBox().innerHTML='<p class="ai-desc" style="margin:8px 0 0">That code has expired. Ask for another.</p>';
+      _pairCode=''; return; }
+    if(el)el.textContent=Math.floor(left/60)+':'+String(left%60).padStart(2,'0');
+  };
+  // Four and four. The same grouping the long key uses, for the same reason:
+  // a person reading it aloud or across a room needs somewhere to pause.
+  const pretty=r.pair.slice(0,4)+' '+r.pair.slice(4);
+  box.innerHTML=`<div class="synccode" style="margin-top:10px">${pretty}</div>
+    <p class="ai-desc" style="margin-top:8px">On your other device: open <b>Cloud</b>, tap <b>Add this device</b>, and type that code. It works once, and expires in <b id="pairLeft" style="color:var(--t1)">10:00</b>.</p>
+    <button class="imp-all" style="width:100%;margin-top:8px" onclick="pairWithdraw()">Cancel it</button>`;
+  paint(); pairStop(); _pairTick=setInterval(paint,1000);
+}
+async function pairWithdraw(){
+  const pair=_pairCode,code=syncCode();
+  pairStop(); _pairCode='';
+  const box=pairBox(); if(box)box.innerHTML='';
+  if(!pair)return;
+  // Fire-and-forget: the code dies on its own clock regardless, so a failed
+  // cancel is not worth a message.
+  try{fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({op:'pair_cancel',pair,code})});}catch(e){}
+}
+// The other end. This is the one that merges.
+async function pairJoin(){
+  if(appLocked){toast('Unlock the list first');return;}
+  const el=document.getElementById('pairCodeIn');
+  const typed=((el&&el.value)||'').replace(/[^A-Za-z0-9]/g,'').toUpperCase();
+  if(!/^[A-Z0-9]{8}$/.test(typed)){toast('That code is eight characters');return;}
+  toast('Joining…');
+  let r=null;
+  try{
+    const res=await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({op:'pair_claim',pair:typed,dev:wlDevice(),devName:(typeof deviceLabel==='function'?deviceLabel():'')})});
+    r=await res.json();
+  }catch(e){r=null;}
+  if(!r||!r.ok){
+    toast(r&&r.error==='used'?'That code has already been used by another device'
+        :r&&r.error==='expired'?'That code has expired — ask for a new one'
+        :r&&r.error==='no such code'?'No code like that. Check it and try again'
+        :'Could not reach the cloud just now');
+    return;
+  }
+  const code=String(r.code||'');
+  if(!/^[A-Z0-9]{10,64}$/.test(code)){toast('The cloud sent back something odd. Nothing changed');return;}
+  if(code===syncCode()){toast('Already on that key');renderSyncUI();return;}
+  // Read the key we are joining BEFORE adopting it, so a locked or unreadable
+  // list is refused while this device still has its own.
+  let remote=null;
+  try{
+    const res=await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({op:'pull',code})});
+    remote=await res.json();
+  }catch(e){remote=null;}
+  if(!remote){toast('Could not read that list. Nothing changed');return;}
+  const {inner}=unwrapSync(remote.data);
+  if(inner&&isEnvelope(inner)){
+    toast('That list has a password on it — unlock it on its own device and back it up again first');
+    return;
+  }
+  // Anything else that is not a list is not a list. Without this the join falls
+  // through a shape it cannot merge, merges nothing, and adopts the key anyway
+  // — leaving this device pointed at a backup it cannot read, having just
+  // given up its own. An EMPTY key is fine and different: both devices end up on
+  // it and this one publishes what it has.
+  if(inner&&!Array.isArray(inner)){toast('Could not read that list. Nothing changed');return;}
+  // A restore point first, every time, in the slot the push path already uses.
+  try{localStorage.setItem('wl_prepush_backup',JSON.stringify(anime));}catch(e){}
+  const before=anime.length;
+  if(Array.isArray(inner)&&inner.length){
+    // Local FIRST, so the surviving copy is this device's and the other fills
+    // the gaps — the same ordering mergeFromCode uses, and for the same reason.
+    const r2=dedupeList(anime.concat(migrate(inner)));
+    anime=r2.kept;
+  }
+  const added=anime.length-before;
+  // Only now does this device change where it backs up. Everything above could
+  // fail without costing anyone their key.
+  setSyncCode(code); setSyncAt(0); setBackupDeclined(false);
+  try{clearKeySelf();}catch(e){}           // it is no longer a key this device invented
+  writeLocal();
+  try{render();}catch(e){}
+  try{renderSyncUI();}catch(e){}
+  try{schedulePush();}catch(e){}
+  const box=pairBox(); if(box)box.innerHTML='';
+  toast(added?`Joined · ${added} added from your other device`:'Joined — both devices now back up together');
+  try{setTimeout(fetchCovers,500);}catch(e){}
+}
 async function syncRestore(){
   // Strip ANY separator, not just spaces. Codes get written down, pasted out of
   // messages, and read aloud — hyphens and dots come back with them, and a
@@ -9684,7 +9814,18 @@ function renderSyncUI(){
         <p class="ai-desc" style="font-size:12px;margin-top:4px">Devices normally merge, newest edit per title winning. If one of them has drifted, pick the one that's correct and every device takes that list — once. After that they merge normally again. You can do this from any device, not just the one you're picking. Anything held only somewhere else is lost; a restore point stays on this device.</p>
         <div id="devPickBox"><button class="imp-all" style="width:100%;margin-top:8px" onclick="loadDeviceList(this)">Show my devices</button></div>
       </details>
-      <p class="ai-desc" style="margin-top:10px">On another device: install the app, open this panel, paste the code, tap <b>Use code</b>.</p>
+      <div class="dt-label" style="margin-top:16px">${icon('refresh')} Your other devices</div>
+      <p class="ai-desc">Two devices only share a list if they are on the <b>same key</b>. A device that had titles before you set backup up made a key of its own — it is backing up, correctly, somewhere nothing else can see. This is how you put them on one.</p>
+      <div style="display:flex;gap:8px;margin-top:8px;">
+        <button class="parse-btn" style="margin:0;flex:1" onclick="pairOffer(this)">${icon('upload')} Add a device</button>
+        <button class="imp-all" onclick="loadDeviceList(document.getElementById('devPickBox'))">Who is on this key?</button>
+      </div>
+      <div id="pairBox"></div>
+      <p class="ai-desc" style="font-size:12px;margin-top:8px">Press <b>Add a device</b> here, then type the eight characters it shows into the other device's <b>Add this device</b> box below. The other device keeps everything it already had — the two lists are folded together, not replaced.</p>
+      <div style="display:flex;gap:8px;margin-top:10px;">
+        <textarea class="ai-prompt-in urlin" rows="1" id="pairCodeIn" placeholder="eight-character code" autocomplete="off" autocapitalize="characters" spellcheck="false" onkeydown="if(event.key==='Enter'){event.preventDefault();pairJoin();}"></textarea>
+        <button class="ai-run-btn" onclick="pairJoin()">Add this device</button>
+      </div>
       ${adminToken()?`<div class="dt-label" style="margin-top:16px">${icon('lock')} Your setup key</div>
       <p class="ai-desc">Both keys in one line, for your own devices. Paste it into the unlock box on a new device and it lets the device in <b>and</b> pulls your list down \u2014 one paste instead of two. <b style="color:#ff6b6b">Never share this one</b>: it contains your admin token, which approves people onto the whole app. The 20-character code above is the one you give friends.</p>
       <button class="parse-btn" onclick="copySetupKey()">${icon('clipboard')} Copy setup key</button>`:''}
@@ -9706,7 +9847,13 @@ function renderSyncUI(){
       <div style="display:flex;gap:8px;margin-top:8px;">
         <textarea class="ai-prompt-in urlin" rows="2" id="syncCodeIn" placeholder="…or paste a code to restore" autocomplete="off" autocapitalize="characters" spellcheck="false" onkeydown="if(event.key==='Enter'){event.preventDefault();syncRestore();}"></textarea>
         <button class="ai-run-btn" onclick="syncRestore()">Use code</button>
-      </div>`;
+      </div>
+      <p class="ai-desc" style="font-size:12px;margin-top:10px">Already using WatchList on another device? Open <b>Cloud</b> there, press <b>Add a device</b>, and type the eight characters it gives you — this device joins that backup and keeps anything it already has.</p>
+      <div style="display:flex;gap:8px;margin-top:6px;">
+        <textarea class="ai-prompt-in urlin" rows="1" id="pairCodeIn" placeholder="eight-character code" autocomplete="off" autocapitalize="characters" spellcheck="false" onkeydown="if(event.key==='Enter'){event.preventDefault();pairJoin();}"></textarea>
+        <button class="ai-run-btn" onclick="pairJoin()">Add this device</button>
+      </div>
+      <div id="pairBox"></div>`;
   }
 }
 
@@ -25837,26 +25984,17 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-10-18.62',
-  title:'Calmer, and harder to make ugly',
-  push:'Watch opens the episode you pressed on the source you set \u2014 and the whole app has been redrawn as something you keep rather than something you browse.',
+  v:'2026-11-01.63',
+  title:'Your devices, on one list',
+  push:'Put your phone and your computer on the same list by typing eight characters \u2014 and nothing gets replaced doing it.',
   notes:[
+    'Your devices can finally be put on one list without you copying a twenty-character key between them. On the device that already has your list, open <b>Cloud</b> and press <b>Add a device</b>: it gives you eight characters, good for ten minutes and one device. Type those into the other device and the two lists are <b>folded together</b> \u2014 nothing is replaced, nothing is dropped, and whatever that device already had is kept.',
+    'Why this was needed: a device that already had titles when you first set backup up quietly made a key of its own. It was backing up perfectly well \u2014 somewhere nothing else could see. Nothing was broken, so nothing ever said so, and the device picker had nothing to show because from either side there really was no other device.',
+    'The bar at the bottom is even again. It had six slots with the add key in the third, so there were two things on its left and three on its right and the middle of the bar fell in the gap beside it. Five now, two either side, add key in the middle \u2014 and that key is drawn with the same pen as the rest of the icons instead of being a typed character.',
     'If your devices each made their own cloud code, you can finally put them back together. Paste another device\u2019s code and press <b>Merge it in</b>: anything it has and this one hasn\u2019t is added, anything you both have is folded into one \u2014 the further episode, the stronger status, both sets of notes \u2014 and this device keeps its own code. Copying a list out and importing it back used to be the only way, and that quietly dropped your notes and favourites.',
     '\u201cNot for me\u201d now actually takes it off the list. It was recording that you had passed, and telling you so, and then drawing the row again \u2014 with the waiting count still counting it.',
-    'Cloud backup has its own button in the bar now. It is the one setting with a real consequence if you never find it, and it was four taps deep behind a settings list.',
     'The app is calmer. The top of every screen used to sit under a dark red wash \u2014 a gradient nobody chose, staining the search field and the header of every page \u2014 and the accent that was supposed to mark what you can press was also marking everything else. The wash is neutral now, the colour at the top of the page comes from the artwork behind it, and the accent is a jade that sits back instead of shouting.',
-    'Picking your own colour cannot make it ugly any more. You choose the hue \u2014 the part you actually mean \u2014 and the app takes care of how far to push it, then checks the result is still readable on a dark screen and fixes it if it is not. A colour too dark to read comes back as the same colour, readable.',
     'Press an episode and that is the episode that opens. A link you pinned was stored exactly as you pasted it, so every episode of that show went to the one you pasted \u2014 press 2, get 1. And when the app works a site out for you, it now has to rebuild your own address from its answer before it is allowed to keep it.',
-    'The home screen is laid out as an index: each shelf numbered, named, and followed by a rule out to its count. Where a shelf has progress in it, that rule is filled to how far through it you are \u2014 so the line dividing the page is also measuring it.',
-    'When a device turns on cloud backup by itself it makes up a code, and nothing said so plainly enough \u2014 so devices that each did it were each backing up alone, under a code of their own, and the device picker told you to wait for one that could never arrive. It now names what happened and what to do about it.',
-    'Covers are printed rather than tiled. Crisper corners, a flat two\u2011pixel measure under the ones in progress, and the episode you are on set in figures on the card instead of only drawn as a bar.',
-    'A title the database could not identify put the app into a loop it never left \u2014 saving every two seconds and backing up every forty-five, all day, on every device with WatchList open. Nothing looked wrong, which is why it ran for so long. It is gone, and so is the battery and data it was quietly spending.',
-    'The home screen no longer gets slower as your list grows. The two shelves that scroll sideways were building a card for every single title behind them, so a long list meant a heavy page; they now build what you can actually reach.',
-    'Watch never takes the app away with it. If your browser blocks the tab you get a link to tap instead of losing your place, and Sources now says plainly where Watch is going to send you \u2014 and which choice plays inside WatchList rather than in a tab.',
-    'Stats is a picture of your library instead of a page of bars: your own covers behind the hours, a ring for where everything stands, and the shape of how you actually rate things. It reads properly on a big screen now too.',
-    'Picking a device in Cloud backup actually holds. The decision used to be stored inside the list it was deciding about, so the next device to back up could quietly undo it and bring its old titles back with it.',
-    'The app checks for updates again. It had been serving a copy of itself it cached weeks earlier, so fixes were shipping and not arriving \u2014 and the panel that is meant to tell you which version you are on was reporting the same answer either way.',
-    'Retro reaches every screen now, Stats included, and the glow follows your artwork without arguing with the theme you picked.',
   ],
 };
 // The rows animate in once, on the first paint of a session. render() runs on

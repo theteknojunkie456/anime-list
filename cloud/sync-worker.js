@@ -185,6 +185,95 @@ export default {
       return json({ ok: true, updatedAt: now, adopt }, 200, cors);
     }
 
+    // ── PAIRING: how a second device joins the FIRST one's key ──────────────
+    //
+    // The bug this exists to kill is not a sync failure. Two devices that were
+    // each used before either was pointed at the other each minted a key of
+    // their own and each backed up alone — correctly, forever, to different
+    // places. Nothing was broken, so nothing reported an error, and the device
+    // picker had nothing to show because from either side there genuinely was
+    // no other device.
+    //
+    // The old answer was "type the other device's 20-character key". Nobody
+    // reads 20 characters off a laptop into a phone, and the button that
+    // accepted it REPLACED the list, so the one person who tried it had to
+    // gamble their library on getting it right. A door people will not walk
+    // through is not a door.
+    //
+    // So: a short code, read off one screen and typed into another, alive for
+    // ten minutes, usable once. It carries the real key; it is not itself the
+    // key, so a code glanced over a shoulder is worthless ten minutes later.
+    //
+    // 8 characters of a 32-letter alphabet with the ambiguous ones removed is
+    // ~1.1e12 codes. A guesser gets one ten-minute window per live pairing and
+    // must hit it exactly; a 6-character code (~1e9) was the first instinct and
+    // is a thousand times weaker for one character less to type.
+    const PAIR_TTL = 600;                       // ten minutes
+    const PAIR_ABC = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    const mkPair = () => {
+      const a = new Uint8Array(8);
+      crypto.getRandomValues(a);
+      // Rejection-free because 256 is a multiple of 32 — no modulo bias, which
+      // would quietly shrink the keyspace that is the whole security argument.
+      return [...a].map(b => PAIR_ABC[b & 31]).join('');
+    };
+
+    // Offering one. Holding the key IS the authority in this system — the same
+    // thing a push proves — so nothing new is invented here.
+    if (op === 'pair_new') {
+      const code = String(body.code || '');
+      if (!/^[A-Za-z0-9]{10,64}$/.test(code)) return json({ error: 'bad code' }, 400, cors);
+      // A key with nothing behind it cannot be joined: it would hand the other
+      // device an empty list and call it a merge.
+      let has = false;
+      try { has = !!(await env.LISTS.get('list:' + code)); } catch {}
+      if (!has) return json({ error: 'that key has no backup yet' }, 404, cors);
+      const pair = mkPair();
+      const exp = Date.now() + PAIR_TTL * 1000;
+      await env.LISTS.put('pair:' + pair, JSON.stringify({ code, exp, by: String(body.dev || '').slice(0, 64), used: '' }),
+                          { expirationTtl: PAIR_TTL });
+      return json({ ok: true, pair, expiresAt: exp, ttl: PAIR_TTL }, 200, cors);
+    }
+
+    // Taking it. Single use — with one exception that matters: the device that
+    // already claimed it may claim again. A phone that reloads mid-join, or a
+    // PWA iOS evicts while the sheet is open, is not an attacker, and making it
+    // start over is how a feature earns the reputation of not working.
+    if (op === 'pair_claim') {
+      const pair = String(body.pair || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+      if (!/^[A-Z0-9]{8}$/.test(pair)) return json({ error: 'bad code' }, 400, cors);
+      const dev = String(body.dev || '');
+      if (!okDev(dev)) return json({ error: 'bad device' }, 400, cors);
+      let rec = null;
+      try { const s2 = await env.LISTS.get('pair:' + pair); if (s2) rec = JSON.parse(s2); }catch {}
+      // The TTL deletes it, so "gone" and "expired" are the same answer. The
+      // explicit check is for the gap between expiry and eviction.
+      if (!rec) return json({ error: 'no such code' }, 404, cors);
+      if (+rec.exp && Date.now() > +rec.exp) return json({ error: 'expired' }, 410, cors);
+      if (rec.used && rec.used !== dev) return json({ error: 'used' }, 409, cors);
+      if (rec.used !== dev) {
+        rec.used = dev;
+        const left = Math.max(30, Math.ceil(((+rec.exp || 0) - Date.now()) / 1000));
+        await env.LISTS.put('pair:' + pair, JSON.stringify(rec), { expirationTtl: left });
+      }
+      return json({ ok: true, code: rec.code }, 200, cors);
+    }
+
+    // Closing the sheet should actually close the door, not leave a live code
+    // on a screen somebody walks past.
+    if (op === 'pair_cancel') {
+      const pair = String(body.pair || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+      if (!/^[A-Z0-9]{8}$/.test(pair)) return json({ error: 'bad code' }, 400, cors);
+      const code = String(body.code || '');
+      let rec = null;
+      try { const s2 = await env.LISTS.get('pair:' + pair); if (s2) rec = JSON.parse(s2); } catch {}
+      // Only the device that offered it may withdraw it, or cancelling becomes
+      // a way to sabotage somebody else's pairing by guessing codes.
+      if (rec && rec.code !== code) return json({ error: 'not yours' }, 403, cors);
+      try { await env.LISTS.delete('pair:' + pair); } catch {}
+      return json({ ok: true }, 200, cors);
+    }
+
     // ── who's around ────────────────────────────────────────────────────────
     // Your friends' codes are already in your list, and each one has a live
     // channel while their app is open. Asking those channels directly means

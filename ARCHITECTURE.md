@@ -297,6 +297,53 @@ download five copies of the list.
 Ops: `pull` · `push` · `devices` · `pull_dev`. Covered by
 `cloud/adopt-sync.test.mjs` and `scripts/device-dominance-test.mjs`.
 
+### Pairing — how a second device joins the first one's key
+
+`mergeFromCode()` (below) folds another key's list into this one but leaves the
+two devices on separate keys, which is the right behaviour for a rescue and the
+wrong one for "these are both mine". **Pairing** is the door that actually puts
+them on one key, and it is now the primary one.
+
+The old route was "read the 20-character key off the laptop and type it into the
+phone", and the button that accepted it **replaced** the list. Nobody walks
+through a door that asks them to gamble their library on typing twenty
+characters correctly, so in practice both devices kept the key each had minted
+for itself. A door nobody uses is not a door.
+
+A pairing code is a **short-lived bearer of the real key**, not the key:
+
+| | |
+|---|---|
+| length | 8 characters, from the 32-letter alphabet with the look-alikes removed |
+| life | 10 minutes (`expirationTtl`, plus an explicit clock check for the gap before eviction) |
+| uses | one device — re-claimable by *that* device, refused to everyone else |
+
+Eight characters is ~1.1e12 codes. Six was the first instinct and is a thousand
+times weaker for one character less to type.
+
+Ops: `pair_new` (needs the real key, and refuses a key with no backup behind it —
+otherwise the join hands the other device an empty list and calls it a merge) ·
+`pair_claim` · `pair_cancel` (only the device that offered it may withdraw it,
+or cancelling becomes sabotage-by-guessing).
+
+**The join merges.** `pairJoin()` claims the code, pulls the target key, folds
+this device's list into it with `dedupeList(anime.concat(migrate(inner)))` —
+local first, so the surviving copy is this device's — writes a restore point to
+`wl_prepush_backup`, and only *then* adopts the key. The ordering is the point:
+everything that can fail happens before this device gives up the key it had.
+
+Three things are refused before adoption: a password-locked blob, **anything
+that is not an array**, and a claim the worker turned down. That middle one is
+not hypothetical — without it the join falls through a shape it cannot merge,
+merges nothing, and adopts the key anyway, leaving the device pointed at a
+backup it cannot read with its own key already gone. `scripts/pair-join-test.mjs`
+caught exactly that.
+
+An *empty* key is fine and different: both devices end up on it and this one
+publishes what it has.
+
+Covered by `cloud/pairing.test.mjs` (15) and `scripts/pair-join-test.mjs` (27).
+
 ### Putting two devices back together
 
 `ensureBackup()` mints a sync code on any device that has titles and no code.

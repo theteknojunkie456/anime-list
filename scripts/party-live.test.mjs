@@ -14,6 +14,14 @@ const wait=ms=>new Promise(r=>setTimeout(r,ms));
 // because a suite that cries wolf stops being read. This waits for the thing to
 // become true, up to a deadline, and is only for assertions of that shape.
 // Anything checking that something did NOT happen keeps its flat sleep.
+// Which assertions use it: every POSITIVE one — "this must have arrived". A
+// flat sleep followed by a check is a race against the network, and on a loaded
+// machine the race is lost by a working app, which is the one failure a suite
+// must never produce. Two of these (play reaching everyone, a share being
+// attributed) were still on flat sleeps and duly reported a healthy room as
+// broken. NEGATIVE assertions — "a guest CANNOT" — keep their flat sleep on
+// purpose: there is nothing to wait for, and waiting would only give the thing
+// being forbidden more time to happen.
 const until=async(pred,ms=4000)=>{const t0=Date.now();
   for(;;){try{if(pred())return true;}catch(e){}
     if(Date.now()-t0>ms)return false;await wait(50);}};
@@ -49,6 +57,7 @@ function mkClient(ROOM){
   await wait(900);
   
   // ── everyone sees everyone ────────────────────────────────────────────────
+  await until(()=>(A.last('state')?.room?.members||[]).length===2&&!!(A.last('state')?.room||{}).host);
   const mem=A.last('state')?.room?.members||[];
   t('two people in the room', mem.length, 2);
   tt('the room names them', mem.map(m=>m.name).sort().join(',')==='Ayaan,Bilal', JSON.stringify(mem));
@@ -68,24 +77,26 @@ function mkClient(ROOM){
      'title is now '+(A.last('state')?.room?.title));
   
   // ── play / pause ──────────────────────────────────────────────────────────
-  A.send({t:'play'}); await wait(600);
+  A.send({t:'play'}); await until(()=>{const r=B.last('state')?.room||{};return r.paused===false&&r.playAt>0;});
   {const rm=B.last('state')?.room||{};
    tt('play reaches everyone', rm.paused===false&&rm.playAt>0, 'paused='+rm.paused+' playAt='+rm.playAt);}
-  A.send({t:'pause'}); await wait(600);
+  A.send({t:'pause'}); await until(()=>(B.last('state')?.room||{}).paused===true);
   {const rm=B.last('state')?.room||{};
    tt('pause reaches everyone', rm.paused===true, 'paused='+rm.paused);}
   
   // ── chat, typing, reactions ───────────────────────────────────────────────
   B.send({t:'chat',msg:'this opening is unreal'});
-  await wait(700);
+  await until(()=>A.seen(m=>JSON.stringify(m).includes('this opening is unreal'))
+                &&B.seen(m=>JSON.stringify(m).includes('this opening is unreal'))
+                &&(A.last('state')?.room?.chat||[]).some(c=>c.msg==='this opening is unreal'));
   tt('chat arrives for the other person', A.seen(m=>JSON.stringify(m).includes('this opening is unreal')), '');
   tt('and the sender sees their own message', B.seen(m=>JSON.stringify(m).includes('this opening is unreal')), '');
   tt('the message is attributed to who sent it',
      (A.last('state')?.room?.chat||[]).some(c=>c.msg==='this opening is unreal'&&c.name==='Bilal'),
      JSON.stringify((A.last('state')?.room?.chat||[]).slice(-2)));
-  B.send({t:'react',emoji:'\u{1F525}'}); await wait(500);
+  B.send({t:'react',emoji:'\u{1F525}'}); await until(()=>A.seen(m=>m.t==='react'));
   tt('a reaction arrives', A.seen(m=>m.t==='react'), '');
-  B.send({t:'typing'}); await wait(400);
+  B.send({t:'typing'}); await until(()=>A.seen(m=>m.t==='typing'));
   tt('typing arrives', A.seen(m=>m.t==='typing'), '');
   
   // ── the queue ─────────────────────────────────────────────────────────────
@@ -96,28 +107,33 @@ function mkClient(ROOM){
   t('anyone can add to the queue', q.length, 2);
   if(q.length){
     B.send({t:'queue-vote',qid:q[1]&&q[1].id});
-    await wait(700);
+    await until(()=>{const z=(A.last('state')?.room?.queue||[]).find(x=>x.id===(q[1]&&q[1].id));
+                     return !!z&&((z.votes||[]).length>0||z.v>0);});
     const q2=A.last('state')?.room?.queue||[];
     const voted=q2.find(x=>x.id===(q[1]&&q[1].id));
     tt('a vote is counted', !!voted&&((voted.votes||[]).length>0||voted.v>0), JSON.stringify(voted));
   }
-  A.send({t:'queue-next'}); await wait(800);
+  A.send({t:'queue-next'}); await until(()=>{const r=A.last('state')?.room;return !!r&&r.title!=='Frieren';});
   const afterNext=A.last('state')?.room;
   tt('queue-next moves the room on', afterNext&&afterNext.title!=='Frieren', 'title='+(afterNext||{}).title);
   
   // ── ready check ───────────────────────────────────────────────────────────
-  B.send({t:'ready',on:true}); await wait(600);
+  B.send({t:'ready',on:true});
+  await until(()=>{const m2=(A.last('state')?.room?.members||[]).find(m=>m.uid==='uidB');return !!m2&&m2.ready===true;});
   const bm=(A.last('state')?.room?.members||[]).find(m=>m.uid==='uidB');
   tt('ready shows on the member', !!bm&&bm.ready===true, JSON.stringify(bm));
   
   // ── a late arrival gets the current state, not an empty room ──────────────
-  const C=client('Chetan','uidC'); await C.ready(); await wait(900);
+  const C=client('Chetan','uidC'); await C.ready();
+  await until(()=>!!(C.last('state')?.room||{}).title&&(C.last('state')?.room?.members||[]).length===3);
   const cr=C.last('state')?.room;
   tt('someone joining late sees what is already playing', !!cr&&!!cr.title, JSON.stringify(cr&&cr.title));
   t('and sees all three people', (cr?.members||[]).length, 3);
   
   // ── the host leaves ───────────────────────────────────────────────────────
-  A.ws.close(); await wait(1400);
+  A.ws.close();
+  await until(()=>{const r=B.last('state')?.room;
+    return !!r&&r.host!=='uidA'&&(r.members||[]).some(m=>m.uid===r.host);},6000);
   const afterHost=B.last('state')?.room;
   tt('the room survives the host leaving', !!afterHost, '');
   tt('and hands the room to someone still in it',
@@ -152,7 +168,8 @@ function mkClient(ROOM){
   G.send({t:'host-set',to:'uidG'}); await wait(700);
   tt('a guest cannot make themselves host', H.room().host==='uidH', 'host='+H.room().host);
   
-  G.send({t:'queue-add',title:'Dandadan',animeId:'a2',aniId:1,ep:1,img:''}); await wait(600);
+  G.send({t:'queue-add',title:'Dandadan',animeId:'a2',aniId:1,ep:1,img:''});
+  await until(()=>(H.room().queue||[]).length===1);
   tt('but a guest CAN add to the queue (by design)', (H.room().queue||[]).length===1,
      JSON.stringify((H.room().queue||[]).length));
   G.send({t:'queue-next'}); await wait(700);
@@ -169,7 +186,7 @@ function mkClient(ROOM){
   
   // ── abuse ─────────────────────────────────────────────────────────────────
   const huge='x'.repeat(5000);
-  G.send({t:'chat',msg:huge}); await wait(700);
+  G.send({t:'chat',msg:huge}); await until(()=>!!((H.room().chat||[]).slice(-1)[0]||{}).msg);
   const last=(H.room().chat||[]).slice(-1)[0]||{};
   tt('an oversized message is trimmed, not stored whole', !last.msg||last.msg.length<=300, 'len='+((last.msg||'').length));
   tt('and the socket survives it', !G.closed, 'closed='+G.closed);
@@ -178,7 +195,7 @@ function mkClient(ROOM){
   tt('junk does not take the room down', !G.closed && !!H.room().code, 'closed='+G.closed);
   
   for(let i=0;i<60;i++) G.send({t:'chat',msg:'flood '+i});
-  await wait(1400);
+  await until(()=>(H.room().chat||[]).some(c=>/^flood 59$/.test(c.msg||'')),6000);
   const chatLen=(H.room().chat||[]).length;
   tt('chat history is capped rather than growing forever', chatLen<=200, 'chat length='+chatLen);
   tt('the room is still answering after a flood', !!H.room().title, 'title='+H.room().title);
@@ -196,7 +213,8 @@ function mkClient(ROOM){
   
   // ── everyone leaves, then someone returns ─────────────────────────────────
   H.ws.close(); G2.ws.close(); await wait(1200);
-  const L=client('Later','uidL'); await L.ready(); await wait(900);
+  const L=client('Later','uidL'); await L.ready();
+  await until(()=>L.room().title==='Frieren'||!!L.room().code);
   tt('an empty room still knows what was playing', L.room().title==='Frieren'||!!L.room().code,
      'title='+L.room().title+' code='+L.room().code);
   L.ws.close();
@@ -213,26 +231,29 @@ function mkClient(ROOM){
   H.send({t:'set',title:'Frieren',animeId:'a1',ep:5,img:''}); await wait(600);
   
   // ── voice presence ────────────────────────────────────────────────────────
-  A.send({t:'voice',on:true}); await wait(700);
+  A.send({t:'voice',on:true});
+  await until(()=>{const x=H.room().voice;return Array.isArray(x)?x.includes('uidA'):!!(x&&x.uidA);});
   const v=H.room().voice;
   tt('joining voice shows for everyone', Array.isArray(v)?v.includes('uidA'):!!(v&&v.uidA), JSON.stringify(v));
-  A.send({t:'voice',on:false}); await wait(700);
+  A.send({t:'voice',on:false});
+  await until(()=>{const x=H.room().voice;return Array.isArray(x)?!x.includes('uidA'):!(x&&x.uidA);});
   const v2=H.room().voice;
   tt('and leaving voice clears it', Array.isArray(v2)?!v2.includes('uidA'):!(v2&&v2.uidA), JSON.stringify(v2));
   
   // ── screen share ──────────────────────────────────────────────────────────
-  H.send({t:'share',on:true}); await wait(700);
+  H.send({t:'share',on:true}); await until(()=>A.room().sharing==='uidH');
   tt('screen share is attributed to the sharer', A.room().sharing==='uidH', 'sharing='+A.room().sharing);
-  H.send({t:'share',on:false}); await wait(700);
+  H.send({t:'share',on:false}); await until(()=>A.room().sharing==='');
   tt('and clears when they stop', A.room().sharing==='', 'sharing='+A.room().sharing);
   
   // ── the WebRTC relay must be point to point ───────────────────────────────
-  A.send({t:'signal',to:'uidB',kind:'offer',data:{sdp:'FAKE-SDP'}}); await wait(800);
+  A.send({t:'signal',to:'uidB',kind:'offer',data:{sdp:'FAKE-SDP'}});
+  await until(()=>B.seen(m=>m.t==='signal'&&m.from==='uidA'&&m.kind==='offer'));
   tt('a signal reaches the person it names', B.seen(m=>m.t==='signal'&&m.from==='uidA'&&m.kind==='offer'), '');
   tt('and nobody else sees it', !H.seen(m=>m.t==='signal'), 'the host received a signal meant for Ben');
   
   // ── playback sync ─────────────────────────────────────────────────────────
-  H.send({t:'pb',playing:true,time:123.5}); await wait(700);
+  H.send({t:'pb',playing:true,time:123.5}); await until(()=>A.seen(m=>m.t==='pb'&&m.time===123.5));
   tt('the host\'s playback position reaches the others', A.seen(m=>m.t==='pb'&&m.time===123.5), '');
   tt('and is not echoed back to the host', !H.seen(m=>m.t==='pb'), 'host got its own pb back');
   A.send({t:'pb',playing:false,time:9}); await wait(700);

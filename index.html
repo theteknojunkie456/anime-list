@@ -1755,6 +1755,15 @@ body.first-paint .row-sec,body.content-in .row-sec{animation:fadeUp .5s cubic-be
 /* ── TUTORIAL (reuses the .statsview full-screen shell) ── */
 .tut-intro{font-size:13px;line-height:1.6;color:var(--t2);padding:2px 18px 4px;}
 .tut-step{display:flex;gap:13px;align-items:flex-start;margin:0 18px;padding:15px 0;border-top:1px solid var(--bn2);}
+/* Twelve steps, every one the same icon tile over the same two lines of text,
+   separated by the same hairline. Nothing in that is wrong on its own and all
+   of it together is a wall: with no landmarks you cannot tell how far through
+   you are, which of them you have already read, or which part of the app you
+   are being told about. The same five named groups Settings uses, so the page
+   is five short lists rather than one long one — and a group heading, unlike
+   another row, is a place the eye can rest. */
+.tut-grp{margin:22px 18px 2px;}
+.tut-grp + .tut-step{border-top:0;padding-top:6px;}
 .tut-ico{width:36px;height:36px;flex-shrink:0;border-radius:10px;background:var(--bg3);border:1px solid var(--b2);display:flex;align-items:center;justify-content:center;color:var(--rc,var(--a2));}
 .tut-ico .ico{width:17px;height:17px;}
 .tut-h{font-size:15px;font-weight:800;color:var(--t1);margin-bottom:3px;letter-spacing:-.2px;}
@@ -3086,6 +3095,12 @@ body.yt-open{overflow:hidden;touch-action:none;}
   padding:15px 16px 13px;border-radius:18px;background:var(--bg2);border:1px solid var(--b3);
   box-shadow:0 22px 60px rgba(0,0,0,.65);transition:top .3s cubic-bezier(.2,1,.28,1),left .3s cubic-bezier(.2,1,.28,1);}
 .wt-step{font-size:10px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:var(--a2);}
+/* Flat, two pixels, the same measure the cards and shelf heads use. Not a pill,
+   not a glow: it is the same object as the rule under a shelf head, so the tour
+   is measured in the app's own language rather than in a borrowed one. */
+.wt-meter{height:2px;margin-top:7px;background:var(--bn2);overflow:hidden;}
+.wt-meter i{display:block;height:100%;width:100%;transform-origin:left;transform:scaleX(0);
+  background:var(--a);transition:transform .3s cubic-bezier(.2,1,.3,1);}
 .wt-t{margin-top:5px;font-family:var(--fd);font-size:17px;font-weight:800;letter-spacing:-.2px;color:var(--t1);line-height:1.2;}
 .wt-b{margin-top:7px;font-size:13px;line-height:1.55;color:var(--t2);}
 .wt-b b{color:var(--t1);}
@@ -5625,6 +5640,7 @@ body.recsel .pcard{position:relative;}
   <div class="wt-hole" id="wtHole"></div>
   <div class="wt-card" id="wtCard" role="dialog" aria-live="polite">
     <div class="wt-step" id="wtStep"></div>
+    <div class="wt-meter"><i id="wtFill"></i></div>
     <div class="wt-t" id="wtT"></div>
     <div class="wt-b" id="wtB"></div>
     <div class="wt-need" id="wtNeed" hidden></div>
@@ -6118,6 +6134,7 @@ body.recsel .pcard{position:relative;}
   </div>
   <p class="tut-intro">Everything you watch and read, in one place — with covers, air times and progress filled in for you.</p>
 
+  <div class="dt-label tut-grp">Getting started</div>
   <div class="tut-step">
     <div class="tut-ico" style="--rc:var(--a2)"><i data-ic="plus"></i></div>
     <div><div class="tut-h">Add anything</div><div class="tut-p">Tap <b>+</b> and type a title. <b>Autofill</b> pulls the real cover, episode count, genres and watch order — anime, TV, movies, manga, manhwa and webtoons. No setup, no API key.</div></div>
@@ -6134,6 +6151,7 @@ body.recsel .pcard{position:relative;}
     <div class="tut-ico" style="--rc:var(--pln)"><i data-ic="book"></i></div>
     <div><div class="tut-h">Watch or Read</div><div class="tut-p">The switch beside the search box flips between your <b>watch</b> list and your <b>reading</b> list. They're kept completely separate.</div></div>
   </div>
+  <div class="dt-label tut-grp">Keeping up</div>
   <div class="tut-step">
     <div class="tut-ico" style="--rc:var(--wat)"><i data-ic="calendar"></i></div>
     <div><div class="tut-h">Never miss an episode</div><div class="tut-p">The <b>calendar</b> shows what airs this week for the shows you follow, in your own time zone — and it tracks delays. Turn on the <b>bell</b> to get a notification the moment one drops.</div></div>
@@ -6150,6 +6168,7 @@ body.recsel .pcard{position:relative;}
     <div class="tut-ico" style="--rc:var(--wat)"><i data-ic="check"></i></div>
     <div><div class="tut-h">Your progress keeps itself</div><div class="tut-p">You don't have to press anything. Use the site's <b>own</b> next-episode link and WatchList follows you — it banks the one you finished and moves to the next, and you'll see the number change at the top. Same when you're reading. If it ever gets one wrong, the bar that appears says <b>Undo</b> and puts it straight back.</div></div>
   </div>
+  <div class="dt-label tut-grp">Making it yours</div>
   <div class="tut-step">
     <div class="tut-ico" style="--rc:var(--pln)"><i data-ic="palette"></i></div>
     <div><div class="tut-h">Make it yours</div><div class="tut-p">The <b>palette</b> repaints the whole app — Naruto orange, Sasuke purple, Zoro green and more. Or build your own: pick any two colours and tap <b>Harmonize</b> — it keeps your colours, turns them into a palette that actually works, sets the glow and brightness to match, and names it. Each title also quietly borrows its own artwork's colour as you browse.</div></div>
@@ -6159,6 +6178,7 @@ body.recsel .pcard{position:relative;}
     <div><div class="tut-h">Ask it things (optional)</div><div class="tut-p">There's a chat that knows your list — what to watch next, what's short tonight, what fits your mood. It needs a <b>free</b> key (about two minutes, no card); <b>Settings → AI</b> walks you through it step by step. Everything else works without one.</div></div>
   </div>
 
+  <div class="dt-label tut-grp">With other people</div>
   <div class="tut-step">
     <div class="tut-ico" style="--rc:var(--wat)"><i data-ic="send"></i></div>
     <div><div class="tut-h">Hand your setup to a friend</div><div class="tut-p">Got your site working? <b>Sources → Share mine</b> gives you a link. Whoever opens it sees plainly what they're getting and taps <b>Accept</b> — and they get everything: your site, the links you taught it, and every show you corrected by hand. It never changes your own settings, and they don't need to be your friend in the app.</div></div>
@@ -6167,6 +6187,7 @@ body.recsel .pcard{position:relative;}
     <div class="tut-ico" style="--rc:var(--fin)"><i data-ic="users"></i></div>
     <div><div class="tut-h">Watch together, properly</div><div class="tut-p">In a <b>watch party</b> the host presses play and everyone starts together — on their own copy, in full quality, with their own audio. Nothing is streamed between you, so nothing looks compressed and nobody's battery suffers. The host's <b>pause and skip</b> carry across too. There's voice and video alongside it, with each person in their own colour.</div></div>
   </div>
+  <div class="dt-label tut-grp">Keeping it private</div>
   <div class="tut-step">
     <div class="tut-ico" style="--rc:var(--drp)"><i data-ic="lock"></i></div>
     <div><div class="tut-h">Lock it (optional)</div><div class="tut-p">A password encrypts your whole list — unreadable without it, here and in the cloud. You'll get a one-time <b>recovery key</b>; it's the only way back in if you forget the password. Save both. Lose both and the list is gone for good — there's no backdoor. You can also unlock with <b>Face ID or your fingerprint</b> instead of typing — whatever your device supports.</div></div>
@@ -14867,6 +14888,12 @@ function wtGo(i){
   try{ if(st.open)st.open(); else closeAll(); }catch(e){}
   const set=(id,v)=>{const e=document.getElementById(id); if(e)e.innerHTML=v;};
   set('wtStep','Step '+(i+1)+' of '+WT_STEPS.length);
+  // The app measures progress everywhere else with a rule filled to how far
+  // through you are — shelf heads, cards, the lot. The tour stated it as a
+  // sentence and drew nothing, which is the one place the idea would be felt
+  // rather than read: ten steps is long enough to wonder how much is left.
+  try{const f=document.getElementById('wtFill');
+    if(f)f.style.transform='scaleX('+((i+1)/WT_STEPS.length).toFixed(3)+')';}catch(e){}
   set('wtT',st.t);
   set('wtB',st.b);
   const back=document.getElementById('wtBack'); if(back)back.style.visibility=i?'':'hidden';
@@ -18375,10 +18402,10 @@ function renderSettings(){
     {grp:'Getting your bearings'},
     {ic:'compass',  h:'Show me around',      p:wtSeen()?'Run the walkthrough again':'A guided walkthrough of the real app', go:'wtStart()'},
     {ic:'bulb',     h:'How WatchList works', p:'The written version, if you prefer reading', go:'openTutorial()'},
-    {grp:'Not losing it'},
+    {grp:'Privacy and alerts'},
     {ic:'lock',     h:'Password',            p:encEnabled()?'On — your list is encrypted':'Off', go:"openSheet('securitySheet')"},
     {ic:'bell',     h:'Notifications',       p:notifyOn()?'On — you\'ll be told when an episode airs':'Off', go:'openNotifySheet()'},
-    {grp:'Where Watch goes'},
+    {grp:'Accounts you connect'},
     {ic:'refresh',  h:'AniList sync',        p:alConnected()?'On — '+alUser()+' · progress syncs both ways':'Off — connect to sync progress everywhere', go:"openSheet('anilistSheet')"},
     {ic:'sparkles', h:'AI & chat key',       p:getKey()?'On — '+(keyProvider(getKey())||'key')+' connected':(aiBorrowed()?'On — using the key you were lent':'Off — add a free key to unlock chat'), go:"openAIChat()"},
     {grp:'How it looks'},

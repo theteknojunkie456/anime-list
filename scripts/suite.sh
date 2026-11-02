@@ -7,6 +7,11 @@
 #                                  just wrote. A suite that only tells the truth
 #                                  the first time is worse than no suite.
 cd "$(dirname "$0")/.."
+case "${1:-}" in
+  --node) FILES="cloud/*.test.mjs" ;;
+  --browser) FILES="scripts/*-test.mjs scripts/*.test.mjs" ;;
+  *) FILES="scripts/*-test.mjs scripts/*.test.mjs cloud/*.test.mjs" ;;
+esac
 # Each test spawns a throwaway web server and a headless Chrome and kills both on
 # the way out — unless it crashes, in which case they outlive it, hold the port,
 # and the NEXT test to want that port dies on "address already in use". One
@@ -33,8 +38,13 @@ cd "$(dirname "$0")/.."
 # ssh tunnel from another project, so the handshake connected to THAT, every
 # command drove a browser that could not see the local server, and the run
 # reported "2 passed, 10 failed" with not one failure about the app.
-ports(){ grep -ho 'PORT *= *[0-9]\+\|DBG *= *[0-9]\+\|remote-debugging-port=[0-9]\+' \
-           scripts/*.mjs cloud/*.mjs 2>/dev/null \
+# Only the ports belonging to the files THIS run will execute. It used to scan
+# every test file regardless, and the preflight below waits up to twelve seconds
+# per port before calling one foreign — so `--node`, whose twelve files open no
+# ports at all, sat waiting on sixty-eight ports it was never going to use. The
+# fast half has to actually be fast or nobody runs it.
+ports(){ eval "set -- $FILES"; grep -ho 'PORT *= *[0-9]\+\|DBG *= *[0-9]\+\|remote-debugging-port=[0-9]\+' \
+           "$@" 2>/dev/null \
          | grep -o '[0-9]\+' | sort -u; }
 sweep(){
   pkill -f 'user-data-dir=[^ ]*/wl-' 2>/dev/null
@@ -94,7 +104,18 @@ PASS=0; FAIL=0; FAILED=""
 # notes, and the tests still asked the old way. A test outside the suite is a
 # test that reports to nobody. These are plain node, no browser, so they cost
 # about a second between them.
-for f in scripts/*-test.mjs scripts/*.test.mjs cloud/*.test.mjs; do
+# Two halves, because they cost wildly different amounts. The cloud/ files are
+# plain node — no browser, no server, about a second for all twelve — so they
+# can run on every change. The scripts/ files each spawn a headless Chrome and a
+# web server, which on an 8 GB machine shared with other work is the heaviest
+# thing in this repo, and belongs before a commit rather than after every edit.
+#
+#   sh scripts/suite.sh --node     the fast half only
+#   sh scripts/suite.sh            everything (default, unchanged)
+#
+# Splitting it is only safe because the halves do not share state: the cloud
+# tests mock KV in-process and never touch a port.
+for f in $FILES; do
   [ -f "$f" ] || continue
   n=$(basename "$f" .mjs)
   # Judge by exit status, not by parsing the summary line. Four suites print

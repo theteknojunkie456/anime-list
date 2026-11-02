@@ -23274,6 +23274,20 @@ function linkPreviewHTML(){
       ${tone==='bad'&&src?`<p class="ai-desc" style="font-size:12px;margin-top:9px">Paste one episode address into the box above and the rest follow — these sites put the episode in the address, so teaching it one show teaches it every episode of that show.</p>`:''}
     </div>`;
 }
+// Putting one back is a tap; putting thirty back should not be thirty taps.
+// It clears the list in one write rather than calling toggleHiddenSrc in a
+// loop — that function toasts and re-renders on every call, so looping it would
+// fire thirty toasts and rebuild the sheet thirty times to do one thing.
+function unhideAllSrc(){
+  let n=0;
+  try{
+    n=(hiddenSrc()||[]).length;
+    if(!n)return;
+    localStorage.setItem(HIDE_KEY,'[]');
+    toast(n===1?'Brought it back':`Brought all ${n} back`);
+  }catch(e){}
+  try{renderSource();}catch(e){}
+}
 function renderSource(){
   const box=document.getElementById('sourceBody'); if(!box) return;
   // Hiding/renaming rebuilds this whole sheet, which would snap open folds shut
@@ -23382,12 +23396,26 @@ function renderSource(){
 
       <div class="dt-label" style="margin-top:14px">Your sources</div>
       <label class="ct-dk">Only the sites I added<span class="ct-tgl"><input type="checkbox" id="onlyMineTgl" ${onlyMine()?'checked':''} onchange="setOnlyMine(this.checked)"><span class="ct-tgl-track"></span></span></label>
-      <p class="ai-desc" style="margin-top:7px">Tap a name to rename it, or Hide the ones you never want to see${hiddenCount?` — <b>${hiddenCount}</b> hidden right now`:''}.</p>
-      ${allKnownSources().map(s=>{const off=isHiddenSrc(s.name),q=escH(s.name).replace(/'/g,"\\'");
-        return `<div class="src-opt" style="display:flex;align-items:center;gap:10px${off?';opacity:.45':''}" onclick="renameSrcPrompt('${jsq(q)}')">
+      <p class="ai-desc" style="margin-top:7px">Tap a name to rename it, or Hide the ones you never want to see.</p>
+      <!-- Hidden sources used to keep a full-width row each, with their own
+           button saying "Unhide" — so hiding most of the list left
+           twenty-eight identical rows saying the same word, which is longer and
+           louder than the list you were trying to shorten. A thing you have put
+           away should take less room than a thing you use, not the same. The
+           ones you use stay as rows; the ones you hid become chips you tap to
+           bring back. -->
+      ${allKnownSources().filter(s=>!isHiddenSrc(s.name)).map(s=>{const q=escH(s.name).replace(/'/g,"\\'");
+        return `<div class="src-opt" style="display:flex;align-items:center;gap:10px" onclick="renameSrcPrompt('${jsq(q)}')">
           <div style="flex:1;min-width:0"><div class="src-name">${escH(srcLabel(s.name))}</div><div class="src-sub">${escH(host(s.url||''))}</div></div>
-          <button class="src-chip${off?' on':''}" onclick="event.stopPropagation();toggleHiddenSrc('${jsq(q)}')">${off?'Unhide':'Hide'}</button>
+          <button class="src-chip" onclick="event.stopPropagation();toggleHiddenSrc('${jsq(q)}')">Hide</button>
         </div>`;}).join('')}
+      ${(()=>{const hid=allKnownSources().filter(s=>isHiddenSrc(s.name));
+        if(!hid.length)return '';
+        return `<div class="dt-label" style="margin-top:16px">Hidden · ${hid.length}</div>
+        <p class="ai-desc" style="font-size:12px;margin-top:4px">Tap one to bring it back.</p>
+        <div class="src-picks" style="margin-top:8px">${hid.map(s=>{const q=escH(s.name).replace(/'/g,"\\'");
+          return `<button class="src-chip" onclick="toggleHiddenSrc('${jsq(q)}')">${escH(srcLabel(s.name))}</button>`;}).join('')}</div>
+        ${hid.length>1?`<button class="sync-quiet" onclick="unhideAllSrc()">Bring all ${hid.length} back</button>`:''}`;})()}
 
       <div class="dt-label" style="margin-top:20px">Add one yourself</div>
       <p class="ai-desc">Only if the paste box above didn't suit — a service you subscribe to, or an address you want to write out.</p>

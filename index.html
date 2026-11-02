@@ -4458,6 +4458,28 @@ body.recsel .pcard{position:relative;}
   text-align:left;font-size:12px;line-height:1.5;color:var(--t3);cursor:pointer;}
 .sync-quiet:hover{color:var(--t2);text-decoration:underline;text-underline-offset:3px;}
 
+/* The two settings that change what the app DOES, as a pair rather than as two
+   more rows in a column of thirteen. Side by side they are read as a choice
+   between two things; stacked they were read as items 4 and 8 of a list. */
+.set-hero{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:2px 0 16px;}
+.set-tile{display:flex;flex-direction:column;align-items:flex-start;gap:2px;
+  padding:14px 13px 13px;border-radius:18px;text-align:left;
+  background:var(--bg3);border:1px solid var(--bn2);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.04);
+  transition:background-color .16s,border-color .16s,transform .12s;}
+.set-tile:active{transform:scale(.985);}
+.set-tile:hover{background:var(--bg4);}
+.set-tile-ic{width:30px;height:30px;border-radius:10px;display:flex;align-items:center;justify-content:center;
+  background:var(--ag);color:var(--a2);margin-bottom:7px;}
+.set-tile-ic .ico{width:16px;height:16px;}
+.set-tile-h{font-family:var(--fd);font-size:14px;font-weight:800;color:var(--t1);letter-spacing:-.01em;}
+.set-tile-p{font-size:11.5px;line-height:1.4;color:var(--t3);}
+/* Only ever the backup one, and only when there is nothing backed up: this is
+   the single setting whose absence costs you everything. */
+.set-tile.warn{border-color:color-mix(in srgb,#ff6b6b 42%,transparent);}
+.set-tile.warn .set-tile-ic{background:color-mix(in srgb,#ff6b6b 16%,transparent);color:#ff6b6b;}
+.set-tile.warn .set-tile-p{color:#ff6b6b;}
+
 /* ── STATS ── */
 .stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
 .stat-card{background:linear-gradient(160deg,var(--bg3),var(--bg2));border:1px solid var(--b2);border-radius:18px;padding:17px;}
@@ -18354,12 +18376,9 @@ function renderSettings(){
     {ic:'compass',  h:'Show me around',      p:wtSeen()?'Run the walkthrough again':'A guided walkthrough of the real app', go:'wtStart()'},
     {ic:'bulb',     h:'How WatchList works', p:'The written version, if you prefer reading', go:'openTutorial()'},
     {grp:'Not losing it'},
-    {ic:'cloud',    h:'Cloud backup',        p:backupStatusLine(),
-     go:"openSheet('backupSheet')", warn:!backedUp||backupFailing()},
     {ic:'lock',     h:'Password',            p:encEnabled()?'On — your list is encrypted':'Off', go:"openSheet('securitySheet')"},
     {ic:'bell',     h:'Notifications',       p:notifyOn()?'On — you\'ll be told when an episode airs':'Off', go:'openNotifySheet()'},
     {grp:'Where Watch goes'},
-    {ic:'play',     h:'Sources', p:'Where Watch now / Read now open', go:"openSheet('sourceSheet')"},
     {ic:'refresh',  h:'AniList sync',        p:alConnected()?'On — '+alUser()+' · progress syncs both ways':'Off — connect to sync progress everywhere', go:"openSheet('anilistSheet')"},
     {ic:'sparkles', h:'AI & chat key',       p:getKey()?'On — '+(keyProvider(getKey())||'key')+' connected':(aiBorrowed()?'On — using the key you were lent':'Off — add a free key to unlock chat'), go:"openAIChat()"},
     {grp:'How it looks'},
@@ -18418,7 +18437,29 @@ function renderSettings(){
   // the same weight means no row is findable. They go in named groups, under
   // the same hairline label the rest of the app uses for a section, so Settings
   // is four short lists instead of one long one.
-  el.innerHTML=rows.map(r=>
+  // TWO OF THEM ARE NOT ROWS.
+  //
+  // Sources and Cloud backup are the only two settings that change what the app
+  // DOES rather than how it looks, and both were a row in the middle of
+  // thirteen, where "where does Watch send me" and "am I going to lose this"
+  // carried exactly the weight of "Import / Export". They come out of the list
+  // and sit at the top as a pair — which also means the first thing in Settings
+  // is not another row, so the page has a shape before the lists begin. Their
+  // rows are REMOVED rather than duplicated: two doors to one place inside one
+  // screen is how a settings page starts lying about where things live.
+  const hero=`<div class="set-hero">
+    <button class="set-tile${(!backedUp||backupFailing())?' warn':''}" onclick="openSheet('backupSheet')">
+      <div class="set-tile-ic">${icon('cloud')}</div>
+      <div class="set-tile-h">Cloud backup</div>
+      <div class="set-tile-p">${escH(backupStatusLine())}</div>
+    </button>
+    <button class="set-tile" onclick="openSheet('sourceSheet')">
+      <div class="set-tile-ic">${icon('play')}</div>
+      <div class="set-tile-h">Sources</div>
+      <div class="set-tile-p">Where Watch and Read open</div>
+    </button>
+  </div>`;
+  el.innerHTML=hero+rows.map(r=>
     r.grp?`<div class="dt-label set-grp">${escH(r.grp)}</div>`:
     `<button class="set-row${r.warn?' warn':''}" onclick="${r.go}">
       <div class="set-ico">${icon(r.ic)}</div>

@@ -4415,6 +4415,48 @@ body.recsel .pcard{position:relative;}
   font-family:inherit;cursor:pointer;background:var(--a);color:var(--aFg);}
 .dev-pick:active{transform:scale(.96);}
 .synccode{font-family:ui-monospace,Menlo,monospace;font-size:17px;font-weight:700;letter-spacing:2px;text-align:center;background:var(--bg4);border:1px solid var(--b2);border-radius:14px;padding:12px;color:var(--a2);user-select:all;-webkit-user-select:all;word-break:break-all;}
+/* ── THE CLOUD PANEL ──────────────────────────────────────────────────────
+   Every block in here used to be the same width, the same radius and the same
+   weight, stacked down the page. That sameness is what read as harsh: with no
+   variation there is no hierarchy, so the eye has nothing to land on and the
+   thing you came to do sits level with the thing you will never touch. These
+   four rules exist to break that rhythm — a panel inside the panel, a row that
+   runs across instead of down, a pair that shares a line, and a control with no
+   box at all. */
+
+/* The one job, in its own ground, raised half a step off the sheet. */
+.sync-primary{margin-top:14px;padding:15px 15px 13px;border-radius:18px;
+  background:var(--bg3);border:1px solid var(--bn2);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.04);}
+.sync-primary-h{display:flex;align-items:center;gap:8px;
+  font-family:var(--fd);font-size:14px;font-weight:800;color:var(--t1);letter-spacing:-.01em;}
+.sync-primary-h .ico{width:16px;height:16px;color:var(--a2);}
+
+/* A field and its button on ONE line. Stacked, a text box and a button are two
+   more full-width slabs; side by side they read as one control, which is what
+   they are. The field gives up its height so both sit on the same baseline. */
+.sync-join{display:flex;gap:8px;align-items:stretch;margin-top:9px;}
+.sync-join textarea{flex:1;min-width:0;min-height:0;height:auto;resize:none;}
+.sync-join .ai-run-btn{flex:none;white-space:nowrap;}
+
+/* The key runs ACROSS: it is a thing you copy, not a thing you read aloud. As a
+   centred block it took the visual weight of a headline for a string most
+   people will never type again now that pairing exists. */
+.sync-keyrow{display:flex;gap:8px;align-items:center;margin-top:8px;}
+.sync-keyrow .synccode{flex:1;min-width:0;text-align:left;font-size:13px;letter-spacing:1px;
+  padding:10px 12px;border-radius:12px;overflow-x:auto;white-space:nowrap;word-break:normal;}
+.sync-keyrow .imp-all{flex:none;white-space:nowrap;}
+
+/* Two endings to the same sentence, so they share a line rather than queueing. */
+.sync-2up{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.sync-2up .imp-all{width:100%;}
+
+/* A control that is a sentence, not a slab. Underlined on hover like the link
+   it behaves as — it belongs to the paragraph above it, not to the row of
+   buttons, and giving it a box would say otherwise. */
+.sync-quiet{display:block;width:100%;margin-top:10px;padding:0;border:0;background:none;
+  text-align:left;font-size:12px;line-height:1.5;color:var(--t3);cursor:pointer;}
+.sync-quiet:hover{color:var(--t2);text-decoration:underline;text-underline-offset:3px;}
 
 /* ── STATS ── */
 .stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
@@ -9832,56 +9874,70 @@ function renderSyncUI(){
     // A code you didn't save is a backup you don't have — which is exactly how a
     // list gets lost. Say it first, and say it plainly.
     box.innerHTML=`<div class="dt-label">${icon('cloud')} Cloud backup · ON</div>${meter}
-      <p class="ai-desc"><b style="color:var(--a2)">Save this code somewhere safe</b> — a password manager, or email it to yourself. It's the only way back to your list if you lose or reinstall the app. Anyone with it can read your list and settings, so keep it to yourself.</p>
-      <div class="synccode">${pretty}</div>
-      <p class="ai-desc" style="margin-top:6px;font-size:12px">Twenty characters, in five blocks. Not the same as the six-block <b>recovery key</b> from Password \u2014 that one unlocks encryption, this one finds your backup.</p>
-      <div style="display:flex;gap:8px;margin-top:10px;">
-        <button class="parse-btn" style="margin:0;flex:1" onclick="copySyncCode()">${icon('clipboard')} Copy code</button>
-        <button class="imp-all" onclick="syncOff()">Turn off</button>
+
+      <!-- THE JOB, FIRST AND IN ITS OWN GROUND.
+           This panel used to open with two paragraphs about a twenty-character
+           code and put the device controls 724px down, under three identical
+           fold rows. Everything in it was the same width, the same radius and
+           the same weight, stacked — which is what made it read as harsh: there
+           was no shape to the page, so nothing could be more important than
+           anything else. The one thing people come here to do now sits at the
+           top, inside its own panel, and is the only accented thing. -->
+      <div class="sync-primary">
+        <div class="sync-primary-h">${icon('refresh')} Your other devices</div>
+        <p class="ai-desc" style="margin:6px 0 0">Two devices only share a list if they are on the <b>same key</b>. A device that had titles before you set backup up made a key of its own — it is backing up, correctly, somewhere nothing else can see.</p>
+        <button class="parse-btn" id="pairAddBtn" style="margin:11px 0 0;width:100%" onclick="pairOffer(this)">${icon('upload')} Add a device</button>
+        <div id="pairBox"></div>
+        <p class="ai-desc" style="font-size:12px;margin:9px 0 0">It gives you eight characters. Type them into the other device below — that device keeps everything it already had.</p>
+        <div class="sync-join">
+          <textarea class="ai-prompt-in urlin" rows="1" id="pairCodeIn" placeholder="eight-character code" autocomplete="off" autocapitalize="characters" spellcheck="false" onkeydown="if(event.key==='Enter'){event.preventDefault();pairJoin();}"></textarea>
+          <button class="ai-run-btn" onclick="pairJoin()">Add this device</button>
+        </div>
+        <button class="sync-quiet" onclick="loadDeviceList(document.getElementById('devPickBox'))">Who is on this key?</button>
       </div>
-      <p class="ai-desc" style="font-size:12px;margin-top:8px"><b>Turn off</b> stops this device backing up and leaves the stored copy where it is — paste the code back in later and it returns.</p>
-      <details class="dt-fold" style="margin-top:10px">
-        <summary>${icon('trash')} Erase the stored copy<span class="dt-fold-x">Open</span></summary>
-        <p class="ai-desc" style="font-size:12px;margin-top:4px">Deletes what is stored in the cloud under this code — the list, the settings and the friends list — for good. Your titles stay on this device. Use this for a code you are finished with, such as one a device made for itself before you put your devices on the same key.</p>
-        <button class="imp-all" style="width:100%;margin-top:8px" onclick="syncForget()">Erase the stored copy</button>
-      </details>
-      <details class="dt-fold" style="margin-top:12px">
-        <summary>${icon('refresh')} Why is this device different?<span class="dt-fold-x">Check</span></summary>
+
+      <!-- The key is a thing you keep, not a thing you read. It had a centred
+           block of its own and two paragraphs; it gets one line and a button. -->
+      <div class="dt-label" style="margin-top:18px">${icon('lock')} This device's key</div>
+      <div class="sync-keyrow">
+        <code class="synccode">${pretty}</code>
+        <button class="imp-all" onclick="copySyncCode()">${icon('clipboard')} Copy</button>
+      </div>
+      <p class="ai-desc" style="font-size:12px;margin-top:7px">Save it somewhere real — it is the only way back to your list, and nobody can recover it for you. Anyone holding it can read your list and settings. Not the same as the six-block <b>recovery key</b> from Password.</p>
+      ${adminToken()?`<button class="sync-quiet" onclick="copySetupKey()">Copy setup key — both keys in one line, for your own devices. <b style="color:#ff6b6b">Never share it</b></button>`:''}
+
+      <!-- Everything below is a rescue, not a routine. One place, not four. -->
+      <details class="dt-fold" style="margin-top:18px">
+        <summary>${icon('refresh')} If something is out of step<span class="dt-fold-x">Open</span></summary>
+
+        <div class="dt-label" style="margin-top:12px">Which device's list is right?</div>
+        <p class="ai-desc" style="font-size:12px;margin-top:4px">Devices normally merge, newest edit per title winning. If one has drifted, pick the one that is correct and every device takes that list — once. You can do this from any device, not just the one you are picking. Anything held only somewhere else is lost; a restore point stays on this device.</p>
+        <div id="devPickBox"><button class="imp-all" style="width:100%;margin-top:8px" onclick="loadDeviceList(this)">Show my devices</button></div>
+
+        <div class="dt-label" style="margin-top:16px">Why is this device different?</div>
         <p class="ai-desc" style="font-size:12px;margin-top:4px">Reads this device and the cloud and shows every number a merge depends on. Changes nothing. Run it on both devices and compare.</p>
         <button class="imp-all" style="width:100%;margin-top:8px" onclick="showSyncDiagnosis(this)">Check both sides</button>
         <div id="syncDiagBox" style="margin-top:10px"></div>
-      </details>
-      <details class="dt-fold" style="margin-top:12px">
-        <summary>${icon('upload')} Which device's list is right?<span class="dt-fold-x">Open</span></summary>
-        <p class="ai-desc" style="font-size:12px;margin-top:4px">Devices normally merge, newest edit per title winning. If one of them has drifted, pick the one that's correct and every device takes that list — once. After that they merge normally again. You can do this from any device, not just the one you're picking. Anything held only somewhere else is lost; a restore point stays on this device.</p>
-        <div id="devPickBox"><button class="imp-all" style="width:100%;margin-top:8px" onclick="loadDeviceList(this)">Show my devices</button></div>
-      </details>
-      <div class="dt-label" style="margin-top:16px">${icon('refresh')} Your other devices</div>
-      <p class="ai-desc">Two devices only share a list if they are on the <b>same key</b>. A device that had titles before you set backup up made a key of its own — it is backing up, correctly, somewhere nothing else can see. This is how you put them on one.</p>
-      <div style="display:flex;gap:8px;margin-top:8px;">
-        <button class="parse-btn" id="pairAddBtn" style="margin:0;flex:1" onclick="pairOffer(this)">${icon('upload')} Add a device</button>
-        <button class="imp-all" onclick="loadDeviceList(document.getElementById('devPickBox'))">Who is on this key?</button>
-      </div>
-      <div id="pairBox"></div>
-      <p class="ai-desc" style="font-size:12px;margin-top:8px">Press <b>Add a device</b> here, then type the eight characters it shows into the other device's <b>Add this device</b> box below. The other device keeps everything it already had — the two lists are folded together, not replaced.</p>
-      <div style="display:flex;gap:8px;margin-top:10px;">
-        <textarea class="ai-prompt-in urlin" rows="1" id="pairCodeIn" placeholder="eight-character code" autocomplete="off" autocapitalize="characters" spellcheck="false" onkeydown="if(event.key==='Enter'){event.preventDefault();pairJoin();}"></textarea>
-        <button class="ai-run-btn" onclick="pairJoin()">Add this device</button>
-      </div>
-      ${adminToken()?`<div class="dt-label" style="margin-top:16px">${icon('lock')} Your setup key</div>
-      <p class="ai-desc">Both keys in one line, for your own devices. Paste it into the unlock box on a new device and it lets the device in <b>and</b> pulls your list down \u2014 one paste instead of two. <b style="color:#ff6b6b">Never share this one</b>: it contains your admin token, which approves people onto the whole app. The 20-character code above is the one you give friends.</p>
-      <button class="parse-btn" onclick="copySetupKey()">${icon('clipboard')} Copy setup key</button>`:''}
-      <div class="dt-label" style="margin-top:16px">${icon('refresh')} Bring another list here</div>
-      <p class="ai-desc">Restoring replaces what's on this device with the list saved under that code.${
-        (typeof keySelfMade==='function'&&keySelfMade()&&realList().length)
-        ?' <b>This device has '+realList().length+' of its own.</b> If those are worth keeping, use <b>Merge it in</b> below instead \u2014 that keeps both.'
-        :''}</p>
-      <div style="display:flex;gap:8px;">
-        <textarea class="ai-prompt-in urlin" rows="2" id="syncCodeIn" placeholder="paste a code to restore" autocomplete="off" autocapitalize="characters" spellcheck="false" onkeydown="if(event.key==='Enter'){event.preventDefault();syncRestore();}"></textarea>
-        <button class="ai-run-btn" onclick="syncRestore()">Use code</button>
-      </div>
-      <button class="parse-btn" style="margin-top:8px;width:100%" onclick="mergeFromCode()">${icon('layers')} Merge it in instead</button>
-      <p class="ai-desc" style="font-size:12px;margin-top:6px"><b>Use code</b> replaces this list and backs up there from now on. <b>Merge it in</b> keeps both \u2014 anything that code has and this device hasn't is added, anything you both have is folded together (the further episode, the stronger status, both sets of notes), and this device keeps its own code. That is the one to use when your devices each made a code of their own.</p>`;
+
+        <div class="dt-label" style="margin-top:16px">Bring another list here</div>
+        <p class="ai-desc" style="font-size:12px;margin-top:4px">Restoring replaces what's on this device with the list saved under that code.${
+          (typeof keySelfMade==='function'&&keySelfMade()&&realList().length)
+          ?' <b>This device has '+realList().length+' of its own.</b> If those are worth keeping, use <b>Merge it in</b> — that keeps both.'
+          :''}</p>
+        <div class="sync-join" style="margin-top:8px">
+          <textarea class="ai-prompt-in urlin" rows="1" id="syncCodeIn" placeholder="paste a 20-character code" autocomplete="off" autocapitalize="characters" spellcheck="false" onkeydown="if(event.key==='Enter'){event.preventDefault();syncRestore();}"></textarea>
+          <button class="ai-run-btn" onclick="syncRestore()">Use code</button>
+        </div>
+        <button class="imp-all" style="margin-top:8px;width:100%" onclick="mergeFromCode()">${icon('layers')} Merge it in instead</button>
+        <p class="ai-desc" style="font-size:12px;margin-top:6px"><b>Use code</b> replaces this list and backs up there from now on. <b>Merge it in</b> keeps both and this device keeps its own key.</p>
+
+        <div class="dt-label" style="margin-top:16px">Stop, or erase</div>
+        <p class="ai-desc" style="font-size:12px;margin-top:4px"><b>Turn off</b> stops this device backing up and leaves the stored copy where it is — paste the key back in later and it returns. <b>Erase</b> deletes what is stored in the cloud under this key — list, settings and friends — for good. Your titles stay on this device either way.</p>
+        <div class="sync-2up" style="margin-top:8px">
+          <button class="imp-all" onclick="syncOff()">Turn off</button>
+          <button class="imp-all" onclick="syncForget()">Erase the stored copy</button>
+        </div>
+      </details>`;
   }else{
     box.innerHTML=`<div class="dt-label">${icon('cloud')} Cloud backup · OFF</div>${meter}
       <p class="ai-desc">Back up your list to the cloud so it survives losing your phone and syncs across your devices. Private — only someone with your secret code can open it.</p>

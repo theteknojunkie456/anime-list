@@ -46,7 +46,11 @@ localStorage.setItem('seen_release','2026-11-01.63');
 window.__ops=[];window.__forgetFails=false;
 window.fetch=function(u,o){
   let b={};try{b=JSON.parse((o&&o.body)||'{}');}catch(e){}
-  window.__ops.push(b.op+(b.code?(':'+b.code):''));
+  // Record the SYNC ops only. The app also talks to the notify worker, whose
+  // calls carry no op field at all - counting those made this file assert that
+  // no request of any kind was made, which is not what any of it means, and a
+  // background call landing in the window failed a working erase.
+  if(b.op)window.__ops.push(b.op+(b.code?(':'+b.code):''));
   const J=v=>Promise.resolve(new Response(JSON.stringify(v),{status:200,headers:{'Content-Type':'application/json'}}));
   if(b.op==='forget'){ if(window.__forgetFails)return Promise.reject(new Error('offline'));
                        return J({ok:true,existed:true}); }
@@ -71,13 +75,15 @@ t('in the colour reserved for losing something',
   await ev(`(document.getElementById('confirmYesBtn')||{}).className||''`), 'cbtn del');
 t('and names what goes',
   /list, settings and friends/.test(await ev(`(document.getElementById('confirmMsg')||{}).textContent||''`)), true);
-t('nothing has been sent while it waits for an answer', await ev(`window.__ops`), []);
+t('no erase has been sent while it waits for an answer',
+  await ev(`window.__ops.filter(o=>/^forget/.test(o))`), []);
 t('and the code is still here', await ev(`syncCode()`), 'PHONECODE1234567890');
 
 // Backing out must leave everything exactly as it was.
 await ev(`(document.getElementById('confirmBox')||{classList:{remove(){}}}).classList.remove('on');_confirmCb=null;`);
 await wait(200);
-t('backing out erases nothing', [await ev(`syncCode()`), await ev(`window.__ops`)],
+t('backing out erases nothing',
+  [await ev(`syncCode()`), await ev(`window.__ops.filter(o=>/^forget/.test(o))`)],
   ['PHONECODE1234567890',[]]);
 
 // ── a cloud that cannot be reached must not pretend ─────────────────────────
@@ -114,7 +120,7 @@ t('and the panel now offers to turn backup on rather than off',
 await ev(`window.__ops=[];syncForget()`); await wait(400);
 t('with no backup on the device it says so instead of asking',
   await ev(`!document.querySelector('#confirmBox.on')`), true);
-t('and sends nothing', await ev(`window.__ops`), []);
+t('and sends no erase', await ev(`window.__ops.filter(o=>/^forget/.test(o))`), []);
 
 console.log('\n'+pass+' passed, '+fail+' failed');
 ws.close();ch.kill();srv.kill();process.exit(fail?1:0);

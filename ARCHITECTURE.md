@@ -297,6 +297,36 @@ download five copies of the list.
 Ops: `pull` · `push` · `devices` · `pull_dev`. Covered by
 `cloud/adopt-sync.test.mjs` and `scripts/device-dominance-test.mjs`.
 
+### Erasing a backup
+
+`syncOff()` only ever dropped the key from the device. The blob stayed in KV —
+list, settings, friends — under a key nothing in the world could still reach, so
+"off" meant *"I can no longer see it"*, which is the wrong meaning for that
+word. Every device that mints its own key and is later pointed at another one
+leaves one of these behind too.
+
+`op:'forget'` deletes `list:<code>`. Holding the code is the authority, and that
+grants nothing new — a holder can already `pull` the whole blob and `push` an
+empty list over the top. What it adds is honesty: the record is **gone** rather
+than blanked, because a blank record still says somebody was here. It reports
+`existed` so the client can tell an erase from a no-op and not claim a
+destruction that did not happen.
+
+Client side, `syncForget()` has two orderings that are the whole correctness of
+it:
+
+1. **Erase before clearing the key locally** — the key is the only thing that
+   can reach the copy, so dropping it first strands the blob permanently.
+2. **Cancel the scheduled push before erasing** — otherwise the debounce fires a
+   moment later and writes the entire list straight back under the key just
+   deleted, which looks exactly like the erase silently not working.
+
+A failed call keeps the key, so the copy stays reachable rather than being
+orphaned by a network blip. Afterwards `BACKUP_OFF` is set, or `ensureBackup()`
+mints a fresh key on the next save and the erase undoes itself.
+
+Covered by `cloud/forget.test.mjs` (8) and `scripts/forget-backup-test.mjs` (18).
+
 ### Pairing — how a second device joins the first one's key
 
 `mergeFromCode()` (below) folds another key's list into this one but leaves the

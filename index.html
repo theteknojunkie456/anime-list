@@ -9777,6 +9777,42 @@ async function syncRestore(){
   else proceed();
 }
 function syncOff(){setSyncCode('');setBackupDeclined(true);renderSyncUI();try{render();}catch(e){}toast('Backup off. Your list stays on this device');}
+// ERASE THE COPY IN THE CLOUD, not just this device's knowledge of it.
+//
+// "Turn off" drops the key here and leaves the blob — the list, the settings,
+// the friends — sitting under a key nothing in the world can now reach. That is
+// the right behaviour for "stop backing up" and the wrong meaning for "delete",
+// and until now there was no way to mean the second one.
+//
+// Order matters twice over. The erase goes FIRST, because clearing the key here
+// would throw away the only thing that can reach the copy. And the scheduled
+// push is cancelled BEFORE the erase, or the debounce fires a moment later and
+// writes the whole list straight back under the key just deleted.
+async function syncForget(){
+  const code=syncCode();
+  if(!code){toast('There is no backup on this device');return;}
+  if(appLocked){toast('Unlock the list first');return;}
+  askConfirm({danger:true,title:'Erase this backup?',
+    msg:"The copy stored in the cloud under this code — list, settings and friends — is deleted for good. This device keeps the titles it has; it just stops backing them up. Any OTHER device still using this code keeps its own copy until it next backs up.",
+    yes:'Erase it',
+    onYes:async()=>{
+      try{clearTimeout(pushT);}catch(e){}
+      _pushPending=false;_pushSince=0;_pushAgain=false;
+      let r=null;
+      try{
+        const res=await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({op:'forget',code})});
+        r=await res.json();
+      }catch(e){r=null;}
+      if(!r||!r.ok){toast('Could not reach the cloud. Nothing was erased');return;}
+      // Only now is it safe to forget the key locally.
+      setSyncCode('');setSyncAt(0);setBackupDeclined(true);
+      try{clearKeySelf();}catch(e){}
+      renderSyncUI();try{render();}catch(e){}
+      toast(r.existed?'Erased. This device still has your titles'
+                     :'There was nothing stored under that code');
+    }});
+}
 function copySetupKey(){
   const k=makeSetupKey();
   if(!k){toast('This device has no admin token');return;}
@@ -9803,6 +9839,12 @@ function renderSyncUI(){
         <button class="parse-btn" style="margin:0;flex:1" onclick="copySyncCode()">${icon('clipboard')} Copy code</button>
         <button class="imp-all" onclick="syncOff()">Turn off</button>
       </div>
+      <p class="ai-desc" style="font-size:12px;margin-top:8px"><b>Turn off</b> stops this device backing up and leaves the stored copy where it is — paste the code back in later and it returns.</p>
+      <details class="dt-fold" style="margin-top:10px">
+        <summary>${icon('trash')} Erase the stored copy<span class="dt-fold-x">Open</span></summary>
+        <p class="ai-desc" style="font-size:12px;margin-top:4px">Deletes what is stored in the cloud under this code — the list, the settings and the friends list — for good. Your titles stay on this device. Use this for a code you are finished with, such as one a device made for itself before you put your devices on the same key.</p>
+        <button class="imp-all" style="width:100%;margin-top:8px" onclick="syncForget()">Erase the stored copy</button>
+      </details>
       <details class="dt-fold" style="margin-top:12px">
         <summary>${icon('refresh')} Why is this device different?<span class="dt-fold-x">Check</span></summary>
         <p class="ai-desc" style="font-size:12px;margin-top:4px">Reads this device and the cloud and shows every number a merge depends on. Changes nothing. Run it on both devices and compare.</p>
@@ -25984,17 +26026,17 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-11-01.63',
+  v:'2026-11-01.64',
   title:'Your devices, on one list',
   push:'Put your phone and your computer on the same list by typing eight characters \u2014 and nothing gets replaced doing it.',
   notes:[
     'Your devices can finally be put on one list without you copying a twenty-character key between them. On the device that already has your list, open <b>Cloud</b> and press <b>Add a device</b>: it gives you eight characters, good for ten minutes and one device. Type those into the other device and the two lists are <b>folded together</b> \u2014 nothing is replaced, nothing is dropped, and whatever that device already had is kept.',
     'Why this was needed: a device that already had titles when you first set backup up quietly made a key of its own. It was backing up perfectly well \u2014 somewhere nothing else could see. Nothing was broken, so nothing ever said so, and the device picker had nothing to show because from either side there really was no other device.',
+    'You can now delete a backup, not just stop using it. Turning backup off always left the stored copy sitting in the cloud under a code your device had thrown away \u2014 reachable by nothing, removable by no one. <b>Cloud \u2192 Erase the stored copy</b> deletes it for good; the titles stay on your device. Use it on a code you are finished with.',
     'The bar at the bottom is even again. It had six slots with the add key in the third, so there were two things on its left and three on its right and the middle of the bar fell in the gap beside it. Five now, two either side, add key in the middle \u2014 and that key is drawn with the same pen as the rest of the icons instead of being a typed character.',
     'If your devices each made their own cloud code, you can finally put them back together. Paste another device\u2019s code and press <b>Merge it in</b>: anything it has and this one hasn\u2019t is added, anything you both have is folded into one \u2014 the further episode, the stronger status, both sets of notes \u2014 and this device keeps its own code. Copying a list out and importing it back used to be the only way, and that quietly dropped your notes and favourites.',
     '\u201cNot for me\u201d now actually takes it off the list. It was recording that you had passed, and telling you so, and then drawing the row again \u2014 with the waiting count still counting it.',
     'The app is calmer. The top of every screen used to sit under a dark red wash \u2014 a gradient nobody chose, staining the search field and the header of every page \u2014 and the accent that was supposed to mark what you can press was also marking everything else. The wash is neutral now, the colour at the top of the page comes from the artwork behind it, and the accent is a jade that sits back instead of shouting.',
-    'Press an episode and that is the episode that opens. A link you pinned was stored exactly as you pasted it, so every episode of that show went to the one you pasted \u2014 press 2, get 1. And when the app works a site out for you, it now has to rebuild your own address from its answer before it is allowed to keep it.',
   ],
 };
 // The rows animate in once, on the first paint of a session. render() runs on

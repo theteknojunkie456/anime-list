@@ -185,6 +185,33 @@ export default {
       return json({ ok: true, updatedAt: now, adopt }, 200, cors);
     }
 
+    // ── ERASING A BACKUP ────────────────────────────────────────────────────
+    //
+    // Turning backup off only ever dropped the key from the device. The copy in
+    // the cloud — the whole list, the settings, the friends — stayed where it
+    // was, and because the key went with the device there was no longer anything
+    // in the world that could reach it. "Off" meant "I can no longer see it",
+    // not "it is gone", which is the wrong meaning for that word.
+    //
+    // It also leaves a tombstone behind every device that mints its own key and
+    // is later pointed at another one.
+    //
+    // Holding the code is the authority, and that grants nothing new: anyone
+    // with it can already `pull` the entire blob and `push` an empty list over
+    // the top. The only thing this adds is honesty — an erase that erases
+    // instead of writing a blank record that still says somebody was here.
+    if (op === 'forget') {
+      const code = String(body.code || '');
+      if (!/^[A-Za-z0-9]{10,64}$/.test(code)) return json({ error: 'bad code' }, 400, cors);
+      let existed = false;
+      try { existed = !!(await env.LISTS.get('list:' + code)); } catch {}
+      try { await env.LISTS.delete('list:' + code); } catch {}
+      // `existed` is reported so the client can tell "erased" from "there was
+      // nothing there" — a device asking twice, or asking about a key that was
+      // never used, should not be told it destroyed something.
+      return json({ ok: true, existed }, 200, cors);
+    }
+
     // ── PAIRING: how a second device joins the FIRST one's key ──────────────
     //
     // The bug this exists to kill is not a sync failure. Two devices that were

@@ -207,9 +207,29 @@ body is what stopped the UI reading flat when everything was one family at
   it that did nothing, and on a phone that strip is where your thumb rests.
   It keeps the pill's material: blur behind, a hairline of light along the top
   lip (that edge is the only thing telling you the panel is in front of the
-  list rather than smeared over it), and the active item as a filled pill,
-  because at 9px colour alone can't carry "where you are". Capped at 520px and
-  centred on desktop. Takes the full safe area as its own bottom padding.
+  list rather than smeared over it). Capped at 520px and centred on desktop.
+  Takes the full safe area as its own bottom padding.
+
+  **Where you are is marked with a rule, not a lozenge.** A tinted pill behind
+  the active tab is the single most copied object in mobile design, and it did
+  the job by shading a box rather than by pointing at anything. Two pixels of
+  accent across the top of the track says the same thing in the app's own
+  language — the same way a shelf head is marked — and leaves the icon to be an
+  icon.
+
+  **Five tracks, and the count is the point.** The `+` is the only filled,
+  accented object in the bar, so the eye goes there first and measures the bar
+  from it; in an even number of tracks there is no middle track to put it in.
+  Adding a sixth item once put it in track 3 of 6 — two items left, three right,
+  with the bar's true centre falling in the gap beside it. Nothing was
+  misaligned by a pixel; the arrangement was lopsided, which is worse, because
+  there is nothing to nudge. At 390px the `+` centre and the bar centre are both
+  195.0 and all four centre-to-centre gaps are 74.0. A sixth item does not get
+  added to this bar; it goes in Settings.
+
+  Everything in it is drawn by the icon set, including the `+`. It was the
+  character `＋` for a while, and beside four Feather glyphs at stroke-width 2
+  with round caps it read heavier and cruder without it being obvious why.
 - **The measure** — `--measure: clamp(1180px, 88vw, 2600px)` on `:root` at
   ≥900px. Continuous, not stepped: a 27-inch and a 34-inch ultrawide each get a
   layout suited to them rather than the nearest preset. It lives on `:root`

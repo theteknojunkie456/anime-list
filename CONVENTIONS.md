@@ -34,12 +34,23 @@ lint runs automatically after every edit; never commit if it fails.
   broken live app — verify first.
 
 ## Tests
-- `sh scripts/suite.sh` runs every browser suite. It judges by **exit status**,
-  and sweeps stray Chrome/http.server processes between files — a crashed test
-  otherwise holds its port and takes every later test down with it.
+- `sh scripts/suite.sh` runs every suite: `scripts/*-test.mjs`, `scripts/*.test.mjs`
+  **and `cloud/*.test.mjs`**. It judges by **exit status**, and sweeps stray
+  Chrome/http.server processes between files — a crashed test otherwise holds
+  its port and takes every later test down with it.
+- **A test outside the suite reports to nobody.** The `cloud/` files were run by
+  hand, which means they were run when somebody remembered: two of them failed
+  for a whole release against a worker that was correct, and nothing said so. If
+  you add a test, it goes where the suite already looks.
 - **Never assert after a fixed sleep.** Poll for the condition with a deadline.
   A flat `wait(1200)` passes on an idle machine and reports a false failure when
   forty browsers are running, and a suite that cries wolf stops being read.
+  This applies to **positive** assertions — "this must have arrived". A
+  **negative** one — "a guest CANNOT kick the host" — keeps its flat sleep on
+  purpose: there is nothing to wait for, and waiting would only give the thing
+  being forbidden more time to happen. Writing the rule down was not enough on
+  its own: `party-live` carried it in a header comment while 42 of its 46
+  assertions still slept and hoped.
 - A test that writes a persisted setting must clear it first, or its second run
   starts where the first left off. Each test gets its own `--user-data-dir`.
 

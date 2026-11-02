@@ -9859,7 +9859,7 @@ function renderSyncUI(){
       <div class="dt-label" style="margin-top:16px">${icon('refresh')} Your other devices</div>
       <p class="ai-desc">Two devices only share a list if they are on the <b>same key</b>. A device that had titles before you set backup up made a key of its own — it is backing up, correctly, somewhere nothing else can see. This is how you put them on one.</p>
       <div style="display:flex;gap:8px;margin-top:8px;">
-        <button class="parse-btn" style="margin:0;flex:1" onclick="pairOffer(this)">${icon('upload')} Add a device</button>
+        <button class="parse-btn" id="pairAddBtn" style="margin:0;flex:1" onclick="pairOffer(this)">${icon('upload')} Add a device</button>
         <button class="imp-all" onclick="loadDeviceList(document.getElementById('devPickBox'))">Who is on this key?</button>
       </div>
       <div id="pairBox"></div>
@@ -14731,6 +14731,13 @@ const WT_STEPS=[
   {sel:'#backupSheet .sheet-header', open:()=>openSheet('backupSheet'),
    t:'Save that key somewhere real',
    b:'Copy it into your Notes now. It is the only way back to your list, and nobody can recover it for you, not even me.'},
+  // The tour taught the key and stopped there, which is how somebody ends up with
+  // two devices each backing up alone: nothing ever told them the second device
+  // has to be JOINED to the first, and the only visible route was typing twenty
+  // characters into a button that said it would replace their list.
+  {sel:'#pairAddBtn', open:()=>openSheet('backupSheet'),
+   t:'Put your other devices on this list',
+   b:'Press <b>Add a device</b> for eight characters, then type them into the same panel on your phone or laptop. The two lists are folded together \u2014 nothing is replaced. A device you never join keeps backing up on its own, and nothing will tell you.'},
   {sel:'#hb-social', open:()=>openSheet('friendsSheet'),
    t:'Friends, and your own code',
    b:'Open <b>Your code &amp; adding friends</b>. Send someone your code, or paste theirs. Then you can recommend shows to each other and see what they thought.',

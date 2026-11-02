@@ -670,7 +670,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 
 /* Housings and segmented controls: square, no notch. A notch on a 28px icon
    tile is not a bevel, it is a chipped corner. */
-[data-retro] .hub-ico,[data-retro] .set-ico,
+[data-retro] .hub-ico,[data-retro] .set-ico,[data-retro] .set-tile-ic,
 [data-retro] .kind-seg,[data-retro] .kseg{border-radius:2px;}
 
 /* The cover housing already got its carved lip and four rivets, under a comment
@@ -1125,6 +1125,11 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 /* Anything left that is a field or a small action. */
 [data-retro] .cbtn,[data-retro] .parse-btn,[data-retro] .src-chip,
 [data-retro] .fr-row,[data-retro] .set-row,[data-retro] .synccode,
+/* Added with the Settings tiles and the Cloud panel's own panel. Every new box
+   has to be named here or it keeps its rounded corner on a theme where nothing
+   else has one — which is exactly what retro-coverage-test caught, and the
+   reason that test exists rather than being assumed unnecessary. */
+[data-retro] .set-tile,[data-retro] .sync-primary,
 [data-retro] .th-reset,[data-retro] .acc-none,[data-retro] .glow-mode .glow-sw{
   border-radius:2px;
 }

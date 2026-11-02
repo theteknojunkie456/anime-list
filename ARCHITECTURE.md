@@ -695,6 +695,38 @@ A thin **Swift / SwiftUI** wrapper that loads the same web app in a `WKWebView`
 The web app is the source of truth; the shell just adds capabilities the browser
 can't.
 
+### The app mark, and why it has its own test
+
+`icons/icon.svg` is the mark. `icons/icon-1024.png` is the one render of it that
+everything else comes from — the web sizes, the native app's asset catalogue, and
+the Safari extension's. Nothing re-draws the mark; a copy is either that file or a
+downscale of it.
+
+That rule exists because it was broken in the obvious way. The mark was changed,
+`icons/` was re-rendered, and the two asset catalogues were not — so the phone's
+home screen showed three different versions of the logo at once, one of them the
+orange-to-magenta one from July. No build failed and no test complained, because a
+stale picture looks exactly like a current one. The only report was the user saying
+he could not see the new logo.
+
+`scripts/icon-parity-test.mjs` (12) asks the two questions that can be answered
+without a PNG decoder, and between them they are the shape of that bug:
+
+- every **1024×1024** icon in the repo is byte-for-byte `icons/icon-1024.png` —
+  that is the size every catalogue carries at full resolution, so a catalogue that
+  missed an update fails here;
+- no derived icon was **last committed before the master was**. "The mark moved and
+  this copy stayed behind" is literally a timestamp comparison. A file with
+  uncommitted changes is skipped, or the commit that fixes the drift would fail on
+  the drift it is fixing.
+
+It also reads the SVG's palette back, since byte-identical copies of the *wrong*
+picture would satisfy everything above.
+
+Changing the mark therefore means: edit `icons/icon.svg`, re-render
+`icons/icon-1024.png` from it, downscale the rest from that file, and commit the
+lot together.
+
 ---
 
 ## 12. Conventions & hard rules
@@ -709,6 +741,8 @@ can't.
 - After editing `index.html`, **regenerate `friends.html`** (§3).
 - Syntax-check the inline JS before shipping.
 - Web changes go live via GitHub Pages; the app auto-updates (§9).
+- After changing the app mark, re-render **every** copy from `icons/icon-1024.png`
+  and run `node scripts/icon-parity-test.mjs` (§11).
 
 **Hard rules (non-negotiable, both builds)**
 1. **Never host video.** Never embed a service's stream, never handle streaming

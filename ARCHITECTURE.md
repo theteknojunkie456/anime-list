@@ -412,6 +412,39 @@ the network.
 Merging the same code twice is a no-op, because the second pass dedupes against
 a list that already contains it. Covered by `scripts/merge-code-test.mjs`.
 
+### What the Cloud panel is allowed to claim
+
+`syncPayloadSize()` measures **this device**: the size of the blob that would be
+sent. The panel printed it as "Backed up: 3.20 MB of 19.07 MB · 17%" under a
+heading that said `Cloud backup · ON`, which turned a local measurement into a
+claim about a server nobody had asked.
+
+A device whose first push never landed therefore read as fully backed up while
+its key held nothing at all. The only thing in the app that disagreed was
+`pair_new` refusing with *"that key has no backup yet"* — correct, surfaced four
+lines below the sentence saying the opposite, and followed by advice that could
+not be taken: **"give it a moment and try again"**. A push is scheduled by
+`schedulePush()`, which fires on a **list change**, not on a timer. A device
+whose first backup failed is not waiting for a moment; it is waiting for an edit.
+And after three failures the backoff in `syncPush()` holds the next attempt for
+up to an hour.
+
+So the panel now reads the same two facts Settings has always read
+(`backupStatusLine`): `syncAt()` — has anything ever landed — and `pushState().n`
+— how many pushes have failed in a row. Until something lands it says *ready to
+send*, leaves the meter empty, and shows a **Back up now** button.
+
+`backupNow()` clears `setLastPushFP('')` and `setPushState({n:0,at:0,why:''})`,
+which are exactly the two invisible things that can hold a push, then calls
+`syncPush()`. It is deliberately **not** `forcePushList()`: that one stamps
+`adopt`, telling every other device to take this copy whole, which can discard
+their work and is why it asks first. `backupNow()` writes the key's own blob and
+nothing else, so there is nothing to confirm.
+
+Covered by `scripts/backup-truth-test.mjs` (23), which asserts the panel never
+prints "Backed up:" while `syncAt()` is 0, that an ordinary push really is
+suppressed by the backoff, and that the button's push carries no `adopt` stamp.
+
 ### The write budget
 
 KV bills per write **operation**, not per byte: a 50-byte change and a 2 MB list

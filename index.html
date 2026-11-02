@@ -9691,7 +9691,12 @@ async function pairOffer(btn){
   if(!r||!r.ok){
     box.innerHTML='<p class="ai-desc" style="margin:8px 0 0">'+
       (r&&r.error==='that key has no backup yet'
-        ? 'This device has not finished its first backup yet. Give it a moment and try again.'
+        // "Give it a moment and try again" was advice that could not work. A
+        // push is only scheduled when the LIST changes, so a device whose first
+        // one failed waits for an edit rather than a moment — and after three
+        // failures the backoff can hold the next attempt for an hour. Name the
+        // button that actually does it.
+        ? 'Nothing has reached the cloud under this device\u2019s key yet, so there is nothing for the other device to join. Press <b>Back up now</b> above, then try this again.'
         : 'Could not reach the cloud just now.')+'</p>';
     return;
   }
@@ -9903,6 +9908,33 @@ async function syncForget(){
                      :'There was nothing stored under that code');
     }});
 }
+// The first backup, on purpose, when the automatic one has not managed it.
+//
+// Two invisible things can leave a device backing up to nothing. schedulePush()
+// only fires when the list CHANGES, so a device whose first push failed is not
+// waiting for a moment to pass — it is waiting for an edit it may never make.
+// And once three pushes have failed the backoff holds the next attempt for up to
+// an hour. Neither is visible, and neither is something you can usefully wait
+// out, so this clears both and sends now.
+//
+// It is deliberately NOT forcePushList(): that one stamps `adopt`, which tells
+// every other device to take this copy whole and can discard their work, which
+// is why it asks first. This writes the key's own blob and nothing else — the
+// ordinary push, early — so there is nothing to confirm.
+async function backupNow(btn){
+  if(typeof appLocked!=='undefined'&&appLocked){toast('Unlock the list first');return;}
+  if(typeof listUntrusted!=='undefined'&&listUntrusted){toast('This list could not be read properly \u2014 not safe to send');return;}
+  if(!syncCode()){toast('Turn on cloud backup first');return;}
+  const label=btn?btn.innerHTML:'';
+  if(btn){btn.disabled=true;btn.textContent='Sending\u2026';}
+  setLastPushFP('');                  // defeat the "nothing changed" skip
+  setPushState({n:0,at:0,why:''});    // and any backoff still in effect
+  try{await syncPush();}catch(e){}
+  const st=pushState();
+  toast(st.n?('Could not send \u2014 '+(st.why||'try again')):'Backed up \u2014 the cloud has this device\u2019s list');
+  if(btn){btn.disabled=false;btn.innerHTML=label;}
+  try{renderSyncUI();}catch(e){}
+}
 function copySetupKey(){
   const k=makeSetupKey();
   if(!k){toast('This device has no admin token');return;}
@@ -9915,13 +9947,37 @@ function renderSyncUI(){
   const box=document.getElementById('syncBox');if(!box)return;
   const code=syncCode();
   const used=syncPayloadSize(),pct=Math.min(100,Math.round(used/SYNC_CAP*100));
-  const meter=`<div style="height:7px;border-radius:99px;background:var(--bg4);overflow:hidden;margin:9px 0 2px"><div style="height:100%;width:100%;transform:scaleX(${Math.max(0,Math.min(1,used/SYNC_CAP)).toFixed(3)});transform-origin:left;background:var(--a);border-radius:99px;transition:transform .3s"></div></div><p class="ai-desc" style="margin:4px 0 0">Backed up: <b style="color:var(--t1)">${fmtBytes(used)}</b> of ${fmtBytes(SYNC_CAP)} · ${pct}% — list, themes, friends &amp; settings.</p>`;
+  // THE METER MEASURES THIS DEVICE, NOT THE CLOUD. `syncPayloadSize()` is the
+  // size of what WOULD be sent, and it was labelled "Backed up" — a claim about
+  // the cloud that nothing had checked. A device whose first push never landed
+  // read "Cloud backup · ON · Backed up: 3.20 MB" while the key behind it held
+  // nothing at all. The only thing that ever contradicted it was Add a device
+  // refusing with "this device has not finished its first backup yet": true,
+  // unactionable, and sitting four lines under the sentence saying otherwise.
+  //
+  // Settings has always read `syncAt()` and the failure counter for this
+  // (backupStatusLine). This panel now reads the same two, says "ready to send"
+  // until something actually lands, and leaves the bar empty while it hasn't.
+  const _st=pushState(), _at=syncAt(), _landed=!!_at, _fill=_landed?Math.max(0,Math.min(1,used/SYNC_CAP)):0;
+  const _head=!_landed ? 'Cloud backup · on, but nothing has reached the cloud yet'
+            : _st.n>=3 ? `Cloud backup · the last ${_st.n} backups failed`
+            : 'Cloud backup · ON';
+  const _foot=!_landed
+      ? `<b style="color:var(--t1)">${fmtBytes(used)}</b> is ready to send — list, themes, friends &amp; settings. Nothing is stored in the cloud under this key yet, so there is nothing for another device to join.`
+      : _st.n>=3
+      ? `<b style="color:var(--t1)">${fmtBytes(used)}</b> on this device. The cloud copy is from ${relTime(_at)}.${_st.why?' Last error: '+escH(_st.why)+'.':''}`
+      : `Backed up: <b style="color:var(--t1)">${fmtBytes(used)}</b> of ${fmtBytes(SYNC_CAP)} · ${pct}% — list, themes, friends &amp; settings. Last reached the cloud ${relTime(_at)}.`;
+  // Shown only when the automatic push has not managed it, because that is the
+  // only time pressing it does anything the app would not already have done.
+  const _needsPush=!_landed||_st.n>=3;
+  const meter=`<div style="height:7px;border-radius:99px;background:var(--bg4);overflow:hidden;margin:9px 0 2px"><div style="height:100%;width:100%;transform:scaleX(${_fill.toFixed(3)});transform-origin:left;background:var(--a);border-radius:99px;transition:transform .3s"></div></div><p class="ai-desc" style="margin:4px 0 0">${_foot}</p>`+
+    (_needsPush?`<button class="parse-btn" id="backupNowBtn" style="margin:10px 0 0;width:100%" onclick="backupNow(this)">${icon('upload')} Back up now</button>`:'');
   if(code){
     const pretty=code.replace(/(.{4})/g,'$1 ').trim();
     // This panel used to explain how to *use* the code but never said to keep it.
     // A code you didn't save is a backup you don't have — which is exactly how a
     // list gets lost. Say it first, and say it plainly.
-    box.innerHTML=`<div class="dt-label">${icon('cloud')} Cloud backup · ON</div>${meter}
+    box.innerHTML=`<div class="dt-label">${icon('cloud')} ${_head}</div>${meter}
 
       <!-- THE JOB, FIRST AND IN ITS OWN GROUND.
            This panel used to open with two paragraphs about a twenty-character
@@ -26190,17 +26246,17 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-11-01.64',
-  title:'Your devices, on one list',
-  push:'Put your phone and your computer on the same list by typing eight characters \u2014 and nothing gets replaced doing it.',
+  v:'2026-11-02.65',
+  title:'The backup panel tells the truth now',
+  push:'Cloud could say your list was backed up when nothing had ever reached the cloud. It now says which it is \u2014 and gives you a button that sends it.',
   notes:[
+    'The <b>Cloud</b> panel could tell you your list was backed up when nothing of it had ever reached the cloud. The size it showed was real, but it was measuring <b>this device</b> \u2014 how big the backup <i>would</i> be \u2014 and calling it \u201cbacked up\u201d. It now says plainly whether anything has landed, when it last did, and how many backups have failed in a row if any have.',
+    'When nothing has reached the cloud, there is a <b>Back up now</b> button. You needed one: a backup is sent when your <b>list changes</b>, not when time passes, so a device whose first one failed was waiting for an edit rather than a moment \u2014 and after three failures it waits up to an hour before trying again. Neither was visible. The button clears both and sends immediately.',
+    '<b>Add a device</b> used to refuse with \u201cgive it a moment and try again\u201d, which could not work for the same reason. It now tells you nothing is stored under this key yet and points at the button that fixes it.',
     'Your devices can finally be put on one list without you copying a twenty-character key between them. On the device that already has your list, open <b>Cloud</b> and press <b>Add a device</b>: it gives you eight characters, good for ten minutes and one device. Type those into the other device and the two lists are <b>folded together</b> \u2014 nothing is replaced, nothing is dropped, and whatever that device already had is kept.',
     'Why this was needed: a device that already had titles when you first set backup up quietly made a key of its own. It was backing up perfectly well \u2014 somewhere nothing else could see. Nothing was broken, so nothing ever said so, and the device picker had nothing to show because from either side there really was no other device.',
     'You can now delete a backup, not just stop using it. Turning backup off always left the stored copy sitting in the cloud under a code your device had thrown away \u2014 reachable by nothing, removable by no one. <b>Cloud \u2192 Erase the stored copy</b> deletes it for good; the titles stay on your device. Use it on a code you are finished with.',
     'The bar at the bottom is even again. It had six slots with the add key in the third, so there were two things on its left and three on its right and the middle of the bar fell in the gap beside it. Five now, two either side, add key in the middle \u2014 and that key is drawn with the same pen as the rest of the icons instead of being a typed character.',
-    'If your devices each made their own cloud code, you can finally put them back together. Paste another device\u2019s code and press <b>Merge it in</b>: anything it has and this one hasn\u2019t is added, anything you both have is folded into one \u2014 the further episode, the stronger status, both sets of notes \u2014 and this device keeps its own code. Copying a list out and importing it back used to be the only way, and that quietly dropped your notes and favourites.',
-    '\u201cNot for me\u201d now actually takes it off the list. It was recording that you had passed, and telling you so, and then drawing the row again \u2014 with the waiting count still counting it.',
-    'The app is calmer. The top of every screen used to sit under a dark red wash \u2014 a gradient nobody chose, staining the search field and the header of every page \u2014 and the accent that was supposed to mark what you can press was also marking everything else. The wash is neutral now, the colour at the top of the page comes from the artwork behind it, and the accent is a jade that sits back instead of shouting.',
   ],
 };
 // The rows animate in once, on the first paint of a session. render() runs on

@@ -7207,9 +7207,9 @@ function renderAdmin(){
 
     <details class="src-fold" style="margin-top:18px">
       <summary>${icon('send')} Set someone up</summary>
-      <p class="ai-desc" style="margin-top:8px">Makes a link that carries the tedious half of the setup: your sources, you as a friend, and being let in without you approving anything. Not the look \u2014 picking that is the fun part and it stays theirs. One device only; everyone after them is turned away.</p>
+      <p class="ai-desc" style="margin-top:8px">Sends a link that sets their app up for you. It carries your sources, you as a friend, and a way in that needs no approval. It does not carry your look. Good for one device \u2014 anyone after that is turned away.</p>
       <div class="kit-mirror">${kitSummary(kitCollect({})).map(x=>`<span>${escH(x)}</span>`).join('')}</div>
-      <input class="ai-prompt-in" id="kitLabel" placeholder="Who is it for? (just so you can tell them apart)" style="margin-bottom:8px">
+      <input class="ai-prompt-in" id="kitLabel" placeholder="Who is it for?" style="margin-bottom:8px">
       <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
         <span class="ai-desc" style="margin:0;flex:1">AI requests on your key</span>
         <input class="ai-prompt-in" id="kitAi" inputmode="numeric" value="200" style="flex:0 0 80px;text-align:center;padding:8px">
@@ -7218,7 +7218,7 @@ function renderAdmin(){
         <span class="ai-desc" style="margin:0;flex:1">Runs out after (days)</span>
         <input class="ai-prompt-in" id="kitDays" inputmode="numeric" value="30" style="flex:0 0 80px;text-align:center;padding:8px">
       </div>
-      <p class="ai-desc" style="font-size:12px">Those requests are spent on the server, so your key never reaches their phone and the number is a real ceiling rather than a promise. When it runs out they are asked for a key of their own.</p>
+      <p class="ai-desc" style="font-size:12px">Your key stays on the server. Their device never sees it, and it cannot go past this number. After that they are asked for a key of their own.</p>
       <button class="parse-btn" style="margin-top:8px" onclick="kitCreate()">Make the link</button>
       <div id="kitOut" style="margin-top:10px"></div>
       <div id="kitList" style="margin-top:12px"></div>
@@ -7234,12 +7234,12 @@ function renderAdmin(){
 
     <details class="src-fold">
       <summary>${icon('layers')} On-screen card</summary>
-      <p class="ai-desc" style="margin-top:8px">A note or “watch on ___” nudge shown inside everyone’s app.</p>
+      <p class="ai-desc" style="margin-top:8px">A card shown inside everyone’s app.</p>
       <input class="ai-prompt-in" id="msgTitle" placeholder="Card title (e.g. Watch anime on…)" style="margin-bottom:8px">
       <input class="ai-prompt-in" id="msgBody" placeholder="Message" style="margin-bottom:8px">
       <input class="ai-prompt-in" id="msgCta" placeholder="Button text (optional)" style="margin-bottom:8px">
       <textarea class="ai-prompt-in urlin" rows="2" id="msgUrl" placeholder="Button link (optional)" inputmode="url" onkeydown="if(event.key==='Enter')event.preventDefault();"></textarea>
-      <div class="ai-desc" style="margin:10px 0 6px">Target — applies to both Show and Clear</div>
+      <div class="ai-desc" style="margin:10px 0 6px">Who sees it</div>
       <div class="msg-tgt-seg" id="msgTargetSeg">
         <button type="button" class="msg-tgt on" onclick="pickMsgTarget('all',this)">All</button>
         <button type="button" class="msg-tgt" onclick="pickMsgTarget('web',this)">Web</button>
@@ -7254,7 +7254,7 @@ function renderAdmin(){
 
     <details class="src-fold">
       <summary>${icon('play')} Recommended sources</summary>
-      <p class="ai-desc" style="margin-top:8px">Services shown under <b>Recommended</b> in every member’s Watch — no setup on their end.</p>
+      <p class="ai-desc" style="margin-top:8px">Services that appear under <b>Recommended</b> in everyone’s Watch. They set up nothing.</p>
       <div id="adminSrcList"><p class="ai-desc">Loading…</p></div>
       <textarea class="ai-prompt-in urlin" rows="2" id="asURL" placeholder="paste a service’s search page (or a {query} link)" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url" style="margin-top:8px" oninput="asHintName()" onkeydown="if(event.key==='Enter')event.preventDefault();"></textarea>
       <input class="ai-prompt-in" id="asName" placeholder="name" autocomplete="off" spellcheck="false" style="margin-top:8px">
@@ -7267,19 +7267,19 @@ function renderAdmin(){
 
     <details class="src-fold">
       <summary>${icon('edit')} Rename someone's titles</summary>
-      <p class="ai-desc" style="margin-top:8px">Changes what one person's list <i>says</i>, nothing else. Their real titles are what stay saved and what their watch links use, so their shows still open normally. Undo it any time — and it clears itself after 12 hours.</p>
+      <p class="ai-desc" style="margin-top:8px">Changes what one person’s list <i>says</i>. Their real titles stay saved and their shows still open normally. Undo it any time. It clears itself after 12 hours.</p>
       <div id="messList"><p class="ai-desc">Loading members…</p></div>
     </details>
 
     <details class="src-fold" ontoggle="if(this.open)loadUpdates()">
       <summary>${icon('clock')} Updates <span class="src-tag" id="updCount"></span></summary>
-      <p class="ai-desc" style="margin-top:8px">Every change since day one — features, fixes, iOS work, the lot. Straight from the repo.</p>
+      <p class="ai-desc" style="margin-top:8px">Every change since day one.</p>
       <div id="updList"><p class="ai-desc">Open to load…</p></div>
     </details>
 
     <details class="src-fold">
       <summary>${icon('external')} Invite links</summary>
-      <p class="ai-desc" style="margin-top:8px"><b>Request</b> = you approve each; <b>Auto</b> = approved on use.</p>
+      <p class="ai-desc" style="margin-top:8px"><b>Request</b> — you approve each one. <b>Auto</b> — approved on use.</p>
       <div style="display:flex;gap:8px">
         <button class="parse-btn" style="flex:1" onclick="adminInvite('request')">Request link</button>
         <button class="parse-btn" style="flex:1" onclick="adminInvite('auto')">Auto link</button>
@@ -7305,15 +7305,27 @@ let _updPage=0,_updRows=[],_updEnd=false,_updLoading=false;
 // What kind of change it was, read off how the commit describes itself. First
 // match wins, so the specific patterns sit above the catch-alls.
 const UPD_KINDS=[
-  [/^(fix|hotfix)\b|un-?break|crash|blank screen|no longer|stop(s|ped)? |revert/i,'Fix'],
+  // Repo plumbing first. It used to fall through to the catch-all and get
+  // announced as a Feature: "Delete index.html" and "Add .nojekyll to skip
+  // Jekyll processing" both read as things the app had gained.
+  [/^(ci|chore|aider)\b|nojekyll|readme|gitignore|workflow|deploy|pipeline|organi[sz]e repo|^add files via upload$|^(add|delete|rename|move) [\w./-]+$/i,'Build'],
+  [/^(fix|hotfix)\b|un-?break|crash|blank screen|no longer|revert/i,'Fix'],
   [/\bios\b|iphone|testflight|app ?store|xcode|swift|native app|official app|broadcast ext/i,'iOS'],
-  [/security|harden|xss|escape|face ?id|touch ?id|lock\b|admin gate/i,'Security'],
+  // "lock" on its own tagged a keyboard change as Security, because the subject
+  // happened to end "none of it past the lock". A word that common needs its
+  // noun attached before it means anything.
+  [/security|harden|xss|escape|face ?id|touch ?id|lock screen|locked list|password|passkey|encrypt|admin gate/i,'Security'],
   [/party|watch ?together|turn\b|stun|webrtc|jitsi|voice|screen-?share/i,'Party'],
   [/perf|speed|lag|faster|storage|cache|hydrat/i,'Speed'],
   [/theme|polish|spacing|layout|brand|icon|glow|vignette|declutter|sheet|nav\b/i,'Polish'],
-  [/^(ci|chore|aider)|deploy|workflow|ignore|pipeline/i,'Build'],
 ];
 function updKind(msg){for(const[re,name]of UPD_KINDS)if(re.test(msg))return name;return 'Feature';}
+// A commit that opts out of CI is a scheduled job, not a change anybody asked
+// for — chapter-count refreshes run nightly and filled whole days of the feed
+// with the same line. The marker was also being printed: rows read "Chapter
+// counts: refresh [skip ci]", which is build notation in front of a reader who
+// has never seen a build.
+const UPD_SKIP=/\[(skip ci|ci skip)\]/i;
 const UPD_COL={Fix:'#ff6b6b','iOS':'#8b7cff',Security:'#ffc857',Party:'#4ecdc4',Speed:'#5bc8af',Polish:'#b3a8ff',Build:'var(--t3)',Feature:'var(--a)'};
 async function loadUpdates(){
   const box=document.getElementById('updList');
@@ -7335,6 +7347,7 @@ async function updFetchPage(){
     const full=((c.commit||{}).message||'').trim();
     const title=full.split('\n')[0];
     if(/^Merge (pull request|branch)/i.test(title))continue;    // plumbing, not progress
+    if(UPD_SKIP.test(full))continue;                            // a scheduled job, not a change
     // Tag off the subject line only. Reading the body mislabels things — a
     // commit that merely *mentions* iOS or the lock screen isn't iOS work.
     _updRows.push({t:title,d:((c.commit||{}).author||{}).date||'',k:updKind(title)});
@@ -7910,7 +7923,7 @@ function load(){
     try{const bak=s&&s.getItem(LSKEY+'_bak');if(bak){parseInto(bak);return;}}catch{}
     anime=migrate(JSON.parse(JSON.stringify(DEFAULT_DATA)));
     listUntrusted=true;      // sample data standing in for a real list — never publish it
-    try{setTimeout(()=>toast('Couldn’t read your saved list. A copy was kept, so restore from backup if this looks empty.'),800);}catch{}
+    try{setTimeout(()=>toast('Couldn’t read your saved list. A copy was kept — restore from backup if this looks empty.'),800);}catch{}
   }
 }
 let saveWarned=false;let _writeChain=Promise.resolve();
@@ -8656,7 +8669,7 @@ async function enableFaceID(){
     toast(bioName()+' unlock is on');renderLockUI();
   }catch(e){
     const m=e&&e.message;
-    toast(m==='no-prf'?('This device can’t derive a key from '+bioName()+' yet'):(bioName()+' setup cancelled'));
+    toast(m==='no-prf'?('This device can’t use '+bioName()+' to unlock yet'):(bioName()+' setup cancelled'));
   }
 }
 async function disableFaceID(){
@@ -10244,7 +10257,7 @@ async function enableNotify(){
     const r=await fetch(NOTIFY_URL+'/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({subscription:sub,animeIds:ids,mangaIds:notifyMangaIds(),tz:(Intl.DateTimeFormat().resolvedOptions().timeZone)||'UTC'})});
     if(!r.ok)throw new Error('subscribe '+r.status);
     setNotifyOn(true);
-    toast(ids.length?`Notifications on · tracking ${ids.length} show${ids.length!==1?'s':''}`:'Notifications on · open your shows so covers/ids load');
+    toast(ids.length?`Notifications on · tracking ${ids.length} show${ids.length!==1?'s':''}`:'Notifications on · open your shows once to start tracking them');
   }catch(e){toast('Couldn’t turn on notifications. Try again');}
   renderNotifyUI();
 }
@@ -15041,7 +15054,7 @@ const WT_STEPS=[
    needMsg:'Tap <b>Turn on backup</b> in the panel below. This step is the one thing you cannot skip.'},
   {sel:'#backupSheet .sheet-header', open:()=>openSheet('backupSheet'),
    t:'Save that key somewhere real',
-   b:'Copy it into your Notes now. It is the only way back to your list, and nobody can recover it for you, not even me.'},
+   b:'Copy it into your Notes now. It is the only way back to your list, and nobody can recover it for you.'},
   // The tour taught the key and stopped there, which is how somebody ends up with
   // two devices each backing up alone: nothing ever told them the second device
   // has to be JOINED to the first, and the only visible route was typing twenty
@@ -15621,13 +15634,13 @@ function bgFileChosen_go(f){
       g.drawImage(img,0,0,c.width,c.height);
       URL.revokeObjectURL(img.src);
       const url=c.toDataURL('image/jpeg',0.8);
-      if(Math.round(url.length*0.75)>2600000)toast('That photo is large. Cloud sync may reject it, so try a smaller one.');
+      if(Math.round(url.length*0.75)>2600000)toast('That photo is too large to back up. Try a smaller one.');
       // Telling someone the requirement is only half of it; the other half is
       // saying whether what they picked met it. A 700px-wide photo is fine on a
       // phone and visibly soft across a 1184px desktop banner, and there is no
       // way for them to know that from looking at it on the phone.
-      else if(img.width<1200)toast(`Added. It's ${img.width}px wide, so it'll look soft on a big screen`);
-      else if(img.width<img.height)toast('Added. It\u2019s a tall photo, so the wide views will crop it hard');
+      else if(img.width<1200)toast(`Added. At ${img.width}px it will look soft on a big screen`);
+      else if(img.width<img.height)toast('Added. Tall photos get cropped hard in the wide views');
       pendingBg=url;setBgPreview(url);
       dominantColor(url,hex=>{pendingBgAccent=hex||'';}); // derive accent from the uploaded image
       toast('Background added');
@@ -15656,7 +15669,7 @@ function coverFileChosen_go(f){
     // The crop is silent by design, so the toast is the only place it can be
     // mentioned — and a source that was smaller than the target is the one case
     // where the result will actually look worse than the file they picked.
-    if(img.width<480||img.height<680)toast(`Cover added. ${img.width}\u00d7${img.height} is under 480\u00d7680, so it may look soft`);
+    if(img.width<480||img.height<680)toast(`Cover added. It may look soft — ${img.width}\u00d7${img.height}, under 480\u00d7680`);
     else toast('Cover added');
   };
   img.onerror=()=>{URL.revokeObjectURL(img.src);toast('Could not read that image');};
@@ -16103,7 +16116,7 @@ ${text}`;
     const withEp=importItems.filter(x=>x.ep||x.rating).length;
     toast(`AI sorted ${importItems.length}${withEp?`, kept progress on ${withEp}`:''}. Check them over`);
   }catch(e){
-    toast('AI cleanup didn’t work. Using the plain parse');
+    toast('AI cleanup didn’t work. Added them as they were');
     parseImport();   // fall back to the reliable regex import
   }finally{ if(btn){btn.disabled=false;btn.innerHTML=was;} }
 }
@@ -17262,7 +17275,7 @@ async function startShare(){
         : ''),9000);
       try{logProblem('share','captured '+surface+' when monitor was requested',dims);}catch(e){}
     }else if(st.width&&st.width<1200){
-      toast(`Sharing at ${dims} \u2014 lower than asked for, so it may look soft`);
+      toast(`Sharing at ${dims}. It may look soft.`);
     }
   }catch(e){}
   // Tell the encoder what it is looking at. Without a hint it assumes a talking
@@ -19740,7 +19753,7 @@ function pvSetFromURL(){
       .replace(/^./,c=>c.toUpperCase());
     a.titleAlt=a.title;                      // keep what it was, so it can be put back
     a.title=nice;
-    toast(`Renamed to “${nice}”, which is what the site calls it`);
+    toast(`Renamed to “${nice}” — what the site calls it`);
   }
   // If the page's shape differs from the current template, adopt the new shape
   // too — that's the same recognizer the one-paste setup uses.
@@ -21382,7 +21395,7 @@ async function acceptSrcPack(id){
   // The setup works on its own; a key is only needed for the app to WRITE new
   // link patterns for them later. Offer it once, here, rather than letting them
   // hit the wall the first time they try it.
-  if(!getKey())setTimeout(()=>{try{openSheet('keySheet');toast('Optional: add a free key so WatchList can learn new sites for you');}catch(_){}},900);
+  if(!getKey())setTimeout(()=>{try{openSheet('keySheet');toast('Optional: add a free key and WatchList can learn new sites for you');}catch(_){}},900);
 }
 // ─── ONE-PASTE SETUP ────────────────────────────────────────────────────────
 // The old path worked but only if you already understood it: open a fold, paste,
@@ -26505,10 +26518,11 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-11-03.68',
-  title:'Sources moves to the bar',
-  push:'Sources is a tab now, next to the +. Cloud moved into Settings, where it already was.',
+  v:'2026-11-03.69',
+  title:'Sources moves to the bar, and the app says less',
+  push:'Sources is a tab now, next to the +. Cloud moved into Settings. And the admin panel stopped explaining itself.',
   notes:[
+    'The <b>Updates</b> list no longer prints build notation. Nightly jobs that refresh chapter counts filled whole days with the same line, ending in <b>[skip ci]</b> \u2014 they are out. Repo housekeeping is labelled as such instead of being announced as a feature, and a change is only tagged <b>Security</b> when it is actually about a lock, a password or a key.',
     '<b>Sources</b> is in the bar at the bottom. It is the panel you want while you are using the app \u2014 a show opens in the wrong place and you want your services right then, not two taps deep in Settings.',
     '<b>Cloud</b> moved into <b>Settings</b>, at the top, with its status on the tile \u2014 it turns red the moment a backup stops landing. It is also <b>c</b> on a keyboard. The bar holds five tabs so the <b>+</b> has a middle to sit in; six would put it half a tab off centre, with nothing to nudge.',
     '<b>\u2318Z</b> undoes, <b>\u2318\u21e7Z</b> or <b>\u2318Y</b> redoes \u2014 removing a title, moving an episode, changing a status. Removing something was final before, which is a lot to ask of a button sitting beside the one you meant.',

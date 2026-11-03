@@ -23052,6 +23052,16 @@ function bulkToggle(id,range){
   syncBulkUI();
 }
 function bulkClear(){bulkSel=null;_bulkAnchor=-1;syncBulkUI();}
+// Everything the page is currently SHOWING, not everything you own — a filter
+// or a search is a statement about what you are working on, and ⌘A inside a
+// filtered view meaning "all 285 titles" would be a nasty surprise one keypress
+// away from the bulk menu.
+function bulkAll(){
+  const ids=_cardIds();
+  if(!ids.length){toast('Nothing to select');return;}
+  bulkSel=new Set(ids);_bulkAnchor=0;syncBulkUI();
+  toast(ids.length+' selected');
+}
 // A phone has no shift-click, so picking several had no entry point at all —
 // long-press deliberately acts on the one thing you held. This is that entry
 // point: it starts the selection with that card, and from there a plain tap
@@ -26491,8 +26501,8 @@ const RELEASE={
   title:'A keyboard worth using, and plainer words',
   push:'Undo and redo, edit and favourite, episodes and removals \u2014 all on keys now. Press ? to see them. And the app stopped explaining itself at you.',
   notes:[
-    '<b>\u2318Z</b> undoes, <b>\u2318\u21e7Z</b> redoes \u2014 removing a title, moving an episode, changing a status. Removing something was final before, which is a lot to ask of a button sitting beside the one you meant.',
-    'More of the app is on the keyboard. <b>e</b> edits the card you are on and <b>f</b> favourites it, <b>\u2318\u232b</b> removes it or the whole selection (it still asks), <b>\u2318K</b> jumps to search, and with a title open <b>.</b> and <b>,</b> move through episodes. Press <b>?</b> for the full card \u2014 it is grouped now instead of one long run.',
+    '<b>\u2318Z</b> undoes, <b>\u2318\u21e7Z</b> or <b>\u2318Y</b> redoes \u2014 removing a title, moving an episode, changing a status. Removing something was final before, which is a lot to ask of a button sitting beside the one you meant.',
+    'Most of the app is on the keyboard now. <b>1</b>\u2013<b>5</b> switch filters, <b>s</b> and <b>c</b> open Stats and Cloud, <b>\u2318,</b> opens Settings, <b>\u2318A</b> selects everything on screen, <b>e</b> edits and <b>f</b> favourites, <b>\u2318\u232b</b> removes (it still asks). With a title open, <b>.</b> and <b>,</b> move through episodes and <b>w p d x</b> set the status. Press <b>?</b> for the whole card.',
     'Codes now <b>format themselves as you type</b>. Lower case becomes upper, spacing falls into place, pasted punctuation is dropped, and you can fix a character in the middle without the cursor jumping to the end.',
     'The app says less. A lot of what you read was the reasoning behind a feature rather than what had happened and what to do about it \u2014 so <b>Cloud</b>, its checks and its warnings have all been rewritten shorter.',
     'A <b>locked</b> list is no longer reported as an empty one. A device that had not been unlocked yet said \u201cnothing has reached the cloud\u201d and counted your titles as zero. Your titles were never gone and were never at risk of being overwritten \u2014 but that is not what it looked like. It now says the list is locked and offers to unlock it.',
@@ -26712,7 +26722,11 @@ const KB_HELP=[
   ['','Finding things'],
   ['/','Search'],
   ['⌘ K','Search'],
+  ['1 … 5','All, Watching, Plan, Finished, Dropped'],
   ['a','Add a title'],
+  ['s','Stats'],
+  ['c','Cloud backup'],
+  ['⌘ ,','Settings'],
   ['?','This help'],
   ['Esc','Clear selection / close'],
   ['','Moving around'],
@@ -26720,6 +26734,8 @@ const KB_HELP=[
   ['j k ↑ ↓','Move a whole row'],
   ['⇧ + ←→↑↓','Select a run of cards'],
   ['Space','Add one card to the selection'],
+  ['⌘ A','Select everything on screen'],
+  ['⌘ ⇧ A','Clear the selection'],
   ['Enter','Open, or act on the selection'],
   ['Right-click','Act on a card'],
   ['','Changing things'],
@@ -26728,10 +26744,14 @@ const KB_HELP=[
   ['⌘ ⌫','Remove the focused card, or the selection'],
   ['⌘ Z','Undo'],
   ['⌘ ⇧ Z','Redo'],
+  ['⌘ Y','Redo'],
   ['','With a title open'],
   ['.','Next episode'],
   [',','Previous episode'],
+  ['w p d x','Watching, Plan, Done, Dropped'],
   ['f','Favourite'],
+  ['e','Edit'],
+  ['⌫','Remove'],
 ];
 function toggleKbHelp(){
   let el=document.getElementById('kbHelp');
@@ -26755,12 +26775,25 @@ document.addEventListener('keydown',e=>{
   // the same handler as the rest, so they share its typing and blocked guards
   // instead of growing a second set that drifts from them.
   if((e.metaKey||e.ctrlKey)&&!e.altKey){
+    // NOTHING while the list is locked. `anime` is an empty placeholder then,
+    // so an undo would operate on nothing, and ⌘K or ⌘, would hand somebody
+    // the app around the lock screen. _kbBlocked() covers this for the plain
+    // keys below; these run above it and need saying separately.
+    if(typeof appLocked!=='undefined'&&appLocked)return;
     const k=String(e.key||'').toLowerCase();
     // Inside a field ⌘Z is the browser's own undo of your typing, which is the
     // one you want there.
     if(k==='z'&&!_kbTyping()){e.preventDefault();if(e.shiftKey)redoLast();else undoLast();return;}
+    // ⌘Y is redo everywhere outside the Mac, and plenty of people reach for it
+    // on one anyway. Two keys for the same thing costs nothing.
+    if(k==='y'&&!_kbTyping()){e.preventDefault();redoLast();return;}
     if(k==='k'&&!e.shiftKey&&!_kbTyping()){e.preventDefault();
       const s2=document.getElementById('searchIn');if(s2){_kbClear();s2.focus();try{s2.select();}catch(_){}}return;}
+    // ⌘/ is the shortcut card in most things that have one.
+    if(e.key==='/'&&!_kbTyping()){e.preventDefault();if(!_kbBlocked())toggleKbHelp();return;}
+    // ⌘, is Settings on a Mac and harmless anywhere else.
+    if(e.key===','&&!_kbTyping()){e.preventDefault();try{openSheet('settingsSheet');}catch(_){}return;}
+    if(k==='a'&&!_kbTyping()&&!_kbBlocked()){e.preventDefault();if(e.shiftKey)bulkClear();else bulkAll();return;}
     // ⌘⌫ is "delete what is selected" in every file list there has ever
     // been. It still asks first — the shortcut saves a reach, not a decision.
     if((e.key==='Backspace'||e.key==='Delete')&&!_kbTyping()&&!_kbBlocked()){
@@ -26773,10 +26806,18 @@ document.addEventListener('keydown',e=>{
   if(e.altKey)return;
   // WITH A TITLE OPEN. These run before the blocked check on purpose: "a sheet
   // is open" is the state they exist for, not a reason to ignore them.
+  if(typeof appLocked!=='undefined'&&appLocked)return;
   if(!_kbTyping()&&_detailOpen()){
     if(e.key==='.'||e.key==='>'){e.preventDefault();bumpEp(1);return;}
     if(e.key===','||e.key==='<'){e.preventDefault();bumpEp(-1);return;}
     if(e.key==='f'||e.key==='F'){e.preventDefault();toggleFav();return;}
+    if(e.key==='e'||e.key==='E'){e.preventDefault();try{editItem(detailId);}catch(_){}return;}
+    // The four statuses, by their first letter — w, p, d for done, x for
+    // dropped. All four are undoable, which is what makes them safe to put one
+    // keypress away.
+    const st={w:'watching',p:'plan',d:'finished',x:'dropped'}[String(e.key).toLowerCase()];
+    if(st){e.preventDefault();try{setDetailStatus(st);}catch(_){}return;}
+    if(e.key==='Backspace'||e.key==='Delete'){e.preventDefault();try{confirmDelete(detailId);}catch(_){}return;}
   }
   if(e.key==='/'&&!_kbTyping()){e.preventDefault();
     // In an open party, "/" jumps to the chat so you can talk; otherwise it focuses search.
@@ -26789,6 +26830,14 @@ document.addEventListener('keydown',e=>{
   switch(e.key){
     case 'a':e.preventDefault();try{openSheet_add();}catch(_){}break;
     case 'e':{const id=_kbCardId();if(id){e.preventDefault();try{editItem(id);}catch(_){}}break;}
+    case 's':case 'S':e.preventDefault();try{openStats();}catch(_){}break;
+    case 'c':case 'C':e.preventDefault();try{openSheet('backupSheet');}catch(_){}break;
+    // The filter row, by position, the way it reads left to right.
+    case '1':case '2':case '3':case '4':case '5':{
+      e.preventDefault();
+      const f=['all','watching','plan','finished','dropped'][+e.key-1];
+      if(f)try{setFilter(f);}catch(_){}
+      break;}
     case 'f':case 'F':{const id=_kbCardId();if(id){e.preventDefault();kbFav(id);}break;}
     case 'ArrowRight':case 'l':e.preventDefault();_kbMove(1,e.shiftKey);break;
     case 'ArrowLeft':case 'h':e.preventDefault();_kbMove(-1,e.shiftKey);break;

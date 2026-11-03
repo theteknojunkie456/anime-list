@@ -852,13 +852,22 @@ Everything else with a modifier is left to the browser.
 | | |
 |---|---|
 | `/`, `⌘K` | search |
-| `a` | add a title |
-| `?` | the shortcut card |
+| `1`…`5` | filter: all, watching, plan, finished, dropped |
+| `a`, `s`, `c`, `⌘,` | add a title, Stats, Cloud, Settings |
+| `?`, `⌘/` | the shortcut card |
 | `h j k l` / arrows, `⇧`, Space, Enter | move, select, open |
+| `⌘A`, `⌘⇧A` | select everything on screen, clear the selection |
 | `e`, `f` | edit / favourite the focused card |
 | `⌘⌫` | remove the focused card, or the selection — still asks |
-| `⌘Z`, `⌘⇧Z` | undo, redo |
-| `.` `,` `f` *(title open)* | next / previous episode, favourite |
+| `⌘Z` / `⌘⇧Z`, `⌘Y` | undo / redo (⌘Y because it is redo everywhere else) |
+| `.` `,` `f` `e` `⌫` *(title open)* | episode forward / back, favourite, edit, remove |
+| `w` `p` `d` `x` *(title open)* | watching, plan, done, dropped |
+
+`⌘A` takes what the page is **showing**, not everything owned. A filter or a
+search is a statement about what you are working on, and ⌘A meaning "all 285"
+inside a filtered view would be a nasty surprise one keypress from the bulk
+menu. The four status keys are safe to put one press away precisely because
+every one of them is undoable.
 
 The open-title keys run **before** the `_kbBlocked()` check: "a sheet is open"
 is the state they exist for, not a reason to ignore them.

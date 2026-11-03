@@ -176,10 +176,61 @@ await key('f'); await wait(400);
 t('"f" favourites what is open', await ev(`!!anime.find(a=>a.id==='u1').fav`), !fav0);
 await ev(`closeAll()`); await wait(300);
 
+// ── the rest of the map ────────────────────────────────────────────────────
+// ⌘Y is redo everywhere outside a Mac, and people reach for it on one anyway.
+await ev(`(()=>{_undo=[];_redo=[];deleteId='u2';doDelete();return 1;})()`); await wait(300);
+await key('z',{metaKey:true}); await wait(350);
+await key('y',{metaKey:true}); await wait(350);
+t('\u2318Y redoes, the same as \u2318\u21e7Z', await ev(`anime.some(a=>a.id==='u2')`), false);
+await key('z',{metaKey:true}); await wait(350);
+t('and it is back again', await ev(`anime.some(a=>a.id==='u2')`), true);
+
+// Selecting. ⌘A takes what is ON SCREEN, so a filter still means something.
+await ev(`closeAll();bulkClear();setFilter('all');render();`); await wait(500);
+await key('a',{metaKey:true}); await wait(400);
+const allSel=await ev(`bulkSel?bulkSel.size:0`);
+t('\u2318A selects every card on the page', allSel>0, true);
+t('and it is exactly what the page is showing',
+  await ev(`bulkSel.size===_cardIds().length`), true);
+await key('a',{metaKey:true,shiftKey:true}); await wait(350);
+t('\u2318\u21e7A clears it', await ev(`bulkOn()`), false);
+
+// The filter row, by position.
+await key('2'); await wait(400);
+t('"2" filters to Watching', await ev(`filterStatus`), 'watching');
+await key('1'); await wait(400);
+t('"1" goes back to everything', await ev(`filterStatus`), 'all');
+
+// Panels.
+await key('s'); await wait(500);
+t('"s" opens Stats', await ev(`!!document.querySelector('#statsView.on')`), true);
+await ev(`closeAll();document.getElementById('statsView').classList.remove('on')`); await wait(300);
+await key('c'); await wait(500);
+t('"c" opens Cloud', await ev(`!!document.querySelector('#backupSheet.on')`), true);
+await ev(`closeAll()`); await wait(300);
+await key(',',{metaKey:true}); await wait(500);
+t('\u2318, opens Settings', await ev(`!!document.querySelector('#settingsSheet.on')`), true);
+await ev(`closeAll()`); await wait(300);
+
+// Statuses on the open title, which are the keys most worth having undo behind.
+await ev(`openDetail('u1')`); await wait(600);
+await key('d'); await wait(500);
+t('"d" marks it done', await ev(`anime.find(a=>a.id==='u1').status`), 'finished');
+await key('p'); await wait(500);
+t('"p" moves it to plan', await ev(`anime.find(a=>a.id==='u1').status`), 'plan');
+await key('z',{metaKey:true}); await wait(450);
+t('and \u2318Z walks it back', await ev(`anime.find(a=>a.id==='u1').status`), 'finished');
+await key('w'); await wait(500);
+t('"w" sets it watching', await ev(`anime.find(a=>a.id==='u1').status`), 'watching');
+await ev(`closeAll()`); await wait(300);
+
 // ── the help card lists what was added ─────────────────────────────────────
 const help=await ev(`(()=>{const rows=KB_HELP.map(r=>r[0]+'|'+r[1]).join('\\n');return rows;})()`);
-for(const [k,label] of [['\u2318 Z','Undo'],['\u2318 \u21e7 Z','Redo'],['e','Edit the focused card'],
-                        ['.','Next episode'],['\u2318 \u232b','Remove the focused card, or the selection']])
+for(const [k,label] of [['\u2318 Z','Undo'],['\u2318 \u21e7 Z','Redo'],['\u2318 Y','Redo'],
+                        ['e','Edit the focused card'],['.','Next episode'],
+                        ['\u2318 A','Select everything on screen'],
+                        ['w p d x','Watching, Plan, Done, Dropped'],
+                        ['\u2318 \u232b','Remove the focused card, or the selection']])
   t('the help card lists '+label, help.includes(k+'|'+label), true);
 t('and it is grouped, not one flat run',
   await ev(`KB_HELP.filter(r=>r[0]==='').length>=3`), true);
@@ -199,6 +250,22 @@ t('the card actually draws, with headings and no empty key caps',
     return {grpsOk:grps===wantGrps,rowsOk:rows===wantRows,empty};
     }catch(e){return 'threw: '+e.message;}})()`),
   {grpsOk:true,rowsOk:true,empty:false});
+
+// ── a locked list takes no shortcuts at all ────────────────────────────────
+// While locked, `anime` is an empty placeholder. An undo would run against
+// nothing, and \u2318K or \u2318, would hand somebody the app from around the lock
+// screen. The plain keys are covered by _kbBlocked(); these run above it.
+await ev(`(()=>{_undo=[];_redo=[];deleteId='u2';doDelete();appLocked=true;return 1;})()`);
+await wait(300);
+await key('z',{metaKey:true}); await wait(350);
+t('\u2318Z does nothing while the list is locked',
+  await ev(`anime.some(a=>a.id==='u2')`), false);
+await key(',',{metaKey:true}); await wait(350);
+t('and \u2318, cannot open Settings past the lock',
+  await ev(`!!document.querySelector('#settingsSheet.on')`), false);
+await ev(`(()=>{appLocked=false;return 1;})()`); await wait(150);
+await key('z',{metaKey:true}); await wait(400);
+t('and it all works again once unlocked', await ev(`anime.some(a=>a.id==='u2')`), true);
 
 // ── 3. a locked device does not report an empty library ────────────────────
 await ev(`openSheet('backupSheet')`); await wait(400);

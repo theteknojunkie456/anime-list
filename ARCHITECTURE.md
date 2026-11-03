@@ -818,6 +818,41 @@ lot together.
 
 ---
 
+### The admin Updates feed shows strangers your commit log
+
+`loadUpdates()` reads the public repo's commits live and renders the subject
+line of each one. That makes every commit message user-facing copy, written by
+someone in developer mode who was not thinking about a reader. Three rules keep
+it readable, and `scripts/updates-feed-test.mjs` holds them (node-only, no
+browser — it lifts the real regexes out of `index.html` with `new Function`
+rather than restating them, because a test carrying its own copy of the rules
+passes while the app is wrong).
+
+1. **`UPD_SKIP` drops anything carrying the CI-skip marker.** A commit that opts
+   out of CI is a scheduled job, not a change someone asked for. Nightly
+   chapter-count refreshes were filling whole days with one repeated row, and
+   printing the marker itself — build notation in front of a reader who has
+   never seen a build.
+2. **Repo plumbing is matched first, as `Build`.** It used to fall through to the
+   `Feature` catch-all, so "Delete index.html" and "Add .nojekyll to skip Jekyll
+   processing" both read as things the app had gained.
+3. **`Security` needs a noun.** Matching bare `lock` tagged a keyboard change
+   SECURITY because its subject ended "none of it past the lock". The rule wants
+   *lock screen*, *locked list*, *password*, *passkey*, *encrypt*.
+
+### A commit must not cancel its own deploy
+
+GitHub reads the CI-skip marker from **anywhere** in a commit message, not just
+the subject. A commit whose body merely *quoted* the marker — while documenting
+rule 1 above — pushed successfully and never deployed, which is indistinguishable
+from a deploy that worked until you notice the site has not changed. Recovered
+with a manual `workflow_dispatch`.
+
+`scripts/hooks/commit-msg` refuses the marker in a body and allows it in a
+subject, where it is visibly deliberate. `scripts/install-hooks.sh` installs it
+alongside `pre-commit`; `.git/hooks` is not in the repo, so a fresh clone has
+neither until that script is run.
+
 ### The tab bar holds five, and the + owns the middle
 
 `.nav` is `repeat(5,minmax(0,1fr))`. The count is odd deliberately. The `+` is

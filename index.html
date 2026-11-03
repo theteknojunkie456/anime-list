@@ -6422,6 +6422,10 @@ body.recsel .pcard{position:relative;}
 <div class="confirm-box" id="confirmBox">
   <div class="confirm-title" id="confirmTitle">Remove from list?</div>
   <div class="confirm-msg" id="confirmMsg"></div>
+  <!-- Shown only when askConfirm is given an `input`. The password paths need a
+       value as well as a yes, and a second modal just for that would be a second
+       place to get the ordering wrong. -->
+  <input class="ai-prompt-in" id="confirmIn" style="display:none;width:100%;margin:2px 0 10px" autocomplete="off" autocapitalize="off" spellcheck="false">
   <div class="confirm-btns">
     <button class="cbtn cancel" onclick="closeConfirm()">Cancel</button>
     <button class="cbtn del" id="confirmYesBtn" onclick="confirmYes()">Remove</button>
@@ -9617,6 +9621,63 @@ function clearKeySelf(){try{localStorage.removeItem(KEY_SELF);}catch(e){}}
 // title, status, episode and rating, and blanks notes and favourites. This
 // keeps them, because it merges the entries rather than re-adding them.
 //
+// READING A LIST THAT HAS A PASSWORD ON IT.
+//
+// Both paths below used to refuse with advice that cannot be taken: "unlock it
+// on its own device and back it up again first". A protected list is ALWAYS
+// stored as ciphertext — backing it up again produces another envelope — so
+// that sentence asked for something the app can never produce. The effect was
+// that two devices could not be put together at all if either had a password,
+// and the message blamed the user for not doing an impossible thing.
+//
+// The envelope carries the master key wrapped by the password AND by the
+// recovery key; restoring onto a new device already unwraps it exactly this way
+// (see the restore-by-code path). So ask here too, decrypt, and merge on the
+// plaintext — nothing merges ciphertext.
+function askListPassword(env,opts,onList){
+  opts=opts||{};
+  (async()=>{
+    // Already holding the right key — the usual case for a device that has been
+    // on this list before. Nothing to ask.
+    if(cryptoKey){
+      try{ onList(migrate(JSON.parse(await decList(env,cryptoKey))),{pw:env.pw,rec:env.rec,pfk:env.pfk},cryptoKey); return; }catch(e){}
+    }
+    askConfirm({
+      title:'That list has a password',
+      msg:(opts.msg||'')+' Enter its password \u2014 or its recovery key \u2014 to read it.',
+      yes:opts.yes||'Unlock and merge',
+      input:{password:true,placeholder:'password or recovery key'},
+      onYes:async(secret)=>{
+        secret=String(secret||'').trim();
+        if(!secret){toast('Nothing entered \u2014 nothing changed');return;}
+        toast('Unlocking\u2026');
+        // One field, because from here the password and the recovery key are the
+        // same thing: whichever of the two unwraps the master key.
+        for(const pair of [[env.pw,x=>x],[env.rec,normRecovery]]){
+          const wrap=pair[0],norm=pair[1];
+          if(!wrap)continue;
+          try{
+            const k=await unwrapMaster(wrap,norm(secret));
+            onList(migrate(JSON.parse(await decList(env,k))),{pw:env.pw,rec:env.rec,pfk:env.pfk},k);
+            return;
+          }catch(e){}
+        }
+        toast('That password didn\u2019t work \u2014 nothing changed');
+      },
+    });
+  })();
+}
+// Taking on the protection that came with the list. This has to happen BEFORE
+// writeLocal(), or the merged list is written to this device in plain text under
+// a key whose owner set a password — a downgrade nobody asked for and nothing
+// would report.
+function adoptProtection(wraps,key){
+  if(!wraps||!key)return;
+  cryptoKey=key;envWraps=wraps;appLocked=false;
+  try{localStorage.setItem(ENCFLAG,'1');}catch(e){}
+  try{rememberSessionKey();}catch(e){}
+  try{renderLockUI();}catch(e){}
+}
 // It cannot merge by id. mergeLists() matches on a.id, and two devices that
 // minted their own codes generated their own uid() for the same show — every
 // shared title would arrive as a stranger and double. dedupeList matches the
@@ -9641,8 +9702,23 @@ async function mergeFromCode(){
   }catch(e){res=null;}
   if(!res){toast('Could not reach the cloud just now');return;}
   const {inner}=unwrapSync(res.data);
-  if(inner&&isEnvelope(inner)){toast('That list has a password on it \u2014 unlock it on its own device and back it up again first');return;}
+  if(inner&&isEnvelope(inner)){
+    // This path keeps THIS device's key and this device's protection, so say
+    // what that means before the password is typed: the titles arrive here and
+    // are stored the way this device stores things. Pairing is the other path,
+    // and it does adopt the password.
+    askListPassword(inner,{
+      msg:cryptoKey
+        ? 'Its titles will be merged into this list and stay protected here.'
+        : 'Its titles will be merged into this list, which has no password on it \u2014 so on this device they will not be protected by one.',
+      yes:'Unlock and merge',
+    },list=>mergeFinish(list));
+    return;
+  }
   if(!Array.isArray(inner)||!inner.length){toast('Nothing is stored under that code');return;}
+  mergeFinish(inner);
+}
+function mergeFinish(inner){
   // A restore point before anything is touched, in the same slot a push uses,
   // so the recovery is the one that already exists rather than a new one.
   try{localStorage.setItem('wl_prepush_backup',JSON.stringify(anime));}catch(e){}
@@ -9762,7 +9838,13 @@ async function pairJoin(){
   if(!remote){toast('Could not read that list. Nothing changed');return;}
   const {inner}=unwrapSync(remote.data);
   if(inner&&isEnvelope(inner)){
-    toast('That list has a password on it — unlock it on its own device and back it up again first');
+    // The two devices are becoming one list, so this device takes on the
+    // password with it. Adopting the key without the wraps would leave it
+    // pushing plain text to a key whose owner set a password.
+    askListPassword(inner,{
+      msg:'The two devices are about to share one list, so this device will be protected by the same password.',
+      yes:'Unlock and join',
+    },(list,wraps,key)=>pairFinish(code,list,wraps,key));
     return;
   }
   // Anything else that is not a list is not a list. Without this the join falls
@@ -9771,6 +9853,12 @@ async function pairJoin(){
   // given up its own. An EMPTY key is fine and different: both devices end up on
   // it and this one publishes what it has.
   if(inner&&!Array.isArray(inner)){toast('Could not read that list. Nothing changed');return;}
+  pairFinish(code,Array.isArray(inner)?inner:[],null,null);
+}
+// The half that changes this device: merge, take on any protection that came
+// with the list, and only then adopt the key. The ordering is the whole point
+// — everything before setSyncCode() can fail without costing anyone their key.
+function pairFinish(code,inner,wraps,key){
   // A restore point first, every time, in the slot the push path already uses.
   try{localStorage.setItem('wl_prepush_backup',JSON.stringify(anime));}catch(e){}
   const before=anime.length;
@@ -9781,6 +9869,9 @@ async function pairJoin(){
     anime=r2.kept;
   }
   const added=anime.length-before;
+  // Before writeLocal(), so what lands on disk is already encrypted if the list
+  // we just joined is protected.
+  adoptProtection(wraps,key);
   // Only now does this device change where it backs up. Everything above could
   // fail without costing anyone their key.
   setSyncCode(code); setSyncAt(0); setBackupDeclined(false);
@@ -15655,15 +15746,28 @@ function askConfirm(opts){
   document.getElementById('confirmMsg').textContent=opts.msg||'';
   const yb=document.getElementById('confirmYesBtn');
   if(yb){yb.textContent=opts.yes||'Confirm';yb.className='cbtn '+(opts.danger?'del':'go');}
+  const ib=document.getElementById('confirmIn');
+  if(ib){
+    if(opts.input){
+      ib.style.display='';ib.type=opts.input.password?'password':'text';
+      ib.placeholder=opts.input.placeholder||'';ib.value='';
+      ib.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();confirmYes();}};
+      setTimeout(()=>{try{ib.focus();}catch(e){}},80);
+    }else{ib.style.display='none';ib.onkeydown=null;ib.value='';}
+  }
   deleteId=null;
   _confirmCb=typeof opts.onYes==='function'?opts.onYes:null;
   box.classList.add('on');
 }
 function confirmYes(){
   const cb=_confirmCb;_confirmCb=null;
+  // Read it BEFORE the box is hidden and cleared, or every password arrives empty.
+  const ib=document.getElementById('confirmIn');
+  const val=(ib&&ib.style.display!=='none')?ib.value:undefined;
   const box=document.getElementById('confirmBox');if(box)box.classList.remove('on');
+  if(ib){ib.value='';ib.style.display='none';ib.onkeydown=null;}
   if(deleteId){doDelete();return;}   // legacy delete path
-  if(cb)cb();
+  if(cb)cb(val);
 }
 function confirmDelete(id){
   const a=anime.find(x=>x.id===id);if(!a)return;
@@ -26246,17 +26350,17 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-11-02.65',
-  title:'The backup panel tells the truth now',
-  push:'Cloud could say your list was backed up when nothing had ever reached the cloud. It now says which it is \u2014 and gives you a button that sends it.',
+  v:'2026-11-02.66',
+  title:'A password no longer stops two devices pairing',
+  push:'If either device had a password on its list, pairing refused outright. It asks for the password now \u2014 and the panel stopped claiming backups that never happened.',
   notes:[
+    'If your list has a <b>password</b> on it, your devices can now be put together. <b>Add a device</b> used to refuse outright and tell you to \u201cunlock it on its own device and back it up again first\u201d \u2014 which could never work, because a list with a password is <i>always</i> stored locked. It asks you for the password now, or its recovery key, reads the list, and merges. Joining this way also puts the same password on the device you are joining from, so nothing ends up less protected than it was.',
     'The <b>Cloud</b> panel could tell you your list was backed up when nothing of it had ever reached the cloud. The size it showed was real, but it was measuring <b>this device</b> \u2014 how big the backup <i>would</i> be \u2014 and calling it \u201cbacked up\u201d. It now says plainly whether anything has landed, when it last did, and how many backups have failed in a row if any have.',
     'When nothing has reached the cloud, there is a <b>Back up now</b> button. You needed one: a backup is sent when your <b>list changes</b>, not when time passes, so a device whose first one failed was waiting for an edit rather than a moment \u2014 and after three failures it waits up to an hour before trying again. Neither was visible. The button clears both and sends immediately.',
     '<b>Add a device</b> used to refuse with \u201cgive it a moment and try again\u201d, which could not work for the same reason. It now tells you nothing is stored under this key yet and points at the button that fixes it.',
     'Your devices can finally be put on one list without you copying a twenty-character key between them. On the device that already has your list, open <b>Cloud</b> and press <b>Add a device</b>: it gives you eight characters, good for ten minutes and one device. Type those into the other device and the two lists are <b>folded together</b> \u2014 nothing is replaced, nothing is dropped, and whatever that device already had is kept.',
     'Why this was needed: a device that already had titles when you first set backup up quietly made a key of its own. It was backing up perfectly well \u2014 somewhere nothing else could see. Nothing was broken, so nothing ever said so, and the device picker had nothing to show because from either side there really was no other device.',
     'You can now delete a backup, not just stop using it. Turning backup off always left the stored copy sitting in the cloud under a code your device had thrown away \u2014 reachable by nothing, removable by no one. <b>Cloud \u2192 Erase the stored copy</b> deletes it for good; the titles stay on your device. Use it on a code you are finished with.',
-    'The bar at the bottom is even again. It had six slots with the add key in the third, so there were two things on its left and three on its right and the middle of the bar fell in the gap beside it. Five now, two either side, add key in the middle \u2014 and that key is drawn with the same pen as the rest of the icons instead of being a typed character.',
   ],
 };
 // The rows animate in once, on the first paint of a session. render() runs on

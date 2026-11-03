@@ -445,6 +445,52 @@ Covered by `scripts/backup-truth-test.mjs` (23), which asserts the panel never
 prints "Backed up:" while `syncAt()` is 0, that an ordinary push really is
 suppressed by the backoff, and that the button's push carries no `adopt` stamp.
 
+### Joining a list that has a password on it
+
+A protected list is stored as a **master-key envelope**: the list is encrypted
+with a random master key, and that master key is wrapped twice — once by the
+password, once by the recovery key (`wrapMaster`/`unwrapMaster`). Either one
+opens it. The envelope is what goes to the cloud, every time: `syncPush()` sends
+`buildEnvelope()` whenever `cryptoKey && envWraps`.
+
+Both join paths used to refuse an envelope outright, with
+*"unlock it on its own device and back it up again first"*. That cannot be done.
+Backing it up again produces another envelope — a protected list has no
+plaintext form in the cloud — so the sentence asked for something the app can
+never produce, and **two devices could not be paired at all if either had a
+password**. The message read as the user's fault.
+
+`askListPassword(env, opts, onList)` is the fix, and it is the same unwrap the
+restore-by-code path already does. One field takes either secret, because from
+here the password and the recovery key are the same thing: whichever unwraps the
+master key. A device that already holds the right `cryptoKey` is never asked.
+Nothing merges ciphertext — the plaintext comes back first, and the merge runs on
+that.
+
+The two callers differ on purpose, because the actions mean different things:
+
+| | adopts the key | adopts the password |
+|---|---|---|
+| `pairJoin` — *Add a device* | yes | **yes** (`adoptProtection`) |
+| `mergeFromCode` — *Merge it in* | no | no |
+
+Pairing makes the two devices one list, so the joining device takes the wraps
+with the key. Adopting the key *without* them would leave it pushing plain text
+to a key whose owner set a password — a downgrade nothing would report.
+`adoptProtection()` therefore runs **before** `writeLocal()`, or the merged list
+lands on disk unencrypted first.
+
+`mergeFromCode` keeps its own key, so it keeps its own protection, and its
+confirmation says which it is: if this device has no password, the arriving
+titles will not be protected here.
+
+Covered by `scripts/pair-join-test.mjs` (41), which builds the envelope with the
+app's own `encList`/`wrapMaster` — a fixture hand-rolled from constants would
+keep passing after the wrapping changed — and asserts that a wrong password
+changes nothing, that the right one merges rather than replaces, that what is
+then written to disk and pushed is ciphertext, and that the recovery key opens
+the same envelope.
+
 ### The write budget
 
 KV bills per write **operation**, not per byte: a 50-byte change and a 2 MB list

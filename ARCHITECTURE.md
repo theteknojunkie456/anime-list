@@ -441,9 +441,19 @@ which are exactly the two invisible things that can hold a push, then calls
 their work and is why it asks first. `backupNow()` writes the key's own blob and
 nothing else, so there is nothing to confirm.
 
-Covered by `scripts/backup-truth-test.mjs` (23), which asserts the panel never
-prints "Backed up:" while `syncAt()` is 0, that an ordinary push really is
-suppressed by the backoff, and that the button's push carries no `adopt` stamp.
+**Locked is its own state, and it outranks every number.** While the list is
+locked, `anime` is an empty placeholder standing in for the ciphertext. The
+panel measured the placeholder, so a phone that had just joined a protected list
+read *"nothing has reached the cloud yet · 166 KB ready to send"* and the
+diagnosis said *"Titles here 0"* — which is exactly what losing a library looks
+like. Nothing was lost and nothing was ever at risk: `_syncPushInner()` returns
+immediately while `appLocked`, and below that are guards against pushing a list
+that has collapsed or emptied. Only the person reading the panel was misled. The
+panel and the diagnosis now say *locked* before they say any count, and the
+button offered is **Unlock your list**, not Back up now.
+
+Covered by `scripts/backup-truth-test.mjs` (23) and
+`scripts/typing-and-undo-test.mjs` (28).
 
 ### Joining a list that has a password on it
 
@@ -810,11 +820,42 @@ lot together.
 
 ## 12. Conventions & hard rules
 
+**Voice — the app informs the user; it does not explain itself**
+
+The copy had drifted into sounding like the person who wrote it talking to the
+person using it: *"Nothing is stored in the cloud under this key yet, so there is
+nothing for another device to join"*, *"The cloud copy could not be read on this
+device, so the two sides cannot be compared here"*. Every one of those sentences
+is true, and every one of them is a mechanism being explained to somebody who
+only needed to know what happened and what to do.
+
+- Say **what happened** and **what to do**. One fact per sentence.
+- The *why* belongs in a code comment or in this file. Not in the UI.
+- Avoid "so that", "which means", and em-dash asides that carry a second clause.
+- Don't name internals — key, blob, envelope, device id, push — unless the
+  person has to act on that word.
+- Applies to toasts, panel text, diagnostics, release notes and empty states.
+
 **Style**
 - **Feather icons and brand fonts only.** Custom controls, not platform defaults.
 - **No emoji in the UI** — clean typography / Feather icons on brand colors.
 - **Surgical edits, not rewrites.** One action per job; no duplicate paths.
 - Match the surrounding code's density and idiom; comments explain *why*.
+
+**Keyboard (devices that have one)**
+- `⌘Z` / `Ctrl+Z` undoes the last removal, episode change or status change.
+  `pushUndo(label, fn)` stores **the fields to put back**, never a snapshot of
+  the list — a library here is several megabytes, so a stack of snapshots would
+  cost tens of megabytes to buy an undo of the last action. Gated on
+  `hasKeyboard()`; inside a field the browser's own undo wins.
+- Removal's undo takes the **tombstone** off as well. Without that the title
+  comes back and the next sync deletes it again.
+
+**Typed codes**
+- `formatCodeInput(el, max, group)` upper-cases, strips punctuation and groups
+  in fours **as you type** — 8 for a pairing code, 20 for a key. Submit already
+  did this; the field now shows it. It restores the caret by counting the
+  characters that matter before it, so editing the middle of a code works.
 
 **Workflow**
 - After editing `index.html`, **regenerate `friends.html`** (§3).

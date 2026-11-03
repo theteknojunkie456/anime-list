@@ -9036,7 +9036,7 @@ async function loadDeviceList(btn){
         // however long they wait. The honest version names the cause and the
         // one move that fixes it.
         ? 'Nothing else has backed up under this code \u2014 and it never will on its own, because this device made this code up rather than being given one. Your other devices will each have made their own. Pick whichever has the fullest list, copy ITS code, and paste that into every other device under \u201cBring another list here\u201d. They all join one backup from then on.'
-        : 'No other device has backed up under this code yet, so there is nothing to choose between. Open WatchList once on the other device and it will appear here within a minute \u2014 it has to publish a copy before this one can offer it to you.');
+        : 'No other device has backed up here yet. Open WatchList on your other device and it will show up within a minute.');
     box.innerHTML='<div class="dev-list">'+rows.map(d=>_devRow(d,me)).join('')+'</div>'
       +'<p class="ai-desc" style="font-size:12px;margin-top:8px">'+note+'</p>';
   }catch(e){box.innerHTML='<p class="ai-desc">Could not reach the cloud just now.</p>';}
@@ -9175,13 +9175,19 @@ async function showSyncDiagnosis(btn){
   const d=await syncDiagnose();
   // The comparison that matters is stated outright rather than left to be worked
   // out from six numbers: whose copy is newer, and by how much.
+  // LOCKED FIRST. A locked device reports zero titles because `anime` is an
+  // empty placeholder standing in for the ciphertext, and "Titles here 0" is
+  // what losing a library looks like. Say what is actually true before any
+  // number gets a chance to frighten anybody.
+  const locked=(typeof appLocked!=='undefined'&&appLocked);
   let verdict;
-  if(d.cloudCount==='unreachable')verdict='The cloud could not be reached, so this device is on its own copy.';
-  else if(d.cloudCount===0)verdict='The cloud holds nothing. This device has not managed a successful push.';
-  else if(d.cloudUnknown)verdict='The cloud copy could not be read on this device, so the two sides cannot be compared here. Unlock the list and run this again.';
-  else if(d.localNewest>d.cloudNewest)verdict='THIS device holds the newer edits \u2014 the cloud is behind it.';
-  else if(d.cloudNewest>d.localNewest)verdict='THE CLOUD holds newer edits than this device.';
-  else verdict='Both sides carry the same newest edit.';
+  if(locked)verdict='Your list is locked on this device. Unlock it to compare \u2014 your titles are safe.';
+  else if(d.cloudCount==='unreachable')verdict='Could not reach the cloud. This device is on its own copy.';
+  else if(d.cloudCount===0)verdict='Nothing is saved in the cloud yet.';
+  else if(d.cloudUnknown)verdict='This device cannot read the cloud copy, so the two cannot be compared.';
+  else if(d.localNewest>d.cloudNewest)verdict='This device has the newer changes.';
+  else if(d.cloudNewest>d.localNewest)verdict='The cloud has newer changes than this device.';
+  else verdict='Both sides match.';
   // A panel whose whole job is to say whether something is wrong painted every
   // answer in the accent — so "both sides agree", which means there is nothing
   // to do, arrived in the same alarm colour as "the cloud could not be reached".
@@ -9190,7 +9196,8 @@ async function showSyncDiagnosis(btn){
   // "the cloud could not be reached" painted the most serious line on the panel
   // the quietest colour on it. The palette has no danger token, so the literal
   // the rest of the app already falls back to is used directly.
-  const tone = d.cloudCount==='unreachable'||d.cloudCount===0 ? '#ff6b6b'
+  const tone = locked                                        ? 'var(--wat)'
+             : d.cloudCount==='unreachable'||d.cloudCount===0 ? '#ff6b6b'
              : d.cloudUnknown                                 ? 'var(--wat)'
              : d.localNewest!==d.cloudNewest                  ? 'var(--wat)'
              : 'var(--fin)';
@@ -9198,17 +9205,19 @@ async function showSyncDiagnosis(btn){
   const row=(k,v)=>'<div style="display:flex;justify-content:space-between;gap:12px;padding:3px 0"><span class="ai-desc" style="margin:0">'+k+'</span><b style="font-family:var(--fd);font-size:12px">'+v+'</b></div>';
   if(box)box.innerHTML='<p class="ai-desc" style="margin-bottom:6px"><b style="color:'+tone+'">'+escH(verdict)+'</b>'
     +(calm?'<br><span style="font-size:12px">Nothing to fix here.</span>':'')+'</p>'
-    +row('Build running here',escH(String(d.running||'?')))
-    +row('Release notes version',d.build)
+    +row('App version here',escH(String(d.running||'?')))
+    +row("What's new version",d.build)
     +row('Device id',d.device)
-    +row('Titles here',d.localCount)
+    // "0" and "never" are both wrong while locked: the titles exist, this
+    // device just cannot read them yet.
+    +row('Titles on this device',locked?'locked':d.localCount)
     +row('Titles in the cloud',d.cloudCount)
-    +row('Newest edit here',fmtWhen(d.localNewest))
-    +row('Newest edit in cloud',d.cloudUnknown?'not readable here':fmtWhen(d.cloudNewest))
-    +row('Cloud last written',fmtWhen(d.cloudUpdatedAt))
+    +row('Last change here',locked?'locked':fmtWhen(d.localNewest))
+    +row('Last change in the cloud',d.cloudUnknown?'cannot read':fmtWhen(d.cloudNewest))
+    +row('Cloud last saved',fmtWhen(d.cloudUpdatedAt))
     +row('This device last synced',fmtWhen(d.lastSyncAt))
-    +row('Deletions recorded here',d.tombs)
-    +row('Pushes failing',d.pushFails);
+    +row('Deleted titles remembered',d.tombs)
+    +row('Failed saves',d.pushFails);
 }
 let _adoptStamp=0;   // set only by forcePushList, consumed by the next push
 // A device honours any given adopt stamp once. Without this the same cloud copy
@@ -9772,7 +9781,7 @@ async function pairOffer(btn){
         // one failed waits for an edit rather than a moment — and after three
         // failures the backoff can hold the next attempt for an hour. Name the
         // button that actually does it.
-        ? 'Nothing has reached the cloud under this device\u2019s key yet, so there is nothing for the other device to join. Press <b>Back up now</b> above, then try this again.'
+        ? 'Nothing is saved in the cloud yet, so there is nothing for your other device to join. Tap <b>Back up now</b> above, then try again.'
         : 'Could not reach the cloud just now.')+'</p>';
     return;
   }
@@ -10033,6 +10042,34 @@ function copySetupKey(){
   if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(k).then(done).catch(()=>{try{prompt('Copy this:',k);}catch(e){}});
   else{try{prompt('Copy this:',k);}catch(e){}}
 }
+// A CODE KEEPS ITS SHAPE WHILE YOU TYPE IT.
+//
+// These fields took anything and tidied up only on submit. You typed twenty
+// characters with no way to see which one you were on, and a code pasted in
+// lower case or with its spacing still in looked wrong right up until it was
+// accepted — so the field disagreed with the one printed two inches above it.
+// Nothing about what the field ACCEPTS changes here: submit already stripped
+// and upper-cased. This only lets you see it happen.
+//
+// The caret is the whole difficulty. Rewriting .value puts it at the end, which
+// makes fixing the third character impossible. So count the characters that
+// MATTER before the caret, reformat, and put the caret back after that many of
+// them — typing in the middle, backspacing and pasting all land where you
+// expect.
+function formatCodeInput(el,max,group){
+  if(!el)return;
+  const raw=String(el.value||'');
+  const kept=t=>t.replace(/[^A-Za-z0-9]/g,'');
+  const sel=(el.selectionStart==null)?raw.length:el.selectionStart;
+  const before=kept(raw.slice(0,sel)).length;
+  const clean=kept(raw).toUpperCase().slice(0,max);
+  const out=group?clean.replace(new RegExp('(.{'+group+'})(?=.)','g'),'$1 '):clean;
+  if(out===raw)return;
+  el.value=out;
+  let i=0,n=0;
+  while(i<out.length&&n<before){ if(/[A-Z0-9]/.test(out[i]))n++; i++; }
+  try{el.setSelectionRange(i,i);}catch(e){}
+}
 function copySyncCode(){const c=syncCode();if(!c)return;markCodeSeen();const done=()=>toast('Code copied');if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(c).then(done).catch(()=>fallbackCopy(c,done));else fallbackCopy(c,done);}
 function renderSyncUI(){
   const box=document.getElementById('syncBox');if(!box)return;
@@ -10049,20 +10086,35 @@ function renderSyncUI(){
   // Settings has always read `syncAt()` and the failure counter for this
   // (backupStatusLine). This panel now reads the same two, says "ready to send"
   // until something actually lands, and leaves the bar empty while it hasn't.
-  const _st=pushState(), _at=syncAt(), _landed=!!_at, _fill=_landed?Math.max(0,Math.min(1,used/SYNC_CAP)):0;
-  const _head=!_landed ? 'Cloud backup · on, but nothing has reached the cloud yet'
-            : _st.n>=3 ? `Cloud backup · the last ${_st.n} backups failed`
-            : 'Cloud backup · ON';
-  const _foot=!_landed
-      ? `<b style="color:var(--t1)">${fmtBytes(used)}</b> is ready to send — list, themes, friends &amp; settings. Nothing is stored in the cloud under this key yet, so there is nothing for another device to join.`
+  const _st=pushState(), _at=syncAt(), _landed=!!_at;
+  // LOCKED IS ITS OWN STATE, and it has to be said before any number is.
+  // While the list is locked `anime` is an empty placeholder standing in for
+  // the ciphertext, so the panel measured the placeholder: a phone that had
+  // just joined read "nothing has reached the cloud yet · 166 KB ready to
+  // send" and the diagnosis said "Titles here 0" — which is what losing a
+  // library looks like. Nothing was lost; it was locked. (syncPush() already
+  // refuses to push while locked, so the backup was never at risk — only the
+  // person reading this panel was.)
+  const _locked=(typeof appLocked!=='undefined'&&appLocked);
+  const _fill=(_landed&&!_locked)?Math.max(0,Math.min(1,used/SYNC_CAP)):0;
+  const _head=_locked  ? 'Cloud backup · your list is locked'
+            : !_landed ? 'Cloud backup · nothing saved yet'
+            : _st.n>=3 ? `Cloud backup · the last ${_st.n} saves failed`
+            : 'Cloud backup · on';
+  const _foot=_locked
+      ? 'Unlock your list to back it up. Your titles are safe — this device just cannot read them yet.'
+      : !_landed
+      ? `<b style="color:var(--t1)">${fmtBytes(used)}</b> ready to save. Nothing is in the cloud yet.`
       : _st.n>=3
-      ? `<b style="color:var(--t1)">${fmtBytes(used)}</b> on this device. The cloud copy is from ${relTime(_at)}.${_st.why?' Last error: '+escH(_st.why)+'.':''}`
-      : `Backed up: <b style="color:var(--t1)">${fmtBytes(used)}</b> of ${fmtBytes(SYNC_CAP)} · ${pct}% — list, themes, friends &amp; settings. Last reached the cloud ${relTime(_at)}.`;
-  // Shown only when the automatic push has not managed it, because that is the
+      ? `Your cloud copy is from ${relTime(_at)}.${_st.why?' Last error: '+escH(_st.why)+'.':''}`
+      : `<b style="color:var(--t1)">${fmtBytes(used)}</b> of ${fmtBytes(SYNC_CAP)} saved · ${pct}%. Last saved ${relTime(_at)}.`;
+  // Shown only when the automatic save has not managed it, because that is the
   // only time pressing it does anything the app would not already have done.
-  const _needsPush=!_landed||_st.n>=3;
+  // Never while locked: it would refuse, and offering it says the opposite.
+  const _needsPush=!_locked&&(!_landed||_st.n>=3);
   const meter=`<div style="height:7px;border-radius:99px;background:var(--bg4);overflow:hidden;margin:9px 0 2px"><div style="height:100%;width:100%;transform:scaleX(${_fill.toFixed(3)});transform-origin:left;background:var(--a);border-radius:99px;transition:transform .3s"></div></div><p class="ai-desc" style="margin:4px 0 0">${_foot}</p>`+
-    (_needsPush?`<button class="parse-btn" id="backupNowBtn" style="margin:10px 0 0;width:100%" onclick="backupNow(this)">${icon('upload')} Back up now</button>`:'');
+    (_needsPush?`<button class="parse-btn" id="backupNowBtn" style="margin:10px 0 0;width:100%" onclick="backupNow(this)">${icon('upload')} Back up now</button>`:'')
+    +(_locked?`<button class="parse-btn" style="margin:10px 0 0;width:100%" onclick="showLock()">${icon('lock')} Unlock your list</button>`:'');
   if(code){
     const pretty=code.replace(/(.{4})/g,'$1 ').trim();
     // This panel used to explain how to *use* the code but never said to keep it.
@@ -10080,12 +10132,12 @@ function renderSyncUI(){
            top, inside its own panel, and is the only accented thing. -->
       <div class="sync-primary">
         <div class="sync-primary-h">${icon('refresh')} Your other devices</div>
-        <p class="ai-desc" style="margin:6px 0 0">Two devices only share a list if they are on the <b>same key</b>. A device that had titles before you set backup up made a key of its own — it is backing up, correctly, somewhere nothing else can see.</p>
+        <p class="ai-desc" style="margin:6px 0 0">Your devices share a list only when they use the <b>same key</b>. A device that already had titles when you turned backup on made its own key, so it backs up on its own.</p>
         <button class="parse-btn" id="pairAddBtn" style="margin:11px 0 0;width:100%" onclick="pairOffer(this)">${icon('upload')} Add a device</button>
         <div id="pairBox"></div>
-        <p class="ai-desc" style="font-size:12px;margin:9px 0 0">It gives you eight characters. Type them into the other device below — that device keeps everything it already had.</p>
+        <p class="ai-desc" style="font-size:12px;margin:9px 0 0">You get eight characters. Type them into your other device. Nothing on that device is replaced.</p>
         <div class="sync-join">
-          <textarea class="ai-prompt-in urlin" rows="1" id="pairCodeIn" placeholder="eight-character code" autocomplete="off" autocapitalize="characters" spellcheck="false" onkeydown="if(event.key==='Enter'){event.preventDefault();pairJoin();}"></textarea>
+          <textarea class="ai-prompt-in urlin" rows="1" id="pairCodeIn" placeholder="eight-character code" autocomplete="off" autocapitalize="characters" spellcheck="false" oninput="formatCodeInput(this,8,4)" onkeydown="if(event.key==='Enter'){event.preventDefault();pairJoin();}"></textarea>
           <button class="ai-run-btn" onclick="pairJoin()">Add this device</button>
         </div>
         <button class="sync-quiet" onclick="loadDeviceList(document.getElementById('devPickBox'))">Who is on this key?</button>
@@ -10098,7 +10150,7 @@ function renderSyncUI(){
         <code class="synccode">${pretty}</code>
         <button class="imp-all" onclick="copySyncCode()">${icon('clipboard')} Copy</button>
       </div>
-      <p class="ai-desc" style="font-size:12px;margin-top:7px">Save it somewhere real — it is the only way back to your list, and nobody can recover it for you. Anyone holding it can read your list and settings. Not the same as the six-block <b>recovery key</b> from Password.</p>
+      <p class="ai-desc" style="font-size:12px;margin-top:7px">Save this somewhere safe. It is the only way back to your list and it cannot be recovered for you. Anyone with it can read your list and settings. This is not your <b>recovery key</b>.</p>
       ${adminToken()?`<button class="sync-quiet" onclick="copySetupKey()">Copy setup key — both keys in one line, for your own devices. <b style="color:#ff6b6b">Never share it</b></button>`:''}
 
       <!-- Everything below is a rescue, not a routine. One place, not four. -->
@@ -10106,28 +10158,28 @@ function renderSyncUI(){
         <summary>${icon('refresh')} If something is out of step<span class="dt-fold-x">Open</span></summary>
 
         <div class="dt-label" style="margin-top:12px">Which device's list is right?</div>
-        <p class="ai-desc" style="font-size:12px;margin-top:4px">Devices normally merge, newest edit per title winning. If one has drifted, pick the one that is correct and every device takes that list — once. You can do this from any device, not just the one you are picking. Anything held only somewhere else is lost; a restore point stays on this device.</p>
+        <p class="ai-desc" style="font-size:12px;margin-top:4px">Your devices normally merge on their own. If one has drifted, pick the list that is right and the others take it. Anything kept only somewhere else is lost. A restore point stays on this device.</p>
         <div id="devPickBox"><button class="imp-all" style="width:100%;margin-top:8px" onclick="loadDeviceList(this)">Show my devices</button></div>
 
         <div class="dt-label" style="margin-top:16px">Why is this device different?</div>
-        <p class="ai-desc" style="font-size:12px;margin-top:4px">Reads this device and the cloud and shows every number a merge depends on. Changes nothing. Run it on both devices and compare.</p>
+        <p class="ai-desc" style="font-size:12px;margin-top:4px">Compares this device with the cloud. Changes nothing.</p>
         <button class="imp-all" style="width:100%;margin-top:8px" onclick="showSyncDiagnosis(this)">Check both sides</button>
         <div id="syncDiagBox" style="margin-top:10px"></div>
 
         <div class="dt-label" style="margin-top:16px">Bring another list here</div>
-        <p class="ai-desc" style="font-size:12px;margin-top:4px">Restoring replaces what's on this device with the list saved under that code.${
+        <p class="ai-desc" style="font-size:12px;margin-top:4px">This replaces what is on this device with the list saved under that code.${
           (typeof keySelfMade==='function'&&keySelfMade()&&realList().length)
           ?' <b>This device has '+realList().length+' of its own.</b> If those are worth keeping, use <b>Merge it in</b> — that keeps both.'
           :''}</p>
         <div class="sync-join" style="margin-top:8px">
-          <textarea class="ai-prompt-in urlin" rows="1" id="syncCodeIn" placeholder="paste a 20-character code" autocomplete="off" autocapitalize="characters" spellcheck="false" onkeydown="if(event.key==='Enter'){event.preventDefault();syncRestore();}"></textarea>
+          <textarea class="ai-prompt-in urlin" rows="1" id="syncCodeIn" placeholder="paste a 20-character code" autocomplete="off" autocapitalize="characters" spellcheck="false" oninput="formatCodeInput(this,20,4)" onkeydown="if(event.key==='Enter'){event.preventDefault();syncRestore();}"></textarea>
           <button class="ai-run-btn" onclick="syncRestore()">Use code</button>
         </div>
         <button class="imp-all" style="margin-top:8px;width:100%" onclick="mergeFromCode()">${icon('layers')} Merge it in instead</button>
-        <p class="ai-desc" style="font-size:12px;margin-top:6px"><b>Use code</b> replaces this list and backs up there from now on. <b>Merge it in</b> keeps both and this device keeps its own key.</p>
+        <p class="ai-desc" style="font-size:12px;margin-top:6px"><b>Use code</b> replaces this list. <b>Merge it in</b> keeps both.</p>
 
         <div class="dt-label" style="margin-top:16px">Stop, or erase</div>
-        <p class="ai-desc" style="font-size:12px;margin-top:4px"><b>Turn off</b> stops this device backing up and leaves the stored copy where it is — paste the key back in later and it returns. <b>Erase</b> deletes what is stored in the cloud under this key — list, settings and friends — for good. Your titles stay on this device either way.</p>
+        <p class="ai-desc" style="font-size:12px;margin-top:4px"><b>Turn off</b> stops this device backing up and leaves your cloud copy alone. <b>Erase</b> deletes that copy for good. Your titles stay on this device either way.</p>
         <div class="sync-2up" style="margin-top:8px">
           <button class="imp-all" onclick="syncOff()">Turn off</button>
           <button class="imp-all" onclick="syncForget()">Erase the stored copy</button>
@@ -10138,12 +10190,12 @@ function renderSyncUI(){
       <p class="ai-desc">Back up your list to the cloud so it survives losing your phone and syncs across your devices. Private — only someone with your secret code can open it.</p>
       <button class="parse-btn" style="margin-top:0" onclick="syncEnableNew()">Turn on cloud backup</button>
       <div style="display:flex;gap:8px;margin-top:8px;">
-        <textarea class="ai-prompt-in urlin" rows="2" id="syncCodeIn" placeholder="…or paste a code to restore" autocomplete="off" autocapitalize="characters" spellcheck="false" onkeydown="if(event.key==='Enter'){event.preventDefault();syncRestore();}"></textarea>
+        <textarea class="ai-prompt-in urlin" rows="2" id="syncCodeIn" placeholder="…or paste a code to restore" autocomplete="off" autocapitalize="characters" spellcheck="false" oninput="formatCodeInput(this,20,4)" onkeydown="if(event.key==='Enter'){event.preventDefault();syncRestore();}"></textarea>
         <button class="ai-run-btn" onclick="syncRestore()">Use code</button>
       </div>
       <p class="ai-desc" style="font-size:12px;margin-top:10px">Already using WatchList on another device? Open <b>Cloud</b> there, press <b>Add a device</b>, and type the eight characters it gives you — this device joins that backup and keeps anything it already has.</p>
       <div style="display:flex;gap:8px;margin-top:6px;">
-        <textarea class="ai-prompt-in urlin" rows="1" id="pairCodeIn" placeholder="eight-character code" autocomplete="off" autocapitalize="characters" spellcheck="false" onkeydown="if(event.key==='Enter'){event.preventDefault();pairJoin();}"></textarea>
+        <textarea class="ai-prompt-in urlin" rows="1" id="pairCodeIn" placeholder="eight-character code" autocomplete="off" autocapitalize="characters" spellcheck="false" oninput="formatCodeInput(this,8,4)" onkeydown="if(event.key==='Enter'){event.preventDefault();pairJoin();}"></textarea>
         <button class="ai-run-btn" onclick="pairJoin()">Add this device</button>
       </div>
       <div id="pairBox"></div>`;
@@ -15247,6 +15299,15 @@ function markFranchiseSeen(){
 function setDetailStatus(s){
   const a=anime.find(x=>x.id===detailId);if(!a)return;
   const was=a.status;
+  {
+    const id=a.id, wasEp=a.ep, wasFin=a.finAt;
+    if(was!==s)pushUndo('status change',()=>{
+      const x=anime.find(y=>y.id===id);if(!x)return;
+      x.status=was;x.ep=wasEp;
+      if(wasFin===undefined)delete x.finAt;else x.finAt=wasFin;
+      touch(x);
+    });
+  }
   a.status=s;
   // The occasion, and only when it IS one: finishing something you had not
   // finished. Pressing Done on something already done is not an achievement, and
@@ -15384,7 +15445,15 @@ function bumpEp(d){
   // The most-repeated gesture in the app, so it is the one worth feeling.
   try{tap('tick');const el=document.querySelector('.dt-count-n,.dt-epnum');if(el){el.classList.remove('ep-bumped');void el.offsetWidth;el.classList.add('ep-bumped');}}catch(e){}
   const a=anime.find(x=>x.id===detailId);if(!a)return;
+  // Before the step, not after: commitEp() runs on an item already changed.
+  const id=a.id, wasEp=a.ep, wasStatus=a.status, wasFin=a.finAt;
   if(!epStepOnce(a,d))return;
+  pushUndo('episode change',()=>{
+    const x=anime.find(y=>y.id===id);if(!x)return;
+    x.ep=wasEp;x.status=wasStatus;
+    if(wasFin===undefined)delete x.finAt;else x.finAt=wasFin;
+    touch(x);
+  });
   commitEp(a);
 }
 // The five-star value it came from, so the note can name it rather than saying
@@ -15778,8 +15847,58 @@ function confirmDelete(id){
   document.getElementById('confirmBox').classList.add('on');
 }
 function closeConfirm(){deleteId=null;_confirmCb=null;document.getElementById('confirmBox').classList.remove('on');}
+// ── UNDO, ON A KEYBOARD (⌘Z / Ctrl+Z) ──────────────────────────────────────
+//
+// For the three changes people actually regret: removing a title, moving an
+// episode, and changing a status.
+//
+// It does NOT snapshot the list. A library here runs to several megabytes, and
+// a stack of twenty copies is sixty megabytes of memory bought for an undo that
+// is almost only ever used on the last thing done. Each entry keeps the few
+// fields it needs to put back, so the whole stack costs a few hundred bytes.
+//
+// Keyboard devices only, deliberately: there is no ⌘Z on a phone, so on a
+// phone this would be a feature that exists in the release notes and nowhere a
+// thumb can reach. The actions still work there; only the shortcut is absent.
+const UNDO_MAX=25;
+let _undo=[];
+function hasKeyboard(){try{return matchMedia('(hover:hover) and (pointer:fine)').matches;}catch(e){return false;}}
+function pushUndo(label,fn){
+  if(!hasKeyboard())return;
+  _undo.push({label,fn});
+  if(_undo.length>UNDO_MAX)_undo.shift();
+}
+function undoLast(){
+  const e=_undo.pop();
+  if(!e){toast('Nothing to undo');return;}
+  try{e.fn();}catch(err){toast('Could not undo that');return;}
+  save();
+  try{render();}catch(err){}
+  try{if(detailId)renderDetail();}catch(err){}
+  toast('Undone — '+e.label);
+}
+try{addEventListener('keydown',ev=>{
+  if(!(ev.metaKey||ev.ctrlKey)||ev.shiftKey||ev.altKey)return;
+  if(String(ev.key||'').toLowerCase()!=='z')return;
+  // Inside a field ⌘Z is the browser's own undo, and that is the right one.
+  const t=ev.target;
+  if(t&&(/^(INPUT|TEXTAREA)$/.test(t.tagName||'')||t.isContentEditable))return;
+  if(typeof appLocked!=='undefined'&&appLocked)return;
+  if(!hasKeyboard())return;
+  ev.preventDefault();
+  undoLast();
+});}catch(e){}
 function doDelete(){
   if(!deleteId)return;
+  // Captured before the tombstone, because putting the title back means taking
+  // the tombstone off too — otherwise the next sync deletes it again and the
+  // undo looks like it worked for about ten seconds.
+  const gone=anime.find(a=>a.id===deleteId);
+  const hadTomb=!!tombs()[String(deleteId)];
+  if(gone)pushUndo('removed '+(gone.title||'a title'),()=>{
+    if(!anime.some(a=>a.id===gone.id))anime=anime.concat([gone]);
+    if(!hadTomb){const m=tombs();delete m[String(gone.id)];setTombs(m);}
+  });
   tombstone(deleteId);          // or the next sync resurrects it from another device
   anime=anime.filter(a=>a.id!==deleteId);
   try{setTimeout(()=>sweepImages(true),1200);}catch(e){}   // their artwork goes with them
@@ -26350,17 +26469,17 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-11-02.66',
-  title:'A password no longer stops two devices pairing',
-  push:'If either device had a password on its list, pairing refused outright. It asks for the password now \u2014 and the panel stopped claiming backups that never happened.',
+  v:'2026-11-02.67',
+  title:'Undo, codes that type properly, and plainer words',
+  push:'\u2318Z undoes a removal. Codes format themselves as you type. And the app stopped explaining itself at you.',
   notes:[
+    'Press <b>\u2318Z</b> (or Ctrl+Z) to undo removing a title, moving an episode, or changing a status. Removing something was final before, which is a lot to ask of a button sitting next to the one you meant.',
+    'Codes now <b>format themselves as you type</b>. Lower case becomes upper, spacing falls into place, pasted punctuation is dropped, and you can fix a character in the middle without the cursor jumping to the end.',
+    'The app says less. A lot of what you read was the reasoning behind a feature rather than what had happened and what to do about it \u2014 so <b>Cloud</b>, its checks and its warnings have all been rewritten shorter.',
+    'A <b>locked</b> list is no longer reported as an empty one. A device that had not been unlocked yet said \u201cnothing has reached the cloud\u201d and counted your titles as zero. Your titles were never gone and were never at risk of being overwritten \u2014 but that is not what it looked like. It now says the list is locked and offers to unlock it.',
     'If your list has a <b>password</b> on it, your devices can now be put together. <b>Add a device</b> used to refuse outright and tell you to \u201cunlock it on its own device and back it up again first\u201d \u2014 which could never work, because a list with a password is <i>always</i> stored locked. It asks you for the password now, or its recovery key, reads the list, and merges. Joining this way also puts the same password on the device you are joining from, so nothing ends up less protected than it was.',
-    'The <b>Cloud</b> panel could tell you your list was backed up when nothing of it had ever reached the cloud. The size it showed was real, but it was measuring <b>this device</b> \u2014 how big the backup <i>would</i> be \u2014 and calling it \u201cbacked up\u201d. It now says plainly whether anything has landed, when it last did, and how many backups have failed in a row if any have.',
-    'When nothing has reached the cloud, there is a <b>Back up now</b> button. You needed one: a backup is sent when your <b>list changes</b>, not when time passes, so a device whose first one failed was waiting for an edit rather than a moment \u2014 and after three failures it waits up to an hour before trying again. Neither was visible. The button clears both and sends immediately.',
-    '<b>Add a device</b> used to refuse with \u201cgive it a moment and try again\u201d, which could not work for the same reason. It now tells you nothing is stored under this key yet and points at the button that fixes it.',
     'Your devices can finally be put on one list without you copying a twenty-character key between them. On the device that already has your list, open <b>Cloud</b> and press <b>Add a device</b>: it gives you eight characters, good for ten minutes and one device. Type those into the other device and the two lists are <b>folded together</b> \u2014 nothing is replaced, nothing is dropped, and whatever that device already had is kept.',
-    'Why this was needed: a device that already had titles when you first set backup up quietly made a key of its own. It was backing up perfectly well \u2014 somewhere nothing else could see. Nothing was broken, so nothing ever said so, and the device picker had nothing to show because from either side there really was no other device.',
-    'You can now delete a backup, not just stop using it. Turning backup off always left the stored copy sitting in the cloud under a code your device had thrown away \u2014 reachable by nothing, removable by no one. <b>Cloud \u2192 Erase the stored copy</b> deletes it for good; the titles stay on your device. Use it on a code you are finished with.',
+    'Why your devices were apart: one of them already had titles when you first turned backup on, so it made a key of its own and backed up where nothing else could see it. It was working \u2014 just on its own.',
   ],
 };
 // The rows animate in once, on the first paint of a session. render() runs on

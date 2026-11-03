@@ -84,8 +84,8 @@ t('and sent nothing while it looked', d.pushed, 0);
 
 const txt=await ev(`(async()=>{document.body.insertAdjacentHTML('beforeend','<div id="syncDiagBox"></div>');
   await showSyncDiagnosis();return document.getElementById('syncDiagBox').textContent;})()`);
-t('and says so in words', /THIS device holds the newer edits/.test(txt), true);
-t('listing both counts', /Titles here1|Titles here\s*1/.test(txt.replace(/\s+/g,'')+txt), true);
+t('and says so in words', /This device has the newer changes/.test(txt), true);
+t('listing both counts', /Titlesonthisdevice1/.test(txt.replace(/\s+/g,'')), true);
 
 // An encrypted cloud copy must report "not readable", never "never". The first
 // version said "never", which reads as "the cloud has no edits" — a completely
@@ -98,9 +98,9 @@ const enc = await ev(`(async()=>{
   await showSyncDiagnosis();
   const txt = document.getElementById("syncDiagBox").textContent;
   return {unknown: !!d.cloudUnknown,
-          saysNever: /Newest edit in cloud\\s*never/i.test(txt),
-          saysUnreadable: /not readable here/.test(txt),
-          verdict: /cannot be compared/.test(txt)};})()`);
+          saysNever: /Last change in the cloud\\s*never/i.test(txt),
+          saysUnreadable: /cannot read/.test(txt),
+          verdict: /cannot read the cloud copy/.test(txt)};})()`);
 console.log("    encrypted:", JSON.stringify(enc));
 t("an unreadable cloud copy is marked unknown", enc.unknown, true);
 t("and is never reported as never", enc.saysNever, false);

@@ -81,10 +81,10 @@ const setState=(at,n,why)=>ev(`(()=>{localStorage.setItem('syncat_animelist_v4',
 // ── 1. nothing has landed ───────────────────────────────────────────────────
 await setState(0,0); await wait(250);
 let s=await txt();
-t('it says nothing has reached the cloud', /nothing has reached the cloud yet/.test(s), true);
-t('it does NOT claim the list is backed up', /Backed up:/.test(s), false);
-t('it says the size is only ready to send', /ready to send/.test(s), true);
-t('it says why a second device cannot join yet', /nothing for another device to join/.test(s), true);
+t('it says nothing has been saved yet', /nothing saved yet/i.test(s), true);
+t('it does NOT claim a save has happened', /Last saved/.test(s), false);
+t('it says the size is only ready to save', /ready to save/.test(s), true);
+t('it says the cloud holds nothing', /Nothing is in the cloud yet/.test(s), true);
 t('the bar is empty, not 17% full',
   await ev(`(()=>{const d=document.querySelector('#syncBox div[style*="transform:scaleX"]');
     return d?/scaleX\\(0\\.000\\)/.test(d.getAttribute('style')||''):'no bar';})()`), true);
@@ -93,15 +93,15 @@ t('it offers the button that fixes it', await ev(`!!document.getElementById('bac
 // ── 2. something has landed ─────────────────────────────────────────────────
 await setState(Date.now()-60000,0); await wait(250);
 s=await txt();
-t('once a copy exists it says backed up', /Backed up:/.test(s), true);
-t('and says when it last reached the cloud', /Last reached the cloud/.test(s), true);
+t('once a copy exists it says so', /saved \u00b7/.test(s), true);
+t('and says when it last saved', /Last saved/.test(s), true);
 t('and stops offering the button', await ev(`!!document.getElementById('backupNowBtn')`), false);
 
 // ── 3. it had landed, and then started failing ──────────────────────────────
 await setState(Date.now()-86400000,5,'Failed to fetch'); await wait(250);
 s=await txt();
-t('a failing backup says so, with the count', /the last 5 backups failed/.test(s), true);
-t('and does not claim to be backed up', /Backed up:/.test(s), false);
+t('a failing backup says so, with the count', /the last 5 saves failed/.test(s), true);
+t('and does not claim the latest save worked', /Last saved/.test(s), false);
 t('and shows the error it actually got', /Failed to fetch/.test(s), true);
 t('and offers the button again', await ev(`!!document.getElementById('backupNowBtn')`), true);
 
@@ -125,7 +125,7 @@ t('it sends under this device’s own key',
 t('the failure counter is cleared once it lands',
   await ev(`JSON.parse(localStorage.getItem('pushfail_animelist_v4')||'{}').n||0`), 0);
 t('and the panel now says something has landed',
-  /Backed up:/.test(await txt()), true);
+  /Last saved/.test(await txt()), true);
 
 // ── 5. the refusal names the button ─────────────────────────────────────────
 await setState(0,0); await wait(200);

@@ -48,6 +48,11 @@ localStorage.setItem('sync_animelist_v4','DESKCODE12345678901X');
 localStorage.setItem('wl_net_status','approved');
 localStorage.setItem('tut_seen_animelist_v4','1');
 localStorage.setItem('seen_release','2026-11-02.66');
+// The browser profile survives between runs, so tombstones written by the LAST
+// run are still here — and "undo removes the tombstone" only holds if there was
+// no tombstone before the removal. Without this the file passes once and then
+// fails for ever, which is the failure mode suite.sh --twice exists to catch.
+localStorage.removeItem('wl_tombs');
 window.fetch=function(u,o){
   let b={};try{b=JSON.parse((o&&o.body)||'{}');}catch(e){}
   const J=v=>Promise.resolve(new Response(JSON.stringify(v),{status:200,headers:{'Content-Type':'application/json'}}));
@@ -63,7 +68,7 @@ const t=(n,g,e)=>{const ok=JSON.stringify(g)===JSON.stringify(e);ok?pass++:fail+
   console.log((ok?'ok  ':'FAIL')+'  '+n+'  -> '+JSON.stringify(g)+(ok?'':' (want '+JSON.stringify(e)+')'));};
 
 await ev(`openSheet('backupSheet')`); await wait(600);
-t('the test browser counts as a keyboard device', await ev(`hasKeyboard()`), true);
+t('the shortcut handler is installed', await ev(`typeof undoLast==='function'&&typeof redoLast==='function'`), true);
 
 // ── 1. codes keep their shape while they are typed ─────────────────────────
 const fmt=(val,max,group,caret)=>ev(`(()=>{
@@ -123,7 +128,77 @@ t('and clears the finished date it invented',
   await ev(`anime.find(a=>a.id==='u3').finAt===undefined`), true);
 
 t('undoing past the start says so rather than throwing',
-  await ev(`(()=>{_undo=[];undoLast();return 'survived';})()`), 'survived');
+  await ev(`(()=>{_undo=[];_redo=[];undoLast();redoLast();return 'survived';})()`), 'survived');
+
+// ── redo, and the keys themselves ──────────────────────────────────────────
+const key=(k,o={})=>ev(`(()=>{document.dispatchEvent(new KeyboardEvent('keydown',
+  Object.assign({key:${JSON.stringify(k)},bubbles:true,cancelable:true},${JSON.stringify(o)})));return 1;})()`);
+
+await ev(`closeAll&&closeAll()`); await wait(200);
+await ev(`(()=>{_undo=[];_redo=[];deleteId='u2';doDelete();return 1;})()`); await wait(300);
+t('removed again, to undo with the keyboard this time', await ev(`anime.some(a=>a.id==='u2')`), false);
+await key('z',{metaKey:true}); await wait(400);
+t('\u2318Z undoes it', await ev(`anime.some(a=>a.id==='u2')`), true);
+await key('z',{metaKey:true,shiftKey:true}); await wait(400);
+t('\u2318\u21e7Z redoes it', await ev(`anime.some(a=>a.id==='u2')`), false);
+t('and the tombstone came back with the redo',
+  await ev(`!!JSON.parse(localStorage.getItem('wl_tombs')||'{}')['u2']`), true);
+await key('z',{metaKey:true}); await wait(400);
+t('and it undoes a second time', await ev(`anime.some(a=>a.id==='u2')`), true);
+
+t('a fresh action clears the redo line',
+  await ev(`(()=>{_redo=[{label:'stale'}];pushUndo('x',()=>{},()=>{});return _redo.length;})()`), 0);
+
+// Inside a field, ⌘Z is the browser's undo of your typing. Taking it there
+// would make editing a note a trap.
+await ev(`(()=>{_undo=[];_redo=[];const i=document.getElementById('searchIn');i.focus();
+  deleteId='u3';doDelete();return 1;})()`); await wait(300);
+await key('z',{metaKey:true}); await wait(350);
+t('\u2318Z in a text field leaves the list alone',
+  await ev(`anime.some(a=>a.id==='u3')`), false);
+await ev(`(()=>{document.getElementById('searchIn').blur();undoLast();return 1;})()`); await wait(300);
+t('and still works once the field is left', await ev(`anime.some(a=>a.id==='u3')`), true);
+
+// Ctrl is the same shortcut on a PC.
+await ev(`(()=>{_undo=[];_redo=[];deleteId='u3';doDelete();return 1;})()`); await wait(300);
+await key('z',{ctrlKey:true}); await wait(400);
+t('Ctrl+Z does the same thing', await ev(`anime.some(a=>a.id==='u3')`), true);
+
+// ── the open-title keys ────────────────────────────────────────────────────
+await ev(`openDetail('u1')`); await wait(600);
+const ep0=await ev(`anime.find(a=>a.id==='u1').ep`);
+await key('.'); await wait(500);
+t('"." moves to the next episode', await ev(`anime.find(a=>a.id==='u1').ep`), ep0+1);
+await key(','); await wait(500);
+t('"," moves back', await ev(`anime.find(a=>a.id==='u1').ep`), ep0);
+const fav0=await ev(`!!anime.find(a=>a.id==='u1').fav`);
+await key('f'); await wait(400);
+t('"f" favourites what is open', await ev(`!!anime.find(a=>a.id==='u1').fav`), !fav0);
+await ev(`closeAll()`); await wait(300);
+
+// ── the help card lists what was added ─────────────────────────────────────
+const help=await ev(`(()=>{const rows=KB_HELP.map(r=>r[0]+'|'+r[1]).join('\\n');return rows;})()`);
+for(const [k,label] of [['\u2318 Z','Undo'],['\u2318 \u21e7 Z','Redo'],['e','Edit the focused card'],
+                        ['.','Next episode'],['\u2318 \u232b','Remove the focused card, or the selection']])
+  t('the help card lists '+label, help.includes(k+'|'+label), true);
+t('and it is grouped, not one flat run',
+  await ev(`KB_HELP.filter(r=>r[0]==='').length>=3`), true);
+// The data being right is not the same as the card drawing. A group row has no
+// keys to draw, and the renderer has to notice that rather than printing an
+// empty key cap.
+t('the card actually draws, with headings and no empty key caps',
+  await ev(`(()=>{try{toggleKbHelp();const el=document.getElementById('kbHelp');
+    const grps=el.querySelectorAll('.kbhelp-grp').length;
+    const empty=Array.prototype.some.call(el.querySelectorAll('.kbkey'),k=>!k.textContent.trim());
+    const rows=el.querySelectorAll('.kbhelp-row').length;
+    closeKbHelp();
+    // Counted from the table rather than hard-coded, so adding a shortcut does
+    // not fail this for the wrong reason.
+    const wantGrps=KB_HELP.filter(r=>r[0]==='').length;
+    const wantRows=KB_HELP.length-wantGrps;
+    return {grpsOk:grps===wantGrps,rowsOk:rows===wantRows,empty};
+    }catch(e){return 'threw: '+e.message;}})()`),
+  {grpsOk:true,rowsOk:true,empty:false});
 
 // ── 3. a locked device does not report an empty library ────────────────────
 await ev(`openSheet('backupSheet')`); await wait(400);

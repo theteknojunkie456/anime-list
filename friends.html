@@ -4992,6 +4992,12 @@ body.recsel .pcard{position:relative;}
 .kbhelp-h{font-family:var(--fd);font-size:17px;font-weight:800;letter-spacing:-.3px;margin-bottom:14px;color:var(--t1);}
 .kbhelp-row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:9px 0;border-bottom:1px solid var(--b2);font-size:13px;color:var(--t1);}
 .kbhelp-row:last-child{border-bottom:0;}
+/* The card is tall enough now to need landmarks. A group heading rather than
+   another rule: eighteen identical rows is a reference card nobody reads twice. */
+.kbhelp-grp{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--t3);margin:16px 0 2px;}
+.kbhelp-grp:first-of-type{margin-top:0;}
+.kbhelp-grp+.kbhelp-row{border-top:0;}
+.kbhelp-card{max-height:84vh;overflow:auto;}
 .kbhelp-row .keys{display:flex;gap:5px;flex-shrink:0;}
 .kbkey{min-width:22px;height:23px;padding:0 7px;border-radius:6px;background:var(--bg4);border:1px solid var(--b2);font-size:12px;font-weight:700;color:var(--t2);display:inline-flex;align-items:center;justify-content:center;font-family:ui-monospace,SFMono-Regular,monospace;}
 
@@ -15301,12 +15307,15 @@ function setDetailStatus(s){
   const was=a.status;
   {
     const id=a.id, wasEp=a.ep, wasFin=a.finAt;
-    if(was!==s)pushUndo('status change',()=>{
-      const x=anime.find(y=>y.id===id);if(!x)return;
-      x.status=was;x.ep=wasEp;
-      if(wasFin===undefined)delete x.finAt;else x.finAt=wasFin;
-      touch(x);
-    });
+    if(was!==s)pushUndo('status change',
+      ()=>{ const x=anime.find(y=>y.id===id);if(!x)return;
+            x.status=was;x.ep=wasEp;
+            if(wasFin===undefined)delete x.finAt;else x.finAt=wasFin;
+            touch(x); },
+      ()=>{ const x=anime.find(y=>y.id===id);if(!x)return;
+            x.status=s;
+            if(s==='finished'){if(x.epTotal)x.ep=x.epTotal;x.finAt=Date.now();}else delete x.finAt;
+            touch(x); });
   }
   a.status=s;
   // The occasion, and only when it IS one: finishing something you had not
@@ -15448,12 +15457,13 @@ function bumpEp(d){
   // Before the step, not after: commitEp() runs on an item already changed.
   const id=a.id, wasEp=a.ep, wasStatus=a.status, wasFin=a.finAt;
   if(!epStepOnce(a,d))return;
-  pushUndo('episode change',()=>{
-    const x=anime.find(y=>y.id===id);if(!x)return;
-    x.ep=wasEp;x.status=wasStatus;
-    if(wasFin===undefined)delete x.finAt;else x.finAt=wasFin;
-    touch(x);
-  });
+  const nowEp=a.ep;
+  pushUndo('episode change',
+    ()=>{ const x=anime.find(y=>y.id===id);if(!x)return;
+          x.ep=wasEp;x.status=wasStatus;
+          if(wasFin===undefined)delete x.finAt;else x.finAt=wasFin;
+          touch(x); },
+    ()=>{ const x=anime.find(y=>y.id===id);if(!x)return; x.ep=nowEp; touch(x); });
   commitEp(a);
 }
 // The five-star value it came from, so the note can name it rather than saying
@@ -15861,33 +15871,41 @@ function closeConfirm(){deleteId=null;_confirmCb=null;document.getElementById('c
 // phone this would be a feature that exists in the release notes and nowhere a
 // thumb can reach. The actions still work there; only the shortcut is absent.
 const UNDO_MAX=25;
-let _undo=[];
-function hasKeyboard(){try{return matchMedia('(hover:hover) and (pointer:fine)').matches;}catch(e){return false;}}
-function pushUndo(label,fn){
-  if(!hasKeyboard())return;
-  _undo.push({label,fn});
+let _undo=[],_redo=[];
+// Recorded on every device, not only ones with a keyboard. It costs a few
+// hundred bytes, and the first version gated it on a hover/pointer media query
+// — which an iPad with a keyboard attached does not reliably answer, so the
+// undo was missing on exactly the device that had something to press it with.
+function pushUndo(label,undo,redo){
+  _undo.push({label,undo,redo:redo||null});
   if(_undo.length>UNDO_MAX)_undo.shift();
+  _redo=[];                     // a new action ends the redo line
+}
+function _applyStep(e,dir){
+  const fn=(dir==='undo')?e.undo:e.redo;
+  if(typeof fn!=='function'){toast('That one cannot be redone');return false;}
+  try{fn();}catch(err){toast('Could not '+dir+' that');return false;}
+  save();
+  try{render();}catch(err){}
+  try{if(detailId)renderDetail();}catch(err){}
+  return true;
 }
 function undoLast(){
   const e=_undo.pop();
   if(!e){toast('Nothing to undo');return;}
-  try{e.fn();}catch(err){toast('Could not undo that');return;}
-  save();
-  try{render();}catch(err){}
-  try{if(detailId)renderDetail();}catch(err){}
+  // Put it back if it would not apply, or the stack quietly loses a step every
+  // time something fails.
+  if(!_applyStep(e,'undo')){_undo.push(e);return;}
+  if(e.redo)_redo.push(e);
   toast('Undone — '+e.label);
 }
-try{addEventListener('keydown',ev=>{
-  if(!(ev.metaKey||ev.ctrlKey)||ev.shiftKey||ev.altKey)return;
-  if(String(ev.key||'').toLowerCase()!=='z')return;
-  // Inside a field ⌘Z is the browser's own undo, and that is the right one.
-  const t=ev.target;
-  if(t&&(/^(INPUT|TEXTAREA)$/.test(t.tagName||'')||t.isContentEditable))return;
-  if(typeof appLocked!=='undefined'&&appLocked)return;
-  if(!hasKeyboard())return;
-  ev.preventDefault();
-  undoLast();
-});}catch(e){}
+function redoLast(){
+  const e=_redo.pop();
+  if(!e){toast('Nothing to redo');return;}
+  if(!_applyStep(e,'redo')){_redo.push(e);return;}
+  _undo.push(e);
+  toast('Redone — '+e.label);
+}
 function doDelete(){
   if(!deleteId)return;
   // Captured before the tombstone, because putting the title back means taking
@@ -15895,10 +15913,10 @@ function doDelete(){
   // undo looks like it worked for about ten seconds.
   const gone=anime.find(a=>a.id===deleteId);
   const hadTomb=!!tombs()[String(deleteId)];
-  if(gone)pushUndo('removed '+(gone.title||'a title'),()=>{
-    if(!anime.some(a=>a.id===gone.id))anime=anime.concat([gone]);
-    if(!hadTomb){const m=tombs();delete m[String(gone.id)];setTombs(m);}
-  });
+  if(gone)pushUndo('removed '+(gone.title||'a title'),
+    ()=>{ if(!anime.some(a=>a.id===gone.id))anime=anime.concat([gone]);
+          if(!hadTomb){const m=tombs();delete m[String(gone.id)];setTombs(m);} },
+    ()=>{ tombstone(gone.id); anime=anime.filter(a=>a.id!==gone.id); });
   tombstone(deleteId);          // or the next sync resurrects it from another device
   anime=anime.filter(a=>a.id!==deleteId);
   try{setTimeout(()=>sweepImages(true),1200);}catch(e){}   // their artwork goes with them
@@ -26470,16 +26488,16 @@ function _updBusy(){
 // full history lives in git where it belongs.
 const RELEASE={
   v:'2026-11-02.67',
-  title:'Undo, codes that type properly, and plainer words',
-  push:'\u2318Z undoes a removal. Codes format themselves as you type. And the app stopped explaining itself at you.',
+  title:'A keyboard worth using, and plainer words',
+  push:'Undo and redo, edit and favourite, episodes and removals \u2014 all on keys now. Press ? to see them. And the app stopped explaining itself at you.',
   notes:[
-    'Press <b>\u2318Z</b> (or Ctrl+Z) to undo removing a title, moving an episode, or changing a status. Removing something was final before, which is a lot to ask of a button sitting next to the one you meant.',
+    '<b>\u2318Z</b> undoes, <b>\u2318\u21e7Z</b> redoes \u2014 removing a title, moving an episode, changing a status. Removing something was final before, which is a lot to ask of a button sitting beside the one you meant.',
+    'More of the app is on the keyboard. <b>e</b> edits the card you are on and <b>f</b> favourites it, <b>\u2318\u232b</b> removes it or the whole selection (it still asks), <b>\u2318K</b> jumps to search, and with a title open <b>.</b> and <b>,</b> move through episodes. Press <b>?</b> for the full card \u2014 it is grouped now instead of one long run.',
     'Codes now <b>format themselves as you type</b>. Lower case becomes upper, spacing falls into place, pasted punctuation is dropped, and you can fix a character in the middle without the cursor jumping to the end.',
     'The app says less. A lot of what you read was the reasoning behind a feature rather than what had happened and what to do about it \u2014 so <b>Cloud</b>, its checks and its warnings have all been rewritten shorter.',
     'A <b>locked</b> list is no longer reported as an empty one. A device that had not been unlocked yet said \u201cnothing has reached the cloud\u201d and counted your titles as zero. Your titles were never gone and were never at risk of being overwritten \u2014 but that is not what it looked like. It now says the list is locked and offers to unlock it.',
     'If your list has a <b>password</b> on it, your devices can now be put together. <b>Add a device</b> used to refuse outright and tell you to \u201cunlock it on its own device and back it up again first\u201d \u2014 which could never work, because a list with a password is <i>always</i> stored locked. It asks you for the password now, or its recovery key, reads the list, and merges. Joining this way also puts the same password on the device you are joining from, so nothing ends up less protected than it was.',
     'Your devices can finally be put on one list without you copying a twenty-character key between them. On the device that already has your list, open <b>Cloud</b> and press <b>Add a device</b>: it gives you eight characters, good for ten minutes and one device. Type those into the other device and the two lists are <b>folded together</b> \u2014 nothing is replaced, nothing is dropped, and whatever that device already had is kept.',
-    'Why your devices were apart: one of them already had titles when you first turned backup on, so it made a key of its own and backed up where nothing else could see it. It was working \u2014 just on its own.',
   ],
 };
 // The rows animate in once, on the first paint of a session. render() runs on
@@ -26648,6 +26666,20 @@ function _kbFocus(i){
   try{cards[_kbIdx].scrollIntoView({block:'nearest',behavior:_scrollBehavior()});}catch(e){}
 }
 function _kbClear(){document.querySelectorAll('.pcard.kbfocus').forEach(c=>c.classList.remove('kbfocus'));_kbIdx=-1;}
+function _kbCardId(){const ids=_cardIds();return (_kbIdx>=0&&ids[_kbIdx])?ids[_kbIdx]:null;}
+function _detailOpen(){try{return !!detailId&&!!document.querySelector('#detailSheet.on');}catch(e){return false;}}
+// The card-grid version of toggleFav(), which only knows about the open title.
+function kbFav(id){
+  const a=anime.find(x=>x.id===id);if(!a)return;
+  const was=!!a.fav;
+  pushUndo(was?'unfavourited':'favourited',
+    ()=>{const x=anime.find(y=>y.id===id);if(!x)return;if(was)x.fav=true;else delete x.fav;touch(x);},
+    ()=>{const x=anime.find(y=>y.id===id);if(!x)return;if(was)delete x.fav;else x.fav=true;touch(x);});
+  if(was)delete a.fav;else a.fav=true;
+  touch(a);save();
+  try{render();}catch(e){}
+  toast(was?'Removed from favourites':'Added to favourites');
+}
 // Holding shift while moving extends the selection instead of replacing it —
 // the same contract as a file list or a spreadsheet, which is where the reflex
 // comes from. The card you started on is the anchor; everything between it and
@@ -26674,13 +26706,41 @@ function _kbMoveRow(dir,extend){
   if(extend)return _kbSelectTo(i);
   _kbFocus(i);
 }
-const KB_HELP=[['/','Search'],['a','Add a title'],['h l ← →','Move between cards'],['j k ↑ ↓','Move a whole row'],['⇧ + ←→↑↓','Select a run of cards'],['Space','Add one card to the selection'],['Enter','Open, or act on the selection'],['Right-click','Act on a card'],['Esc','Clear selection / close'],['?','This help']];
+// Grouped the way you use them, because a flat list of eighteen rows is a
+// reference card nobody reads twice. A blank label starts a group.
+const KB_HELP=[
+  ['','Finding things'],
+  ['/','Search'],
+  ['⌘ K','Search'],
+  ['a','Add a title'],
+  ['?','This help'],
+  ['Esc','Clear selection / close'],
+  ['','Moving around'],
+  ['h l ← →','Move between cards'],
+  ['j k ↑ ↓','Move a whole row'],
+  ['⇧ + ←→↑↓','Select a run of cards'],
+  ['Space','Add one card to the selection'],
+  ['Enter','Open, or act on the selection'],
+  ['Right-click','Act on a card'],
+  ['','Changing things'],
+  ['e','Edit the focused card'],
+  ['f','Favourite the focused card'],
+  ['⌘ ⌫','Remove the focused card, or the selection'],
+  ['⌘ Z','Undo'],
+  ['⌘ ⇧ Z','Redo'],
+  ['','With a title open'],
+  ['.','Next episode'],
+  [',','Previous episode'],
+  ['f','Favourite'],
+];
 function toggleKbHelp(){
   let el=document.getElementById('kbHelp');
   if(!el){
     el=document.createElement('div');el.id='kbHelp';el.className='kbhelp';el.onclick=ev=>{if(ev.target===el)closeKbHelp();};
     el.innerHTML='<div class="kbhelp-card"><div class="kbhelp-h">Keyboard shortcuts</div>'+
-      KB_HELP.map(r=>'<div class="kbhelp-row"><span>'+schEsc(r[1])+'</span><span class="keys">'+r[0].split(' ').map(k=>'<span class="kbkey">'+schEsc(k)+'</span>').join('')+'</span></div>').join('')+'</div>';
+      KB_HELP.map(r=>r[0]===''
+        ? '<div class="kbhelp-grp">'+schEsc(r[1])+'</div>'
+        : '<div class="kbhelp-row"><span>'+schEsc(r[1])+'</span><span class="keys">'+r[0].split(' ').map(k=>'<span class="kbkey">'+schEsc(k)+'</span>').join('')+'</span></div>').join('')+'</div>';
     document.body.appendChild(el);
   }
   el.classList.toggle('on');
@@ -26690,7 +26750,34 @@ document.addEventListener('keydown',e=>{
   if(e.key==='Escape'){
     if(bulkOn()){bulkClear();return;}      // clear the selection before closing anything else
     closeKbHelp();closeAll();closeConfirm();closeYT();if(_kbTyping()&&document.activeElement.blur)document.activeElement.blur();_kbClear();return;}
-  if(e.metaKey||e.ctrlKey||e.altKey)return;   // leave OS/browser combos (Cmd+L, Ctrl+A…) alone
+  // THE FEW COMBOS THE APP CLAIMS. Everything after this line bails on
+  // ⌘/Ctrl so the browser keeps the rest (⌘L, ⌘T, ⌘R…). They live here, in
+  // the same handler as the rest, so they share its typing and blocked guards
+  // instead of growing a second set that drifts from them.
+  if((e.metaKey||e.ctrlKey)&&!e.altKey){
+    const k=String(e.key||'').toLowerCase();
+    // Inside a field ⌘Z is the browser's own undo of your typing, which is the
+    // one you want there.
+    if(k==='z'&&!_kbTyping()){e.preventDefault();if(e.shiftKey)redoLast();else undoLast();return;}
+    if(k==='k'&&!e.shiftKey&&!_kbTyping()){e.preventDefault();
+      const s2=document.getElementById('searchIn');if(s2){_kbClear();s2.focus();try{s2.select();}catch(_){}}return;}
+    // ⌘⌫ is "delete what is selected" in every file list there has ever
+    // been. It still asks first — the shortcut saves a reach, not a decision.
+    if((e.key==='Backspace'||e.key==='Delete')&&!_kbTyping()&&!_kbBlocked()){
+      if(bulkOn()){e.preventDefault();openBulkMenu();return;}
+      const ids=_cardIds();
+      if(_kbIdx>=0&&ids[_kbIdx]){e.preventDefault();confirmDelete(ids[_kbIdx]);return;}
+    }
+    return;
+  }
+  if(e.altKey)return;
+  // WITH A TITLE OPEN. These run before the blocked check on purpose: "a sheet
+  // is open" is the state they exist for, not a reason to ignore them.
+  if(!_kbTyping()&&_detailOpen()){
+    if(e.key==='.'||e.key==='>'){e.preventDefault();bumpEp(1);return;}
+    if(e.key===','||e.key==='<'){e.preventDefault();bumpEp(-1);return;}
+    if(e.key==='f'||e.key==='F'){e.preventDefault();toggleFav();return;}
+  }
   if(e.key==='/'&&!_kbTyping()){e.preventDefault();
     // In an open party, "/" jumps to the chat so you can talk; otherwise it focuses search.
     const partyOpen=(()=>{try{return document.getElementById('partySheet').classList.contains('on');}catch(_){return false;}})();
@@ -26701,6 +26788,8 @@ document.addEventListener('keydown',e=>{
   if(_kbTyping()||_kbBlocked())return;
   switch(e.key){
     case 'a':e.preventDefault();try{openSheet_add();}catch(_){}break;
+    case 'e':{const id=_kbCardId();if(id){e.preventDefault();try{editItem(id);}catch(_){}}break;}
+    case 'f':case 'F':{const id=_kbCardId();if(id){e.preventDefault();kbFav(id);}break;}
     case 'ArrowRight':case 'l':e.preventDefault();_kbMove(1,e.shiftKey);break;
     case 'ArrowLeft':case 'h':e.preventDefault();_kbMove(-1,e.shiftKey);break;
     case 'ArrowDown':case 'j':e.preventDefault();_kbMoveRow(1,e.shiftKey);break;

@@ -842,14 +842,39 @@ only needed to know what happened and what to do.
 - **Surgical edits, not rewrites.** One action per job; no duplicate paths.
 - Match the surrounding code's density and idiom; comments explain *why*.
 
-**Keyboard (devices that have one)**
-- `⌘Z` / `Ctrl+Z` undoes the last removal, episode change or status change.
-  `pushUndo(label, fn)` stores **the fields to put back**, never a snapshot of
-  the list — a library here is several megabytes, so a stack of snapshots would
-  cost tens of megabytes to buy an undo of the last action. Gated on
-  `hasKeyboard()`; inside a field the browser's own undo wins.
-- Removal's undo takes the **tombstone** off as well. Without that the title
-  comes back and the next sync deletes it again.
+**Keyboard**
+
+One handler, at the bottom of the file, holds the whole map. The combos the app
+claims are listed **before** its `⌘/Ctrl` bail, so they share its `_kbTyping()`
+and `_kbBlocked()` guards instead of growing a second set that drifts from them.
+Everything else with a modifier is left to the browser.
+
+| | |
+|---|---|
+| `/`, `⌘K` | search |
+| `a` | add a title |
+| `?` | the shortcut card |
+| `h j k l` / arrows, `⇧`, Space, Enter | move, select, open |
+| `e`, `f` | edit / favourite the focused card |
+| `⌘⌫` | remove the focused card, or the selection — still asks |
+| `⌘Z`, `⌘⇧Z` | undo, redo |
+| `.` `,` `f` *(title open)* | next / previous episode, favourite |
+
+The open-title keys run **before** the `_kbBlocked()` check: "a sheet is open"
+is the state they exist for, not a reason to ignore them.
+
+`pushUndo(label, undo, redo)` stores **the fields to put back**, never a
+snapshot of the list — a library here is several megabytes, so a stack of
+snapshots would spend tens of megabytes to buy an undo of the last action. It is
+recorded on every device, not only ones with a keyboard: the first version gated
+it on a `(hover:hover) and (pointer:fine)` media query, which an iPad with a
+keyboard attached does not reliably answer, so the undo was missing on exactly
+the device that had something to press. A step that fails to apply is pushed
+back onto its stack rather than lost.
+
+Removal's undo takes the **tombstone** off as well, and its redo puts it back.
+Without that the title returns and the next sync deletes it again, so the undo
+appears to work for about ten seconds.
 
 **Typed codes**
 - `formatCodeInput(el, max, group)` upper-cases, strips punctuation and groups

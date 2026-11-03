@@ -818,6 +818,34 @@ lot together.
 
 ---
 
+### The tab bar holds five, and the + owns the middle
+
+`.nav` is `repeat(5,minmax(0,1fr))`. The count is odd deliberately. The `+` is
+the only filled, accented object in the bar, so the eye finds it first and reads
+the bar's balance from it — which requires a middle track to put it in. Six
+tabs leave it in track 3 of 6, two items left and three right, the bar's true
+centre falling on the gap beside it. Nothing is misaligned by a pixel; the
+arrangement is lopsided, which is worse, because there is nothing to nudge.
+
+The five are **Home, Stats, +, Sources, Settings**. Sources is there because it
+is the panel you reach for *while using the app* — a title opens somewhere
+wrong and you want your services immediately. Cloud is set up once and then
+never touched, so it lives on the first tile in Settings, which carries its live
+status line and goes red the moment a backup stops landing; it is also `c` on a
+keyboard. Anything added to the bar later has to displace a tab, not join them.
+
+`scripts/nav-layout-test.mjs` measures this rather than trusting it: odd tab
+count, `+` at the middle index, its centre within 1px of the bar's, Sources
+present, Cloud absent, and Settings still containing a route to `backupSheet` —
+that last one is the guard that matters, because Cloud leaving the bar makes
+Settings the only always-visible way in.
+
+Sources opens from three places (the tab, the Settings tile, and the player's
+no-source prompt), so **Back** has two right answers. `openSources(fromNav)`
+records which, and `sourceBack()` either closes or returns to Settings. Wiring
+Back straight to Settings dropped you into a panel you had never been in — a
+back button that walks you forward.
+
 ## 12. Conventions & hard rules
 
 **Voice — the app informs the user; it does not explain itself**

@@ -70,5 +70,28 @@ t('phone portrait 430x932',      await shape(430,932),   'bar');   // too narrow
 t('squashed window 1400x500',    await shape(1400,500),  'rail');  // 500 is still taller than the 304 a rail needs
 t('tablet portrait 820x1180',    await shape(820,1180),  'rail');  // wide AND tall, so it qualifies on both counts
 t('back to desktop still a rail',await shape(1440,900),  'rail');
+
+// The + is the only filled object in the bar, so the eye measures the bar from
+// it. That only works if it is actually in the middle: an even number of tracks
+// puts it off-centre by half a track and there is nothing to nudge. These check
+// the arrangement, not a pixel — the tolerance is 1px for subpixel rounding.
+await shape(430,932);
+const bar=await ev(`(()=>{const n=document.querySelector('.nav');
+  const ids=[...n.querySelectorAll('.nbtn')].filter(b=>getComputedStyle(b).display!=='none').map(b=>b.id);
+  const a=document.getElementById('nav-add').getBoundingClientRect();
+  const r=n.getBoundingClientRect();
+  return {ids, off:Math.abs((a.left+a.width/2)-(r.left+r.width/2)),
+          idx:ids.indexOf('nav-add')};})()`);
+t('bar has an odd number of tabs',  bar.ids.length%2,            1);
+t('+ is the middle tab',           bar.idx,                     (bar.ids.length-1)/2);
+t('+ sits on the bar centre',      bar.off<=1,                  true);
+t('Sources is in the bar',         bar.ids.includes('nav-sources'), true);
+t('Cloud is not',                  bar.ids.includes('nav-cloud'),   false);
+// Cloud left the bar, so Settings is the only way in that is always on screen.
+// If that tile ever stops being rendered, backup becomes unreachable for anyone
+// who does not know the keyboard, which is the whole phone.
+const cloudInSettings=await ev(`(()=>{openSheet('settingsSheet');
+  return /backupSheet/.test(document.getElementById('settingsSheet').innerHTML);})()`);
+t('Settings still opens Cloud',    cloudInSettings,             true);
 console.log('\n'+pass+' passed, '+fail+' failed');
 ws.close();ch.kill();srv.kill();process.exit(fail?1:0);

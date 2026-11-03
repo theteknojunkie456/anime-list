@@ -2342,10 +2342,12 @@ body.first-paint .pfill,body.content-in .pfill{animation:barGrow .62s cubic-bezi
      arrangement that was lopsided, which is worse, because there is nothing to
      nudge. Five tracks, two either side, + in the middle.
 
-     Cloud stays (it is the one setting with a real consequence if you never
-     find it). Sources is what left, and it costs nothing: it already has a row
-     in Settings, the player's "Change source" opens it, and so does the prompt
-     you get when Watch has nowhere to go. */
+     Sources is the one you reach for while using the app — a show opens in
+     the wrong place and you want the list of services right then, not two taps
+     into Settings. Cloud is what left. It is set up once and then never
+     touched, and it did not lose its warning: the Settings tile carries the
+     live status line and turns red the moment a backup stops landing, so the
+     thing you must not miss still comes and finds you. */
   display:grid;grid-template-columns:repeat(5,minmax(0,1fr));align-items:center;
   /* The + is the tallest thing in here, so the padding is what guarantees it has
      room. overflow is spelled out because this button has been clipped before. */
@@ -5622,7 +5624,7 @@ body.recsel .pcard{position:relative;}
   <button class="nbtn on" id="nav-home" data-tip="Home" onclick="goHome()"><span><i data-ic="home"></i></span><small>Home</small></button>
   <button class="nbtn" id="nav-stats" data-tip="Stats" onclick="openStats()"><span><i data-ic="chart"></i></span><small>Stats</small></button>
   <button class="nbtn add" id="nav-add" data-tip="Add a title" aria-label="Add a title" onclick="openSheet_add()"><i data-ic="plus"></i></button>
-  <button class="nbtn" id="nav-cloud" data-tip="Cloud backup" onclick="openSheet('backupSheet')"><span><i data-ic="cloud"></i></span><small>Cloud</small></button>
+  <button class="nbtn" id="nav-sources" data-tip="Sources" onclick="openSources(1)"><span><i data-ic="play"></i></span><small>Sources</small></button>
   <button class="nbtn" id="nav-settings" data-tip="Settings" onclick="openSheet('settingsSheet')"><span><i data-ic="settings"></i></span><small>Settings</small></button>
   <button class="nbtn rail-fold" id="nav-fold" data-tip="Collapse" onclick="toggleRail()" aria-label="Collapse the sidebar"><span><i data-ic="chevron-left"></i></span></button>
 </div>
@@ -6242,7 +6244,7 @@ body.recsel .pcard{position:relative;}
   <div class="sheet-handle"></div>
   <div class="sheet-header">
     <div class="sheet-title"><i data-ic="play"></i> Sources</div>
-    <button class="sheet-cancel" onclick="openSheet('settingsSheet')">Back</button>
+    <button class="sheet-cancel" id="srcBackBtn" onclick="sourceBack()">Back</button>
   </div>
   <div id="sourceBody"></div>
 </div>
@@ -15052,7 +15054,7 @@ const WT_STEPS=[
    b:'Open <b>Your code &amp; adding friends</b>. Send someone your code, or paste theirs. Then you can recommend shows to each other and see what they thought.',
    need:()=>{try{return (friendsList()||[]).length>0||(friendsOut()||[]).length>0;}catch(e){return true;}},
    needMsg:'Add one friend, or send one request, and this step is done.'},
-  {sel:'#nav-settings', open:()=>openSheet('sourceSheet'),
+  {sel:'#nav-sources', open:()=>openSources(1),
    t:'Where you actually watch',
    b:'Pick the services you use and <b>Watch</b> opens straight to them. A friend can hand you their whole setup instead, if that is easier.'},
   {sel:'#notifyBell', open:()=>{try{openNotifySheet();}catch(e){}},
@@ -15506,6 +15508,12 @@ function toggleFav(){
 }
 
 // ─── SHEETS ────────────────────────────────────────────────────────────────
+// Sources sits in the tab bar AND in Settings, so Back has two right answers.
+// Hard-wiring it to Settings meant tapping Sources from the bar dropped you
+// into a panel you were never in — a back button that walks you forward.
+let _srcFromNav=false;
+function openSources(fromNav){_srcFromNav=!!fromNav;openSheet('sourceSheet');}
+function sourceBack(){ if(_srcFromNav){_srcFromNav=false;closeAll();} else openSheet('settingsSheet'); }
 function openSheet(id){
   // Watch parties live only in the official app. On the public web build there's
   // no way in — the entry buttons are hidden (body.no-party) and this is the backstop.
@@ -18782,7 +18790,7 @@ function renderSettings(){
       <div class="set-tile-h">Cloud backup</div>
       <div class="set-tile-p">${escH(backupStatusLine())}</div>
     </button>
-    <button class="set-tile" onclick="openSheet('sourceSheet')">
+    <button class="set-tile" onclick="openSources(0)">
       <div class="set-tile-ic">${icon('play')}</div>
       <div class="set-tile-h">Sources</div>
       <div class="set-tile-p">Where Watch and Read open</div>
@@ -21712,7 +21720,7 @@ function renderWatch(){
   const sec=(label,items,off)=>items.length?`<div class="dt-label" style="margin-top:14px">${label}</div>`+items.map((o,i)=>row(o,off+i)).join(''):'';
   // Native nudge: with no services ticked, the "Open in ___" routing has nothing to
   // prefer — point them to My Services so it can open the apps they already pay for.
-  const nudge=(IS_NATIVE&&!myServices().length)?`<button class="wt-nudge" onclick="closeAll();setTimeout(()=>openSheet('sourceSheet'),260)">${icon('film')}<span>Set up <b>My Services</b> — so WatchList opens shows in the apps you already pay for.</span></button>`:'';
+  const nudge=(IS_NATIVE&&!myServices().length)?`<button class="wt-nudge" onclick="closeAll();setTimeout(()=>openSources(1),260)">${icon('film')}<span>Set up <b>My Services</b> — so WatchList opens shows in the apps you already pay for.</span></button>`:'';
   box.innerHTML=`<p class="ai-desc">Where do you want to watch <b>${escH(a.title)}</b>? Tap one and it remembers — next time it opens there automatically.</p>`
     +nudge
     +sec(myShown.length?'Your services':'',myShown,0)
@@ -23863,7 +23871,7 @@ function setSource(v){
 // "No source" mode — user wants nothing auto-opened; Watch prompts them to set one.
 function noSourceMode(){try{return localStorage.getItem('no_source')==='1';}catch{return false;}}
 function setNoSource(){try{localStorage.setItem('no_source','1');localStorage.removeItem('stream_src');}catch{}renderSource();toast('No source yet. Watch will ask you to set one');}
-function showNoSourcePrompt(){toast('Set a source first');try{openSheet('sourceSheet');}catch(e){}}
+function showNoSourcePrompt(){toast('Set a source first');try{openSources(1);}catch(e){}}
 // Select one of the user's own custom services (by id) as the active source.
 // Open the one route that actually plays in-app, and put the cursor where the
 // work is. Scrolled into view because the fold sits below two other choices and
@@ -26497,10 +26505,12 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-11-02.67',
-  title:'A keyboard worth using, and plainer words',
-  push:'Undo and redo, edit and favourite, episodes and removals \u2014 all on keys now. Press ? to see them. And the app stopped explaining itself at you.',
+  v:'2026-11-03.68',
+  title:'Sources moves to the bar',
+  push:'Sources is a tab now, next to the +. Cloud moved into Settings, where it already was.',
   notes:[
+    '<b>Sources</b> is in the bar at the bottom. It is the panel you want while you are using the app \u2014 a show opens in the wrong place and you want your services right then, not two taps deep in Settings.',
+    '<b>Cloud</b> moved into <b>Settings</b>, at the top, with its status on the tile \u2014 it turns red the moment a backup stops landing. It is also <b>c</b> on a keyboard. The bar holds five tabs so the <b>+</b> has a middle to sit in; six would put it half a tab off centre, with nothing to nudge.',
     '<b>\u2318Z</b> undoes, <b>\u2318\u21e7Z</b> or <b>\u2318Y</b> redoes \u2014 removing a title, moving an episode, changing a status. Removing something was final before, which is a lot to ask of a button sitting beside the one you meant.',
     'Most of the app is on the keyboard now. <b>1</b>\u2013<b>5</b> switch filters, <b>s</b> and <b>c</b> open Stats and Cloud, <b>\u2318,</b> opens Settings, <b>\u2318A</b> selects everything on screen, <b>e</b> edits and <b>f</b> favourites, <b>\u2318\u232b</b> removes (it still asks). With a title open, <b>.</b> and <b>,</b> move through episodes and <b>w p d x</b> set the status. Press <b>?</b> for the whole card.',
     'Codes now <b>format themselves as you type</b>. Lower case becomes upper, spacing falls into place, pasted punctuation is dropped, and you can fix a character in the middle without the cursor jumping to the end.',

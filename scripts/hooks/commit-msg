@@ -1,0 +1,25 @@
+#!/bin/sh
+# GitHub reads [skip ci] from ANYWHERE in the commit message, not just the
+# subject line. A commit that merely talked ABOUT the marker — quoting it while
+# explaining that scheduled jobs carry it — skipped its own deploy, and the push
+# looked successful because it was: the workflow simply never started. That cost
+# a confused ten minutes and a manual workflow_dispatch to recover.
+#
+# Intentional use stays allowed; it just has to be in the subject line, where
+# you can see what you are doing. Anywhere else is almost always prose.
+msg_file="$1"
+subject=$(head -1 "$msg_file")
+body=$(tail -n +2 "$msg_file")
+
+echo "$body" | grep -qiE '\[(skip ci|ci skip)\]' || exit 0
+echo "$subject" | grep -qiE '\[(skip ci|ci skip)\]' && exit 0
+
+cat >&2 <<'MSG'
+commit-msg: the body of this message contains [skip ci].
+
+GitHub reads that marker anywhere in the message, so this commit will push
+successfully and then never deploy. If you meant it, put it in the subject
+line. If you were writing about it, break the token up — e.g. "skip-ci" —
+or quote it as `skip` + `ci`.
+MSG
+exit 1

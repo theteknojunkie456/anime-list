@@ -7,4 +7,6 @@ set -e
 cd "$(dirname "$0")/.."
 cp scripts/hooks/pre-commit .git/hooks/pre-commit
 chmod +x .git/hooks/pre-commit
-echo "installed: .git/hooks/pre-commit"
+cp scripts/hooks/commit-msg .git/hooks/commit-msg
+chmod +x .git/hooks/commit-msg
+echo "installed: .git/hooks/pre-commit, .git/hooks/commit-msg"

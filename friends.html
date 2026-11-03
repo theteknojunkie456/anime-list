@@ -5828,7 +5828,7 @@ body.recsel .pcard{position:relative;}
   <details class="keyhow" style="margin-top:10px">
     <summary>Use your own endpoint (Manifest, LiteLLM, a proxy)</summary>
     <div class="keyhow-body">
-      <p class="ai-desc" style="margin:0 0 10px">Anything that speaks the OpenAI chat format. Set this and the key above can be any shape — whatever you paste is sent here instead, and this endpoint decides what it means.</p>
+      <p class="ai-desc" style="margin:0 0 10px">Anything that speaks the OpenAI chat format. With this set, the key above can be any shape.</p>
       <input class="ai-prompt-in" id="aiBaseIn" type="url" placeholder="https://api.example.com/v1" autocomplete="off" spellcheck="false" inputmode="url">
       <input class="ai-prompt-in" id="aiModelIn" style="margin-top:8px" placeholder="model name, exactly as your endpoint expects" autocomplete="off" spellcheck="false">
       <div style="display:flex;gap:8px;margin-top:8px">
@@ -5839,7 +5839,7 @@ body.recsel .pcard{position:relative;}
     </div>
   </details>
   <button class="chat-clear" onclick="removeKey()" style="margin-top:10px"><i data-ic="trash"></i> Remove key</button>
-  <p class="ai-desc" style="margin-top:12px">Your key stays on this device only — it never leaves your phone. The AI features are optional; everything else works without one.</p>
+  <p class="ai-desc" style="margin-top:12px">Your key never leaves this device. AI features are optional — everything else works without one.</p>
 
   <!-- "Get a free key" is meaningless to someone who's never seen an API console.
        Spelled out step by step, because the alternative is they give up here. -->
@@ -6390,7 +6390,7 @@ body.recsel .pcard{position:relative;}
     <div class="sheet-title"><i data-ic="inbox"></i> Storage</div>
     <button class="sheet-cancel" onclick="closeAll()">Done</button>
   </div>
-  <p class="ai-desc">Your list is text and weighs almost nothing. This is really about artwork you upload yourself \u2014 how much of this device WatchList may keep it in.</p>
+  <p class="ai-desc">How much of this device WatchList may use for artwork you upload. Your list itself weighs almost nothing.</p>
   <div id="storageBox"></div>
   <p class="ai-desc" style="margin-top:12px">When it is full, uploading asks you to remove an image rather than taking more room. Nothing already saved is ever deleted for you.</p>
 </div>
@@ -8593,7 +8593,7 @@ async function renderFaceIDUI(){
        <p class="ai-desc">Unlock with ${B} instead of typing your password. Your password and recovery key still work.</p>
        <button class="imp-all" style="width:100%" onclick="disableFaceID()">Turn off ${B} unlock</button>`
     : `<div class="dt-label" style="margin-top:16px">${icon('key')} ${B}</div>
-       <p class="ai-desc">Skip typing your password — unlock with ${B}. It derives a key from your passkey, so your list stays just as encrypted.</p>
+       <p class="ai-desc">Skip typing your password — unlock with ${B}. Your list stays just as encrypted.</p>
        <button class="parse-btn" style="margin-top:0" onclick="enableFaceID()">Turn on ${B} unlock</button>`;
 }
 
@@ -8698,7 +8698,7 @@ function renderLockUI(){
   const box=document.getElementById('lockBox');if(!box)return;
   if(encEnabled()){
     box.innerHTML=`<div class="dt-label">${icon('lock')} Password · ON</div>
-      <p class="ai-desc">Your list is encrypted — genuinely unreadable without your password, on this device <b>and</b> in the cloud. If you ever forget the password, your <b>recovery key</b> is the only way back in.</p>
+      <p class="ai-desc">Your list is encrypted — unreadable without your password, on this device <b>and</b> in the cloud. If you ever forget the password, your <b>recovery key</b> is the only way back in.</p>
       <div style="display:flex;gap:8px;margin-top:8px;">
         <input class="ai-prompt-in" id="newPwIn" type="password" placeholder="New password (to change)" autocomplete="new-password">
         <button class="ai-run-btn" onclick="changeAppPassword()">Change</button>
@@ -10208,7 +10208,7 @@ function renderSyncUI(){
       </details>`;
   }else{
     box.innerHTML=`<div class="dt-label">${icon('cloud')} Cloud backup · OFF</div>${meter}
-      <p class="ai-desc">Back up your list to the cloud so it survives losing your phone and syncs across your devices. Private — only someone with your secret code can open it.</p>
+      <p class="ai-desc">Keeps your list safe if you lose this device, and keeps your devices in step. Only someone with your secret code can open it.</p>
       <button class="parse-btn" style="margin-top:0" onclick="syncEnableNew()">Turn on cloud backup</button>
       <div style="display:flex;gap:8px;margin-top:8px;">
         <textarea class="ai-prompt-in urlin" rows="2" id="syncCodeIn" placeholder="…or paste a code to restore" autocomplete="off" autocapitalize="characters" spellcheck="false" oninput="formatCodeInput(this,20,4)" onkeydown="if(event.key==='Enter'){event.preventDefault();syncRestore();}"></textarea>
@@ -10796,7 +10796,7 @@ function renderNatural(){
       <button class="ns-act drop" onclick="nsFly(false)">${icon('trash')} Remove</button>
       <button class="ns-act keep" onclick="nsFly(true)">${icon('check')} Keep</button>
     </div>
-    <p class="ai-desc" style="margin-top:10px">Swipe the card, use the buttons, or press \u2190 and \u2192. Remove sets it aside in the Archive \u2014 not the same as Dropped, which is for things you started, and not gone either. Nothing goes until you confirm at the end.</p>`;
+    <p class="ai-desc" style="margin-top:10px">Swipe the card, use the buttons, or press \u2190 and \u2192. Remove sets it aside in the Archive, where you can bring it back. Nothing moves until you confirm at the end.</p>`;
   try{hydrateIcons(document.getElementById('nsSheet'));}catch(e){}
   nsArmSwipe();
   nsLoadSyn(a);
@@ -15227,7 +15227,7 @@ function openSeasonsDrawer(id){
   if(a.idWeak){
     const box=document.getElementById('sdBody');
     const t=document.getElementById('sdTitle'); if(t)t.textContent=a.title||'All seasons';
-    if(box)box.innerHTML=`<p class="ai-desc">This one isn\u2019t confidently matched to a database entry, so its seasons can\u2019t be trusted \u2014 they\u2019d be another show\u2019s. Fix the match from the show\u2019s page and this will fill in.</p>`;
+    if(box)box.innerHTML=`<p class="ai-desc">The seasons here would be another show\u2019s \u2014 this title isn\u2019t matched yet. Fix the match from its page and this will fill in.</p>`;
     return;
   }
   renderSeasonsDrawer(true);
@@ -26518,10 +26518,11 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-11-03.69',
+  v:'2026-11-03.70',
   title:'Sources moves to the bar, and the app says less',
   push:'Sources is a tab now, next to the +. Cloud moved into Settings. And the admin panel stopped explaining itself.',
   notes:[
+    'The app <b>says less everywhere else too</b>. Settings, the security panel, the import screens, Natural selection and the admin tools were all explaining how they worked rather than what they do. Shorter now, and the app no longer refers to anyone who built it.',
     'The <b>Updates</b> list no longer prints build notation. Nightly jobs that refresh chapter counts filled whole days with the same line, ending in <b>[skip ci]</b> \u2014 they are out. Repo housekeeping is labelled as such instead of being announced as a feature, and a change is only tagged <b>Security</b> when it is actually about a lock, a password or a key.',
     '<b>Sources</b> is in the bar at the bottom. It is the panel you want while you are using the app \u2014 a show opens in the wrong place and you want your services right then, not two taps deep in Settings.',
     '<b>Cloud</b> moved into <b>Settings</b>, at the top, with its status on the tile \u2014 it turns red the moment a backup stops landing. It is also <b>c</b> on a keyboard. The bar holds five tabs so the <b>+</b> has a middle to sit in; six would put it half a tab off centre, with nothing to nudge.',

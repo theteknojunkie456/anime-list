@@ -898,6 +898,21 @@ only needed to know what happened and what to do.
 - Don't name internals — key, blob, envelope, device id, push — unless the
   person has to act on that word.
 - Applies to toasts, panel text, diagnostics, release notes and empty states.
+- **There is no author inside the app.** The tour told people a key could not be
+  recovered "not even by me". There is no me here; there is the app and the
+  person using it.
+
+`scripts/app-voice-test.mjs` enforces the last two points, because this drifted
+back three times — Cloud was cleaned up, then the admin panel, the tour and the
+toasts each turned out to have their own copy of the same habit. It reads only
+surfaces that are definitely rendered (toast literals, `ai-desc` / `hint`
+paragraphs, and `WT_STEPS`), never comments, which is where the reasoning is
+supposed to live. Scoping it to toasts and panels alone missed the tour, and the
+tour held the worst line in the app — so the scope is part of the test, not an
+implementation detail. Point it at an older revision to see it fail on the copy
+that actually shipped:
+
+    node scripts/app-voice-test.mjs /tmp/old-index.html
 
 **Style**
 - **Feather icons and brand fonts only.** Custom controls, not platform defaults.

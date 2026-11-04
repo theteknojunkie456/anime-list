@@ -8815,6 +8815,36 @@ function unwrapSync(data){
   return {inner:data,extra:null};
 }
 function fmtBytes(n){return n<1024?n+' B':n<1048576?(n/1024).toFixed(0)+' KB':(n/1048576).toFixed(2)+' MB';}
+// A DESKTOP IS NOT A WIDE PHONE. Width alone says yes to a phone in landscape,
+// which this app deliberately gives the rail to — so the rail predicate is the
+// wrong one to borrow. A fine pointer plus room is what actually distinguishes
+// the machine someone works at: there is a keyboard, the window is big enough
+// to spend lines on, and exact values are worth more there than tidy ones.
+//
+// Rounded and relative wording stays on the phone, where "1h ago" is the right
+// answer at a glance and a byte count is noise. On a desktop the same line is
+// hiding the number you came to read.
+function isDesk(){try{return matchMedia('(min-width:1000px) and (pointer:fine)').matches;}catch(e){return false;}}
+const _grp=n=>String(Math.round(n||0)).replace(/\B(?=(\d{3})+(?!\d))/g,',');
+function fmtBytesExact(n){return _grp(n)+' B ('+fmtBytes(n)+')';}
+// Local time, seconds included, no "ago". Relative time cannot answer "did this
+// happen before or after the thing I just did", which is the question anybody
+// reading this panel on a desktop is actually asking.
+function fmtStamp(ms){ if(!ms)return 'never';
+  try{const d=new Date(+ms);const p=x=>String(x).padStart(2,'0');
+    return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds());
+  }catch(e){return String(ms);}}
+// The facts a desktop line can afford and a phone cannot. Monospace, because
+// these are values to compare between two machines, not prose to read.
+function techLine(){
+  const bits=[];
+  try{bits.push('device '+String(wlDevice()).slice(0,8));}catch(e){}
+  try{bits.push('titles '+realList().length);}catch(e){}
+  try{bits.push('deleted '+Object.keys(tombs()).length);}catch(e){}
+  try{const st=pushState();bits.push('failed saves '+((st&&st.n)||0));}catch(e){}
+  try{bits.push('v '+((typeof RELEASE!=='undefined'&&RELEASE&&RELEASE.v)||'?'));}catch(e){}
+  return '<p class="ai-desc" style="margin:6px 0 0;font:11px/1.5 ui-monospace,Menlo,monospace;color:var(--t3)">'+bits.join('  \u00b7  ')+'</p>';
+}
 function syncPayloadSize(){try{return new Blob([JSON.stringify({v:3,list:anime,extra:collectExtra()})]).size;}catch(e){try{return JSON.stringify(anime).length;}catch(_){return 0;}}}
 function genCode(){let s='';const c='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';for(let i=0;i<20;i++)s+=c[Math.floor(Math.random()*c.length)];return s;}
 let pushT;
@@ -9182,6 +9212,10 @@ async function runningBuild(){
 }
 function fmtWhen(ms){
   if(!ms)return 'never';
+  // On a desktop this panel exists to be compared against another machine's,
+  // so it gets the sortable form with seconds. "Nov 3 1:15 AM" cannot tell you
+  // which of two saves came first.
+  if(isDesk())return fmtStamp(ms);
   const d=new Date(+ms);
   return d.toLocaleDateString([],{day:'numeric',month:'short'})+' '+d.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
 }
@@ -10128,12 +10162,14 @@ function renderSyncUI(){
       ? `<b style="color:var(--t1)">${fmtBytes(used)}</b> ready to save. Nothing is in the cloud yet.`
       : _st.n>=3
       ? `Your cloud copy is from ${relTime(_at)}.${_st.why?' Last error: '+escH(_st.why)+'.':''}`
+      : isDesk()
+      ? `<b style="color:var(--t1)">${fmtBytesExact(used)}</b> of ${fmtBytesExact(SYNC_CAP)} · ${(used/SYNC_CAP*100).toFixed(1)}% · last saved ${fmtStamp(_at)}`
       : `<b style="color:var(--t1)">${fmtBytes(used)}</b> of ${fmtBytes(SYNC_CAP)} saved · ${pct}%. Last saved ${relTime(_at)}.`;
   // Shown only when the automatic save has not managed it, because that is the
   // only time pressing it does anything the app would not already have done.
   // Never while locked: it would refuse, and offering it says the opposite.
   const _needsPush=!_locked&&(!_landed||_st.n>=3);
-  const meter=`<div style="height:7px;border-radius:99px;background:var(--bg4);overflow:hidden;margin:9px 0 2px"><div style="height:100%;width:100%;transform:scaleX(${_fill.toFixed(3)});transform-origin:left;background:var(--a);border-radius:99px;transition:transform .3s"></div></div><p class="ai-desc" style="margin:4px 0 0">${_foot}</p>`+
+  const meter=`<div style="height:7px;border-radius:99px;background:var(--bg4);overflow:hidden;margin:9px 0 2px"><div style="height:100%;width:100%;transform:scaleX(${_fill.toFixed(3)});transform-origin:left;background:var(--a);border-radius:99px;transition:transform .3s"></div></div><p class="ai-desc" style="margin:4px 0 0">${_foot}</p>${isDesk()?techLine():''}`+
     (_needsPush?`<button class="parse-btn" id="backupNowBtn" style="margin:10px 0 0;width:100%" onclick="backupNow(this)">${icon('upload')} Back up now</button>`:'')
     +(_locked?`<button class="parse-btn" style="margin:10px 0 0;width:100%" onclick="showLock()">${icon('lock')} Unlock your list</button>`:'');
   if(code){
@@ -26497,10 +26533,11 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-11-03.74',
-  title:'Your list stops reverting',
+  v:'2026-11-03.75',
+  title:'Exact numbers on a desktop',
   push:'Fixed: a whole list could roll back to an older copy, over and over. Your devices stop overwriting each other\u2019s records of what they have already done.',
   notes:[
+    'On a <b>desktop</b>, Cloud now gives you the real values instead of tidy ones: the exact byte count, the percentage to a decimal, and a sortable timestamp with seconds rather than \u201c1h ago\u201d. Under it sits the line you actually need when two machines disagree \u2014 device, titles, deleted, failed saves, version. The phone keeps the short form, where a byte count is noise.',
     '<b>Your list could revert to an older copy, repeatedly.</b> Each device keeps a note of the newest \u201cuse this device\u2019s list everywhere\u201d decision it has already applied, so it applies each one once. That note was being <b>uploaded with your settings and written onto your other devices</b> \u2014 so a device still holding an old value overwrote it, and the device that had already taken the newest list then saw that same decision as new again and took an older copy whole. On the next push, again. Each device keeps its own note now.',
     'The same fault was sharing <b>which device is which</b>. Two devices could end up claiming one identity, which is why the device list could show a single row for both, mark the wrong one as \u201cthis one\u201d, and show a title count belonging to the other machine.',
     'Your <b>restore point</b> \u2014 the copy taken before anything replaces your list \u2014 was travelling too, so every device overwrote every other device\u2019s safety net, and a second full copy of your library rode along with every save. It stays home now.',

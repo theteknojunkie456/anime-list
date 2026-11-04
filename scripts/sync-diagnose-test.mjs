@@ -165,5 +165,55 @@ for(const [label,w] of [['on a phone',390],['on a laptop',1280]]){
   t('nothing in the cloud panel is cut off '+label, await overflow(), []);
 }
 
+// ── the desktop gets the exact numbers ────────────────────────────────────
+// He asked for the desktop to be more technical. Rounded sizes and "1h ago"
+// are right on a phone and are hiding the value on a machine with a keyboard
+// — relative time in particular cannot answer "did this happen before or after
+// the thing I just did", which is the only question this panel gets asked when
+// two machines disagree.
+//
+// isDesk() is overridden rather than emulated: headless Chrome's reported
+// pointer type is not something to hang a test on, and the branch is what
+// matters, not the media query that picks it.
+// renderSyncUI() returns immediately when #syncBox is absent, so without this
+// the next three checks measure an empty string and fail for a reason that has
+// nothing to do with the thing under test.
+await ev(`(()=>{if(!document.getElementById('syncBox')){
+  const d=document.createElement('div');d.id='syncBox';document.body.appendChild(d);} return 1;})()`);
+const desk = await ev(`(()=>{ try{
+  const real=isDesk; isDesk=()=>true;
+  // The meter only renders with a code AND a landed save: without both, this
+  // measures the "nothing saved yet" state and fails for the wrong reason.
+  setSyncCode('ABCDEFGHJKLMNPQRSTUV');
+  setSyncAt(new Date('2026-11-03T01:15:09').getTime());
+  setPushState({n:0,at:0,why:''});
+  renderSyncUI();
+  const t=(document.getElementById('syncBox')||{}).textContent||'';
+  isDesk=real;
+  return {exactBytes:/\\d,\\d{3}\\s*B\\s*\\(/.test(t), stamp:/2026-11-03 01:15:09/.test(t),
+          noRelative:!/ago/.test(t), tech:/device /.test(t)&&/failed saves /.test(t)};
+  }catch(e){return {err:String(e&&e.message||e)};} })()`);
+if(desk&&desk.__err)console.log('      desktop probe threw: '+desk.__err);
+t('desktop prints bytes in full',      desk.exactBytes, true);
+t('and a sortable timestamp',          desk.stamp,      true);
+t('with no "ago" left in it',          desk.noRelative, true);
+t('plus the per-device facts',         desk.tech,       true);
+
+const phone = await ev(`(()=>{
+  const real=isDesk; isDesk=()=>false;
+  setSyncCode('ABCDEFGHJKLMNPQRSTUV');
+  setSyncAt(new Date('2026-11-03T01:15:09').getTime());
+  renderSyncUI();
+  const t=(document.getElementById('syncBox')||{}).textContent||'';
+  isDesk=real;
+  return {rounded:/MB/.test(t), noTech:!/failed saves /.test(t)};})()`);
+t('the phone keeps the rounded size',  phone.rounded, true);
+t('and is not given the tech line',    phone.noTech,  true);
+
+// The formatters themselves, so a failure above points at the panel and not at
+// the arithmetic underneath it.
+t('bytes group in threes',  await ev(`fmtBytesExact(3355443).split(' ')[0]`), '3,355,443');
+t('never is still never',   await ev(`fmtStamp(0)`), 'never');
+
 console.log('\n'+pass+' passed, '+fail+' failed');
 ws.close();ch.kill();srv.kill();process.exit(fail?1:0);

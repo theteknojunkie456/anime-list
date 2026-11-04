@@ -172,5 +172,46 @@ check('episode 1 pasted becomes an episode-shaped template',
 check('with the id and name kept together as the show',
   oslug, 'xwihANStirjP8A22XOxxXqqCddztkM7X/overlord');
 
+// ── a learned address that has rotted ─────────────────────────────────────
+// Aggregators retire an entry and mint a new one for the same show. The name we
+// learned keeps resolving — to a page saying the entry is gone. WatchList cannot
+// see that: the frame is cross-origin, so "it loaded" is all it will ever know.
+// The person can see it, so the recovery has to be reachable by them, and until
+// now nothing anywhere could forget ONE learned name.
+const forget = h.slice(h.indexOf('function forgetLearnedSlug'), h.indexOf('function pvForgetLink'));
+check('there is a way to forget one learned address', forget.length > 0, true);
+
+// Run it rather than reading it. The first version of this function reassigned a
+// const, which parses perfectly and throws the moment a show has a srcSlug — the
+// syntax check cannot see that, and neither can a regex.
+let _map = {'miruro.tv': {'21': 'dead-token/one-piece', '20': 'naruto'}};
+const forgetFn = new Function('srcHost','effectiveSource','slugMap','saveSlugMap',
+  forget + '; return forgetLearnedSlug;')(
+  () => 'miruro.tv', () => '', () => _map, m => { _map = m; });
+
+const op = {aniId: 21, srcSlug: 'dead-token/one-piece'};
+const ret = forgetFn(op);
+check('it does not throw on a show that has one', ret, true);
+check('the learned name is gone from the site map', !!(_map['miruro.tv']||{})['21'], false);
+// effectiveSource reads the per-title copy FIRST, so clearing only the map
+// leaves Watch going straight back to the page that is gone.
+check('and gone from the title itself', op.srcSlug, undefined);
+check('another show on the same site is untouched', (_map['miruro.tv']||{})['20'], 'naruto');
+
+const unknown = {aniId: 99};
+check('forgetting one that was never learned is harmless', forgetFn(unknown), false);
+check('a show with no database id is left alone', forgetFn({srcSlug: 'x'}), false);
+
+// The site entry itself should not linger once its last show is forgotten.
+let _solo = {'miruro.tv': {'21': 'dead'}};
+const forgetSolo = new Function('srcHost','effectiveSource','slugMap','saveSlugMap',
+  forget + '; return forgetLearnedSlug;')(
+  () => 'miruro.tv', () => '', () => _solo, m => { _solo = m; });
+forgetSolo({aniId: 21});
+check('an emptied site leaves no entry behind', Object.keys(_solo).length, 0);
+
+check('the player offers it on the rescue panel', /onclick="pvForgetLink\(\)"/.test(h), true);
+check('and says when to use it', /it says the page is gone/.test(h), true);
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

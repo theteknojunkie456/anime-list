@@ -6298,13 +6298,14 @@ body.recsel .pcard{position:relative;}
         <span class="pv-wrong-ic"><i data-ic="search"></i></span>
         <div class="pv-wrong-copy">
           <div class="pv-wrong-t">Not your show?</div>
-          <div class="pv-wrong-s">This site spells titles its own way. Point it out once and every episode works.</div>
+          <div class="pv-wrong-s">This site spells titles its own way. Point it out once and every episode works. If it says the page is gone, forget it and search again.</div>
         </div>
         <button class="pv-wrong-x" onclick="document.getElementById('pvWrong').classList.remove('on')" aria-label="Dismiss"><i data-ic="x"></i></button>
       </div>
       <div class="pv-wrong-acts">
         <button class="pv-wrong-b prim" onclick="pvSetPrompt()">Find it</button>
         <button class="pv-wrong-b" onclick="pvTrySpelling()" title="Try the show's other titles">Spelling</button>
+        <button class="pv-wrong-b" onclick="pvForgetLink()" title="Forget the address learned for this show">Forget it</button>
       </div>
       <button class="pv-wrong-last" onclick="pvAllowMore()">Screen stayed blank? This site may refuse to play in here</button>
     </div>
@@ -21269,6 +21270,38 @@ function learnedSlugFor(a){
   const host=srcHost(effectiveSource(a)); if(!host)return '';
   return (slugMap()[host]||{})[String(a.aniId)]||'';
 }
+// A learned name is kept forever, keyed by site and show, and until now nothing
+// anywhere could forget ONE of them. That is fine while a site is stable and
+// wrong the moment it is not: aggregators retire an entry and mint a new one for
+// the same show, and the address we learned keeps resolving — to a page saying
+// the entry is gone. The app cannot see that. The frame is cross-origin, so
+// "the page loaded" is the most WatchList will ever know about it.
+//
+// So the recovery has to be something the person can reach, because they are the
+// only one who can see the screen. Forgetting the name sends the next Watch back
+// through the site's own search instead of a dead address, which is exactly
+// where someone browsing the site by hand would have ended up.
+function forgetLearnedSlug(a,tpl){
+  if(!a||!a.aniId)return false;
+  const host=srcHost(tpl||effectiveSource(a)); if(!host)return false;
+  const m=slugMap(), forSite=m[host];
+  let had=!!(forSite&&forSite[String(a.aniId)]);
+  if(forSite){delete forSite[String(a.aniId)]; if(!Object.keys(forSite).length)delete m[host]; saveSlugMap(m);}
+  // The per-title copy is a second place the same fact lives. Clearing only the
+  // map leaves the dead address on the item itself, and effectiveSource() reads
+  // that one first — so Watch would go straight back to the page that is gone.
+  if(a.srcSlug){delete a.srcSlug; had=true;}
+  return had;
+}
+function pvForgetLink(){
+  const a=anime.find(x=>x.id===pvReturnId); if(!a){toast('Nothing open');return;}
+  const name=sourceName&&sourceName();
+  forgetLearnedSlug(a);
+  try{save();}catch(e){}
+  try{document.getElementById('pvWrong').classList.remove('on');}catch(e){}
+  toast('Forgotten. Searching '+(name||'the site')+' for it instead');
+  try{pvSearchHere();}catch(e){}
+}
 // ─── SHARE YOUR SETUP ───────────────────────────────────────────────────────
 // Getting a streaming site working is the hardest part of the app, and it only
 // has to be solved once per site — so someone who has it working can hand the
@@ -26542,10 +26575,11 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-11-03.71',
+  v:'2026-11-03.72',
   title:'Sources moves to the bar, and the app says less',
   push:'Sources is a tab now, next to the +. Cloud moved into Settings. And the admin panel stopped explaining itself.',
   notes:[
+    'When <b>Watch</b> lands on a page saying the entry is gone, you can now <b>forget it</b> from the rescue panel and search the site again. Sites retire an entry and make a new one for the same show; the address WatchList learned still opens, so it had no way of knowing, and no way to let go of it. One show at a time \u2014 nothing else you have taught is touched.',
     '<b>App version here</b>, in the Cloud check, was reporting the same frozen value on every device. It was reading the font cache\u2019s name instead of the build\u2019s \u2014 so the one row whose job is telling you whether a device is up to date has been wrong since it was added.',
     'The Cloud check now tells you <b>what to do</b> when it meets a list it cannot read, instead of reporting that it cannot compare them. If your list has a password and this device has not been given it, it says so and points at the box.',
     'The app <b>says less everywhere else too</b>. Settings, the security panel, the import screens, Natural selection and the admin tools were all explaining how they worked rather than what they do. Shorter now, and the app no longer refers to anyone who built it.',

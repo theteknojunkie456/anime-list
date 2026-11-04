@@ -147,6 +147,20 @@ t('while the settings that SHOULD travel still arrived', loop.applied, true);
 // and "put it back" would have handed him a stranger's library. Nothing in the
 // app reads this key — it is the copy of last resort — so the only thing worth
 // asserting is that an arriving bundle cannot replace it.
+// The per-device note with teeth. ext_watch is "I left for a site to watch ep N
+// at time T", and settling it calls autoMarkWatched() — a write to the list. On
+// a device that never left, the other device's departure clock is always older
+// than the fifteen minutes that mean "they watched it", so the episode gets
+// marked watched where nobody watched it.
+t('another device\u2019s trip cannot mark an episode watched here',
+  await ev(`(()=>{
+    anime=[{id:'w1',title:'Trip',kind:'watch',status:'watching',ep:1,epTotal:12,upd:Date.now()}];writeLocal();
+    clearExternalWatch();
+    applyExtra({ext_watch:JSON.stringify({id:'w1',ep:9,t:Date.now()-60*60*1000,s:''}),bg_bright:'42'});
+    settleExternalWatch();
+    return {ep:(anime.find(x=>x.id==='w1')||{}).ep, arrived:localStorage.getItem('bg_bright')==='42'};})()`),
+  {ep:1,arrived:true});
+
 t('and another device cannot overwrite this one\u2019s restore point',
   await ev(`(()=>{localStorage.setItem('wl_prepush_backup','{"mine":1}');
     applyExtra({wl_prepush_backup:'{"theirs":1}',bg_bright:'37'});

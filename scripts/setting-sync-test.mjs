@@ -33,7 +33,9 @@ const suite=function(){
   // guard was meant to fire once per device.
   const PER_DEVICE=['wl_adopt_seen','wl_prepush_backup','wl_device','wl_admin_token',
                     'wl_admin_ck','wl_net_status','wl_invite','wl_errs','wl_img_bytes',
-                    'wl_booted','wl_rail_folded','wl_seekok','wl_pos'];
+                    'wl_booted','wl_rail_folded','wl_seekok','wl_pos',
+                    // where this device went, and what is half-typed on this screen
+                    'ext_watch','src_draft','src_tab'];
   PER_DEVICE.forEach(k=>{ try{localStorage.setItem(k,'x');}catch(e){} });
   const carried=PER_DEVICE.filter(k=>!syncSkip(k));
   out.push('no per-device key is allowed to sync ('+(carried.join(',')||'none')+'): '+(carried.length===0));

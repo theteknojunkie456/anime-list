@@ -8758,8 +8758,22 @@ function syncSkip(k){
   // write even when not one byte had actually changed — on a plan that allows a
   // thousand writes a day, shared with every real edit. Nothing is lost by
   // leaving them out: each one is re-fetched by the pull that fills it.
+  // Facts about a trip THIS device made, or what is half-typed on THIS screen.
+  //
+  // ext_watch is the one with teeth. It records "I left for a site to watch ep N
+  // at time T", and settleExternalWatch() can turn that into autoMarkWatched() —
+  // a WRITE to the list. Shared, it lands on a device that never left, carrying
+  // the other device's departure clock, so the elapsed time is always past the
+  // fifteen-minute threshold and the episode is marked watched on a machine
+  // where nobody watched it. Same family as the adopt marker: a per-device note
+  // that quietly edits the library once it travels.
+  //
+  // The other two are smaller: src_draft is a custom source nobody has saved
+  // yet, src_tab is which tab a sheet was left on. Neither is anyone else's
+  // business, and both schedule a push on every keystroke-sized change.
+  if(k==='ext_watch'||k==='src_draft'||k==='src_tab')return true;
   if(k==='recs_in'||k==='recs_passed'||k==='recs_echo'||k==='parties_in')return true;
-  if(k==='rel_scan_at'||k==='upcoming_related')return true;
+  if(k==='rel_scan_at'||k==='upcoming_related'||k==='wl_ai_borrowed')return true;
   // How much room this device is willing to give is a fact about THIS device.
   if(k==='store_budget')return true;
   if(k===KEY_SELF)return true;              // "this device invented its own key" is about this device
@@ -26533,10 +26547,12 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-11-03.75',
-  title:'Exact numbers on a desktop',
-  push:'Fixed: a whole list could roll back to an older copy, over and over. Your devices stop overwriting each other\u2019s records of what they have already done.',
+  v:'2026-11-04.76',
+  title:'Nobody else watched it for you',
+  push:'Fixed: an episode could be marked watched on a device where nobody watched it, because a trip made on one device was being sent to the others.',
   notes:[
+    'When you open an episode on another site, the app notes which episode you left for and when, so it can mark it watched if you were gone long enough. <b>That note was being sent to your other devices.</b> On a device that never left, the clock it arrived with was always older than the fifteen minutes that mean \u201cwatched\u201d \u2014 so a title could jump several episodes ahead on a machine you had not watched anything on. The note stays on the device that made the trip now.',
+    'Two smaller ones went the same way: a <b>custom source you were still typing</b> and had not saved could appear on another device, and <b>which tab a sheet was left on</b> travelled with it. Both also cost a save to the cloud every time they changed.',
     'On a <b>desktop</b>, Cloud now gives you the real values instead of tidy ones: the exact byte count, the percentage to a decimal, and a sortable timestamp with seconds rather than \u201c1h ago\u201d. Under it sits the line you actually need when two machines disagree \u2014 device, titles, deleted, failed saves, version. The phone keeps the short form, where a byte count is noise.',
     '<b>Your list could revert to an older copy, repeatedly.</b> Each device keeps a note of the newest \u201cuse this device\u2019s list everywhere\u201d decision it has already applied, so it applies each one once. That note was being <b>uploaded with your settings and written onto your other devices</b> \u2014 so a device still holding an old value overwrote it, and the device that had already taken the newest list then saw that same decision as new again and took an older copy whole. On the next push, again. Each device keeps its own note now.',
     'The same fault was sharing <b>which device is which</b>. Two devices could end up claiming one identity, which is why the device list could show a single row for both, mark the wrong one as \u201cthis one\u201d, and show a title count belonging to the other machine.',

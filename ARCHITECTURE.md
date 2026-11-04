@@ -545,6 +545,22 @@ wrong one "this one". `wl_prepush_backup` travelling meant every device
 overwrote every other's restore point, while a second full copy of the library
 rode along inside every push.
 
+Auditing the rest of the keys afterwards found one more with the same shape and
+real teeth: `ext_watch`, the note saying "I left for a site to watch episode N
+at time T". `settleExternalWatch()` turns that note into `autoMarkWatched()`,
+which **writes to the list**. Shared, it arrived on a device that never left,
+carrying the other device's departure clock — always older than the fifteen
+minutes that mean "watched" — so a title jumped several episodes ahead on a
+machine nobody had watched anything on. `src_draft` (an unsaved custom source)
+and `src_tab` went the same way for smaller reasons. The rule this gives:
+**if a key answers "what is happening on this machine right now", it is not a
+setting**, however much it looks like one.
+
+Left alone on purpose: `notify_on` is AND-ed with the device's own permission
+at every read (`notifyOn()&&granted`), so a travelling "on" cannot make a
+device claim notifications it has no permission for, and the toggle is a
+preference people reasonably want everywhere.
+
 Two tests hold the line, deliberately from different ends. `setting-sync-test`
 asserts the key list — each per-device key is refused by `syncSkip()`, is absent
 from `collectExtra()`, and cannot be written by an incoming `applyExtra()` —

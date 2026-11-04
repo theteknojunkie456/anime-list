@@ -13,7 +13,7 @@ const suite=function(){
   window.schedulePush=function(){pushes++;};      // count intent, don't hit the network
   const n=()=>{const v=pushes;pushes=0;return v;};
   n();
-  applyTheme('retro');                out.push('picking a theme pushes: '+(n()>0));
+  applyTheme('naruto');               out.push('picking a theme pushes: '+(n()>0));
   setAccent('#5ed47a');               out.push('changing the accent pushes: '+(n()>0));
   setDensity('large');                out.push('changing card size pushes: '+(n()>0));
   try{setGlow('theme');}catch(e){}    out.push('changing the glow pushes: '+(n()>0));

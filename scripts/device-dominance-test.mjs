@@ -108,6 +108,51 @@ t('the same decision is honoured once, not every open',
     await syncOnOpen();await new Promise(r=>setTimeout(r,300));
     return anime.some(x=>x.title==='Mine');})()`), true);
 
+// ── the loop that was actually eating his list ──────────────────────────────
+// The guard above is "honour a decision once", and it was correct. What broke
+// it was arriving SETTINGS. collectExtra() uploaded wl_adopt_seen — this
+// device's private note of which decision it had already applied — and
+// applyExtra() wrote another device's copy of that note over it. A stale
+// phone's zero landed on the Mac; the Mac then looked at a decision it had
+// honoured days ago, found it newer than what it now believed it had seen, and
+// took that old list whole. Every open. The key-level guard lives in
+// setting-sync-test; this is the same bug from the user's end, which is the
+// end he reported it from: "WHYS MY LIST KEEPING GOING BACK TO THE PAST".
+const loop=await ev(`(async()=>{
+  const A=Date.now();                 // a decision this device has already honoured
+  setLastAdopt(A);
+  // Reading wl_adopt_seen after the pull proves nothing: re-adopting WRITES that
+  // marker on its way past, so the value looks untouched either way. The restore
+  // point does not lie — preSyncBackup() runs on the adopt path and nowhere else.
+  localStorage.removeItem('wl_prepush_backup');
+  anime=[{id:'now1',title:'Newest thing I watched',kind:'watch',upd:Date.now()}];writeLocal();
+  // a stale device publishes its whole settings bundle, its own adopt note inside
+  window.__cloud.adopt=A;window.__cloud.adoptBy='oldphone';
+  window.__cloud.data={v:3,list:[{id:'old1',title:'Last year',kind:'watch',upd:1}],
+    extra:{wl_adopt_seen:'0',wl_device:'oldphone0001',animetheme:'naruto'}};
+  window.__cloud.updatedAt=Date.now()+1000;setSyncAt(Date.now()-60000);
+  await syncOnOpen();await new Promise(r=>setTimeout(r,500));
+  return {readopted:!!localStorage.getItem('wl_prepush_backup'),
+          kept:anime.some(x=>x.title==='Newest thing I watched'),
+          id:wlDevice(),
+          applied:localStorage.getItem('animetheme')==='naruto'};})()`);
+t('arriving settings cannot re-arm an honoured decision', loop.readopted, false);
+t('so the newest progress is still here after the pull', loop.kept, true);
+t('and this device still answers to its own name', loop.id, 'thisdevice1234');
+// Without this last row the three above could all pass because the pull bailed
+// out early and applied nothing — a green test for an app that syncs nothing.
+t('while the settings that SHOULD travel still arrived', loop.applied, true);
+
+// The restore point was travelling too, so every device overwrote every other's
+// and "put it back" would have handed him a stranger's library. Nothing in the
+// app reads this key — it is the copy of last resort — so the only thing worth
+// asserting is that an arriving bundle cannot replace it.
+t('and another device cannot overwrite this one\u2019s restore point',
+  await ev(`(()=>{localStorage.setItem('wl_prepush_backup','{"mine":1}');
+    applyExtra({wl_prepush_backup:'{"theirs":1}',bg_bright:'37'});
+    return localStorage.getItem('wl_prepush_backup')==='{"mine":1}'
+        && localStorage.getItem('bg_bright')==='37';})()`), true);
+
 // ── being told to catch up, instead of silently overwriting ─────────────────
 t('a push refused as stale pulls instead of backing off',
   await ev(`(async()=>{

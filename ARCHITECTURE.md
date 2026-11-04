@@ -527,6 +527,37 @@ settings bundle alongside the copy already in `list`. Now skipped — which, bec
 `applyExtra()` filters through the same function, also stops a stale `_bak` from
 another device being written over yours.
 
+### A fact about THIS device is not a setting
+
+`collectExtra()` is an allowlist by omission: it uploads every `localStorage`
+key `syncSkip()` does not refuse, and `applyExtra()` writes the lot onto every
+other device. That is right for a theme and wrong for anything a device knows
+only about itself, so a new key is a decision, not a default.
+
+The one that cost a real library was `wl_adopt_seen` — this device's note of
+the newest "use this device's list everywhere" decision it has already applied,
+which is what makes the guard fire **once** per device. Shared, a device still
+holding an old value overwrote it; the device that had already taken the newest
+list then read a decision it honoured days ago as new, and took that older copy
+whole. On the next push, again. `wl_device` travelling put two machines behind
+one identity, which is why the roster could show one row for both and mark the
+wrong one "this one". `wl_prepush_backup` travelling meant every device
+overwrote every other's restore point, while a second full copy of the library
+rode along inside every push.
+
+Two tests hold the line, deliberately from different ends. `setting-sync-test`
+asserts the key list — each per-device key is refused by `syncSkip()`, is absent
+from `collectExtra()`, and cannot be written by an incoming `applyExtra()` —
+while real settings still travel. `device-dominance-test` reproduces the
+user-visible failure instead: honour a decision, take an edit, pull a stale
+device's whole settings bundle, and the newest progress must still be there.
+
+That second test detects the re-adopt through `wl_prepush_backup` rather than by
+re-reading `wl_adopt_seen`, because adopting **writes** that marker on its way
+past — reading it afterwards shows the fixed value on a broken build. Any
+assertion here should be checked against the revision before the fix
+(`aecf7ae`); three of these rows went green on the broken code until they were.
+
 **Identical pushes.** `syncPush()` fingerprints the *plaintext* (list + extra) and
 returns early when it matches the last **confirmed** push. Plaintext, not payload:
 an encrypted envelope carries a fresh IV each time, so hashing what goes on the

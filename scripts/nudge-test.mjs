@@ -71,6 +71,10 @@ const NF=await ev('String(NUDGE_FLAG)');
 
 let pass=0,fail=0;
 const t=(name,got,want)=>{const o=got.includes(want);o?pass++:fail++;console.log((o?'ok  ':'FAIL')+'  '+name+'\n       '+got);};
+// The banner checks compare text by substring; the layout checks below are
+// yes/no. One helper doing both silently coerced a boolean and threw.
+const tb=(name,got,want)=>{const o=got===want;o?pass++:fail++;
+  console.log((o?'ok  ':'FAIL')+'  '+name.padEnd(46)+String(got)+(o?'':'  (want '+want+')'));};
 
 t('backup off entirely -> offer to turn it on',
   await banner(`localStorage.removeItem('${SC}');localStorage.setItem('${BO}','1');localStorage.removeItem('${NF}');localStorage.removeItem('${K}')`),
@@ -93,6 +97,33 @@ t('a failing backup outranks the code reminder',
 t('healthy backup -> no nudge at all',
   await banner(`localStorage.setItem('${CS}','1');localStorage.removeItem('${K}')`),
   '(no banner)');
+
+// ── home opens on progress, not on a suggestion ───────────────────────────
+// There used to be a "Pick up where you left off" card above every band. It
+// said what Continue Watching says one row lower, and to say it the billboard
+// had to skip whatever the card had taken — so his own progress was pulled out
+// of the picture to make a tip about it. It also never stayed dismissed: the
+// key was showId:episodesBehind held in memory, so it reset on every open and
+// stopped matching the moment he watched one episode.
+const home=await ev(`(()=>{
+  localStorage.setItem('${CS}','1');localStorage.removeItem('${K}');
+  anime=[{id:'a1',title:'A Show',kind:'watch',status:'watching',aniId:1,ep:3,epTotal:24,airEp:16,upd:Date.now()},
+         {id:'a2',title:'Another',kind:'watch',status:'watching',aniId:2,ep:1,epTotal:12,airEp:9,upd:Date.now()}];
+  renderHome();
+  const h=document.getElementById('home')||document.body;
+  const bands=[...h.querySelectorAll('.rz-scroll,.bb-wrap,.nudge')].map(e=>
+    e.classList.contains('rz-scroll')?'resume':e.classList.contains('nudge')?'nudge':'billboard');
+  return {html:h.innerHTML.length>0, bands,
+          noCard:!h.querySelector('.resume-card,.resume-wrap'),
+          behindGone:typeof behindHTML==='undefined'};})()`);
+tb('the resume card is gone from the markup', home.noCard, true);
+tb('and its builder no longer exists', home.behindGone, true);
+// Whatever bands this list produces, a suggestion must not be the first thing.
+tb('no banner sits above the bands', home.bands[0]==='nudge', false);
+// behindItems() survives because resumeItems() ranks the rail with it — deleting
+// it with the banner would have taken the ordering of the surface that stayed.
+tb('the rail still ranks by how far behind you are',
+  await ev(`typeof behindItems==='function'&&behindItems().length>0`), true);
 
 console.log('\n'+pass+' passed, '+fail+' failed');
 ws.close();ch.kill();srv.kill();process.exit(fail?1:0);

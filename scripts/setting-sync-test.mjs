@@ -24,6 +24,40 @@ const suite=function(){
   localStorage.setItem('sync_code','X');               out.push('sync bookkeeping does NOT push: '+(n()===0));
   localStorage.setItem('animelist_v4','[]');           out.push('the list itself does NOT push here: '+(n()===0));
   applyExtra({animetheme:'naruto',bg_bright:'10'});    out.push('applying the cloud’s settings does NOT push back: '+(n()===0));
+  // ── per-device facts must not travel ──────────────────────────────────
+  // collectExtra() uploads every key syncSkip() does not refuse, and applyExtra()
+  // writes them onto every other device. wl_adopt_seen is "the newest decision I
+  // have already applied": shared, a stale device overwrote the Mac's value, the
+  // Mac then found an adopt stamp it had already honoured to be newer than what
+  // it now believed it had seen, and took that old list whole — on a loop. The
+  // guard was meant to fire once per device.
+  const PER_DEVICE=['wl_adopt_seen','wl_prepush_backup','wl_device','wl_admin_token',
+                    'wl_admin_ck','wl_net_status','wl_invite','wl_errs','wl_img_bytes',
+                    'wl_booted','wl_rail_folded','wl_seekok','wl_pos'];
+  PER_DEVICE.forEach(k=>{ try{localStorage.setItem(k,'x');}catch(e){} });
+  const carried=PER_DEVICE.filter(k=>!syncSkip(k));
+  out.push('no per-device key is allowed to sync ('+(carried.join(',')||'none')+'): '+(carried.length===0));
+  const bundle=collectExtra();
+  const leaked=PER_DEVICE.filter(k=>k in bundle);
+  out.push('and none of them is in the pushed bundle ('+(leaked.join(',')||'none')+'): '+(leaked.length===0));
+
+  // The one that cost him the list, stated on its own so a future edit that
+  // re-admits it fails with its name on the row.
+  out.push('a device keeps its own record of which decision it applied: '+(syncSkip('wl_adopt_seen')===true));
+  out.push('and its own identity: '+(syncSkip('wl_device')===true));
+
+  // Arriving settings must not be able to rewrite them either.
+  try{localStorage.setItem('wl_adopt_seen','111');}catch(e){}
+  applyExtra({wl_adopt_seen:'1',wl_device:'someone-else',animetheme:'naruto'});
+  out.push('an incoming push cannot move this device\u2019s adopt marker: '+(localStorage.getItem('wl_adopt_seen')==='111'));
+  out.push('nor take over its identity: '+(localStorage.getItem('wl_device')!=='someone-else'));
+
+  // ...without turning into a blanket refusal: real settings still travel.
+  out.push('your sources still sync: '+(syncSkip('wl_sources')===false));
+  out.push('your theme still syncs: '+(syncSkip('animetheme')===false));
+  out.push('your archive still syncs: '+(syncSkip('wl_archive')===false));
+  out.push('deletions still sync: '+(syncSkip('wl_tombs')===false));
+
   const pre=document.createElement('pre');pre.id='S';pre.textContent=JSON.stringify(out);document.body.appendChild(pre);
 };
 const i=src.lastIndexOf('</body>');

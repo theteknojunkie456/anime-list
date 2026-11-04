@@ -333,7 +333,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
    touching the picture's brightness, so nothing becomes hard to recognise.
    This is the number to tune: .6 sits back, .85 barely moves, .4 is severe. */
 [data-retro] .pcard-img,[data-retro] .rz-img,[data-retro] .pk-cover,
-[data-retro] .dt-cover,[data-retro] .sched-thumb,[data-retro] .resume-art,
+[data-retro] .dt-cover,[data-retro] .sched-thumb,
 [data-retro] .pop-cover,[data-retro] .pick-img,
 [data-retro] .hero-bg-img,[data-retro] .rc-note-img{
   /* Covers stay sharp. A mosaic filter samples an image; it does not draw one,
@@ -357,7 +357,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 /* The carved lip, on those same surfaces. */
 [data-retro] .rz-img,[data-retro] .pk-cover,[data-retro] .dt-cover,
 [data-retro] .dt-cover-ph,[data-retro] .sched-thumb,[data-retro] .sched-thumb-ph,
-[data-retro] .resume-art,[data-retro] .pop-cover,[data-retro] .pick-img{
+[data-retro] .pop-cover,[data-retro] .pick-img{
   border-radius:2px;
   box-shadow:
     inset 2px 2px 0 0 color-mix(in srgb,var(--edge) 42%,transparent),
@@ -563,26 +563,21 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
    The cyberpunk is the lip colour only — cyan on the light edge — so the screen
    reads as a tight palette with neon edges rather than a glow with a UI in it. */
 [data-retro] .search-wrap,[data-retro] .hbtn,[data-retro] .nbtn,
-[data-retro] .resume-card,[data-retro] .resume-go,[data-retro] .bb-slide,
+[data-retro] .bb-slide,
 [data-retro] .nav{
   border-radius:2px;
 }
 /* Sunk: the well you type into, and the strip you left something in. */
-[data-retro] .search-wrap,[data-retro] .resume-card{
+[data-retro] .search-wrap{
   box-shadow:
     inset 2px 2px 0 0 rgba(0,0,0,.88),
     inset -1px -1px 0 0 color-mix(in srgb,var(--edge) 30%,transparent);
 }
 /* Raised: anything you press. */
 [data-retro] .hbtn,[data-retro] .nbtn,[data-retro] .sort-btn,
-[data-retro] .resume-go{
-  box-shadow:
-    inset 1px 1px 0 0 color-mix(in srgb,var(--edge) 42%,transparent),
-    inset -2px -2px 0 0 rgba(0,0,0,.90);
-}
 /* Pressed inverts the bevel — the control physically goes in. */
 [data-retro] .hbtn:active,[data-retro] .nbtn:active,
-[data-retro] .sort-btn:active,[data-retro] .resume-go:active{
+[data-retro] .sort-btn:active{
   box-shadow:
     inset 2px 2px 0 0 rgba(0,0,0,.90),
     inset -1px -1px 0 0 color-mix(in srgb,var(--edge) 30%,transparent);
@@ -619,7 +614,6 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
   border-radius:2px;
 }
 [data-retro] .nbtn.add,[data-retro] .paint-save,
-[data-retro] .resume-card{border-radius:2px;clip-path:var(--cut);}
 /* THE STATS SCREEN, IN RETRO.
    Everything else in the app takes the notch and the lit edge; the stats screen
    was rebuilt afterwards and nothing here knew about its parts, so it stayed
@@ -690,7 +684,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
    One blur survives, on the focused field, because focus should be the brightest
    event on the screen and nothing else competes with it. */
 [data-retro] .hbtn{border-radius:2px;}
-[data-retro] .search-play,[data-retro] .resume-go{border-radius:2px;}
+[data-retro] .search-play{border-radius:2px;}
 [data-retro] .rz-card{clip-path:none;border-radius:2px;}
 [data-retro] .hero-cta{border-radius:2px;}
 [data-retro] .nbtn.add{--notch:8px;}
@@ -882,7 +876,6 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 :root:not([data-retro]) .pk-cover,
 :root:not([data-retro]) .dt-cover,
 :root:not([data-retro]) .sched-thumb,
-:root:not([data-retro]) .resume-art,
 :root:not([data-retro]) .pop-cover,
 :root:not([data-retro]) .pick-img,
 :root:not([data-retro]) .hero-bg-img,
@@ -1783,8 +1776,13 @@ body.first-paint .row-sec,body.content-in .row-sec{animation:fadeUp .5s cubic-be
 .tut-link{width:100%;padding:12px 0;margin-top:12px;border-radius:14px;font-size:13px;font-weight:800;background:transparent;border:1px solid var(--b2);color:var(--t2);display:inline-flex;align-items:center;justify-content:center;gap:7px;}
 .tut-link .ico{width:14px;height:14px;}
 /* one-time backup nudge — a list with no sync code is one tap from gone */
-.nudge{display:flex;align-items:center;gap:10px;margin:12px 18px 0;padding:10px 11px;border-radius:14px;background:color-mix(in srgb,var(--a) 11%,var(--bg3));border:1px solid color-mix(in srgb,var(--a) 28%,transparent);animation:fadeUp .4s ease both;}
-.nudge>.ico{width:16px;height:16px;color:var(--a2);flex-shrink:0;}
+/* A plain surface, like every other card. It used to be an accent wash with an
+   accent border and an accent icon — three uses of the one colour this app
+   reserves for things you can press, on a strip where only the button is
+   pressable. That is what made it read as decoration rather than as the app
+   telling you something, and 14px is the radius everything else here uses. */
+.nudge{display:flex;align-items:center;gap:10px;margin:12px 18px 0;padding:10px 11px;border-radius:14px;background:var(--bg2);border:1px solid var(--bn2);animation:fadeUp .4s ease both;}
+.nudge>.ico{width:16px;height:16px;color:var(--t3);flex-shrink:0;}
 .nudge-t{flex:1;min-width:0;font-size:12px;font-weight:600;color:var(--t1);line-height:1.45;}
 .nudge-go{flex-shrink:0;padding:7px 12px;border-radius:10px;font-size:12px;font-weight:800;background:var(--a);color:var(--aFg);}
 .nudge-go:active{transform:scale(.94);}
@@ -2716,50 +2714,6 @@ body.first-paint .pfill,body.content-in .pfill{animation:barGrow .62s cubic-bezi
 .dt-epbar .pfill{background:color-mix(in srgb,var(--a) 80%,transparent);}
 .dt-epbar span{flex:none;font-size:12px;font-weight:700;color:var(--t3);font-variant-numeric:tabular-nums;}
 
-/* Resume card — artwork, where you're going back to, one thing to press. */
-/* Stacks now, because the card can be followed by the other shows you are behind
-   on. The dismiss button is absolute, so it stays pinned to the card's corner. */
-.resume-wrap{position:relative;display:flex;flex-direction:column;align-items:stretch;margin:9px 18px 0;}
-.resume-more{align-self:flex-start;margin-top:6px;padding:6px 12px;border-radius:99px;
-  background:var(--bg3);border:1px solid var(--bn2);color:var(--t2);
-  font-family:var(--fd);font-size:12px;font-weight:700;}
-.resume-more:active{transform:scale(.97);}
-.resume-rest{display:flex;flex-direction:column;gap:6px;margin-top:7px;}
-.resume-row{display:flex;align-items:center;gap:10px;width:100%;text-align:left;
-  padding:7px 9px;border-radius:14px;background:var(--bg2);border:1px solid var(--bn2);}
-.resume-row:active{transform:scale(.995);}
-.resume-row-art{width:44px;height:30px;flex:0 0 44px;border-radius:6px;object-fit:cover;background:var(--bg4);}
-.resume-row-b{display:flex;flex-direction:column;min-width:0;flex:1;}
-.resume-row-t{font-size:13px;font-weight:700;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.resume-row-s{font-size:12px;font-weight:600;color:var(--t3);}
-.resume-row-go{flex:0 0 auto;color:var(--a2);display:flex;}
-.resume-x{position:absolute;right:6px;top:6px;width:26px;height:26px;border-radius:50%;
-  display:flex;align-items:center;justify-content:center;color:var(--t3);
-  background:color-mix(in srgb,var(--bg) 55%,transparent);border:0;cursor:pointer;transition:color .15s;}
-.resume-x:hover{color:var(--t1);}
-.resume-x .ico{width:13px;height:13px;}
-/* The dismiss x is absolutely positioned at the wrap's top-right, and the play
-   circle is the last thing inside the card at ITS right — so the two sat on top
-   of one another, an x floating over a green button. The card keeps its right
-   edge clear instead, which fixes it at every width rather than nudging one of
-   them until it looks right on this screen. */
-.resume-card{display:flex;align-items:center;gap:13px;flex:1;min-width:0;padding:10px 42px 10px 10px;
-  border-radius:18px;text-align:left;background:var(--bg2);
-  border:0;cursor:pointer;transition:transform .12s,background-color .15s;}
-.resume-card:hover{background:var(--bg3);}
-.resume-card:active{transform:scale(.985);}
-.resume-art,.resume-ph{width:52px;height:52px;border-radius:14px;object-fit:cover;flex:none;background:var(--bg4);}
-.resume-ph{display:flex;align-items:center;justify-content:center;font-family:var(--fd);font-size:21px;font-weight:800;color:var(--t3);}
-.resume-body{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1;}
-.resume-k{font-size:12px;font-weight:600;color:var(--t3);}
-.resume-t{font-family:var(--fd);font-size:15px;font-weight:800;color:var(--t1);letter-spacing:-.02em;
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.resume-s{font-size:12px;font-weight:600;color:var(--t2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.resume-n{color:var(--a2);font-weight:800;}
-.resume-row-s .resume-n{color:var(--a2);}
-.resume-go{display:flex;align-items:center;justify-content:center;width:40px;height:40px;flex:none;
-  border-radius:50%;background:var(--a);color:var(--aFg);box-shadow:0 6px 16px -6px var(--glow);}
-.resume-go .ico{width:17px;height:17px;}
 .dt-fav.on{background:var(--ag);border-color:var(--a);color:var(--a2);}
 .dt-label{font-family:var(--fd);font-size:13px;font-weight:600;color:var(--t3);margin:18px 0 8px;display:flex;align-items:center;gap:7px;flex-wrap:wrap;row-gap:6px;min-width:0;}
 .dt-label>*{min-width:0;}
@@ -3022,7 +2976,7 @@ body.yt-open{overflow:hidden;touch-action:none;}
 [data-retro] .dt-banner-img,[data-retro] .hero-bg-img,[data-retro] .sd-art,[data-retro] .rtm-art,
 [data-retro] .ns-art img,[data-retro] .ns-vs-art img,
 [data-retro] .fy-img,[data-retro] .pick-img,[data-retro] .ptrail-art,[data-retro] .rc-note-img,
-[data-retro] .resume-art,[data-retro] .resume-row-art,[data-retro] .sched-thumb,
+[data-retro] .sched-thumb,
 [data-retro] .dt-char-img,[data-retro] .dt-ep-img,[data-retro] .dt-rec-img,
 [data-retro] .hero-bg,[data-retro] .pop-cover,
 [data-retro] .sv-mosaic i{image-rendering:pixelated;}
@@ -4783,8 +4737,6 @@ body.recsel .pcard{position:relative;}
   .nbtn.add{padding:6px 14px;}
   .page{padding-bottom:calc(var(--safe-b) + 62px);}
   /* The resume strip is a one-line reminder; it does not need poster height. */
-  .resume-card{padding:6px 8px;}
-  .resume-art,.resume-ph{width:34px;height:34px;}
 }
 @media (orientation:landscape) and (max-height:560px){
   /* The player's own two bars were eating a third of a landscape phone before
@@ -5067,8 +5019,6 @@ body.recsel .pcard{position:relative;}
   .search-row{padding:0;}
   .ctrl-row{padding:0;}
   .search-in{padding-top:8px;padding-bottom:8px;}
-  .resume-wrap{margin-top:6px;}
-  .resume-art,.resume-ph{width:40px;height:40px;}
   .billboard,.bb-slide{min-height:150px;}
   .hero-title{font-size:17px;}
   .hero-cta{margin-top:8px;padding:7px 13px;}
@@ -5280,7 +5230,7 @@ body.recsel .pcard{position:relative;}
   --edge-hi:inset 0 1px 0 rgba(255,255,255,.06);
 }
 /* Raised things: the decks, the cards, the panels that hold controls. */
-.dt-deck,.stat-card,.src-fold,.resume-card,.sv-heronum{box-shadow:var(--lift-1);}
+.dt-deck,.stat-card,.src-fold,.sv-heronum{box-shadow:var(--lift-1);}
 .sheet,.lock-card{box-shadow:var(--lift-2);}
 /* Artwork is already a picture, so it only wants the hairline — a shadow under a
    cover competes with the cover. */
@@ -8778,6 +8728,31 @@ function syncSkip(k){
   // save re-armed the push debounce below.
   if(k===LSKEY+'_bak')return true;
   if(k==='party_uid'||k==='party_active')return true; // party_name (your display name) DOES sync
+  // PER-DEVICE FACTS. collectExtra() uploads every key this function does not
+  // refuse, and applyExtra() writes them all onto every other device — so a key
+  // that answers a question ABOUT THIS DEVICE was being answered for it by
+  // whichever device pushed last. Two of these cost him his list, repeatedly:
+  //
+  //   wl_adopt_seen  — "the newest decision I have already applied". A stale
+  //     device pushing an older value overwrote the Mac's, and the Mac then met
+  //     an adopt stamp it had already honoured, found it NEWER than what it now
+  //     believed it had seen, and took that old list whole. Again on the next
+  //     push. That is the whole list reverting, on a loop, from a guard that was
+  //     designed to fire exactly once per device.
+  //
+  //   wl_device — this device's identity. With it shared, two devices claim one
+  //     id: the roster shows one row for both, "this one" points at the wrong
+  //     machine, and the title count beside it belongs to the other device.
+  //
+  // The rest are the same mistake with smaller blast radii: an approval gate is
+  // per device or it is not a gate, an admin token is a credential and belongs
+  // on the machine it was typed into, and wl_prepush_backup is this device's
+  // restore point — a SECOND full copy of the list, which was riding inside the
+  // settings bundle of every push and overwriting each device's own safety net.
+  if(k==='wl_adopt_seen'||k==='wl_prepush_backup'||k==='wl_device'||
+     k==='wl_admin_token'||k==='wl_admin_ck'||k==='wl_net_status'||k==='wl_invite'||
+     k==='wl_errs'||k==='wl_img_bytes'||k==='wl_booted'||
+     k==='wl_rail_folded'||k==='wl_seekok'||k==='wl_pos')return true;
   // Caches of things the server already holds. These are rewritten on EVERY
   // pull, and because a setItem schedules a push, each pull was costing a KV
   // write even when not one byte had actually changed — on a plan that allows a
@@ -12113,7 +12088,7 @@ function pxSrc(url){
 // rather than as a choice.
 const PX_ART=['.pcard-img','.rz-img','.pk-cover','.dt-cover','.dt-banner-img','.hero-bg-img',
   '.sd-art','.rtm-art','.fy-img','.pick-img','.ptrail-art','.rc-note-img',
-  '.resume-art','.resume-row-art','.sched-thumb'];
+  '.sched-thumb'];
 const _pxCache=new Map();
 const PX_MAX_PER_PASS=12;
 // 64-bit used to return 0 — no canvas, no blocks — on the theory that it was the
@@ -13939,20 +13914,18 @@ function renderHome(){
   // (one O(n log n) instead of one per section: spotlight ×4, rows ×4, favs, genres).
   const S=sorted(pool);
   const watching=S.filter(a=>a.status==='watching');
-  // The resume banner below surfaces the airing shows you're behind on. Decide now
-  // which those are, so the billboard can skip them — otherwise the show you're most
-  // behind on shows up as both the compact banner AND the first billboard slide,
-  // stacked, which is the duplication that made the top of home feel doubled.
   const nudge=nudgeHTML();
-  const bannerIds=new Set();
-  if(!nudge&&!isRead){ try{ const bi=behindItems(); if(bi.length&&_resumeGone!==(bi[0].a.id+':'+bi[0].behind)) bi.forEach(x=>bannerIds.add(x.a.id)); }catch(e){} }
-  // spotlight billboard: watching-with-art, then favorites-with-art, then any watching, then any-with-art (max 5)
-  const seen=new Set(),spot=[];const addSpot=(a,force)=>{if(a&&!seen.has(a.id)&&(force||!bannerIds.has(a.id))){seen.add(a.id);spot.push(a);}};
-  const fillSpot=f=>{S.filter(a=>a.status==='watching'&&titleBg(a)).forEach(a=>addSpot(a,f));S.filter(a=>a.fav&&titleBg(a)).forEach(a=>addSpot(a,f));watching.forEach(a=>addSpot(a,f));S.filter(a=>titleBg(a)).forEach(a=>addSpot(a,f));};
-  fillSpot(false);
-  // If every billboard-worthy title was one the banner already covers, don't leave
-  // the billboard blank — let them back in rather than show nothing.
-  if(!spot.length){seen.clear();fillSpot(true);}
+  // There used to be a "Pick up where you left off" card above everything, and a
+  // carve-out here so the billboard would skip whatever the card had taken. Both
+  // are gone. The card said what Continue Watching already says, one row lower,
+  // and to say it the billboard had to give up the show you are most behind on —
+  // so your own progress was pulled out of the picture to make a tip about it.
+  // Continue Watching is the top of home now, which is where progress belongs.
+  const seen=new Set(),spot=[];const addSpot=a=>{if(a&&!seen.has(a.id)){seen.add(a.id);spot.push(a);}};
+  S.filter(a=>a.status==='watching'&&titleBg(a)).forEach(addSpot);
+  S.filter(a=>a.fav&&titleBg(a)).forEach(addSpot);
+  watching.forEach(addSpot);
+  S.filter(a=>titleBg(a)).forEach(addSpot);
   const spotlight=spot.slice(0,5),spotSet=new Set(spotlight.map(a=>a.id));
   heroAmb=spotlight[0]?titleAccent(spotlight[0]):'';setAmbient(heroAmb);
   // Continue-watching rail: the ONE watching surface on home — every watching
@@ -13967,7 +13940,7 @@ function renderHome(){
   // the only thing standing between a silently broken backup and someone finding
   // out when their device is gone, and it had never once been shown. Ask the
   // function, then fall back.
-  const topBanner=nudge||(isRead?'':behindHTML());
+  const topBanner=nudge;
   // A brand-new user who's started adding still sees the beginner shelf (up top) so
   // they can keep stacking titles — it rides above their small list until dismissed.
   const beg=beginnerShelfActive(isRead);
@@ -18906,70 +18879,19 @@ function behindItems(){
     .filter(x=>x.behind>=1)
     .sort((x,y)=>{ const ax=x.a.airEp?1:0, ay=y.a.airEp?1:0; if(ax!==ay)return ay-ax; return y.behind-x.behind; });
 }
-// Dismissable, because "pick up where you left off" is a suggestion and a
-// suggestion you cannot decline is a demand. It comes back when the situation
-// changes — a new episode, or a different show becoming the one you're most
-// behind on — rather than being gone for good, since the point is to be useful
-// tomorrow and not to be permanently silenced today.
-let _resumeGone='';
-function dismissResume(ev){
-  try{ev.stopPropagation();}catch(e){}
-  const items=behindItems();
-  _resumeGone=items.length?(items[0].a.id+':'+items[0].behind):'';
-  try{renderHome();}catch(e){}
-}
-function behindHTML(){
-  const items=behindItems(); if(!items.length) return '';
-  if(_resumeGone===(items[0].a.id+':'+items[0].behind))return '';
-  const {a,behind}=items[0];
-  // It was a sentence with a button on the end, and the sentence got longer the
-  // further behind you were — "ONE PIECE — 1081 new episodes since you last
-  // watched · +4 more shows" wrapped to three lines and told you nothing you
-  // could act on. It is a card now: the artwork you recognise, the episode you
-  // are going back to, and one thing to press.
-  const art=titleBg(a)||a.img;
-  const ch=((a.title||'?').trim()[0]||'?').toUpperCase().replace(/['"<&]/g,'?');
-  const next=(a.ep||0)+1;
-  // No accentVars here. Every other card on this screen wears the title's own
-  // colour, and this one sat above all of them wearing a different one — so the
-  // home screen opened on a colour clash with itself. It belongs to the app, not
-  // to the show, so it takes the theme.
-  return`<div class="resume-wrap"><button class="resume-card" onclick="resumeWatch('${a.id}')">
-    ${art?`<img class="resume-art" decoding="async" src="${escH(art)}" alt="" loading="lazy" onerror="artFallback(this,${JSON.stringify(String(a.title||'?')).replace(/"/g,'&quot;')},'resume-ph')">`:`<span class="resume-ph">${ch}</span>`}
-    <span class="resume-body">
-      <span class="resume-k">Pick up where you left off</span>
-      <span class="resume-t">${schEsc(a.title)}</span>
-      <span class="resume-s">Episode ${next} · <b class="resume-n">${behind} waiting</b></span>
-    </span>
-    <span class="resume-go">${icon('play')}</span>
-  </button>
-  <button class="resume-x" onclick="dismissResume(event)" aria-label="Dismiss">${icon('x')}</button>
-  ${(()=>{
-    // "+1 more show" was text inside the card's own button, so the only thing it
-    // could do was resume the first show — it named the others and then hid them.
-    // Its own control now, and pressing it shows them, each one a row you can
-    // start from directly. Nested buttons are not a thing, which is why it sits
-    // outside the card rather than inside the sentence.
-    const rest=items.slice(1);
-    if(!rest.length)return '';
-    const label=_resumeOpen?'Show less':`+${rest.length} more show${rest.length>1?'s':''}`;
-    return `<button class="resume-more" onclick="toggleResumeMore(event)" aria-expanded="${_resumeOpen?'true':'false'}">${label}</button>`+
-      (_resumeOpen?`<div class="resume-rest">${rest.map(({a:b,behind:bh})=>{
-        const bart=titleBg(b)||b.img; const bn=(b.ep||0)+1;
-        return `<button class="resume-row" onclick="resumeWatch('${b.id}')">
-          ${bart?`<img class="resume-row-art" decoding="async" loading="lazy" src="${escH(bart)}" alt="">`:`<span class="resume-row-art"></span>`}
-          <span class="resume-row-b"><span class="resume-row-t">${schEsc(b.title)}</span>
-          <span class="resume-row-s">Episode ${bn} · <b class="resume-n">${bh} waiting</b></span></span>
-          <span class="resume-row-go">${icon('play')}</span></button>`;}).join('')}</div>`:'');
-  })()}
-  </div>`;
-}
-let _resumeOpen=false;
-function toggleResumeMore(ev){
-  try{ev.stopPropagation();}catch(e){}
-  _resumeOpen=!_resumeOpen;
-  try{renderHome();}catch(e){}
-}
+// The "Pick up where you left off" banner lived here, with its dismissal, its
+// expand-the-rest list, and the _resumeGone key that was supposed to remember
+// being dismissed. It is gone, for two reasons.
+//
+// It never stayed dismissed. _resumeGone was an in-memory `let` holding
+// "showId:episodesBehind", so it reset on every open, and inside one session it
+// stopped matching the moment the number moved — watching a single episode
+// brought the card straight back, because 12 behind is not 13 behind. "Dismiss"
+// meant "hide until anything at all happens", which is why it felt relentless.
+//
+// And it was a second way to say what Continue Watching says one row lower, in
+// the place where progress should be. behindItems() stays: resumeItems() uses it
+// to rank the rail, which is the surface that survived.
 
 // ─── STATS ──────────────────────────────────────────────────────────────────
 function parseHrs(s){const m=/([\d.]+)/.exec(s||'');return m?+m[1]:0;}
@@ -26575,10 +26497,18 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-11-03.72',
-  title:'Sources moves to the bar, and the app says less',
-  push:'Sources is a tab now, next to the +. Cloud moved into Settings. And the admin panel stopped explaining itself.',
+  v:'2026-11-03.74',
+  title:'Your list stops reverting',
+  push:'Fixed: a whole list could roll back to an older copy, over and over. Your devices stop overwriting each other\u2019s records of what they have already done.',
   notes:[
+    '<b>Your list could revert to an older copy, repeatedly.</b> Each device keeps a note of the newest \u201cuse this device\u2019s list everywhere\u201d decision it has already applied, so it applies each one once. That note was being <b>uploaded with your settings and written onto your other devices</b> \u2014 so a device still holding an old value overwrote it, and the device that had already taken the newest list then saw that same decision as new again and took an older copy whole. On the next push, again. Each device keeps its own note now.',
+    'The same fault was sharing <b>which device is which</b>. Two devices could end up claiming one identity, which is why the device list could show a single row for both, mark the wrong one as \u201cthis one\u201d, and show a title count belonging to the other machine.',
+    'Your <b>restore point</b> \u2014 the copy taken before anything replaces your list \u2014 was travelling too, so every device overwrote every other device\u2019s safety net, and a second full copy of your library rode along with every save. It stays home now.',
+    'Your <b>admin token</b> and a device\u2019s <b>approval</b> no longer travel either. A credential belongs on the machine it was typed into, and an approval that applies to every device is not an approval.',
+    'The <b>\u201cPick up where you left off\u201d card is gone</b>. It said what <b>Continue Watching</b> says one row lower, and to say it the billboard had to skip whatever the card had taken \u2014 so a show was pulled out of your own progress to make a card about that show. Continue Watching is the top of home now.',
+    'The <b>\u201cPick up where you left off\u201d card is gone</b>. It said what <b>Continue Watching</b> says one row lower, and to say it the billboard had to skip whatever the card had taken \u2014 so a show was pulled out of your own progress to make a card about that show. Continue Watching is the top of home now.',
+    'It also never stayed dismissed. It remembered being closed as \u201cthis show, this many episodes behind\u201d, held only in memory \u2014 so it came back on every open, and came back the moment you watched one episode, because twelve behind is not thirteen behind. Closing it meant hiding it until anything at all happened.',
+    'The banners that remain look like the rest of the app instead of like an advert: no tinted panel, no coloured border, no coloured icon. The one colour this app saves for things you can press is now only on the thing you can press.',
     'When <b>Watch</b> lands on a page saying the entry is gone, you can now <b>forget it</b> from the rescue panel and search the site again. Sites retire an entry and make a new one for the same show; the address WatchList learned still opens, so it had no way of knowing, and no way to let go of it. One show at a time \u2014 nothing else you have taught is touched.',
     '<b>App version here</b>, in the Cloud check, was reporting the same frozen value on every device. It was reading the font cache\u2019s name instead of the build\u2019s \u2014 so the one row whose job is telling you whether a device is up to date has been wrong since it was added.',
     'The Cloud check now tells you <b>what to do</b> when it meets a list it cannot read, instead of reporting that it cannot compare them. If your list has a password and this device has not been given it, it says so and points at the box.',

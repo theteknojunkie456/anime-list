@@ -25,6 +25,13 @@ for(const m of src.matchAll(/class="(?:ai-desc|hint)[^"]*"[^>]*>([^<]{25,})</g))
 // The tour's own titles and bodies. Scoping to toasts and panels alone missed
 // WT_STEPS entirely — which is where "not even me" sat, the worst line in the
 // app and the one that prompted the rule.
+// The sync panel's verdicts. These are plain `verdict='…'` assignments, so
+// neither the toast scan nor the panel scan saw them — and "cannot read the
+// cloud copy, so the two cannot be compared" survived two voice passes in plain
+// sight because of it. Every surface this test does not read is a surface the
+// rule does not apply to.
+for(const m of src.matchAll(/\bverdict\s*=\s*(['"`])((?:\\.|(?!\1)[\s\S])*?)\1/g))
+  strings.push({where:'verdict',text:m[2],at:m.index});
 const wt=src.indexOf('const WT_STEPS=[');
 if(wt<0) throw new Error('WT_STEPS not found in index.html');
 const wtEnd=src.indexOf('\n];',wt);
@@ -34,7 +41,9 @@ for(const m of src.slice(wt,wtEnd).matchAll(/\b[tb]:\s*(['"`])((?:\\.|(?!\1)[\s\
 const line=i=>src.slice(0,i).split('\n').length;
 
 // Explaining the mechanism instead of stating the outcome.
-const EXPLAINS=[/\bwhich means\b/i,/\bso that\b/i,/\bin other words\b/i,/\bthe reason (is|why)\b/i,/\brather than a promise\b/i];
+const EXPLAINS=[/\bwhich means\b/i,/\bso that\b/i,/\bin other words\b/i,/\bthe reason (is|why)\b/i,/\brather than a promise\b/i,
+  // A report about the panel's own difficulty instead of the way out of it.
+  /\bcannot be compared\b/i,/\bso the two\b/i];
 // An author inside the product. "not even me" shipped in the tour for months.
 // Possessives and contractions of the user's own voice are fine: the test only
 // looks for a first person SPEAKING, which in this app is always me.

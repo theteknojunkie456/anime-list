@@ -130,6 +130,27 @@ t('the picker lists this device and every other that has backed up',
       r.classList.contains('me')?'me':r.querySelector('.dev-id b').textContent.trim());})()`),
   ['me','Mac']);
 
+// His phone: the server's record for THIS device said 210 titles, the app in
+// front of him held none, and the row printed the server's number beside the
+// words "this one". The button under it then refuses with "nothing on this
+// device to send" — correct, and unreadable as anything but a broken app.
+t('a device holding less than it sent says both numbers',
+  await ev(`(()=>{const me=wlDevice();
+    const saved=anime; anime=[];
+    const html=_devRow({id:me,name:'iPhone app',n:210,at:Date.now()},me);
+    anime=saved;
+    return /0 titles here/.test(html)&&/210 backed up/.test(html);})()`),
+  true);
+t('and a device that agrees with its record stays plain',
+  await ev(`(()=>{const me=wlDevice();
+    const html=_devRow({id:me,name:'iPhone app',n:realList().length,at:Date.now()},me);
+    return /here \u00b7/.test(html);})()`),
+  false);
+t('another device is always its own record',
+  await ev(`(()=>{const h=_devRow({id:'mac00000001',name:'Mac',n:2,at:Date.now()},wlDevice());
+    return /2 titles/.test(h)&&!/here/.test(h);})()`),
+  true);
+
 const took=await ev(`(async()=>{window.__pushes=[];setLastAdopt(0);
   adoptFromDevice('mac00000001');await new Promise(r=>setTimeout(r,150));
   confirmYes();await new Promise(r=>setTimeout(r,900));

@@ -9022,7 +9022,19 @@ let _devCache=[];
 function _devRow(d,me){
   const mine=d.id===me;
   const when=d.at?relTime(d.at):'never';
-  const n=d.n?(d.n+' title'+(d.n===1?'':'s')):'unknown size';
+  let n=d.n?(d.n+' title'+(d.n===1?'':'s')):'unknown size';
+  // d.n is what this device last SENT, which is not always what it is holding
+  // now: a second instance on the same phone, a cleared storage, or a copy it
+  // cannot decrypt all leave the two apart. Printing the server's number next
+  // to the words "this one" then tells somebody they have 210 titles on a
+  // screen showing none — and the button underneath refuses with "nothing on
+  // this device to send", which reads like the app breaking rather than the app
+  // protecting the 210. Say both numbers when they disagree.
+  if(mine){
+    let have=null; try{have=realList().length;}catch(e){}
+    if(have!==null&&d.n!=null&&have!==d.n)
+      n=have+' title'+(have===1?'':'s')+' here \u00b7 '+d.n+' backed up';
+  }
   return `<div class="dev-row${mine?' me':''}">
     <div class="dev-id">
       <b>${escH(d.name||'A device')}${mine?' <span class="dev-me">this one</span>':''}</b>
@@ -9180,7 +9192,14 @@ async function runningBuild(){
   try{
     if(!('caches' in window))return '(no cache api)';
     const keys=await caches.keys();
-    const mine=keys.filter(k=>/^animelist-/.test(k)).sort();
+    // The BUILD STAMP only — ten hex characters of a hash of index.html. The
+    // filter used to be /^animelist-/ and take the last after a sort, which also
+    // matched 'animelist-fonts-v1', the font cache. "fonts-v1" sorts after any
+    // hex string, so the row whose entire job is answering "is this device
+    // current?" reported the same frozen constant on every device that had ever
+    // loaded a font — which is all of them. It was wrong on his phone for as
+    // long as the row has existed, and wrong in a way that looks like an answer.
+    const mine=keys.filter(k=>/^animelist-[0-9a-f]{6,}$/.test(k)).sort();
     if(!mine.length)return '(not installed)';
     return mine[mine.length-1].replace(/^animelist-/,'');
   }catch(e){return '(unreadable)';}
@@ -9205,7 +9224,12 @@ async function showSyncDiagnosis(btn){
   if(locked)verdict='Your list is locked on this device. Unlock it to compare \u2014 your titles are safe.';
   else if(d.cloudCount==='unreachable')verdict='Could not reach the cloud. This device is on its own copy.';
   else if(d.cloudCount===0)verdict='Nothing is saved in the cloud yet.';
-  else if(d.cloudUnknown)verdict='This device cannot read the cloud copy, so the two cannot be compared.';
+  // "cannot be compared" is a report about the panel's own difficulty. What the
+  // person needs is the way out: the cloud copy has a password and this device
+  // has not been given it. With nothing stored here either, that is the whole
+  // situation — say so, and say which button fixes it.
+  else if(d.cloudUnknown)verdict=d.localCount?'The cloud copy has a password this device has not been given.'
+                                             :'Your list is in the cloud with a password on it. Enter it below to bring it down.';
   else if(d.localNewest>d.cloudNewest)verdict='This device has the newer changes.';
   else if(d.cloudNewest>d.localNewest)verdict='The cloud has newer changes than this device.';
   else verdict='Both sides match.';
@@ -26518,10 +26542,12 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-11-03.70',
+  v:'2026-11-03.71',
   title:'Sources moves to the bar, and the app says less',
   push:'Sources is a tab now, next to the +. Cloud moved into Settings. And the admin panel stopped explaining itself.',
   notes:[
+    '<b>App version here</b>, in the Cloud check, was reporting the same frozen value on every device. It was reading the font cache\u2019s name instead of the build\u2019s \u2014 so the one row whose job is telling you whether a device is up to date has been wrong since it was added.',
+    'The Cloud check now tells you <b>what to do</b> when it meets a list it cannot read, instead of reporting that it cannot compare them. If your list has a password and this device has not been given it, it says so and points at the box.',
     'The app <b>says less everywhere else too</b>. Settings, the security panel, the import screens, Natural selection and the admin tools were all explaining how they worked rather than what they do. Shorter now, and the app no longer refers to anyone who built it.',
     'The <b>Updates</b> list no longer prints build notation. Nightly jobs that refresh chapter counts filled whole days with the same line, ending in <b>[skip ci]</b> \u2014 they are out. Repo housekeeping is labelled as such instead of being announced as a feature, and a change is only tagged <b>Security</b> when it is actually about a lock, a password or a key.',
     '<b>Sources</b> is in the bar at the bottom. It is the panel you want while you are using the app \u2014 a show opens in the wrong place and you want your services right then, not two taps deep in Settings.',

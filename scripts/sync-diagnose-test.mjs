@@ -100,12 +100,31 @@ const enc = await ev(`(async()=>{
   return {unknown: !!d.cloudUnknown,
           saysNever: /Last change in the cloud\\s*never/i.test(txt),
           saysUnreadable: /cannot read/.test(txt),
-          verdict: /cannot read the cloud copy/.test(txt)};})()`);
+          namesThePassword: /password/i.test(txt),
+          stillTalksAboutItself: /cannot be compared/i.test(txt)};})()`);
 console.log("    encrypted:", JSON.stringify(enc));
 t("an unreadable cloud copy is marked unknown", enc.unknown, true);
 t("and is never reported as never", enc.saysNever, false);
 t("it says plainly that it could not read it", enc.saysUnreadable, true);
-t("and refuses to claim a comparison", enc.verdict, true);
+// The verdict used to be "cannot read the cloud copy, so the two cannot be
+// compared" — a report about the panel's own difficulty. The person is not
+// stuck because a comparison failed; they are stuck because the list has a
+// password this device has not been given, and that sentence never said so.
+t("it names the password", enc.namesThePassword, true);
+t("and stops reporting its own difficulty", enc.stillTalksAboutItself, false);
+
+// His phone, exactly: nothing stored locally AND a cloud copy it cannot open.
+// The old wording left the one device that most needed instructions with a
+// statement that two things could not be compared, one of which was empty.
+const encEmpty = await ev(`(async()=>{
+  window.__cloud = JSON.stringify({v:2, ct:"nonsense", iv:"nope"});
+  cryptoKey = null; anime = [];
+  await showSyncDiagnosis();
+  const txt = document.getElementById("syncDiagBox").textContent;
+  return {tellsYouWhatToDo: /Enter it below/i.test(txt),
+          namesThePassword: /password/i.test(txt)};})()`);
+t("an empty device is told what to do", encEmpty.tellsYouWhatToDo, true);
+t("and why",                           encEmpty.namesThePassword, true);
 // ── the panel has to FIT ────────────────────────────────────────────────────
 // The folds in here inset their contents, and for a while they did it with
 // margin — so a child asking for width:100% measured the full content box and

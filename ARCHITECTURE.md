@@ -527,6 +527,30 @@ settings bundle alongside the copy already in `list`. Now skipped — which, bec
 `applyExtra()` filters through the same function, also stops a stale `_bak` from
 another device being written over yours.
 
+### Two kinds of copy, and they are not the same copy
+
+The cloud copy is **not** a copy of a device, and trying to make it one is the
+bug above. It carries what belongs on every device and refuses what belongs to
+one. That refusal is load-bearing.
+
+A copy of a *device* is the other thing, and it lives in the admin panel
+(`fullCopyRead` / `fullCopyWrite`, `scripts/full-copy-test.mjs`). It takes
+every `localStorage` key with no exceptions — including every key `syncSkip()`
+refuses — plus the artwork offloaded into the `wl_media` IndexedDB store, which
+is the only state that does not live in `localStorage` at all. Written back onto
+an empty install, the device returns as itself: same identity, same adopt
+marker, same cloud key.
+
+It is admin-gated because the file holds the cloud key and the admin token in
+the clear. That is correct for a copy of everything and wrong for anything that
+could be shared, so it lives behind the one panel that asks for a token.
+
+Restoring writes inside `withoutPush()`: every `setItem` schedules a push, so a
+few hundred keys would queue a few hundred pushes, each racing the reload with a
+half-restored device. And the restore saves a copy of what is already there
+first — if that copy cannot be written, nothing is replaced, because there would
+be nothing to go back to.
+
 ### A fact about THIS device is not a setting
 
 `collectExtra()` is an allowlist by omission: it uploads every `localStorage`

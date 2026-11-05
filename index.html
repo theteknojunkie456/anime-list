@@ -7118,6 +7118,114 @@ function wlPlatform(){
   }catch(e){}
   return 'web';
 }
+// ─── EVERYTHING ON THIS DEVICE, WITH NO EXCEPTIONS ──────────────────────────
+// The cloud deliberately does NOT carry everything: syncSkip() refuses the keys
+// that are facts about one machine, and that refusal is what stopped the list
+// reverting. So a cloud copy is not a copy of this device — it is a copy of the
+// things that belong on every device.
+//
+// This is the other thing. It takes the lot: every localStorage key without a
+// single exception, including the ones sync refuses, plus the artwork offloaded
+// into IndexedDB. Put it back on an empty install and the device returns as it
+// was, down to its own identity and which decisions it had already applied.
+//
+// Admin-gated because it writes the cloud key and the admin token into a file
+// on disk, in the clear. That is correct for a copy of everything and wrong for
+// anything shared, so the panel it lives in is the one nobody else can open.
+const FULL_KIND='watchlist-everything';
+const FULL_V=1;
+let _fullPending=null;
+async function fullCopyRead(){
+  const local={};let n=0;
+  try{
+    // Snapshot the names first. Reading by index while anything writes would
+    // renumber the rest, and a copy that silently skips a key is worse than no
+    // copy at all.
+    const names=[];
+    for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k!==null)names.push(k);}
+    for(const k of names){const v=localStorage.getItem(k);if(v!==null){local[k]=v;n++;}}
+  }catch(e){}
+  const media={};let m=0,mb=0;
+  try{
+    const keys=await idbKeys();
+    for(const k of keys){const v=await idbGet(k);if(typeof v==='string'&&v){media[String(k)]=v;m++;mb+=v.length;}}
+  }catch(e){}   // artwork is the one part that can be refetched, so never fail the copy for it
+  const safe=(f,d)=>{try{const v=f();return v===undefined||v===null?d:v;}catch(e){return d;}};
+  return {kind:FULL_KIND,v:FULL_V,at:Date.now(),
+    app:safe(()=>RELEASE.v,''),
+    origin:safe(()=>location.origin,''),
+    device:safe(()=>String(wlDevice()||''),''),
+    deviceName:safe(()=>String(deviceLabel()||''),''),
+    counts:{keys:n,images:m,imageBytes:mb,titles:safe(()=>realList().length,-1)},
+    local:local,media:media};
+}
+function fullCopyStamp(d){const p=x=>String(x).padStart(2,'0');
+  return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+'-'+p(d.getHours())+p(d.getMinutes());}
+function fullCopySave(obj,name){
+  const blob=new Blob([JSON.stringify(obj)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download=name||('watchlist-everything-'+fullCopyStamp(new Date())+'.json');
+  document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>{try{URL.revokeObjectURL(url);}catch(e){}},20000);
+  return a.download;
+}
+function fullCopyNote(html){const o=document.getElementById('fullCopyOut');if(o)o.innerHTML=html;}
+async function fullCopyExport(){
+  try{
+    const o=await fullCopyRead();
+    const name=fullCopySave(o);
+    const kb=Math.max(1,Math.round(JSON.stringify(o).length/1024));
+    fullCopyNote('<p class="ai-desc">Saved <b>'+escH(name)+'</b> \u2014 '+
+      o.counts.titles+' titles, '+o.counts.keys+' keys, '+o.counts.images+' images, '+kb+' KB. '+
+      'Keep it somewhere only you can read: the cloud key is inside it.</p>');
+    toast('Everything on this device is in that file');
+  }catch(e){ fullCopyNote('<p class="ai-desc">The copy could not be made. Nothing was changed.</p>'); }
+}
+function fullCopyPick(){const i=document.getElementById('fullCopyFile');if(i){i.value='';i.click();}}
+async function fullCopyChosen(input){
+  const f=input&&input.files&&input.files[0];if(input)input.value='';
+  if(!f)return;
+  let o=null;
+  try{o=JSON.parse(await f.text());}catch(e){fullCopyNote('<p class="ai-desc">That file could not be read.</p>');return;}
+  if(!o||o.kind!==FULL_KIND||!o.local||typeof o.local!=='object'||!Object.keys(o.local).length){
+    fullCopyNote('<p class="ai-desc">That is not a copy of a WatchList device.</p>');return;}
+  _fullPending=o;
+  const c=o.counts||{},when=o.at?new Date(o.at).toLocaleString():'an unknown time';
+  askConfirm({danger:true,title:'Put this copy back?',
+    yes:'Replace everything',
+    msg:'Everything on this device is replaced by the copy taken on '+when+
+        ' \u2014 '+(c.titles>=0?c.titles:'?')+' titles, '+(c.keys||0)+' keys, '+(c.images||0)+' images'+
+        (o.deviceName?' from '+o.deviceName:'')+'. A copy of what is here right now is saved first.',
+    onYes:()=>{fullCopyApply();}});
+}
+// The writing half on its own, so a test can exercise the real restore rather
+// than a second copy of it written in the test. Everything above it is deciding
+// whether to restore; this is the restoring.
+async function fullCopyWrite(o){
+  // Writing a key schedules a push. Restoring a few hundred would queue a few
+  // hundred, each one racing the reload with a half-restored device.
+  withoutPush(()=>{
+    try{localStorage.clear();}catch(e){}
+    for(const k in o.local){ if(typeof o.local[k]==='string'){try{localStorage.setItem(k,o.local[k]);}catch(e){}} }
+  });
+  if(o.media&&typeof o.media==='object'){
+    for(const k in o.media){ if(typeof o.media[k]==='string'){try{await idbSet(k,o.media[k]);}catch(e){}} }
+  }
+  return true;
+}
+async function fullCopyApply(){
+  const o=_fullPending;if(!o)return;
+  _fullPending=null;
+  // Never replace a device without leaving it a way back. If this cannot be
+  // written there is nothing to fall back TO, so it is the one step allowed to
+  // stop the restore.
+  try{ fullCopySave(await fullCopyRead(),'watchlist-before-putting-a-copy-back-'+fullCopyStamp(new Date())+'.json'); }
+  catch(e){ fullCopyNote('<p class="ai-desc">A copy of what is here now could not be saved, so nothing was replaced.</p>'); return; }
+  try{ await fullCopyWrite(o); }catch(e){}
+  fullCopyNote('<p class="ai-desc">Put back. Reloading\u2026</p>');
+  setTimeout(()=>{try{location.reload();}catch(e){}},400);
+}
+
 function openAdmin(){_msgTarget='all';renderAdmin();openSheet('adminSheet');}   // segment re-renders with All active
 // Secret unlock: tap the WatchList logo 5× fast to bring up admin the first time
 // (to enter your token). After that, a nav button appears — see injectAdminNav.
@@ -7155,6 +7263,16 @@ function renderAdmin(){
       <button class="src-chip" onclick="adminSetCap()">Set</button>
     </div>
     <div id="adminMembers"><p class="ai-desc">Loading…</p></div>
+
+    <details class="src-fold" style="margin-top:18px">
+      <summary>${icon('copy')} Everything on this device</summary>
+      <p class="ai-desc" style="margin-top:8px">One file holding every single thing this device has \u2014 titles and progress, friends, recommendations, sources, your look, every setting, the cloud key, and the artwork. Nothing is left out, including the things the cloud deliberately keeps to one device. Put it back on an empty install and this device comes back exactly as it is now.</p>
+      <p class="ai-desc" style="font-size:12px">The cloud key is inside the file in plain text. It opens your list from any device, so the file is for you and nobody else.</p>
+      <button class="parse-btn" style="margin-top:8px" onclick="fullCopyExport()">Save everything to a file</button>
+      <input type="file" id="fullCopyFile" accept="application/json,.json" style="display:none" onchange="fullCopyChosen(this)">
+      <button class="src-chip" style="margin-top:8px" onclick="fullCopyPick()">Put a copy back</button>
+      <div id="fullCopyOut" style="margin-top:10px"></div>
+    </details>
 
     <details class="src-fold" style="margin-top:18px">
       <summary>${icon('send')} Set someone up</summary>
@@ -26547,7 +26665,7 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-11-04.76',
+  v:'2026-11-04.77',
   title:'Nobody else watched it for you',
   push:'Fixed: an episode could be marked watched on a device where nobody watched it, because a trip made on one device was being sent to the others.',
   notes:[

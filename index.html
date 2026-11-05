@@ -10187,30 +10187,70 @@ function syncOff(){setSyncCode('');setBackupDeclined(true);renderSyncUI();try{re
 // would throw away the only thing that can reach the copy. And the scheduled
 // push is cancelled BEFORE the erase, or the debounce fires a moment later and
 // writes the whole list straight back under the key just deleted.
+// WHOSE COPY IS THIS, REALLY.
+//
+// "Any OTHER device still using this code keeps its own copy" is true, and it
+// is exactly the kind of true sentence people read past. The dangerous reading
+// of this button is the natural one — "erase the backup belonging to the
+// device I am holding" — and after Add a device that reading is wrong: there
+// is one copy under the key and the other machine restores from it. Somebody
+// tidying up a phone can erase what their computer depends on.
+//
+// The app does not have to pose the question. syncDevices() knows who has
+// published under this key, and a named machine with a title count beside it is
+// not something you read past. So the confirm opens at once, with the erase
+// held until the answer arrives — a destructive button should not be
+// pressable while the app is still working out what it destroys.
 async function syncForget(){
   const code=syncCode();
   if(!code){toast('There is no backup on this device');return;}
   if(appLocked){toast('Unlock the list first');return;}
-  askConfirm({danger:true,title:'Erase this backup?',
-    msg:"The copy stored in the cloud under this code — list, settings and friends — is deleted for good. This device keeps the titles it has; it just stops backing them up. Any OTHER device still using this code keeps its own copy until it next backs up.",
-    yes:'Erase it',
-    onYes:async()=>{
-      try{clearTimeout(pushT);}catch(e){}
-      _pushPending=false;_pushSince=0;_pushAgain=false;
-      let r=null;
-      try{
-        const res=await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({op:'forget',code})});
-        r=await res.json();
-      }catch(e){r=null;}
-      if(!r||!r.ok){toast('Could not reach the cloud. Nothing was erased');return;}
-      // Only now is it safe to forget the key locally.
-      setSyncCode('');setSyncAt(0);setBackupDeclined(true);
-      try{clearKeySelf();}catch(e){}
-      renderSyncUI();try{render();}catch(e){}
-      toast(r.existed?'Erased. This device still has your titles'
-                     :'There was nothing stored under that code');
-    }});
+  const GENERIC="The copy stored in the cloud under this code — list, settings and friends — is deleted for good. This device keeps the titles it has; it just stops backing them up. Any OTHER device still using this code keeps its own copy until it next backs up.";
+  const doErase=async()=>{
+    try{clearTimeout(pushT);}catch(e){}
+    _pushPending=false;_pushSince=0;_pushAgain=false;
+    let r=null;
+    try{
+      const res=await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({op:'forget',code})});
+      r=await res.json();
+    }catch(e){r=null;}
+    if(!r||!r.ok){toast('Could not reach the cloud. Nothing was erased');return;}
+    // Only now is it safe to forget the key locally.
+    setSyncCode('');setSyncAt(0);setBackupDeclined(true);
+    try{clearKeySelf();}catch(e){}
+    renderSyncUI();try{render();}catch(e){}
+    toast(r.existed?'Erased. This device still has your titles'
+                   :'There was nothing stored under that code');
+  };
+  askConfirm({danger:true,title:'Erase this backup?',msg:GENERIC,yes:'Erase it',onYes:doErase});
+  const yb=document.getElementById('confirmYesBtn');
+  if(yb){yb.disabled=true;yb.textContent='Checking\u2026';}
+  let others=[];
+  try{
+    // A read must never be the thing standing between somebody and a button, so
+    // it gets two and a half seconds and then we go with what we have.
+    const res=await Promise.race([syncDevices(),new Promise(r=>setTimeout(()=>r(null),2500))]);
+    const me=String(wlDevice()||'');
+    others=(((res||{}).devices)||[]).filter(d=>d&&d.id!==me);
+  }catch(e){others=[];}
+  // The dialog may have been answered or dismissed while we were asking, and
+  // the next one along is not ours to rewrite.
+  const box=document.getElementById('confirmBox');
+  if(!box||!box.classList.contains('on')||_confirmCb!==doErase)return;
+  if(others.length){
+    const who=others.slice(0,3).map(d=>String((d&&d.name)||'A device')+(d&&d.n?' ('+d.n+' titles)':'')).join(', ')
+      +(others.length>3?(' and '+(others.length-3)+' more'):'');
+    const one=others.length===1;
+    const ct=document.getElementById('confirmTitle');
+    if(ct)ct.textContent='Erase the copy '+(others.length+1)+' devices share?';
+    const cm=document.getElementById('confirmMsg');
+    if(cm)cm.textContent='This copy is not just this device\u2019s. '+who+' '+(one?'backs':'back')+
+      ' up here too, and erasing it erases what '+(one?'that device restores':'those devices restore')+
+      ' from. Every device keeps the titles it is holding right now; nothing in the cloud survives. '+
+      'To stop only THIS device backing up, use Turn off instead.';
+  }
+  if(yb){yb.disabled=false;yb.textContent='Erase it';}
 }
 // The first backup, on purpose, when the automatic one has not managed it.
 //
@@ -26688,10 +26728,11 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-11-04.78',
+  v:'2026-11-05.79',
   title:'The device in your hand is the wrong one',
   push:'Add a device can now replace this device\u2019s list with the one it joins, instead of folding the two together.',
   notes:[
+    '<b>Erase the stored copy</b> now tells you whose copy it is. Once two devices share a key there is one copy in the cloud and the other machine restores from it \u2014 so on a phone, a button named for erasing a backup could take away what the computer depends on. It asks the cloud who else backs up under the key before it asks you anything, and names them: <i>Mac (286 titles) backs up here too, and erasing it erases what that device restores from.</i> The erase is held, reading <b>Checking</b>, until it knows \u2014 and it points you at <b>Turn off</b>, which is what you wanted if you only meant to stop this device. A cloud that never answers opens the old wording after a moment rather than leaving the button dead.',
     '<b>Add a device</b> has a second choice under it: <b>Replace what is on this device</b>. Left off it behaves as it always has \u2014 the two lists are folded together and nothing is lost. Turned on, the device you are holding drops its own list, shows the one it joined instead, and <b>sends none of its own titles to it</b>. That is the way round you want when the phone is the copy to be rid of and the computer is right: before this, joining carried the phone\u2019s titles into the good list and up to the cloud, which is the opposite of what was wanted and could not be undone from the other end. A restore point is kept on the device either way, and a backup with nothing in it is refused rather than allowed to land on a full device.',
     'When you open an episode on another site, the app notes which episode you left for and when, so it can mark it watched if you were gone long enough. <b>That note was being sent to your other devices.</b> On a device that never left, the clock it arrived with was always older than the fifteen minutes that mean \u201cwatched\u201d \u2014 so a title could jump several episodes ahead on a machine you had not watched anything on. The note stays on the device that made the trip now.',
     'Two smaller ones went the same way: a <b>custom source you were still typing</b> and had not saved could appear on another device, and <b>which tab a sheet was left on</b> travelled with it. Both also cost a save to the cloud every time they changed.',

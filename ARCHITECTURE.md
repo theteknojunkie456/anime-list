@@ -1182,3 +1182,32 @@ makes it safe to run from the wrong device.
 id, the phone's note (the most specific thing a merge preserves) is gone, and
 nothing matching `phone-` reaches `__pushed` after `flushPush()`. On the build
 before this existed, that last row fails — the titles went up.
+
+### Erasing a copy two devices share
+
+`syncForget()` has the same shape of problem one step later. Once a join has
+happened there is **one** copy under the key, and the other machine restores from
+it — but the button is read on whatever device is in your hand, where "Erase the
+stored copy" naturally parses as *erase this device's backup*. The old confirm
+said "Any OTHER device still using this code keeps its own copy", which is true
+and is exactly the kind of true sentence people read past.
+
+It now answers the question instead of posing it. Before the dialog can be
+accepted it calls `syncDevices()`, filters out `wlDevice()`, and if anyone else
+is there the title and message are rewritten to name them with their title
+counts, say what erasing costs those machines, and point at **Turn off** — which
+is the button somebody means when they only want this device to stop.
+
+Two details are load-bearing:
+
+- The confirm opens **immediately** with the generic wording and the Yes button
+  `disabled`, reading "Checking…". A destructive button must not be pressable
+  while the app is still working out what it destroys, and an instant dialog
+  whose text changes under a reader is worse than one that waits.
+- The lookup is raced against a **2.5s** timeout and wrapped in `try`. A read
+  must never be the thing standing between somebody and a button, so a cloud
+  that never answers gets the old wording and a working Erase, not a dead one.
+
+Before rewriting the dialog it re-checks `confirmBox.classList.contains('on')`
+and `_confirmCb === doErase`: the dialog may have been answered or dismissed
+while the lookup was in flight, and the next one along is not ours to rewrite.

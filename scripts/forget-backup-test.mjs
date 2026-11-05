@@ -43,7 +43,7 @@ localStorage.setItem('sync_animelist_v4','PHONECODE1234567890');
 localStorage.setItem('wl_net_status','approved');
 localStorage.setItem('tut_seen_animelist_v4','1');
 localStorage.setItem('seen_release','2026-11-01.63');
-window.__ops=[];window.__forgetFails=false;
+window.__ops=[];window.__forgetFails=false;window.__others=[];window.__devDelay=0;
 window.fetch=function(u,o){
   let b={};try{b=JSON.parse((o&&o.body)||'{}');}catch(e){}
   // Record the SYNC ops only. The app also talks to the notify worker, whose
@@ -54,6 +54,11 @@ window.fetch=function(u,o){
   const J=v=>Promise.resolve(new Response(JSON.stringify(v),{status:200,headers:{'Content-Type':'application/json'}}));
   if(b.op==='forget'){ if(window.__forgetFails)return Promise.reject(new Error('offline'));
                        return J({ok:true,existed:true}); }
+  // Answerable slowly on purpose: the window where the erase is held open is
+  // real but short, and a stub that answers instantly cannot be used to see it.
+  if(b.op==='devices')return new Promise(r=>setTimeout(()=>r(new Response(
+    JSON.stringify({ok:true,devices:(window.__others||[])}),
+    {status:200,headers:{'Content-Type':'application/json'}})),(window.__devDelay||0)));
   if(b.op==='push')return J({ok:true,updatedAt:Date.now()});
   if(b.op==='pull')return J({data:null,updatedAt:0});
   return new Promise(()=>{});
@@ -121,6 +126,59 @@ await ev(`window.__ops=[];syncForget()`); await wait(400);
 t('with no backup on the device it says so instead of asking',
   await ev(`!document.querySelector('#confirmBox.on')`), true);
 t('and sends no erase', await ev(`window.__ops.filter(o=>/^forget/.test(o))`), []);
+
+// ── WHOSE copy is about to go ───────────────────────────────────────────────
+// After Add a device there is ONE copy under the key and the other machine
+// restores from it. "Erase the stored copy", read on a phone, sounds like it
+// erases the phone's. The confirm has to say the other machine's name out loud,
+// and it must not be answerable until it knows whether there is one.
+// The erase above left this device with no key at all, so put one back: this
+// section is about a device that IS backing up, beside another one.
+await ev(`(()=>{setSyncCode('PHONECODE1234567890');setBackupDeclined(false);renderSyncUI();return syncCode();})()`);
+await wait(300);
+await ev(`window.__others=[{id:'macdevice00000000',name:'Mac',at:Date.now()-60000,n:286}]`);
+await ev(`window.__devDelay=700`);
+// NOT `ev('syncForget()')`: Runtime.evaluate is called with awaitPromise, so
+// awaiting an async function means waiting for the very window this is trying
+// to look inside. Start it and come back.
+await ev(`window.__ops=[];(()=>{syncForget();return 1;})()`); await wait(250);
+t('the erase is not pressable while it works out what it erases',
+  await ev(`!!(document.getElementById('confirmYesBtn')||{}).disabled`), true);
+t('and says why it is waiting rather than looking broken',
+  await ev(`(document.getElementById('confirmYesBtn')||{}).textContent||''`), 'Checking\u2026');
+await wait(1100); await ev(`window.__devDelay=0`);
+t('and becomes pressable once it knows',
+  await ev(`!!(document.getElementById('confirmYesBtn')||{}).disabled`), false);
+const m=await ev(`(document.getElementById('confirmMsg')||{}).textContent||''`);
+t('the other machine is named', /Mac/.test(m), true);
+t('with what it has on it, so the number is the warning', /286 titles/.test(m), true);
+t('it says what erasing costs that machine', /restores from/.test(m), true);
+t('and points at the button they actually wanted', /use Turn off instead/i.test(m), true);
+t('the title counts the devices, not the copies',
+  await ev(`(document.getElementById('confirmTitle')||{}).textContent||''`), 'Erase the copy 2 devices share?');
+t('asking who is on the key does not erase anything',
+  await ev(`window.__ops.filter(o=>/^forget/.test(o))`), []);
+t('nor does it cost the key', await ev(`syncCode()`), 'PHONECODE1234567890');
+await ev(`confirmNo?confirmNo():(document.getElementById('confirmBox').classList.remove('on'))`); await wait(200);
+
+// Nobody else on the key: the plain wording, and no invented company.
+await ev(`window.__others=[]`);
+await ev(`window.__ops=[];syncForget()`); await wait(900);
+const m2=await ev(`(document.getElementById('confirmMsg')||{}).textContent||''`);
+t('alone on the key, it does not claim anyone shares it', /restores from/.test(m2), false);
+t('and still names what goes', /list, settings and friends/.test(m2), true);
+t('the title stays the plain one',
+  await ev(`(document.getElementById('confirmTitle')||{}).textContent||''`), 'Erase this backup?');
+await ev(`confirmNo?confirmNo():(document.getElementById('confirmBox').classList.remove('on'))`); await wait(200);
+
+// A device that never answers must not leave the button dead forever.
+await ev(`window.fetch=(function(f){return function(u,o){let b={};try{b=JSON.parse((o&&o.body)||'{}');}catch(e){}
+  if(b.op==='devices')return new Promise(()=>{});return f(u,o);};})(window.fetch)`);
+await ev(`syncForget()`); await wait(3200);
+t('a cloud that never answers still lets the erase be pressed',
+  await ev(`!!(document.getElementById('confirmYesBtn')||{}).disabled`), false);
+t('on the wording that assumes nothing',
+  /list, settings and friends/.test(await ev(`(document.getElementById('confirmMsg')||{}).textContent||''`)), true);
 
 console.log('\n'+pass+' passed, '+fail+' failed');
 ws.close();ch.kill();srv.kill();process.exit(fail?1:0);

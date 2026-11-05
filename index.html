@@ -10004,6 +10004,9 @@ async function pairWithdraw(){
 async function pairJoin(){
   if(appLocked){toast('Unlock the list first');return;}
   const el=document.getElementById('pairCodeIn');
+  // Read before the first await. The panel re-renders while this runs, and a
+  // choice read afterwards is read off a checkbox that no longer exists.
+  const rep=!!((document.getElementById('pairReplace')||{}).checked);
   const typed=((el&&el.value)||'').replace(/[^A-Za-z0-9]/g,'').toUpperCase();
   if(!/^[A-Z0-9]{8}$/.test(typed)){toast('That code is eight characters');return;}
   toast('Joining…');
@@ -10040,7 +10043,7 @@ async function pairJoin(){
     askListPassword(inner,{
       msg:'The two devices are about to share one list, so this device will be protected by the same password.',
       yes:'Unlock and join',
-    },(list,wraps,key)=>pairFinish(code,list,wraps,key));
+    },(list,wraps,key)=>pairFinish(code,list,wraps,key,rep));
     return;
   }
   // Anything else that is not a list is not a list. Without this the join falls
@@ -10049,16 +10052,28 @@ async function pairJoin(){
   // given up its own. An EMPTY key is fine and different: both devices end up on
   // it and this one publishes what it has.
   if(inner&&!Array.isArray(inner)){toast('Could not read that list. Nothing changed');return;}
-  pairFinish(code,Array.isArray(inner)?inner:[],null,null);
+  pairFinish(code,Array.isArray(inner)?inner:[],null,null,rep);
 }
 // The half that changes this device: merge, take on any protection that came
 // with the list, and only then adopt the key. The ordering is the whole point
 // — everything before setSyncCode() can fail without costing anyone their key.
-function pairFinish(code,inner,wraps,key){
+function pairFinish(code,inner,wraps,key,replace){
+  // Replace is the one way through this join that drops titles, so the thing
+  // being joined has to be worth having: an empty backup landing on a full
+  // device is never what anybody meant, and the far end keeps no history to
+  // undo it. Merging needs no such guard — it can only ever add.
+  if(replace&&!(Array.isArray(inner)&&inner.length)){
+    toast('That backup is empty \u2014 left this device alone');return;
+  }
   // A restore point first, every time, in the slot the push path already uses.
   try{localStorage.setItem('wl_prepush_backup',JSON.stringify(anime));}catch(e){}
   const before=anime.length;
-  if(Array.isArray(inner)&&inner.length){
+  if(replace){
+    // Taking the other list whole, which is what somebody means when the device
+    // in their hand is the wrong one. Nothing of this device's is pushed, so the
+    // list being joined is not disturbed by being joined.
+    anime=migrate(inner);
+  }else if(Array.isArray(inner)&&inner.length){
     // Local FIRST, so the surviving copy is this device's and the other fills
     // the gaps — the same ordering mergeFromCode uses, and for the same reason.
     const r2=dedupeList(anime.concat(migrate(inner)));
@@ -10077,7 +10092,9 @@ function pairFinish(code,inner,wraps,key){
   try{renderSyncUI();}catch(e){}
   try{schedulePush();}catch(e){}
   const box=pairBox(); if(box)box.innerHTML='';
-  toast(added?`Joined · ${added} added from your other device`:'Joined — both devices now back up together');
+  toast(replace?`Joined · this device now shows the other one’s ${anime.length} titles`
+       :added?`Joined · ${added} added from your other device`
+       :'Joined — both devices now back up together');
   try{setTimeout(fetchCovers,500);}catch(e){}
 }
 async function syncRestore(){
@@ -10324,11 +10341,14 @@ function renderSyncUI(){
         <p class="ai-desc" style="margin:6px 0 0">Your devices share a list only when they use the <b>same key</b>. A device that already had titles when you turned backup on made its own key, so it backs up on its own.</p>
         <button class="parse-btn" id="pairAddBtn" style="margin:11px 0 0;width:100%" onclick="pairOffer(this)">${icon('upload')} Add a device</button>
         <div id="pairBox"></div>
-        <p class="ai-desc" style="font-size:12px;margin:9px 0 0">You get eight characters. Type them into your other device. Nothing on that device is replaced.</p>
+        <p class="ai-desc" style="font-size:12px;margin:9px 0 0">You get eight characters. Type them into your other device. The two lists are folded together.</p>
         <div class="sync-join">
           <textarea class="ai-prompt-in urlin" rows="1" id="pairCodeIn" placeholder="eight-character code" autocomplete="off" autocapitalize="characters" spellcheck="false" oninput="formatCodeInput(this,8,4)" onkeydown="if(event.key==='Enter'){event.preventDefault();pairJoin();}"></textarea>
           <button class="ai-run-btn" onclick="pairJoin()">Add this device</button>
         </div>
+        <label class="ct-dk" style="margin:10px 0 0;font-size:12px">Replace what is on this device
+          <span class="ct-tgl"><input type="checkbox" id="pairReplace"><span class="ct-tgl-track"></span></span></label>
+        <p class="ai-desc" style="font-size:12px;margin:2px 0 0">On, this device drops its own list and shows the other one instead. A restore point is kept here either way.</p>
         <button class="sync-quiet" onclick="loadDeviceList(document.getElementById('devPickBox'))">Who is on this key?</button>
       </div>
 
@@ -10382,11 +10402,14 @@ function renderSyncUI(){
         <textarea class="ai-prompt-in urlin" rows="2" id="syncCodeIn" placeholder="…or paste a code to restore" autocomplete="off" autocapitalize="characters" spellcheck="false" oninput="formatCodeInput(this,20,4)" onkeydown="if(event.key==='Enter'){event.preventDefault();syncRestore();}"></textarea>
         <button class="ai-run-btn" onclick="syncRestore()">Use code</button>
       </div>
-      <p class="ai-desc" style="font-size:12px;margin-top:10px">Already using WatchList on another device? Open <b>Cloud</b> there, press <b>Add a device</b>, and type the eight characters it gives you — this device joins that backup and keeps anything it already has.</p>
+      <p class="ai-desc" style="font-size:12px;margin-top:10px">Already using WatchList on another device? Open <b>Cloud</b> there, press <b>Add a device</b>, and type the eight characters it gives you — this device joins that backup.</p>
       <div style="display:flex;gap:8px;margin-top:6px;">
         <textarea class="ai-prompt-in urlin" rows="1" id="pairCodeIn" placeholder="eight-character code" autocomplete="off" autocapitalize="characters" spellcheck="false" oninput="formatCodeInput(this,8,4)" onkeydown="if(event.key==='Enter'){event.preventDefault();pairJoin();}"></textarea>
         <button class="ai-run-btn" onclick="pairJoin()">Add this device</button>
       </div>
+      <label class="ct-dk" style="margin:10px 0 0;font-size:12px">Replace what is on this device
+        <span class="ct-tgl"><input type="checkbox" id="pairReplace"><span class="ct-tgl-track"></span></span></label>
+      <p class="ai-desc" style="font-size:12px;margin-top:2px">Off, the two lists are folded together. On, this device drops its own list and shows the other one instead. A restore point is kept here either way.</p>
       <div id="pairBox"></div>`;
   }
 }
@@ -15227,7 +15250,7 @@ const WT_STEPS=[
   // characters into a button that said it would replace their list.
   {sel:'#pairAddBtn', open:()=>openSheet('backupSheet'),
    t:'Put your other devices on this list',
-   b:'Press <b>Add a device</b> for eight characters, then type them into the same panel on your phone or laptop. The two lists are folded together \u2014 nothing is replaced. A device you never join keeps backing up on its own, and nothing will tell you.'},
+   b:'Press <b>Add a device</b> for eight characters, then type them into the same panel on your phone or laptop. The two lists are folded together \u2014 nothing is replaced, unless you turn on <b>Replace what is on this device</b> there, which drops that device\u2019s list and shows this one instead. A device you never join keeps backing up on its own, and nothing will tell you.'},
   {sel:'#hb-social', open:()=>openSheet('friendsSheet'),
    t:'Friends, and your own code',
    b:'Open <b>Your code &amp; adding friends</b>. Send someone your code, or paste theirs. Then you can recommend shows to each other and see what they thought.',
@@ -26665,10 +26688,11 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-11-04.77',
-  title:'Nobody else watched it for you',
-  push:'Fixed: an episode could be marked watched on a device where nobody watched it, because a trip made on one device was being sent to the others.',
+  v:'2026-11-04.78',
+  title:'The device in your hand is the wrong one',
+  push:'Add a device can now replace this device\u2019s list with the one it joins, instead of folding the two together.',
   notes:[
+    '<b>Add a device</b> has a second choice under it: <b>Replace what is on this device</b>. Left off it behaves as it always has \u2014 the two lists are folded together and nothing is lost. Turned on, the device you are holding drops its own list, shows the one it joined instead, and <b>sends none of its own titles to it</b>. That is the way round you want when the phone is the copy to be rid of and the computer is right: before this, joining carried the phone\u2019s titles into the good list and up to the cloud, which is the opposite of what was wanted and could not be undone from the other end. A restore point is kept on the device either way, and a backup with nothing in it is refused rather than allowed to land on a full device.',
     'When you open an episode on another site, the app notes which episode you left for and when, so it can mark it watched if you were gone long enough. <b>That note was being sent to your other devices.</b> On a device that never left, the clock it arrived with was always older than the fifteen minutes that mean \u201cwatched\u201d \u2014 so a title could jump several episodes ahead on a machine you had not watched anything on. The note stays on the device that made the trip now.',
     'Two smaller ones went the same way: a <b>custom source you were still typing</b> and had not saved could appear on another device, and <b>which tab a sheet was left on</b> travelled with it. Both also cost a save to the cloud every time they changed.',
     'On a <b>desktop</b>, Cloud now gives you the real values instead of tidy ones: the exact byte count, the percentage to a decimal, and a sortable timestamp with seconds rather than \u201c1h ago\u201d. Under it sits the line you actually need when two machines disagree \u2014 device, titles, deleted, failed saves, version. The phone keeps the short form, where a byte count is noise.',

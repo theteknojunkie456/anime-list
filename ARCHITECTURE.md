@@ -1138,3 +1138,47 @@ key's shape no longer tells you where the request goes. From then on:
 The base URL and key are localStorage-only and are **never synced**, for the same
 reason the provider keys aren't: a credential in cloud storage is a credential
 given away.
+
+---
+
+## Joining a key, and the one time merging is wrong
+
+**Add a device** (`pairOffer` → `pairJoin` → `pairFinish`) folds two lists
+together. That is right nearly every time: two devices that have both been used
+each hold something the other does not, and a merge cannot lose anything.
+
+It is wrong in exactly one case, and it is a case people hit on purpose: *the
+device in your hand is the copy you want gone.* The phone drifted, the computer
+is right, and the person is holding the phone. Merging then does three things
+they did not ask for — the phone's stale titles enter the good list, `pairFinish`
+calls `schedulePush()` and sends them to the cloud, and from there every other
+device pulls them. None of that is undoable from the far end, because KV keeps
+no history.
+
+So `pairFinish(code, inner, wraps, key, replace)` has a second mode, offered as
+**Replace what is on this device** beside both copies of the join field (the
+panel renders a different one depending on whether backup is already on, and a
+phone that minted its own key sees the *on* branch — the mode has to exist in
+both or it is missing exactly where it is needed).
+
+What `replace` changes, and nothing else:
+
+- `anime = migrate(inner)` instead of `dedupeList(anime.concat(...))`. The
+  joined list arrives whole; this device's does not survive.
+- An **empty** `inner` is refused outright — list untouched, key not adopted.
+  This is the `forcePushList` / `adoptFromDevice` rule in a third place: an empty
+  list replacing a full one is never what anybody meant. Merging needs no such
+  guard, since it can only ever add.
+- The restore point is still written first, into `wl_prepush_backup`, before
+  anything is dropped.
+
+What it deliberately does **not** change: it does not apply the other device's
+`extra` (ordinary sync carries settings across on the next pull — see §8), and it
+does not stamp `adopt`. Replacing is a statement about *this* device only. The
+list being joined is not disturbed by being joined, which is the property that
+makes it safe to run from the wrong device.
+
+`scripts/replace-join-test.mjs` holds it to that: the Mac's rows arrive id for
+id, the phone's note (the most specific thing a merge preserves) is gone, and
+nothing matching `phone-` reaches `__pushed` after `flushPush()`. On the build
+before this existed, that last row fails — the titles went up.

@@ -8,7 +8,7 @@ A personal anime / manga / show / movie tracker that runs entirely in the browse
 ## Install it
 
 - **Android** — [android.html](https://theteknojunkie456.github.io/anime-list/android.html): install from Chrome in two taps, or download the signed **APK** from [Releases](https://github.com/theteknojunkie456/anime-list/releases/latest). Verified against the site with Digital Asset Links, so the app runs without a browser address bar. See [ANDROID.md](ANDROID.md).
-- **iPhone / iPad** — open in Safari → Share → **Add to Home Screen**. For screen-sharing a party, the native app in [ios-broadcast/](ios-broadcast) is the only thing on iOS that can capture a screen.
+- **iPhone / iPad** — open in Safari → Share → **Add to Home Screen**. The native app in [ios-broadcast/](ios-broadcast) adds the three things a web view cannot do: screen-sharing a party (the only way to capture a screen on iOS), Face ID unlock, and a **Home Screen widget** showing what you are part-way through and when the next episode lands.
 - **Desktop** — it just runs; Chrome will offer to install it.
 
 All of them load the same live site, so a deploy reaches every surface at once. Only the native shells need rebuilding, and only for icon/name/native-capability changes.

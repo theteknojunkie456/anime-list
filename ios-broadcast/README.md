@@ -16,10 +16,15 @@ together.
 
 ## What you need
 - A **Mac with Xcode** (installed).
-- A **free Apple ID** is enough to run it on **your own** iPhone. Only *you* (the
-  host) install it; friends use the web. No $99 account needed.
-- **No App Groups** — those need a paid account, so the app and the extension share
-  the party code through a private named pasteboard instead (`AppGroup.swift`).
+- A **free Apple ID** is enough to run the broadcast half on **your own** iPhone.
+  Only *you* (the host) install it; friends use the web.
+- **The party code travels through a named pasteboard**, not an App Group
+  (`AppGroup.swift`) — that is what let the broadcast extension work on a free
+  Apple ID, and it still does.
+- **The Home Screen widget does need the paid account** (this one has it: the team
+  is `NGEK7NY2X4`). It shares a real **App Group**, `group.com.humblezone.watchlist`,
+  because a named pasteboard does not survive a reboot and a widget that goes blank
+  every time the phone restarts is worse than no widget.
 
 ## Build it (the project is generated for you)
 The Xcode project is produced from `project.yml` by **XcodeGen**, so you don't wire
@@ -27,8 +32,8 @@ up targets by hand. It's committed as `WatchListParty.xcodeproj` — just open i
 you ever change the file list, regenerate with `xcodegen generate`.)
 
 1. **Open** `ios-broadcast/WatchListParty.xcodeproj` in Xcode.
-2. **Signing** — do this for **both** targets (they're in the left sidebar:
-   `WatchListParty` and `BroadcastExt`):
+2. **Signing** — do this for **all three** targets (they're in the left sidebar:
+   `WatchListParty`, `BroadcastExt` and `WatchListWidget`):
    - Select the target → **Signing & Capabilities** tab.
    - **Team** → pick your Apple ID (add it under Xcode → Settings → Accounts if it
      isn't there — a free Apple ID is fine).
@@ -78,3 +83,46 @@ you ever change the file list, regenerate with `xcodegen generate`.)
 No backend work needed. The `share` / `signal` messages and the room WebSocket
 already exist in `cloud/sync-worker.js` (the `PartyRoom` Durable Object). This app is
 just another client of that room.
+
+---
+
+## The Home Screen widget
+
+`WatchListWidget` is a third target: a WidgetKit extension showing **what you are
+part-way through**, in three sizes — small (one title over its artwork), medium
+(three, each its own tap target) and the lock-screen rectangle (one line).
+
+**It computes nothing.** A widget is a separate process that runs at moments iOS
+picks, usually while the app is closed, and it cannot reach the web view or its
+local storage. So the flow runs one way only:
+
+```
+web app (index.html)                  shell (WidgetBridge)              widget
+  nativeWidget()        ──wl bridge──▶  write widget.json  ──App Group──▶ draw
+  on save / theme / boot                cache cover art
+                                        WidgetCenter.reload
+```
+
+Three rules the code keeps, each for a reason that is not obvious:
+
+- **Unchanged snapshot → no reload.** iOS budgets widget reloads at tens per day
+  and spends them silently. The web side posts only when the snapshot actually
+  differs, and coalesces a burst of episode ticks into one message; the shell
+  compares again before touching `WidgetCenter`.
+- **The widget never uses the network.** Cover art is downloaded once by the app,
+  scaled to 400px, and written into the shared container. The widget only reads
+  local files.
+- **Locking the app clears it.** A password in front of a list anyone can read on
+  the Home Screen is not a password, so `showLock()` wipes the snapshot and the
+  cached art.
+
+Taps come back the other way as `watchlist://title/<id>`, which the app turns into
+`window.wlOpenTitle(id)`. That scheme is **registered now** (`CFBundleURLTypes` in
+`project.yml`) — `LinkRouter` had handled `watchlist://party/CODE` links since
+parties shipped, but nothing ever claimed the scheme, so no such link could reach
+the app at all.
+
+Checked by `scripts/widget-feed-test.mjs`, which asserts both the feed (what gets
+sent, and when nothing does) and the contract — every key the page sends is a key
+the Swift side reads. Nothing in Xcode fails when those drift; the widget just
+quietly shows an empty tile.

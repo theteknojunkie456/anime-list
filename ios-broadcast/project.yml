@@ -23,7 +23,7 @@ packages:
 settings:
   base:
     MARKETING_VERSION: "1.0"
-    CURRENT_PROJECT_VERSION: "10"
+    CURRENT_PROJECT_VERSION: "12"
     SWIFT_VERSION: "5.0"
     GENERATE_INFOPLIST_FILE: "NO"
     CODE_SIGN_STYLE: Automatic
@@ -47,6 +47,8 @@ targets:
       - WatchListBroadcastApp.swift
       - ContentView.swift
       - AppGroup.swift
+      - WidgetShared.swift
+      - WidgetBridge.swift
       - Assets.xcassets
     info:
       path: Generated/App-Info.plist
@@ -71,13 +73,28 @@ targets:
         NSMicrophoneUsageDescription: Talk in a watch party — voice chat and screen-share audio.
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
+        # The app has handled watchlist:// links since parties shipped (see
+        # LinkRouter) but never claimed the scheme, so iOS had nowhere to send
+        # one and every invite link fell through to the browser. The widget's
+        # taps use the same scheme.
+        CFBundleURLTypes:
+          - CFBundleURLName: com.humblezone.watchlist
+            CFBundleTypeRole: Editor
+            CFBundleURLSchemes:
+              - watchlist
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.humblezone.watchlist
         TARGETED_DEVICE_FAMILY: "1,2"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+    entitlements:
+      path: Generated/App.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.com.humblezone.watchlist
     dependencies:
       - target: BroadcastExt
+      - target: WatchListWidget
       # WebRTC is declared on the extension, which is the target whose code uses
       # it — but an app extension cannot carry its own copy of a dynamic
       # framework. It resolves @rpath/WebRTC.framework against the HOST APP's
@@ -114,3 +131,36 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.humblezone.watchlist.BroadcastExt
     dependencies:
       - package: WebRTC
+
+  # The Home Screen widget. It is a separate process with no access to the web
+  # view, so it reads a snapshot the app leaves in the App Group container —
+  # which is also why this target carries the same group entitlement.
+  #
+  # Deliberately NOT a dependency of WebRTC: nothing here streams anything, and
+  # an extension that pulls in a 100 MB framework it never calls is an extension
+  # that gets killed for memory on a Home Screen refresh.
+  WatchListWidget:
+    type: app-extension
+    platform: iOS
+    deploymentTarget:
+      iOS: "16.0"
+    sources:
+      - Widget
+      - WidgetShared.swift
+    info:
+      path: Generated/Widget-Info.plist
+      properties:
+        CFBundleDisplayName: WatchList
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    entitlements:
+      path: Generated/Widget.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.com.humblezone.watchlist
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.humblezone.watchlist.Widget
+        SKIP_INSTALL: "YES"

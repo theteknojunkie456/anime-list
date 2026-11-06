@@ -11,12 +11,28 @@ import Combine
 final class LinkRouter: ObservableObject {
     static let shared = LinkRouter()
     @Published var pendingParty: String?
+    /// A title tapped on the Home Screen widget — watchlist://title/<id>.
+    @Published var pendingTitle: String?
 
     func open(_ url: URL) {
         var code: String?
         if url.scheme == "watchlist" {
-            // watchlist://party/CODE → host "party", the code is the last path piece
-            code = url.pathComponents.last(where: { $0 != "/" }) ?? url.host
+            let tail = url.pathComponents.last(where: { $0 != "/" }) ?? ""
+            // Branch on the host FIRST. Without this, watchlist://title/k3f9xq
+            // fell through the party path below, where a 5-to-8-character
+            // alphanumeric tail is exactly what a party code looks like — so
+            // tapping a widget would have tried to join a party named after a
+            // row in your own list.
+            switch url.host {
+            case "title":
+                let id = tail.filter { $0.isLetter || $0.isNumber }
+                if !id.isEmpty { pendingTitle = id }
+                return
+            case "home":
+                return                      // opening the app is the whole action
+            default:
+                code = tail.isEmpty ? url.host : tail
+            }
         }
         if code == nil,
            let q = URLComponents(url: url, resolvingAgainstBaseURL: false)?

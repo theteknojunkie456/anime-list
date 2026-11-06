@@ -850,10 +850,68 @@ A thin **Swift / SwiftUI** wrapper that loads the same web app in a `WKWebView`
 - `PartySignaling.swift` — watch-party signaling.
 - `SampleHandler.swift` — ReplayKit screen broadcast extension.
 - `AppGroup.swift` — shared storage between app & broadcast extension.
+- `WidgetShared.swift` / `WidgetBridge.swift` / `Widget/` — the Home Screen widget.
 - `project.yml` — XcodeGen project definition.
 
 The web app is the source of truth; the shell just adds capabilities the browser
 can't.
+
+### The Home Screen widget, and why it is fed rather than queried
+
+`WatchListWidget` is a WidgetKit extension: small (one title over its artwork),
+medium (three, each its own tap) and the lock-screen rectangle.
+
+A widget is **a separate process that runs when iOS says so**, usually while the
+app is closed. It cannot open the web view, it cannot read the page's
+localStorage, and there is no moment at which it could ask. So nothing on it is
+computed there. The page builds a small snapshot — the titles you are part-way
+through, the next episode due, the theme's five colour tokens — posts it over the
+`wl` bridge, and the shell writes it into the App Group container. The widget
+renders whatever it finds and nothing else.
+
+```
+index.html  nativeWidget()   ──wl──▶  WidgetBridge.accept()  ──group container──▶  WatchListWidget
+  save / applyTheme / boot              widget.json + art/            draw (no network, no list)
+```
+
+**The App Group is the one place this project uses one.** The party code travels
+through a named pasteboard instead (`AppGroup.swift`) because that worked on a
+free Apple ID. For the widget a pasteboard would have been wrong even if it were
+free: named pasteboards do not survive a reboot, and a Home Screen tile that goes
+blank every time the phone restarts is worse than no tile. The account is paid —
+the team carries TestFlight provisioning — so `group.com.humblezone.watchlist` is
+on both the app and the widget.
+
+Three rules in the code that are not obvious from reading it:
+
+- **An unchanged snapshot costs nothing.** iOS budgets widget reloads at tens per
+  day and spends them silently; a chatty app ends up with a widget that stops
+  updating in the afternoon. Ticking through a binge is coalesced into one message
+  (1.2s debounce), the page drops a snapshot identical to the last one it sent,
+  and the shell compares again before it touches `WidgetCenter`.
+- **The widget has no network.** Cover art is fetched once by the app, scaled to
+  400px, and written into the shared container under the title's id — not its URL,
+  which changes when somebody re-picks a cover and would leave the old file
+  uncollectable. The widget only ever reads a local file.
+- **A locked app has a blank widget.** `showLock()` sends `widgetclear`, which
+  wipes the snapshot and the cached art. Otherwise the password is in front of a
+  list anybody can read on the way past.
+
+Taps travel back as `watchlist://title/<id>` → `window.wlOpenTitle(id)`, which
+refuses while the app is locked and ignores an id that has since been deleted.
+`LinkRouter` branches on the URL's **host** before anything else: a title id is
+five-to-eight alphanumeric characters, which is also exactly what a party code
+looks like, so without that branch tapping the widget would have tried to join a
+party named after a row in your own list. Registering `CFBundleURLTypes` for the
+scheme is new too — `LinkRouter` had handled `watchlist://party/CODE` since
+parties shipped, but nothing ever claimed the scheme, so iOS had nowhere to send
+one and every invite link fell through to the browser.
+
+`scripts/widget-feed-test.mjs` covers both halves: the feed (what is sent, and the
+three cases that send nothing — unchanged, locked, and the web build) and the
+contract between the languages, asserting that every key the page sends is a key
+`WidgetBridge` reads. Nothing in Xcode fails when those drift; the widget just
+quietly shows an empty tile, which is the kind of bug nobody reports.
 
 ### The app mark, and why it has its own test
 

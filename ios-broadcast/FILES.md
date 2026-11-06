@@ -1,7 +1,8 @@
 # What each file is (so Xcode makes sense)
 
-You'll have **two targets** in Xcode: the **app** (what you tap to open) and the
-**BroadcastExt** (the invisible screen-capture piece iOS runs while broadcasting).
+You'll have **three targets** in Xcode: the **app** (what you tap to open), the
+**BroadcastExt** (the invisible screen-capture piece iOS runs while broadcasting)
+and the **WatchListWidget** (the Home Screen tile).
 Each file below is tagged with the target(s) it belongs to.
 
 | File | Target | What it does |
@@ -13,6 +14,9 @@ Each file below is tagged with the target(s) it belongs to.
 | `WebRTCBroadcaster.swift` | BroadcastExt | The A/V engine: turns your screen into one video track and the app-audio into one audio track, and opens a connection to each viewer. |
 | `BroadcastAudioDevice.swift` | BroadcastExt | A custom WebRTC audio device that forwards the app-audio ReplayKit captures into WebRTC — *without* opening the mic or an AVAudioSession (which the extension can't afford). This is what makes host audio possible. |
 | `SampleHandler.swift` | BroadcastExt | The extension itself — iOS hands it every screen frame **and audio buffer**; it pushes them into WebRTC. Wires everything together. |
+| `WidgetShared.swift` | **App + Widget** | The one description of what the Home Screen widget shows, and where the two processes meet — the App Group container. |
+| `WidgetBridge.swift` | App | Takes the snapshot the web app posts, writes it into the container, caches the cover art, and asks iOS to redraw. Does nothing when nothing changed: widget reloads are budgeted. |
+| `Widget/WatchListWidget.swift` | WatchListWidget | The tile itself — small, medium and lock-screen. Draws the snapshot and nothing else; it has no network and no access to your list. |
 | `README.md` | — | The step-by-step Xcode setup. |
 | `FILES.md` | — | This file. |
 
@@ -25,9 +29,14 @@ Each file below is tagged with the target(s) it belongs to.
 ## Target membership cheat-sheet (the thing beginners miss)
 When you drag a file into Xcode, click it and check the right box under
 **File Inspector → Target Membership**:
-- App only: `WatchListBroadcastApp`, `ContentView`
-- Both: `AppGroup`
+- App only: `WatchListBroadcastApp`, `ContentView`, `WidgetBridge`
+- App + BroadcastExt: `AppGroup`
+- App + WatchListWidget: `WidgetShared`
 - BroadcastExt only: `PartySignaling`, `WebRTCBroadcaster`, `BroadcastAudioDevice`, `SampleHandler`
+- WatchListWidget only: `Widget/WatchListWidget`
+
+(You shouldn't have to do any of this by hand — `project.yml` says it all, and
+`scripts/ios-sync.sh` regenerates the project from it.)
 
 ## This app does not update itself
 

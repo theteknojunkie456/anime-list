@@ -216,13 +216,31 @@ struct WatchListShell: UIViewRepresentable {
         // once the page has finished loading.
         var pageLoaded = false
         var pendingParty: String?
+        var pendingTitle: String?
         private var linkSub: AnyCancellable?
+        private var titleSub: AnyCancellable?
         func observeLinks() {
             linkSub = LinkRouter.shared.$pendingParty.sink { [weak self] code in
                 guard let self, let code, !code.isEmpty else { return }
                 self.pendingParty = code
                 self.flushParty()
             }
+            titleSub = LinkRouter.shared.$pendingTitle.sink { [weak self] id in
+                guard let self, let id, !id.isEmpty else { return }
+                self.pendingTitle = id
+                self.flushTitle()
+            }
+        }
+        /// Open the title a widget tap asked for, once the page is up to be
+        /// asked. The id is base-36 out of the web app's own uid(), and it is
+        /// filtered again here — it is being pasted into a line of JavaScript.
+        func flushTitle() {
+            guard pageLoaded, let id = pendingTitle, let web = web else { return }
+            let safe = id.filter { $0.isLetter || $0.isNumber }
+            pendingTitle = nil
+            guard !safe.isEmpty else { return }
+            web.evaluateJavaScript("window.wlOpenTitle && window.wlOpenTitle('\(safe)')",
+                                   completionHandler: nil)
         }
         func flushParty() {
             guard pageLoaded, let code = pendingParty, let web = web else { return }
@@ -260,6 +278,7 @@ struct WatchListShell: UIViewRepresentable {
             NSLog("WatchList: page loaded — password in Keychain? %@", saved ? "yes" : "no (unlock once in the app to save it)")
             pageLoaded = true
             flushParty()   // a pending invite link → join now that the web app is up
+            flushTitle()   // …and a title tapped on the Home Screen widget
             guard saved else { return }
             PWStore.load { pw in
                 NSLog("WatchList: Face ID unlock → %@", pw != nil ? "got password, filling" : "no password (denied/failed)")
@@ -400,6 +419,12 @@ struct WatchListShell: UIViewRepresentable {
                 DispatchQueue.main.async { self.broadcaster.start() }
             case "notify":
                 if let items = body["items"] as? [[String: Any]] { Notifier.schedule(items) }
+            // The Home Screen widget's whole supply of truth. The page decides
+            // what is worth showing; this side only stores it and redraws.
+            case "widget":
+                WidgetBridge.accept(body)
+            case "widgetclear":
+                WidgetBridge.clear()
             // The web side hands its identity over whenever it changes, so the
             // copy that survives eviction is never the stale one.
             case "saveid":

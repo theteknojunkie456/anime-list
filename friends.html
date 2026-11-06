@@ -6120,6 +6120,10 @@ body.recsel .pcard{position:relative;}
     <div><div class="tut-h">Never miss an episode</div><div class="tut-p">The <b>calendar</b> shows what airs this week for the shows you follow, in your own time zone — and it tracks delays. Turn on the <b>bell</b> to get a notification the moment one drops.</div></div>
   </div>
   <div class="tut-step">
+    <div class="tut-ico" style="--rc:var(--pln)"><i data-ic="grid"></i></div>
+    <div><div class="tut-h">On your Home Screen</div><div class="tut-p">In the <b>iPhone app</b>, WatchList has a <b>Home Screen widget</b>: what you are part-way through, the episode to watch, and when the next one lands. Hold the Home Screen, tap <b>+</b>, search <b>WatchList</b>. Tapping a title opens that title, not the front door — and it wears whatever theme you have on.</div></div>
+  </div>
+  <div class="tut-step">
     <div class="tut-ico" style="--rc:var(--fin)"><i data-ic="compass"></i></div>
     <div><div class="tut-h">Find your next one</div><div class="tut-p">The <b>compass</b> suggests titles you don't have yet, picked from what you already watch — real community recommendations, not guesses.</div></div>
   </div>
@@ -8263,7 +8267,7 @@ function save(){
     const unsafe=(typeof appLocked!=='undefined'&&appLocked)||(typeof listUntrusted!=='undefined'&&listUntrusted);
     if(!unsafe)dedupeAnime();
   }catch(e){}
-  writeLocal();try{ensureBackup();}catch(e){}schedulePush();scheduleNotifyUpdate();
+  writeLocal();try{ensureBackup();}catch(e){}schedulePush();scheduleNotifyUpdate();try{nativeWidget();}catch(e){}
 }
 // The other half of the mirror. localStorage is read synchronously at boot and
 // IndexedDB can't be, so this runs just after and only steps in when the local
@@ -8491,6 +8495,7 @@ let lockRecMode=false;
 let _lockTapH=null;
 function showLock(){
   appLocked=true;lockRecMode=false;forgetSessionKey();
+  try{nativeWidgetClear();}catch(e){}   // off the Home Screen while it is locked
   const el=document.getElementById('lockScreen');if(!el)return;
   // Locking is immediate; SHOWING the lock waits for the boot film to start its
   // dissolve, so the film plays on black and hands over to the lock card instead
@@ -9920,6 +9925,7 @@ function askListPassword(env,opts,onList){
 function adoptProtection(wraps,key){
   if(!wraps||!key)return;
   cryptoKey=key;envWraps=wraps;appLocked=false;
+  try{nativeWidget();}catch(e){}       // unlocked — the widget may show the list again
   try{localStorage.setItem(ENCFLAG,'1');}catch(e){}
   try{rememberSessionKey();}catch(e){}
   try{renderLockUI();}catch(e){}
@@ -10981,6 +10987,7 @@ function applyTheme(id,persist=true){
   try{applyAccent();}catch(e){}      // a chosen accent survives a theme change
   try{applyTint();}catch(e){}        // and the tint re-mixes into the new theme's greys
   try{applyAmbient();}catch(e){}
+  try{nativeWidget();}catch(e){}   // the widget wears the theme too
   renderThemeGrid();
 }
 // ─── YOUR OWN ACCENT ────────────────────────────────────────────────────────
@@ -16993,6 +17000,60 @@ function nativeScheduleNotifs(){
     window.webkit.messageHandlers.wl.postMessage({type:'notify',items});
   }catch(e){}
 }
+// ── THE HOME SCREEN WIDGET ───────────────────────────────────────
+// The widget is a separate process on the Home Screen. It cannot read this page
+// — not the list, not the theme — and it draws at moments iOS picks, usually
+// while the app is closed. So it is handed everything in advance: the few titles
+// you are part-way through, the next episode due, and the colours the app is
+// wearing, so the tile matches the app it opens rather than a palette chosen
+// once at build time.
+let _wgT=0,_wgLast='';
+function nativeWidget(){
+  if(!IS_NATIVE)return;
+  // Ticking an episode saves, renders and would post on every tap. iOS budgets
+  // widget reloads — tens a day, spent silently — so a burst is coalesced into
+  // one message rather than burning the budget before lunch.
+  clearTimeout(_wgT);_wgT=setTimeout(_nativeWidgetNow,1200);
+}
+function _nativeWidgetNow(){
+  try{
+    if(typeof appLocked!=='undefined'&&appLocked)return;   // a locked list stays off the Home Screen
+    const css=getComputedStyle(document.documentElement);
+    const v=k=>String(css.getPropertyValue(k)||'').trim();
+    const up=resumeItems(anime.filter(a=>kindOf(a)==='watch'),false).slice(0,4).map(a=>({
+      id:a.id,title:a.title||'',
+      ep:(+a.ep||0)+1,                      // what to watch next, not what was watched
+      total:+a.epTotal||0,img:a.img||''}));
+    const nx=airingThisWeek()[0];
+    const msg={type:'widget',up,
+      air:nx?{title:nx.title||'',at:+nx.airAt||0,ep:+nx.airEp||0}:null,
+      watching:anime.filter(a=>kindOf(a)==='watch'&&a.status==='watching').length,
+      theme:{a:v('--a'),bg:v('--bg'),bg2:v('--bg2'),t1:v('--t1'),t2:v('--t2')}};
+    const sig=JSON.stringify(msg);
+    if(sig===_wgLast)return;                // nothing moved: do not spend a reload
+    _wgLast=sig;
+    window.webkit.messageHandlers.wl.postMessage(msg);
+  }catch(e){}
+}
+// Locking the app, or signing out of it, has to take the titles off the Home
+// Screen too — otherwise the lock screen is a password in front of a list that
+// anybody can read on the way past.
+function nativeWidgetClear(){
+  if(!IS_NATIVE)return;
+  _wgLast='';clearTimeout(_wgT);
+  try{window.webkit.messageHandlers.wl.postMessage({type:'widgetclear'});}catch(e){}
+}
+// A tap on the widget: the shell turns watchlist://title/<id> into this call
+// once the page is up to be asked.
+window.wlOpenTitle=function(id){
+  try{
+    // A widget tap is not a key. If the app is locked it opens the lock, and
+    // whatever was tapped is simply not what happens next.
+    if(typeof appLocked!=='undefined'&&appLocked)return;
+    if(!anime.some(a=>a.id===id))return;    // deleted since the widget last drew
+    openDetail(id);
+  }catch(e){}
+};
 // Native Face ID → password auto-unlock: the app saves the password in the iPhone
 // Keychain (behind Face ID) and calls wlNativeUnlock() to fill + submit it for you.
 function nativeSavePw(pw){if(!IS_NATIVE||!pw)return;try{window.webkit.messageHandlers.wl.postMessage({type:'savepw',pw});}catch(e){}}
@@ -26870,10 +26931,11 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-11-05.81',
-  title:'The copy you walked away from',
-  push:'Add a device can now replace this device\u2019s list with the one it joins, instead of folding the two together.',
+  v:'2026-11-06.82',
+  title:'WatchList on the Home Screen',
+  push:'The iPhone app has a Home Screen widget: what you are part-way through, and when the next episode lands.',
   notes:[
+    'The <b>iPhone app</b> has a <b>Home Screen widget</b>. Hold the Home Screen, tap <b>+</b>, search <b>WatchList</b>: the small size shows the one title you are most likely to open next, over its own artwork, with the episode to watch and how far through you are; the medium size shows three, each its own tap; and there is a lock-screen size that is one line. Tapping a title opens it \u2014 not the app\u2019s front door, that title. It also wears whatever theme you are using, so it changes colour when the app does, and it goes blank the moment the app is locked, because a password in front of a list nobody can read on the Home Screen is not a password.',
     'When a device <b>joins another backup</b>, restores from a code, or opens a setup kit, it stops using the key it had \u2014 and the copy stored under that key stays in the cloud, holding a snapshot of your library, reachable only by a key the device has just stopped keeping. Nothing in the app could mention it again. <b>Cloud</b> now says it is there and offers to erase it, and the offer is all it does: nothing is deleted on its own. Before you can press it, the app asks that old key who is still backing up under it \u2014 one phone joining your computer does not speak for another phone that stayed \u2014 and names them if anyone is.',
     'Fixed on the way: leaving one of those confirmations while it was still checking could leave the <b>confirm button dead for the rest of the session</b>, for every other thing you might confirm. Every confirmation in the app shares one button, so opening one now states that button completely rather than inheriting whatever the last one left behind.',
     'The other two buttons that can cost you a list now name the machines as well. <b>Use this list everywhere</b> says which devices take the version you are sending and what it costs them \u2014 <i>Mac (286 titles), iPad (12 titles) take this version next time they open, and whatever they have that this device does not is lost</i> \u2014 or, when nobody else has backed up under the key, that there is nothing else to overwrite, which is worth knowing before you press it. <b>Taking another device\u2019s list</b> now says what the device in your hand gives up, which was the one number missing: it told you what arrived and called what left \u201canything held only somewhere else\u201d. Both hold the button, reading <b>Checking</b>, until the app knows what it is about to replace.',
@@ -27351,7 +27413,7 @@ try{askPersist();}catch(e){}
 try{setTimeout(()=>{try{repairBanners();}catch(e){}},900);}catch(e){}
 try{setTimeout(()=>{restoreCreds().then(()=>{try{if(typeof syncOnOpen==='function')syncOnOpen();}catch(e){}});},0);}catch{}try{setTimeout(()=>{try{fetchSequels();}catch(e){}},6000);}catch{}try{setTimeout(restoreFromIDB,0);}catch{}try{setTimeout(()=>{try{ensureBackup();}catch(e){}},1200);}catch{}try{purgeAdult();}catch{}try{if(!appLocked&&dedupeAnime())writeLocal();}catch{}
 try{if(!appLocked&&adoptOfficialCase())writeLocal();}catch{}
-loadTheme();try{seedHiddenDefaults();}catch{}try{_restoreUpd();}catch{}render();try{nativeScheduleNotifs();}catch{}try{hydrateImages();}catch{}
+loadTheme();try{seedHiddenDefaults();}catch{}try{_restoreUpd();}catch{}render();try{nativeScheduleNotifs();}catch{}try{nativeWidget();}catch{}try{hydrateImages();}catch{}
 // After the list is up — and after the tutorial has had its chance to claim a
 // new install — tell returning users what changed in the update they just got.
 try{setTimeout(maybeShowWhatsNew,900);}catch{}

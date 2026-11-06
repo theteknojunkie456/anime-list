@@ -1261,3 +1261,34 @@ Two details are load-bearing:
 Before rewriting the dialog it re-checks `confirmBox.classList.contains('on')`
 and `_confirmCb === doErase`: the dialog may have been answered or dismissed
 while the lookup was in flight, and the next one along is not ours to rewrite.
+
+
+### The copy a device walks away from
+
+Four paths change the key a device backs up under: `pairJoin` → `pairFinish`,
+`syncRestore`, a setup kit, and `adoptByIdentity`. All four leave the copy
+stored under the **old** key exactly where it was — in KV, holding a snapshot of
+the library, reachable only by a key the device has just stopped storing. Until
+now nothing in the app could ever mention it again.
+
+`setSyncCode()` remembers it, because that is the one function all four go
+through; putting it in each of them is how one gets missed. The rule is narrow:
+
+- a **move** (old key, different new key) records `wl_left_key`;
+- **turning backup off** (`setSyncCode('')`) records nothing — that copy is
+  deliberately kept, and the panel already offers to restore from it;
+- **coming back** to the very key in `wl_left_key` clears the note, since there
+  is no copy behind a key you are using again.
+
+A→B→A therefore leaves **B** behind, not A. Each move leaves exactly one copy,
+the key just stepped off.
+
+`wl_left_key` is in `syncSkip()`. It is a fact about one device's history, in
+the same family as `wl_prepush_backup` and `wl_device`: shared, every device
+would offer to erase a copy another machine walked away from — or one it is
+still using.
+
+That last risk is why `forgetLeftKey()` asks the **old** key who is on it
+(`othersOnKey(code)` — the lookup takes a key now instead of assuming the
+current one) and names them before the erase is pressable. One phone joining
+the Mac does not speak for another phone that stayed on the old key.

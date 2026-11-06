@@ -62,6 +62,7 @@ localStorage.setItem('wl_net_status','approved');
 localStorage.setItem('tut_seen_animelist_v4','1');
 localStorage.setItem('seen_release','2026-10-18.62');
 window.__pushed=[];window.__empty=false;window.__pulled=[];
+window.__forgot=[];window.__devs={};window.__devDelay=0;
 window.fetch=function(u,o){
   let b={};try{b=JSON.parse((o&&o.body)||'{}');}catch(e){}
   const J=v=>Promise.resolve(new Response(JSON.stringify(v),{status:200,headers:{'Content-Type':'application/json'}}));
@@ -73,6 +74,10 @@ window.fetch=function(u,o){
     return J({data:null,updatedAt:0});
   }
   if(b.op==='push'){window.__pushed.push(b.data);return J({ok:true,updatedAt:Date.now()});}
+  if(b.op==='forget'){window.__forgot.push(b.code);return J({ok:true,existed:true});}
+  if(b.op==='devices')return new Promise(r=>setTimeout(()=>r(new Response(
+    JSON.stringify({ok:true,devices:((window.__devs||{})[b.code]||[])}),
+    {status:200,headers:{'Content-Type':'application/json'}})),(window.__devDelay||0)));
   return new Promise(()=>{});
 };`;
 await cmd('Page.addScriptToEvaluateOnNewDocument',{source:SEED});
@@ -135,6 +140,63 @@ t('and NOTHING of the phone’s was pushed to the key it joined',
 // ── the same choice exists before backup is ever turned on ─────────────────
 await ev(`(()=>{setSyncCode('');renderSyncUI();return 1;})()`); await wait(500);
 t('a device with no backup yet is offered it too', await tgl(true), true);
+
+// ── THE COPY THE PHONE WALKED AWAY FROM ───────────────────────
+// Joining another key does not delete the copy under the old one. It stays in
+// the cloud holding a snapshot of the library, reachable only by a key this
+// device has just stopped storing — and before this, nothing in the app
+// could ever mention it again.
+t('the key it left is remembered', await ev(`localStorage.getItem('wl_left_key')`), 'MYOWNCODE1234567890');
+t('and it is remembered as a fact about THIS device, so it never travels',
+  await ev(`syncSkip('wl_left_key')`), true);
+t('which means it is not in what gets uploaded',
+  await ev(`(()=>{try{return Object.keys(collectExtra()||{}).includes('wl_left_key');}catch(e){return 'threw: '+e.message;}})()`), false);
+t('the panel offers to clear it up',
+  await ev(`(()=>{renderSyncUI();return /left behind/.test(document.getElementById('syncBox').innerHTML||'');})()`), true);
+
+// The old key may still be somebody else's backup: one phone joining the Mac
+// does not speak for another phone that stayed on the old key.
+await ev(`window.__devs={'MYOWNCODE1234567890':[{id:'otherphone000000',name:'Old phone',at:Date.now(),n:40}]};
+          window.__devDelay=700;`);
+await ev(`(()=>{window.__forgot=[];forgetLeftKey();return 1;})()`); await wait(250);
+t('the erase is held while it asks who is still on that key',
+  await ev(`!!(document.getElementById('confirmYesBtn')||{}).disabled`), true);
+await wait(1100);
+const lm=await ev(`(document.getElementById('confirmMsg')||{}).textContent||''`);
+t('the device still using it is named', /Old phone \(40 titles\)/.test(lm), true);
+t('and what erasing costs it is stated', /restores from/.test(lm), true);
+t('nothing was erased while it asked', await ev(`window.__forgot`), []);
+await ev(`document.getElementById('confirmBox').classList.remove('on')`); await wait(150);
+
+// Nobody else on it: erase, and erase the RIGHT key.
+await ev(`window.__devs={};window.__devDelay=0;`);
+await ev(`(()=>{window.__forgot=[];forgetLeftKey();return 1;})()`); await wait(900);
+t('alone on the old key, it says so',
+  /No device is backing up under it any more/.test(await ev(`(document.getElementById('confirmMsg')||{}).textContent||''`)), true);
+await ev(`confirmYes()`); await wait(800);
+t('it erases the key it LEFT, not the one it uses now',
+  await ev(`window.__forgot`), ['MYOWNCODE1234567890']);
+t('and stops offering once the copy is gone', await ev(`localStorage.getItem('wl_left_key')`), null);
+t('the panel stops mentioning it too',
+  await ev(`(()=>{renderSyncUI();return /left behind/.test(document.getElementById('syncBox').innerHTML||'');})()`), false);
+
+// Each move leaves exactly one copy behind: the key just stepped off. Going
+// A to B to A leaves B behind, not A — A is the one in use again.
+await ev(`(()=>{setSyncCode('AAAACODE111111111111');setSyncCode('BBBBCODE222222222222');return 1;})()`);
+t('moving again remembers the key just left',
+  await ev(`localStorage.getItem('wl_left_key')`), 'AAAACODE111111111111');
+await ev(`(()=>{setSyncCode('AAAACODE111111111111');return 1;})()`);
+t('and moving back leaves the OTHER one behind, which is where the copy now is',
+  await ev(`localStorage.getItem('wl_left_key')`), 'BBBBCODE222222222222');
+
+// Turning backup off and restoring the same key is not a move at all, and the
+// note has to go: there is no copy behind a key you are using.
+await ev(`(()=>{syncOff();return 1;})()`);
+t('turning off leaves the note alone — that copy really is still there',
+  await ev(`localStorage.getItem('wl_left_key')`), 'BBBBCODE222222222222');
+await ev(`(()=>{setSyncCode('BBBBCODE222222222222');return 1;})()`);
+t('and coming back to that very key clears it',
+  await ev(`localStorage.getItem('wl_left_key')`), null);
 
 console.log('\n'+pass+' passed, '+fail+' failed');
 ws.close();ch.kill();srv.kill();process.exit(fail?1:0);

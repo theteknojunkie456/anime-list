@@ -8822,7 +8822,28 @@ function saveIdentityNative(opts){
   }catch(e){}
 }
 function syncCode(){try{return localStorage.getItem('sync_'+LSKEY)||'';}catch{return'';}}
-function setSyncCode(c){try{if(c)localStorage.setItem('sync_'+LSKEY,c);else localStorage.removeItem('sync_'+LSKEY);}catch{}
+// A DEVICE THAT MOVES LEAVES A COPY BEHIND.
+//
+// Joining another key, restoring from one, or opening a setup kit all swap the
+// key this device backs up under. The copy stored under the OLD key does not go
+// anywhere \u2014 it sits in the cloud, holding a snapshot of the library, now
+// reachable only by a key this device has just stopped storing. Nothing in the
+// app could ever mention it again.
+//
+// Remembering it here rather than in each of those four places is deliberate:
+// this is the one function all of them go through. Nothing is erased on its own
+// \u2014 the panel offers it, and the offer is the whole point, because the
+// alternative is a copy nobody can reach and nobody knows about.
+function setSyncCode(c){
+  try{
+    const prev=localStorage.getItem('sync_'+LSKEY)||'';
+    // Only a MOVE leaves something behind. Turning backup off keeps the key's
+    // copy deliberately, and erasing it has already deleted the thing.
+    if(c&&prev&&prev!==c)localStorage.setItem('wl_left_key',prev);
+    // Moving back to the key it left: there is nothing behind it any more.
+    if(c&&c===(localStorage.getItem('wl_left_key')||''))localStorage.removeItem('wl_left_key');
+  }catch(e){}
+  try{if(c)localStorage.setItem('sync_'+LSKEY,c);else localStorage.removeItem('sync_'+LSKEY);}catch{}
   try{if(c)mirrorCreds();else idbSet(IDB_CRED_KEY,'').catch(()=>{});}catch(e){}
   // Clearing the code is a decision, not an accident — the Keychain copy has to
   // go with it or the next launch quietly puts it back.
@@ -8867,7 +8888,12 @@ function syncSkip(k){
   // on the machine it was typed into, and wl_prepush_backup is this device's
   // restore point — a SECOND full copy of the list, which was riding inside the
   // settings bundle of every push and overwriting each device's own safety net.
-  if(k==='wl_adopt_seen'||k==='wl_prepush_backup'||k==='wl_device'||
+  //   wl_left_key — the key THIS device stopped using. Shared, every device
+  //     would offer to erase a copy another machine walked away from, or worse,
+  //     one it is still using. Same family as the restore point: a note about
+  //     one device's history, which means something only on that device.
+  if(k==='wl_left_key'||
+     k==='wl_adopt_seen'||k==='wl_prepush_backup'||k==='wl_device'||
      k==='wl_admin_token'||k==='wl_admin_ck'||k==='wl_net_status'||k==='wl_invite'||
      k==='wl_errs'||k==='wl_img_bytes'||k==='wl_booted'||
      k==='wl_rail_folded'||k==='wl_seekok'||k==='wl_pos')return true;
@@ -9165,8 +9191,8 @@ async function forcePushList(){
 // one from each. Then the question is answerable from anywhere: read the Mac's
 // copy on the phone, take it whole, and publish it as the decision. From that
 // point the two are the same list and ordinary two-way merging resumes.
-async function syncDevices(){
-  const code=syncCode();if(!code||!SYNC_URL)return null;
+async function syncDevices(code){
+  code=code||syncCode();if(!code||!SYNC_URL)return null;
   const r=await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({op:'devices',code})});
   return await r.json();
 }
@@ -10199,6 +10225,48 @@ async function syncRestore(){
   if(anime.length)askConfirm({danger:true,title:'Restore from backup?',msg:"This replaces this device's list with the backup for that code.",yes:'Replace',onYes:proceed});
   else proceed();
 }
+function leftKey(){try{const k=localStorage.getItem('wl_left_key')||'';return (k&&k!==syncCode())?k:'';}catch(e){return '';}}
+function clearLeftKey(){try{localStorage.removeItem('wl_left_key');}catch(e){}}
+// Erasing a copy this device walked away from. Same shape as syncForget(),
+// including the part that matters most: the key it left may still be the key
+// ANOTHER device backs up under \u2014 one phone joining the Mac does not speak
+// for the other phone that stayed. So it asks that key who is on it, by name,
+// before this is pressable.
+async function forgetLeftKey(){
+  const k=leftKey();
+  if(!k){toast('There is no older copy to erase');return;}
+  if(appLocked){toast('Unlock the list first');return;}
+  const GENERIC='This device used to back up under a different key, and the copy stored under it is still in the cloud. '+
+    'Erasing it deletes that older copy for good. It is not the backup this device uses now, and nothing on this device changes.';
+  const doErase=async()=>{
+    let r=null;
+    try{
+      const res=await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({op:'forget',code:k})});
+      r=await res.json();
+    }catch(e){r=null;}
+    if(!r||!r.ok){toast('Could not reach the cloud. Nothing was erased');return;}
+    // Only once the far end is gone does the note about it go.
+    clearLeftKey();
+    renderSyncUI();
+    toast(r.existed?'Erased the copy this device left behind':'That older copy was already gone');
+  };
+  askConfirm({danger:true,title:'Erase the older copy?',msg:GENERIC,yes:'Erase it',onYes:doErase});
+  const yb=holdConfirm();
+  const others=await othersOnKey(k);
+  if(!confirmStillMine(doErase))return;
+  if(others&&others.length){
+    const one=others.length===1;
+    reword('That key is still in use by '+others.length+' device'+(one?'':'s'),
+      nameDevices(others)+' '+(one?'still backs':'still back')+' up under the key this device left, and erasing it '+
+      'erases what '+(one?'that device restores':'those devices restore')+' from. '+
+      'This device does not use that key any more, so leaving it alone costs this device nothing.');
+  }else if(others){
+    reword('Erase the older copy?',
+      GENERIC+' No device is backing up under it any more.');
+  }
+  releaseConfirm(yb);
+}
 function syncOff(){setSyncCode('');setBackupDeclined(true);renderSyncUI();try{render();}catch(e){}toast('Backup off. Your list stays on this device');}
 // ERASE THE COPY IN THE CLOUD, not just this device's knowledge of it.
 //
@@ -10228,9 +10296,9 @@ function syncOff(){setSyncCode('');setBackupDeclined(true);renderSyncUI();try{re
 // [] is how "no other device has backed up under this key, so there is nothing
 // else to overwrite" ends up printed after a lookup that simply failed \u2014 a
 // reassurance invented from a timeout, on the most destructive button here.
-async function othersOnKey(){
+async function othersOnKey(code){
   try{
-    const res=await Promise.race([syncDevices(),new Promise(r=>setTimeout(()=>r(null),2500))]);
+    const res=await Promise.race([syncDevices(code),new Promise(r=>setTimeout(()=>r(null),2500))]);
     if(!res||!Array.isArray(res.devices))return null;   // no answer is not an answer
     const me=String(wlDevice()||'');
     return res.devices.filter(d=>d&&d.id!==me);
@@ -10497,6 +10565,8 @@ function renderSyncUI(){
           <button class="imp-all" onclick="syncOff()">Turn off</button>
           <button class="imp-all" onclick="syncForget()">Erase the stored copy</button>
         </div>
+        ${leftKey()?`<p class="ai-desc" style="font-size:12px;margin-top:12px">This device backed up under a different key before it joined this one, and that older copy is still stored.</p>
+        <button class="imp-all" style="width:100%;margin-top:6px" onclick="forgetLeftKey()">Erase the copy this device left behind</button>`:''}
       </details>`;
   }else{
     box.innerHTML=`<div class="dt-label">${icon('cloud')} Cloud backup · OFF</div>${meter}
@@ -10514,7 +10584,9 @@ function renderSyncUI(){
       <label class="ct-dk" style="margin:10px 0 0;font-size:12px">Replace what is on this device
         <span class="ct-tgl"><input type="checkbox" id="pairReplace"><span class="ct-tgl-track"></span></span></label>
       <p class="ai-desc" style="font-size:12px;margin-top:2px">Off, the two lists are folded together. On, this device drops its own list and shows the other one instead. A restore point is kept here either way.</p>
-      <div id="pairBox"></div>`;
+      <div id="pairBox"></div>
+      ${leftKey()?`<p class="ai-desc" style="font-size:12px;margin-top:12px">This device backed up under a different key before, and that older copy is still stored.</p>
+      <button class="imp-all" style="width:100%;margin-top:6px" onclick="forgetLeftKey()">Erase the copy this device left behind</button>`:''}`;
   }
 }
 
@@ -26798,10 +26870,11 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-11-05.80',
-  title:'Which devices, and what they lose',
+  v:'2026-11-05.81',
+  title:'The copy you walked away from',
   push:'Add a device can now replace this device\u2019s list with the one it joins, instead of folding the two together.',
   notes:[
+    'When a device <b>joins another backup</b>, restores from a code, or opens a setup kit, it stops using the key it had \u2014 and the copy stored under that key stays in the cloud, holding a snapshot of your library, reachable only by a key the device has just stopped keeping. Nothing in the app could mention it again. <b>Cloud</b> now says it is there and offers to erase it, and the offer is all it does: nothing is deleted on its own. Before you can press it, the app asks that old key who is still backing up under it \u2014 one phone joining your computer does not speak for another phone that stayed \u2014 and names them if anyone is.',
     'Fixed on the way: leaving one of those confirmations while it was still checking could leave the <b>confirm button dead for the rest of the session</b>, for every other thing you might confirm. Every confirmation in the app shares one button, so opening one now states that button completely rather than inheriting whatever the last one left behind.',
     'The other two buttons that can cost you a list now name the machines as well. <b>Use this list everywhere</b> says which devices take the version you are sending and what it costs them \u2014 <i>Mac (286 titles), iPad (12 titles) take this version next time they open, and whatever they have that this device does not is lost</i> \u2014 or, when nobody else has backed up under the key, that there is nothing else to overwrite, which is worth knowing before you press it. <b>Taking another device\u2019s list</b> now says what the device in your hand gives up, which was the one number missing: it told you what arrived and called what left \u201canything held only somewhere else\u201d. Both hold the button, reading <b>Checking</b>, until the app knows what it is about to replace.',
     '<b>Erase the stored copy</b> now tells you whose copy it is. Once two devices share a key there is one copy in the cloud and the other machine restores from it \u2014 so on a phone, a button named for erasing a backup could take away what the computer depends on. It asks the cloud who else backs up under the key before it asks you anything, and names them: <i>Mac (286 titles) backs up here too, and erasing it erases what that device restores from.</i> The erase is held, reading <b>Checking</b>, until it knows \u2014 and it points you at <b>Turn off</b>, which is what you wanted if you only meant to stop this device. A cloud that never answers opens the old wording after a moment rather than leaving the button dead.',

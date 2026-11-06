@@ -1183,6 +1183,56 @@ id, the phone's note (the most specific thing a merge preserves) is gone, and
 nothing matching `phone-` reaches `__pushed` after `flushPush()`. On the build
 before this existed, that last row fails — the titles went up.
 
+### The three buttons that can cost somebody a list
+
+`syncForget()`, `forcePushList()` and `adoptFromDevice()` are the only places in
+the app where pressing a button can end with fewer titles than before. All three
+used to describe that in the abstract — *"any OTHER device"*, *"every other
+device will take this version"*, *"anything held only somewhere else is lost"* —
+and an abstract warning about an unnamed device is the kind of true sentence
+people read past.
+
+Four small helpers, shared by all three, replace it with an answer:
+
+| helper | what it does |
+|---|---|
+| `othersOnKey()` | `syncDevices()` minus this device, raced against **2.5s**, never throws. Answers **three** ways: a list, an empty list (nobody is there), or `null` (the cloud did not say) |
+| `nameDevices(list)` | three names with title counts, then "and N more" |
+| `holdConfirm()` / `releaseConfirm(yb)` | disable Yes, show "Checking…", restore the original label |
+| `confirmStillMine(cb)` | the dialog is still open **and** still ours before rewriting it |
+
+The shape is the same every time, and the order is the point: **open the confirm
+at once** with wording that assumes nothing, hold the Yes, ask, then say more. A
+destructive button must not be pressable while the app is still working out what
+it destroys, and a dialog whose text changes under a reader is worse than one
+that waits. Because the lookup is raced and wrapped, a cloud that never answers
+yields the old generic wording and a *working* button — never a dead one.
+
+`adoptFromDevice()` needs no lookup at all: the number it was missing is
+`realList().length`, which is already in hand. It said what arrived and called
+what left "anything held only somewhere else"; it now says *the 286 titles on
+this device are replaced*.
+
+An empty answer is worth as much as a full one. On `forcePushList()`, "no other
+device has backed up under this key, so there is nothing else to overwrite" is
+the sentence that lets somebody press a frightening button they were right to
+hesitate over.
+
+Which is exactly why `null` has to be a third answer rather than an empty list.
+The first version collapsed them, and the test for a cloud that never answers
+caught what that means: a reassurance *invented from a timeout*, printed on the
+most destructive button in the app. A lookup that failed knows nothing about
+who is out there, so the wording that assumes nothing stays on screen.
+
+**One shared button, so opening a dialog states it completely.** Every confirm
+in the app reuses the same `#confirmYesBtn`, which means it opens from whatever
+state the last dialog left it in. `holdConfirm()` can disable it, and a dialog
+dismissed *while still held* — one cancelled erase on a slow network — used to
+leave it `disabled` for the rest of the session, so the next confirm, for
+anything at all, opened with a dead Yes. `askConfirm()` now resets `disabled`
+and clears `dataset.was` alongside the label and class. Any future code that
+puts this button into a new state must reset it there too.
+
 ### Erasing a copy two devices share
 
 `syncForget()` has the same shape of problem one step later. Once a join has

@@ -180,5 +180,28 @@ t('a cloud that never answers still lets the erase be pressed',
 t('on the wording that assumes nothing',
   /list, settings and friends/.test(await ev(`(document.getElementById('confirmMsg')||{}).textContent||''`)), true);
 
+// ── the held button must not stay held ─────────────────────────────
+// Every confirm in the app shares ONE Yes button. Walking away from an erase
+// while it is still working out who shares the copy used to leave that button
+// disabled for the rest of the session — so the next confirm, for anything
+// at all, opened dead. Opening a dialog has to state the button completely.
+await ev(`window.__devDelay=2000;window.__others=[]`);
+await ev(`(()=>{setSyncCode('PHONECODE1234567890');setBackupDeclined(false);syncForget();return 1;})()`);
+await wait(250);
+t('the erase is held while it looks',
+  await ev(`!!(document.getElementById('confirmYesBtn')||{}).disabled`), true);
+// Walk away mid-lookup, the way a person does.
+await ev(`document.getElementById('confirmBox').classList.remove('on')`);
+await wait(2200);
+await ev(`askConfirm({title:'Something else entirely',msg:'unrelated',yes:'Do it',onYes:()=>{window.__other=1;}})`);
+await wait(150);
+t('the NEXT confirm opens with a working button',
+  await ev(`!!(document.getElementById('confirmYesBtn')||{}).disabled`), false);
+t('and its own label, not the held one',
+  await ev(`(document.getElementById('confirmYesBtn')||{}).textContent||''`), 'Do it');
+t('and it actually runs when pressed',
+  await ev(`(()=>{window.__other=0;confirmYes();return window.__other;})()`), 1);
+await ev(`window.__devDelay=0`);
+
 console.log('\n'+pass+' passed, '+fail+' failed');
 ws.close();ch.kill();srv.kill();process.exit(fail?1:0);

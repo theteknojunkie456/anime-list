@@ -210,6 +210,16 @@ t('another device is always its own record',
     return /2 titles/.test(h)&&!/here/.test(h);})()`),
   true);
 
+// The number somebody is actually deciding about is the one on the device in
+// front of them, and it was the one the wording left out: it said what arrives
+// and called what leaves "anything held only somewhere else".
+t('taking another device\u2019s list says what THIS device gives up',
+  await ev(`(async()=>{adoptFromDevice('mac00000001');await new Promise(r=>setTimeout(r,200));
+    const m=(document.getElementById('confirmMsg')||{}).textContent||'';
+    document.getElementById('confirmBox').classList.remove('on');
+    return /The \\d+ titles? on this device (is|are) replaced/.test(m)&&/anything held only here is lost/.test(m);})()`),
+  true);
+
 const took=await ev(`(async()=>{window.__pushes=[];setLastAdopt(0);
   adoptFromDevice('mac00000001');await new Promise(r=>setTimeout(r,150));
   confirmYes();await new Promise(r=>setTimeout(r,900));

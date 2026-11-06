@@ -9109,7 +9109,7 @@ function preSyncBackup(){
     return true;
   }catch(e){return false;}   // out of space is not a reason to block the push
 }
-function forcePushList(){
+async function forcePushList(){
   if(typeof appLocked!=='undefined'&&appLocked){toast('Unlock the list first');return;}
   if(typeof listUntrusted!=='undefined'&&listUntrusted){toast('This list could not be read properly \u2014 not safe to send');return;}
   if(!syncCode()){toast('Turn on cloud backup first');return;}
@@ -9117,27 +9117,44 @@ function forcePushList(){
   // The guard that exists for a reason: an empty list replacing a full one is
   // never what anybody meant, and KV keeps no history to undo it.
   if(!n){toast('Nothing on this device to send');return;}
-  askConfirm({
-    danger:true,
-    title:'Use this list everywhere?',
+  const doPush=async()=>{
+    preSyncBackup();
+    try{
+      _adoptStamp=Date.now();     // tell every other device to take this one whole
+      setLastAdopt(_adoptStamp);  // including us, so we never adopt our own push back
+      setLastPushFP('');          // defeat the "nothing changed" skip
+      setPushState({n:0,at:0,why:''});   // and any backoff still in effect
+      await syncPush();
+      const st=pushState();
+      toast(st&&st.n?('Could not send \u2014 '+(st.why||'try again')):('Sent \u2014 '+n+' titles are now the cloud copy'));
+    }catch(e){toast('Could not send right now');}
+    try{renderSyncUI();}catch(e){}   // the cloud panel, not the app-wide render scheduler
+  };
+  askConfirm({danger:true,title:'Use this list everywhere?',
     msg:n+' titles from this device will replace the cloud copy, and every other '+
         'device will take this version next time it opens. Anything that exists '+
         'only on another device is lost. A restore point is kept on this device.',
-    yes:'Replace',
-    onYes:async()=>{
-      preSyncBackup();
-      try{
-        _adoptStamp=Date.now();     // tell every other device to take this one whole
-        setLastAdopt(_adoptStamp);  // including us, so we never adopt our own push back
-        setLastPushFP('');          // defeat the "nothing changed" skip
-        setPushState({n:0,at:0,why:''});   // and any backoff still in effect
-        await syncPush();
-        const st=pushState();
-        toast(st&&st.n?('Could not send \u2014 '+(st.why||'try again')):('Sent \u2014 '+n+' titles are now the cloud copy'));
-      }catch(e){toast('Could not send right now');}
-      try{renderSyncUI();}catch(e){}   // the cloud panel, not the app-wide render scheduler
-    }
-  });
+    yes:'Replace',onYes:doPush});
+  const yb=holdConfirm();
+  const others=await othersOnKey();
+  if(!confirmStillMine(doPush))return;
+  // Both answers are worth having. Named machines say what is at stake; an
+  // empty answer says the opposite, and somebody hesitating over this button
+  // deserves to hear that nothing else is listening.
+  if(others&&others.length){
+    const one=others.length===1;
+    reword('Replace the list on '+others.length+' other device'+(one?'':'s')+'?',
+      n+' titles from this device become the cloud copy. '+nameDevices(others)+' '+
+      (one?'takes':'take')+' this version next time '+(one?'it opens':'they open')+', and whatever '+
+      (one?'it has':'they have')+' that this device does not is lost. A restore point is kept on this device.');
+  }else if(others){
+    reword('Use this list everywhere?',
+      n+' titles from this device become the cloud copy. No other device has backed up '+
+      'under this key, so there is nothing else to overwrite. A restore point is kept on this device.');
+  }
+  // others === null: the cloud did not answer, so the wording that assumes
+  // nothing is the only honest one, and it is already on screen.
+  releaseConfirm(yb);
 }
 // ─── WHICH DEVICE IS RIGHT ──────────────────────────────────────────────────
 // "Use this device's list everywhere" only ever worked from the device you
@@ -9218,11 +9235,18 @@ async function adoptFromDevice(id){
   if(!syncCode()){toast('Turn on cloud backup first');return;}
   const d0=_devCache.find(x=>x.id===id)||{};
   const label=d0.name||'that device',n=+d0.n||0;
+  // What this device is holding is the number the person is actually deciding
+  // about, and it was the one number missing: the old wording said what arrives
+  // and called what leaves "anything held only somewhere else". No lookup for
+  // this one \u2014 the list is right here.
+  let here=0; try{here=realList().length;}catch(e){}
   askConfirm({
     danger:true,
     title:'Make '+(label||'that device')+' the main list?',
     msg:(n?n+' titles from ':'The list from ')+(label||'that device')+' becomes the list on every device, including this one. '+
-        'Anything held only somewhere else is lost. A restore point is kept on this device.',
+        (here?('The '+here+' title'+(here===1?'':'s')+' on this device '+(here===1?'is':'are')+' replaced, and anything held only here is lost. '):
+              'Anything held only somewhere else is lost. ')+
+        'A restore point is kept on this device.',
     yes:'Use it',
     onYes:async()=>{
       try{
@@ -10187,6 +10211,61 @@ function syncOff(){setSyncCode('');setBackupDeclined(true);renderSyncUI();try{re
 // would throw away the only thing that can reach the copy. And the scheduled
 // push is cancelled BEFORE the erase, or the debounce fires a moment later and
 // writes the whole list straight back under the key just deleted.
+// WHO ELSE IS ON THIS KEY.
+//
+// Three buttons in this app can cost somebody a list: erase the stored copy,
+// use this list everywhere, and take that device's list. All three used to
+// describe the danger in the abstract — "any OTHER device", "every other
+// device", "anything held only somewhere else" — and an abstract warning is
+// the kind of true sentence people read past. The app knows the answer:
+// syncDevices() says who has published under this key and how much each last
+// sent. A machine called Mac with 286 titles beside it is not read past.
+//
+// It answers within two and a half seconds and never throws. A read must never
+// be the thing standing between somebody and a button.
+// Three answers, not two: a list of machines, an empty list meaning nobody is
+// there, and NULL meaning the cloud did not say. Collapsing the last two into
+// [] is how "no other device has backed up under this key, so there is nothing
+// else to overwrite" ends up printed after a lookup that simply failed \u2014 a
+// reassurance invented from a timeout, on the most destructive button here.
+async function othersOnKey(){
+  try{
+    const res=await Promise.race([syncDevices(),new Promise(r=>setTimeout(()=>r(null),2500))]);
+    if(!res||!Array.isArray(res.devices))return null;   // no answer is not an answer
+    const me=String(wlDevice()||'');
+    return res.devices.filter(d=>d&&d.id!==me);
+  }catch(e){return null;}
+}
+// Names for a sentence, not a list: three at most, then a count. The title
+// number is what makes it land, so it goes in wherever the cloud knows one.
+function nameDevices(list){
+  list=list||[];
+  return list.slice(0,3).map(d=>String((d&&d.name)||'A device')+(d&&d.n?' ('+d.n+' titles)':'')).join(', ')
+    +(list.length>3?(' and '+(list.length-3)+' more'):'');
+}
+// A destructive button must not be pressable while the app is still working out
+// what it destroys, and a dialog whose text changes under a reader is worse
+// than one that waits. So: open at once, hold the answer, then say more.
+function holdConfirm(){
+  const yb=document.getElementById('confirmYesBtn');
+  if(yb){yb.dataset.was=yb.textContent;yb.disabled=true;yb.textContent='Checking\u2026';}
+  return yb;
+}
+function releaseConfirm(yb){
+  if(!yb)return;
+  yb.disabled=false;
+  if(yb.dataset.was){yb.textContent=yb.dataset.was;delete yb.dataset.was;}
+}
+// The dialog may have been answered or dismissed while we were asking, and the
+// next one along is not ours to rewrite.
+function confirmStillMine(cb){
+  const box=document.getElementById('confirmBox');
+  return !!(box&&box.classList.contains('on')&&_confirmCb===cb);
+}
+function reword(title,msg){
+  const ct=document.getElementById('confirmTitle');if(ct&&title)ct.textContent=title;
+  const cm=document.getElementById('confirmMsg');if(cm&&msg)cm.textContent=msg;
+}
 // WHOSE COPY IS THIS, REALLY.
 //
 // "Any OTHER device still using this code keeps its own copy" is true, and it
@@ -10224,33 +10303,18 @@ async function syncForget(){
                    :'There was nothing stored under that code');
   };
   askConfirm({danger:true,title:'Erase this backup?',msg:GENERIC,yes:'Erase it',onYes:doErase});
-  const yb=document.getElementById('confirmYesBtn');
-  if(yb){yb.disabled=true;yb.textContent='Checking\u2026';}
-  let others=[];
-  try{
-    // A read must never be the thing standing between somebody and a button, so
-    // it gets two and a half seconds and then we go with what we have.
-    const res=await Promise.race([syncDevices(),new Promise(r=>setTimeout(()=>r(null),2500))]);
-    const me=String(wlDevice()||'');
-    others=(((res||{}).devices)||[]).filter(d=>d&&d.id!==me);
-  }catch(e){others=[];}
-  // The dialog may have been answered or dismissed while we were asking, and
-  // the next one along is not ours to rewrite.
-  const box=document.getElementById('confirmBox');
-  if(!box||!box.classList.contains('on')||_confirmCb!==doErase)return;
-  if(others.length){
-    const who=others.slice(0,3).map(d=>String((d&&d.name)||'A device')+(d&&d.n?' ('+d.n+' titles)':'')).join(', ')
-      +(others.length>3?(' and '+(others.length-3)+' more'):'');
+  const yb=holdConfirm();
+  const others=await othersOnKey();
+  if(!confirmStillMine(doErase))return;
+  if(others&&others.length){
     const one=others.length===1;
-    const ct=document.getElementById('confirmTitle');
-    if(ct)ct.textContent='Erase the copy '+(others.length+1)+' devices share?';
-    const cm=document.getElementById('confirmMsg');
-    if(cm)cm.textContent='This copy is not just this device\u2019s. '+who+' '+(one?'backs':'back')+
+    reword('Erase the copy '+(others.length+1)+' devices share?',
+      'This copy is not just this device\u2019s. '+nameDevices(others)+' '+(one?'backs':'back')+
       ' up here too, and erasing it erases what '+(one?'that device restores':'those devices restore')+
       ' from. Every device keeps the titles it is holding right now; nothing in the cloud survives. '+
-      'To stop only THIS device backing up, use Turn off instead.';
+      'To stop only THIS device backing up, use Turn off instead.');
   }
-  if(yb){yb.disabled=false;yb.textContent='Erase it';}
+  releaseConfirm(yb);
 }
 // The first backup, on purpose, when the automatic one has not managed it.
 //
@@ -16074,7 +16138,13 @@ function askConfirm(opts){
   const t=document.getElementById('confirmTitle');if(t)t.textContent=opts.title||'Are you sure?';
   document.getElementById('confirmMsg').textContent=opts.msg||'';
   const yb=document.getElementById('confirmYesBtn');
-  if(yb){yb.textContent=opts.yes||'Confirm';yb.className='cbtn '+(opts.danger?'del':'go');}
+  // Every confirm in the app shares this one button, so it opens from whatever
+  // state the last one left it in. holdConfirm() can disable it, and a dialog
+  // dismissed while still held would leave it disabled for good \u2014 one
+  // cancelled erase on a slow network, and every confirm after it, for anything
+  // at all, has a dead Yes. Opening a dialog states the button completely.
+  if(yb){yb.textContent=opts.yes||'Confirm';yb.className='cbtn '+(opts.danger?'del':'go');
+         yb.disabled=false;delete yb.dataset.was;}
   const ib=document.getElementById('confirmIn');
   if(ib){
     if(opts.input){
@@ -26728,10 +26798,12 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-11-05.79',
-  title:'The device in your hand is the wrong one',
+  v:'2026-11-05.80',
+  title:'Which devices, and what they lose',
   push:'Add a device can now replace this device\u2019s list with the one it joins, instead of folding the two together.',
   notes:[
+    'Fixed on the way: leaving one of those confirmations while it was still checking could leave the <b>confirm button dead for the rest of the session</b>, for every other thing you might confirm. Every confirmation in the app shares one button, so opening one now states that button completely rather than inheriting whatever the last one left behind.',
+    'The other two buttons that can cost you a list now name the machines as well. <b>Use this list everywhere</b> says which devices take the version you are sending and what it costs them \u2014 <i>Mac (286 titles), iPad (12 titles) take this version next time they open, and whatever they have that this device does not is lost</i> \u2014 or, when nobody else has backed up under the key, that there is nothing else to overwrite, which is worth knowing before you press it. <b>Taking another device\u2019s list</b> now says what the device in your hand gives up, which was the one number missing: it told you what arrived and called what left \u201canything held only somewhere else\u201d. Both hold the button, reading <b>Checking</b>, until the app knows what it is about to replace.',
     '<b>Erase the stored copy</b> now tells you whose copy it is. Once two devices share a key there is one copy in the cloud and the other machine restores from it \u2014 so on a phone, a button named for erasing a backup could take away what the computer depends on. It asks the cloud who else backs up under the key before it asks you anything, and names them: <i>Mac (286 titles) backs up here too, and erasing it erases what that device restores from.</i> The erase is held, reading <b>Checking</b>, until it knows \u2014 and it points you at <b>Turn off</b>, which is what you wanted if you only meant to stop this device. A cloud that never answers opens the old wording after a moment rather than leaving the button dead.',
     '<b>Add a device</b> has a second choice under it: <b>Replace what is on this device</b>. Left off it behaves as it always has \u2014 the two lists are folded together and nothing is lost. Turned on, the device you are holding drops its own list, shows the one it joined instead, and <b>sends none of its own titles to it</b>. That is the way round you want when the phone is the copy to be rid of and the computer is right: before this, joining carried the phone\u2019s titles into the good list and up to the cloud, which is the opposite of what was wanted and could not be undone from the other end. A restore point is kept on the device either way, and a backup with nothing in it is refused rather than allowed to land on a full device.',
     'When you open an episode on another site, the app notes which episode you left for and when, so it can mark it watched if you were gone long enough. <b>That note was being sent to your other devices.</b> On a device that never left, the clock it arrived with was always older than the fifteen minutes that mean \u201cwatched\u201d \u2014 so a title could jump several episodes ahead on a machine you had not watched anything on. The note stays on the device that made the trip now.',

@@ -47,9 +47,14 @@ localStorage.setItem('animelist_v4',JSON.stringify([
  {id:'b',title:'Vinland Saga',status:'watching',kind:'watch',ep:3,epTotal:24,aniId:101348,upd:Date.now()}]));
 localStorage.setItem('wl_net_status','approved');
 localStorage.setItem('sync_animelist_v4','ABCDEFGHIJKLMNOPQRST');
-window.__pushes=0;
+window.__pushes=0;window.__others=[];window.__devDelay=0;
 window.fetch=function(u,o){let b={};try{b=JSON.parse((o&&o.body)||'{}');}catch(e){}
   if(b.op==='push'){window.__pushes++;return Promise.resolve(new Response('{"ok":true}',{status:200,headers:{'Content-Type':'application/json'}}));}
+  // Answerable slowly on purpose: the window where Replace is held open is real
+  // but short, and a stub that answers instantly cannot be used to see it.
+  if(b.op==='devices')return new Promise(r=>setTimeout(()=>r(new Response(
+    JSON.stringify({ok:true,devices:(window.__others||[])}),
+    {status:200,headers:{'Content-Type':'application/json'}})),(window.__devDelay||0)));
   return Promise.resolve(new Response('{"ok":true,"data":null,"updatedAt":0}',{status:200,headers:{'Content-Type':'application/json'}}));};`});
 await cmd('Page.navigate',{url:`http://localhost:${PORT}/index.html?cb=`+Math.random()});
 await wait(4200);
@@ -94,5 +99,58 @@ t('with no cloud backup on, it refuses',
     window.__pushes=0;forcePushList();
     const asked=document.getElementById('confirmBox').classList.contains('on');
     localStorage.setItem('sync_animelist_v4',c);return {asked,pushed:window.__pushes};})()`), {asked:false,pushed:0});
+// ── WHAT this replaces, by name ─────────────────────────────────
+// "Every other device will take this version" is true and is read past. The
+// app knows which devices those are and how much each last sent, so it says so
+// — and holds Replace until it knows, because a button that can discard
+// somebody else's work should not be pressable while the app is still working
+// out whose work it is.
+//
+// NOT `ev('forcePushList()')`: Runtime.evaluate is called with awaitPromise,
+// so awaiting an async function means waiting out the very window this is
+// trying to look inside. Start it and come back.
+await ev(`window.__others=[{id:'macdevice00000000',name:'Mac',at:Date.now()-60000,n:286},
+                           {id:'ipaddevice0000000',name:'iPad',at:Date.now()-900000,n:12}];
+          window.__devDelay=700;`);
+await ev(`(()=>{window.__pushes=0;forcePushList();return 1;})()`); await wait(250);
+t('Replace is held while it works out whose list it overwrites',
+  await ev(`!!(document.getElementById('confirmYesBtn')||{}).disabled`), true);
+t('and says why it is waiting rather than looking broken',
+  await ev(`(document.getElementById('confirmYesBtn')||{}).textContent||''`), 'Checking\u2026');
+t('nothing is sent while it waits', await ev(`window.__pushes`), 0);
+await wait(1100);
+const fm=await ev(`(document.getElementById('confirmMsg')||{}).textContent||''`);
+t('the machines that would take this version are named', /Mac \(286 titles\), iPad \(12 titles\)/.test(fm), true);
+t('and what it costs them is stated, not implied', /that this device does not is lost/.test(fm), true);
+t('the title counts the devices at risk, not this one',
+  await ev(`(document.getElementById('confirmTitle')||{}).textContent||''`), 'Replace the list on 2 other devices?');
+t('Replace is pressable once it knows',
+  await ev(`!!(document.getElementById('confirmYesBtn')||{}).disabled`), false);
+t('asking who is on the key sends nothing', await ev(`window.__pushes`), 0);
+await ev(`document.getElementById('confirmBox').classList.remove('on')`); await wait(150);
+
+// Alone on the key this button is harmless, and saying so is worth as much as
+// the warning: the person hesitating deserves to hear nothing else is listening.
+await ev(`window.__others=[];window.__devDelay=0;`);
+await ev(`(()=>{window.__pushes=0;forcePushList();return 1;})()`); await wait(900);
+const fm2=await ev(`(document.getElementById('confirmMsg')||{}).textContent||''`);
+t('alone on the key, it says there is nothing to overwrite',
+  /No other device has backed up under this key/.test(fm2), true);
+t('and does not invent company', /is lost/.test(fm2), false);
+t('the title stays the plain one',
+  await ev(`(document.getElementById('confirmTitle')||{}).textContent||''`), 'Use this list everywhere?');
+t('and it still sends when confirmed',
+  await ev(`(async()=>{window.__pushes=0;confirmYes();await new Promise(r=>setTimeout(r,900));return window.__pushes>=1;})()`), true);
+
+// A cloud that never answers must not leave the button dead.
+await ev(`window.fetch=(function(f){return function(u,o){let b={};try{b=JSON.parse((o&&o.body)||'{}');}catch(e){}
+  if(b.op==='devices')return new Promise(()=>{});return f(u,o);};})(window.fetch)`);
+await ev(`(()=>{forcePushList();return 1;})()`); await wait(3200);
+t('a cloud that never answers still lets Replace be pressed',
+  await ev(`!!(document.getElementById('confirmYesBtn')||{}).disabled`), false);
+t('on the wording that assumes nothing',
+  /every other device will take this version/.test(await ev(`(document.getElementById('confirmMsg')||{}).textContent||''`)), true);
+await ev(`document.getElementById('confirmBox').classList.remove('on')`);
+
 console.log('\n'+pass+' passed, '+fail+' failed');
 ws.close();ch.kill();srv.kill();process.exit(fail?1:0);

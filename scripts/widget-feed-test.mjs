@@ -56,6 +56,19 @@ function contract(){
   t('the widget target depends on nothing heavy', /package:\s*WebRTC/.test(wblock), false);
   t('the widget draws from a file, never the network',
     widget.includes('Data(contentsOf:') && !/URLSession/.test(widget), true);
+  // A countdown built as a String freezes until the next timeline entry, an hour
+  // away — so "in 4 hr" still says four hours at a quarter to. The system ticks
+  // Text(_:style:) for free; anything else is a lie that costs a reload to fix.
+  t('the countdown ticks instead of being baked into a string',
+    /Text\(air\.when, style: \.relative\)/.test(widget), true);
+  t('and it says which show it is counting down',
+    widget.includes('withTitle') && widget.includes('air.title'), true);
+  // Cover art is cached under the title's id, so nothing would ever replace it
+  // when a cover is re-picked, and nothing would ever remove it when the title
+  // drops off the widget.
+  t('a re-picked cover drops the cached one', /was\[r\.id\] != r\.img/.test(sw), true);
+  t('and art for titles the widget no longer shows is swept',
+    /func prune\(keeping/.test(sw) && /prune\(keeping: s\.up\)/.test(sw), true);
 }
 
 async function run(ua,label){

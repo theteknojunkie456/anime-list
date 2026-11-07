@@ -60,8 +60,31 @@ enum WidgetBridge {
             NSLog("WatchList: widget snapshot could not be written — is the App Group entitlement on?")
             return
         }
+        // The cache is keyed by title id, so a re-picked cover would otherwise
+        // keep drawing the old artwork for ever: the file is already there, and
+        // "already there" is the only question fetchArt asks. Drop the file when
+        // the URL behind it changed.
+        var was: [String: String] = [:]
+        for r in old.up { was[r.id] = r.img }
+        for r in s.up where was[r.id] != nil && was[r.id] != r.img {
+            if let u = WidgetShare.artURL(r.id) { try? FileManager.default.removeItem(at: u) }
+        }
+        prune(keeping: s.up)
         fetchArt(for: s.up) {
             WidgetCenter.shared.reloadAllTimelines()
+        }
+    }
+
+    /// Everything you have ever been part-way through would otherwise leave a
+    /// cover behind in a container that is backed up and never swept. Only the
+    /// handful the widget can actually draw is worth keeping.
+    private static func prune(keeping rows: [WLUpNext]) {
+        guard let dir = WidgetShare.artDir else { return }
+        let keep = Set(rows.compactMap { WidgetShare.artURL($0.id)?.lastPathComponent })
+        let fm = FileManager.default
+        guard let names = try? fm.contentsOfDirectory(atPath: dir.path) else { return }
+        for n in names where !keep.contains(n) {
+            try? fm.removeItem(at: dir.appendingPathComponent(n))
         }
     }
 

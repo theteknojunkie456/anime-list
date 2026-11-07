@@ -137,8 +137,9 @@ private struct MediumCard: View {
                         .foregroundColor(snap.theme.color(\.t1))
                     Spacer(minLength: 6)
                     if let air = snap.air {
-                        Text(air.line)
-                            .font(.system(size: 11, weight: .medium)).lineLimit(1)
+                        AirLine(air: air, withTitle: true)
+                            .font(.system(size: 11, weight: .medium))
+                            .lineLimit(1).truncationMode(.tail)
                             .foregroundColor(snap.theme.color(\.t2))
                     } else if snap.watching > 0 {
                         Text("\(snap.watching) on the go")
@@ -190,8 +191,14 @@ private struct InlineCard: View {
             Text("Up next").font(.system(size: 11, weight: .semibold)).wlAccentable()
             if let top = snap.up.first {
                 Text(top.title).font(.system(size: 14, weight: .bold)).lineLimit(1)
-                Text(snap.air.map { "\(top.epShort) · \($0.line)" } ?? top.epLine)
-                    .font(.system(size: 11)).lineLimit(1)
+                // Only when the countdown belongs to the title above it. Stacked
+                // otherwise, the two lines are about two different shows and read
+                // as one sentence about the first.
+                if let air = snap.air, air.title == top.title {
+                    AirLine(air: air, withTitle: false).font(.system(size: 11)).lineLimit(1)
+                } else {
+                    Text(top.epLine).font(.system(size: 11)).lineLimit(1)
+                }
             } else {
                 Text("Nothing on the go").font(.system(size: 14, weight: .bold)).lineLimit(1)
             }
@@ -238,6 +245,27 @@ private struct Cover: View {
     }
 }
 
+/// The countdown has to TICK. Built as a string it freezes until the next
+/// timeline entry — an hour away — so "in 4 hr" would still say four hours at a
+/// quarter to, which is worse than saying nothing. `Text(_:style: .relative)` is
+/// redrawn by the system without spending one of the day's reloads, which is the
+/// only way to say "soon" honestly and cheaply at once.
+///
+/// It names the show, too: the episode being counted down is often not the title
+/// at the top of the widget, and an unattributed "Ep 12 in 3 hr" is a riddle.
+private struct AirLine: View {
+    let air: WLAir
+    let withTitle: Bool
+    var body: some View {
+        let who = (withTitle && !air.title.isEmpty) ? air.title + " " : ""
+        if air.isOut {
+            Text("\(who)\(air.epName) is out")
+        } else {
+            Text("\(who)\(air.epName) in ") + Text(air.when, style: .relative)
+        }
+    }
+}
+
 private struct Progress: View {
     let value: Double
     let tint: Color
@@ -274,16 +302,9 @@ extension WLUpNext {
 }
 
 extension WLAir {
-    /// "Ep 6 in 4h" — relative, because "1:30 AM Friday" needs arithmetic from
-    /// the reader and the whole job of this line is to save them that.
-    var line: String {
-        let when = Date(timeIntervalSince1970: at)
-        let ep = self.ep > 0 ? "Ep \(self.ep)" : "Next ep"
-        if when <= Date() { return "\(ep) is out" }
-        let f = RelativeDateTimeFormatter()
-        f.unitsStyle = .short
-        return "\(ep) \(f.localizedString(for: when, relativeTo: Date()))"
-    }
+    var when: Date { Date(timeIntervalSince1970: at) }
+    var epName: String { ep > 0 ? "Ep \(ep)" : "Next ep" }
+    var isOut: Bool { when <= Date() }
 }
 
 extension WLTheme {

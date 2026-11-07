@@ -892,10 +892,22 @@ Three rules in the code that are not obvious from reading it:
 - **The widget has no network.** Cover art is fetched once by the app, scaled to
   400px, and written into the shared container under the title's id — not its URL,
   which changes when somebody re-picks a cover and would leave the old file
-  uncollectable. The widget only ever reads a local file.
+  uncollectable. The widget only ever reads a local file. Keying by id costs two
+  things back, and both are handled on the way in: a re-picked cover is dropped
+  from the cache (the fetch only asks "is it already there", so otherwise it would
+  draw the old artwork for ever), and art for titles that have fallen off the
+  widget is swept, or every title you were ever part-way through leaves a cover
+  behind in a container that is backed up and never cleaned.
 - **A locked app has a blank widget.** `showLock()` sends `widgetclear`, which
   wipes the snapshot and the cached art. Otherwise the password is in front of a
   list anybody can read on the way past.
+
+The air countdown is a `Text(_:style: .relative)`, not a formatted string. Built
+as a string it would freeze until the next timeline entry an hour later — "in 4
+hr" still reading four hours at a quarter to — and refreshing often enough to keep
+a string honest would spend the day's reload budget by lunchtime. The system
+redraws a relative `Text` for free. It carries the show's name too, because the
+episode being counted down is usually not the title at the top of the widget.
 
 Taps travel back as `watchlist://title/<id>` → `window.wlOpenTitle(id)`, which
 refuses while the app is locked and ignores an id that has since been deleted.

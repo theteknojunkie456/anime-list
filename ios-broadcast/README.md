@@ -93,8 +93,11 @@ just another client of that room.
 ## The Home Screen widget
 
 `WatchListWidget` is a third target: a WidgetKit extension showing **what you are
-part-way through**, in three sizes — small (one title over its artwork), medium
-(three, each its own tap target) and the lock-screen rectangle (one line).
+part-way through**. The artwork IS the widget — edge to edge, with a hairline of
+progress along the bottom and nothing else over it. Small uses the cover, medium
+uses the show's banner art (a portrait cover cropped to a 2:1 tile is a band
+across somebody's chin), and the lock-screen rectangle falls back to type,
+because the system draws that one as a vibrant stencil.
 
 **It computes nothing.** A widget is a separate process that runs at moments iOS
 picks, usually while the app is closed, and it cannot reach the web view or its

@@ -32,12 +32,18 @@ enum WidgetShare {
         }
         return d
     }
-    /// Cover art is keyed by the title's id, not by its URL: the URL can change
-    /// when somebody re-picks a cover, and a stale file under the old name would
+    /// Art is keyed by the title's id, not by its URL: the URL can change when
+    /// somebody re-picks a cover, and a stale file under the old name would
     /// never be collected.
-    static func artURL(_ id: String) -> URL? {
+    ///
+    /// Two shapes per title. The small widget is a square-ish crop of the
+    /// portrait cover; the medium one is twice as wide as it is tall, and a
+    /// portrait cover cropped to that is a band across somebody's chin. The
+    /// banner is the art that was drawn to be wide.
+    static func artURL(_ id: String, wide: Bool = false) -> URL? {
         guard let d = artDir, !id.isEmpty else { return nil }
-        return d.appendingPathComponent(id.replacingOccurrences(of: "/", with: "_") + ".jpg")
+        let safe = id.replacingOccurrences(of: "/", with: "_")
+        return d.appendingPathComponent(safe + (wide ? "-w.jpg" : ".jpg"))
     }
 }
 
@@ -48,6 +54,7 @@ struct WLUpNext: Codable, Identifiable, Equatable {
     var ep: Int = 0          // the episode to watch next
     var total: Int = 0       // 0 when nobody knows how many there are
     var img: String = ""     // remote cover; the shell caches it into the container
+    var banner: String = ""  // the wide art, when the title has any
 }
 
 /// The next episode due to land, of anything on the list.

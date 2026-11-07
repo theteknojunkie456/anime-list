@@ -858,8 +858,21 @@ can't.
 
 ### The Home Screen widget, and why it is fed rather than queried
 
-`WatchListWidget` is a WidgetKit extension: small (one title over its artwork),
-medium (three, each its own tap) and the lock-screen rectangle.
+`WatchListWidget` is a WidgetKit extension. **The artwork is the widget**: the
+cover of the show you are part-way through, edge to edge, with a 3.5pt hairline
+across the bottom for how far through you are, and nothing else on top of it.
+The medium size uses the title's *banner* art rather than its cover, because a
+portrait cover cropped to a 2:1 tile is a band across somebody's chin. The
+lock-screen rectangle is the exception: the system draws those as a vibrant
+stencil, so it says in words what the others say in pictures.
+
+The first version was a card with a poster in it — a caps label, the title, an
+episode line, a scrim over a third of the picture and a progress pill — which is
+the look every generated widget ships with, and it was rejected on sight. A Home
+Screen is already a grid of artwork; this belongs to that grid rather than
+sitting on top of it. The progress bar carries its own dark track instead of a
+gradient scrim: a track is three and a half points of artwork given up, a scrim
+is a third of it dimmed.
 
 A widget is **a separate process that runs when iOS says so**, usually while the
 app is closed. It cannot open the web view, it cannot read the page's
@@ -889,8 +902,10 @@ Three rules in the code that are not obvious from reading it:
   updating in the afternoon. Ticking through a binge is coalesced into one message
   (1.2s debounce), the page drops a snapshot identical to the last one it sent,
   and the shell compares again before it touches `WidgetCenter`.
-- **The widget has no network.** Cover art is fetched once by the app, scaled to
-  400px, and written into the shared container under the title's id — not its URL,
+- **The widget has no network.** Art is fetched once by the app — the cover at
+  700px and the banner at 1200px, enough for a 3x screen and for aspect-fill
+  cropping, since a soft cover is now the whole widget looking soft — and written
+  into the shared container under the title's id — not its URL,
   which changes when somebody re-picks a cover and would leave the old file
   uncollectable. The widget only ever reads a local file. Keying by id costs two
   things back, and both are handled on the way in: a re-picked cover is dropped

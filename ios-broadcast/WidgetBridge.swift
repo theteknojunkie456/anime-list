@@ -32,7 +32,8 @@ enum WidgetBridge {
                          title: r["title"] as? String ?? "",
                          ep: intOf(r["ep"]),
                          total: intOf(r["total"]),
-                         img: r["img"] as? String ?? "")
+                         img: r["img"] as? String ?? "",
+                         banner: r["banner"] as? String ?? "")
             }.filter { !$0.title.isEmpty }
         }
         if let a = body["air"] as? [String: Any], let t = a["title"] as? String, !t.isEmpty {
@@ -64,10 +65,13 @@ enum WidgetBridge {
         // keep drawing the old artwork for ever: the file is already there, and
         // "already there" is the only question fetchArt asks. Drop the file when
         // the URL behind it changed.
-        var was: [String: String] = [:]
-        for r in old.up { was[r.id] = r.img }
-        for r in s.up where was[r.id] != nil && was[r.id] != r.img {
-            if let u = WidgetShare.artURL(r.id) { try? FileManager.default.removeItem(at: u) }
+        var wasCover: [String: String] = [:], wasWide: [String: String] = [:]
+        for r in old.up { wasCover[r.id] = r.img; wasWide[r.id] = r.banner }
+        for r in s.up {
+            if wasCover[r.id] != nil, wasCover[r.id] != r.img,
+               let u = WidgetShare.artURL(r.id) { try? FileManager.default.removeItem(at: u) }
+            if wasWide[r.id] != nil, wasWide[r.id] != r.banner,
+               let u = WidgetShare.artURL(r.id, wide: true) { try? FileManager.default.removeItem(at: u) }
         }
         prune(keeping: s.up)
         fetchArt(for: s.up) {
@@ -80,7 +84,8 @@ enum WidgetBridge {
     /// handful the widget can actually draw is worth keeping.
     private static func prune(keeping rows: [WLUpNext]) {
         guard let dir = WidgetShare.artDir else { return }
-        let keep = Set(rows.compactMap { WidgetShare.artURL($0.id)?.lastPathComponent })
+        var keep = Set(rows.compactMap { WidgetShare.artURL($0.id)?.lastPathComponent })
+        keep.formUnion(rows.compactMap { WidgetShare.artURL($0.id, wide: true)?.lastPathComponent })
         let fm = FileManager.default
         guard let names = try? fm.contentsOfDirectory(atPath: dir.path) else { return }
         for n in names where !keep.contains(n) {
@@ -99,15 +104,19 @@ enum WidgetBridge {
     // ── art ──────────────────────────────────────────────────────────────────
     private static func fetchArt(for rows: [WLUpNext], done: @escaping () -> Void) {
         let group = DispatchGroup()
+        var jobs: [(String, URL, CGFloat)] = []    // src, dest, longest edge
         for r in rows {
-            guard let dest = WidgetShare.artURL(r.id),
-                  let url = URL(string: r.img), !r.img.isEmpty else { continue }
-            // Covers do not change under you; one download per title is enough.
+            if let d = WidgetShare.artURL(r.id), !r.img.isEmpty { jobs.append((r.img, d, 700)) }
+            if let d = WidgetShare.artURL(r.id, wide: true), !r.banner.isEmpty { jobs.append((r.banner, d, 1200)) }
+        }
+        for (src, dest, maxW) in jobs {
+            guard let url = URL(string: src) else { continue }
+            // Art does not change under you; one download per file is enough.
             if FileManager.default.fileExists(atPath: dest.path) { continue }
             group.enter()
             URLSession.shared.dataTask(with: url) { data, _, _ in
                 defer { group.leave() }
-                guard let data, let small = shrink(data) else { return }
+                guard let data, let small = shrink(data, maxW: maxW) else { return }
                 try? small.write(to: dest, options: .atomic)
             }.resume()
         }
@@ -122,19 +131,20 @@ enum WidgetBridge {
         DispatchQueue.main.asyncAfter(deadline: .now() + 6) { once() }
     }
 
-    /// A 1500px AniList cover is ~400 KB and the widget draws it at ~150pt.
-    /// Keeping the full size would put megabytes in a container that is backed
-    /// up and synced for no visible gain.
-    private static func shrink(_ data: Data) -> Data? {
+    /// Scaled to roughly what the widget draws, with headroom for a 3x screen
+    /// and for aspect-fill cropping — the artwork IS the widget now, so a soft
+    /// cover is the whole thing looking soft. Not the full 1500px original
+    /// either: that would put megabytes in a container that is backed up and
+    /// synced, for detail no 155pt tile can show.
+    private static func shrink(_ data: Data, maxW: CGFloat) -> Data? {
         #if canImport(UIKit)
         guard let img = UIImage(data: data) else { return nil }
-        let maxW: CGFloat = 400
-        guard img.size.width > maxW else { return img.jpegData(compressionQuality: 0.85) }
+        guard img.size.width > maxW else { return img.jpegData(compressionQuality: 0.9) }
         let scale = maxW / img.size.width
         let size = CGSize(width: maxW, height: (img.size.height * scale).rounded())
         let r = UIGraphicsImageRenderer(size: size)
         let out = r.image { _ in img.draw(in: CGRect(origin: .zero, size: size)) }
-        return out.jpegData(compressionQuality: 0.85)
+        return out.jpegData(compressionQuality: 0.9)
         #else
         return data
         #endif

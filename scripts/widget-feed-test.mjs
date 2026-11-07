@@ -31,7 +31,7 @@ function contract(){
 
   for(const k of ['up','air','watching','theme'])
     t('the shell reads the "'+k+'" the page sends', sw.includes('body["'+k+'"]'), true);
-  for(const k of ['id','title','ep','total','img'])
+  for(const k of ['id','title','ep','total','img','banner'])
     t('an up-next row’s "'+k+'" is read', sw.includes('r["'+k+'"]'), true);
   for(const k of ['title','at','ep'])
     t('the air time’s "'+k+'" is read', sw.includes('a["'+k+'"]'), true);
@@ -66,7 +66,18 @@ function contract(){
   // Cover art is cached under the title's id, so nothing would ever replace it
   // when a cover is re-picked, and nothing would ever remove it when the title
   // drops off the widget.
-  t('a re-picked cover drops the cached one', /was\[r\.id\] != r\.img/.test(sw), true);
+  t('a re-picked cover drops the cached one', /wasCover\[r\.id\] != r\.img/.test(sw), true);
+  t('and so does a changed banner', /wasWide\[r\.id\] != r\.banner/.test(sw), true);
+  // THE ARTWORK IS THE WIDGET. Everything the first version stacked on top of
+  // the poster — a caps label, the title, the episode line, a scrim over a
+  // third of the picture — is the dashboard-tile look, and it is gone. What is
+  // left over the art is the progress hairline and nothing else.
+  t('nothing is stacked on the artwork but progress',
+    !/UP NEXT/.test(widget) && !/LinearGradient\(colors: \[\.black/.test(widget), true);
+  t('the wide size prefers the art drawn wide',
+    /wide: wide\) \?\? WLArt\.image\(item\.id, wide: false\)/.test(widget), true);
+  t('and the bar carries its own track rather than a scrim',
+    widget.includes('Color.black.opacity(0.5)') && widget.includes('ProgressStrip'), true);
   t('and art for titles the widget no longer shows is swept',
     /func prune\(keeping/.test(sw) && /prune\(keeping: s\.up\)/.test(sw), true);
 }

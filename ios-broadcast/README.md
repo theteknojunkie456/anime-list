@@ -36,7 +36,9 @@ you ever change the file list, regenerate with `xcodegen generate`.)
    `WatchListParty`, `BroadcastExt` and `WatchListWidget`):
    - Select the target → **Signing & Capabilities** tab.
    - **Team** → pick your Apple ID (add it under Xcode → Settings → Accounts if it
-     isn't there — a free Apple ID is fine).
+     isn't there). A free Apple ID signs the app and the broadcast extension; the
+     **widget needs the paid team**, because its App Group has to be registered
+     against an account that can register one.
    - If Xcode complains the bundle id is taken, change `com.watchlist.party` (and the
      extension's `com.watchlist.party.BroadcastExt`) to something unique like
      `com.<yourname>.watchlist` — keep the extension id as `<app id>.BroadcastExt`.
@@ -70,8 +72,10 @@ you ever change the file list, regenerate with `xcodegen generate`.)
   the mic**; it just resamples ReplayKit's `.audioApp` buffers to 48 kHz mono and feeds
   them into WebRTC's ADM. So viewers hear the *show*, not your room. It's send-only
   (playout is a deliberate no-op — the extension must not play anything back).
-- **7-day expiry (free account):** apps signed with a free Apple ID stop launching
-  after 7 days — just press ▶ Run again from Xcode to renew.
+- **7-day expiry, on a free Apple ID only:** apps signed with one stop launching
+  after 7 days — press ▶ Run again from Xcode to renew. Signed with the paid team
+  (`NGEK7NY2X4`) the profile lasts a year, so this does not apply to the build
+  that carries the widget.
 - **libwebrtc API drift:** `stasel/WebRTC`'s types are stable but method signatures
   can shift by version — fix small compile errors against the version pulled
   (pinned to `150.0.0` in `project.yml`).

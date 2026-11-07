@@ -55,11 +55,11 @@ struct UpNextWidget: Widget {
         }
         .configurationDisplayName("Up next")
         .description("The show you are part-way through, and how far through you are.")
-        .supportedFamilies(Self.families)
-    }
-    static var families: [WidgetFamily] {
-        if #available(iOS 16.0, *) { return [.systemSmall, .systemMedium, .accessoryRectangular] }
-        return [.systemSmall, .systemMedium]
+        .supportedFamilies([.systemSmall, .systemMedium, .accessoryRectangular])
+        // Without this the artwork fills the tile but everything drawn ON it is
+        // inset by the system's 16pt content margin — so the hairline meant to
+        // sit along the bottom edge floats above it with gaps at both sides.
+        .contentMarginsDisabled()
     }
 }
 
@@ -82,11 +82,7 @@ struct UpNextView: View {
     }
 
     private var isAccessory: Bool {
-        if #available(iOS 16.0, *) {
-            return family == .accessoryRectangular || family == .accessoryInline
-                || family == .accessoryCircular
-        }
-        return false
+        family == .accessoryRectangular || family == .accessoryInline || family == .accessoryCircular
     }
 }
 
@@ -187,6 +183,9 @@ private struct InlineCard: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        // Margins are off for the whole widget so the artwork can reach the
+        // edges; the lock-screen size has no artwork and wants them back.
+        .padding(.horizontal, 2)
         .widgetURL(snap.up.first?.link ?? WLUpNext.home)
     }
 }
@@ -277,29 +276,19 @@ extension Color {
 }
 
 extension View {
-    /// iOS 17 stopped letting a widget paint its own background directly; it has
-    /// to be declared, or the widget draws on the system material and the
-    /// artwork is inset by the default padding instead of filling the tile.
-    @ViewBuilder func wlArtBackground<B: View>(@ViewBuilder _ bg: @escaping () -> B) -> some View {
-        if #available(iOS 17.0, *) {
-            self.containerBackground(for: .widget) { bg() }
-        } else {
-            self.background(bg().ignoresSafeArea())
-        }
+    /// A widget may not paint its own background directly; it has to be
+    /// declared, or the widget draws on the system material instead of the
+    /// artwork filling the tile.
+    func wlArtBackground<B: View>(@ViewBuilder _ bg: @escaping () -> B) -> some View {
+        containerBackground(for: .widget) { bg() }
     }
     /// The lock screen renders its widgets as a vibrant stencil over the
     /// wallpaper. Giving that one a background paints a dark block onto
     /// somebody's lock screen; it gets a clear container instead.
-    @ViewBuilder func wlAccessoryContainer() -> some View {
-        if #available(iOS 17.0, *) {
-            self.containerBackground(for: .widget) { Color.clear }
-        } else {
-            self
-        }
+    func wlAccessoryContainer() -> some View {
+        containerBackground(for: .widget) { Color.clear }
     }
-    @ViewBuilder func wlAccentable() -> some View {
-        if #available(iOS 16.0, *) { self.widgetAccentable() } else { self }
-    }
+    func wlAccentable() -> some View { widgetAccentable() }
 }
 
 extension WLSnapshot {

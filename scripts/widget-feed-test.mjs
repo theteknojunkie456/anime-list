@@ -78,6 +78,23 @@ function contract(){
     /wide: wide\) \?\? WLArt\.image\(item\.id, wide: false\)/.test(widget), true);
   t('and the bar carries its own track rather than a scrim',
     widget.includes('Color.black.opacity(0.5)') && widget.includes('ProgressStrip'), true);
+  // Without this the artwork fills the tile but everything drawn ON it is inset
+  // 16pt, so the hairline meant to sit along the bottom edge floats above it
+  // with a gap at either side. There is no way to branch on it, which is why
+  // the widget target is iOS 17 while the app is 15.
+  t('the system does not inset what is drawn on the artwork',
+    widget.includes('.contentMarginsDisabled()'), true);
+  // URLSession does not speak data:, and artwork somebody picked from their own
+  // photos IS a data: URL — every self-chosen cover would have failed with
+  // "unsupported URL" and shown no art at all.
+  t('art chosen from your own photos is read, not fetched',
+    /src\.hasPrefix\("data:"\)/.test(sw) && /Data\(contentsOf: url\)/.test(sw), true);
+  t('and is stored as a fingerprint, not megabytes of base64',
+    /func tag\(/.test(sw) && sw.includes('img: tag(cover)'), true);
+  // That art lives in IndexedDB and is not in `anime` until hydration finishes,
+  // which is after the boot feed — so without a second feed it never arrived.
+  t('the widget is fed again once offloaded art is back',
+    /hydrateImages[\s\S]{0,900}?nativeWidget\(\)/.test(html), true);
   t('and art for titles the widget no longer shows is swept',
     /func prune\(keeping/.test(sw) && /prune\(keeping: s\.up\)/.test(sw), true);
 }

@@ -23,7 +23,7 @@ packages:
 settings:
   base:
     MARKETING_VERSION: "1.0"
-    CURRENT_PROJECT_VERSION: "14"
+    CURRENT_PROJECT_VERSION: "15"
     SWIFT_VERSION: "5.0"
     GENERATE_INFOPLIST_FILE: "NO"
     CODE_SIGN_STYLE: Automatic
@@ -142,8 +142,15 @@ targets:
   WatchListWidget:
     type: app-extension
     platform: iOS
-    deploymentTarget:
-      iOS: "16.0"
+    # 17.0, where the app itself is 15.0. The widget is artwork edge to edge,
+    # and contentMarginsDisabled() — the only way to stop iOS insetting the
+    # progress hairline 16pt from the bottom and both sides — is 17-only. There
+    # is no back-deployment for it and no way to branch on it in a
+    # WidgetConfiguration, since every modifier returns a different type.
+    # A plain string, not a nested map: the map form is what `options` takes,
+    # and on a target XcodeGen accepts it silently and ignores it — the widget
+    # built against iOS 15 and every 16/17-only call failed to compile.
+    deploymentTarget: "17.0"
     sources:
       - Widget
       - WidgetShared.swift

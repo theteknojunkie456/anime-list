@@ -26,14 +26,25 @@ enum WidgetBridge {
         s.at = Date().timeIntervalSince1970
         s.watching = body["watching"] as? Int ?? 0
 
+        // The raw art values, kept aside. Artwork somebody picked themselves is
+        // a data: URL holding the whole image — fine to fetch from, ruinous to
+        // store: it would sit in the snapshot that is read on every single
+        // widget draw, and a four-title snapshot could be megabytes of base64.
+        // What gets stored is a fingerprint, which is all the change detection
+        // ever needed from it.
+        var art: [String: (String, String)] = [:]      // id -> (cover, banner)
         if let rows = body["up"] as? [[String: Any]] {
             s.up = rows.prefix(4).map { r in
-                WLUpNext(id: String(describing: r["id"] ?? ""),
-                         title: r["title"] as? String ?? "",
-                         ep: intOf(r["ep"]),
-                         total: intOf(r["total"]),
-                         img: r["img"] as? String ?? "",
-                         banner: r["banner"] as? String ?? "")
+                let id = String(describing: r["id"] ?? "")
+                let cover = r["img"] as? String ?? ""
+                let wide = r["banner"] as? String ?? ""
+                art[id] = (cover, wide)
+                return WLUpNext(id: id,
+                                title: r["title"] as? String ?? "",
+                                ep: intOf(r["ep"]),
+                                total: intOf(r["total"]),
+                                img: tag(cover),
+                                banner: tag(wide))
             }.filter { !$0.title.isEmpty }
         }
         if let a = body["air"] as? [String: Any], let t = a["title"] as? String, !t.isEmpty {
@@ -74,7 +85,7 @@ enum WidgetBridge {
                let u = WidgetShare.artURL(r.id, wide: true) { try? FileManager.default.removeItem(at: u) }
         }
         prune(keeping: s.up)
-        fetchArt(for: s.up) {
+        fetchArt(for: s.up, from: art) {
             WidgetCenter.shared.reloadAllTimelines()
         }
     }
@@ -102,17 +113,31 @@ enum WidgetBridge {
     }
 
     // ── art ──────────────────────────────────────────────────────────────────
-    private static func fetchArt(for rows: [WLUpNext], done: @escaping () -> Void) {
+    private static func fetchArt(for rows: [WLUpNext],
+                                from art: [String: (String, String)],
+                                done: @escaping () -> Void) {
         let group = DispatchGroup()
         var jobs: [(String, URL, CGFloat)] = []    // src, dest, longest edge
         for r in rows {
-            if let d = WidgetShare.artURL(r.id), !r.img.isEmpty { jobs.append((r.img, d, 700)) }
-            if let d = WidgetShare.artURL(r.id, wide: true), !r.banner.isEmpty { jobs.append((r.banner, d, 1200)) }
+            let (cover, wide) = art[r.id] ?? ("", "")
+            if let d = WidgetShare.artURL(r.id), !cover.isEmpty { jobs.append((cover, d, 700)) }
+            if let d = WidgetShare.artURL(r.id, wide: true), !wide.isEmpty { jobs.append((wide, d, 1200)) }
         }
         for (src, dest, maxW) in jobs {
             guard let url = URL(string: src) else { continue }
             // Art does not change under you; one download per file is enough.
             if FileManager.default.fileExists(atPath: dest.path) { continue }
+            // URLSession does not speak data:, and artwork somebody picked from
+            // their own photos IS a data: URL — so every self-chosen cover would
+            // have failed with "unsupported URL" and shown no art at all.
+            // Data(contentsOf:) reads both schemes; only the remote one needs to
+            // be off the main thread.
+            if src.hasPrefix("data:") {
+                if let d = try? Data(contentsOf: url), let small = shrink(d, maxW: maxW) {
+                    try? small.write(to: dest, options: .atomic)
+                }
+                continue
+            }
             group.enter()
             URLSession.shared.dataTask(with: url) { data, _, _ in
                 defer { group.leave() }
@@ -151,6 +176,19 @@ enum WidgetBridge {
     }
 
     // ── small helpers ────────────────────────────────────────────────────────
+    /// What gets STORED in place of an art value. A remote URL is already short
+    /// and is kept as is; a data: URL becomes a fingerprint of itself, so the
+    /// snapshot stays small and "has this cover changed" still has an honest
+    /// answer. djb2 rather than hashValue: Swift seeds hashValue per process, so
+    /// the same image would fingerprint differently after every relaunch and
+    /// every cover would look re-picked.
+    private static func tag(_ v: String) -> String {
+        guard v.hasPrefix("data:") else { return v }
+        var h: UInt64 = 5381
+        for b in v.utf8 { h = (h &* 33) &+ UInt64(b) }
+        return "data:#\(h)"
+    }
+
     private static func intOf(_ v: Any?) -> Int {
         if let i = v as? Int { return i }
         if let d = v as? Double { return Int(d) }

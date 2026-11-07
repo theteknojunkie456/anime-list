@@ -8151,6 +8151,11 @@ async function hydrateImages(){
   if(!jobs.length)return;                       // nothing offloaded → no work at all
   try{await Promise.all(jobs);}catch(e){}
   try{render();}catch(e){}try{if(typeof detailId!=='undefined'&&detailId)renderDetail();}catch(e){}
+  // Artwork you picked yourself lives in IndexedDB and is not in `anime` until
+  // this finishes. The widget is fed at boot, which is BEFORE this finishes, so
+  // without a second feed here a self-chosen cover never reached the Home
+  // Screen — it waited for the next thing you happened to change.
+  try{nativeWidget();}catch(e){}
 }
 // Resolve one title's offloaded images immediately (used when its detail opens,
 // so the sheet always has its art even before the background pass reaches it).

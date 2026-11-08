@@ -9786,7 +9786,7 @@ async function syncOnOpen(){
       if(extra)applyExtra(extra);              // themes + friends are plaintext — apply even if the list stays locked
       let arr=null;
       if(inner&&inner.v===2){
-        if(!cryptoKey)return;                  // encrypted list — adopt it after unlock (extra already applied)
+        if(!cryptoKey){offerCloudUnlock(inner,res);return;}   // ask for the password rather than give up in silence
         try{arr=JSON.parse(await decList(inner,cryptoKey));}catch{return;} // wrong master / corrupt → leave local intact
         envWraps={pw:inner.pw||(envWraps&&envWraps.pw),rec:inner.rec||(envWraps&&envWraps.rec),pfk:inner.pfk||(envWraps&&envWraps.pfk)};
       }else if(Array.isArray(inner)){arr=inner;}
@@ -9954,6 +9954,46 @@ function adoptProtection(wraps,key){
   try{localStorage.setItem(ENCFLAG,'1');}catch(e){}
   try{rememberSessionKey();}catch(e){}
   try{renderLockUI();}catch(e){}
+}
+// A DEVICE ON THE RIGHT KEY THAT CANNOT READ WHAT IS UNDER IT.
+//
+// This used to be a bare `return`. A device that had joined a protected list
+// but did not hold its password pulled the backup, recognised the envelope,
+// could not open it, and said nothing — on every open, for ever. On a device
+// that had just joined and so had no list of its own, that is a WatchList
+// showing zero titles with no error, no prompt and nothing to tap: the list is
+// right there on the key it is already pointed at, and the app's own answer was
+// silence.
+//
+// Typing the code by hand has always handled this properly — it stores the
+// envelope and shows the lock screen. The automatic pull is the same situation
+// arriving a different way, so it asks the same question.
+//
+// Once a session, because this runs on every open and a password box that
+// reappears every time you open an app is its own kind of broken. Not while the
+// lock screen is up either: that is already asking, for the same password.
+let _askedCloudPw=false;
+function offerCloudUnlock(env,res){
+  if(_askedCloudPw||appLocked)return;
+  _askedCloudPw=true;
+  askListPassword(env,{
+    msg:'Your list is in the backup this device is signed in to, protected by a password.',
+    yes:'Unlock and use it',
+  },(list,wraps,key)=>{
+    if(!Array.isArray(list)||!list.length){toast('That backup is empty \u2014 nothing changed');return;}
+    // Before writeLocal(), or the list lands on this device in plain text under
+    // a key whose owner set a password.
+    adoptProtection(wraps,key);
+    // Merge, never replace — the rule everywhere else on this path. This device
+    // having nothing is the common case, and then a merge IS the whole list.
+    const before=anime.length;
+    anime=migrate(mergeLists(anime,list));
+    try{writeLocal();}catch(e){}
+    setSyncAt((res&&res.updatedAt)||Date.now());
+    try{render();}catch(e){}
+    try{renderSyncUI();}catch(e){}
+    toast(before?'Unlocked \u2014 '+(anime.length-before)+' added':'Unlocked \u2014 '+anime.length+' titles');
+  });
 }
 // It cannot merge by id. mergeLists() matches on a.id, and two devices that
 // minted their own codes generated their own uid() for the same show — every
@@ -26986,11 +27026,12 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-11-08.84',
+  v:'2026-11-08.85',
   title:'WatchList on the Home Screen',
   push:'The iPhone app has a Home Screen widget: the show you are part-way through, as its own artwork.',
   notes:[
     'The <b>iPhone app</b> has a <b>Home Screen widget</b>. Hold the Home Screen, tap <b>+</b>, search <b>WatchList</b>. It is the <b>artwork of what you are part-way through</b>, edge to edge, with a hairline across the bottom showing how far through you are \u2014 nothing else on top of it. The small size uses the cover; the wide size uses the show\u2019s banner art, so it is not a cover cropped to a letterbox. Tapping it opens that title, not the app\u2019s front door. There is a lock-screen size too, which says in words what the others say in pictures. The bar wears your theme\u2019s colour, and the whole thing goes blank the moment the app is locked, because a password in front of a list nobody can read on the Home Screen is not a password.',
+    'A device that had <b>joined a password-protected list without its password</b> showed nothing and said nothing. It pulled the backup, recognised that it was protected, could not open it, and gave up without a word \u2014 on every open. On a device that had just joined, and so had no list of its own, that is <b>zero titles, no error and nothing to tap</b>, while the list sits on the key the device is already signed in to. Typing the code by hand had always handled this properly; arriving the same place the other way did not. It now <b>asks for the password</b>, once, and opens the list when you give it.',
     'Three on the widget itself. It now keeps up when your list <b>arrives from another device</b>, instead of holding yesterday\u2019s library until you happened to tick an episode \u2014 which is exactly what a phone looks like the moment it joins your computer\u2019s list. <b>Artwork that failed to download</b>, a cover you were out of signal for, is asked for again rather than leaving that title as plain type for good. And a countdown <b>flips to \u201cis out\u201d the moment the episode lands</b>; before, it could go on saying <i>in 5 min</i> about something that aired five minutes ago, for up to an hour.',
     '<b>Episode alerts had the same gap</b>, and it showed on the same day: when a list arrived from another device \u2014 a sync, a restore, joining a computer\u2019s library \u2014 every title came with its airing time and none of them got an alarm until the app was next opened. They are set from the list itself now. Two things fell out of fixing it: alerts you had <b>turned off</b> could be quietly turned back on by editing anything, and that no longer happens; and turning them <b>off and on again</b> now genuinely re-arms them rather than appearing to.',
     'The same gap again, on the browser side: the list of shows the <b>alert server watches for you</b> was refreshed when you edited something, not when a list arrived \u2014 so a browser that had just taken on another device\u2019s library left the server watching the few shows it knew about before. It follows the list now. While that was open: <b>ticking episodes all evening used to tell the server so</b>, every few seconds, although the shows it watches had not changed. It is told only when the set actually moves, which is a real saving against a daily limit this has been running into.',

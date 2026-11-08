@@ -913,6 +913,19 @@ Three rules in the code that are not obvious from reading it:
   draw the old artwork for ever), and art for titles that have fallen off the
   widget is swept, or every title you were ever part-way through leaves a cover
   behind in a container that is backed up and never cleaned.
+- **A device on the right key that cannot read what is under it asks.**
+  `syncOnOpen()` recognised a `v:2` envelope, found no `cryptoKey`, and returned
+  silently — on every open. A device that had just joined a protected list had
+  no list of its own to fall back on, so that silence was a WatchList showing
+  zero titles with no error and nothing to tap, pointed at a key that held the
+  whole library. Typing the code by hand had always handled it (store the
+  envelope, show the lock screen); the automatic pull is the same situation
+  arriving the other way, so `offerCloudUnlock()` asks for the password through
+  the same `askListPassword()` the join path uses. Once a session, because this
+  runs on every open, and never while the lock screen is already asking for that
+  same password. It merges rather than replaces, and takes on the protection
+  before `writeLocal()` so the list never lands in plain text under a key whose
+  owner set a password.
 - **The feed hangs off `writeLocal()`, not `save()`.** `save()` is only the path
   where *you* changed something. A cloud sync merging another device's list, a
   restore from a code or a backup, and the IndexedDB mirror stepping in at boot

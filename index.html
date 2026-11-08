@@ -8220,6 +8220,11 @@ function writeLocal(){
   // launched. Rescheduling is debounced and de-duplicated too, so hanging it
   // here rather than on seven separate arrival paths costs nothing per tick.
   try{nativeScheduleNotifs();}catch(e){}
+  // And the third of the same kind: the list of ids the push server polls was
+  // only ever refreshed from save() and from one of the several arrival paths,
+  // so a browser that had just taken on another device's library left the
+  // server watching the handful of shows it knew about before.
+  try{scheduleNotifyUpdate();}catch(e){}
   if(cryptoKey&&envWraps){                       // password set → persist ciphertext only
     const snap=JSON.stringify(realList());
     _writeChain=_writeChain.then(async()=>{
@@ -8287,7 +8292,7 @@ function save(){
     const unsafe=(typeof appLocked!=='undefined'&&appLocked)||(typeof listUntrusted!=='undefined'&&listUntrusted);
     if(!unsafe)dedupeAnime();
   }catch(e){}
-  writeLocal();try{ensureBackup();}catch(e){}schedulePush();scheduleNotifyUpdate();
+  writeLocal();try{ensureBackup();}catch(e){}schedulePush();
 }
 // The other half of the mirror. localStorage is read synchronously at boot and
 // IndexedDB can't be, so this runs just after and only steps in when the local
@@ -10706,6 +10711,7 @@ const NOTIFY_SENT_KEY='wl_notify_count';
 // Per-kind high-water marks, so a collapse in one kind can't hide behind the
 // size of the other.
 const NOTIFY_KINDS_KEY='wl_notify_kinds';
+let _nuLast='';
 async function notifyUpdate(){
   if(!pushSupported())return;
   try{
@@ -10738,7 +10744,17 @@ async function notifyUpdate(){
     try{const p=JSON.parse(localStorage.getItem(NOTIFY_KINDS_KEY)||'null')||{};lastA=p.a||0;lastM=p.m||0;}catch(e){}
     if(lastA>=4&&animeIds.length<lastA*0.4){try{logProblem('notify','refused a collapsed episode-alert list',animeIds.length+' vs '+lastA);}catch(e){}return;}
     if(lastM>=4&&mangaIds.length<lastM*0.4){try{logProblem('notify','refused a collapsed chapter-alert list',mangaIds.length+' vs '+lastM);}catch(e){}return;}
+    // Every one of these is a write on the server, and the free write quota is
+    // a ceiling this project has already hit. Ticking episodes all evening
+    // changes nothing the server polls — the ids only move when a title joins
+    // or leaves the list — so an unchanged set must not cost one. Remembered in
+    // memory only, and only once the POST has landed: a failed send has to be
+    // retried, and a reload paying for one redundant write is a cheaper mistake
+    // than a device that has quietly stopped publishing.
+    const sig=JSON.stringify({e:sub.endpoint,a:animeIds,m:mangaIds});
+    if(sig===_nuLast)return;
     await fetch(NOTIFY_URL+'/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({endpoint:sub.endpoint,animeIds,mangaIds})});
+    _nuLast=sig;
     try{localStorage.setItem(NOTIFY_SENT_KEY,String(n));}catch(e){}
     try{localStorage.setItem(NOTIFY_KINDS_KEY,JSON.stringify({a:animeIds.length,m:mangaIds.length}));}catch(e){}
   }catch{}
@@ -26977,6 +26993,7 @@ const RELEASE={
     'The <b>iPhone app</b> has a <b>Home Screen widget</b>. Hold the Home Screen, tap <b>+</b>, search <b>WatchList</b>. It is the <b>artwork of what you are part-way through</b>, edge to edge, with a hairline across the bottom showing how far through you are \u2014 nothing else on top of it. The small size uses the cover; the wide size uses the show\u2019s banner art, so it is not a cover cropped to a letterbox. Tapping it opens that title, not the app\u2019s front door. There is a lock-screen size too, which says in words what the others say in pictures. The bar wears your theme\u2019s colour, and the whole thing goes blank the moment the app is locked, because a password in front of a list nobody can read on the Home Screen is not a password.',
     'Three on the widget itself. It now keeps up when your list <b>arrives from another device</b>, instead of holding yesterday\u2019s library until you happened to tick an episode \u2014 which is exactly what a phone looks like the moment it joins your computer\u2019s list. <b>Artwork that failed to download</b>, a cover you were out of signal for, is asked for again rather than leaving that title as plain type for good. And a countdown <b>flips to \u201cis out\u201d the moment the episode lands</b>; before, it could go on saying <i>in 5 min</i> about something that aired five minutes ago, for up to an hour.',
     '<b>Episode alerts had the same gap</b>, and it showed on the same day: when a list arrived from another device \u2014 a sync, a restore, joining a computer\u2019s library \u2014 every title came with its airing time and none of them got an alarm until the app was next opened. They are set from the list itself now. Two things fell out of fixing it: alerts you had <b>turned off</b> could be quietly turned back on by editing anything, and that no longer happens; and turning them <b>off and on again</b> now genuinely re-arms them rather than appearing to.',
+    'The same gap again, on the browser side: the list of shows the <b>alert server watches for you</b> was refreshed when you edited something, not when a list arrived \u2014 so a browser that had just taken on another device\u2019s library left the server watching the few shows it knew about before. It follows the list now. While that was open: <b>ticking episodes all evening used to tell the server so</b>, every few seconds, although the shows it watches had not changed. It is told only when the set actually moves, which is a real saving against a daily limit this has been running into.',
     'When a device <b>joins another backup</b>, restores from a code, or opens a setup kit, it stops using the key it had \u2014 and the copy stored under that key stays in the cloud, holding a snapshot of your library, reachable only by a key the device has just stopped keeping. Nothing in the app could mention it again. <b>Cloud</b> now says it is there and offers to erase it, and the offer is all it does: nothing is deleted on its own. Before you can press it, the app asks that old key who is still backing up under it \u2014 one phone joining your computer does not speak for another phone that stayed \u2014 and names them if anyone is.',
     'Fixed on the way: leaving one of those confirmations while it was still checking could leave the <b>confirm button dead for the rest of the session</b>, for every other thing you might confirm. Every confirmation in the app shares one button, so opening one now states that button completely rather than inheriting whatever the last one left behind.',
     'The other two buttons that can cost you a list now name the machines as well. <b>Use this list everywhere</b> says which devices take the version you are sending and what it costs them \u2014 <i>Mac (286 titles), iPad (12 titles) take this version next time they open, and whatever they have that this device does not is lost</i> \u2014 or, when nobody else has backed up under the key, that there is nothing else to overwrite, which is worth knowing before you press it. <b>Taking another device\u2019s list</b> now says what the device in your hand gives up, which was the one number missing: it told you what arrived and called what left \u201canything held only somewhere else\u201d. Both hold the button, reading <b>Checking</b>, until the app knows what it is about to replace.',

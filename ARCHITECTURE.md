@@ -933,6 +933,17 @@ Three rules in the code that are not obvious from reading it:
   owner had switched off), and turning them off posts an empty set straight past
   the de-duplication, so that path clears the remembered signature or switching
   them back on would be a no-op.
+- **So does the push server's poll set, and it now costs a write only when it
+  moves.** `scheduleNotifyUpdate()` had the same attachment problem and the same
+  symptom on the web build. It is also the one of the three that costs something
+  on a server rather than on the phone: every update is a KV write, against a
+  free daily quota this project has already exhausted, and it was firing on a
+  debounce every few seconds through an evening of ticking episodes — although
+  the ids only move when a title joins or leaves the list. `notifyUpdate()` now
+  compares endpoint-plus-ids against the last set that was actually accepted,
+  and remembers it only after the POST lands, so a failed send is still retried.
+  In memory rather than in storage: a reload paying for one redundant write is a
+  cheaper mistake than a device that has quietly stopped publishing.
 - **An unchanged snapshot is still allowed to fix itself.** The cheap check above
   has a hole: art that failed to download — the phone was on a train when the
   snapshot landed — would never be asked for again, because an identical snapshot

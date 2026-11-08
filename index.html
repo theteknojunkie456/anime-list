@@ -8214,6 +8214,12 @@ function writeLocal(){
   // device changed", and this is it. The call is debounced and de-duplicated,
   // so the extra ones cost nothing.
   try{nativeWidget();}catch(e){}
+  // Episode alerts have exactly the same hole, and it bites on exactly the same
+  // day: 286 titles arrive from the computer, every one of them with an airing
+  // time, and not one of them had an alarm against it until the app was next
+  // launched. Rescheduling is debounced and de-duplicated too, so hanging it
+  // here rather than on seven separate arrival paths costs nothing per tick.
+  try{nativeScheduleNotifs();}catch(e){}
   if(cryptoKey&&envWraps){                       // password set → persist ciphertext only
     const snap=JSON.stringify(realList());
     _writeChain=_writeChain.then(async()=>{
@@ -10649,7 +10655,7 @@ async function enableNotify(){
   renderNotifyUI();
 }
 async function disableNotify(){
-  if(typeof IS_NATIVE!=='undefined'&&IS_NATIVE){setNotifyOn(false);try{window.webkit.messageHandlers.wl.postMessage({type:'notify',items:[]});}catch{}toast('Notifications off');renderNotifyUI();return;}
+  if(typeof IS_NATIVE!=='undefined'&&IS_NATIVE){setNotifyOn(false);try{_nfLast='';window.webkit.messageHandlers.wl.postMessage({type:'notify',items:[]});}catch{}toast('Notifications off');renderNotifyUI();return;}
   try{
     const sub=await getPushSub();
     if(sub){
@@ -16999,8 +17005,21 @@ function broadcastCountdown(){
 function nativeNotifyCode(){if(!IS_NATIVE)return;try{window.webkit.messageHandlers.wl.postMessage({type:'code',code:partyCode||''});}catch(e){}}
 // Inside the app there's no web push — so hand the native shell every upcoming
 // episode air time and let it schedule free on-device local notifications instead.
+// Debounced and de-duplicated for the same reason the widget is: this is called
+// from every path that can touch an airing time, and during a binge that is
+// every few seconds. The phone rebuilds up to sixty scheduled notifications
+// each time, so an unchanged set must cost nothing.
+let _nfT=0,_nfLast='';
 function nativeScheduleNotifs(){
   if(!IS_NATIVE)return;
+  clearTimeout(_nfT);_nfT=setTimeout(_nativeNotifsNow,1200);
+}
+function _nativeNotifsNow(){
+  if(!IS_NATIVE)return;
+  // Turning episode alerts off and then editing anything used to turn them
+  // back on: nothing on this path ever asked whether they were wanted. Hanging
+  // it off writeLocal would have made that happen on every single edit.
+  try{if(!notifyOn())return;}catch(e){return;}
   try{
     // Each item carries its own source's lag, so the phone buzzes when that
     // source has it rather than when Tokyo aired it. Anything that aired within
@@ -17011,6 +17030,9 @@ function nativeScheduleNotifs(){
       .map(a=>({title:a.title,at:a.airAt,ep:a.airEp||0,lag:subLagMins(itemHost(a))*60}));
     upcomingRelated().forEach(r=>{if(r.airAt&&r.airAt>now)_list.push({title:r.title,at:r.airAt,ep:r.airEp||0,lag:subLagMins(itemHost(r))*60});});
     const items=_list.sort((x,y)=>x.at-y.at).slice(0,60);
+    const sig=JSON.stringify(items);
+    if(sig===_nfLast)return;        // nothing moved: do not rebuild sixty alarms
+    _nfLast=sig;
     window.webkit.messageHandlers.wl.postMessage({type:'notify',items});
   }catch(e){}
 }
@@ -26954,6 +26976,7 @@ const RELEASE={
   notes:[
     'The <b>iPhone app</b> has a <b>Home Screen widget</b>. Hold the Home Screen, tap <b>+</b>, search <b>WatchList</b>. It is the <b>artwork of what you are part-way through</b>, edge to edge, with a hairline across the bottom showing how far through you are \u2014 nothing else on top of it. The small size uses the cover; the wide size uses the show\u2019s banner art, so it is not a cover cropped to a letterbox. Tapping it opens that title, not the app\u2019s front door. There is a lock-screen size too, which says in words what the others say in pictures. The bar wears your theme\u2019s colour, and the whole thing goes blank the moment the app is locked, because a password in front of a list nobody can read on the Home Screen is not a password.',
     'Three on the widget itself. It now keeps up when your list <b>arrives from another device</b>, instead of holding yesterday\u2019s library until you happened to tick an episode \u2014 which is exactly what a phone looks like the moment it joins your computer\u2019s list. <b>Artwork that failed to download</b>, a cover you were out of signal for, is asked for again rather than leaving that title as plain type for good. And a countdown <b>flips to \u201cis out\u201d the moment the episode lands</b>; before, it could go on saying <i>in 5 min</i> about something that aired five minutes ago, for up to an hour.',
+    '<b>Episode alerts had the same gap</b>, and it showed on the same day: when a list arrived from another device \u2014 a sync, a restore, joining a computer\u2019s library \u2014 every title came with its airing time and none of them got an alarm until the app was next opened. They are set from the list itself now. Two things fell out of fixing it: alerts you had <b>turned off</b> could be quietly turned back on by editing anything, and that no longer happens; and turning them <b>off and on again</b> now genuinely re-arms them rather than appearing to.',
     'When a device <b>joins another backup</b>, restores from a code, or opens a setup kit, it stops using the key it had \u2014 and the copy stored under that key stays in the cloud, holding a snapshot of your library, reachable only by a key the device has just stopped keeping. Nothing in the app could mention it again. <b>Cloud</b> now says it is there and offers to erase it, and the offer is all it does: nothing is deleted on its own. Before you can press it, the app asks that old key who is still backing up under it \u2014 one phone joining your computer does not speak for another phone that stayed \u2014 and names them if anyone is.',
     'Fixed on the way: leaving one of those confirmations while it was still checking could leave the <b>confirm button dead for the rest of the session</b>, for every other thing you might confirm. Every confirmation in the app shares one button, so opening one now states that button completely rather than inheriting whatever the last one left behind.',
     'The other two buttons that can cost you a list now name the machines as well. <b>Use this list everywhere</b> says which devices take the version you are sending and what it costs them \u2014 <i>Mac (286 titles), iPad (12 titles) take this version next time they open, and whatever they have that this device does not is lost</i> \u2014 or, when nobody else has backed up under the key, that there is nothing else to overwrite, which is worth knowing before you press it. <b>Taking another device\u2019s list</b> now says what the device in your hand gives up, which was the one number missing: it told you what arrived and called what left \u201canything held only somewhere else\u201d. Both hold the button, reading <b>Checking</b>, until the app knows what it is about to replace.',

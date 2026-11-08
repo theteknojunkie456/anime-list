@@ -223,6 +223,34 @@ async function native(){
     return m?!!m.up.find(x=>x.id==='w9'):false;})()`);
   t('a list that arrived by sync reaches the widget without save()', pulled, true);
 
+  // Episode alerts ride the same trigger now, because they had the same hole:
+  // 286 titles arrive from the computer, every one of them with an airing time,
+  // and not one has an alarm against it until the app is next launched.
+  const alerts=await ev(`(async()=>{localStorage.setItem('notify_on','1');_nfLast='';window.__sent=[];
+    anime=anime.concat([{id:'w8',title:'Arrived With An Air Date',kind:'watch',status:'watching',ep:1,epTotal:12,img:'',airAt:Math.floor(Date.now()/1000)+7200,airEp:2}]);
+    writeLocal();
+    await new Promise(r=>setTimeout(r,1700));
+    const m=window.__sent.filter(x=>x.type==='notify').pop();
+    return m?m.items.some(i=>i.title==='Arrived With An Air Date'):false;})()`);
+  t('a title that arrived by sync gets its episode alert', alerts, true);
+
+  // Nothing on this path ever asked whether alerts were wanted, so hanging it
+  // off writeLocal would turn them back on every time you edited anything.
+  const off=await ev(`(async()=>{localStorage.removeItem('notify_on');_nfLast='';window.__sent=[];
+    const a=anime.find(x=>x.id==='w1');a.ep=5;writeLocal();
+    await new Promise(r=>setTimeout(r,1700));
+    return window.__sent.filter(x=>x.type==='notify').length;})()`);
+  t('alerts you turned off are not re-armed by an edit', off, 0);
+
+  // And the de-duplication must not become a mute: turning them off posts an
+  // empty set straight past it, so the remembered signature goes with them.
+  const back=await ev(`(async()=>{window.__sent=[];disableNotify();
+    await new Promise(r=>setTimeout(r,200));enableNotify();
+    await new Promise(r=>setTimeout(r,1700));
+    const m=window.__sent.filter(x=>x.type==='notify').pop();
+    return m?m.items.length>0:false;})()`);
+  t('turning them off and on again re-arms them', back, true);
+
   // A password on the app is not a password if the Home Screen shows the list.
   const locked=await ev(`(async()=>{window.__sent=[];appLocked=true;nativeWidgetClear();
     nativeWidget();await new Promise(r=>setTimeout(r,1500));

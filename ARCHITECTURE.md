@@ -922,6 +922,17 @@ Three rules in the code that are not obvious from reading it:
   after it joins your computer's list. One function means "the list on this
   device changed", and that is the one the widget listens to. It already returns
   early when the app is locked, which is the rule the widget wanted anyway.
+- **Episode alerts hang off the same place, for the same reason.**
+  `nativeScheduleNotifs()` was called from the handful of events that change an
+  airing time, which missed every path where the list *arrives* — so a phone
+  that had just taken on another device's library had an alarm against none of
+  it until the next launch. It is debounced and signature-de-duplicated like the
+  widget feed, so sharing `writeLocal()` costs nothing per tick. Two things had
+  to come with it: nothing on that path ever asked whether alerts were *wanted*,
+  so it now checks `notifyOn()` (otherwise any edit would re-arm alerts the
+  owner had switched off), and turning them off posts an empty set straight past
+  the de-duplication, so that path clears the remembered signature or switching
+  them back on would be a no-op.
 - **An unchanged snapshot is still allowed to fix itself.** The cheap check above
   has a hole: art that failed to download — the phone was on a train when the
   snapshot landed — would never be asked for again, because an identical snapshot

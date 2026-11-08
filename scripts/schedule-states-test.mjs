@@ -53,12 +53,21 @@ const t=(n,g,e)=>{const ok=JSON.stringify(g)===JSON.stringify(e);ok?pass++:fail+
 const res=await ev(`(()=>{
   const now=Math.floor(Date.now()/1000);
   const ws=new Date(); ws.setHours(0,0,0,0); ws.setDate(ws.getDate()-ws.getDay());
+  // The grid only ever draws ONE week, so an episode seeded at a fixed offset
+  // from "now" silently falls out of it near either boundary: two hours before
+  // a Sunday 01:00 is last Saturday, and five hours after a Saturday 21:00 is
+  // next Sunday. Both ends, not just the one that happened to break today.
+  // Squeeze the offsets into whatever of the week is actually left on each
+  // side; scaling is monotone, so the order the assertions below rely on holds.
+  const wsSec=Math.floor(ws.getTime()/1000), weSec=wsSec+7*86400;
+  const fwd=s=>Math.max(1,Math.round(s*Math.min(1,(weSec-now)*0.8/20000)));
+  const back=Math.max(1,Math.min(7200,Math.floor((now-wsSec)*0.8)));
   document.getElementById('scheduleBody').innerHTML='<div class="sched-days" id="schedDays"></div>';
   renderSchedDays(ws,[
-    {id:'p',title:'Already Aired',img:'',episode:1,airingAt:now-7200,aniId:1,lag:0,delayed:0},
-    {id:'n',title:'The Next One',img:'',episode:2,airingAt:now+5400,aniId:2,lag:0,delayed:0},
-    {id:'d',title:'Pushed Back',img:'',episode:3,airingAt:now+9000,aniId:3,lag:0,delayed:now+3600},
-    {id:'l',title:'Later Still',img:'',episode:4,airingAt:now+20000,aniId:4,lag:0,delayed:0}]);
+    {id:'p',title:'Already Aired',img:'',episode:1,airingAt:now-back,aniId:1,lag:0,delayed:0},
+    {id:'n',title:'The Next One',img:'',episode:2,airingAt:now+fwd(5400),aniId:2,lag:0,delayed:0},
+    {id:'d',title:'Pushed Back',img:'',episode:3,airingAt:now+fwd(9000),aniId:3,lag:0,delayed:now+fwd(3600)},
+    {id:'l',title:'Later Still',img:'',episode:4,airingAt:now+fwd(20000),aniId:4,lag:0,delayed:0}]);
   const rows=[...document.querySelectorAll('.sched-row')];
   return {
     total:rows.length,

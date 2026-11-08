@@ -84,6 +84,19 @@ function contract(){
   // the widget target is iOS 17 while the app is 15.
   t('the system does not inset what is drawn on the artwork',
     widget.includes('.contentMarginsDisabled()'), true);
+  // Text(style: .relative) prints the SIZE of the gap and never its sign, so a
+  // single-entry timeline keeps saying "Ep 12 in 5 min" about an episode that
+  // came out five minutes ago, for up to an hour.
+  t('the countdown flips to "is out" at the airing moment',
+    /air\.when\.addingTimeInterval\(1\)/.test(widget)
+      && /entries\.append/.test(widget), true);
+  // An unchanged snapshot returns early, and "already on disk" is the only
+  // question fetchArt asks — so art that failed on a train would never be
+  // asked for again and the widget would draw type for ever.
+  t('art that never arrived is asked for again',
+    /missingArt\(s\.up, art\)/.test(sw) && /private static func missingArt/.test(sw), true);
+  t('and the retry only spends a reload if something turned up',
+    /if got \{ WidgetCenter\.shared\.reloadAllTimelines\(\) \}/.test(sw), true);
   // URLSession does not speak data:, and artwork somebody picked from their own
   // photos IS a data: URL — every self-chosen cover would have failed with
   // "unsupported URL" and shown no art at all.

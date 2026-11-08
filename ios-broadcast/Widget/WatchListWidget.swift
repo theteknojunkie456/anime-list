@@ -38,8 +38,20 @@ struct WLProvider: TimelineProvider {
         // on the lock screen ticks on its own (Text(style: .relative) redraws
         // without an entry). The hourly refresh is the safety net for a phone
         // whose owner has not opened the app in days, not the mechanism.
-        let entry = WLEntry(date: Date(), snap: WLSnapshot.load())
-        completion(Timeline(entries: [entry], policy: .after(Date().addingTimeInterval(3600))))
+        let snap = WLSnapshot.load()
+        let now = Date()
+        var entries = [WLEntry(date: now, snap: snap)]
+        // `Text(style: .relative)` prints the SIZE of the gap and never its
+        // sign, so the minute an episode is out that same line reads "Ep 12 in
+        // 5 min" about something that aired five minutes ago, and keeps saying
+        // it until the next timeline an hour later. A second entry at the airing
+        // moment rebuilds the view as "is out" exactly then. Extra entries in
+        // one timeline are free; only asking for a new timeline costs a reload.
+        if let air = snap.air {
+            let out = air.when.addingTimeInterval(1)
+            if out > now { entries.append(WLEntry(date: out, snap: snap)) }
+        }
+        completion(Timeline(entries: entries, policy: .after(now.addingTimeInterval(3600))))
     }
 }
 

@@ -67,7 +67,19 @@ enum WidgetBridge {
         a.at = 0; b.at = 0
         let changed = (a != b)
 
-        guard changed else { return }
+        // Art that never arrived — the phone was offline when this snapshot
+        // landed, or one request fell over — would otherwise never be asked for
+        // again: an unchanged snapshot returns here, and "already on disk" is
+        // the only question fetchArt asks, so the widget would draw the
+        // typographic fallback for ever. An unchanged snapshot still gets a look
+        // at the files, and redraws only if something actually turned up.
+        guard changed else {
+            guard missingArt(s.up, art) else { return }
+            fetchArt(for: s.up, from: art) { got in
+                if got { WidgetCenter.shared.reloadAllTimelines() }
+            }
+            return
+        }
         guard s.save() else {
             NSLog("WatchList: widget snapshot could not be written — is the App Group entitlement on?")
             return
@@ -85,9 +97,24 @@ enum WidgetBridge {
                let u = WidgetShare.artURL(r.id, wide: true) { try? FileManager.default.removeItem(at: u) }
         }
         prune(keeping: s.up)
-        fetchArt(for: s.up, from: art) {
+        fetchArt(for: s.up, from: art) { _ in
             WidgetCenter.shared.reloadAllTimelines()
         }
+    }
+
+    /// A row is missing art when the page gave a source for it and the file it
+    /// should have become is not there. A title with no cover at all is not
+    /// missing anything — it is a title with no cover.
+    private static func missingArt(_ rows: [WLUpNext], _ art: [String: (String, String)]) -> Bool {
+        let fm = FileManager.default
+        for r in rows {
+            let (cover, wide) = art[r.id] ?? ("", "")
+            if !cover.isEmpty, let d = WidgetShare.artURL(r.id),
+               !fm.fileExists(atPath: d.path) { return true }
+            if !wide.isEmpty, let d = WidgetShare.artURL(r.id, wide: true),
+               !fm.fileExists(atPath: d.path) { return true }
+        }
+        return false
     }
 
     /// Everything you have ever been part-way through would otherwise leave a
@@ -115,8 +142,12 @@ enum WidgetBridge {
     // ── art ──────────────────────────────────────────────────────────────────
     private static func fetchArt(for rows: [WLUpNext],
                                 from art: [String: (String, String)],
-                                done: @escaping () -> Void) {
+                                done: @escaping (Bool) -> Void) {
         let group = DispatchGroup()
+        // Touched from URLSession's queues as well as this one.
+        let lock = NSLock()
+        var wrote = false
+        let mark = { lock.lock(); wrote = true; lock.unlock() }
         var jobs: [(String, URL, CGFloat)] = []    // src, dest, longest edge
         for r in rows {
             let (cover, wide) = art[r.id] ?? ("", "")
@@ -133,16 +164,15 @@ enum WidgetBridge {
             // Data(contentsOf:) reads both schemes; only the remote one needs to
             // be off the main thread.
             if src.hasPrefix("data:") {
-                if let d = try? Data(contentsOf: url), let small = shrink(d, maxW: maxW) {
-                    try? small.write(to: dest, options: .atomic)
-                }
+                if let d = try? Data(contentsOf: url), let small = shrink(d, maxW: maxW),
+                   (try? small.write(to: dest, options: .atomic)) != nil { mark() }
                 continue
             }
             group.enter()
             URLSession.shared.dataTask(with: url) { data, _, _ in
                 defer { group.leave() }
                 guard let data, let small = shrink(data, maxW: maxW) else { return }
-                try? small.write(to: dest, options: .atomic)
+                if (try? small.write(to: dest, options: .atomic)) != nil { mark() }
             }.resume()
         }
         // The widget must be redrawn whether or not the art arrived — a title
@@ -151,7 +181,12 @@ enum WidgetBridge {
         // happens first wins: a widget reload is a budgeted resource, so the
         // slow path must not spend a second one.
         var fired = false
-        let once = { if !fired { fired = true; done() } }
+        let once = {
+            guard !fired else { return }
+            fired = true
+            lock.lock(); let got = wrote; lock.unlock()
+            done(got)
+        }
         group.notify(queue: .main) { once() }
         DispatchQueue.main.asyncAfter(deadline: .now() + 6) { once() }
     }

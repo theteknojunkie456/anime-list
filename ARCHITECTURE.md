@@ -913,6 +913,14 @@ Three rules in the code that are not obvious from reading it:
   draw the old artwork for ever), and art for titles that have fallen off the
   widget is swept, or every title you were ever part-way through leaves a cover
   behind in a container that is backed up and never cleaned.
+- **An unchanged snapshot is still allowed to fix itself.** The cheap check above
+  has a hole: art that failed to download — the phone was on a train when the
+  snapshot landed — would never be asked for again, because an identical snapshot
+  returns before the fetch and "is the file already there" is the only question
+  the fetch asks. So an unchanged snapshot still looks at the files, and refetches
+  anything a row has a source for and the container does not have. That retry
+  spends a reload only if a file actually turned up, or a permanently dead URL
+  would burn the budget once per message.
 - **A locked app has a blank widget.** `showLock()` sends `widgetclear`, which
   wipes the snapshot and the cached art. Otherwise the password is in front of a
   list anybody can read on the way past.
@@ -923,6 +931,13 @@ hr" still reading four hours at a quarter to — and refreshing often enough to 
 a string honest would spend the day's reload budget by lunchtime. The system
 redraws a relative `Text` for free. It carries the show's name too, because the
 episode being counted down is usually not the title at the top of the widget.
+
+That style prints the *size* of the gap and never its sign, which is its one
+trap: the minute an episode is out, the same line reads "Ep 12 in 5 min" about
+something that aired five minutes ago, and keeps saying it until the next
+timeline an hour later. The timeline therefore carries a second entry at the
+airing moment, which rebuilds the view as "is out" exactly then. Extra entries in
+one timeline are free; only asking for a new timeline costs a reload.
 
 Taps travel back as `watchlist://title/<id>` → `window.wlOpenTitle(id)`, which
 refuses while the app is locked and ignores an id that has since been deleted.

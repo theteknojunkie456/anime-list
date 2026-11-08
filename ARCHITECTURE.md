@@ -925,7 +925,12 @@ Three rules in the code that are not obvious from reading it:
   runs on every open, and never while the lock screen is already asking for that
   same password. It merges rather than replaces, and takes on the protection
   before `writeLocal()` so the list never lands in plain text under a key whose
-  owner set a password.
+  owner set a password. The same silence had a second form a few lines down: a
+  device whose key no longer opens the stored copy — the password was changed on
+  another device, or this key was re-minted — hit `catch{return;}` and never
+  synced again, while the panel went on reporting a healthy backup and the two
+  lists drifted apart for good. The envelope carries current wraps, so that asks
+  as well, and `askListPassword()` tries the key already held before it asks.
 - **The feed hangs off `writeLocal()`, not `save()`.** `save()` is only the path
   where *you* changed something. A cloud sync merging another device's list, a
   restore from a code or a backup, and the IndexedDB mirror stepping in at boot

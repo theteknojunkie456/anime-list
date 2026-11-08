@@ -94,6 +94,21 @@ const wrong=await ev(`(async()=>{_askedCloudPw=false;cryptoKey=null;envWraps=nul
 t('a wrong password changes nothing', wrong.titles, 0);
 t('and leaves the device unprotected rather than half-protected', wrong.key, false);
 
+// The same silence wearing a different hat: this device HOLDS a key, it just
+// isn't the one that opens what is in the cloud — the password was changed
+// somewhere else, or this key was re-minted. That returned silently too, so the
+// device never synced again and the panel went on reporting a healthy backup
+// while the two lists drifted apart for good.
+const wrongKey=await ev(`(async()=>{_askedCloudPw=false;appLocked=false;
+  cryptoKey=await crypto.subtle.generateKey({name:'AES-GCM',length:256},true,['encrypt','decrypt']);
+  envWraps=null;anime=[{id:'mine',title:'Only Here',status:'plan',kind:'watch',ep:0,upd:Date.now()}];
+  setSyncAt(0);window.__asked=0;window.__answer='hunter2';
+  await syncOnOpen();await new Promise(r=>setTimeout(r,600));
+  return {asked:window.__asked,titles:anime.map(a=>a.title).sort()};})()`);
+t('a key that does not open the cloud copy asks too', wrongKey.asked, 1);
+t('and the right password recovers it without losing local titles',
+  wrongKey.titles, ['Also On It','On The Computer','Only Here']);
+
 // The lock screen is already asking for this exact password. Two prompts for one
 // secret is how somebody ends up typing it into the wrong one.
 const locked=await ev(`(async()=>{_askedCloudPw=false;cryptoKey=null;envWraps=null;

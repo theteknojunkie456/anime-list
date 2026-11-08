@@ -9787,7 +9787,20 @@ async function syncOnOpen(){
       let arr=null;
       if(inner&&inner.v===2){
         if(!cryptoKey){offerCloudUnlock(inner,res);return;}   // ask for the password rather than give up in silence
-        try{arr=JSON.parse(await decList(inner,cryptoKey));}catch{return;} // wrong master / corrupt → leave local intact
+        try{arr=JSON.parse(await decList(inner,cryptoKey));}
+        catch{
+          // The key this device holds does not open the copy in the cloud: the
+          // password was changed on another device, or this key was re-minted.
+          // Returning silently meant the device never synced again and never
+          // said why — the panel went on reporting a healthy backup while the
+          // two lists drifted apart for good, which is the same silence as the
+          // case above wearing a different hat. The envelope carries current
+          // wraps, so the current password recovers it. Local stays untouched
+          // until somebody answers.
+          try{logProblem('sync','cloud copy would not open with this device\u2019s key','asked for the password');}catch(e){}
+          offerCloudUnlock(inner,res);
+          return;
+        }
         envWraps={pw:inner.pw||(envWraps&&envWraps.pw),rec:inner.rec||(envWraps&&envWraps.rec),pfk:inner.pfk||(envWraps&&envWraps.pfk)};
       }else if(Array.isArray(inner)){arr=inner;}
       // Somebody pressed "use this device's list everywhere" on another device.
@@ -27026,12 +27039,12 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-11-08.85',
+  v:'2026-11-08.86',
   title:'WatchList on the Home Screen',
   push:'The iPhone app has a Home Screen widget: the show you are part-way through, as its own artwork.',
   notes:[
     'The <b>iPhone app</b> has a <b>Home Screen widget</b>. Hold the Home Screen, tap <b>+</b>, search <b>WatchList</b>. It is the <b>artwork of what you are part-way through</b>, edge to edge, with a hairline across the bottom showing how far through you are \u2014 nothing else on top of it. The small size uses the cover; the wide size uses the show\u2019s banner art, so it is not a cover cropped to a letterbox. Tapping it opens that title, not the app\u2019s front door. There is a lock-screen size too, which says in words what the others say in pictures. The bar wears your theme\u2019s colour, and the whole thing goes blank the moment the app is locked, because a password in front of a list nobody can read on the Home Screen is not a password.',
-    'A device that had <b>joined a password-protected list without its password</b> showed nothing and said nothing. It pulled the backup, recognised that it was protected, could not open it, and gave up without a word \u2014 on every open. On a device that had just joined, and so had no list of its own, that is <b>zero titles, no error and nothing to tap</b>, while the list sits on the key the device is already signed in to. Typing the code by hand had always handled this properly; arriving the same place the other way did not. It now <b>asks for the password</b>, once, and opens the list when you give it.',
+    'A device that had <b>joined a password-protected list without its password</b> showed nothing and said nothing. It pulled the backup, recognised that it was protected, could not open it, and gave up without a word \u2014 on every open. On a device that had just joined, and so had no list of its own, that is <b>zero titles, no error and nothing to tap</b>, while the list sits on the key the device is already signed in to. Typing the code by hand had always handled this properly; arriving the same place the other way did not. It now <b>asks for the password</b>, once, and opens the list when you give it. The same silence had a second form: a device holding a key that <b>no longer opens</b> the stored copy \u2014 after the password was changed somewhere else, or that key was replaced \u2014 stopped syncing for good, while the panel went on reporting a healthy backup. That asks now too, and keeps whatever the device already had.',
     'Three on the widget itself. It now keeps up when your list <b>arrives from another device</b>, instead of holding yesterday\u2019s library until you happened to tick an episode \u2014 which is exactly what a phone looks like the moment it joins your computer\u2019s list. <b>Artwork that failed to download</b>, a cover you were out of signal for, is asked for again rather than leaving that title as plain type for good. And a countdown <b>flips to \u201cis out\u201d the moment the episode lands</b>; before, it could go on saying <i>in 5 min</i> about something that aired five minutes ago, for up to an hour.',
     '<b>Episode alerts had the same gap</b>, and it showed on the same day: when a list arrived from another device \u2014 a sync, a restore, joining a computer\u2019s library \u2014 every title came with its airing time and none of them got an alarm until the app was next opened. They are set from the list itself now. Two things fell out of fixing it: alerts you had <b>turned off</b> could be quietly turned back on by editing anything, and that no longer happens; and turning them <b>off and on again</b> now genuinely re-arms them rather than appearing to.',
     'The same gap again, on the browser side: the list of shows the <b>alert server watches for you</b> was refreshed when you edited something, not when a list arrived \u2014 so a browser that had just taken on another device\u2019s library left the server watching the few shows it knew about before. It follows the list now. While that was open: <b>ticking episodes all evening used to tell the server so</b>, every few seconds, although the shows it watches had not changed. It is told only when the set actually moves, which is a real saving against a daily limit this has been running into.',

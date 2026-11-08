@@ -884,7 +884,7 @@ renders whatever it finds and nothing else.
 
 ```
 index.html  nativeWidget()   ──wl──▶  WidgetBridge.accept()  ──group container──▶  WatchListWidget
-  save / applyTheme / boot              widget.json + art/            draw (no network, no list)
+  writeLocal / applyTheme / boot        widget.json + art/            draw (no network, no list)
 ```
 
 **The App Group is the one place this project uses one.** The party code travels
@@ -913,6 +913,15 @@ Three rules in the code that are not obvious from reading it:
   draw the old artwork for ever), and art for titles that have fallen off the
   widget is swept, or every title you were ever part-way through leaves a cover
   behind in a container that is backed up and never cleaned.
+- **The feed hangs off `writeLocal()`, not `save()`.** `save()` is only the path
+  where *you* changed something. A cloud sync merging another device's list, a
+  restore from a code or a backup, and the IndexedDB mirror stepping in at boot
+  all replace `anime` and call `writeLocal()` without ever going through
+  `save()` — so the widget kept drawing the old library until you happened to
+  tick an episode, which is precisely what a phone looks like in the minutes
+  after it joins your computer's list. One function means "the list on this
+  device changed", and that is the one the widget listens to. It already returns
+  early when the app is locked, which is the rule the widget wanted anyway.
 - **An unchanged snapshot is still allowed to fix itself.** The cheap check above
   has a hole: art that failed to download — the phone was on a train when the
   snapshot landed — would never be asked for again, because an identical snapshot

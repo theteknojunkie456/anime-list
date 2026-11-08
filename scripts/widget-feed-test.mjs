@@ -108,6 +108,12 @@ function contract(){
   // which is after the boot feed — so without a second feed it never arrived.
   t('the widget is fed again once offloaded art is back',
     /hydrateImages[\s\S]{0,900}?nativeWidget\(\)/.test(html), true);
+  // save() is only the path where YOU changed something. A cloud sync, a
+  // restore and the IndexedDB mirror all replace the list and call writeLocal()
+  // without going through save(), so the feed hangs off writeLocal — the one
+  // place that means "the list on this device changed".
+  t('the feed hangs off writeLocal, not save',
+    /function writeLocal\(\)[\s\S]{0,900}?nativeWidget\(\)/.test(html), true);
   t('and art for titles the widget no longer shows is swept',
     /func prune\(keeping/.test(sw) && /prune\(keeping: s\.up\)/.test(sw), true);
 }
@@ -204,6 +210,18 @@ async function native(){
     const m=window.__sent.filter(x=>x.type==='widget').pop();
     return m?m.up.find(x=>x.id==='w2').ep:null;})()`);
   t('ticking an episode moves the widget', moved, 13);
+
+  // The shape of joining the Mac's list on a fresh phone: the list is replaced
+  // wholesale and persisted, and save() is never called. Before the feed moved
+  // onto writeLocal the Home Screen kept drawing the old library until you
+  // happened to tick an episode.
+  const pulled=await ev(`(async()=>{window.__sent=[];
+    anime=anime.concat([{id:'w9',title:'Arrived By Sync',kind:'watch',status:'watching',ep:2,epTotal:13,img:''}]);
+    writeLocal();
+    await new Promise(r=>setTimeout(r,1700));
+    const m=window.__sent.filter(x=>x.type==='widget').pop();
+    return m?!!m.up.find(x=>x.id==='w9'):false;})()`);
+  t('a list that arrived by sync reaches the widget without save()', pulled, true);
 
   // A password on the app is not a password if the Home Screen shows the list.
   const locked=await ev(`(async()=>{window.__sent=[];appLocked=true;nativeWidgetClear();

@@ -962,6 +962,18 @@ Three rules in the code that are not obvious from reading it:
   and remembers it only after the POST lands, so a failed send is still retried.
   In memory rather than in storage: a reload paying for one redundant write is a
   cheaper mistake than a device that has quietly stopped publishing.
+- **And unlocking is the fourth arrival — the one that writes nothing.** A
+  protected list comes back at `finishUnlock()`, which deliberately does *not*
+  call `writeLocal()`: the ciphertext on disk is already correct, so
+  re-encrypting it there would churn the file for nothing. That made it the one
+  arrival the shared trigger could not reach, and on a device with a password it
+  is the *only* one on a cold start — so the Home Screen went on drawing the
+  list from before the password was set, and not one alarm was armed, until some
+  unrelated edit happened to save. `finishUnlock()` therefore calls
+  `nativeWidget()` and `nativeScheduleNotifs()` itself, after `hideLock()` has
+  cleared `appLocked`; before it, both would publish the empty placeholder that
+  stands in for the real list. `notifyUpdate()` was already there for the same
+  reason. `scripts/list-arrival-test.mjs` holds the whole class, including this.
 - **An unchanged snapshot is still allowed to fix itself.** The cheap check above
   has a hole: art that failed to download — the phone was on a train when the
   snapshot landed — would never be asked for again, because an identical snapshot

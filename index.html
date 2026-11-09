@@ -8635,6 +8635,16 @@ function finishUnlock(){try{rememberSessionKey();}catch(e){}hideLock();render();
   // against the empty placeholder that stands in while locked, so without this
   // the server keeps that empty snapshot and every alert stays dead until some
   // unrelated edit happens to push a good list.
+  //
+  // The widget and the episode alarms are here for the same reason, and on a
+  // protected device this is the only path that ever feeds them: both hang off
+  // writeLocal(), and unlocking writes nothing — the ciphertext on disk is
+  // already correct, so re-encrypting it here would churn the file for nothing.
+  // Without these two the list appears, the app looks entirely right, and the
+  // Home Screen goes on drawing whatever it held before the password was set
+  // while not one alarm is armed, until some unrelated edit happens to save.
+  try{nativeWidget();}catch(e){}
+  try{nativeScheduleNotifs();}catch(e){}
   try{setTimeout(notifyUpdate,400);}catch(e){}try{setTimeout(fetchCovers,600);}catch{}try{restorePlayer();}catch{}try{alBootSync();}catch{}try{if(_pendingPartyJoin){var _pc=_pendingPartyJoin;_pendingPartyJoin=null;setTimeout(function(){try{window.wlJoinParty(_pc);}catch(e){}},350);}}catch{}}
 async function tryUnlock(){                            // unlock with the password
   const i=document.getElementById('lockPw'),err=document.getElementById('lockErr');
@@ -27039,7 +27049,7 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-11-08.86',
+  v:'2026-11-08.87',
   title:'WatchList on the Home Screen',
   push:'The iPhone app has a Home Screen widget: the show you are part-way through, as its own artwork.',
   notes:[
@@ -27047,6 +27057,7 @@ const RELEASE={
     'A device that had <b>joined a password-protected list without its password</b> showed nothing and said nothing. It pulled the backup, recognised that it was protected, could not open it, and gave up without a word \u2014 on every open. On a device that had just joined, and so had no list of its own, that is <b>zero titles, no error and nothing to tap</b>, while the list sits on the key the device is already signed in to. Typing the code by hand had always handled this properly; arriving the same place the other way did not. It now <b>asks for the password</b>, once, and opens the list when you give it. The same silence had a second form: a device holding a key that <b>no longer opens</b> the stored copy \u2014 after the password was changed somewhere else, or that key was replaced \u2014 stopped syncing for good, while the panel went on reporting a healthy backup. That asks now too, and keeps whatever the device already had.',
     'Three on the widget itself. It now keeps up when your list <b>arrives from another device</b>, instead of holding yesterday\u2019s library until you happened to tick an episode \u2014 which is exactly what a phone looks like the moment it joins your computer\u2019s list. <b>Artwork that failed to download</b>, a cover you were out of signal for, is asked for again rather than leaving that title as plain type for good. And a countdown <b>flips to \u201cis out\u201d the moment the episode lands</b>; before, it could go on saying <i>in 5 min</i> about something that aired five minutes ago, for up to an hour.',
     '<b>Episode alerts had the same gap</b>, and it showed on the same day: when a list arrived from another device \u2014 a sync, a restore, joining a computer\u2019s library \u2014 every title came with its airing time and none of them got an alarm until the app was next opened. They are set from the list itself now. Two things fell out of fixing it: alerts you had <b>turned off</b> could be quietly turned back on by editing anything, and that no longer happens; and turning them <b>off and on again</b> now genuinely re-arms them rather than appearing to.',
+    'And the one place neither of those reached: a list with a <b>password</b> on it. Unlocking brings your list back without saving anything \u2014 the copy on the device is already correct \u2014 so on a phone with a password the widget went on drawing whatever it held before, and <b>not one episode alert was armed</b>, until you happened to edit something. Unlocking now counts as the list arriving, because on a protected device it is the only moment it does.',
     'The same gap again, on the browser side: the list of shows the <b>alert server watches for you</b> was refreshed when you edited something, not when a list arrived \u2014 so a browser that had just taken on another device\u2019s library left the server watching the few shows it knew about before. It follows the list now. While that was open: <b>ticking episodes all evening used to tell the server so</b>, every few seconds, although the shows it watches had not changed. It is told only when the set actually moves, which is a real saving against a daily limit this has been running into.',
     'When a device <b>joins another backup</b>, restores from a code, or opens a setup kit, it stops using the key it had \u2014 and the copy stored under that key stays in the cloud, holding a snapshot of your library, reachable only by a key the device has just stopped keeping. Nothing in the app could mention it again. <b>Cloud</b> now says it is there and offers to erase it, and the offer is all it does: nothing is deleted on its own. Before you can press it, the app asks that old key who is still backing up under it \u2014 one phone joining your computer does not speak for another phone that stayed \u2014 and names them if anyone is.',
     'Fixed on the way: leaving one of those confirmations while it was still checking could leave the <b>confirm button dead for the rest of the session</b>, for every other thing you might confirm. Every confirmation in the app shares one button, so opening one now states that button completely rather than inheriting whatever the last one left behind.',

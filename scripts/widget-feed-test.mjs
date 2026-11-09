@@ -260,6 +260,20 @@ async function native(){
   t('locking the app wipes the Home Screen', locked&&locked.cleared, true);
   t('and nothing is sent while it stays locked', locked&&locked.leaked, false);
 
+  // And the mirror of it, which was missing: unlocking has to put it back. On a
+  // device with a password this is the ONLY thing that feeds the widget on a
+  // cold start, because unlocking writes nothing — the ciphertext on disk is
+  // already correct, so there is no writeLocal() to ride in on.
+  const unlocked=await ev(`(async()=>{window.__sent=[];localStorage.setItem('notify_on','1');
+    _wgLast='';_nfLast='';appLocked=true;finishUnlock();
+    await new Promise(r=>setTimeout(r,1800));
+    const w=window.__sent.filter(x=>x.type==='widget').pop();
+    const n=window.__sent.filter(x=>x.type==='notify').pop();
+    return {w:w?w.up.length>0:false,n:!!n,open:!appLocked};})()`);
+  t('unlocking puts the Home Screen back', unlocked&&unlocked.w, true);
+  t('and arms the alarms the lock screen was holding up', unlocked&&unlocked.n, true);
+  t('and the lock is down before either is sent', unlocked&&unlocked.open, true);
+
   // The tap back the other way.
   const tap=await ev(`(()=>{detailId='';window.wlOpenTitle('w1');return detailId;})()`);
   t('a widget tap opens that title', tap, 'w1');

@@ -60,6 +60,26 @@ t('locking the app clears the remembered snapshot', /_wgLast='';clearTimeout/.te
 t('a poll set is only remembered once the send lands',
   html.indexOf('_nuLast=sig;') > html.indexOf("await fetch(NOTIFY_URL+'/update'"), true);
 
+// ── the fourth path, which writes nothing at all ────────────────────────────
+// Unlocking a protected list is an arrival like any other, but it is the one
+// that cannot hang off writeLocal(): the ciphertext on disk is already correct,
+// so unlocking deliberately writes nothing. On a device with a password that
+// makes finishUnlock() the ONLY place the widget and the alarms are ever fed on
+// a cold start — the list appears, the app looks right, and the Home Screen
+// keeps drawing the list from before the password until some unrelated edit.
+// Bounded to the function itself: the generous window body() uses would reach
+// into tryUnlock() and beyond, and a call found there would pass for one here.
+const fin=(()=>{const w=body('finishUnlock');
+  const e=w.search(/\n(async )?function /);return e<0?w:w.slice(0,e);})();
+t('unlocking feeds the widget', fin.includes('nativeWidget()'), true);
+t('unlocking arms the episode alarms', fin.includes('nativeScheduleNotifs()'), true);
+t('unlocking refreshes the poll set', fin.includes('notifyUpdate'), true);
+// hideLock() is what clears appLocked, and everything above inherits writeLocal's
+// refusal to act while locked. Feeding the widget before it would post the empty
+// placeholder that stands in for the real list.
+t('and only after the lock is actually down',
+  fin.indexOf('hideLock()') < fin.indexOf('nativeWidget()'), true);
+
 // Nothing on the alarm path ever asked whether alerts were WANTED. Before this
 // was shared with writeLocal() that was rare; after, it would have re-armed
 // alerts the owner switched off on every single edit.

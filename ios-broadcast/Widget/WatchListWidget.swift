@@ -128,8 +128,16 @@ private struct Art: View {
         // A portrait cover cropped to a medium widget is a band across
         // somebody's chin, so the wide size prefers the art that was drawn
         // wide and only falls back to the cover when a title has none.
-        if let img = WLArt.image(item.id, wide: wide) ?? WLArt.image(item.id, wide: false) {
+        if let img = WLArt.image(item.id, wide: wide) {
             Image(uiImage: img).resizable().scaledToFill()
+        } else if let cover = WLArt.image(item.id, wide: false) {
+            // The fallback IS that band, and a centred crop takes the worst part
+            // of it: a 2:3 cover filled into a 2:1 tile shows the middle third,
+            // which on a cover is the gap between a face and the title type.
+            // Anchored to the top it keeps whoever the cover is of. Only the
+            // wide size reaches here — the small one asked for the cover first.
+            Image(uiImage: cover).resizable().scaledToFill()
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         } else {
             NoArt(item: item, theme: theme)
         }

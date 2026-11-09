@@ -75,7 +75,12 @@ function contract(){
   t('nothing is stacked on the artwork but progress',
     !/UP NEXT/.test(widget) && !/LinearGradient\(colors: \[\.black/.test(widget), true);
   t('the wide size prefers the art drawn wide',
-    /wide: wide\) \?\? WLArt\.image\(item\.id, wide: false\)/.test(widget), true);
+    /if let img = WLArt\.image\(item\.id, wide: wide\)/.test(widget), true);
+  // And the cover it falls back to is cropped from the top, not the middle: a
+  // 2:3 cover filled into a 2:1 tile shows its middle third, which is the gap
+  // between a face and the title type — the band this was meant to avoid.
+  t('and a cover standing in for it is cropped from the top',
+    /wide: false\)[\s\S]{0,700}?alignment: \.top/.test(widget), true);
   t('and the bar carries its own track rather than a scrim',
     widget.includes('Color.black.opacity(0.5)') && widget.includes('ProgressStrip'), true);
   // Without this the artwork fills the tile but everything drawn ON it is inset

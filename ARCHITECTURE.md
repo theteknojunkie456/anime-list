@@ -862,7 +862,12 @@ can't.
 cover of the show you are part-way through, edge to edge, with a 3.5pt hairline
 across the bottom for how far through you are, and nothing else on top of it.
 The medium size uses the title's *banner* art rather than its cover, because a
-portrait cover cropped to a 2:1 tile is a band across somebody's chin. The
+portrait cover cropped to a 2:1 tile is a band across somebody's chin. Not
+every title has one — AniList's `bannerImage` is often null, and `bannerTried`
+marks the ones that were asked for and had none — so the medium size does fall
+back to the cover, and when it does it crops from the *top* rather than the
+middle. The middle third of a 2:3 cover is the gap between a face and the title
+type, which is the band the banner was there to avoid in the first place. The
 lock-screen rectangle is the exception: the system draws those as a vibrant
 stencil, so it says in words what the others say in pictures.
 

@@ -9290,7 +9290,13 @@ async function loadDeviceList(btn){
         // however long they wait. The honest version names the cause and the
         // one move that fixes it.
         ? 'Nothing else has backed up under this code \u2014 and it never will on its own, because this device made this code up rather than being given one. Your other devices will each have made their own. Pick whichever has the fullest list, copy ITS code, and paste that into every other device under \u201cBring another list here\u201d. They all join one backup from then on.'
-        : 'No other device has backed up here yet. Open WatchList on your other device and it will show up within a minute.');
+        // "It will show up within a minute" is false in the one case somebody is
+        // most likely to be standing in: a device that joined with "Replace what
+        // is on this device" deliberately sends nothing, so it will never appear
+        // here however long you wait — not until something on it changes. Waiting
+        // for a device that is never coming is worse than being told to go and
+        // touch it.
+        : 'No other device has backed up here yet. A device appears once it saves something of its own — so if you joined one with “Replace what is on this device”, it sends nothing until you change something there.');
     box.innerHTML='<div class="dev-list">'+rows.map(d=>_devRow(d,me)).join('')+'</div>'
       +'<p class="ai-desc" style="font-size:12px;margin-top:8px">'+note+'</p>';
   }catch(e){box.innerHTML='<p class="ai-desc">Could not reach the cloud just now.</p>';}
@@ -27049,7 +27055,7 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-11-08.87',
+  v:'2026-11-08.88',
   title:'WatchList on the Home Screen',
   push:'The iPhone app has a Home Screen widget: the show you are part-way through, as its own artwork.',
   notes:[

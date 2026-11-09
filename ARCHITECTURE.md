@@ -936,6 +936,12 @@ Three rules in the code that are not obvious from reading it:
   synced again, while the panel went on reporting a healthy backup and the two
   lists drifted apart for good. The envelope carries current wraps, so that asks
   as well, and `askListPassword()` tries the key already held before it asks.
+  A wrong answer re-asks rather than returning: spending the single prompt on
+  a typo put the device back where it started — showing nothing, with nothing
+  to tap and no route back to the question short of restarting the app, which
+  is the bug the prompt exists to fix reached through a different door. Bounded
+  at three, because the caller answering `onYes` may be a stub rather than a
+  person. Nothing typed is "not now", not a wrong answer, and does not count.
 - **The feed hangs off `writeLocal()`, not `save()`.** `save()` is only the path
   where *you* changed something. A cloud sync merging another device's list, a
   restore from a code or a backup, and the IndexedDB mirror stepping in at boot

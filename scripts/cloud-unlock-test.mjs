@@ -93,6 +93,12 @@ const wrong=await ev(`(async()=>{_askedCloudPw=false;cryptoKey=null;envWraps=nul
   return {asked:window.__asked,titles:anime.length,key:!!cryptoKey};})()`);
 t('a wrong password changes nothing', wrong.titles, 0);
 t('and leaves the device unprotected rather than half-protected', wrong.key, false);
+// A typo must not be the end of it. Spending the one chance on a mistyped
+// password left the device showing nothing with nothing to tap — which is the
+// bug this prompt exists to fix, reached through a different door. It re-asks,
+// bounded, because the thing answering here is a stub that would otherwise
+// return the same wrong secret for ever.
+t('a typo is offered another go', wrong.asked, 3);
 
 // The same silence wearing a different hat: this device HOLDS a key, it just
 // isn't the one that opens what is in the cloud — the password was changed

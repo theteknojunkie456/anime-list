@@ -12430,7 +12430,14 @@ function resumeRailHTML(items,isRead){
   // scroll forever, wrapping seamlessly at the seam (see rzLoop).
   const loop=items.length>=3;
   const cards=(loop?items.concat(items):items).map(card).join('');
-  return `<div class="rz-sec"><div class="rz-head" style="--fill:${shelfFill(items)}">Continue watching</div>
+  // The hero directly above this says "Continue watching" over one title, and
+  // this shelf said it again over a different set — the same two words a thumb
+  // apart, naming two things, which reads as the hero having fallen out of the
+  // shelf rather than as two sections. The hero keeps the phrase because it is
+  // describing what you are doing; the shelf is the queue behind it, so it is
+  // named for its place in the queue. It also happens to be the only name here
+  // that is true of a reading list as well.
+  return `<div class="rz-sec"><div class="rz-head" style="--fill:${shelfFill(items)}">Up next</div>
     <div class="rz-scroll" id="rzScroll"${loop?' data-loop="1"':''}>${cards}</div></div>`;
 }
 // Seamless infinite horizontal loop. The items are rendered twice; when the
@@ -14261,7 +14268,7 @@ function airingRailHTML(items){
 // preference can never hide someone's library.
 const HOME_SECTIONS=[
   ['spotlight','Spotlight','The big rotating hero at the top'],
-  ['resume','Continue watching','Pick up where you left off'],
+  ['resume','Up next','Pick up where you left off'],
   ['airing','Airing this week','What lands in the next 7 days'],
   ['quickpick','Not sure what to watch?','A short list when you can\u2019t decide'],
   ['friendrecs','From friends','Shows people sent you'],
@@ -27105,10 +27112,11 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-11-10.91',
+  v:'2026-11-10.92',
   title:'WatchList on the Home Screen',
   push:'The iPhone app has a Home Screen widget: the show you are part-way through, as its own artwork.',
   notes:[
+    'The home shelf under the big card is called <b>Up next</b> now. The card above it already says <i>Continue watching</i> over one title, and the shelf said the same two words again over a different set — near enough together to read as one thing broken in half rather than two. Nothing moved; only the name changed.',
     'The top of the screen used to <b>settle after it appeared</b>. The filter row and the watch/read switch are drawn by the app rather than shipped with the page, so for the first moment they had no size — the search field sat too wide and the whole list underneath started a little higher than it ended up, then dropped as they arrived. On a list with a <b>password</b> that moment was not the first moment at all: it was whenever you finished unlocking. Both now hold their place from the start, so the page you first see is the page you get.',
     '<b>Your Stats</b> had a tidy-up. The row of totals under the big number — episodes, chapters, finished, favourites — wrapped by content width, so the last one landed on a second line lining up with nothing; they sit in <b>columns</b> now, and the second row starts where the first one does. The <b>ratings chart</b> no longer draws all five bands in the same colour: it runs from dim at 1–2 to full strength at 9–10, so the shape of what you like reads before any of the numbers do. The bands are wider on a large screen, where five of them used to stop halfway across and leave the rest of the row empty. And the <b>section headings</b> were the faintest words on a long page they are supposed to lead — they are a step clearer than the data under them now.',
     'The <b>iPhone app</b> has a <b>Home Screen widget</b>. Hold the Home Screen, tap <b>+</b>, search <b>WatchList</b>. It is the <b>artwork of what you are part-way through</b>, edge to edge, with a hairline across the bottom showing how far through you are \u2014 nothing else on top of it. The small size uses the cover; the wide size uses the show\u2019s banner art, so it is not a cover cropped to a letterbox. Tapping it opens that title, not the app\u2019s front door. There is a lock-screen size too, which says in words what the others say in pictures. The bar wears your theme\u2019s colour, and the whole thing goes blank the moment the app is locked, because a password in front of a list nobody can read on the Home Screen is not a password.',

@@ -93,5 +93,32 @@ t('Cloud is not',                  bar.ids.includes('nav-cloud'),   false);
 const cloudInSettings=await ev(`(()=>{openSheet('settingsSheet');
   return /backupSheet/.test(document.getElementById('settingsSheet').innerHTML);})()`);
 t('Settings still opens Cloud',    cloudInSettings,             true);
+
+// ── controls the page ships empty still own their space ─────────────────────
+// Both are written by script into an empty container, so until that runs they
+// have no size: the search pill was drawn 94px too wide and the filter row 8px
+// tall instead of 42, and the whole list below started high and dropped as they
+// arrived. On a list with a password that is not a boot-time flicker — the
+// script runs when the password is accepted, so it happens in front of you.
+// Measured by emptying each one and re-measuring, which is the state the page
+// is actually in before render() has run.
+const held=await ev(`(()=>{
+  const seg=document.getElementById('kindSeg'), row=document.getElementById('filtRow');
+  const segFull=Math.round(seg.getBoundingClientRect().width);
+  const rowFull=Math.round(row.getBoundingClientRect().height);
+  const segHTML=seg.innerHTML, rowHTML=row.innerHTML;
+  seg.innerHTML=''; row.innerHTML='';
+  const segEmpty=Math.round(seg.getBoundingClientRect().width);
+  const rowEmpty=Math.round(row.getBoundingClientRect().height);
+  seg.innerHTML=segHTML; row.innerHTML=rowHTML;
+  return {segFull,segEmpty,rowFull,rowEmpty};})()`);
+t('the watch/read switch holds its width before it has buttons',
+  held.segEmpty===held.segFull, true);
+t('the filter row holds its height before it has segments',
+  held.rowEmpty===held.rowFull, true);
+// The reservation is worth nothing if it is not the size the control ends up.
+t('and the sizes held are the real ones',
+  held.segFull===94 && held.rowFull===42, true);
+
 console.log('\n'+pass+' passed, '+fail+' failed');
 ws.close();ch.kill();srv.kill();process.exit(fail?1:0);

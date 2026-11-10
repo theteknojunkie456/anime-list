@@ -1557,7 +1557,12 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
      sliced in half by the scroller's edge — a segmented control that cannot show
      all its segments is not one. It fills the row and the segments share the
      space instead. */
-  display:flex;gap:0;width:auto;max-width:100%;min-width:0;padding:3px;border-radius:99px;
+  /* Always exactly three segments, each 34px tall, so the row's height is 42px
+     before a single one exists. It is filled by script — and on a list with a
+     password, not until the password is entered — so an unreserved row is drawn
+     8px tall and everything below it drops 34px when the segments arrive. That
+     jump is the whole page re-seating itself under your thumb. */
+  display:flex;gap:0;width:auto;max-width:100%;min-width:0;min-height:42px;padding:3px;border-radius:99px;
   background:var(--bg2);
   border:1px solid var(--b1);
 }
@@ -1865,7 +1870,11 @@ img[data-fd="in"]{opacity:1;transition:opacity .18s ease-out;}
 .sv-store-fill{height:100%;border-radius:99px;background:linear-gradient(90deg,var(--a),var(--a2));transition:width .5s cubic-bezier(.2,.8,.2,1);}
 .sv-store-fill.warn{background:linear-gradient(90deg,#ff8b3d,var(--drp,#ff5f6b));}
 .sv-store-note{margin-top:8px;font-size:12px;color:var(--t3);line-height:1.4;}
-.sv-h{font-family:var(--fd);font-size:13px;font-weight:600;color:var(--t3);margin-bottom:8px;}
+/* These are the only way through a long panel, and they sat on the faintest
+   step of the ramp — fainter than the chip labels underneath them, so the eye
+   found the data before the question it answers. One step up the ramp, not a
+   new colour. */
+.sv-h{font-family:var(--fd);font-size:13px;font-weight:600;color:var(--t2);margin-bottom:8px;}
 .sv-bar{display:flex;align-items:center;gap:10px;padding:11px 0;cursor:pointer;border-top:1px solid var(--bn2);min-height:44px;}
 .sv-bar:first-child{border-top:none;}
 .sv-bar .lbl{font-size:13px;font-weight:700;color:var(--t1);width:96px;flex-shrink:0;display:flex;align-items:center;gap:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
@@ -1910,8 +1919,14 @@ img[data-fd="in"]{opacity:1;transition:opacity .18s ease-out;}
   text-shadow:0 2px 20px var(--glow);}
 .sv-big-u{font-size:17px;font-weight:800;letter-spacing:-.2px;color:var(--t2);margin-left:6px;}
 .sv-big-sub{font-size:13px;font-weight:600;color:var(--t2);margin-top:6px;}
-.sv-mini{display:flex;gap:18px;margin-top:16px;flex-wrap:wrap;}
-.sv-mini div{display:flex;flex-direction:column;gap:2px;}
+/* Five numbers in a wrapping flex row sized themselves by their own content,
+   so the fifth dropped onto a second line and began nowhere near the first
+   number above it — four tidy figures and one loose one, which reads as a
+   layout that gave up rather than one that wrapped. A grid wraps too, but the
+   second row starts in the same column as the first. */
+.sv-mini{display:grid;grid-template-columns:repeat(auto-fit,minmax(92px,1fr));
+  gap:14px 18px;margin-top:16px;}
+.sv-mini div{display:flex;flex-direction:column;gap:2px;min-width:0;}
 .sv-mini b{font-family:var(--fd);font-size:21px;font-weight:800;letter-spacing:-.6px;color:var(--t1);line-height:1;}
 .sv-mini span{font-size:10px;font-weight:700;color:var(--t3);letter-spacing:.03em;text-transform:uppercase;}
 
@@ -1957,6 +1972,12 @@ img[data-fd="in"]{opacity:1;transition:opacity .18s ease-out;}
   transition:bottom .8s cubic-bezier(.2,1,.3,1);}
 .sv-col .bar{width:100%;border-radius:10px 10px 0 0;background:linear-gradient(180deg,var(--a2),var(--a));
   height:0;transition:height .8s cubic-bezier(.2,1,.3,1),filter .16s;}
+/* Five bars in one accent tell you how many, never which. The rating bands run
+   worst to best, so the colour can carry that: the band is dimmer at 1-2 and
+   full strength at 9-10, which is readable before a single number is. Only the
+   ratings chart gets it — months have an order but not a better and a worse,
+   and shading them would be inventing a result. */
+.sv-hist.ramp .sv-col .bar{opacity:calc(.52 + var(--t,1) * .48);}
 .sv-col.dim .bar{height:0!important;}
 .sv-col:active .bar{filter:brightness(1.25);}
 .sv-col .cn{font-family:var(--fd);font-size:13px;font-weight:800;color:var(--t2);line-height:1;pointer-events:none;}
@@ -4529,7 +4550,12 @@ body.recsel .pcard{position:relative;}
      as the heading above it — centred, the chart floated away from the words
      that introduce it and the pair stopped looking related. */
   .sv-hist{justify-content:flex-start;}
-  .sv-col{max-width:92px;}
+  /* 92px left the five rating bands filling little over half the column, with
+     the rest of the row empty — the chart read as cut off rather than capped.
+     116 fills ~70% and is still a bar rather than a billboard. The twelve-month
+     chart divides to 65px and never reaches the cap, so this only moves the
+     chart that needed it. */
+  .sv-col{max-width:116px;}
   /* The ring, and the numbers explaining it, within reading distance of each
      other. Given the full column the count ended up four hundred pixels from
      the label it belonged to. */
@@ -4567,7 +4593,12 @@ body.recsel .pcard{position:relative;}
 @media(prefers-reduced-motion:reduce){.lfx{display:none;}}
 
 /* ── KIND VIEW SWITCH (Watch / Read) — docked beside the search field ── */
-.kind-seg{display:flex;gap:2px;flex-shrink:0;padding:3px;border-radius:14px;background:var(--bg3);border:1px solid var(--bn);}
+/* Both of this control's buttons are fixed-size icons, so its width is known
+   before it has any: 2x42 + 2 gap + 6 padding + 2 border. It ships empty and is
+   filled by script, and the search pill beside it is flex:1 — so without the
+   reservation the pill is drawn 94px too wide, then snaps narrower the moment
+   the buttons land. Holding the space costs nothing and the row never twitches. */
+.kind-seg{display:flex;gap:2px;flex-shrink:0;min-width:94px;padding:3px;border-radius:14px;background:var(--bg3);border:1px solid var(--bn);}
 .kseg{
   width:42px;height:40px;border-radius:10px;
   display:flex;align-items:center;justify-content:center;
@@ -24937,8 +24968,8 @@ function renderStats(){
     items:anime.filter(a=>{const v=+a.rating||0;return v>=lo&&v<=hi&&v>0;})
   }));
   const maxR=Math.max(1,...rd.map(x=>x.items.length));
-  const hist=rated.length?'<div class="sv-hist">'+rd.map(x=>
-      '<div class="sv-col'+(x.items.length?'':' dim')+'" onclick="svDrill(\'r-'+x.r+'\',this)">'+
+  const hist=rated.length?'<div class="sv-hist ramp">'+rd.map((x,i)=>
+      '<div class="sv-col'+(x.items.length?'':' dim')+'" style="--t:'+(i/(RBANDS.length-1)).toFixed(3)+'" onclick="svDrill(\'r-'+x.r+'\',this)">'+
         '<div class="barbox"><div class="cn" style="bottom:'+Math.round(x.items.length/maxR*100)+'%">'+x.items.length+'</div>'+
         '<div class="bar" data-h="'+Math.round(x.items.length/maxR*100)+'"></div></div>'+
         '<div class="cl">'+x.r+'</div></div>').join('')+'</div>'+
@@ -27074,10 +27105,12 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-11-09.90',
+  v:'2026-11-10.91',
   title:'WatchList on the Home Screen',
   push:'The iPhone app has a Home Screen widget: the show you are part-way through, as its own artwork.',
   notes:[
+    'The top of the screen used to <b>settle after it appeared</b>. The filter row and the watch/read switch are drawn by the app rather than shipped with the page, so for the first moment they had no size — the search field sat too wide and the whole list underneath started a little higher than it ended up, then dropped as they arrived. On a list with a <b>password</b> that moment was not the first moment at all: it was whenever you finished unlocking. Both now hold their place from the start, so the page you first see is the page you get.',
+    '<b>Your Stats</b> had a tidy-up. The row of totals under the big number — episodes, chapters, finished, favourites — wrapped by content width, so the last one landed on a second line lining up with nothing; they sit in <b>columns</b> now, and the second row starts where the first one does. The <b>ratings chart</b> no longer draws all five bands in the same colour: it runs from dim at 1–2 to full strength at 9–10, so the shape of what you like reads before any of the numbers do. The bands are wider on a large screen, where five of them used to stop halfway across and leave the rest of the row empty. And the <b>section headings</b> were the faintest words on a long page they are supposed to lead — they are a step clearer than the data under them now.',
     'The <b>iPhone app</b> has a <b>Home Screen widget</b>. Hold the Home Screen, tap <b>+</b>, search <b>WatchList</b>. It is the <b>artwork of what you are part-way through</b>, edge to edge, with a hairline across the bottom showing how far through you are \u2014 nothing else on top of it. The small size uses the cover; the wide size uses the show\u2019s banner art, so it is not a cover cropped to a letterbox. Tapping it opens that title, not the app\u2019s front door. There is a lock-screen size too, which says in words what the others say in pictures. The bar wears your theme\u2019s colour, and the whole thing goes blank the moment the app is locked, because a password in front of a list nobody can read on the Home Screen is not a password.',
     'A device that had <b>joined a password-protected list without its password</b> showed nothing and said nothing. It pulled the backup, recognised that it was protected, could not open it, and gave up without a word \u2014 on every open. On a device that had just joined, and so had no list of its own, that is <b>zero titles, no error and nothing to tap</b>, while the list sits on the key the device is already signed in to. Typing the code by hand had always handled this properly; arriving the same place the other way did not. It now <b>asks for the password</b>, once, and opens the list when you give it. The same silence had a second form: a device holding a key that <b>no longer opens</b> the stored copy \u2014 after the password was changed somewhere else, or that key was replaced \u2014 stopped syncing for good, while the panel went on reporting a healthy backup. That asks now too, and keeps whatever the device already had. And a <b>password typed wrong</b> no longer ends it: the prompt comes back, the way the lock screen always has, instead of spending its one chance on a typo and leaving you back at nothing to tap.',
     'Three on the widget itself. It now keeps up when your list <b>arrives from another device</b>, instead of holding yesterday\u2019s library until you happened to tick an episode \u2014 which is exactly what a phone looks like the moment it joins your computer\u2019s list. <b>Artwork that failed to download</b>, a cover you were out of signal for, is asked for again rather than leaving that title as plain type for good. And a countdown <b>flips to \u201cis out\u201d the moment the episode lands</b>; before, it could go on saying <i>in 5 min</i> about something that aired five minutes ago, for up to an hour.',

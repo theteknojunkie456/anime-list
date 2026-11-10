@@ -836,3 +836,42 @@ quotes, angle brackets and whitespace, so a friend's cover URL cannot break out
 of the attribute it lands in.
 
 **Links.** Every `target="_blank"` carries `rel="noopener"`.
+
+## A control the page does not ship with still owns its space
+
+The filter segments, the watch/read switch and the sort button are all written
+into empty containers by script. Until that script runs, each one is a box with
+no content and therefore no size — so the search field beside the switch was
+drawn 94px too wide, the filter row was 8px tall instead of 42, and everything
+below the header started high and dropped as the controls arrived.
+
+This is not a boot-time curiosity. On a list with a password the script runs
+when the password is accepted, which can be a long way into the session, so the
+drop happens in front of you rather than before you look.
+
+Both are reserved in CSS now: `min-width:94px` on `.kind-seg` (two fixed-size
+icon buttons, 2×42 + 2 gap + 6 padding + 2 border — a width that is known before
+the buttons exist) and `min-height:42px` on `.filt-row` (always exactly three
+34px segments inside 3px of padding and a hairline). **Any control the page
+ships empty and fills later needs the same treatment**, and the rule for finding
+them is that the final size has to be derivable from the design rather than from
+the data: a fixed number of fixed-size children, not a list.
+
+## A distribution may carry its own direction
+
+The rating histogram drew all five bands in the accent, which says how many and
+never which. The bands run worst to best, so `.sv-hist.ramp` fades the bar by
+its position (`opacity: .52 + t × .48`, `--t` set per column) and the shape of
+someone's taste is legible before a single number is read.
+
+It is opt-in by class for a reason. The twelve-month chart next to it has an
+order too, but not a better and a worse, and shading it would be the chart
+inventing a result — the same trap as crowning a top genre when the top two are
+level. **A ramp needs a quantity that genuinely ranges, not merely a sequence.**
+
+Alongside it: `.sv-col` is capped so a three-band chart does not draw
+billboards, and the cap was low enough (92px) that five bands stopped a little
+past halfway across the 860px reading column and left the rest of the row empty,
+which reads as a chart cut off rather than a chart capped. 116px fills about
+70%. The twelve-month chart divides to 65px and never reaches the cap, so the
+number only moves the chart that needed it.

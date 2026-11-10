@@ -170,10 +170,35 @@ const wide=await ev(`(()=>{
           keyRun:Math.round(key.getBoundingClientRect().width)};})()`);
 t('the column stops before it runs the width of the window', wide.sec<=860, true);
 t('…and is centred in it', wide.centred, true);
-t('a rating bar stays a bar, not a slab', wide.col<=92, true);
+// The cap moved 92 -> 116 deliberately: at 92 the five rating bands filled a
+// little over half the 860px reading column and left the rest of the row
+// empty, which reads as a chart cut off rather than a chart capped. The
+// bound is still the point of this row — the failure it was written against
+// was a 280px slab, and 116 is nowhere near it.
+t('a rating bar stays a bar, not a slab', wide.col<=116, true);
 t('the chart lines up with the words above it', wide.alignedToHeading, true);
 t('the ring keeps its legend within reading distance', wide.ring<=520, true);
 await cmd('Emulation.clearDeviceMetricsOverride');
+
+// ── the rating bands carry the rating ───────────────────────────────────────
+// Five bars in one accent say how many and never which. The bands run worst to
+// best, so the bar fades with its position — and the months beside them must
+// NOT, because a month has an order but not a better and a worse, and shading
+// one would be the chart inventing a result.
+const ramp=await ev(`(()=>{const h=[...document.querySelectorAll('.sv-hist')];
+  const r=h.find(x=>x.classList.contains('ramp')), plain=h.find(x=>!x.classList.contains('ramp'));
+  const op=e=>+getComputedStyle(e.querySelector('.bar')).opacity;
+  const cols=r?[...r.children]:[];
+  return {ramped:!!r, months:!!plain,
+    rises: cols.length>1 && cols.every((c,i)=>i===0||op(c)>op(cols[i-1])),
+    worst: cols.length?+op(cols[0]).toFixed(2):0,
+    best:  cols.length?+op(cols[cols.length-1]).toFixed(2):0,
+    flatMonths: plain?[...plain.children].every(c=>op(c)===1):false};})()`);
+t('the ratings chart is the one that ramps', ramp.ramped, true);
+t('every band is brighter than the one below it', ramp.rises, true);
+t('the worst band is dimmed, not hidden', ramp.worst>=.5&&ramp.worst<.6, true);
+t('the best band is at full strength', ramp.best, 1);
+t('the months are left alone', ramp.flatMonths, true);
 
 // ── and in Retro ────────────────────────────────────────────────────────────
 // Every other screen takes the notch and the lit edge. This one was rebuilt

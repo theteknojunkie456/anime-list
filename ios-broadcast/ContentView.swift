@@ -418,7 +418,9 @@ struct WatchListShell: UIViewRepresentable {
                 AppGroup.partyOn(true)
                 DispatchQueue.main.async { self.broadcaster.start() }
             case "notify":
-                if let items = body["items"] as? [[String: Any]] { Notifier.schedule(items) }
+                if let items = body["items"] as? [[String: Any]] {
+                    Notifier.schedule(items, hideTitles: (body["hide"] as? Bool) ?? false)
+                }
             // The Home Screen widget's whole supply of truth. The page decides
             // what is worth showing; this side only stores it and redraws.
             case "widget":
@@ -643,7 +645,13 @@ enum Notifier {
     // the hour is only the fallback for a source with no track record yet.
     static let subLagDefault: TimeInterval = 3600
     static let subLagMax: TimeInterval = 6 * 3600
-    static func schedule(_ items: [[String: Any]]) {
+    /// `hideTitles` is on when the list has a password. The Home Screen widget is
+    /// already blanked while the app is locked, because a password in front of a
+    /// list anybody can read on the way past is not a password — and an alert
+    /// naming the show is that same list, printed on the lock screen, by the part
+    /// of the app nobody thought to ask. The alert still fires: what is dropped is
+    /// the name, not the alarm, so a phone that is never opened still buzzes.
+    static func schedule(_ items: [[String: Any]], hideTitles: Bool = false) {
         let c = UNUserNotificationCenter.current()
         c.removeAllPendingNotificationRequests()
         let now = Date().timeIntervalSince1970
@@ -657,11 +665,17 @@ enum Notifier {
             if at <= now + 60 || scheduled >= 60 { continue }   // future only; iOS caps ~64 pending
             let ep = (it["ep"] as? Int) ?? (it["ep"] as? NSNumber)?.intValue ?? 0
             let content = UNMutableNotificationContent()
-            content.title = title
+            content.title = hideTitles ? "Something on your list" : title
             content.body = ep > 0 ? "Episode \(ep) is out now" : "A new episode is out now"
             content.sound = .default
             let trigger = UNTimeIntervalNotificationTrigger(timeInterval: at - now, repeats: false)
-            c.add(UNNotificationRequest(identifier: "wl-\(title)-\(ep)", content: content, trigger: trigger))
+            // The identifier was built from the title, which is fine until every
+            // title is the same word: adding a request with an identifier already
+            // pending REPLACES it, so sixty anonymised alerts would have collapsed
+            // into one and the privacy fix would have quietly cost the feature.
+            // The whole set is rebuilt from scratch every time, so a counter is
+            // all the uniqueness this ever needed.
+            c.add(UNNotificationRequest(identifier: "wl-\(scheduled)", content: content, trigger: trigger))
             scheduled += 1
         }
     }

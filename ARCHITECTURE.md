@@ -973,6 +973,21 @@ Three rules in the code that are not obvious from reading it:
   and remembers it only after the POST lands, so a failed send is still retried.
   In memory rather than in storage: a reload paying for one redundant write is a
   cheaper mistake than a device that has quietly stopped publishing.
+- **A password hides the alert titles, not the alerts.** `showLock()` blanks the
+  widget because a password in front of a list anybody can read on the way past
+  is not a password — and an episode alert naming the show was that same list on
+  that same lock screen, from the one part of the app nobody had asked. The page
+  sends `hide` with the `notify` payload (from `encEnabled()`, and inside the
+  signature, or turning the password on would re-arm nothing), and the shell
+  draws "Something on your list" instead of the name. The *alarm* is untouched,
+  so a phone that is never opened still buzzes; cancelling them on lock would
+  have closed the leak by removing the feature. The flag rather than a blanked
+  title on the page is what lets this ship before the build that acts on it: an
+  older shell ignores `hide` and behaves exactly as it did.
+  `UNNotificationRequest` identifiers moved from the title to a counter at the
+  same time and for the same reason — adding a request whose identifier is
+  already pending *replaces* it, so sixty alerts all titled the same word would
+  have collapsed into one.
 - **And unlocking is the fourth arrival — the one that writes nothing.** A
   protected list comes back at `finishUnlock()`, which deliberately does *not*
   call `writeLocal()`: the ciphertext on disk is already correct, so

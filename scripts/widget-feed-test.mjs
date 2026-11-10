@@ -38,6 +38,17 @@ function contract(){
   for(const k of ['a','bg','bg2','t1','t2'])
     t('the theme’s "'+k+'" is read', sw.includes('th["'+k+'"]'), true);
 
+  // A password on the list blanks the Home Screen. An alert that names the show
+  // is that same list on that same lock screen, put there by the part of the app
+  // nobody thought to ask. The name goes; the alarm stays.
+  t('the shell is told when the titles are to be hidden', cv.includes('body["hide"]'), true);
+  t('and an alert with no name still says something', /hideTitles \? "Something on your list"/.test(cv), true);
+  // Adding a request whose identifier is already pending REPLACES it, so sixty
+  // alerts all titled the same word would have collapsed into one — the privacy
+  // fix quietly costing the feature it was protecting.
+  t('anonymised alerts do not collapse into one',
+    cv.includes('identifier: "wl-\\(scheduled)"') && !cv.includes('identifier: "wl-\\(title)'), true);
+
   t('both messages the page can send are handled', ['case "widget":','case "widgetclear":'].every(x=>cv.includes(x)), true);
   t('a widget tap calls back into the page', cv.includes('window.wlOpenTitle') && html.includes('window.wlOpenTitle='), true);
   t('and the page registers the scheme that carries it',
@@ -264,6 +275,25 @@ async function native(){
     appLocked=false;return {cleared,leaked};})()`);
   t('locking the app wipes the Home Screen', locked&&locked.cleared, true);
   t('and nothing is sent while it stays locked', locked&&locked.leaked, false);
+
+  // The page's half: the flag travels, and it travels in the signature too —
+  // otherwise setting a password would change nothing until something else did.
+  const hid=await ev(`(async()=>{localStorage.setItem('notify_on','1');
+    localStorage.setItem(ENCFLAG,'1');window.__sent=[];
+    const a=anime.find(x=>x.id==='w8');a.airAt=Math.floor(Date.now()/1000)+9000;writeLocal();
+    await new Promise(r=>setTimeout(r,1800));
+    const m=window.__sent.filter(x=>x.type==='notify').pop();
+    const named=m?m.items.some(i=>i.title==='Arrived With An Air Date'):false;
+    return {hide:m?m.hide:null,named};})()`);
+  t('a password on the list hides the alert titles', hid&&hid.hide, true);
+  // The real title still crosses, because only the shell can decide what to draw
+  // and an older build has to go on working. Nothing names the show on screen.
+  t('and the page still sends what the shell needs', hid&&hid.named, true);
+  const reArm=await ev(`(async()=>{window.__sent=[];localStorage.removeItem(ENCFLAG);
+    writeLocal();await new Promise(r=>setTimeout(r,1800));
+    const m=window.__sent.filter(x=>x.type==='notify').pop();
+    return m?m.hide:null;})()`);
+  t('taking the password off re-arms them in the open', reArm, false);
 
   // And the mirror of it, which was missing: unlocking has to put it back. On a
   // device with a password this is the ONLY thing that feeds the widget on a

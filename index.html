@@ -17127,10 +17127,17 @@ function _nativeNotifsNow(){
       .map(a=>({title:a.title,at:a.airAt,ep:a.airEp||0,lag:subLagMins(itemHost(a))*60}));
     upcomingRelated().forEach(r=>{if(r.airAt&&r.airAt>now)_list.push({title:r.title,at:r.airAt,ep:r.airEp||0,lag:subLagMins(itemHost(r))*60});});
     const items=_list.sort((x,y)=>x.at-y.at).slice(0,60);
-    const sig=JSON.stringify(items);
+    // A password on the list takes the titles off the Home Screen already. An
+    // alert that names the show is the same list on the same lock screen, so it
+    // travels with a flag rather than with the name removed here: an older build
+    // ignores the flag and behaves exactly as it did, which is what lets this
+    // ship before the build that acts on it. The alarm still fires either way.
+    const hide=(()=>{try{return encEnabled();}catch(e){return false;}})();
+    // In the signature, or turning the password on would not re-arm anything.
+    const sig=JSON.stringify([hide,items]);
     if(sig===_nfLast)return;        // nothing moved: do not rebuild sixty alarms
     _nfLast=sig;
-    window.webkit.messageHandlers.wl.postMessage({type:'notify',items});
+    window.webkit.messageHandlers.wl.postMessage({type:'notify',items,hide});
   }catch(e){}
 }
 // ── THE HOME SCREEN WIDGET ───────────────────────────────────────
@@ -27067,7 +27074,7 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-11-08.89',
+  v:'2026-11-09.90',
   title:'WatchList on the Home Screen',
   push:'The iPhone app has a Home Screen widget: the show you are part-way through, as its own artwork.',
   notes:[
@@ -27075,6 +27082,7 @@ const RELEASE={
     'A device that had <b>joined a password-protected list without its password</b> showed nothing and said nothing. It pulled the backup, recognised that it was protected, could not open it, and gave up without a word \u2014 on every open. On a device that had just joined, and so had no list of its own, that is <b>zero titles, no error and nothing to tap</b>, while the list sits on the key the device is already signed in to. Typing the code by hand had always handled this properly; arriving the same place the other way did not. It now <b>asks for the password</b>, once, and opens the list when you give it. The same silence had a second form: a device holding a key that <b>no longer opens</b> the stored copy \u2014 after the password was changed somewhere else, or that key was replaced \u2014 stopped syncing for good, while the panel went on reporting a healthy backup. That asks now too, and keeps whatever the device already had. And a <b>password typed wrong</b> no longer ends it: the prompt comes back, the way the lock screen always has, instead of spending its one chance on a typo and leaving you back at nothing to tap.',
     'Three on the widget itself. It now keeps up when your list <b>arrives from another device</b>, instead of holding yesterday\u2019s library until you happened to tick an episode \u2014 which is exactly what a phone looks like the moment it joins your computer\u2019s list. <b>Artwork that failed to download</b>, a cover you were out of signal for, is asked for again rather than leaving that title as plain type for good. And a countdown <b>flips to \u201cis out\u201d the moment the episode lands</b>; before, it could go on saying <i>in 5 min</i> about something that aired five minutes ago, for up to an hour.',
     '<b>Episode alerts had the same gap</b>, and it showed on the same day: when a list arrived from another device \u2014 a sync, a restore, joining a computer\u2019s library \u2014 every title came with its airing time and none of them got an alarm until the app was next opened. They are set from the list itself now. Two things fell out of fixing it: alerts you had <b>turned off</b> could be quietly turned back on by editing anything, and that no longer happens; and turning them <b>off and on again</b> now genuinely re-arms them rather than appearing to.',
+    'A <b>password on your list</b> takes the titles off the Home Screen \u2014 and left them on the <b>lock screen</b>. An episode alert named the show, which is the same list in the same place, put there by the one part of the app nobody had asked. The alert still arrives, and still says which episode; what it no longer says is <b>which show</b>. Nothing changes for anyone without a password set.',
     'And the one place neither of those reached: a list with a <b>password</b> on it. Unlocking brings your list back without saving anything \u2014 the copy on the device is already correct \u2014 so on a phone with a password the widget went on drawing whatever it held before, and <b>not one episode alert was armed</b>, until you happened to edit something. Unlocking now counts as the list arriving, because on a protected device it is the only moment it does.',
     'The same gap again, on the browser side: the list of shows the <b>alert server watches for you</b> was refreshed when you edited something, not when a list arrived \u2014 so a browser that had just taken on another device\u2019s library left the server watching the few shows it knew about before. It follows the list now. While that was open: <b>ticking episodes all evening used to tell the server so</b>, every few seconds, although the shows it watches had not changed. It is told only when the set actually moves, which is a real saving against a daily limit this has been running into.',
     'When a device <b>joins another backup</b>, restores from a code, or opens a setup kit, it stops using the key it had \u2014 and the copy stored under that key stays in the cloud, holding a snapshot of your library, reachable only by a key the device has just stopped keeping. Nothing in the app could mention it again. <b>Cloud</b> now says it is there and offers to erase it, and the offer is all it does: nothing is deleted on its own. Before you can press it, the app asks that old key who is still backing up under it \u2014 one phone joining your computer does not speak for another phone that stayed \u2014 and names them if anyone is.',

@@ -99,13 +99,24 @@ const back=await ev(`(async()=>{
   return {empty,count:Object.keys(now).length===Object.keys(was).length,differ,
           img:await idbGet('a:img'),
           list:JSON.parse(now['animelist_v4']||'[]').map(x=>x.title).sort(),
-          code:now['sync_animelist_v4'],device:now['wl_device'],seen:now['wl_adopt_seen']};})()`);
+          code:now['sync_animelist_v4'],device:now['wl_device'],seen:now['wl_adopt_seen'],
+          wasKeys:JSON.stringify(was),nowKeys:JSON.stringify(now)};})()`);
 t('the device really was emptied first', back.empty, {keys:0,imgs:0});
-t('every key comes back', back.count, true);
-t('…with every value identical', back.differ, []);
+// Everything comes back EXCEPT the device's identity, which is the one thing in
+// the file that must not: restoring it makes this machine claim to be the
+// machine the file came from, the cloud keeps one backup per device, and the
+// two then overwrite each other instead of merging. See fullCopyWrite.
+t('everything comes back but the identity', back.count, false);
+t('…and the identity is the only thing missing',
+  Object.keys(JSON.parse(back.wasKeys)).filter(k=>!(k in JSON.parse(back.nowKeys))), ['wl_device']);
+t('…with every other value identical', back.differ.filter(k=>k!=='wl_device'), []);
 t('the list is the list', back.list, ['Monster','Vinland Saga']);
 t('the cloud key comes back', back.code, 'ABCDEFGHIJKLMNOPQRST');
-t('the device is itself again', back.device, 'thisdevice1234');
+// Absent rather than blank: wlDevice() mints only when the key is MISSING, so
+// an empty string would leave the machine with no identity instead of a new one.
+t('the restored machine does not take the other one\u2019s identity', back.device, undefined);
+t('…and mints one of its own when next asked',
+  await ev(`(()=>{const d=wlDevice();return !!d&&d!=='thisdevice1234';})()`), true);
 t('…including which decisions it had already applied', back.seen, '1762200000000');
 t('and the artwork is back', back.img, 'data:image/png;base64,AAAA');
 

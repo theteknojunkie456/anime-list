@@ -7245,14 +7245,40 @@ async function fullCopyChosen(input){
 // than a second copy of it written in the test. Everything above it is deciding
 // whether to restore; this is the restoring.
 async function fullCopyWrite(o){
+  // The one thing in the file that must NOT come back: wl_device, this copy's
+  // device identity. It rides in twice — as a plain key, and inside the
+  // __creds__ bundle in media — and restoring it makes the machine doing the
+  // restoring claim to BE the machine the file came from.
+  //
+  // That is not a cosmetic duplicate in the device list. The cloud keeps one
+  // snapshot per device id, so from that moment the two machines stop merging
+  // and start replacing each other: whichever saves last wins, and an edit made
+  // on the other one is silently undone the next time it syncs. Marking a title
+  // finished and finding it back where it was, an hour later, with no error and
+  // nothing to tap, is this.
+  //
+  // So the identity is dropped and a new one is minted on the next wlDevice()
+  // call. The honest cost is that restoring onto a replacement machine leaves
+  // the dead machine's row in the picker until it is cleared — a stale row
+  // somebody can read and ignore, against a live list quietly fighting itself.
+  // That trade is not close.
+  const local=Object.assign({},o.local||{});
+  delete local[NET_KEY];
+  const media=Object.assign({},o.media||{});
+  if(typeof media[IDB_CRED_KEY]==='string'){
+    try{
+      const c=JSON.parse(media[IDB_CRED_KEY]);
+      if(c&&c.v&&typeof c.v==='object'){ delete c.v[NET_KEY]; media[IDB_CRED_KEY]=JSON.stringify(c); }
+    }catch(e){ delete media[IDB_CRED_KEY]; }   // unreadable: drop it rather than restore an identity blind
+  }
   // Writing a key schedules a push. Restoring a few hundred would queue a few
   // hundred, each one racing the reload with a half-restored device.
   withoutPush(()=>{
     try{localStorage.clear();}catch(e){}
-    for(const k in o.local){ if(typeof o.local[k]==='string'){try{localStorage.setItem(k,o.local[k]);}catch(e){}} }
+    for(const k in local){ if(typeof local[k]==='string'){try{localStorage.setItem(k,local[k]);}catch(e){}} }
   });
-  if(o.media&&typeof o.media==='object'){
-    for(const k in o.media){ if(typeof o.media[k]==='string'){try{await idbSet(k,o.media[k]);}catch(e){}} }
+  if(media&&typeof media==='object'){
+    for(const k in media){ if(typeof media[k]==='string'){try{await idbSet(k,media[k]);}catch(e){}} }
   }
   return true;
 }
@@ -9822,9 +9848,77 @@ async function syncPull(){
   const r=await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({op:'pull',code})});
   return await r.json();
 }
+// Two machines cannot be one machine. A device restored from another device's
+// full copy used to wake up holding that device's identity, and the pair then
+// shared ONE cloud snapshot — so they stopped merging and started overwriting,
+// and an edit made on one was undone the next time the other synced. The restore
+// no longer carries the identity, but that does nothing for the devices already
+// paired up wrongly, which cannot be repaired by hand: wlDevice() only mints
+// when the key is ABSENT, so re-joining, re-pairing and restoring all keep the
+// id the device already has.
+//
+// The roster is what gives it away. Every push stamps the row with the pushing
+// device's own name, so a row carrying MY id under somebody ELSE'S name means
+// that somebody is pushing as me. The names are derived from the platform and
+// never change on their own, so a mismatch is the clash and not a rename.
+//
+// The cure is to stop being them. A device id is a label on a backup, not a
+// claim on the list — the list belongs to the code — so taking a fresh one
+// costs nothing and loses nothing. It runs before the pull, because the pull is
+// the step that would otherwise hand this device the other one's list again.
+async function healDeviceClash(){
+  try{
+    const code=syncCode(); if(!code)return false;
+    try{if(localStorage.getItem('wl_id_healed'))return false;}catch(e){}
+    const mine=wlDevice(), label=deviceLabel(); if(!label)return false;
+    // Nothing here may hold up syncing. This is a check on a label, and the
+    // thing behind it is the user's list — so if the roster does not answer
+    // promptly the repair waits for another open and the pull goes ahead now.
+    // Written as a race because an unreachable worker does not fail, it simply
+    // never answers, and an await on that is a device that silently stops
+    // syncing for good: the exact shape of outage this app has shipped before.
+    const r=await Promise.race([
+      syncDevices(code).catch(()=>null),
+      new Promise(res=>setTimeout(()=>res(null),4000)),
+    ]);
+    if(!r||!r.ok||!Array.isArray(r.devices))return false;
+    const row=r.devices.find(d=>d&&d.id===mine);
+    if(!row||!row.name||row.name===label)return false;
+    // Once, ever. The test is a good signal and not a proof: deviceLabel() reads
+    // IS_NATIVE, and anything that makes this device describe itself differently
+    // for one open would otherwise have it mint a new id on every open and bury
+    // the picker in rows for one machine. A clash is a thing that happened TO a
+    // device once, so the cure is allowed to fire once; if it ever misfires the
+    // cost is one spare row, not a device that churns.
+
+    // Writing a key schedules a push, and a push from in here lands BEFORE the
+    // pull that syncOnOpen is about to do — with whatever this device happens to
+    // be holding, which during a join is a list that is not yet an envelope.
+    // That is how this first went out: an identity repair quietly publishing
+    // plaintext over an encrypted copy. The identity is this device's own note
+    // to itself and nothing else needs telling, so it is written with the push
+    // suppressed and the ordinary sync that follows carries it.
+    withoutPush(()=>{
+      try{localStorage.setItem('wl_id_healed','1');}catch(e){}
+      try{localStorage.setItem(NET_KEY,'d'+Math.random().toString(36).slice(2)+Date.now().toString(36));}catch(e){}
+    });
+    try{mirrorCreds();}catch(e){}
+    // Said out loud, because the symptom was the app undoing the user's work and
+    // nobody could have guessed why from the inside.
+    toast('This device was sharing an ID with another one — it has its own now');
+    return true;
+  }catch(e){ return false; }
+}
 async function syncOnOpen(){
   if(!syncCode()||appLocked)return;
   try{
+    // Deliberately NOT awaited. Syncing is the user's list; this is a check on a
+    // label, and the first must never wait on the second — an await here on a
+    // worker that does not answer is a device that silently stops syncing for
+    // good. If it does find a clash it re-runs this, so the pull that matters
+    // happens again under the new identity a moment later. It can only fire
+    // once per device, so that second run cannot start a third.
+    try{healDeviceClash().then(did=>{if(did){try{syncOnOpen();}catch(e){}}});}catch(e){}
     const res=await syncPull();
     // A code whose cloud copy is empty is not a backup, however healthy it looks
     // in Settings. That happens after a mint that never got a successful push,
@@ -27127,10 +27221,11 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-11-10.93',
+  v:'2026-11-10.94',
   title:'WatchList on the Home Screen',
   push:'The iPhone app has a Home Screen widget: the show you are part-way through, as its own artwork.',
   notes:[
+    'If you have ever used <b>Put a copy back</b> to set up a second device, those two devices have been <b>sharing one identity</b> — and the cloud keeps one backup per device. They stopped merging and started replacing each other: whichever saved last won, and an edit made on the other one was undone the next time it synced, with no error and nothing to tap. <b>Marking something finished and finding it back where it was</b> is this. Two fixes. Putting a copy back no longer carries the identity of the machine the file came from, so it cannot happen again. And a device that is already in this state <b>gets itself out</b>: if the backup list shows your device’s row under another device’s name, this one quietly takes an identity of its own and tells you it did. Nothing about your list changes — the list belongs to your code, not to the device — and the two start merging properly again from that moment.',
     'The home screen stops repeating itself. A shelf whose name is already a status — <b>Plan to Watch</b>, <b>Finished</b>, <b>Dropped</b> — no longer puts that same word on every card inside it, and nor does the grid under a filter you just set. It was a dark tag over the artwork saying what the heading above had already said, repeated down the row until it was pattern rather than information. It stays wherever the statuses genuinely mix — <b>Favourites</b>, the genre shelves, <b>All</b> — so it means something every time you see it. The spacing changed with it: the big card at the top and the shelf under it sit together now, and there is a real break before <b>Browse your list by genre</b>, so the page reads as three parts instead of one long run of shelves.',
     'The home shelf under the big card is called <b>Up next</b> now. The card above it already says <i>Continue watching</i> over one title, and the shelf said the same two words again over a different set — near enough together to read as one thing broken in half rather than two. Nothing moved; only the name changed.',
     'The top of the screen used to <b>settle after it appeared</b>. The filter row and the watch/read switch are drawn by the app rather than shipped with the page, so for the first moment they had no size — the search field sat too wide and the whole list underneath started a little higher than it ended up, then dropped as they arrived. On a list with a <b>password</b> that moment was not the first moment at all: it was whenever you finished unlocking. Both now hold their place from the start, so the page you first see is the page you get.',

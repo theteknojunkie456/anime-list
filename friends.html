@@ -2099,7 +2099,7 @@ img[data-fd="in"]{opacity:1;transition:opacity .18s ease-out;}
 .bb-dots{gap:5px;}
 .bb-dot{width:16px;height:2px;border-radius:0;background:rgba(255,255,255,0.34);transition:background-color .35s cubic-bezier(.2,1,.3,1),opacity .35s;cursor:pointer;}
 .bb-dot.on{background:#fff;}
-.row-div{font-family:var(--fd);font-size:13px;font-weight:600;color:var(--t3);padding:26px 18px 4px;}
+.row-div{font-family:var(--fd);font-size:13px;font-weight:600;color:var(--t3);padding:48px 18px 4px;}
 
 /* ── CONTINUE WATCHING RAIL ── */
 /* Continue-watching: framed as its own band (hairline top + bottom), a row of
@@ -2114,6 +2114,7 @@ img[data-fd="in"]{opacity:1;transition:opacity .18s ease-out;}
 .qp-chip:active{transform:scale(.95);}
 .qp-chip svg{width:15px;height:15px;color:var(--a);stroke-width:2.2;}
 .rz-sec{margin-top:18px;padding:16px 0 15px;border-top:1px solid var(--b1);border-bottom:1px solid var(--b1);animation:fadeUp .4s ease both;}
+.billboard + .rz-sec{margin-top:10px;}
 /* Same index entry as every other shelf — it used to wear a three-pixel accent
    bar of its own, which meant the two kinds of shelf on one page announced
    themselves in two different languages. */
@@ -2243,6 +2244,13 @@ img[data-fd="in"]{opacity:1;transition:opacity .18s ease-out;}
 .pcard-badge::before{content:'';width:5px;height:5px;border-radius:50%;background:currentColor;}
 .pcard-badge .ico{display:none;}
 .pcard-badge{max-width:calc(100% - 14px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+/* A shelf called Plan to Watch put PLAN on every card in it, and the Watching
+   filter put WATCHING on all of them — a dark notch over the artwork, repeated
+   until it is pattern rather than information, and covering the part of the
+   cover it sits on for nothing. The tag is hidden where the heading above has
+   already said it, and kept wherever statuses genuinely mix: Favorites, the
+   genre shelves, and All. It then means something every time it appears. */
+[data-onestatus] .pcard-badge{display:none;}
 /* Present for a screen reader, gone for an eye. */
 .sr{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;
   clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;border:0;}
@@ -13077,12 +13085,16 @@ function renderSync(){ if(_renderRAF){cancelAnimationFrame(_renderRAF);_renderRA
 // removed from any row; you just stop paying for the part that is off screen.
 const RAIL_FIRST=18, RAIL_STEP=18;
 let _railRest=Object.create(null), _railN=0;
-function railScroll(cells){
+// `oneStatus` is the status this rail is entirely made of, when its heading
+// already names it — the cards inside then drop their status tag. Favorites and
+// the genre rails pass nothing, because theirs really do mix.
+function railScroll(cells,oneStatus){
   const head=cells.slice(0,RAIL_FIRST).map(s=>posterCard(s.a,s.n)).join('');
-  if(cells.length<=RAIL_FIRST)return `<div class="row-scroll">${head}</div>`;
+  const tagless=oneStatus?` data-onestatus="${escH(oneStatus)}"`:'';
+  if(cells.length<=RAIL_FIRST)return `<div class="row-scroll"${tagless}>${head}</div>`;
   const id='rail'+(++_railN);
   _railRest[id]={cells,at:RAIL_FIRST};
-  return `<div class="row-scroll" data-rail="${id}" onscroll="railMore(this)">${head}</div>`;
+  return `<div class="row-scroll"${tagless} data-rail="${id}" onscroll="railMore(this)">${head}</div>`;
 }
 function railMore(el){
   const id=el&&el.getAttribute('data-rail'), st=id&&_railRest[id];
@@ -13864,7 +13876,10 @@ function gridHTML(list){
   _gridAll=list||[];
   _gridShown=Math.min(GRID_CHUNK,_gridAll.length);
   const rest=_gridAll.length>_gridShown?'<div id="gridMore" aria-hidden="true"></div>':'';
-  return `<div class="grid" id="gridEl">${_gridAll.slice(0,_gridShown).map(a=>posterCard(a)).join('')}</div>${rest}`;
+  // Same rule as a status rail: under Watching every card is watching, and the
+  // chip that set the filter is still on screen saying so.
+  const gTag=(filterStatus&&filterStatus!=='all')?` data-onestatus="${escH(filterStatus)}"`:'';
+  return `<div class="grid" id="gridEl"${gTag}>${_gridAll.slice(0,_gridShown).map(a=>posterCard(a)).join('')}</div>${rest}`;
 }
 // The images for a handful of cards, patched into those cards. No list-wide
 // scan, and no render() — rewriting the entire grid to show one late thumbnail
@@ -14503,7 +14518,7 @@ function renderHome(){
     if(!items.length)continue;
     const cells=collapseSeries(items);
     html+=`<div class="row-sec" data-amb="${items[0]?titleAccent(items[0]):''}"><div class="row-head" style="--rc:${rc};--fill:${shelfFill(items)}"><div class="row-title">${label}</div><div class="row-count">${cells.length}</div></div>
-      ${railScroll(cells)}</div>`;
+      ${railScroll(cells,st)}</div>`;
   }
   const favs=homeOn('favorites')?S.filter(a=>a.fav):[];
   if(favs.length){const fc=collapseSeries(favs);html+=`<div class="row-sec" data-amb="${favs[0]?titleAccent(favs[0]):''}"><div class="row-head" style="--rc:var(--a2);--fill:${shelfFill(favs)}"><div class="row-title">Favorites</div><div class="row-count">${fc.length}</div></div>
@@ -27112,10 +27127,11 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-11-10.92',
+  v:'2026-11-10.93',
   title:'WatchList on the Home Screen',
   push:'The iPhone app has a Home Screen widget: the show you are part-way through, as its own artwork.',
   notes:[
+    'The home screen stops repeating itself. A shelf whose name is already a status — <b>Plan to Watch</b>, <b>Finished</b>, <b>Dropped</b> — no longer puts that same word on every card inside it, and nor does the grid under a filter you just set. It was a dark tag over the artwork saying what the heading above had already said, repeated down the row until it was pattern rather than information. It stays wherever the statuses genuinely mix — <b>Favourites</b>, the genre shelves, <b>All</b> — so it means something every time you see it. The spacing changed with it: the big card at the top and the shelf under it sit together now, and there is a real break before <b>Browse your list by genre</b>, so the page reads as three parts instead of one long run of shelves.',
     'The home shelf under the big card is called <b>Up next</b> now. The card above it already says <i>Continue watching</i> over one title, and the shelf said the same two words again over a different set — near enough together to read as one thing broken in half rather than two. Nothing moved; only the name changed.',
     'The top of the screen used to <b>settle after it appeared</b>. The filter row and the watch/read switch are drawn by the app rather than shipped with the page, so for the first moment they had no size — the search field sat too wide and the whole list underneath started a little higher than it ended up, then dropped as they arrived. On a list with a <b>password</b> that moment was not the first moment at all: it was whenever you finished unlocking. Both now hold their place from the start, so the page you first see is the page you get.',
     '<b>Your Stats</b> had a tidy-up. The row of totals under the big number — episodes, chapters, finished, favourites — wrapped by content width, so the last one landed on a second line lining up with nothing; they sit in <b>columns</b> now, and the second row starts where the first one does. The <b>ratings chart</b> no longer draws all five bands in the same colour: it runs from dim at 1–2 to full strength at 9–10, so the shape of what you like reads before any of the numbers do. The bands are wider on a large screen, where five of them used to stop halfway across and leave the rest of the row empty. And the <b>section headings</b> were the faintest words on a long page they are supposed to lead — they are a step clearer than the data under them now.',

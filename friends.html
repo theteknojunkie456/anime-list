@@ -1416,7 +1416,7 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
    the CONTENT (a mask, not a painted scrim) means posters dissolve into whatever
    is behind them — which is a per-title ambient gradient, so a solid scrim would
    have been a visible band of the wrong colour. */
-.page{flex:1;overflow-y:auto;overscroll-behavior:none;padding-bottom:calc(var(--safe-b) + 96px);counter-reset:shelf;}
+.page{flex:1;overflow-y:auto;overscroll-behavior:none;padding-bottom:calc(var(--safe-b) + 96px);}
 
 /* ── HEADER ── */
 .hdr{padding:calc(var(--safe-t) + 12px) 18px 0;display:flex;align-items:center;justify-content:space-between;}
@@ -2183,13 +2183,24 @@ img[data-fd="in"]{opacity:1;transition:opacity .18s ease-out;}
 /* The index mark. Body face, tabular, in the shelf's own colour and small
    enough to be a mark rather than a second heading. */
 .row-title::before,.rz-head::before{
-  content:counter(shelf,decimal-leading-zero);order:0;flex:none;
+  content:var(--shelf-n,"");order:0;flex:none;
   font-family:var(--fb);font-size:11px;font-weight:700;letter-spacing:0.08em;
   font-variant-numeric:tabular-nums;font-variation-settings:normal;
   color:var(--rc,var(--a));opacity:.8;
 }
 .row-title::before{margin-right:9px;vertical-align:1.5px;}
-.row-sec,.rz-sec{counter-increment:shelf;}
+/* The index used to be `counter(shelf)`. On the phone every mark read 00.
+   The obvious suspect was `content-visibility:auto` on .row-sec skipping the
+   subtree that increments the counter — but that was measured and is NOT it:
+   Chrome resolves the counter correctly at the bottom of a page whose every
+   earlier section is skipped. The phone runs WebKit, not Chrome, so the cause
+   is still open.
+   What is not open is that a CSS counter cannot be tested. getComputedStyle
+   returns the unresolved `counter(...)` function, never the number that paints,
+   so nothing here could ever assert what the user actually sees — which is why
+   a wrong number shipped and stayed. A shelf's index is a fact about the page,
+   not about what happens to be visible, so renderHome stamps it on and ::before
+   reads it back. Now a test can read it too; shelf-index-test does. */
 .row-count{order:3;font-family:var(--fb);font-size:12px;font-weight:700;color:var(--t3);font-variant-numeric:tabular-nums;letter-spacing:0.02em;align-self:center;}
 
 .row-scroll{display:flex;gap:10px;overflow-x:auto;padding:2px 18px 6px;scroll-padding:18px;}
@@ -14465,6 +14476,18 @@ function markContentChange(){
   _viewSigT=setTimeout(()=>{try{b.classList.remove('content-in');}catch(e){}},900);
 }
 let _viewSigT=0;
+// Numbers the shelves in document order. Deliberately not a CSS counter: see
+// the note beside .row-title::before. Cheap — it touches one style property per
+// shelf, on a list that is already being rebuilt.
+function numberShelves(){
+  try{
+    const p=document.getElementById('pageEl'); if(!p)return;
+    let i=0;
+    p.querySelectorAll('.row-sec,.rz-sec').forEach(sec=>{
+      sec.style.setProperty('--shelf-n','"'+String(++i).padStart(2,'0')+'"');
+    });
+  }catch(e){}
+}
 function renderHome(){
   const el=document.getElementById('pageEl');
   _searchQ='';                       // only a live search marks up notes
@@ -14549,6 +14572,7 @@ function renderHome(){
     // shelves for it to sit above, and a friend already watching something is a
     // better reason to stay than an empty box telling them to import.
     el.innerHTML=partyRailHTML()+emptyBox+(beg?beginnerShelfHTML():'');
+    numberShelves();
     if(beg)loadPopularShelf();
     return;
   }
@@ -14643,6 +14667,7 @@ function renderHome(){
     }
   }
   el.innerHTML=html+bulkBarHTML();bbSetup(spotlight);try{rzLoop();}catch{}if(beg)loadPopularShelf();
+  numberShelves();
   try{setTimeout(tuneBackdrops,120);}catch(e){}   // after the images have had a chance to start loading
   try{cdTick();}catch(e){}   // (re)arm any countdown this paint put on screen
 }
@@ -27227,10 +27252,11 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-11-10.95',
+  v:'2026-11-10.96',
   title:'WatchList on the Home Screen',
   push:'The iPhone app has a Home Screen widget: the show you are part-way through, as its own artwork.',
   notes:[
+    'Every shelf on the home screen carries a small number \u2014 <b>01</b>, <b>02</b>, <b>03</b> \u2014 and on the phone they all read <b>00</b>. The number was being counted by the page itself as it drew, which is a thing that can only be seen and never checked: nothing in the app could ask what a shelf actually shows, which is why a wrong number stayed wrong. The app sets the number now, and it is checked on every build.',
     'If you have ever used <b>Put a copy back</b> to set up a <b>second</b> device, those two devices have been <b>sharing one identity</b> — the file carries the identity of the machine it came from, and the machine restoring it took that on. Your list was never stored per device, so this did not overwrite it. What it broke is everything that has to tell your devices apart: the device list shows <b>one row for two machines</b>, so <b>which device is right?</b> points at the wrong one and the title count beside it belongs to the other machine — which is a bad thing to be reading when you are deciding whose copy to keep. Two fixes. Putting a copy back no longer carries the identity, so it cannot happen again. And a device already in this state <b>gets itself out</b>: if the device list shows its row under another device’s name, it quietly takes an identity of its own and tells you it did. Nothing about your list changes — your list belongs to your code, not to your device.',
     'The home screen stops repeating itself. A shelf whose name is already a status — <b>Plan to Watch</b>, <b>Finished</b>, <b>Dropped</b> — no longer puts that same word on every card inside it, and nor does the grid under a filter you just set. It was a dark tag over the artwork saying what the heading above had already said, repeated down the row until it was pattern rather than information. It stays wherever the statuses genuinely mix — <b>Favourites</b>, the genre shelves, <b>All</b> — so it means something every time you see it. The spacing changed with it: the big card at the top and the shelf under it sit together now, and there is a real break before <b>Browse your list by genre</b>, so the page reads as three parts instead of one long run of shelves.',
     'The home shelf under the big card is called <b>Up next</b> now. The card above it already says <i>Continue watching</i> over one title, and the shelf said the same two words again over a different set — near enough together to read as one thing broken in half rather than two. Nothing moved; only the name changed.',

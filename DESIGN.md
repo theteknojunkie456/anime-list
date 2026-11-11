@@ -875,3 +875,34 @@ past halfway across the 860px reading column and left the rest of the row empty,
 which reads as a chart cut off rather than a chart capped. 116px fills about
 70%. The twelve-month chart divides to 65px and never reaches the cap, so the
 number only moves the chart that needed it.
+
+## If a test cannot read it, it will stay wrong
+
+The shelf index on the home screen — the `01`, `02`, `03` beside each shelf
+heading — was `content: counter(shelf, decimal-leading-zero)`. It is the
+textbook use of a CSS counter, and it read `00` on the phone for long enough
+that the number had stopped meaning anything.
+
+It survived because nothing could see it. `getComputedStyle(el, '::before')
+.content` returns the literal string `counter(shelf, decimal-leading-zero)` —
+the function, never the number it resolves to. There is no DOM read that gives
+the painted value. Every test in this repo could inspect that element and every
+one of them would agree the rule was correct.
+
+The suspected cause was `content-visibility: auto` on `.row-sec` — the
+optimisation that took a 300-title home from 584ms to nothing — skipping the
+subtree that increments the counter. **That was measured, and it is false:**
+Chrome resolves the counter correctly at the bottom of a page whose every
+earlier section is skipped. The phone runs WebKit, so the cause is still open.
+
+The fix is not a cause fix, and it is still right. `renderHome` stamps
+`--shelf-n` on each section in document order and `::before` reads it back.
+Same pixels, one JS property write per shelf on a list that is already being
+rebuilt — and now `shelf-index-test` reads the exact string each heading shows,
+at phone width, with most shelves below the fold.
+
+**Prefer the mechanism a test can observe, even when the elegant one is
+correct.** A declarative rule that is right in principle and wrong on one engine
+is indistinguishable, from inside the code, from one that is right everywhere.
+The counter was not wrong because counters are bad; it was unfixable because it
+was unreadable, and the thing that paints is the only thing worth asserting on.

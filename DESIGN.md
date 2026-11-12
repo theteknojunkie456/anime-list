@@ -906,3 +906,32 @@ correct.** A declarative rule that is right in principle and wrong on one engine
 is indistinguishable, from inside the code, from one that is right everywhere.
 The counter was not wrong because counters are bad; it was unfixable because it
 was unreadable, and the thing that paints is the only thing worth asserting on.
+
+## The floor one control knew about
+
+`.hbtn` — the row of icons across the top — solved its own touch problem well.
+Six 38px buttons beside a wordmark cannot grow to 44 without overflowing a
+393px header, so the button stays 38 and an invisible 44px box grows under it
+from `::after`. Nothing moves, every tap lands, and the comment above it says
+exactly that.
+
+Then it kept the trick to itself. A measured sweep of the home screen at 393px
+found eleven more controls under the floor: the carousel dots at **16×2**,
+`Delete` and `Fix all` at 28 tall, the per-card buttons at 30, the filter chips
+at 34, the sort button at 32. A two-pixel target is not a small button; it is a
+button that works by accident.
+
+They all use `.hbtn`'s rule now. The exception is written into the CSS rather
+than left to be noticed: `.bb-dot` takes the full 44 in height and stays 22
+wide, because five dots at 44 wide overlap their neighbours — which trades a
+target you miss for one that hits the wrong slide.
+
+**The reason this hid so long is the reason it is now testable.** The hit area
+is a pseudo-element, so the layout box understates it — and a sweep that reads
+`getBoundingClientRect` alone reports `.hbtn`, the one control that got this
+right first, as the worst offender on the screen. `touch-target-test` reads the
+box *and* any absolutely positioned `::before`/`::after`, takes the larger, and
+separately asserts that `.hbtn` still carries its invisible box, so the rule
+cannot be deleted without a failure. It also asserts it measured more than 25
+controls: a sweep that finds nothing because it looked at nothing passes for
+the wrong reason.

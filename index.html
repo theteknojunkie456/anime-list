@@ -1444,6 +1444,34 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 .hbtn::after{content:'';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:44px;height:44px;}
 .hbtn:focus-visible{outline:2px solid var(--a2);outline-offset:2px;}
 .hbtn:active{transform:scale(0.9);}
+
+/* THE SAME FLOOR, EVERYWHERE ELSE.
+   .hbtn worked this out and then kept it to itself. A measured sweep of the
+   home screen at 393px found eleven more controls under 44px in both axes —
+   the carousel dots at 16x2, Delete and Fix all at 28 tall, the per-card
+   recommend button at 30, the filter chips and the sort button at 32-34. The
+   dots are the honest extreme: a two-pixel target is not a small button, it is
+   a button that works by accident.
+   Same technique, same reason: the visual box is the right size for the layout
+   it sits in, so the box does not move and an invisible one grows under it.
+   Width is grown only where there is room beside the control — the dots sit in
+   a tight row, so they take the full 44 in height and stay narrow, which is the
+   axis a thumb misses on anyway. */
+.fixbar-b,.pcard-rec,.pcard-bump,.fchip,.sort-btn,.kseg,.qp-chip,.bb-dot,.hdr-title{position:relative;}
+.fixbar-b::after,.pcard-rec::after,.pcard-bump::after,.fchip::after,.sort-btn::after,.kseg::after,.qp-chip::after{
+  content:'';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  width:max(100%,44px);height:max(100%,44px);
+}
+.bb-dot::after{
+  content:'';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  width:max(100%,22px);height:44px;
+}
+/* The wordmark opens the home view and is 24px tall. Its ::after is already
+   spoken for by the accent dot beside it, so the hit area goes on ::before. */
+.hdr-title::before{
+  content:'';position:absolute;top:50%;left:0;transform:translateY(-50%);
+  width:100%;height:44px;
+}
 .hbtn.bell-on{background:color-mix(in srgb,var(--a) 22%,var(--bg3));border-color:transparent;color:var(--a2);}
 .hdr-actions{display:flex;align-items:center;gap:7px;flex:0 0 auto;}
 /* Shown only where the two-finger hold is impossible. On a touch screen the
@@ -27281,10 +27309,11 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-11-11.97',
+  v:'2026-11-11.98',
   title:'WatchList on the Home Screen',
   push:'The iPhone app has a Home Screen widget: the show you are part-way through, as its own artwork.',
   notes:[
+    'Small things on the phone are easier to hit. Eleven controls were under the size a fingertip reliably lands on \u2014 <b>Delete</b> and <b>Fix all</b>, the filter chips and the sort button, the little buttons on a card, and the dots under the big card, which were <b>two pixels tall</b>. Nothing looks any different and nothing moved: each one grew an invisible target under it, the same way the buttons along the top of the screen already worked.',
     'Your shows carry <b>the name they were given</b>. AniList has the Japanese title for almost everything \u2014 <b>\u846c\u9001\u306e\u30d5\u30ea\u30fc\u30ec\u30f3</b> under <i>Frieren: Beyond Journey\u2019s End</i> \u2014 and the app had been storing it all along and showing it nowhere. It sits under the title on the big card and on the title\u2019s own page, at reading weight rather than as a second heading. The line beside it changed too: where the big card used to say how many episodes there are, which the progress bar underneath already says, it now says <b>who made it and when</b> \u2014 <i>Madhouse \u00b7 2023 \u00b7 Action</i>.',
     'Every shelf on the home screen carries a small number \u2014 <b>01</b>, <b>02</b>, <b>03</b> \u2014 and on the phone they all read <b>00</b>. The number was being counted by the page itself as it drew, which is a thing that can only be seen and never checked: nothing in the app could ask what a shelf actually shows, which is why a wrong number stayed wrong. The app sets the number now, and it is checked on every build.',
     'If you have ever used <b>Put a copy back</b> to set up a <b>second</b> device, those two devices have been <b>sharing one identity</b> — the file carries the identity of the machine it came from, and the machine restoring it took that on. Your list was never stored per device, so this did not overwrite it. What it broke is everything that has to tell your devices apart: the device list shows <b>one row for two machines</b>, so <b>which device is right?</b> points at the wrong one and the title count beside it belongs to the other machine — which is a bad thing to be reading when you are deciding whose copy to keep. Two fixes. Putting a copy back no longer carries the identity, so it cannot happen again. And a device already in this state <b>gets itself out</b>: if the device list shows its row under another device’s name, it quietly takes an identity of its own and tells you it did. Nothing about your list changes — your list belongs to your code, not to your device.',

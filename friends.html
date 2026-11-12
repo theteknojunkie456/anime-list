@@ -86,6 +86,9 @@
      a UI read as generic. */
   --fd:'Bricolage Grotesque','Manrope',-apple-system,sans-serif;
   --fb:'Manrope',-apple-system,sans-serif;
+  /* Japanese titles. Hiragino ships with macOS and iOS — the only platforms
+     this app has — so the native name costs no bytes and no FOUT. */
+  --fjp:'Hiragino Sans','Hiragino Kaku Gothic ProN','Yu Gothic Medium','Noto Sans JP',var(--fb);
   /* Four states, pulled back from full saturation. They are labels on a card,
      not signals in a cockpit, and at full strength four vivid hues in one grid
      argue with the artwork and with each other. All four still clear AA. */
@@ -2028,6 +2031,18 @@ img[data-fd="in"]{opacity:1;transition:opacity .18s ease-out;}
   font-variation-settings:'opsz' 72,'wght' 800;
   text-wrap:balance;text-shadow:0 2px 14px rgba(0,0,0,.6);}
 .hero-meta{font-size:12px;color:rgba(255,255,255,0.75);font-weight:600;margin-top:5px;}
+/* THE NAME IT WAS GIVEN.
+   AniList hands back title.native for every show and the app has been storing
+   it as `titleNa` since the day covers were added — and spending it only on
+   building source URLs. Nothing ever showed it. A tracker full of anime that
+   never once says 葉送のフリーレン looks like a tracker for anything else.
+   Set at reading weight, not display: it is the title's other name, not a
+   second heading competing with the first. */
+.title-jp{font-family:var(--fjp);font-weight:400;letter-spacing:.01em;line-height:1.3;
+  font-feature-settings:'palt' 1;}
+.hero-title + .title-jp{font-size:13px;color:rgba(255,255,255,.72);margin-top:4px;
+  text-shadow:0 1px 8px rgba(0,0,0,.85);}
+.dt-title + .title-jp{font-size:13.5px;color:var(--t2);margin-top:5px;}
 .hero-prog{margin-top:10px;display:flex;align-items:center;gap:10px;}
 .hero-prog .pbar{flex:1;}
 .hero-prog span{font-size:12px;font-weight:700;color:rgba(255,255,255,0.85);}
@@ -14270,12 +14285,25 @@ function bbSlideHTML(a){
     <div class="hero-body">
       <div class="hero-kicker">${kicker}</div>
       <div class="hero-title">${schEsc(a.title)}</div>
-      <div class="hero-meta">${schEsc([a.eps,a.time,genresOf(a)[0]].filter(Boolean).join(' · '))}</div>
+      ${jpLine(a)}
+      <div class="hero-meta">${schEsc([a.studio,a.year||'',genresOf(a)[0]].filter(Boolean).join(' · '))}</div>
       ${a.epTotal?`<div class="hero-prog"><div class="pbar"><div class="pfill" style="width:${Math.round(p*100)}%"></div></div><span>${a.ep||0} / ${a.epTotal}</span></div>`:''}
       ${airHTML}
       <div class="hero-cta">${icon('play')} &nbsp;Open</div>
     </div>
   </div>`;
+}
+// The native name, when there is one and it is not just the name again. Shows
+// for anything AniList knows; silent for a title added by hand that was never
+// matched, which is the honest answer rather than a blank line held open.
+function jpLine(a){
+  try{
+    const jp=a&&a.titleNa?String(a.titleNa).trim():'';
+    if(!jp)return '';
+    const shown=String((a&&a.title)||'').trim();
+    if(!shown||jp===shown)return '';
+    return `<div class="title-jp" lang="ja">${schEsc(jp)}</div>`;
+  }catch(e){ return ''; }
 }
 // Infinite carousel: clone the last slide before the first and the first after
 // the last, so advancing off either end lands on a clone, then snaps invisibly
@@ -14970,6 +14998,7 @@ function renderDetail(){
       ${cover}
       <div class="dt-info">
         <div class="dt-title">${schEsc(a.title)}</div>
+        ${jpLine(a)}
         <div class="dt-meta">${[a.eps, kindOf(a)==='read'?a.time:''].filter(Boolean).join(' · ')}</div>
         <button class="dt-fav${a.fav?' on':''}" onclick="toggleFav()">${a.fav?icon('heart','fill')+' Favorited':icon('heart')+' Favorite'}</button>
       </div>
@@ -27252,10 +27281,11 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-11-10.96',
+  v:'2026-11-11.97',
   title:'WatchList on the Home Screen',
   push:'The iPhone app has a Home Screen widget: the show you are part-way through, as its own artwork.',
   notes:[
+    'Your shows carry <b>the name they were given</b>. AniList has the Japanese title for almost everything \u2014 <b>\u846c\u9001\u306e\u30d5\u30ea\u30fc\u30ec\u30f3</b> under <i>Frieren: Beyond Journey\u2019s End</i> \u2014 and the app had been storing it all along and showing it nowhere. It sits under the title on the big card and on the title\u2019s own page, at reading weight rather than as a second heading. The line beside it changed too: where the big card used to say how many episodes there are, which the progress bar underneath already says, it now says <b>who made it and when</b> \u2014 <i>Madhouse \u00b7 2023 \u00b7 Action</i>.',
     'Every shelf on the home screen carries a small number \u2014 <b>01</b>, <b>02</b>, <b>03</b> \u2014 and on the phone they all read <b>00</b>. The number was being counted by the page itself as it drew, which is a thing that can only be seen and never checked: nothing in the app could ask what a shelf actually shows, which is why a wrong number stayed wrong. The app sets the number now, and it is checked on every build.',
     'If you have ever used <b>Put a copy back</b> to set up a <b>second</b> device, those two devices have been <b>sharing one identity</b> — the file carries the identity of the machine it came from, and the machine restoring it took that on. Your list was never stored per device, so this did not overwrite it. What it broke is everything that has to tell your devices apart: the device list shows <b>one row for two machines</b>, so <b>which device is right?</b> points at the wrong one and the title count beside it belongs to the other machine — which is a bad thing to be reading when you are deciding whose copy to keep. Two fixes. Putting a copy back no longer carries the identity, so it cannot happen again. And a device already in this state <b>gets itself out</b>: if the device list shows its row under another device’s name, it quietly takes an identity of its own and tells you it did. Nothing about your list changes — your list belongs to your code, not to your device.',
     'The home screen stops repeating itself. A shelf whose name is already a status — <b>Plan to Watch</b>, <b>Finished</b>, <b>Dropped</b> — no longer puts that same word on every card inside it, and nor does the grid under a filter you just set. It was a dark tag over the artwork saying what the heading above had already said, repeated down the row until it was pattern rather than information. It stays wherever the statuses genuinely mix — <b>Favourites</b>, the genre shelves, <b>All</b> — so it means something every time you see it. The spacing changed with it: the big card at the top and the shelf under it sit together now, and there is a real break before <b>Browse your list by genre</b>, so the page reads as three parts instead of one long run of shelves.',

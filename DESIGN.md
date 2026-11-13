@@ -935,3 +935,43 @@ separately asserts that `.hbtn` still carries its invisible box, so the rule
 cannot be deleted without a failure. It also asserts it measured more than 25
 controls: a sweep that finds nothing because it looked at nothing passes for
 the wrong reason.
+
+## The hero is lit by the show on it
+
+AniList sends `coverImage.color`, the dominant colour of a title's key art, and
+the app has stored it as `aniColor` since covers were added. `accentVars()` —
+the one function whose job was spending it — had been emptied to `return ''`,
+so every hero on every device was lit the same grey. The cheapest art direction
+available was already on the record and switched off.
+
+Three layers now, none of which costs a repaint of the art beneath:
+
+- **A key light in the title's own colour**, `screen`-blended from the top-left,
+  drifting 3.5% across the frame over 34 seconds — too slow to watch happening,
+  fast enough to notice has happened. Only on the live carousel slide: five
+  slides each running their own animation is four compositor layers kept awake
+  for nobody.
+- **Grain**, a static 180px tile. Grain is what stops a gradient reading as a
+  gradient.
+- **Two planes.** Art and words translate opposite ways against scroll. Ken
+  Burns already owns `transform`, so the parallax uses `translate` — a separate
+  property that *composes* with it rather than replacing it. Had it used
+  `transform`, the drift would have silently stopped and nothing would have said
+  so.
+
+A title AniList never matched gets **no light at all**, rather than a default
+glow. The fallback glow is the version of this that looks machine-made.
+
+`[data-art=cinematic]` was already in the stylesheet — a deeper hero gradient,
+a touch more saturation, a stronger shelf scrim — on an attribute nothing ever
+set. It had never run once. It runs now, with the hero gradient re-cut to hold
+the top clear and land softer, because the old curve buried the lower half of
+every image to make room for text that only uses the bottom third.
+
+**The harness lies about motion.** Headless Chrome reports
+`prefers-reduced-motion: reduce` by default, so every motion rule is suppressed
+before the page loads and a motion test that says nothing measures the still
+version and passes for the wrong reason — three measurements were lost to this
+before it was spotted. `hero-cinema-test` forces the feature both ways and
+asserts both halves, and its first assertion is that the browser is not
+secretly in reduced motion.

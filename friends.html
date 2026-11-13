@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-art="cinematic">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
@@ -2049,9 +2049,38 @@ img[data-fd="in"]{opacity:1;transition:opacity .18s ease-out;}
    dimming at the very top and reached 0.93 — so most of the picture was under
    shade to protect a title sitting in the bottom third. It now stays clear until
    the text does, and the title carries a shadow of its own for the rest. */
+/* A HERO THAT IS LIT, NOT JUST DIMMED.
+   Still art reads as a flat panel until something in the frame has direction.
+   Two layers do it, and neither costs a repaint: a key light in the title's own
+   colour from the top-left, and a film grain over everything. The light is
+   `screen`, so it only ever adds — .hero-shade below still owns the darkening,
+   and the two are not fighting over the same pixels.
+   Both collapse to nothing when AniList never sent a colour, rather than
+   falling back to a generic glow, which is the version of this that looks
+   machine-made. */
+.hero-grade{position:absolute;inset:0;pointer-events:none;mix-blend-mode:screen;
+  background:radial-gradient(130% 110% at 12% -10%,
+    color-mix(in oklab, var(--sc,transparent) 78%, transparent) 0%,
+    color-mix(in oklab, var(--sc,transparent) 34%, transparent) 30%,
+    color-mix(in oklab, var(--sc,transparent) 8%, transparent) 54%,
+    transparent 72%);}
+/* The light drifts across the frame. Only the live slide: five carousel slides
+   each running their own animation is five compositor layers kept awake for
+   four that nobody is looking at. */
+.bb-slide.bb-live .hero-grade{animation:heroLight 34s ease-in-out infinite alternate;}
+@keyframes heroLight{
+  from{transform:translate3d(0,0,0) scale(1);opacity:.92;}
+  to{transform:translate3d(3.5%,2%,0) scale(1.08);opacity:1;}
+}
+@media(prefers-reduced-motion:reduce){.bb-slide.bb-live .hero-grade{animation:none;}}
+/* Static noise, 180px tile, drawn once by the renderer and never animated.
+   Grain is what stops a gradient reading as a gradient. */
+.hero-grain{position:absolute;inset:0;pointer-events:none;opacity:.055;
+  mix-blend-mode:overlay;background-repeat:repeat;background-size:180px 180px;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/></filter><rect width='180' height='180' filter='url(%23n)' opacity='.5'/></svg>");}
 .hero-shade{position:absolute;inset:0;background:
   linear-gradient(to top,rgba(8,8,10,.95) 0px,rgba(8,8,10,.9) 130px,rgba(8,8,10,.55) 205px,rgba(8,8,10,.12) 275px,transparent 330px);}
-[data-art=cinematic] .hero-shade{background:linear-gradient(180deg,rgba(0,0,0,0.05) 0%,rgba(8,8,10,0.6) 55%,rgba(8,8,10,0.93) 100%);}
+[data-art=cinematic] .hero-shade{background:linear-gradient(180deg,rgba(0,0,0,0) 0%,rgba(8,8,10,0.10) 34%,rgba(8,8,10,0.52) 62%,rgba(8,8,10,0.88) 100%);}
 [data-art=cinematic] .hero-bg-img,[data-art=cinematic] .hero-bg{filter:saturate(1.08);}
 .hero-body{position:relative;padding:16px 18px;width:100%;}
 .hero-kicker{font-size:12px;font-weight:600;color:rgba(255,255,255,.72);margin-bottom:7px;}
@@ -2125,6 +2154,17 @@ img[data-fd="in"]{opacity:1;transition:opacity .18s ease-out;}
 .bb-slide .hero-bg-img{animation:none;will-change:auto;}
 .bb-slide.bb-live .hero-bg-img{animation:kenburns 24s ease-in-out infinite alternate;will-change:transform;}
 @media(prefers-reduced-motion:reduce){.bb-slide.bb-live .hero-bg-img{animation:none;will-change:auto;}}
+/* 2.5D. The Ken Burns above owns `transform`; this uses `translate`, which is a
+   separate property and composes with it rather than replacing it — so the
+   drift and the parallax can both run on the same element without one of them
+   silently winning. Art and words move opposite ways against the scroll, which
+   is the whole of the effect: a still frame with two planes in it stops being
+   a picture of a thing and starts being a thing. */
+.bb-slide .hero-bg-img,.bb-slide .hero-bg{translate:0 calc(var(--pz,0) * 18px);}
+.bb-slide .hero-body{translate:0 calc(var(--pz,0) * -9px);}
+@media(prefers-reduced-motion:reduce){
+  .bb-slide .hero-bg-img,.bb-slide .hero-bg,.bb-slide .hero-body{translate:none;}
+}
 .bb-cd{position:absolute;top:12px;left:14px;z-index:4;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;max-width:calc(100% - 28px);
   padding:6px 11px;border-radius:99px;font-size:12px;font-weight:700;letter-spacing:.01em;color:#fff;
   background:rgba(8,8,11,.8);
@@ -13095,7 +13135,20 @@ function onPageScroll(){
 // brown show made brown buttons and a brown progress bar sitting on blue sky —
 // one screen never matched the next. Artwork still drives the ambient light
 // behind the page; it no longer drives anything you press.
-function accentVars(a){return '';}
+// THE SHOW'S OWN LIGHT.
+// AniList sends coverImage.color — the dominant colour of the key art — and the
+// app has stored it as aniColor since covers were added. This function used to
+// be the thing that spent it and was emptied to a stub, so every hero has been
+// lit the same grey since. It is the one piece of per-title art direction that
+// costs nothing: the colour is already on the record.
+// Validated, because a bad value here lands in a style attribute.
+function accentVars(a){
+  try{
+    const c=a&&a.aniColor?String(a.aniColor).trim():'';
+    if(!/^#[0-9a-f]{6}$/i.test(c))return '';
+    return '--sc:'+c+';';
+  }catch(e){ return ''; }
+}
 function query(){return document.getElementById('searchIn').value.toLowerCase().trim();}
 // Searching your own list is the thing you do most, and it was a substring test
 // against title+genre+notes. So "aot" found nothing. "shingeki" found nothing,
@@ -14308,7 +14361,7 @@ function bbSlideHTML(a){
   const airHTML=cd?'':(air?`<div class="hero-air">${icon('calendar')} Ep ${air.ep} · airs ${air.when}</div>`:'');
   const kicker=a.status==='watching'?(kindOf(a)==='read'?'Continue reading':'Continue watching'):(a.fav?'One of your favorites':'In your spotlight');
   return`<div class="bb-slide"${av?` style="${av}"`:''} onclick="openDetail('${a.id}')">
-    ${bg}<div class="hero-shade"></div>
+    ${bg}<div class="hero-grade"></div><div class="hero-shade"></div><div class="hero-grain"></div>
     ${cd}
     <div class="hero-body">
       <div class="hero-kicker">${kicker}</div>
@@ -14544,6 +14597,28 @@ function numberShelves(){
     });
   }catch(e){}
 }
+// Drives --pz, the one number the hero parallax reads: how far the page has
+// scrolled, as a fraction of the billboard's own height, clamped to [-1,1].
+// One rAF-coalesced listener for the whole page, attached once — renderHome
+// runs on every filter change and a listener per render is a leak that shows up
+// as the page getting heavier the longer it is open.
+let _pzOn=false;
+function heroParallax(){
+  try{
+    const p=document.getElementById('pageEl'); if(!p||_pzOn)return;
+    _pzOn=true;
+    let raf=0;
+    const set=()=>{
+      raf=0;
+      const bb=document.querySelector('.billboard'); if(!bb)return;
+      const h=bb.offsetHeight||1;
+      const v=Math.max(-1,Math.min(1,(p.scrollTop||0)/h));
+      bb.style.setProperty('--pz',v.toFixed(4));
+    };
+    p.addEventListener('scroll',()=>{if(!raf)raf=requestAnimationFrame(set);},{passive:true});
+    set();
+  }catch(e){}
+}
 function renderHome(){
   const el=document.getElementById('pageEl');
   _searchQ='';                       // only a live search marks up notes
@@ -14724,6 +14799,7 @@ function renderHome(){
   }
   el.innerHTML=html+bulkBarHTML();bbSetup(spotlight);try{rzLoop();}catch{}if(beg)loadPopularShelf();
   numberShelves();
+  heroParallax();
   try{setTimeout(tuneBackdrops,120);}catch(e){}   // after the images have had a chance to start loading
   try{cdTick();}catch(e){}   // (re)arm any countdown this paint put on screen
 }
@@ -27309,10 +27385,11 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-11-11.98',
+  v:'2026-11-12.99',
   title:'WatchList on the Home Screen',
   push:'The iPhone app has a Home Screen widget: the show you are part-way through, as its own artwork.',
   notes:[
+    'The big card on the home screen is <b>lit by the show on it</b>. AniList sends the main colour of every title\u2019s art and the app has been storing it and lighting every card the same grey anyway \u2014 there is a key light in that colour now, drifting across the frame slowly enough that you only notice it has moved. The picture and the words also <b>move apart as you scroll</b>, so a still frame has two planes in it instead of one. Film grain over the whole thing, and less of the artwork is buried under the shade the text needs. All of it stops if your phone is set to reduce motion.',
     'Small things on the phone are easier to hit. Eleven controls were under the size a fingertip reliably lands on \u2014 <b>Delete</b> and <b>Fix all</b>, the filter chips and the sort button, the little buttons on a card, and the dots under the big card, which were <b>two pixels tall</b>. Nothing looks any different and nothing moved: each one grew an invisible target under it, the same way the buttons along the top of the screen already worked.',
     'Your shows carry <b>the name they were given</b>. AniList has the Japanese title for almost everything \u2014 <b>\u846c\u9001\u306e\u30d5\u30ea\u30fc\u30ec\u30f3</b> under <i>Frieren: Beyond Journey\u2019s End</i> \u2014 and the app had been storing it all along and showing it nowhere. It sits under the title on the big card and on the title\u2019s own page, at reading weight rather than as a second heading. The line beside it changed too: where the big card used to say how many episodes there are, which the progress bar underneath already says, it now says <b>who made it and when</b> \u2014 <i>Madhouse \u00b7 2023 \u00b7 Action</i>.',
     'Every shelf on the home screen carries a small number \u2014 <b>01</b>, <b>02</b>, <b>03</b> \u2014 and on the phone they all read <b>00</b>. The number was being counted by the page itself as it drew, which is a thing that can only be seen and never checked: nothing in the app could ask what a shelf actually shows, which is why a wrong number stayed wrong. The app sets the number now, and it is checked on every build.',

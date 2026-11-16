@@ -9829,21 +9829,70 @@ async function _syncPushInner(code){
   // merge cannot run (list locked, cloud unreadable), this device simply does
   // not publish. Declining to back up is recoverable; overwriting good data is
   // not.
-  if(!_reconciling){
-    let far=null;
-    try{ far=await syncPull(); }catch(e){ far=null; }
-    if(far&&far.data&&(+far.updatedAt||0)>syncAt()){
-      _reconciling=true;
-      try{ await syncOnOpen(); }
-      catch(e){}
-      finally{ _reconciling=false; }
-      // syncOnOpen schedules its own push once it has merged. If it could not
-      // merge, syncAt is unchanged and we must not publish over the newer copy.
-      if((+far.updatedAt||0)>syncAt()){
-        try{logProblem('sync','declined to publish over a newer cloud copy',String(far.updatedAt));}catch(e){}
-        return;
+  // An adopt push is the one case that is MEANT to replace: somebody pressed
+  // "use this one" and said so twice. Reconciling first would publish the merge
+  // instead of the list they chose, which is the button not doing what it says.
+  if(!_reconciling&&!_adoptStamp){
+    let far=null,asked=false;
+    try{ far=await syncPull(); asked=true; }catch(e){ far=null; }
+    // A LOOK THAT FAILED IS NOT PERMISSION TO REPLACE.
+    //
+    // This used to fall straight through to the write when the pull threw. On a
+    // phone a pull that throws is a Tuesday — one dropped request — and the
+    // consequence was the whole guard below being skipped silently, so a device
+    // holding a day-old list published it over everyone's newer one having
+    // never looked. Not knowing what is up there is the strongest reason not to
+    // overwrite it, not the weakest. It counts as a push failure, so the
+    // existing backoff retries it rather than the device going quiet for good.
+    if(!asked){
+      try{logProblem('sync','did not publish \u2014 could not read the cloud copy first','');}catch(e){}
+      notePushFail('could not read the cloud copy first');
+      return;
+    }
+    if(far&&far.data){
+      const theirs=+far.n||0, mine=realList().length;
+      const newer=(+far.updatedAt||0)>syncAt();
+      // SIZE, NOT ONLY TIME.
+      //
+      // Timestamps answer "has something happened since I last looked", and a
+      // device that believes it is current never asks anything else. It can be
+      // current and still be missing a quarter of the list — a merge that
+      // stopped half way, a copy it could not open, a day it spent offline —
+      // and nothing compared the two counts, so 210 titles replaced 288 and the
+      // only sign was the 78 that were gone. Below ~85% of the shared copy,
+      // reconcile whatever the clock says. The one deliberate way to shrink the
+      // shared list is the adopt push above, which never reaches this.
+      const shrinking=theirs>=10&&mine<theirs*0.85;
+      if(newer||shrinking){
+        _reconciling=true;
+        try{ await syncOnOpen(); }
+        catch(e){}
+        finally{ _reconciling=false; }
+        // syncOnOpen schedules its own push once it has merged. If it could not
+        // merge, syncAt is unchanged and we must not publish over the newer copy.
+        if((+far.updatedAt||0)>syncAt()){
+          try{logProblem('sync','declined to publish over a newer cloud copy',String(far.updatedAt));}catch(e){}
+          return;
+        }
       }
     }
+  }
+  // THE SIZE CHECK BELONGS NEXT TO THE WRITE, not inside the block above.
+  //
+  // syncOnOpen ends with a syncPush() of its own — "local is current or newer,
+  // make sure the cloud has it" — and that nested call runs with _reconciling
+  // set, which skips the whole block above. So the one path that reached the
+  // write while this device was behind was the one path the check did not
+  // cover, which is how a guard can be present, correct, and still lose 78
+  // titles. Here it is unavoidable: every publish passes this line.
+  //
+  // _adoptStamp is the deliberate exception and the only one. Somebody pressed
+  // "use this one" and confirmed it, which is the single way the shared list is
+  // allowed to get smaller.
+  if(!_adoptStamp&&_cloudN>=10&&realList().length<_cloudN*0.85){
+    try{logProblem('sync','declined to shrink the cloud copy',realList().length+' vs '+_cloudN);}catch(e){}
+    notePushFail('this device is missing titles the backup has');
+    return;
   }
   const fp=pushFingerprint(code);
   if(fp&&fp===lastPushFP()&&!pushState().n)return;
@@ -10020,10 +10069,19 @@ function mergeLists(local,remote){
   });
   return out;
 }
+// How many titles the shared copy says it holds, from the last pull that
+// answered. Plaintext beside the ciphertext, because a device cannot decrypt
+// another device's copy to count it and must still be able to tell whether it
+// is about to make the backup smaller. Recorded here rather than at the call
+// sites: every pull in the app goes through this one function, and a guard that
+// depends on being remembered at four call sites is a guard with three holes.
+let _cloudN=0;
 async function syncPull(){
   const code=syncCode();if(!code||!SYNC_URL)return null;
   const r=await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({op:'pull',code})});
-  return await r.json();
+  const j=await r.json();
+  try{_cloudN=+(j&&j.n)||0;}catch(e){}
+  return j;
 }
 // Two machines cannot be one machine. A device restored from another device's
 // full copy used to wake up holding that device's identity, and from then on
@@ -27586,10 +27644,11 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-11-15.101',
-  title:'Getting to the bottom of the list',
-  push:'Your list counts down now — what is left, what is nearly done, and how far through the whole thing you are.',
+  v:'2026-11-15.102',
+  title:'Your backup cannot quietly get smaller',
+  push:'A device that is missing titles can no longer overwrite your backup with its own copy.',
   notes:[
+    'A device can no longer <b>quietly shrink your backup</b>. The copy in the cloud is sealed, so no device could read another one’s to count it — which meant a phone holding 210 titles could replace a backup of 288 and nothing in the app was in a position to notice. The backup now says <b>how many titles it holds</b>, in the open beside the sealed copy, and a device about to publish a materially smaller list <b>stops and merges first</b>. If it still cannot match, it keeps the backup that is already there and records why, rather than writing over it. The other half was simpler and worse: before publishing, a device checks what is already up there — and if that check <b>failed</b>, it went ahead and wrote anyway. One dropped request was enough. Not knowing what is in your backup is now a reason not to replace it, and the attempt is retried rather than dropped. The one deliberate way to make the list smaller is unchanged: <b>Use this one</b>, which asks you twice and keeps a restore point.',
     'Your list knows it is a <b>list</b>. The app only ever counted what you had already done — <i>9 of 24</i>, hours watched, titles finished — and none of those have an end in them. It counts the other way now as well. A title within three of the end says <b>2 left</b> rather than <i>22/24</i>, with the time that actually means beside it instead of the length of the whole series. A new shelf, <b>Nearly done</b>, gathers everything one evening from finished, nearest first — lifted out of <b>Up next</b> rather than added to the screen a second time. And <b>Your Stats</b> now opens with how far through the whole thing you are, and what is left of it in episodes, chapters and hours, beside the hours you have already spent. Two rules keep it honest: a season whose last episode has not aired is <b>never</b> counted down, because “two left” about something that comes out on Saturday is a promise the list cannot keep; and anything you <b>dropped</b> is left out of both halves of the figure, since otherwise the only way to reach the end would be to finish what you chose to stop watching.',
     'The big card on the home screen is <b>the artwork now</b>, not a strip with the name written across the middle of it. On the phone it stands up like a poster — the picture the show was sold with, edge to edge, with the title, its Japanese name and how far through you are along the bottom. The picture itself changed too: the app had been keeping a <b>230-pixel</b> copy of every cover while asking the database for the <b>460-pixel</b> one and throwing it away, so what you were looking at was always a thumbnail stretched to fit. The <b>Open</b> button has gone from it on the phone, because the whole card already opens the show. Turn the phone sideways, or open it on a tablet, and it goes back to the <b>wide picture</b>, which is the right crop for that shape — and only the one it is showing is ever downloaded.',
     'The big card on the home screen is <b>lit by the show on it</b>. AniList sends the main colour of every title\u2019s art and the app has been storing it and lighting every card the same grey anyway \u2014 there is a key light in that colour now, drifting across the frame slowly enough that you only notice it has moved. The picture and the words also <b>move apart as you scroll</b>, so a still frame has two planes in it instead of one. Film grain over the whole thing, and less of the artwork is buried under the shade the text needs. All of it stops if your phone is set to reduce motion.',

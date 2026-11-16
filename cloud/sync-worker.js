@@ -172,7 +172,18 @@ export default {
           (a === dev ? -1 : b === dev ? 1 : 0) || ((+devs[b].at || 0) - (+devs[a].at || 0)));
         for (const id of ids.slice(DEV_KEEP)) delete devs[id];
       }
-      const rec = { data: body.data ?? null, updatedAt: now, adopt, adoptBy, devs };
+      // HOW BIG THE SHARED COPY IS, in plain sight.
+      //
+      // The per-device rows have carried a title count since the picker needed
+      // one, but the shared record never did — so a device deciding whether to
+      // replace the shared copy could not tell whether it was about to shrink
+      // it without decrypting it first, which it cannot do for another device's
+      // password. A count is not the list; it is the one fact that makes
+      // "am I about to publish 210 over 288?" answerable before the write.
+      // Absent on records written by older clients, which reads as 0 and simply
+      // turns the check off rather than blocking anyone.
+      const n = Math.max(0, Math.min(1_000_000, +body.n || 0));
+      const rec = { data: body.data ?? null, updatedAt: now, adopt, adoptBy, n, devs };
       let payload = JSON.stringify(rec);
       // The blob now carries the whole setup (list + themes + friends + settings), not
       // just titles, so give it real room. Cloudflare KV allows 25 MB/value; keep headroom.

@@ -1083,3 +1083,47 @@ the section off, checks they came back, and toggles it on again.
 The shelf passes `oneStatus` to `railScroll`, so it does not stamp **WATCHING**
 on every card — the same rule the status shelves already follow, applied to the
 new shelf rather than rediscovered later.
+
+## A device may not quietly shrink the backup
+
+On 13 November a phone holding 210 titles replaced a cloud copy of 288. Every
+guard on the push path was present and every one of them passed: the list was
+not empty, it had not collapsed against what that device itself had stored, and
+the reconcile step believed the cloud held nothing newer. 78 titles went, and
+the only sign was that they were gone.
+
+Three separate holes, and the third is the one worth remembering.
+
+**A look that failed was treated as permission.** The reconcile step pulls the
+cloud copy before replacing it, inside a `try`. When the pull *threw*, `far`
+stayed null and the code carried straight on to the write. On a phone a pull
+that throws is a Tuesday — one dropped request — and the consequence was a
+device publishing over a copy it had never seen. Not knowing what is up there is
+the strongest reason not to overwrite it, not the weakest. It now declines and
+records a push failure, so the existing backoff retries it rather than the
+device going quiet for good.
+
+**It compared time and never size.** Timestamps answer "has anything happened
+since I last looked", and a device that believes it is current never asks
+anything else. It can be current by the clock and still be missing a quarter of
+the list — a merge that stopped half way, a copy it could not open, a day
+offline. Nothing compared the two counts, because **the shared record did not
+carry one**: the list is ciphertext, so no device can open another's copy to
+count it. The record now carries `n` in plaintext beside the sealed list. A
+count is not the list; it is the one fact that makes *am I about to shrink
+this?* answerable before the write.
+
+**And the check was in the wrong place.** The first version of this fix put the
+size comparison inside the reconcile block — which is skipped when
+`_reconciling` is set. `syncOnOpen` ends with a `syncPush()` of its own ("local
+is current or newer, make sure the cloud has it"), and that nested call runs
+with the flag set. So the one path that reached the write while the device was
+behind was the one path the new guard did not cover. It would have passed any
+review and shipped the same bug with a test next to it. The check now sits
+immediately before the write, where every publish must pass it, and the cloud
+count is recorded inside `syncPull()` rather than at four call sites — a guard
+that depends on being remembered at four call sites is a guard with three holes.
+
+The deliberate way to make the shared list smaller is untouched: the adopt push,
+where somebody pressed **Use this one** and confirmed it. That is the single
+exception, and it is checked.

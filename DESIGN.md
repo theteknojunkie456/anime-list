@@ -975,3 +975,64 @@ version and passes for the wrong reason — three measurements were lost to this
 before it was spotted. `hero-cinema-test` forces the feature both ways and
 asserts both halves, and its first assertion is that the browser is not
 secretly in reduced motion.
+
+## The hero is a key visual, not a banner
+
+A 240px band with the title written across the middle of it is a banner, and a
+banner is a label for the thing rather than the thing. On a portrait phone the
+hero is now **4:5** — the shape a show is actually sold in. The art runs edge to
+edge, the words sit in the bottom third, and the next section still shows under
+it.
+
+Making the frame taller is the easy half. The half that would have made it worse
+is which picture goes in it:
+
+- **The banner cannot fill a tall frame.** `titleBg()` returns AniList's
+  `bannerImage`, which is 1900×400. Cropped to 4:5 it shows about a sixth of its
+  width, and whatever happens to be in that sixth is what you get. There is no
+  taller frame the banner survives — at 16:9 it is already shorter than the band
+  it replaced.
+- **The cover is the key visual.** One picture, composed by the people who made
+  the show, for exactly this shape.
+- **The cover the app had stored was the wrong file.** `coverImage.large` is not
+  the large file: AniList resolves it to `/cover/medium/`, 230×318. Measured,
+  not assumed. `extraLarge` is `/cover/large/`, 460×636, and is the biggest
+  cover AniList holds. The query has asked for both since covers were added and
+  nothing ever read the second one — the same shape of find as `titleNa` and
+  `accentVars()`. A 357px-wide hero fed the 230px file is visibly soft.
+
+One `<picture>`, two crops. `<source media>` tells the browser which shape it is
+looking at; it fetches only the matching one and swaps on rotation. Rendering
+both and hiding one would have cost every slide a second image — seven of them
+in the carousel — which is the memory pressure the `bb-live` rule exists to keep
+off this phone.
+
+Three things give way to the new proportions, all of them scoped to the portrait
+phone so the wide shapes are untouched:
+
+- **The light gets quieter.** The grade was cut for a band, where it fell mostly
+  on sky. Over a full key visual the same gradient covers the subject too and
+  the picture goes flat and mauve — a wash, which is the opposite of a key
+  light. Smaller radius, nearer the corner, 44% where it was 78%.
+- **The shade starts lower.** Clear until 44% of the frame, then it arrives
+  fast. A gradient that starts at the top edge is a dimmer switch left on the
+  picture.
+- **The `Open` pill goes.** Not for the 50px — although that is what was keeping
+  the words out of the bottom third — but because the whole frame already opens
+  the title, and a white button in the corner of a key visual is the one element
+  that makes it read as a card with a picture on it rather than as the picture.
+  The tap target is 357×446. It stays on every wider shape, where the hero *is*
+  a card.
+
+The title is capped at three lines. *That Time I Got Reincarnated as a Slime* is
+a real title on a real list, and without a cap one like it decides how tall the
+words are, which decides how much of the picture is left.
+
+`hero-keyvisual-test` measures the words as a **fraction** of the frame, not in
+pixels — a pixel figure passes on one phone and lies on all the others — and
+takes two readings, because a title is not one length: an ordinary one has to
+leave the art the top two thirds, and the three-line case still has to leave it
+half. It reads `currentSrc`, which is what the browser actually fetched rather
+than what the markup asked for, so it can tell which `<source>` won; and it
+checks the landscape phone and the tablet still get the banner, because a rule
+that quietly took over every shape would pass every assertion about the phone.

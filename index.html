@@ -1727,6 +1727,10 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 .hero-bg{position:absolute;inset:0;background-size:cover;background-position:center 22%;}
 /* per-title banner art rendered as an <img> so it lazy-loads + can gracefully drop on error (falls back to the gradient .hero-bg beneath it) */
 .hero-bg-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 30%;animation:kenburns 28s ease-in-out infinite alternate;}
+/* The <picture> that art-directs it. An inline wrapper in a flex row is a flex
+   item, and a flex item with nothing in it still takes part in the layout; this
+   takes it back out and makes the frame the image's containing block. */
+.hero-art{position:absolute;inset:0;pointer-events:none;}
 @keyframes kenburns{from{transform:scale(1.06) translate(0,0);}to{transform:scale(1.18) translate(-2.5%,-3%);}}
 /* Phase-2 motion: staggered reveals + tactile press */
 /* Entrance motion used to re-run on every render — and render runs on every tap,
@@ -2164,6 +2168,67 @@ img[data-fd="in"]{opacity:1;transition:opacity .18s ease-out;}
 .bb-slide .hero-body{translate:0 calc(var(--pz,0) * -9px);}
 @media(prefers-reduced-motion:reduce){
   .bb-slide .hero-bg-img,.bb-slide .hero-bg,.bb-slide .hero-body{translate:none;}
+}
+/* ── THE KEY VISUAL ────────────────────────────────────────────────
+   A 240px band with the name written across the middle of it is a banner, and
+   a banner is a label for the thing rather than the thing. The frame a show is
+   actually sold with is a portrait: art from edge to edge, and the words down
+   in the bottom third where a poster puts them. 4:5, so the art leads and the
+   next shelf still shows under it.
+   Portrait phone only, on purpose. A landscape phone has no height to give
+   this — the rule further down already cuts the hero to a 132px strip there —
+   and at tablet width the wide banner is the right crop for the space. */
+@media (orientation:portrait) and (max-width:759px){
+  [data-art=cinematic] .billboard{aspect-ratio:4/5;min-height:0;max-height:min(58dvh,520px);}
+  [data-art=cinematic] .bb-track,[data-art=cinematic] .bb-slide{height:100%;min-height:0;}
+  /* A cover is composed with the subject high in it, so the tenth of the height
+     this frame has to lose comes off the bottom rather than the face. */
+  [data-art=cinematic] .bb-slide .hero-bg-img{object-position:center 18%;}
+  /* Twice the frame, so twice the fall. The two planes have further to separate
+     before the words reach the top of the screen. */
+  [data-art=cinematic] .bb-slide .hero-bg-img,
+  [data-art=cinematic] .bb-slide .hero-bg{translate:0 calc(var(--pz,0) * 30px);}
+  [data-art=cinematic] .bb-slide .hero-body{translate:0 calc(var(--pz,0) * -14px);}
+  @media(prefers-reduced-motion:reduce){
+    [data-art=cinematic] .bb-slide .hero-bg-img,
+    [data-art=cinematic] .bb-slide .hero-bg,
+    [data-art=cinematic] .bb-slide .hero-body{translate:none;}
+  }
+  /* The top half stays off the artwork entirely, then the shade arrives fast
+     and finishes dark enough to read white text on. A gradient that starts at
+     the top edge is a dimmer switch left on the picture. */
+  [data-art=cinematic] .hero-shade{background:linear-gradient(180deg,
+    rgba(0,0,0,0) 0%,rgba(8,8,10,.04) 44%,rgba(8,8,10,.34) 62%,
+    rgba(8,8,10,.74) 78%,rgba(8,8,10,.95) 100%);}
+  /* THE LIGHT GETS QUIETER WHEN THE FRAME GETS BIGGER.
+     The grade was cut for a 240px band, where it fell mostly on sky. Over a
+     full key visual the same gradient covers the subject as well and the
+     picture goes flat and mauve — a wash, which is the opposite of a key
+     light. Smaller, nearer the corner, and much weaker: the art already has
+     colour of its own here, and this is only meant to say where the light is
+     coming from. */
+  [data-art=cinematic] .bb-slide .hero-grade{
+    background:radial-gradient(96% 64% at 14% -8%,
+      color-mix(in oklab, var(--sc,transparent) 44%, transparent) 0%,
+      color-mix(in oklab, var(--sc,transparent) 18%, transparent) 34%,
+      color-mix(in oklab, var(--sc,transparent) 5%, transparent) 58%,
+      transparent 74%);}
+  [data-art=cinematic] .hero-body{padding:18px 20px 20px;}
+  /* The title has a poster to sit on now, not a strip — but a poster's name is
+     not the loudest thing on it, and the sizes above this one start costing the
+     art a line at a time. Three lines is the hard stop: "That Time I Got
+     Reincarnated as a Slime" is a real title on a real list, and without a cap
+     one like it decides how tall the words are, which decides how much of the
+     picture is left. */
+  [data-art=cinematic] .bb-slide .hero-title{font-size:clamp(26px,6.8vw,36px);
+    display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden;}
+  /* THE PILL GOES. Not for room — although it is the 50px that was keeping the
+     words out of the bottom third — but because the whole frame already opens
+     the title, and a white button in the corner of a key visual is the one
+     element that makes it read as a card with a picture on it rather than as
+     the picture. Nothing is lost: the tap target is 357×446. It is still there
+     on every wider shape, where the hero IS a card. */
+  [data-art=cinematic] .bb-slide .hero-cta{display:none;}
 }
 .bb-cd{position:absolute;top:12px;left:14px;z-index:4;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;max-width:calc(100% - 28px);
   padding:6px 11px;border-radius:99px;font-size:12px;font-weight:700;letter-spacing:.01em;color:#fff;
@@ -8122,7 +8187,7 @@ function migrate(list){
   // banner/aniColor = AniList per-title art + dominant color; bgImage/bgAccent = user's own background + its extracted color
   // Defensive: drop non-object entries and guarantee id/title/status so one malformed
   // item (from a bad import, a truncated paste, a future format change) can't crash render.
-  const mapped=(Array.isArray(list)?list:[]).filter(a=>a&&typeof a==='object').map(a=>({id:uid(),title:'',status:'plan',ep:0,rating:0,fav:false,upd:0,epTotal:parseEpTotal(a.eps),img:'',order:[],notes:'',genre:'',eps:'',time:'',kind:'watch',banner:'',aniColor:'',bgImage:'',bgAccent:'',bannerTried:false,...a}));
+  const mapped=(Array.isArray(list)?list:[]).filter(a=>a&&typeof a==='object').map(a=>({id:uid(),title:'',status:'plan',ep:0,rating:0,fav:false,upd:0,epTotal:parseEpTotal(a.eps),img:'',order:[],notes:'',genre:'',eps:'',time:'',kind:'watch',banner:'',imgXL:'',aniColor:'',bgImage:'',bgAccent:'',bannerTried:false,...a}));
   // Titles that arrived already HTML-escaped — "Shikimori&#39;s", "Kubo Won&#39;t"
   // — were escaped a SECOND time on the way into the page, so the entity itself
   // was what you read. Decoding here, at the data layer, fixes every surface at
@@ -8130,7 +8195,7 @@ function migrate(list){
   // Two passes, because some of these arrived double-encoded (&amp;#39;), and it
   // stays safe because every one of those surfaces still runs escH on the way out.
   mapped.forEach(a=>{a.title=deEnt(a.title);a.genre=deEnt(a.genre);a.notes=deEnt(a.notes);});
-  mapped.forEach(a=>{a.img=safeImg(a.img);a.banner=safeImg(a.banner);a.bgImage=safeImg(a.bgImage);});
+  mapped.forEach(a=>{a.img=safeImg(a.img);a.banner=safeImg(a.banner);a.imgXL=safeImg(a.imgXL);a.bgImage=safeImg(a.bgImage);});
   return normalizeFinished(normalizeRatings(dedupeList(mapped).kept));   // no duplicates, no old rating scale, no "plan" that is actually finished
 }
 // Did the list we're holding come from a FAILURE rather than from the user?
@@ -13027,6 +13092,16 @@ function titleBg(a){
   if(a.bannerFor&&a.aniId&&a.bannerFor!==a.aniId)return '';
   return a.banner;
 }
+// THE PORTRAIT FRAME WANTS THE PORTRAIT ART.
+// titleBg() hands back the wide banner — a 4.75:1 strip. Cropped to a 4:5
+// frame it shows about a sixth of its width, and whatever happens to be there
+// is what you get. The cover is the key visual: one picture, composed by the
+// people who made the show, for exactly this shape. A background the owner set
+// themselves still outranks both.
+function keyVisual(a){
+  if(!a)return '';
+  return a.bgImage||a.imgXL||a.img||'';
+}
 function titleAccent(a){if(!a)return'';return (a.bgImage?(a.bgAccent||a.aniColor):a.aniColor)||'';}
 let _ambBase='';   // last adaptive color from what you're browsing
 // The background glow (--amb) obeys a user setting: adaptive (follow content),
@@ -14352,10 +14427,20 @@ function epNextHTML(a){
   return `<div class="dt-ep-next">${icon('clock')} <b>Episode ${a.airEp||''}</b> in ${cdSpan(a.airAt*1000)} \u00b7 <span>${schEsc(stamp)}</span></div>`;
 }
 function bbSlideHTML(a){
-  const art=titleBg(a);
+  // ONE <picture>, TWO CROPS. The hero is a 4:5 key visual on a portrait phone
+  // and a wide banner everywhere else, and those two shapes want two different
+  // pictures. <source media> is how the browser is told that: it fetches only
+  // the one that matches, and swaps on rotation. Rendering both and hiding one
+  // would have cost every slide a second image download — seven of them in the
+  // carousel — which is the memory pressure the bb-live rule above exists to
+  // keep off this phone.
+  const art=titleBg(a),kv=safeImg(keyVisual(a));
+  const wide=art||kv,tall=kv||art;
   let bg=`<div class="hero-bg" style="background:linear-gradient(135deg,var(--bg4),var(--bg2))"></div>`;
-  if(art)bg+=`<img class="hero-bg-img" decoding="async" src="${escH(art)}" loading="lazy" alt="" onerror="this.remove()">`;
-  else if(safeImg(a.img))bg=`<div class="hero-bg" style="background-image:url('${safeImg(a.img)}')"></div>`;
+  if(wide){
+    const alt=(tall&&tall!==wide)?`<source media="(orientation:portrait) and (max-width:759px)" srcset="${escH(tall)}">`:'';
+    bg+=`<picture class="hero-art">${alt}<img class="hero-bg-img" decoding="async" src="${escH(wide)}" loading="lazy" alt="" onerror="this.remove()"></picture>`;
+  }
   const av=accentVars(a),p=prog(a),air=airingInfo(a);
   const cd=bbCountdown(a);
   const airHTML=cd?'':(air?`<div class="hero-air">${icon('calendar')} Ep ${air.ep} · airs ${air.when}</div>`:'');
@@ -26284,7 +26369,7 @@ function titleLooksRight(candidate,typed){
   }
   return false;
 }
-function coverNeedy(){return anime.filter(a=>!a.adultChk||(!a.img&&!a.imgTried)||(!a.eps&&!a.detTried)||(!a.banner&&!a.bannerTried)||(!a.aniScore&&!a.scoreTried)||(!a.aniId&&!a.idTried)||airingNeedy(a));}
+function coverNeedy(){return anime.filter(a=>!a.adultChk||(!a.img&&!a.imgTried)||(!a.imgXL&&!a.xlTried)||(!a.eps&&!a.detTried)||(!a.banner&&!a.bannerTried)||(!a.aniScore&&!a.scoreTried)||(!a.aniId&&!a.idTried)||airingNeedy(a));}
 // Sequels get their OWN pass, deliberately, and a much smaller batch.
 //
 // `relations` is expensive: AniList scores a query for complexity and caps it at
@@ -26502,7 +26587,7 @@ async function fetchCovers(){
         // The success path two hundred lines down already stamps it, with the
         // reason written out: "a title AniList doesn't carry shouldn't be asked
         // about forever". This is that same case, reached by the other door.
-        if(bad){bad.scoreTried=1;bad.detTried=true;bad.bannerTried=true;bad.adultChk=1;bad.idTried=1;if(!bad.img)bad.imgTried=true;if(kindOf(bad)!=='read')bad.airChk=Date.now();}
+        if(bad){bad.scoreTried=1;bad.detTried=true;bad.bannerTried=true;bad.xlTried=1;bad.adultChk=1;bad.idTried=1;if(!bad.img)bad.imgTried=true;if(kindOf(bad)!=='read')bad.airChk=Date.now();}
         batchSize=25;save();await pause(400);continue;
       }
       if(failed||!data){ // network hiccup: back off, retry a few times, then leave the rest for next launch (don't mark tried)
@@ -26522,6 +26607,15 @@ async function fetchCovers(){
         if(m&&isAdultMedia(m)){adultIds.push(a.id);return;}
         if(m){
           if(!a.img&&!a.imgTried)a.img=(m.coverImage&&m.coverImage.large)||'';
+          // THE KEY VISUAL, AT THE SIZE IT EXISTS IN.
+          // AniList's `coverImage.large` is not the large file — it resolves to
+          // /cover/medium/, 230×318. That is a poster thumbnail. `extraLarge` is
+          // /cover/large/, 460×636, and is the biggest cover AniList holds. The
+          // query has asked for both since covers were added and nothing ever
+          // read the second one. A hero 357px wide fed the 230px file is visibly
+          // soft; fed this one it is the picture the show was sold with.
+          if(m.coverImage&&m.coverImage.extraLarge)a.imgXL=m.coverImage.extraLarge;
+          a.xlTried=1;
           // AniList title variants — power the {titleEnglish}/{titleRomaji}/{titleNative} custom-source tokens
           if(m.title){if(m.title.english)a.titleEn=m.title.english;if(m.title.romaji)a.titleRo=m.title.romaji;if(m.title.native)a.titleNa=m.title.native;}
           // Now that the official spelling is known, take its capitalisation if
@@ -27385,10 +27479,11 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-11-12.99',
-  title:'WatchList on the Home Screen',
-  push:'The iPhone app has a Home Screen widget: the show you are part-way through, as its own artwork.',
+  v:'2026-11-15.100',
+  title:'The big card is the artwork',
+  push:'The card at the top of your list is a poster now — the picture the show was sold with, full size.',
   notes:[
+    'The big card on the home screen is <b>the artwork now</b>, not a strip with the name written across the middle of it. On the phone it stands up like a poster — the picture the show was sold with, edge to edge, with the title, its Japanese name and how far through you are along the bottom. The picture itself changed too: the app had been keeping a <b>230-pixel</b> copy of every cover while asking the database for the <b>460-pixel</b> one and throwing it away, so what you were looking at was always a thumbnail stretched to fit. The <b>Open</b> button has gone from it on the phone, because the whole card already opens the show. Turn the phone sideways, or open it on a tablet, and it goes back to the <b>wide picture</b>, which is the right crop for that shape — and only the one it is showing is ever downloaded.',
     'The big card on the home screen is <b>lit by the show on it</b>. AniList sends the main colour of every title\u2019s art and the app has been storing it and lighting every card the same grey anyway \u2014 there is a key light in that colour now, drifting across the frame slowly enough that you only notice it has moved. The picture and the words also <b>move apart as you scroll</b>, so a still frame has two planes in it instead of one. Film grain over the whole thing, and less of the artwork is buried under the shade the text needs. All of it stops if your phone is set to reduce motion.',
     'Small things on the phone are easier to hit. Eleven controls were under the size a fingertip reliably lands on \u2014 <b>Delete</b> and <b>Fix all</b>, the filter chips and the sort button, the little buttons on a card, and the dots under the big card, which were <b>two pixels tall</b>. Nothing looks any different and nothing moved: each one grew an invisible target under it, the same way the buttons along the top of the screen already worked.',
     'Your shows carry <b>the name they were given</b>. AniList has the Japanese title for almost everything \u2014 <b>\u846c\u9001\u306e\u30d5\u30ea\u30fc\u30ec\u30f3</b> under <i>Frieren: Beyond Journey\u2019s End</i> \u2014 and the app had been storing it all along and showing it nowhere. It sits under the title on the big card and on the title\u2019s own page, at reading weight rather than as a second heading. The line beside it changed too: where the big card used to say how many episodes there are, which the progress bar underneath already says, it now says <b>who made it and when</b> \u2014 <i>Madhouse \u00b7 2023 \u00b7 Action</i>.',

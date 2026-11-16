@@ -125,12 +125,18 @@ render()
 2. the **spotlight billboard** (`billboardHTML`, up to 5 hero items),
 3. the **Continue Watching** rail (`resumeItems` → `resumeRailHTML`) — the single
    "watching" surface on home,
+3b. **Nearly done** (`nearlyDone` → `nearlyRowHTML`) — titles within
+   `FINISH_REACH` of the end with nothing still to air. These are *lifted out
+   of* the rail above, not added beside it. If the section is switched off the
+   split does not happen at all and they stay in the rail: hiding a section
+   costs you a shelf, never the titles that were on it,
 4. the friends-recommend row (web build),
 5. per-status rows (Plan / Finished / Dropped), Favorites, and genre collections.
 
 **Invariant: a show appears at most once on the home screen.** The billboard is
-computed first (`spotSet`), the rail excludes `spotSet`, and the rows exclude
-both. Preserve this when editing home — overlapping sets were a real bug.
+computed first (`spotSet`), Nearly done takes from what is left of the watching
+set, the rail excludes both, and the rows exclude all three. Preserve this when
+editing home — overlapping sets were a real bug.
 
 Other key render functions: `renderDetail()` (the per-title sheet),
 `posterCard()` (grid/row card), `collapseSeries()` (folds multi-season series

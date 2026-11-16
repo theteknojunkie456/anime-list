@@ -1036,3 +1036,50 @@ half. It reads `currentSrc`, which is what the browser actually fetched rather
 than what the markup asked for, so it can tell which `<source>` won; and it
 checks the landscape phone and the tablet still get the banner, because a rule
 that quietly took over every shape would pass every assertion about the phone.
+
+## It is called a list. You get to the bottom of a list.
+
+Everything the app counted, it counted the way round with no end in it. `9 / 24`
+is where you are. *422 hours watched* is where you have been. *40 finished* is
+what is behind you. None of them is a finish line, and the thing is called a
+**list** — a list is something you get to the bottom of.
+
+So it counts the other way as well, at the three scales the idea shows up:
+
+- **One title.** Within three of the end, the card and the hero count *down*:
+  **2 left**, in accent, instead of `22/24`. The same two numbers, but only one
+  of them is a reason to open it tonight. Out of reach it stays a fraction,
+  because *47 left* is not encouragement. The hours beside it change with it —
+  once the card says "1 left", the figure next to it can no longer be the length
+  of the whole series, or "1 left · ~10h" reads as a ten-hour episode.
+- **One shelf.** **Nearly done**: everything one evening from finished, nearest
+  first. Seasons are not collapsed here, unlike every other shelf on home —
+  elsewhere a stack of seasons is one card because you are browsing a show;
+  here the whole point is that *this season* is two episodes from over.
+- **The whole list.** Stats opens with how far through it you are, and what is
+  left in episodes, chapters and hours — the other end of the sentence its own
+  face begins with *422 hours*.
+
+Two rules keep it trustworthy, and most of `finish-line-test` exists to hold
+them:
+
+**A season whose finale has not aired is never counted down.** The arithmetic is
+right and the sentence is a lie: *2 left* about an episode that comes out on
+Saturday is a promise the list cannot keep, and a countdown that has lied about
+one evening does not get read the next time.
+
+**Dropped is not unfinished.** Dropping something is a decision, not outstanding
+work. Counting it means the only way to reach 100% is to finish the thing you
+chose to stop watching, which makes the number both wrong and unreachable.
+
+And one structural rule, from `ARCHITECTURE.md`: **a title appears once on the
+home screen.** Nearly-done titles are *lifted out of* Up next, not added
+alongside it — and if the section is switched off, the lift does not happen and
+they stay where they were. Hiding a section should cost you a shelf, never the
+titles that were on it. That is a thing a human will not notice until the day a
+title they were halfway through silently is not anywhere, so the test toggles
+the section off, checks they came back, and toggles it on again.
+
+The shelf passes `oneStatus` to `railScroll`, so it does not stamp **WATCHING**
+on every card — the same rule the status shelves already follow, applied to the
+new shelf rather than rediscovered later.

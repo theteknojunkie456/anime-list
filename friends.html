@@ -1910,6 +1910,15 @@ img[data-fd="in"]{opacity:1;transition:opacity .18s ease-out;}
    found the data before the question it answers. One step up the ramp, not a
    new colour. */
 .sv-h{font-family:var(--fd);font-size:13px;font-weight:600;color:var(--t2);margin-bottom:8px;}
+/* The whole list as one bar. Same two-pixel rule the shelves and the cards use,
+   so this reads as the same measurement taken further back, not as a new kind
+   of chart arriving on the page. */
+.sv-fin{display:flex;align-items:baseline;gap:12px;margin-bottom:7px;}
+.sv-fin .pbar{flex:1;align-self:center;}
+.sv-fin b{font-family:var(--fd);font-size:19px;font-weight:800;letter-spacing:-.03em;
+  color:var(--t1);font-variant-numeric:tabular-nums;}
+.sv-fin span{font-family:var(--fd);font-size:13px;font-weight:700;color:var(--t3);margin-left:-8px;}
+.sv-fin-sub{font-size:13px;line-height:1.5;color:var(--t3);}
 .sv-bar{display:flex;align-items:center;gap:10px;padding:11px 0;cursor:pointer;border-top:1px solid var(--bn2);min-height:44px;}
 .sv-bar:first-child{border-top:none;}
 .sv-bar .lbl{font-size:13px;font-weight:700;color:var(--t1);width:96px;flex-shrink:0;display:flex;align-items:center;gap:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
@@ -2107,6 +2116,7 @@ img[data-fd="in"]{opacity:1;transition:opacity .18s ease-out;}
 .hero-prog{margin-top:10px;display:flex;align-items:center;gap:10px;}
 .hero-prog .pbar{flex:1;}
 .hero-prog span{font-size:12px;font-weight:700;color:rgba(255,255,255,0.85);}
+.hero-prog span.is-left{color:#fff;font-weight:800;}
 .hero-cta{
   margin-top:12px;display:inline-flex;align-items:center;justify-content:center;gap:7px;
   background:rgba(255,255,255,0.94);color:#0a0a0c;font-size:13px;font-weight:800;
@@ -2423,6 +2433,9 @@ img[data-fd="in"]{opacity:1;transition:opacity .18s ease-out;}
 .pcard-sub{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 /* The figures lead the line they are on: everything else there is an estimate. */
 .pc-ep{color:var(--t2);font-weight:700;}
+/* The one figure on a card that is an invitation rather than a reading, so it
+   is the one that gets the accent. */
+.pc-left{color:var(--a2);font-weight:800;}
 .pcard-fav{position:absolute;top:5px;right:7px;font-size:13px;text-shadow:0 1px 6px rgba(0,0,0,0.6);}
 /* Small and square, sitting in the corner of the artwork. It is a second target
    on a card whose whole face is already a target, so it stays quiet until the
@@ -12757,10 +12770,65 @@ function sorted(list){
   return l;
 }
 function prog(a){return a.status==='finished'?1:(a.epTotal?Math.max(0,Math.min(1,(a.ep||0)/a.epTotal)):0);}
+// ── WHAT IS LEFT ───────────────────────────────────────────────
+// Everything the app counted, it counted the way round that has no end in it.
+// 9 / 24 is where you are. Hours watched is where you have been. Neither of
+// them is a finish line, and the thing is called a LIST — a list is something
+// you get to the bottom of.
+// Zero where there is nothing honest to count against: an open-ended manga, a
+// movie, a title the database never matched. A guessed remainder is worse than
+// no remainder, because it is the number somebody would plan an evening around.
+function leftOf(a){
+  if(!a||a.status==='finished')return 0;
+  const t=+a.epTotal||0; if(!t)return 0;
+  return Math.max(0,t-Math.min(+a.ep||0,t));
+}
+// Can it actually be crossed off tonight? A season with its finale still to air
+// cannot, however close the count looks — "2 left" about an episode that comes
+// out on Saturday is a promise the list cannot keep, and the one kind of wrong
+// that would make the whole idea untrustworthy.
+function finishable(a){
+  if(!a||a.status!=='watching')return false;
+  if(!leftOf(a))return false;
+  if(a.airAt&&a.airAt*1000>Date.now())return false;
+  return true;
+}
+// One sitting, not one weekend. Three episodes is an evening; ten is a plan,
+// and a shelf of plans is the backlog again under a kinder name.
+const FINISH_REACH=3;
+function nearlyDone(list){
+  return (list||[]).filter(a=>finishable(a)&&leftOf(a)<=FINISH_REACH)
+    .sort((x,y)=>leftOf(x)-leftOf(y)||(y.upd||0)-(x.upd||0));
+}
+// The whole list as one figure. Dropped titles are left out of both halves:
+// dropping something is a decision, not outstanding work, and counting it as
+// unfinished means the only way to reach 100% is to finish things you chose
+// not to.
+function finishLine(list){
+  const L=(list||[]).filter(a=>a&&a.status!=='dropped');
+  const total=L.length, done=L.filter(a=>a.status==='finished').length;
+  let eps=0,chs=0,mins=0;
+  L.forEach(a=>{ const k=leftOf(a); if(!k)return;
+    if(kindOf(a)==='read')chs+=k; else {eps+=k;mins+=k*(+a.dur||24);} });
+  return {total,done,pct:total?Math.round(done/total*100):0,eps,chs,hrs:Math.round(mins/60)};
+}
 // How far through a whole shelf you are: the mean of its titles' progress. The
 // hairline at the head of each shelf is filled to this, so the rule that
 // separates the heading from its count is also reporting something. A shelf
 // with nothing started returns 0% and the rule is simply a rule.
+// The shelf is the point of the whole idea: the titles one evening from done,
+// nearest first. Seasons are NOT collapsed here — everywhere else on home a
+// stack of seasons is one card because you are browsing a show, but this shelf
+// is about a specific season being two episodes from over, and folding it into
+// its siblings hides exactly the thing it exists to say.
+function nearlyRowHTML(items){
+  if(!items||!items.length)return '';
+  const cells=items.map(a=>({a,n:1}));
+  return `<div class="row-sec" data-amb="${titleAccent(items[0])}">
+    <div class="row-head" style="--rc:${(STATUS_META.finished||{}).color||'var(--a2)'};--fill:${shelfFill(items)}">
+      <div class="row-title">Nearly done</div><div class="row-count">${cells.length}</div></div>
+    ${railScroll(cells,'watching')}</div>`;
+}
 function shelfFill(items){
   if(!items||!items.length)return '0%';
   let t=0;for(const a of items)t+=prog(a);
@@ -14278,8 +14346,18 @@ function posterCard(a,nSeas){
   // The bar under the cover is two pixels now, which is right for an ornament
   // and useless as a reading. The figures say it instead — first on the line,
   // tabular, so a column of cards lines up on the slash.
-  const frac=(a.status==='watching'&&a.epTotal)?`<b class="pc-ep">${a.ep||0}/${a.epTotal}</b>`:'';
-  const durBits=[frac,twMins?fmtWatch(twMins):'',_nx?(_nx.soon?'S2 soon':'S2 out'):''].filter(Boolean);
+  // Within reach, the card counts DOWN. "19/24" and "5 left" are the same two
+  // numbers, but only one of them is a reason to open it tonight. Out of reach
+  // it stays a fraction, because "47 left" is not encouragement.
+  const _left=finishable(a)&&leftOf(a)<=FINISH_REACH?leftOf(a):0;
+  const frac=(a.status==='watching'&&a.epTotal)
+    ?(_left?`<b class="pc-left">${_left} left</b>`:`<b class="pc-ep">${a.ep||0}/${a.epTotal}</b>`)
+    :'';
+  // The two figures on this line imply each other, so they have to agree. Once
+  // the card says "1 left", the hours beside it can no longer be the whole
+  // series — "1 left · ~10h" reads as a ten-hour episode. It is the time left.
+  const _leftMins=_left?_left*(+a.dur||24):0;
+  const durBits=[frac,(_left?(_leftMins?fmtWatch(_leftMins):''):(twMins?fmtWatch(twMins):'')),_nx?(_nx.soon?'S2 soon':'S2 out'):''].filter(Boolean);
   const durLine=durBits.length?`<div class="pcard-sub">${durBits.join(' \u00b7 ')}</div>`:'';
   const noteLine=noteHitHTML(a);
   // data-gid so a late-arriving image can be patched into THIS card without
@@ -14442,6 +14520,7 @@ function bbSlideHTML(a){
     bg+=`<picture class="hero-art">${alt}<img class="hero-bg-img" decoding="async" src="${escH(wide)}" loading="lazy" alt="" onerror="this.remove()"></picture>`;
   }
   const av=accentVars(a),p=prog(a),air=airingInfo(a);
+  const hLeft=finishable(a)&&leftOf(a)<=FINISH_REACH?leftOf(a):0;
   const cd=bbCountdown(a);
   const airHTML=cd?'':(air?`<div class="hero-air">${icon('calendar')} Ep ${air.ep} · airs ${air.when}</div>`:'');
   const kicker=a.status==='watching'?(kindOf(a)==='read'?'Continue reading':'Continue watching'):(a.fav?'One of your favorites':'In your spotlight');
@@ -14453,7 +14532,7 @@ function bbSlideHTML(a){
       <div class="hero-title">${schEsc(a.title)}</div>
       ${jpLine(a)}
       <div class="hero-meta">${schEsc([a.studio,a.year||'',genresOf(a)[0]].filter(Boolean).join(' · '))}</div>
-      ${a.epTotal?`<div class="hero-prog"><div class="pbar"><div class="pfill" style="width:${Math.round(p*100)}%"></div></div><span>${a.ep||0} / ${a.epTotal}</span></div>`:''}
+      ${a.epTotal?`<div class="hero-prog"><div class="pbar"><div class="pfill" style="width:${Math.round(p*100)}%"></div></div><span${hLeft?' class="is-left"':''}>${hLeft?hLeft+' left':`${a.ep||0} / ${a.epTotal}`}</span></div>`:''}
       ${airHTML}
       <div class="hero-cta">${icon('play')} &nbsp;Open</div>
     </div>
@@ -14589,6 +14668,7 @@ function airingRailHTML(items){
 const HOME_SECTIONS=[
   ['spotlight','Spotlight','The big rotating hero at the top'],
   ['resume','Up next','Pick up where you left off'],
+  ['nearly','Nearly done','Titles you could cross off tonight'],
   ['airing','Airing this week','What lands in the next 7 days'],
   ['quickpick','Not sure what to watch?','A short list when you can\u2019t decide'],
   ['friendrecs','From friends','Shows people sent you'],
@@ -14814,7 +14894,14 @@ function renderHome(){
   heroAmb=spotlight[0]?titleAccent(spotlight[0]):'';setAmbient(heroAmb);
   // Continue-watching rail: the ONE watching surface on home — every watching
   // title, minus anything already up in the billboard so nothing appears twice.
-  const railItems=resumeItems(pool,isRead).filter(a=>!spotSet.has(a.id)).slice(0,RAIL_CAP);
+  // The ones within reach of the end are lifted OUT of Up next into their own
+  // shelf rather than added to home a second time — a title appears once on this
+  // screen (ARCHITECTURE.md). Switched off, the lift does not happen and they
+  // stay in Up next, because a section you hid should cost you a shelf, not the
+  // titles that were on it.
+  const nearSet=homeOn('nearly')?nearlyDone(S.filter(a=>!spotSet.has(a.id))):[];
+  const nearIds=new Set(nearSet.map(a=>a.id));
+  const railItems=resumeItems(pool,isRead).filter(a=>!spotSet.has(a.id)&&!nearIds.has(a.id)).slice(0,RAIL_CAP);
   // one banner at most: backup warning (critical) wins; otherwise the behind nudge
   // nudgeHTML() decides for itself which of its three banners applies, and its
   // LAST branch is the one that calls shouldNudge(). Gating the call on
@@ -14835,6 +14922,7 @@ function renderHome(){
   const SECT={
     spotlight:()=>spotlight.length?billboardHTML(spotlight):'',
     resume:()=>resumeRailHTML(railItems,isRead),
+    nearly:()=>nearlyRowHTML(nearSet),
     airing:()=>isRead?'':airingRailHTML(airingThisWeek()),
     quickpick:()=>quickPickStripHTML(pool,isRead),
     friendrecs:()=>friendRecRowHTML(),
@@ -25326,6 +25414,25 @@ function renderStats(){
     parts.map(p=>'<div class="sv-drill" id="drill-st-'+p.key+'">'+svChips(anime.filter(a=>a.status===p.key))+'</div>').join('')+
     '</div>':'';
 
+  // ── the finish line ─────────────────────────────────────────
+  // "Where everything stands" above says what fraction of the list is in each
+  // state. This says the one thing the page never said: how much is LEFT. The
+  // face of the page is hours already spent; this is the other end of the same
+  // sentence, and the reason the thing is called a list.
+  const F=finishLine(anime);
+  const _rest=[F.eps?F.eps.toLocaleString()+' episode'+(F.eps===1?'':'s'):'',
+               F.chs?F.chs.toLocaleString()+' chapter'+(F.chs===1?'':'s'):''].filter(Boolean);
+  // The bar carries how far. The line under it carries what is left, and
+  // nothing else — "40 of 80 finished" is the ring directly below this one
+  // saying the same thing twice on one screen.
+  const finSec=F.total?'<div class="sv-sec"><div class="sv-h">How far through the list you are</div>'+
+    '<div class="sv-fin"><div class="pbar"><div class="pfill" style="width:'+F.pct+'%"></div></div>'+
+    '<b data-to="'+F.pct+'">0</b><span>%</span></div>'+
+    '<div class="sv-fin-sub">'+(_rest.length
+      ? _rest.join(' and ')+' to go'+(F.hrs?', about '+F.hrs.toLocaleString()+' hours':'')
+      : 'Nothing left on it — the whole list is done.')+
+    '</div></div>':'';
+
   // ── ratings: a distribution ───────────────────────────────────────────────
   const RBANDS=[[1,2],[3,4],[5,6],[7,8],[9,10]];
   const rd=RBANDS.map(([lo,hi])=>({
@@ -25389,7 +25496,7 @@ function renderStats(){
   const topSec=topRated.length?'<div class="sv-sec"><div class="sv-h">Your best of</div>'+
     '<div class="sv-drill on">'+topRated.map(a=>'<span class="sv-chip">'+schEsc(a.title)+' '+icon('star','fill')+a.rating+'</span>').join('')+'</div></div>':'';
 
-  body.innerHTML=face+statusSec+ratingSec+genreSec+timeSec+topSec+
+  body.innerHTML=face+finSec+statusSec+ratingSec+genreSec+timeSec+topSec+
     '<details class="sv-fold"><summary>'+icon('inbox')+' Device storage<b>Check</b></summary>'+storageBarHTML()+'</details>';
 
   // Sections arrive in order rather than all at once, which is the difference
@@ -27479,10 +27586,11 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-11-15.100',
-  title:'The big card is the artwork',
-  push:'The card at the top of your list is a poster now — the picture the show was sold with, full size.',
+  v:'2026-11-15.101',
+  title:'Getting to the bottom of the list',
+  push:'Your list counts down now — what is left, what is nearly done, and how far through the whole thing you are.',
   notes:[
+    'Your list knows it is a <b>list</b>. The app only ever counted what you had already done — <i>9 of 24</i>, hours watched, titles finished — and none of those have an end in them. It counts the other way now as well. A title within three of the end says <b>2 left</b> rather than <i>22/24</i>, with the time that actually means beside it instead of the length of the whole series. A new shelf, <b>Nearly done</b>, gathers everything one evening from finished, nearest first — lifted out of <b>Up next</b> rather than added to the screen a second time. And <b>Your Stats</b> now opens with how far through the whole thing you are, and what is left of it in episodes, chapters and hours, beside the hours you have already spent. Two rules keep it honest: a season whose last episode has not aired is <b>never</b> counted down, because “two left” about something that comes out on Saturday is a promise the list cannot keep; and anything you <b>dropped</b> is left out of both halves of the figure, since otherwise the only way to reach the end would be to finish what you chose to stop watching.',
     'The big card on the home screen is <b>the artwork now</b>, not a strip with the name written across the middle of it. On the phone it stands up like a poster — the picture the show was sold with, edge to edge, with the title, its Japanese name and how far through you are along the bottom. The picture itself changed too: the app had been keeping a <b>230-pixel</b> copy of every cover while asking the database for the <b>460-pixel</b> one and throwing it away, so what you were looking at was always a thumbnail stretched to fit. The <b>Open</b> button has gone from it on the phone, because the whole card already opens the show. Turn the phone sideways, or open it on a tablet, and it goes back to the <b>wide picture</b>, which is the right crop for that shape — and only the one it is showing is ever downloaded.',
     'The big card on the home screen is <b>lit by the show on it</b>. AniList sends the main colour of every title\u2019s art and the app has been storing it and lighting every card the same grey anyway \u2014 there is a key light in that colour now, drifting across the frame slowly enough that you only notice it has moved. The picture and the words also <b>move apart as you scroll</b>, so a still frame has two planes in it instead of one. Film grain over the whole thing, and less of the artwork is buried under the shade the text needs. All of it stops if your phone is set to reduce motion.',
     'Small things on the phone are easier to hit. Eleven controls were under the size a fingertip reliably lands on \u2014 <b>Delete</b> and <b>Fix all</b>, the filter chips and the sort button, the little buttons on a card, and the dots under the big card, which were <b>two pixels tall</b>. Nothing looks any different and nothing moved: each one grew an invisible target under it, the same way the buttons along the top of the screen already worked.',

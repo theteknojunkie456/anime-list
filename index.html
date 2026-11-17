@@ -10166,7 +10166,22 @@ async function syncOnOpen(){
     // last is the one that never hears it was overruled, which is the device
     // that most needs to.
     const _newer=!!(res&&res.updatedAt>syncAt());
-    if(res&&res.data&&(_newer||(+(res.adopt)||0)>lastAdopt())){
+    // A DEVICE THAT IS BEHIND HAS TO CATCH ITSELF UP.
+    //
+    // This gate was the clock alone, and the clock only answers "has anything
+    // happened since I last looked". A device can be perfectly current by that
+    // question and still be holding two thirds of the list — which is how one
+    // sat on 210 titles while the backup held 288. The push side now refuses to
+    // publish from that state, and refusing is the right thing, but on its own
+    // it just protects the backup and leaves the device quietly wrong for as
+    // long as nobody looks.
+    //
+    // The count on the shared copy makes the other question askable without a
+    // key: it holds more than this device does, so take it, whatever the
+    // timestamps say. That is what makes it one list rather than two that
+    // usually agree.
+    const _short=!!(res&&(+res.n||0)>=10&&realList().length<(+res.n)*0.85);
+    if(res&&res.data&&(_newer||_short||(+(res.adopt)||0)>lastAdopt())){
       const {inner,extra}=unwrapSync(res.data);
       if(extra)applyExtra(extra);              // themes + friends are plaintext — apply even if the list stays locked
       let arr=null;
@@ -10210,7 +10225,7 @@ async function syncOnOpen(){
         return;
       }
       if(arr){
-        if(!_newer)return;   // only here for the adopt check, and there wasn't one
+        if(!_newer&&!_short)return;   // only here for the adopt check, and there wasn't one
         // Data-safety guard: never let auto-sync silently replace a non-empty local
         // list with an empty cloud copy. A fresh or half-initialized device can push
         // [] (before its real list loads) and win on timestamp — that would wipe a
@@ -10234,7 +10249,11 @@ async function syncOnOpen(){
         // Merge, never replace. `arr` is the other device's view, not the truth.
         const before=anime.length;
         anime=migrate(mergeLists(anime,arr));
-        writeLocal();setSyncAt(res.updatedAt);render();renderSyncUI();
+        // A high-water mark, not a copy of the far end's clock: catching up can
+        // merge a copy that is OLDER than this device's mark, and writing its
+        // stamp would walk the mark backwards and re-merge the same copy on
+        // every open.
+        writeLocal();setSyncAt(Math.max(syncAt(),+res.updatedAt||0));render();renderSyncUI();
         toast(anime.length>before?`Synced. ${anime.length-before} added from your other device`:'Synced');
         // The merged list is newer than either side, so the cloud needs it too —
         // otherwise the device that pushed last keeps overwriting this one.
@@ -27644,10 +27663,11 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-11-15.102',
-  title:'Your backup cannot quietly get smaller',
-  push:'A device that is missing titles can no longer overwrite your backup with its own copy.',
+  v:'2026-11-16.103',
+  title:'One list, not two that usually agree',
+  push:'A device that has fallen behind now catches itself up the moment you open it.',
   notes:[
+    'Your devices keep <b>one list</b>, not two that usually agree. When a device opens it checks the backup — and until now it only asked whether anything had <b>happened</b> since it last looked, which a device can honestly answer “no” to while holding two thirds of the list. That is how a phone sat on 210 titles for three days while the backup held 288: not behind by the clock, only by the contents. The backup now says how many titles it holds, so that second question can be asked without opening it, and a device holding materially less <b>takes the backup when it opens</b> and publishes the result, so both sides end up level by themselves. A device holding <b>more</b> than the backup never takes the smaller copy, and a device already in step does not merge, or spend a save, saying so.',
     'A device can no longer <b>quietly shrink your backup</b>. The copy in the cloud is sealed, so no device could read another one’s to count it — which meant a phone holding 210 titles could replace a backup of 288 and nothing in the app was in a position to notice. The backup now says <b>how many titles it holds</b>, in the open beside the sealed copy, and a device about to publish a materially smaller list <b>stops and merges first</b>. If it still cannot match, it keeps the backup that is already there and records why, rather than writing over it. The other half was simpler and worse: before publishing, a device checks what is already up there — and if that check <b>failed</b>, it went ahead and wrote anyway. One dropped request was enough. Not knowing what is in your backup is now a reason not to replace it, and the attempt is retried rather than dropped. The one deliberate way to make the list smaller is unchanged: <b>Use this one</b>, which asks you twice and keeps a restore point.',
     'Your list knows it is a <b>list</b>. The app only ever counted what you had already done — <i>9 of 24</i>, hours watched, titles finished — and none of those have an end in them. It counts the other way now as well. A title within three of the end says <b>2 left</b> rather than <i>22/24</i>, with the time that actually means beside it instead of the length of the whole series. A new shelf, <b>Nearly done</b>, gathers everything one evening from finished, nearest first — lifted out of <b>Up next</b> rather than added to the screen a second time. And <b>Your Stats</b> now opens with how far through the whole thing you are, and what is left of it in episodes, chapters and hours, beside the hours you have already spent. Two rules keep it honest: a season whose last episode has not aired is <b>never</b> counted down, because “two left” about something that comes out on Saturday is a promise the list cannot keep; and anything you <b>dropped</b> is left out of both halves of the figure, since otherwise the only way to reach the end would be to finish what you chose to stop watching.',
     'The big card on the home screen is <b>the artwork now</b>, not a strip with the name written across the middle of it. On the phone it stands up like a poster — the picture the show was sold with, edge to edge, with the title, its Japanese name and how far through you are along the bottom. The picture itself changed too: the app had been keeping a <b>230-pixel</b> copy of every cover while asking the database for the <b>460-pixel</b> one and throwing it away, so what you were looking at was always a thumbnail stretched to fit. The <b>Open</b> button has gone from it on the phone, because the whole card already opens the show. Turn the phone sideways, or open it on a tablet, and it goes back to the <b>wide picture</b>, which is the right crop for that shape — and only the one it is showing is ever downloaded.',

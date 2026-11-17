@@ -94,10 +94,25 @@ const setup=async(js)=>await ev(`(async()=>{
 t('this device really is holding 210', await ev(`realList().length`), 210);
 
 // ── the hole that lost the titles ────────────────────────────────────────
+// The device is short and the clock says it has nothing to collect. It used to
+// publish the short list from here. Now the catch-up on the pull side reads the
+// same count this guard reads, so the ordinary outcome is better than a refusal:
+// the device fixes ITSELF and publishes the full list.
 let r=await setup(`window.__cloud={data:{v:3,list:window.__mk(288,0),extra:{}},updatedAt:1,n:288};`);
-t('210 does not go over a backup of 288', r.pushes.length, 0);
-t('and the device still holds its own 210 either way', r.have, 210);
-t('the refusal is recorded, so backup does not go quietly dead', r.fails>0, true);
+t('210 does not go over a backup of 288', (r.pushes[0]||{}).n!==210, true);
+t('the device catches up instead of publishing short', r.have, 288);
+t('and what reaches the cloud is the full list', (r.pushes[0]||{}).n, 288);
+
+// THE CASE THAT STILL NEEDS THE REFUSAL. Catching up is only possible when this
+// device can READ the backup. His list is password-protected, so a device whose
+// key does not open the stored copy cannot merge it however much it would like
+// to — it asks for the password and stops. That is the state the guard is for,
+// and it is the one that actually happened: short, unable to catch up, and one
+// save away from taking everyone else down with it.
+r=await setup(`window.__cloud={data:{v:3,list:{v:2,enc:'A256GCM',iv:'x',ct:'y'},extra:{}},updatedAt:1,n:288};`);
+t('a device that CANNOT read the backup does not publish over it', r.pushes.length, 0);
+t('it keeps its own list rather than losing that too', r.have, 210);
+t('and the refusal is recorded, so backup does not go quietly dead', r.fails>0, true);
 
 // Same shape, but the merge actually brings this device up to size: that is
 // not a shrink any more and it must publish, or the fix is just an outage.

@@ -1127,3 +1127,30 @@ that depends on being remembered at four call sites is a guard with three holes.
 The deliberate way to make the shared list smaller is untouched: the adopt push,
 where somebody pressed **Use this one** and confirmed it. That is the single
 exception, and it is checked.
+
+### The other half: a device that is behind catches itself up
+
+Refusing to publish a short list protects the backup. On its own it leaves the
+device sitting on the short list, silently, for as long as nobody notices — a
+phone held 210 titles for three days while the backup held 288 and nothing on
+either side was in a position to say so.
+
+It never caught up because the merge gate was **the clock alone**, and the clock
+only answers *has anything happened since I last looked*. A device can answer
+"no" to that honestly while missing a third of the list. The count now on the
+shared record makes the other question askable without a key — *it holds more
+than I do* — so the device pulls itself up on open and publishes the result,
+and both sides end up level without anybody pressing anything.
+
+`syncAt` became a high-water mark rather than a copy of the far end's clock:
+catching up can merge a copy that is *older* than this device's mark, and
+writing that stamp would walk the mark backwards and re-merge the same copy on
+every open.
+
+Most of `catch-up-test` is about what must **not** start happening: a device
+holding more than the backup must never take the smaller copy (the original bug
+arriving through the other door), a device in step must not merge on every open
+or spend a write saying so, a gap too small to mean anything is left alone, and
+a backup from a worker that sends no count behaves exactly as it did before.
+Two of its nine assertions fail against the previous build; the other seven are
+the guarantees that had to survive the change.

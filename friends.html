@@ -2774,6 +2774,12 @@ body.first-paint .pfill,body.content-in .pfill{animation:barGrow .62s cubic-bezi
 .dt-banner{position:absolute;top:-10px;left:-22px;right:-22px;height:150px;overflow:hidden;z-index:0;}
 .dt-banner-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 28%;}
 .dt-banner-scrim{position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,0.12) 0%,rgba(0,0,0,0.42) 46%,color-mix(in srgb,var(--bg2) 94%,transparent) 100%);}
+/* The light drifts here too, but only on the full-screen title page: the small
+   banner above a recommendation card is 150px of a sheet nobody is looking at
+   for 34 seconds, and an animation per open card is a compositor layer per open
+   card. One sheet, one drift. */
+#detailSheet .dt-banner .hero-grade{animation:heroLight 34s ease-in-out infinite alternate;}
+@media(prefers-reduced-motion:reduce){#detailSheet .dt-banner .hero-grade{animation:none;}}
 /* Cinematic full-screen title page (id-specific: overrides the bottom-sheet + landscape-modal .sheet styles in every orientation) */
 #detailSheet{position:fixed;inset:0;width:auto;height:100dvh;max-height:none;border:none;border-radius:0;opacity:1;box-shadow:none;padding:0;background:var(--bg2);transform:translateY(100%);transition:transform .46s cubic-bezier(.2,1,.28,1);}
 #detailSheet.on{transform:translateY(0);opacity:1;}
@@ -15235,7 +15241,14 @@ function renderDetail(){
     :`<div class="dt-cover-ph">${((a.title||'?').trim()[0]||'?').toUpperCase().replace(/['"<&]/g,'?')}</div>`)+_lvl+`</div>`;
   // per-title banner header + accent tint (scoped to this sheet only, never the global chrome)
   const art=titleBg(a);
-  const bannerHTML=art?`<div class="dt-banner"><img class="dt-banner-img" decoding="async" src="${escH(art)}" loading="lazy" alt="" onerror="this.closest('.dt-banner').remove()"><div class="dt-banner-scrim"></div></div>`:'';
+  // THE SAME LIGHT AS THE CARD YOU TAPPED TO GET HERE.
+  // The home hero is lit in the show's own colour and this page was not, so
+  // opening a title went from a frame with a light in it to a flat one — the
+  // kind of seam you feel without being able to name. Same two layers, same
+  // colour off the same record, and both collapse to nothing when AniList
+  // never sent one. The scrim stays where it is and still owns the darkening;
+  // the grade only ever adds.
+  const bannerHTML=art?`<div class="dt-banner" style="${accentVars(a)}"><img class="dt-banner-img" decoding="async" src="${escH(art)}" loading="lazy" alt="" onerror="this.closest('.dt-banner').remove()"><div class="hero-grade"></div><div class="dt-banner-scrim"></div><div class="hero-grain"></div></div>`:'';
   // Watch/Plan/Done/Drop reads wrong on a manga. Same four states, said the way
   // that kind of thing is actually talked about.
   const stLabel=st=>statusLabel(st,read);
@@ -27663,10 +27676,11 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-11-16.103',
-  title:'One list, not two that usually agree',
-  push:'A device that has fallen behind now catches itself up the moment you open it.',
+  v:'2026-11-17.104',
+  title:'The title page is lit too',
+  push:'Opening a show no longer goes from a lit frame to a flat one.',
   notes:[
+    'The page you land on when you open a title is <b>lit the same way the card you tapped was</b>. The big card on the home screen has carried a key light in the show’s own colour for a week and the title page had not, so opening something went from a frame with light in it to a flat one — the kind of seam you feel without being able to name. Same colour off the same record, same film grain, drifting the same way, and the same silence when the database never sent a colour for that title rather than a glow that could have belonged to anything.',
     'Your devices keep <b>one list</b>, not two that usually agree. When a device opens it checks the backup — and until now it only asked whether anything had <b>happened</b> since it last looked, which a device can honestly answer “no” to while holding two thirds of the list. That is how a phone sat on 210 titles for three days while the backup held 288: not behind by the clock, only by the contents. The backup now says how many titles it holds, so that second question can be asked without opening it, and a device holding materially less <b>takes the backup when it opens</b> and publishes the result, so both sides end up level by themselves. A device holding <b>more</b> than the backup never takes the smaller copy, and a device already in step does not merge, or spend a save, saying so.',
     'A device can no longer <b>quietly shrink your backup</b>. The copy in the cloud is sealed, so no device could read another one’s to count it — which meant a phone holding 210 titles could replace a backup of 288 and nothing in the app was in a position to notice. The backup now says <b>how many titles it holds</b>, in the open beside the sealed copy, and a device about to publish a materially smaller list <b>stops and merges first</b>. If it still cannot match, it keeps the backup that is already there and records why, rather than writing over it. The other half was simpler and worse: before publishing, a device checks what is already up there — and if that check <b>failed</b>, it went ahead and wrote anyway. One dropped request was enough. Not knowing what is in your backup is now a reason not to replace it, and the attempt is retried rather than dropped. The one deliberate way to make the list smaller is unchanged: <b>Use this one</b>, which asks you twice and keeps a restore point.',
     'Your list knows it is a <b>list</b>. The app only ever counted what you had already done — <i>9 of 24</i>, hours watched, titles finished — and none of those have an end in them. It counts the other way now as well. A title within three of the end says <b>2 left</b> rather than <i>22/24</i>, with the time that actually means beside it instead of the length of the whole series. A new shelf, <b>Nearly done</b>, gathers everything one evening from finished, nearest first — lifted out of <b>Up next</b> rather than added to the screen a second time. And <b>Your Stats</b> now opens with how far through the whole thing you are, and what is left of it in episodes, chapters and hours, beside the hours you have already spent. Two rules keep it honest: a season whose last episode has not aired is <b>never</b> counted down, because “two left” about something that comes out on Saturday is a promise the list cannot keep; and anything you <b>dropped</b> is left out of both halves of the figure, since otherwise the only way to reach the end would be to finish what you chose to stop watching.',

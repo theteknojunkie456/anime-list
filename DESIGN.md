@@ -1154,3 +1154,26 @@ or spend a write saying so, a gap too small to mean anything is left alone, and
 a backup from a worker that sends no count behaves exactly as it did before.
 Two of its nine assertions fail against the previous build; the other seven are
 the guarantees that had to survive the change.
+
+### The same light on the page you land on
+
+The hero was lit and the title page was not, so opening a show went from a frame
+with a light in it to a flat one — a seam you feel without being able to name.
+The title page header now carries the same two layers, driven by `accentVars()`
+off the same record, with the same drift and the same collapse to nothing when
+AniList never sent a colour. The scrim still owns the darkening; `mix-blend-mode:
+screen` means the grade can only ever add to it, which is asserted rather than
+assumed, because a grade that started subtracting would quietly double the
+darkening on every title page.
+
+Only the full-screen sheet drifts. The same banner markup appears above a
+recommendation card at 150px, and an animation per open card is a compositor
+layer per open card for something nobody looks at for thirty-four seconds.
+
+One assertion in `hero-cinema-test` had to change to make room for the seed that
+tests this: it took **the first slide carrying a colour**, which is whichever
+title the carousel happens to lead with. Adding banner art to two seeded titles
+reordered the carousel and the assertion failed on a page that was entirely
+correct. It now asks for the slide that opens `p0` by name. A positional
+assertion about a carousel is a test that will eventually lie about something
+that works.

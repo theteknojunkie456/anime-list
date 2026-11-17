@@ -22,8 +22,14 @@ const T=['Frieren','Vinland Saga','Mushishi','Monster','Dandadan','Oshi no Ko','
 // must collapse to nothing rather than fall back to a generic glow, which is
 // the version of this effect that looks machine-made.
 const C=['#e4a672','#5a7f9c','','javascript:x','#b05545','#3f6d52','#8c6d4f','#5a7f9c'];
+// Two of them carry banner art, because the title page only draws its header
+// when there IS art to draw — and those two are p0 (a colour) and p2 (none),
+// which is the pair the light has to treat differently. They are the first and
+// third watching titles either way, so the carousel's order does not move.
+const BAN=`http://localhost:${PORT}/.preview/banner.svg`;
 const list=T.map((t,i)=>({id:'p'+i,kind:'watch',status:i<3?'watching':'plan',title:t,titleNa:'日本語',
-  studio:'Madhouse',year:2023,aniColor:C[i],ep:3,epTotal:24,dur:24,genre:'Action',genres:['Action'],upd:1799999999000-i}));
+  studio:'Madhouse',year:2023,aniColor:C[i],ep:3,epTotal:24,dur:24,genre:'Action',genres:['Action'],
+  ...(i===0||i===2?{aniId:900+i,banner:BAN,bannerFor:900+i}:{}),upd:1799999999000-i}));
 const seed={wl_net_status:'approved',seen_release:(src.match(/const RELEASE=\{\s*v:'([^']+)'/)||[,'9'])[1],seen_msg:'1',
   animelist_v4:JSON.stringify(list),onboarded_animelist_v4:'1',tut_seen_animelist_v4:'1',backupoff_animelist_v4:'1',backup_nudge_animelist_v4:'1'};
 const inject='<script>try{'+Object.entries(seed).map(([k,v])=>`localStorage.setItem(${JSON.stringify(k)},${JSON.stringify(v)});`).join('')+'}catch(e){}</script>';
@@ -67,9 +73,14 @@ t('the cinematic rules are switched on',
 t('the hero has a light layer and a grain layer',
   await ev(`[!!document.querySelector('.bb-slide .hero-grade'),!!document.querySelector('.bb-slide .hero-grain')]`), [true,true]);
 // The colour must be the SHOW's, read off the slide that was given one.
+// Named, not positional. This used to take the FIRST slide carrying a colour,
+// which is whichever title the carousel happens to lead with — so changing the
+// seed moved it to a different show and the assertion failed on a page that was
+// perfectly correct. Ask for the slide that opens p0.
 t('a show with art colour lights the frame in it',
-  await ev(`(()=>{const s=[...document.querySelectorAll('.bb-slide')].find(x=>(x.getAttribute('style')||'').includes('--sc'));
-    return s?(s.getAttribute('style').match(/--sc:(#[0-9a-f]{6})/i)||[])[1]:'none';})()`), '#e4a672');
+  await ev(`(()=>{const s=[...document.querySelectorAll('.bb-slide')]
+      .find(x=>String(x.getAttribute('onclick')||'').includes("'p0'"));
+    return s?((s.getAttribute('style')||'').match(/--sc:(#[0-9a-f]{6})/i)||[])[1]||'no colour':'no slide for p0';})()`), '#e4a672');
 // A missing or hostile colour must produce no light at all, not a default glow.
 t('a show with none, or a bad one, gets no light',
   await ev(`(()=>{const bad=['','javascript:x'];
@@ -99,6 +110,36 @@ t('reduced motion stops the parallax', [await tr('.bb-slide .hero-bg,.bb-slide .
 t('reduced motion stops the light drifting',
   await ev(`(()=>{const e=document.querySelector('.bb-slide.bb-live .hero-grade');
     return e?getComputedStyle(e).animationName:'no live slide';})()`), 'none');
+
+// ── AND THE PAGE YOU LAND ON ─────────────────────────────────────────────
+// The hero is lit and the title page behind it was not, so opening a show went
+// from a frame with a light in it to a flat one. Same colour, same two layers,
+// same silence when there is no colour to use.
+await motion('no-preference'); await wait(400);
+await ev(`openDetail('p0')`); await wait(1200);
+t('the title page header has the same two layers',
+  await ev(`[!!document.querySelector('#detailSheet .dt-banner .hero-grade'),
+            !!document.querySelector('#detailSheet .dt-banner .hero-grain')]`), [true,true]);
+t('lit in that title\u2019s own colour',
+  await ev(`(()=>{const b=document.querySelector('#detailSheet .dt-banner');
+    return b?(b.getAttribute('style')||'').match(/--sc:(#[0-9a-f]{6})/i)?.[1]||'none':'missing';})()`), '#e4a672');
+t('and the light moves here too',
+  await ev(`(()=>{const e=document.querySelector('#detailSheet .dt-banner .hero-grade');
+    return e?getComputedStyle(e).animationName:'missing';})()`), 'heroLight');
+// The scrim still owns the darkening; the grade may only ever add to it.
+t('the grade adds light rather than taking it away',
+  await ev(`(()=>{const e=document.querySelector('#detailSheet .dt-banner .hero-grade');
+    return e?getComputedStyle(e).mixBlendMode:'missing';})()`), 'screen');
+await ev(`closeDetail&&closeDetail()`); await wait(500);
+await ev(`openDetail('p2')`); await wait(1200);
+t('a title with no colour gets no light here either, not a default glow',
+  await ev(`(()=>{const b=document.querySelector('#detailSheet .dt-banner');
+    if(!b)return 'missing'; const m=(b.getAttribute('style')||'').match(/--sc:([^;]+)/);
+    return !m||/^#[0-9a-f]{6}$/i.test(m[1].trim());})()`), true);
+await motion('reduce'); await wait(700);
+t('and reduced motion stops the drift on this page as well',
+  await ev(`(()=>{const e=document.querySelector('#detailSheet .dt-banner .hero-grade');
+    return e?getComputedStyle(e).animationName:'missing';})()`), 'none');
 
 console.log('\n'+pass+' passed, '+fail+' failed');
 ws.close();ch.kill();srv.kill();process.exit(fail?1:0);

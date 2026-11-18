@@ -5333,18 +5333,18 @@ body.recsel .pcard{position:relative;}
      which is three pixels of overhang on every edge — exactly the kind of thing
      that reads as "wonky" without being nameable. The circle IS the button. */
   .nav .nbtn.on>span{background:var(--bg4);}
-  /* The marker against the capsule's inner edge, the way the reference marks its
-     selected item — the rail says which one, the button does not shout it. */
-  /* The marker lives at the WINDOW edge, outside the capsule entirely — the rail
-     says which one is selected, and it says it from the side of the screen. The
-     capsule is inset 18px and padded 9, so -28 puts this flush against the edge. */
-  /* The bar marks the active tab with a rule across the top of its track; a
-     rail is vertical, so the same idea turns on its side and sits against the
-     window edge. right:auto and the explicit height undo the bar's rule rather
-     than fighting it — both set left, and an over-constrained box is decided by
+  /* THE MARKER BESIDE THE THING IT MARKS. It used to sit at the window edge,
+     27px from its own icon with the capsule's border in between, which is far
+     enough that it reads as a stray mark on the screen rather than as a pointer
+     at one button — there was nothing to say it belonged to the icon nearest it
+     rather than to the rail as a whole.
+     It sits in the capsule's own padding now, a few pixels off the circle. Close
+     enough to be that icon's, inside the capsule so it travels with it.
+     right:auto and the explicit height undo the phone bar's rule rather than
+     fighting it — both set left, and an over-constrained box is resolved by
      writing direction, which is not a thing to leave to chance. */
-  .nav .nbtn.on::before,.nav .nbtn.on:not(.add)::before{content:"";position:absolute;left:-27px;right:auto;top:50%;transform:translateY(-50%);
-    width:3px;height:22px;border-radius:0 2px 2px 0;background:var(--a);animation:none;}
+  .nav .nbtn.on::before,.nav .nbtn.on:not(.add)::before{content:"";position:absolute;left:-6px;right:auto;top:50%;transform:translateY(-50%);
+    width:3px;height:20px;border-radius:2px;background:var(--a);animation:none;}
   .nav .nbtn.add.on::before{display:none;}
 
   /* A label that appears beside the icon, instead of the browser's own tooltip —
@@ -5372,7 +5372,10 @@ body.recsel .pcard{position:relative;}
   .nav .nbtn#nav-settings>span::before,.nav .nbtn.rail-fold>span::before{
     content:'';position:absolute;top:-7px;left:50%;transform:translateX(-50%);
     width:20px;height:1px;background:var(--bn2);}
-  .nav .nbtn.rail-fold{display:flex;color:var(--t3);}
+  /* Hidden until the width where it has a job. Below that the rail is icons
+     already, so folding it could only mean hiding the navigation, and a control
+     whose only function is to take the navigation away is not one to offer. */
+  .nav .nbtn.rail-fold{display:none;color:var(--t3);}
   .nav .nbtn.rail-fold .ico{width:17px;height:17px;}
   /* The rail had its own circle, so squaring the + in the bar left this one
      round — the same control with two shapes depending on how wide the window
@@ -5390,12 +5393,47 @@ body.recsel .pcard{position:relative;}
      escape and ended up at x:-87 — a sidebar that vanishes with no way back,
      which is the one thing the comment above it said not to build.
      Shrinking needs no trick and cannot strand the control. */
-  :root.rail-folded .nav .nbtn:not(.rail-fold){display:none;}
-  :root.rail-folded .nav{padding:7px;gap:0;}
-  :root.rail-folded .nav .nbtn.rail-fold{margin-top:0;}
-  :root.rail-folded .nav .nbtn.rail-fold::after{display:none;}
+  /* FOLDED NOW MEANS ICONS, NOT GONE. It used to hide every button but the
+     chevron: the fold control's entire effect was to remove the navigation and
+     leave a single mystery tab behind. Collapsing a labelled sidebar to its
+     icons is what the control is for, and it is also the state this rail was in
+     before labels existed, so folded is the old rail exactly.
+     The chevron turns to point the other way, because it now offers the opposite
+     of what it just did. */
   :root.rail-folded .nav .nbtn.rail-fold .ico{transform:rotate(180deg);}
-  :root.rail-folded #app{padding-left:84px;}
+}
+/* THE RAIL, LABELLED, once there is room for it.
+   Five unlabelled glyphs is what a phone does because a phone has no room. A
+   1280px desktop has three hundred spare pixels down one side and was still
+   making you hover each icon in turn to find out what it was — the names existed
+   the whole time, in the tooltip, a second late and one at a time.
+   So above 1100 the rail becomes what the space allows: icon and name on a row,
+   nothing hidden. The LABEL IS THE TOOLTIP'S OWN TEXT, taken from data-tip and
+   laid inline rather than floated, so there is one source for what each button
+   is called and no markup had to change to say it twice.
+   Below 1100 none of this applies and the rail stays icons, because at that width
+   a 190px sidebar is taking room the content needs more. */
+@media (min-width:1100px) and (min-height:380px){
+  .nav .nbtn.rail-fold{display:flex;}
+  :root:not(.rail-folded) .nav, :root:not(.rail-folded).two-pane .nav{
+    grid-template-columns:1fr;justify-items:stretch;padding:12px;border-radius:22px;}
+  :root:not(.rail-folded) .nav .nbtn{
+    flex-direction:row;justify-content:flex-start;gap:12px;
+    width:100%;min-width:188px;max-width:none;border-radius:14px;
+    justify-self:stretch;padding-right:12px;}
+  /* the floating tooltip, set down. Same text, same type, no longer a second late */
+  :root:not(.rail-folded) .nav .nbtn[data-tip]::after{
+    position:static;transform:none;opacity:1;z-index:auto;transition:none;
+    background:none;border:none;box-shadow:none;padding:0;
+    font-size:13px;font-weight:700;letter-spacing:-.01em;color:inherit;}
+  /* the group hairline is positioned against the BUTTON, not the icon slot, so
+     widening it here spans the row instead of floating over the icon alone */
+  :root:not(.rail-folded) .nav .nbtn#nav-settings>span::before,
+  :root:not(.rail-folded) .nav .nbtn.rail-fold>span::before{width:calc(100% - 10px);}
+  :root:not(.rail-folded) .nav .nbtn.add{
+    width:100%;height:44px;min-width:0;margin:4px 0;border-radius:14px;
+    justify-content:flex-start;gap:12px;padding-left:13px;font-size:19px;}
+  :root:not(.rail-folded) #app{padding-left:232px;}
 }
 @media (min-width:820px) and (min-height:380px) and (hover:hover){
   .nav .nbtn:hover>span{background:var(--bg3);}

@@ -63,11 +63,32 @@ t('phone portrait: nothing sits below the bar', await navRows(), 0);
 
 await cmd('Emulation.setDeviceMetricsOverride',{width:932,height:430,deviceScaleFactor:1,mobile:true});
 await wait(300);
-t('phone landscape: rail, so the fold is there', await shown(), true);
+// WHAT THE FOLD MEANS CHANGED, so what this asserts changes with it. It used to
+// hide every button but itself, which is why it was worth having wherever the rail
+// was: it did something, even if what it did was take the navigation away. It now
+// collapses a LABELLED rail to its icons, and labels only exist from 1100px up. At
+// phone-landscape width the rail is icons already, so folding could only mean
+// hiding the navigation again — and a control with nothing to do is exactly what
+// this file was written to keep off the screen. Same principle, opposite answer.
+t('phone landscape: icons already, so nothing to fold', await shown(), false);
 
 await cmd('Emulation.setDeviceMetricsOverride',{width:1440,height:900,deviceScaleFactor:1,mobile:false});
 await wait(300);
-t('desktop: the fold is there', await shown(), true);
+t('desktop: labels, so the fold is there', await shown(), true);
+
+// and it collapses to icons rather than to nothing: every button survives folding
+await ev(`toggleRail()`); await wait(320);
+t('folded: the navigation is still there', await ev(`[...document.querySelectorAll('.nav .nbtn')]
+    .filter(b=>getComputedStyle(b).display!=='none').length`), 6);
+t('folded: and the labels are the thing that went',
+  await ev(`(()=>{const b=document.querySelector('#nav-home');
+    return getComputedStyle(b,'::after').position==='absolute';})()`), true);
+await ev(`toggleRail()`); await wait(320);
+
+// just below the label threshold the rail is icons and the control is gone again
+await cmd('Emulation.setDeviceMetricsOverride',{width:1040,height:900,deviceScaleFactor:1,mobile:false});
+await wait(300);
+t('1040 wide: no labels, so no fold', await shown(), false);
 
 await cmd('Emulation.setDeviceMetricsOverride',{width:430,height:932,deviceScaleFactor:1,mobile:true});
 await wait(300);

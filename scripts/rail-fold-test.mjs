@@ -60,6 +60,8 @@ const vis=()=>ev(`(()=>{const b=document.getElementById('nav-fold').getBoundingC
 
 t('open to begin with', await ev(`document.documentElement.classList.contains('rail-folded')`), false);
 const openX=await vis();
+const openW=await ev(`Math.round(document.querySelector('.nav').getBoundingClientRect().width)`);
+const openBtns=await ev(`[...document.querySelectorAll('.nav .nbtn')].filter(b=>getComputedStyle(b).display!=='none').length`);
 const openH=await ev(`Math.round(document.querySelector('.nav').getBoundingClientRect().height)`);
 const openPad=await ev(`parseInt(getComputedStyle(document.getElementById('app')).paddingLeft)`);
 t('the fold control is reachable', openX.onScreen, true);
@@ -70,9 +72,20 @@ const foldedX=await vis();
 const foldedH=await ev(`Math.round(document.querySelector('.nav').getBoundingClientRect().height)`);
 const foldedPad=await ev(`parseInt(getComputedStyle(document.getElementById('app')).paddingLeft)`);
 console.log('    rail height open/folded:', openH, '/', foldedH, ' padding:', openPad, '/', foldedPad);
-// Folding takes away HEIGHT, not width — the capsule was always one column wide,
-// so an earlier assertion about width was asking the wrong question.
-t('the rail shrinks to one control tall', foldedH < openH/2, true);
+// WIDTH IS THE RIGHT QUESTION AGAIN. This used to read "folding takes away HEIGHT,
+// not width — the capsule was always one column wide, so an earlier assertion about
+// width was asking the wrong question", and that was true while folding worked by
+// hiding every button but the chevron: the column could not get narrower, only
+// shorter. Above 1100 the rail now carries labels, and folding puts those away and
+// nothing else, so it loses width and keeps its height — and every button it had.
+// The old assertion would now only pass if folding still took the navigation away,
+// which is the behaviour that was wrong.
+const foldedW=await ev(`Math.round(document.querySelector('.nav').getBoundingClientRect().width)`);
+const foldedBtns=await ev(`[...document.querySelectorAll('.nav .nbtn')].filter(b=>getComputedStyle(b).display!=='none').length`);
+console.log('    rail width open/folded:', openW, '/', foldedW, ' buttons:', openBtns, '/', foldedBtns);
+t('folding takes the labels away, so the rail narrows', foldedW < openW * 0.65, true);
+t('it keeps its height, because it kept its buttons', Math.abs(foldedH-openH) < openH*0.25, true);
+t('every button survives the fold', foldedBtns === openBtns && foldedBtns >= 6, true);
 
 console.log('    fold tab when folded:', JSON.stringify(foldedX));
 t('but the control is still on screen', foldedX.onScreen, true);

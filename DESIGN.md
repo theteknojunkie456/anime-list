@@ -1177,3 +1177,26 @@ reordered the carousel and the assertion failed on a page that was entirely
 correct. It now asks for the slide that opens `p0` by name. A positional
 assertion about a carousel is a test that will eventually lie about something
 that works.
+
+### And the header behind it is not a letterbox either
+
+The same mistake, one surface along. The title page header is full-bleed and
+`min(48vh,360px)` tall — near enough square on a phone — and it was being handed
+the 1900×400 banner, so it showed about a quarter of its width. For most titles
+that quarter is sky. The fix is the one the hero already proved: the tall frame
+gets the key visual through a `<picture>`, the wide shapes keep the banner, and
+the browser downloads only the shape it is showing.
+
+**The small poster stays**, against the tidier composition. It looks redundant
+beside a large crop of the same art, and removing it would give the title the
+full width — but it carries two things nothing else does: the progress waterline,
+and the `just-done` celebration when a show is finished. Losing the app's best
+moment on its primary device is a bad trade for a cleaner header, and
+`finish-moment-test` is what says so out loud. The two framings differ anyway:
+the header is a crop with the subject filling it, the poster is the whole thing.
+
+A comment written an hour earlier claimed the drift rule was scoped to
+`#detailSheet` because a recommendation card draws its own 150px banner. It does
+not — `.dt-banner` is built in exactly one place. The 150px rule is the
+pre-fullscreen fallback the id-specific block overrides. The scope is still
+right and the reason was invented; it now says the true one.

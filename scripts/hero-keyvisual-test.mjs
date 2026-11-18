@@ -161,5 +161,24 @@ t('and keeps the button, because there the hero is a card',
   await ev(`getComputedStyle(document.querySelector('.bb-slide .hero-cta')).display`), 'inline-flex');
 t('and the banner with it', await shown(), 'banner.png');
 
+// ── THE SAME QUESTION, ON THE PAGE BEHIND IT ─────────────────────────────
+// The title page header is full-bleed and 360px tall on a phone — near enough
+// square — and it was fed the same 1900x400 banner, so it showed about a
+// quarter of its width. Same mistake as the hero, one surface along; the same
+// <picture> answers it, and the wide shapes must still get the banner.
+await screen(393,852); await wait(1000);
+await ev(`openDetail('p0')`); await wait(1500);
+const dtShown=async()=>await ev(`(()=>{const i=document.querySelector('#detailSheet .dt-banner-img');
+  return i?String(i.currentSrc||i.src).split('/').pop():'missing';})()`);
+t('the title page header is fed the key visual too', await dtShown(), 'xl.png');
+// One <picture>, one <img> inside it. Two images with one hidden would pass any
+// assertion about what is on screen while costing every open title a second
+// download it never shows.
+t('and it is a real <picture>, not two images one of which is hidden',
+  await ev(`[document.querySelectorAll('#detailSheet .dt-banner picture').length,
+            document.querySelectorAll('#detailSheet .dt-banner img').length]`), [1,1]);
+await screen(1024,1366); await wait(1400);
+t('a wide header still gets the banner, which is its shape', await dtShown(), 'banner.png');
+
 console.log('\n'+pass+' passed, '+fail+' failed');
 ws.close();ch.kill();srv.kill();process.exit(fail?1:0);

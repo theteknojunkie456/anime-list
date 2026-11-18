@@ -2774,10 +2774,10 @@ body.first-paint .pfill,body.content-in .pfill{animation:barGrow .62s cubic-bezi
 .dt-banner{position:absolute;top:-10px;left:-22px;right:-22px;height:150px;overflow:hidden;z-index:0;}
 .dt-banner-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 28%;}
 .dt-banner-scrim{position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,0.12) 0%,rgba(0,0,0,0.42) 46%,color-mix(in srgb,var(--bg2) 94%,transparent) 100%);}
-/* The light drifts here too, but only on the full-screen title page: the small
-   banner above a recommendation card is 150px of a sheet nobody is looking at
-   for 34 seconds, and an animation per open card is a compositor layer per open
-   card. One sheet, one drift. */
+/* Scoped to the full-screen sheet, which is the only place a .dt-banner is ever
+   built — the 150px rule above it is the pre-fullscreen fallback the id-specific
+   block below overrides, not a second banner somewhere. Keeping the animation on
+   the id means an element matching that fallback can never start one by accident. */
 #detailSheet .dt-banner .hero-grade{animation:heroLight 34s ease-in-out infinite alternate;}
 @media(prefers-reduced-motion:reduce){#detailSheet .dt-banner .hero-grade{animation:none;}}
 /* Cinematic full-screen title page (id-specific: overrides the bottom-sheet + landscape-modal .sheet styles in every orientation) */
@@ -2787,6 +2787,17 @@ body.first-paint .pfill,body.content-in .pfill{animation:barGrow .62s cubic-bezi
 #detailBody{padding:0 22px calc(var(--safe-b) + 46px);}
 #detailSheet .dt-banner{top:0;left:-22px;right:-22px;height:min(48vh,360px);will-change:transform;}
 #detailSheet .dt-banner-scrim{background:linear-gradient(to bottom,rgba(0,0,0,.10) 0%,rgba(0,0,0,.32) 42%,color-mix(in srgb,var(--bg2) 97%,transparent) 100%);}
+@media (orientation:portrait) and (max-width:759px){
+  /* A cover is composed with the subject high in it, and this frame keeps about
+     three quarters of its height, so what it loses comes off the bottom rather
+     than the face. The top half stays clear of the scrim: the art is the reason
+     the header is this tall. */
+  #detailSheet .dt-banner .dt-banner-img{object-position:center 16%;}
+  #detailSheet .dt-banner-scrim{background:linear-gradient(to bottom,
+    rgba(0,0,0,0) 0%,rgba(0,0,0,.06) 40%,rgba(0,0,0,.34) 64%,
+    color-mix(in srgb,var(--bg2) 80%,transparent) 86%,
+    color-mix(in srgb,var(--bg2) 99%,transparent) 100%);}
+}
 #detailSheet .dt-top.has-banner{padding-top:calc(min(48vh,360px) - 92px);}
 #detailSheet .dt-top:not(.has-banner){padding-top:calc(var(--safe-t) + 62px);}
 #detailSheet .dt-title{font-size:24px;}
@@ -5304,7 +5315,15 @@ body.recsel .pcard{position:relative;}
   .nav{grid-template-columns:46px;justify-items:center;}
   .nav .nbtn{position:relative;flex-direction:column;gap:0;padding:0;border-radius:50%;
     background:none;justify-self:center;align-self:center;
-    width:46px;min-width:46px;max-width:46px;height:46px;min-height:46px;}
+    width:46px;min-width:46px;max-width:46px;height:46px;min-height:46px;
+    /* THE MARKER WAS BEING DRAWN AND THEN THROWN AWAY.
+       .nbtn carries overflow:hidden so the phone bar can ellipsis a long label.
+       The rail has no labels, and it hangs two things OUTSIDE the button — the
+       selected marker at the window edge, and the hover label beside it — so
+       that one inherited property was quietly clipping both. The rail has told
+       you which section you are in since the day it was built; nobody has ever
+       seen it do so. */
+    overflow:visible;}
   .nav .nbtn small{display:none;}
   .nav .nbtn>span{width:46px;height:46px;border-radius:50%;display:flex;align-items:center;justify-content:center;
     background:transparent;transition:background-color .16s,transform .2s cubic-bezier(.2,.75,.3,1);}
@@ -5342,11 +5361,17 @@ body.recsel .pcard{position:relative;}
   }
   /* Hairlines, not boxes. Two groups and then the fold. */
   .nav .nbtn#nav-settings,.nav .nbtn.rail-fold{margin-top:10px;}
-  /* The dividers moved to ::before-of-the-group rather than ::after, because
-     ::after is now the tooltip. Drawn with a box-shadow on the button's own top
-     edge so it needs no element at all. */
-  .nav .nbtn#nav-settings,.nav .nbtn.rail-fold{
-    box-shadow:0 -6px 0 -5px var(--bn2);}
+  /* A HAIRLINE HAS TO BE DRAWN ON SOMETHING STRAIGHT.
+     These were a box-shadow on the button's own top edge, and a box-shadow
+     follows its element's border-radius — the element being a circle, so the
+     divider came out as a 46px ARC floating above each group. It read as a
+     smudge or a rendering fault, which is the worst kind of wrong: nobody
+     reports it, they just think the app looks broken.
+     The icon's own slot carries it instead. A pseudo-element is a box of its
+     own and does not inherit the circle. */
+  .nav .nbtn#nav-settings>span::before,.nav .nbtn.rail-fold>span::before{
+    content:'';position:absolute;top:-7px;left:50%;transform:translateX(-50%);
+    width:20px;height:1px;background:var(--bn2);}
   .nav .nbtn.rail-fold{display:flex;color:var(--t3);}
   .nav .nbtn.rail-fold .ico{width:17px;height:17px;}
   /* The rail had its own circle, so squaring the + in the bar left this one
@@ -5380,10 +5405,6 @@ body.recsel .pcard{position:relative;}
      app's. */
   .nav .nbtn[data-tip]:hover::after,.nav .nbtn[data-tip]:focus-visible::after{
     opacity:1;transform:translateY(-50%) translateX(0);}
-}
-  .nav .nbtn.on:hover>span{background:var(--bg4);}
-}
-  .nav .nbtn.on:hover>span{background:var(--ag);}
 }
 
 /* ── SIGNS OF LIFE ───────────────────────────────────────────────────────────
@@ -15248,7 +15269,16 @@ function renderDetail(){
   // colour off the same record, and both collapse to nothing when AniList
   // never sent one. The scrim stays where it is and still owns the darkening;
   // the grade only ever adds.
-  const bannerHTML=art?`<div class="dt-banner" style="${accentVars(a)}"><img class="dt-banner-img" decoding="async" src="${escH(art)}" loading="lazy" alt="" onerror="this.closest('.dt-banner').remove()"><div class="hero-grade"></div><div class="dt-banner-scrim"></div><div class="hero-grain"></div></div>`:'';
+  // THE HEADER IS NOT A LETTERBOX, SO IT CANNOT BE FED LETTERBOX ART.
+  // On a phone this frame is full-bleed and 360px tall — near enough square —
+  // and it was being handed the 1900×400 banner, so it showed about a quarter
+  // of its width: whatever happened to be in that quarter, which for most shows
+  // is sky. Same mistake the home hero made, on the next surface along, and the
+  // same fix: the tall frame gets the key visual, the wide one keeps the banner,
+  // and one <picture> lets the browser fetch only the shape it is showing.
+  const _kv=safeImg(keyVisual(a));
+  const _wide=art||_kv, _tall=_kv||art;
+  const bannerHTML=_wide?`<div class="dt-banner" style="${accentVars(a)}"><picture class="hero-art">${(_tall&&_tall!==_wide)?`<source media="(orientation:portrait) and (max-width:759px)" srcset="${escH(_tall)}">`:''}<img class="dt-banner-img" decoding="async" src="${escH(_wide)}" loading="lazy" alt="" onerror="this.closest('.dt-banner').remove()"></picture><div class="hero-grade"></div><div class="dt-banner-scrim"></div><div class="hero-grain"></div></div>`:'';
   // Watch/Plan/Done/Drop reads wrong on a manga. Same four states, said the way
   // that kind of thing is actually talked about.
   const stLabel=st=>statusLabel(st,read);
@@ -27676,10 +27706,11 @@ function _updBusy(){
 // bury the first. Highlights only, newest release, six or seven at most; the
 // full history lives in git where it belongs.
 const RELEASE={
-  v:'2026-11-17.104',
-  title:'The title page is lit too',
-  push:'Opening a show no longer goes from a lit frame to a flat one.',
+  v:'2026-11-17.105',
+  title:'The title page shows the show',
+  push:'The picture at the top of a title page is the show now, not a strip of sky from behind it.',
   notes:[
+    'The picture at the top of a title page is <b>the show</b>. That header is full-width and most of a phone screen tall, and it was being handed the <b>wide banner</b> — a strip four and a half times wider than it is high — so it showed about a quarter of its width, which for most titles is sky. It gets the <b>key visual</b> now: the picture the show was sold with, filling the frame, with the shade holding off the top half so the art leads. Turn the phone sideways or open it on a tablet and the header goes back to the wide banner, which is the right crop for that shape — and only the one being shown is ever downloaded.',
     'The page you land on when you open a title is <b>lit the same way the card you tapped was</b>. The big card on the home screen has carried a key light in the show’s own colour for a week and the title page had not, so opening something went from a frame with light in it to a flat one — the kind of seam you feel without being able to name. Same colour off the same record, same film grain, drifting the same way, and the same silence when the database never sent a colour for that title rather than a glow that could have belonged to anything.',
     'Your devices keep <b>one list</b>, not two that usually agree. When a device opens it checks the backup — and until now it only asked whether anything had <b>happened</b> since it last looked, which a device can honestly answer “no” to while holding two thirds of the list. That is how a phone sat on 210 titles for three days while the backup held 288: not behind by the clock, only by the contents. The backup now says how many titles it holds, so that second question can be asked without opening it, and a device holding materially less <b>takes the backup when it opens</b> and publishes the result, so both sides end up level by themselves. A device holding <b>more</b> than the backup never takes the smaller copy, and a device already in step does not merge, or spend a save, saying so.',
     'A device can no longer <b>quietly shrink your backup</b>. The copy in the cloud is sealed, so no device could read another one’s to count it — which meant a phone holding 210 titles could replace a backup of 288 and nothing in the app was in a position to notice. The backup now says <b>how many titles it holds</b>, in the open beside the sealed copy, and a device about to publish a materially smaller list <b>stops and merges first</b>. If it still cannot match, it keeps the backup that is already there and records why, rather than writing over it. The other half was simpler and worse: before publishing, a device checks what is already up there — and if that check <b>failed</b>, it went ahead and wrote anyway. One dropped request was enough. Not knowing what is in your backup is now a reason not to replace it, and the attempt is retried rather than dropped. The one deliberate way to make the list smaller is unchanged: <b>Use this one</b>, which asks you twice and keeps a restore point.',

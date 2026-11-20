@@ -33,7 +33,18 @@ const list=T.map((t,i)=>({id:'p'+i,kind:'watch',status:i<3?'watching':'plan',tit
 const seed={wl_net_status:'approved',seen_release:(src.match(/const RELEASE=\{\s*v:'([^']+)'/)||[,'9'])[1],seen_msg:'1',
   animelist_v4:JSON.stringify(list),onboarded_animelist_v4:'1',tut_seen_animelist_v4:'1',backupoff_animelist_v4:'1',backup_nudge_animelist_v4:'1'};
 const inject='<script>try{'+Object.entries(seed).map(([k,v])=>`localStorage.setItem(${JSON.stringify(k)},${JSON.stringify(v)});`).join('')+'}catch(e){}</script>';
-mkdirSync('.preview',{recursive:true});writeFileSync('.preview/cinema.html',src.replace('<script',inject+'<script'));
+mkdirSync('.preview',{recursive:true});
+// THE BANNER HAS TO BE WRITTEN, NOT ASSUMED. This asked for .preview/banner.svg and never
+// made one. It passed only while a file of that name happened to be left in .preview from
+// something else — and .preview is gitignored, so on a fresh clone, or after anyone clears
+// scratch, the image 404s. The app then does exactly what it should: onerror removes the
+// whole .dt-banner rather than leaving a broken frame. Six assertions about the title page's
+// light then read "missing", and the suite blames the app for a fixture that was never there.
+// hero-keyvisual-test writes its own images for this reason; this one now does too.
+writeFileSync('.preview/banner.svg',
+  '<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="400">'
+  + '<rect width="1200" height="400" fill="#4a3a2a"/></svg>');
+writeFileSync('.preview/cinema.html',src.replace('<script',inject+'<script'));
 const srv=spawn('python3',['-m','http.server',String(PORT)],{cwd:process.cwd(),stdio:'ignore'});
 const ch=spawn('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
  ['--headless=new','--remote-debugging-port='+DBG,`--user-data-dir=${(process.env.TMPDIR||'/tmp')}/wl-cinema`,

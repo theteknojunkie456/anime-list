@@ -44,7 +44,10 @@ src=src.slice(0,i)+`<script>addEventListener('load',()=>setTimeout(()=>{try{(${s
 mkdirSync('.preview',{recursive:true});writeFileSync('.preview/audit.html',src.replace('<script',inject+'<script'));
 const srv=spawn('python3',['-m','http.server','8985'],{stdio:'ignore',detached:true});
 await new Promise(r=>setTimeout(r,900));
-let dom='';try{dom=spawnSync(CHROME,['--headless=new','--disable-gpu','--no-sandbox','--hide-scrollbars','--virtual-time-budget=20000','--window-size=430,900','--dump-dom','http://127.0.0.1:8985/.preview/audit.html'],{encoding:'utf8',maxBuffer:1<<28}).stdout||''}finally{process.kill(-srv.pid)}
+// The rules apply at every width, but this only ever looked at a phone -- so the widest layouts, which are
+// the ones that have room to go wrong (a labelled rail, a two-pane split), were never measured at all.
+const SIZE = process.argv[2] || '430,900';
+let dom='';try{dom=spawnSync(CHROME,['--headless=new','--disable-gpu','--no-sandbox','--hide-scrollbars','--virtual-time-budget=20000',`--window-size=${SIZE}`,'--dump-dom','http://127.0.0.1:8985/.preview/audit.html'],{encoding:'utf8',maxBuffer:1<<28}).stdout||''}finally{process.kill(-srv.pid)}
 const m=/<pre id="A">([\s\S]*?)<\/pre>/.exec(dom);
 if(!m){console.log('no result');process.exit(2)}
 const dec=s=>s.replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&').replace(/&quot;/g,'"');

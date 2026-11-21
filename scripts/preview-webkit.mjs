@@ -11,6 +11,18 @@
 //
 //   node scripts/preview-webkit.mjs 393x852 out.png "applyTheme('naruto')"
 import { spawn } from 'node:child_process';
+
+import { existsSync } from 'node:fs';
+// .preview/index.html is written by scripts/preview.mjs and is gitignored, so it is
+// absent on a fresh clone and after any cleanup. Without this check the page simply
+// 404s and the run goes on to measure frame timings ON THE ERROR PAGE, reporting them
+// as if they were the app's. A missing fixture must stop the run, not quietly change
+// what is being measured.
+if (!existsSync('.preview/index.html')) {
+  console.error('.preview/index.html is missing — run `node scripts/preview.mjs` first.');
+  process.exit(1);
+}
+
 // Resolved at run time so this works whether Playwright is installed in the
 // project or, as here, kept outside it — the repo has no node_modules and this
 // script is not worth giving it one. PW may point at a playwright/index.js.

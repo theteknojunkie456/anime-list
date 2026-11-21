@@ -22,6 +22,18 @@
 //
 //   PW=<path>/playwright/index.js node scripts/perf-real.mjs [retro|plain|both]
 import { spawn } from 'node:child_process';
+import { existsSync } from 'node:fs';
+// .preview/index.html is written by scripts/preview.mjs and is gitignored, so it is
+// absent on a fresh clone and after any cleanup. Without this check the page simply
+// 404s and the run goes on to measure frame timings ON THE ERROR PAGE, reporting them
+// as if they were the app's. A missing fixture must stop the run, not quietly change
+// what is being measured.
+if (!existsSync('.preview/index.html')) {
+  console.error('.preview/index.html is missing — run `node scripts/preview.mjs` first.');
+  process.exit(1);
+}
+
+
 const _pw = await import(process.env.PW || 'playwright');
 const { webkit, devices } = _pw.default ?? _pw;
 

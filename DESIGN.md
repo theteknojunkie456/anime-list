@@ -141,9 +141,15 @@ or muddy greys and look wrong as UI.
 
 **Hierarchy.** A section head is the only landmark on a long scrolling page, and
 at 16px/800 it sat at the same visual weight as a card title four pixels below
-it — so nothing outranked anything and the page read flat. Heads are 19px with
--0.035em tracking against a count that recedes; the *contrast between them* is
+it — so nothing outranked anything and the page read flat. Heads are 21px with
+-0.045em tracking against a count that recedes; the *contrast between them* is
 what makes one read as a heading rather than a label.
+
+(This paragraph said 19px and -0.035em until 2026-11-22. `.row-title` and
+`.rz-head` have been 21px at -0.045em for some time — the heads grew and the
+tracking tightened and nobody came back here. Worth knowing that the two 19px
+rules left in the file are not section heads, so anyone auditing against this
+page would have gone looking for a size that no head uses.)
 
 Card titles moved from the body face at 11.5/600 — which is a caption — to the
 display face at 13/700. A title is a name, and the artwork and its name should
@@ -153,6 +159,22 @@ The hero is the one place the display face is allowed to be loud:
 `clamp(24px, 5.2vw, 34px)` at -0.04em, which is the tracking floor in the
 general rules and correct here because it's the only thing on the page set that
 large.
+
+**The type scale, counted rather than guessed.** Before calling a size drift, count how
+many rules use it. In this file:
+
+    12px  206 rules      13px  181      15px  77       10px  62
+    17px   28 rules      21px   23      34px   5       40px   3
+    ---- and the outliers ----
+    14px    3 rules      24px    3      19px   2       11.5px  1
+
+So the scale is 10 / 12 / 13 / 15 / 17 / 21 / 34 / 40. **15px is a member**, the fourth most
+used size in the app — it is not a value between 13 and 17 that someone slipped in. An audit
+that reports the sizes on one screen will make it look like one, because any single screen
+shows a handful of them; the count across the file is what settles it.
+
+I moved six things off 15px once, believing I was tidying them onto the scale, and had to put
+them back. The outliers are the short column: a lone 11.5px, three 14px, three 24px.
 
 **The hero's ladder, and why it is not drift.** Below that clamp the hero title
 steps down five times, and an audit counting sizes on screen will report two

@@ -154,6 +154,27 @@ The hero is the one place the display face is allowed to be loud:
 general rules and correct here because it's the only thing on the page set that
 large.
 
+**The hero's ladder, and why it is not drift.** Below that clamp the hero title
+steps down five times, and an audit counting sizes on screen will report two
+values — 24 and 27 — that are on no scale:
+
+    34  phone portrait (the clamp's ceiling)
+    27  >= 900px wide
+    24  landscape, or >= 760px wide
+    21  landscape under 560px tall
+    17  landscape under 520px tall
+
+Read the conditions rather than the numbers: every step is tied to vertical room
+running out, and the sequence only ever goes down. A hero that keeps its portrait
+size on a 420px-tall landscape phone eats the screen it is supposed to introduce.
+So this is a deliberate display ladder, not twenty-nine shadows doing the work of
+three, and snapping 24 and 27 onto the body scale would collapse two of its five
+steps and break the thing it exists for.
+
+The rule it does obey: the steps are *decided here* rather than invented one per
+breakpoint. If the hero needs another size, add it to this list with the
+condition that earns it.
+
 Honest note for anyone auditing this: these are both sans, which is the pairing
 the general rules warn about. It works here because Bricolage is a variable
 display grotesque used at 700–800 with negative tracking against Manrope at

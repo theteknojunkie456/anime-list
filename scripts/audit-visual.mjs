@@ -8,7 +8,23 @@ const seed={wl_net_status:'approved',seen_release:(src.match(/const RELEASE=\{\s
 const inject='<script>try{'+Object.entries(seed).map(([k,v])=>`localStorage.setItem(${JSON.stringify(k)},${JSON.stringify(v)});`).join('')+'}catch(e){}</script>';
 const suite=function(){
   const tally=(arr)=>{const m={};arr.forEach(v=>m[v]=(m[v]||0)+1);return Object.entries(m).sort((a,b)=>b[1]-a[1]);};
-  const vis=[...document.querySelectorAll('#app *')].filter(e=>{const r=e.getBoundingClientRect();return r.width>8&&r.height>8;});
+  // Every sheet in this app -- settings, party, archive -- is a SIBLING of #app, not a child, so scanning
+  // '#app *' measured 147 elements out of 1336 and never once looked at a sheet. Scan the document, and decide
+  // what is on screen properly: a closed sheet is still laid out, just moved away, so a size test alone would
+  // count it. checkVisibility catches display/visibility/opacity including ancestors; the rect test then keeps
+  // only what is actually within the viewport.
+  const onScreen=e=>{
+    if(/^(SCRIPT|STYLE|PRE|TEMPLATE|HEAD|META|LINK|TITLE)$/.test(e.tagName)) return false;
+    if(e.checkVisibility&&!e.checkVisibility({opacityProperty:true,visibilityProperty:true,contentVisibilityAuto:true})) return false;
+    // A closed sheet is translated off-screen with opacity 1, so checkVisibility passes it and geometry cannot
+    // tell it from a card below the fold. Rather than guess, use the app's OWN test for whether something is
+    // open (the selector in isOverlayOpen): anything inside a closed overlay is not on screen. That keeps the
+    // rest of the page -- below the fold included -- which a viewport test would have thrown away.
+    if(e.closest('.sheet:not(.on),.onb:not(.on),.lockscreen:not(.on),#playerView:not(.on),#shareView:not(.on)')) return false;
+    const r=e.getBoundingClientRect();
+    return r.width>8&&r.height>8;
+  };
+  const vis=[...document.querySelectorAll('body *')].filter(onScreen);
   const R={};
   R.radius=tally(vis.map(e=>getComputedStyle(e).borderRadius).filter(v=>v&&v!=='0px'));
   const textEls=vis.filter(e=>[...e.childNodes].some(n=>n.nodeType===3&&n.textContent.trim()));
@@ -39,8 +55,15 @@ const suite=function(){
   R.triple=tally(R.triple);
   const pre=document.createElement('pre');pre.id='A';pre.textContent=JSON.stringify(R);document.body.appendChild(pre);
 };
+// A third argument opens something first, the way preview.mjs does, because the rules apply to every screen
+// and this only ever measured the one the app boots into. A sheet is where decoration piles up -- it is the
+// screen that gets a background AND a border AND a shadow -- and none of them had ever been looked at.
+const AFTER = process.argv[3] || '';
 const i=src.lastIndexOf('</body>');
-src=src.slice(0,i)+`<script>addEventListener('load',()=>setTimeout(()=>{try{(${suite.toString()})()}catch(e){const p=document.createElement('pre');p.id='A';p.textContent=JSON.stringify({err:e.message});document.body.appendChild(p)}},1000))<\/script>`+src.slice(i);
+src=src.slice(0,i)+`<script>addEventListener('load',()=>setTimeout(()=>{
+  try{ ${AFTER} }catch(e){}
+  setTimeout(()=>{try{(${suite.toString()})()}catch(e){const p=document.createElement('pre');p.id='A';p.textContent=JSON.stringify({err:e.message});document.body.appendChild(p)}},700);
+},1000))<\/script>`+src.slice(i);
 mkdirSync('.preview',{recursive:true});writeFileSync('.preview/audit.html',src.replace('<script',inject+'<script'));
 const srv=spawn('python3',['-m','http.server','8985'],{stdio:'ignore',detached:true});
 await new Promise(r=>setTimeout(r,900));

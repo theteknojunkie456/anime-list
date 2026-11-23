@@ -10,21 +10,41 @@ permissions:
   pages: write
   id-token: write
 
+# One deployment at a time. In-progress runs are NOT cancelled: a half-finished
+# production deploy is worse than a slightly stale one, and the chapters bot
+# pushes several times a day, so cancelling would regularly kill a live deploy
+# mid-flight. GitHub queues the rest and skips the ones in between.
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
+# Two jobs, not one, and the split is the fix rather than tidiness.
+#
+# When a single job uploaded the artifact and then deployed it, deploy-pages
+# queried the artifact API within the same job and twice got "Found 0
+# artifact(s)" -- the upload step had succeeded, the artifact was simply not
+# visible yet, and the action does not retry that lookup. Finishing the build
+# job first means the artifact is registered before the deploy job starts.
+#
+# It also makes a failed deploy safe to re-run. In the single-job form, re-running
+# it re-ran the UPLOAD too, producing a second artifact named github-pages and
+# turning a transient "count is 0" into a permanent "count is 2".
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
           path: .
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
       - id: deployment
         uses: actions/deploy-pages@v4

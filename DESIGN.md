@@ -16,11 +16,26 @@ system rather than an inconsistency. There were **23 distinct corner values** in
 small to read as a decision and just large enough to make everything feel
 slightly misaligned. Add *to* the scale, never *between* it.
 
-**Elevation: three levels.**
+**Elevation: three levels**, and since 2026-11-23 they are tokens rather than
+strings you retype: `--elev-raise`, `--elev-float`, `--elev-overlay`.
 `0 2px 8px -2px` raised · `0 8px 24px -8px` floating · `0 20px 48px -18px`
 overlay. Twenty-nine near-identical shadows were doing the work of three, which
 is how a UI ends up feeling assembled rather than designed — nothing is wrong,
 but nothing agrees either.
+
+It had started again, quietly, which is why they are tokens now. The overlay
+level existed six times as a literal at three different alphas — .72, .75 and
+.8 — nobody having typed the wrong number, just nobody having typed the same
+one. `--elev2` meanwhile held a fourth value and was referenced nowhere at all.
+Thirteen literals now point at the three tokens; the dead one is gone.
+
+`--elev1` (`0 1px 2px`) survives as something else: a hairline under inputs and
+tiles, six uses, far too subtle to be the raised level. Three deliberate
+exceptions stay off the scale — the bottom bar casts its shadow UPWARD, the
+retro theme uses a harder `#000` because that theme states things with a lit
+edge rather than a halo, and the pick-card pulse carries its own shadow through
+a keyframe. A new bespoke shadow should now look out of place next to a token,
+which is the point.
 
 ## Colour
 

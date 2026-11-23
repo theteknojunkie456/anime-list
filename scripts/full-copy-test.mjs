@@ -58,7 +58,25 @@ localStorage.setItem('src_draft','half typed source');
 window.fetch=function(){return Promise.resolve(new Response('{"ok":true}',{status:200,headers:{'Content-Type':'application/json'}}));};
 `});
 await cmd('Page.navigate',{url:`http://localhost:${PORT}/index.html?cb=`+Math.random()});
-await wait(4500);
+
+// This was `await wait(4500)`, and it failed three times in three suite runs while passing
+// alone every time -- with a DIFFERENT assertion each run, which is the signature of a race
+// rather than a bug. 4.5s is plenty on an idle machine and not enough with thirty browsers
+// running, so the copy was being read while boot was still writing keys: fullCopyRead()
+// snapshotted localStorage, boot then added one more (fr_announced), and the comparison
+// found a key the snapshot could not have had. CONVENTIONS.md bans exactly this and the
+// test carried it anyway.
+// Wait for the condition instead: the app's own API present, the document complete, and
+// localStorage quiet for five consecutive polls (~300ms) so boot has stopped writing.
+const until=async(expr,ms=20000)=>{const t0=Date.now();
+  for(;;){const v=await ev(expr);if(v)return v;
+    if(Date.now()-t0>ms)return null;await wait(60);}};
+if(!await until(`typeof fullCopyRead==='function' && document.readyState==='complete'`))
+  { console.log('FAIL  the app never finished booting'); process.exit(1); }
+if(!await until(`(()=>{const n=localStorage.length;
+    if(window.__lsN===n){window.__lsQuiet=(window.__lsQuiet||0)+1;}else{window.__lsN=n;window.__lsQuiet=0;}
+    return window.__lsQuiet>=5;})()`))
+  { console.log('FAIL  localStorage never stopped changing'); process.exit(1); }
 let pass=0,fail=0;
 const t=(n,g,e)=>{const ok=JSON.stringify(g)===JSON.stringify(e);ok?pass++:fail++;
   console.log((ok?'ok  ':'FAIL')+'  '+n.padEnd(60)+JSON.stringify(g)+(ok?'':'  (want '+JSON.stringify(e)+')'));};

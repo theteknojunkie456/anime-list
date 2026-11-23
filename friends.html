@@ -113,7 +113,14 @@
   --r:14px;--r2:10px;
   /* neutral, theme-independent hairlines + soft depth (kept out of the per-theme accent tint) */
   --bn:rgba(255,255,255,0.09);--bn2:rgba(255,255,255,0.055);
-  --elev1:0 1px 2px rgba(0,0,0,0.28);--elev2:0 6px 20px -8px rgba(0,0,0,0.55);
+  /* The elevation scale. DESIGN.md names three levels and the code had them as copy-pasted
+     literals -- the overlay one at three different alphas (.72/.75/.8), which is near-identical
+     shadows doing the work of one. --elev1 stays: it is a fourth, much subtler hairline used on
+     inputs and tiles. --elev2 was referenced nowhere and is gone. */
+  --elev1:0 1px 2px rgba(0,0,0,0.28);
+  --elev-raise:0 2px 8px -2px rgba(0,0,0,.45);
+  --elev-float:0 8px 24px -8px rgba(0,0,0,.6);
+  --elev-overlay:0 20px 48px -18px rgba(0,0,0,.75);
 }
 /* ── RETRO ──────────────────────────────────────────────────────────────────
    Cyberpunk, not vintage. The first attempt used a dusty violet ground, which
@@ -436,7 +443,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
     left:50%;right:auto;bottom:auto;top:50%;
     width:min(760px,92vw);max-height:86dvh;
     border-radius:18px;border:1px solid var(--b3);border-top:1px solid var(--b3);
-    box-shadow:0 20px 48px -18px rgba(0,0,0,.72);
+    box-shadow:var(--elev-overlay);
     transform:translate(-50%,calc(-50% + 26px));
   }
   #hubSheet.on{transform:translate(-50%,-50%);}
@@ -517,7 +524,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
 .ns-stage{position:relative;min-height:clamp(300px,46vh,420px);margin:6px 0 12px;}
 .ns-card{
   position:relative;border-radius:18px;overflow:hidden;background:var(--bg3);
-  border:1px solid var(--bn2);box-shadow:0 8px 24px -8px rgba(0,0,0,.6);
+  border:1px solid var(--bn2);box-shadow:var(--elev-float);
   will-change:transform,opacity;touch-action:pan-y;
 }
 .ns-art{position:relative;width:100%;height:clamp(150px,24vh,220px);display:block;background:var(--bg4);overflow:hidden;}
@@ -842,7 +849,7 @@ button{transition:transform .12s ease,background .16s ease,border-color .16s eas
    properly. */
 [data-retro] #detailSheet{
   border:1px solid color-mix(in srgb,var(--edge) 34%,transparent);
-  box-shadow:inset 0 0 0 1px rgba(0,0,0,.92),0 20px 48px -18px rgba(0,0,0,.8);
+  box-shadow:inset 0 0 0 1px rgba(0,0,0,.92),var(--elev-overlay);
 }
 /* A section head reads as a plate, not a whisper: cyan, spaced, with its rule
    running out to the edge — the app already draws that rule, it was just grey. */
@@ -1554,7 +1561,7 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 .sort-btn.on,.sort-btn.filt-on{background:color-mix(in srgb,var(--a) 20%,var(--bg3));color:var(--a2);}
 .sort-btn .ico{width:13px;height:13px;}
 .sort-btn .ico:last-child{width:12px;height:12px;opacity:.7;}
-.sort-menu{position:absolute;right:0;top:calc(100% + 8px);z-index:60;min-width:172px;background:var(--bg2);border:1px solid var(--b2);border-radius:14px;padding:6px;box-shadow:0 20px 48px -18px rgba(0,0,0,.75);display:none;flex-direction:column;gap:2px;
+.sort-menu{position:absolute;right:0;top:calc(100% + 8px);z-index:60;min-width:172px;background:var(--bg2);border:1px solid var(--b2);border-radius:14px;padding:6px;box-shadow:var(--elev-overlay);display:none;flex-direction:column;gap:2px;
   /* It grew an entry and could then run off the bottom of a short screen with no
      way to reach the last one. Cap it against the viewport and let it scroll. */
   max-height:min(62vh,420px);overflow-y:auto;overscroll-behavior:contain;}
@@ -1702,7 +1709,7 @@ body.bright .hdr-title,body.bright .row-title,body.bright .row-count,body.bright
 .fchip,.sort-btn{
   background:color-mix(in srgb,var(--bg3) 88%,transparent);
   border:1px solid rgba(255,255,255,.16);
-  box-shadow:0 2px 8px -2px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.08);
+  box-shadow:var(--elev-raise),inset 0 1px 0 rgba(255,255,255,.08);
 }
 .fchip.on{background:color-mix(in srgb,var(--a) 34%,color-mix(in srgb,var(--bg3) 55%,transparent));border-color:color-mix(in srgb,var(--a) 45%,transparent);color:var(--a2);}
 .fchip.on-watching{background:color-mix(in srgb,var(--wat) 34%,color-mix(in srgb,var(--bg3) 55%,transparent));border-color:color-mix(in srgb,var(--wat) 45%,transparent);color:var(--wat);}
@@ -2847,7 +2854,7 @@ body.first-paint .pfill,body.content-in .pfill{animation:barGrow .62s cubic-bezi
 .dt-top.has-banner .dt-title{text-shadow:0 2px 12px rgba(0,0,0,0.55);}
 /* The poster is a progress medallion now: it owns a stacking context so the fill
    clips to its corners. */
-.dt-cover-wrap{position:relative;width:110px;height:156px;flex-shrink:0;border-radius:18px;overflow:hidden;box-shadow:0 8px 24px -8px rgba(0,0,0,.6);}
+.dt-cover-wrap{position:relative;width:110px;height:156px;flex-shrink:0;border-radius:18px;overflow:hidden;box-shadow:var(--elev-float);}
 .dt-cover{width:100%;height:100%;border-radius:18px;object-fit:cover;background:var(--bg4);border:1px solid var(--b2);display:block;}
 /* The waterline: a wash of this title's own accent rising from the bottom of the
    artwork to how far in you are, with a bright edge where it stops. The height
@@ -2901,7 +2908,7 @@ body.first-paint .pfill,body.content-in .pfill{animation:barGrow .62s cubic-bezi
   margin:0 0 20px;padding:15px;border-radius:18px;
   background:color-mix(in srgb,var(--bg2) 82%,transparent);
   border:1px solid var(--bn2);
-  box-shadow:0 20px 48px -18px rgba(0,0,0,.75);
+  box-shadow:var(--elev-overlay);
 }
 .dt-deck .dt-watch{margin-top:0;}
 .dt-deck .prog-row{margin:12px 0 0;}
@@ -3144,7 +3151,7 @@ body.yt-open{overflow:hidden;touch-action:none;}
 .dt-char-n{font-size:12px;font-weight:700;color:var(--t1);margin-top:6px;line-height:1.2;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
 .dt-char-r{font-size:10px;color:var(--t3);text-transform:capitalize;margin-top:1px;}
 .dt-rec{flex-shrink:0;width:104px;background:none;border:none;padding:0;text-align:left;cursor:pointer;}
-.dt-rec-img{width:104px;height:148px;border-radius:14px;background:var(--bg4) center/cover no-repeat;border:1px solid var(--b2);box-shadow:0 8px 24px -8px rgba(0,0,0,.6);position:relative;transition:transform .15s;}
+.dt-rec-img{width:104px;height:148px;border-radius:14px;background:var(--bg4) center/cover no-repeat;border:1px solid var(--b2);box-shadow:var(--elev-float);position:relative;transition:transform .15s;}
 .dt-rec:active .dt-rec-img{transform:scale(.95);}
 .dt-rec-img::after{content:'＋';position:absolute;right:5px;bottom:5px;width:24px;height:24px;border-radius:50%;background:var(--a);color:var(--aFg);font-size:17px;font-weight:700;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 8px rgba(0,0,0,.35);}
 .dt-rec-t{font-size:12px;color:var(--t2);line-height:1.3;margin-top:6px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
@@ -5132,7 +5139,7 @@ body.recsel .pcard{position:relative;}
 .pcard.bulk .pcard-wrap{outline:2.5px solid var(--a);outline-offset:2px;border-radius:14px;}
 .pcard.bulk .pcard-img,.pcard.bulk .pcard-ph{opacity:.72;}
 .bulk-menu{position:fixed;z-index:120;min-width:210px;padding:6px;border-radius:18px;
-  background:var(--bg2);border:1px solid var(--b3);box-shadow:0 20px 48px -18px rgba(0,0,0,.75);
+  background:var(--bg2);border:1px solid var(--b3);box-shadow:var(--elev-overlay);
   animation:sortIn .14s ease;}
 .bulk-menu-h{padding:7px 11px 8px;font-size:10px;font-weight:800;letter-spacing:.07em;
   text-transform:uppercase;color:var(--t3);}
@@ -5169,7 +5176,7 @@ body.recsel .pcard{position:relative;}
 .pcard.kbfocus .pcard-wrap{box-shadow:0 0 0 1px var(--a),0 12px 30px -8px var(--glow);}
 .kbhelp{position:fixed;inset:0;z-index:400;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.55);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);}
 .kbhelp.on{display:flex;animation:fadeUp .2s ease both;}
-.kbhelp-card{width:min(420px,92vw);background:var(--bg2);border:1px solid var(--b3);border-radius:18px;padding:22px 24px;box-shadow:0 20px 48px -18px rgba(0,0,0,.75);}
+.kbhelp-card{width:min(420px,92vw);background:var(--bg2);border:1px solid var(--b3);border-radius:18px;padding:22px 24px;box-shadow:var(--elev-overlay);}
 .kbhelp-h{font-family:var(--fd);font-size:17px;font-weight:800;letter-spacing:-.3px;margin-bottom:14px;color:var(--t1);}
 .kbhelp-row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:9px 0;border-bottom:1px solid var(--b2);font-size:13px;color:var(--t1);}
 .kbhelp-row:last-child{border-bottom:0;}

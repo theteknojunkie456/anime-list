@@ -29,8 +29,8 @@ const suite=function(){
   // reported 147 elements out of 1336 as if it were the whole UI -- confident numbers about
   // a tenth of the interface, with nothing on screen to suggest it. A coverage line is what
   // would have shown that at a glance, so it prints whether or not anyone asks.
-  R.coverage={measured:vis.length,inDocument:document.querySelectorAll('body *').length};
   const R={};
+  R.coverage={measured:vis.length,inDocument:document.querySelectorAll('body *').length};
   R.radius=tally(vis.map(e=>getComputedStyle(e).borderRadius).filter(v=>v&&v!=='0px'));
   const textEls=vis.filter(e=>[...e.childNodes].some(n=>n.nodeType===3&&n.textContent.trim()));
   R.size=tally(textEls.map(e=>getComputedStyle(e).fontSize));

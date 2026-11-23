@@ -32,6 +32,17 @@ lint runs automatically after every edit; never commit if it fails.
 ## Deploy
 - `git push origin main` → GitHub Pages goes live in ~1 min. A broken push is a
   broken live app — verify first.
+- **Verify by reading the live build, not by the push succeeding.** `curl` the
+  deployed `sw.js` and compare its `animelist-…` stamp to the local one. The
+  stamp is derived from `index.html`, so an app change must move it and a docs
+  or tooling change must not — which also tells you which kind of change you
+  just shipped.
+- **A Pages deploy that fails with "0 artifacts" must not be re-run with
+  `gh run rerun --failed`.** That job uploads *and* deploys, so re-running it
+  adds a second artifact named `github-pages` and the next error is "Multiple
+  artifacts… count is 2" — a transient failure turned into a permanent one.
+  Artifacts are scoped per run: start a fresh one with
+  `gh workflow run deploy.yml --ref main` (no empty commit needed).
 
 ## Tests
 - `sh scripts/suite.sh` runs every suite: `scripts/*-test.mjs`, `scripts/*.test.mjs`
@@ -53,6 +64,23 @@ lint runs automatically after every edit; never commit if it fails.
   assertions still slept and hoped.
 - A test that writes a persisted setting must clear it first, or its second run
   starts where the first left off. Each test gets its own `--user-data-dir`.
+- **Run one suite at a time, and nothing else that opens a browser.** The suite
+  sweeps its own ports, but a second suite — or an `audit-visual` run started
+  while one is going — collides and the damage reads as real test failures.
+  `full-copy` and `sync-diagnose` both "failed" that way and both passed 20/20
+  and 25/25 alone. A suite started immediately after another one can also hit a
+  port the previous run has not released yet, which it reports honestly
+  (`ports busy after sweep`, exit 2) and which is easy to misread as a pass.
+  If a failure cannot be caused by your change, check what else was running
+  before bisecting.
+- **Never put anything after the command whose status you need.**
+  `sh scripts/suite.sh > log 2>&1; echo "exit=$?"` exits 0 whatever the suite
+  did, because the echo is the last command — and `make build | tail -5` reports
+  tail's status, not the build's. Run it bare, or `set -o pipefail`. The suite
+  judges by exit status and says so above; a wrapper that eats it turns every
+  rule in this section into decoration. Read the `---- N ok, M failing` line as
+  well, and once, make something fail ON PURPOSE and confirm the wrapper says
+  so: a status channel nobody has seen carry a failure is not known to work.
 
 ## Don't
 - Do NOT add in-app streaming from scraper/torrent sources (anikoto, consumet,

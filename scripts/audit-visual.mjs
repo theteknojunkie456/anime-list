@@ -25,6 +25,11 @@ const suite=function(){
     return r.width>8&&r.height>8;
   };
   const vis=[...document.querySelectorAll('body *')].filter(onScreen);
+  // Say how much was looked at, every run. This audit scanned '#app *' for months and
+  // reported 147 elements out of 1336 as if it were the whole UI -- confident numbers about
+  // a tenth of the interface, with nothing on screen to suggest it. A coverage line is what
+  // would have shown that at a glance, so it prints whether or not anyone asks.
+  R.coverage={measured:vis.length,inDocument:document.querySelectorAll('body *').length};
   const R={};
   R.radius=tally(vis.map(e=>getComputedStyle(e).borderRadius).filter(v=>v&&v!=='0px'));
   const textEls=vis.filter(e=>[...e.childNodes].some(n=>n.nodeType===3&&n.textContent.trim()));
@@ -75,6 +80,14 @@ const m=/<pre id="A">([\s\S]*?)<\/pre>/.exec(dom);
 if(!m){console.log('no result');process.exit(2)}
 const dec=s=>s.replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&').replace(/&quot;/g,'"');
 const R=JSON.parse(dec(m[1]));
+// Lead with coverage. Every number below describes exactly this many elements and no more --
+// the one fact whose absence let this tool report on a tenth of the UI without anyone noticing.
+if(R.coverage){
+  const {measured,inDocument}=R.coverage;
+  const pct=Math.round(measured/Math.max(inDocument,1)*100);
+  console.log(`\n  measured ${measured} of ${inDocument} elements in the document (${pct}%) -- the rest are off screen or inside a closed overlay`);
+  if(measured<40) console.log('  WARNING: that is implausibly few. The selector or the visibility test is probably broken, and every tally below is wrong.');
+}
 const show=(t,rows,n=10)=>{console.log('\n  '+t+'  ('+rows.length+' distinct)');rows.slice(0,n).forEach(([v,c])=>console.log('   '+String(c).padStart(4)+'  '+v));};
 console.log('\n  text sizes, and who uses them');
 Object.entries(R.sizeOwners).sort((a,b)=>parseFloat(b[0])-parseFloat(a[0])).forEach(([z,cs])=>console.log('   '+z.padStart(7)+'  '+cs.join(', ')));

@@ -453,6 +453,25 @@ rather than one more line of noise.
 
 Reduced-motion is respected globally (one `*` rule collapses every duration).
 
+**Durations.** One gesture, one speed. A panel entering or leaving the screen
+is **340ms** — sheets, the detail sheet, the stats view, the player, share and
+yt views, the slide drawer, the carousel track. Below that: **300ms** for a
+thing moving to a new place on the page, **200ms** for a small move, **150ms**
+for colour, border and opacity on a control, **120ms** for the press itself.
+
+This is written down because it drifted. The same panel slide had six durations
+— .38s, .42s, .44s, .45s, .46s and .34s — each written on its own day and timed
+by feel. `#detailSheet` was .46s in one-pane and .34s in two-pane, so the same
+sheet changed speed when the window got wide enough for two columns.
+
+**Anything above 340ms has to run after the tap, not in front of it.** The stat
+bars growing out of the axis, a progress fill, the waterline rising up the hero,
+the ambient drift — those are the app telling you something it has already done,
+and taking its time reads as considered. A panel you are waiting on is the
+opposite: every extra frame is a frame where you have asked and not been
+answered. `scripts/motion-scale-test.mjs` enforces exactly that line, with the
+decorative selectors listed in it by name.
+
 **Ambient.** The background glow is the title's own colour (`--amb`, an
 `@property` so it can transition). A soft blob of it drifts on a 42s alternating
 cycle — transform only, so the gradient rasterises once and the GPU moves it;

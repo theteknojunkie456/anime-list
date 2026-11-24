@@ -9443,7 +9443,14 @@ try{
 // write to report that it had looked. On a plan whose thousand daily writes
 // are already gone, that is the difference between syncing when your list
 // changes and syncing because a timer fired.
-const PUSH_FP_IGNORE=['imgTried','detTried','bannerTried','idTried','scoreTried','adultChk','airChk','svcTried'];
+// Three more of exactly these were stamped on items and NOT listed here, found
+// 2026-11-24: xlTried (no larger cover exists), seqTried (stamped "either way,
+// or this retries forever", so a failed sequel lookup counted as a change) and
+// epTried (asked once per title). The six above were the examples; the class is
+// every stamp an enricher leaves to remember it already looked. A list of
+// examples does not stay complete on its own, so scripts/fp-ignore-test.mjs
+// now requires every *Tried/*Chk field in the file to appear here.
+const PUSH_FP_IGNORE=['imgTried','detTried','bannerTried','idTried','scoreTried','adultChk','airChk','svcTried','xlTried','seqTried','epTried'];
 function fpList(){
   return realList().map(a=>{
     let copy=null;

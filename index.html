@@ -1791,7 +1791,7 @@ body.first-paint .row-sec,body.content-in .row-sec{animation:fadeUp .5s cubic-be
 .hero{transition:transform .16s ease;}
 .hero:active{transform:scale(.99);}
 /* Full-screen Stats experience */
-.statsview{position:fixed;inset:0;z-index:90;background:var(--bg);overflow-y:auto;transform:translateY(100%);transition:transform .42s cubic-bezier(.2,1,.28,1);padding-bottom:calc(var(--safe-b) + 40px);}
+.statsview{position:fixed;inset:0;z-index:90;background:var(--bg);overflow-y:auto;transform:translateY(100%);transition:transform .34s cubic-bezier(.2,1,.28,1);padding-bottom:calc(var(--safe-b) + 40px);}
 .statsview.on{transform:translateY(0);}
 .sv-top{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:12px;padding:calc(var(--safe-t) + 14px) 18px 12px;background:linear-gradient(var(--bg),color-mix(in srgb,var(--bg) 55%,transparent));backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);}
 .sv-back{width:40px;height:40px;flex-shrink:0;border-radius:14px;background:var(--bg3);border:1px solid var(--b2);display:flex;align-items:center;justify-content:center;color:var(--t1);}
@@ -2161,7 +2161,7 @@ img[data-fd="in"]{opacity:1;transition:opacity .18s ease-out;}
 
 /* ── BILLBOARD (auto-rotating spotlight) ── */
 .billboard{position:relative;margin:14px 18px 6px;border-radius:26px;overflow:hidden;min-height:240px;box-shadow:0 18px 44px -14px rgba(0,0,0,.72);animation:fadeUp .4s ease both;}
-.bb-track{display:flex;min-height:240px;transition:transform .45s cubic-bezier(.22,1,.28,1);}
+.bb-track{display:flex;min-height:240px;transition:transform .34s cubic-bezier(.22,1,.28,1);}
 .bb-track.dragging{transition:none;}
 .bb-slide{position:relative;flex:0 0 100%;min-height:240px;display:flex;align-items:flex-end;cursor:pointer;overflow:hidden;}
 /* ONLY the visible slide animates. The billboard renders up to five spotlight
@@ -2262,7 +2262,7 @@ img[data-fd="in"]{opacity:1;transition:opacity .18s ease-out;}
 /* Dots under a carousel are the stock gesture. These are the same information
    as a row of measures: equal segments, the one you are on inked. */
 .bb-dots{gap:5px;}
-.bb-dot{width:16px;height:2px;border-radius:0;background:rgba(255,255,255,0.34);transition:background-color .35s cubic-bezier(.2,1,.3,1),opacity .35s;cursor:pointer;}
+.bb-dot{width:16px;height:2px;border-radius:0;background:rgba(255,255,255,0.34);transition:background-color .34s cubic-bezier(.2,1,.3,1),opacity .34s;cursor:pointer;}
 .bb-dot.on{background:#fff;}
 .row-div{font-family:var(--fd);font-size:13px;font-weight:600;color:var(--t3);padding:48px 18px 4px;}
 
@@ -2757,7 +2757,7 @@ body.first-paint .pfill,body.content-in .pfill{animation:barGrow .62s cubic-bezi
   background:var(--bg2);border-radius:26px 26px 0 0;border-top:1px solid var(--b3);
   padding:10px 22px calc(var(--safe-b) + 24px);
   box-shadow:0 -20px 60px rgba(0,0,0,0.5);
-  transform:translateY(calc(100% + 100px));transition:transform .44s cubic-bezier(.2,1,.28,1);
+  transform:translateY(calc(100% + 100px));transition:transform .34s cubic-bezier(.2,1,.28,1);
 }
 @supports ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
   .sheet.on{background:color-mix(in srgb,var(--bg2) 82%,transparent);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);}
@@ -2788,7 +2788,7 @@ body.first-paint .pfill,body.content-in .pfill{animation:barGrow .62s cubic-bezi
 #detailSheet .dt-banner .hero-grade{animation:heroLight 34s ease-in-out infinite alternate;}
 @media(prefers-reduced-motion:reduce){#detailSheet .dt-banner .hero-grade{animation:none;}}
 /* Cinematic full-screen title page (id-specific: overrides the bottom-sheet + landscape-modal .sheet styles in every orientation) */
-#detailSheet{position:fixed;inset:0;width:auto;height:100dvh;max-height:none;border:none;border-radius:0;opacity:1;box-shadow:none;padding:0;background:var(--bg2);transform:translateY(100%);transition:transform .46s cubic-bezier(.2,1,.28,1);}
+#detailSheet{position:fixed;inset:0;width:auto;height:100dvh;max-height:none;border:none;border-radius:0;opacity:1;box-shadow:none;padding:0;background:var(--bg2);transform:translateY(100%);transition:transform .34s cubic-bezier(.2,1,.28,1);}
 #detailSheet.on{transform:translateY(0);opacity:1;}
 #detailSheet .sheet-handle{display:none;}
 #detailBody{padding:0 22px calc(var(--safe-b) + 46px);}
@@ -3487,7 +3487,7 @@ html.rotating .pv-frame{opacity:0;}
 /* Belt and braces: even if the class is somehow set while iOS is presenting,
    never hide the element it is presenting from. */
 html.rotating .pv-frame:fullscreen,html.rotating .pv-frame:-webkit-full-screen{opacity:1!important;}
-.playerview{position:fixed;inset:0;z-index:120;background:#000;display:flex;flex-direction:column;transform:translateY(100%);transition:transform .38s cubic-bezier(.2,1,.28,1);}
+.playerview{position:fixed;inset:0;z-index:120;background:#000;display:flex;flex-direction:column;transform:translateY(100%);transition:transform .34s cubic-bezier(.2,1,.28,1);}
 /* `none`, not `translateY(0)`. A position:fixed element that still carries a
    transform is composited against a snapshotted viewport and becomes the
    containing block for its fixed descendants — and iOS resizes the visual
@@ -4070,7 +4070,7 @@ textarea.ai-prompt-in{resize:none;line-height:1.45;display:block;}
 .pc-num svg{width:.6em;height:.6em;fill:currentColor;stroke:currentColor;display:block;margin:0 auto;}
 .pc-lbl{font-size:15px;font-weight:700;color:rgba(255,255,255,.7);letter-spacing:.04em;}
 @keyframes pcPop{0%{transform:scale(.4);opacity:0;}30%{transform:scale(1.1);opacity:1;}100%{transform:scale(1);opacity:1;}}
-.shareview{position:fixed;inset:0;z-index:130;background:#000;display:none;transform:translateY(100%);transition:transform .38s cubic-bezier(.2,1,.28,1);}
+.shareview{position:fixed;inset:0;z-index:130;background:#000;display:none;transform:translateY(100%);transition:transform .34s cubic-bezier(.2,1,.28,1);}
 .shareview.on{display:block;transform:translateY(0);}
 /* Voice/screen call embedded at the top of the party sheet (not a takeover). */
 .party-call{margin:2px 0 12px;border-radius:18px;overflow:hidden;border:1px solid var(--b2);background:var(--bg2);box-shadow:0 10px 30px -14px var(--glow);transition:border-color .18s;}
@@ -4222,7 +4222,7 @@ body.call-full{overflow:hidden;}
 .party-call.full .party-call-frame:has(iframe){height:auto;}
 .party-call-frame iframe{position:absolute!important;inset:0;width:100%!important;height:100%!important;border:0;}
 /* In-app player — mirrors .shareview so the transition feels identical */
-.ytview{position:fixed;inset:0;z-index:130;background:#000;display:none;transform:translateY(100%);transition:transform .38s cubic-bezier(.2,1,.28,1);}
+.ytview{position:fixed;inset:0;z-index:130;background:#000;display:none;transform:translateY(100%);transition:transform .34s cubic-bezier(.2,1,.28,1);}
 .ytview.on{display:block;transform:translateY(0);}
 .ytview .pv-top{position:absolute;top:0;left:0;right:0;z-index:3;background:linear-gradient(to bottom,rgba(0,0,0,.6),rgba(0,0,0,0));padding-bottom:26px;}
 .yt-stage{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;}

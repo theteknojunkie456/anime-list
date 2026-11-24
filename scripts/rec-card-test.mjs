@@ -80,14 +80,22 @@ t('both layers are anchored to the same box',
 t('a cover that 404s leaves the tile behind, not a hole',
   await ev(`(async()=>{const h=document.createElement('div');h.style.cssText='position:fixed;left:0;top:0;width:900px';
     h.innerHTML=${card('Dandadan','http://localhost:'+PORT+'/__missing__.jpg')};document.body.appendChild(h);
-    await new Promise(r=>setTimeout(r,900));
+    // Was a flat 900ms. That is long enough on an idle machine and not with thirty browsers
+    // up, so the img had not errored out yet and the tile still held it -- the test failed in
+    // the suite and passed alone. Wait for the condition, with a deadline so a cover that
+    // never errors still fails rather than hanging.
+    for(let t0=Date.now();h.querySelector('.rec-img')&&Date.now()-t0<8000;)
+      await new Promise(r=>setTimeout(r,50));
     const out={img:!!h.querySelector('.rec-img'),ph:(h.querySelector('.rec-ph')||{}).textContent};
     h.remove();return out;})()`), {img:false,ph:'D'});
 t('a cover that loads is revealed',
   await ev(`(async()=>{const u='data:image/svg+xml;base64,'+btoa('<svg xmlns="http://www.w3.org/2000/svg" width="6" height="9"><rect width="6" height="9" fill="#357"/></svg>');
     const h=document.createElement('div');h.style.cssText='position:fixed;left:0;top:0;width:900px';
     h.innerHTML=recCard('k',{item:{title:'Frieren',img:u,aniId:0},senders:[{code:'AAAAAAAAAA',name:'Rin'}]});
-    document.body.appendChild(h);await new Promise(r=>setTimeout(r,700));
+    document.body.appendChild(h);
+    // Same reason as above: poll for the reveal instead of guessing how long decoding takes.
+    for(let t0=Date.now();!h.querySelector('.rec-img').classList.contains('on')&&Date.now()-t0<8000;)
+      await new Promise(r=>setTimeout(r,50));
     const on=h.querySelector('.rec-img').classList.contains('on');h.remove();return on;})()`), true);
 
 // ── the cover comes from another person, so it goes through safeImg ────────

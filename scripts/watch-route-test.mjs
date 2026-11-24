@@ -92,8 +92,19 @@ t('and it is the service it said it would open',
   await ev(`(window.__opened[0]||'').includes('peacocktv.com')`), true);
 
 // ── the screen now says which choice plays in-app ──────────────────────────
+// Nothing set and nothing to fall back on is the state a fresh device is in, because
+// every built-in starts hidden. The screen used to answer it with "Open a site" already
+// selected, its sub-line reading "Pick one below first", and nothing below to pick. One
+// route out now: the paste box. The modes below are about a source that exists.
+t('with nothing set up at all, Sources leads with the paste box, not an empty choice',
+  await ev(`(()=>{setSource('');WATCH_PRESETS.forEach(p=>{if(!isHiddenSrc(p.name))toggleHiddenSrc(p.name);});
+    openSheet('sourceSheet');renderSource();
+    return {paste:!!document.getElementById('srcQuickIn'),
+            choices:[...document.querySelectorAll('#sourceBody .src-choice .src-name')].length};})()`),
+  {paste:true,choices:0});
+// and the moment one exists, the modes are choices rather than a buried fold
 t('Sources offers playing inside the app as a choice, not a buried fold',
-  await ev(`(()=>{setSource('');openSheet('sourceSheet');renderSource();
+  await ev(`(()=>{if(isHiddenSrc('Peacock'))toggleHiddenSrc('Peacock');setSource('');openSheet('sourceSheet');renderSource();
     return [...document.querySelectorAll('#sourceBody .src-choice .src-name')].map(x=>x.textContent);})()`),
   ['Open a site','Play inside WatchList','Ask me each time']);
 t('and says plainly that a built-in opens a tab, naming it',

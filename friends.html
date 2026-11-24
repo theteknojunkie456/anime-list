@@ -5710,6 +5710,9 @@ body.recsel .pcard{position:relative;}
 /* The sites belong to the choice they configure, so they sit inside it rather
    than floating between the two and belonging to neither. */
 .src-choice-body{padding:0 13px 12px 42px;margin:0;}
+/* The setup card states a fact rather than offering a choice, so it carries no
+   radio mark — and without one the 42px that clears the mark is just a limp. */
+.src-setup .src-choice-body,.src-setup .src-choice-top{padding-left:13px;}
 /* The setup for "play inside WatchList" sits in that choice, so it reads as its
    detail rather than as a rival option — and stays out of the way until the
    choice is the one being made. Open by default it was taller than the other two
@@ -22723,7 +22726,11 @@ function quickSetup(){
   if(!inp||!out)return;
   const raw=(inp.value||'').trim();
   try{raw?localStorage.setItem('src_draft',raw):localStorage.removeItem('src_draft');}catch(e){}
-  if(raw.length<12){out.style.display='none';return;}
+  // Was `raw.length<12`, a guard against reacting to half-typed text that also
+  // refused netflix.com (11 characters), hulu.com and max.com — the shortest and
+  // likeliest things anyone would paste. Length was never the question: a dot with
+  // something after it is what makes an address, so that is what it asks for.
+  if(raw.length<4||!/[a-z0-9-]\.[a-z]{2,}/i.test(raw)){out.style.display='none';return;}
   const url=normSrc(raw);
   const tpl=templatizeSearchURL(url);
   out.style.display='block';
@@ -22761,6 +22768,28 @@ function quickSetup(){
         A pattern built on this link would send <b>every</b> show to this one, so there's nothing to learn here.
         <p class="ai-desc" style="margin:9px 0 0">What works instead: open a show, and use <b>Advanced: paste a direct episode link</b> on its card. That pins the address for that one title, and the episode number still follows you through it.</p>
         </div>`;
+      return;
+    }
+    // A SITE ON ITS OWN IS A VALID ANSWER.
+    // Pasting netflix.com used to be refused — "I can't tell which show or episode
+    // that address points at" — which is true and beside the point. Somebody who
+    // wants Netflix wants Watch to take them to Netflix. The app cannot know how a
+    // site it has never seen names its shows, so it says that plainly and takes
+    // the person at their word instead of sending them away to find a better link.
+    const bareSite=(()=>{try{
+      const u=new URL(url);
+      return u.pathname.replace(/\/+$/,'')===''||/^\/(browse|home|search|tv|anime)\/?$/i.test(u.pathname);
+    }catch(e){return false;}})();
+    if(bareSite){
+      let hostn=''; try{hostn=new URL(url).hostname.replace(/^www\./,'');}catch(e){}
+      out.dataset.tpl=url; out.dataset.site=hostn;
+      out.innerHTML=`<div class="src-quick-ok">
+        <div class="src-quick-got">${icon('check')} Watch will open <b>${escH(hostn||'that site')}</b>.</div>
+        <div class="src-quick-sub">It lands you on the site rather than on the episode — this address does not show how
+          ${escH(hostn||'the site')} names its shows, so there is nothing to follow. Open any episode there and paste
+          <b>that</b> address instead, and every show goes straight to its page.</div>
+        <button class="parse-btn" style="margin-top:10px" onclick="quickSetupUse()">Use ${escH(hostn||'this site')}</button>
+      </div>`;
       return;
     }
     out.innerHTML=`<div class="src-quick-bad">${icon('search')} I can't tell which show or episode that address points at.<br>
@@ -22808,6 +22837,9 @@ function quickShowTemplate(tpl,url){
       <div class="src-quick-got">${icon('check')} That's <b>${escH(showName)}</b>${ep?` episode ${escH(ep)}`:''} on <b>${escH(site||'your site')}</b>.</div>
       <div class="src-quick-sub">Watch will open every show the same way${other?` — ${escH(other.title)} episode 3 would go to:`:'.'}</div>
       ${proof?`<div class="src-quick-url">${escH(proof)}</div>`:''}
+      ${/\{(slug|slug_|title\w*)\}/i.test(tpl)?`<div class="src-quick-sub" style="margin-top:8px">Sites spell shows their own
+        way, so one may not open under the name above. When that happens the player asks which page is right — you point it
+        out once and every episode of that show follows.</div>`:''}
       <button class="parse-btn" style="margin-top:10px" onclick="quickSetupUse()">Use this for everything</button>
     </div>`;
   out.dataset.tpl=tpl; out.dataset.site=site;
@@ -24722,7 +24754,11 @@ function readQuickSetup(){
   const inp=document.getElementById('rsrcQuickIn'),out=document.getElementById('rsrcQuickOut');
   if(!inp||!out)return;
   const raw=(inp.value||'').trim();
-  if(raw.length<12){out.style.display='none';return;}
+  // Was `raw.length<12`, a guard against reacting to half-typed text that also
+  // refused netflix.com (11 characters), hulu.com and max.com — the shortest and
+  // likeliest things anyone would paste. Length was never the question: a dot with
+  // something after it is what makes an address, so that is what it asks for.
+  if(raw.length<4||!/[a-z0-9-]\.[a-z]{2,}/i.test(raw)){out.style.display='none';return;}
   const url=normSrc(raw);
   let tpl=templatizeSearchURL(url).replace(/\{ep\}/g,'{ch}');
   // Readers are mostly SERIES pages — /comics/<name>, /manga/<name>, /series/<name>
@@ -24893,109 +24929,11 @@ function unhideAllSrc(){
   }catch(e){}
   try{renderSource();}catch(e){}
 }
-function renderSource(){
-  const box=document.getElementById('sourceBody'); if(!box) return;
-  // Hiding/renaming rebuilds this whole sheet, which would snap open folds shut
-  // and jump the scroll to the top — so you couldn't hide several in a row.
-  // Snapshot which folds are open and where we're scrolled, and restore after.
-  const openFolds={};box.querySelectorAll('details[data-fold]').forEach(d=>{openFolds[d.dataset.fold]=d.open;});
-  const scroller=box.closest('.sheet')||box, prevScroll=scroller?scroller.scrollTop:0;
-  const O=k=>openFolds[k]?' open':'';
-  const custom=streamSource(), rcustom=readSource();
-  const host=u=>{try{return new URL(u.replace(/\{[^}]+\}/g,'x')).hostname;}catch{return u.slice(0,32);}};
-  // Yours first. The built-in list is fixed and findable; the sites you added are
-  // the ones you actually reach for, and they were sitting after eight presets.
-  const chips=customServices().filter(s=>!isHiddenSrc(s.name)).map(s=>`<button class="src-chip yours${custom===s.url?' on':''}" onclick="setSourceById('${s.id}')">${escH(s.name)}</button>`).join('')
-    +WATCH_PRESETS.filter(p=>!isHiddenSrc(p.name)).map(p=>`<button class="src-chip${custom===p.url?' on':''}" onclick="setSource('${jsq(p.url)}')">${escH(p.name)}</button>`).join('');
-  const myCount=customServices().length, hiddenCount=hiddenSrc().length;
-  const tab=srcTab();
-  const tabs=`<div class="src-tabs">
-      <button class="src-tab${tab==='watch'?' on':''}" onclick="setSrcTab('watch')">${icon('play')} Anime</button>
-      <button class="src-tab${tab==='read'?' on':''}" onclick="setSrcTab('read')">${icon('book')} Reading</button>
-    </div>`;
-  if(tab==='read'){box.innerHTML=tabs+readSourceHTML(rcustom);try{if(scroller)scroller.scrollTop=prevScroll;}catch{}return;}
-  // A newcomer used to meet the ADVANCED path first: a big "paste your site's
-  // address" card, before anything said that Watch already works. That reads as
-  // a setup screen you have to get through, when in fact there is nothing to do.
-  // So: say what tapping Watch does right now, then offer the choices, and keep
-  // the custom-site flow folded away for people who actually want it.
-  // This line and the one under it used to disagree with each other: the banner
-  // said Watch had "nowhere to go yet" while the sentence directly beneath it
-  // said "that already works — nothing to set up". Both were generated, neither
-  // knew what the other had decided, and a reader had to work out which was
-  // lying. One decision now, stated once, with the caption following from it.
-  const _free=freeDefault();
-  // A site the PERSON supplied, as opposed to one of the built-ins. This is the
-  // distinction the whole screen turns on and it was never drawn: picking a
-  // built-in wrote its URL into the same setting as a custom one, so the panel
-  // could not tell you which of the two situations you were in — and they behave
-  // completely differently when you press Watch.
-  const _mine=!!custom&&!WATCH_PRESETS.some(x=>x.url===custom);
-  box.innerHTML=tabs+`
-    <!-- ONE SETTING, SHOWN AS ONE SETTING.
-         There was a banner saying what Watch does, a card directly beneath
-         saying it again, and between the two choices a row of site chips with
-         nothing to say which choice they belonged to — three elements describing
-         one setting, and no filled control anywhere to show which answer was
-         currently true. The mark is the point: a list of options with nothing
-         filled in is a list of suggestions. -->
-    <div class="dt-label">${icon('play')} When you tap Watch</div>
-
-    <div class="src-choice${!_mine&&!noSourceMode()?' on':''}">
-      <button class="src-choice-top" onclick="setSource('')">
-        <span class="src-mark"></span>
-        <span class="src-choice-txt">
-          <span class="src-name">Open a site</span>
-          <span class="src-sub">${_free||custom
-            ? ('Goes to '+escH(_free?_free.name:host(custom))+', '+handoffWord())
-            : 'Pick one below first'}</span>
-        </span>
-      </button>
-      ${chips?`<div class="src-picks src-choice-body">${chips}</div>`:''}
-    </div>
-
-    <!-- THE ANSWER TO "WHY DOES NOTHING OPEN IN WATCHLIST".
-         It always opened a tab, and the screen never said why: the big services
-         send a header that forbids any other page from displaying them, which is
-         the browser refusing, not something this app can code around. The one
-         route that does play in-app is a site you supply yourself — and that was
-         buried in a fold called "Use a site of your own", under a headline
-         telling you there was nothing to set up. It is a choice now, beside the
-         other choices, saying what it gets you. -->
-    <div class="src-choice${_mine?' on':''}">
-      <button class="src-choice-top" onclick="openOwnSource()">
-        <span class="src-mark"></span>
-        <span class="src-choice-txt">
-          <span class="src-name">Play inside WatchList</span>
-          <span class="src-sub">${_mine
-            ? escH(host(custom))+' — plays in the app'
-            : 'Needs a site of your own. Paste one episode link and it works out the rest.'}</span>
-        </span>
-      </button>
-      <!-- The setup lives INSIDE the choice it belongs to. It used to be a
-           separate fold below, headed "Use a site of your own": the same job
-           reachable two ways, one of them presented as a choice and one as a
-           drawer, with nothing to say they were the same thing. One control
-           now, and the thing it asks for sits directly under it. -->
-      <div class="src-choice-body src-own">
-          <p class="ai-desc" style="margin:9px 0 11px;font-size:13px">Open your site, start <b>any</b> episode of <b>any</b> show, and paste that page's address. That one link is the whole setup — WatchList works out the pattern and uses it for every show.</p>
-          <textarea class="ai-prompt-in urlin" rows="2" id="srcQuickIn" placeholder="paste that episode's address" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url" oninput="quickSetup()" onkeydown="if(event.key==='Enter')event.preventDefault();"></textarea>
-          <div id="srcQuickOut" class="src-quick-out" style="display:none"></div>
-          <button class="src-quick-share" id="shareMineBtn" onclick="shareMine()">${icon('send')} Share mine<span>${custom?escH(host(custom)):'anyone can use your setup'}</span></button>
-      </div>
-    </div>
-
-    <button class="src-choice src-choice-solo${noSourceMode()?' on':''}" onclick="setNoSource()">
-      <span class="src-mark"></span>
-      <span class="src-choice-txt">
-        <span class="src-name">Ask me each time</span>
-        <span class="src-sub">Watch brings you here to choose, every time</span>
-      </span>
-    </button>
-
-
-    ${linkPreviewHTML()}
-
+// The manage list is the same list whichever state the screen is in, so it is
+// written once and called from both. It used to live inline in one branch,
+// which is why the other branch could not have it.
+function manageFoldHTML(O,host,custom){
+  return `
     <details class="src-fold" data-fold="settings"${O('settings')} style="margin-top:16px">
       <summary>${icon('settings')} Manage the list of sites</summary>
 
@@ -25052,7 +24990,168 @@ function renderSource(){
       <p class="ai-desc">Tick what you subscribe to and Watch offers "Open in …" for each.</p>
       <div class="src-picks">${PAID_SERVICES.map(s=>`<button class="src-chip${myServices().includes(s.id)?' on':''}" onclick="toggleService('${s.id}')">${s.name}</button>`).join('')}</div>`:''}
 
-    </details>
+    </details>`;
+}
+// ── WHEN WATCH HAS NOWHERE TO GO ─────────────────────────────────────────────
+//
+// seedHiddenDefaults() hides every built-in on first run — a deliberate clean
+// slate, so the app never pushes anyone at a service. The screen did not know
+// that, and still led with "Open a site" selected, its sub-line reading "Pick
+// one below first", and nothing below it to pick: freeDefault() returns null
+// once everything is hidden, so the preview underneath said "Nothing to open"
+// in red. A fresh device met a setting that was already wrong and offered no
+// way to make it right.
+//
+// Two states were being told apart by nobody: the seed hid these, or the person
+// did. A site someone hid should stay hidden. A site hidden only because the app
+// starts empty is a suggestion the app is entitled to make, and ONLY while there
+// is nothing set at all — the moment anything is chosen, the ordinary rules
+// apply again and a hidden site is hidden.
+//
+// The paste box leads, because it is the one route that plays inside WatchList
+// and the one the rest of this screen is built around: give it any episode
+// address and it works out how that site builds links, so every other episode
+// follows. The services underneath hand off to the browser.
+function sourceSetupHTML(){
+  return `
+    <div class="dt-label">${icon('play')} Watch has nowhere to go yet</div>
+    <p class="ai-desc" style="margin:4px 0 12px">Nothing is set up for you, on purpose — the app does not send you
+      anywhere you did not choose. Paste where you watch and Watch goes there.</p>
+
+    <div class="src-choice src-setup on">
+      <div class="src-choice-body" style="padding-top:12px">
+        <p class="ai-desc" style="margin:0 0 10px;font-size:13px">Best is <b>one episode's address</b>, copied from the site
+          while it is playing — WatchList reads how that site builds its links, and every other show follows the same shape.
+          A bare site like <b>netflix.com</b> works too; it just opens the site rather than the episode.</p>
+        <textarea class="ai-prompt-in urlin" rows="2" id="srcQuickIn" placeholder="paste an episode's address, or just the site"
+          autocomplete="off" autocapitalize="off" spellcheck="false" oninput="quickSetup()"></textarea>
+        <div id="srcQuickOut" class="src-quick-out" style="display:none"></div>
+      </div>
+    </div>
+  `;
+}
+function renderSource(){
+  const box=document.getElementById('sourceBody'); if(!box) return;
+  // Hiding/renaming rebuilds this whole sheet, which would snap open folds shut
+  // and jump the scroll to the top — so you couldn't hide several in a row.
+  // Snapshot which folds are open and where we're scrolled, and restore after.
+  const openFolds={};box.querySelectorAll('details[data-fold]').forEach(d=>{openFolds[d.dataset.fold]=d.open;});
+  const scroller=box.closest('.sheet')||box, prevScroll=scroller?scroller.scrollTop:0;
+  const O=k=>openFolds[k]?' open':'';
+  const custom=streamSource(), rcustom=readSource();
+  const host=u=>{try{return new URL(u.replace(/\{[^}]+\}/g,'x')).hostname;}catch{return u.slice(0,32);}};
+  // Yours first. The built-in list is fixed and findable; the sites you added are
+  // the ones you actually reach for, and they were sitting after eight presets.
+  const chips=customServices().filter(s=>!isHiddenSrc(s.name)).map(s=>`<button class="src-chip yours${custom===s.url?' on':''}" onclick="setSourceById('${s.id}')">${escH(s.name)}</button>`).join('')
+    +WATCH_PRESETS.filter(p=>!isHiddenSrc(p.name)).map(p=>`<button class="src-chip${custom===p.url?' on':''}" onclick="setSource('${jsq(p.url)}')">${escH(p.name)}</button>`).join('');
+  const myCount=customServices().length, hiddenCount=hiddenSrc().length;
+  const tab=srcTab();
+  const tabs=`<div class="src-tabs">
+      <button class="src-tab${tab==='watch'?' on':''}" onclick="setSrcTab('watch')">${icon('play')} Anime</button>
+      <button class="src-tab${tab==='read'?' on':''}" onclick="setSrcTab('read')">${icon('book')} Reading</button>
+    </div>`;
+  if(tab==='read'){box.innerHTML=tabs+readSourceHTML(rcustom);try{if(scroller)scroller.scrollTop=prevScroll;}catch{}return;}
+  // A newcomer used to meet the ADVANCED path first: a big "paste your site's
+  // address" card, before anything said that Watch already works. That reads as
+  // a setup screen you have to get through, when in fact there is nothing to do.
+  // So: say what tapping Watch does right now, then offer the choices, and keep
+  // the custom-site flow folded away for people who actually want it.
+  // This line and the one under it used to disagree with each other: the banner
+  // said Watch had "nowhere to go yet" while the sentence directly beneath it
+  // said "that already works — nothing to set up". Both were generated, neither
+  // knew what the other had decided, and a reader had to work out which was
+  // lying. One decision now, stated once, with the caption following from it.
+  const _free=freeDefault();
+  // A site the PERSON supplied, as opposed to one of the built-ins. This is the
+  // distinction the whole screen turns on and it was never drawn: picking a
+  // built-in wrote its URL into the same setting as a custom one, so the panel
+  // could not tell you which of the two situations you were in — and they behave
+  // completely differently when you press Watch.
+  const _mine=!!custom&&!WATCH_PRESETS.some(x=>x.url===custom);
+  // Nothing chosen AND nothing to fall back on: the state the seed creates on a
+  // fresh device. Lead with setting one up rather than with a selected choice
+  // that cannot do anything. Everything below — the modes, the manage list — is
+  // about a source that exists, so it waits until one does.
+  if(!custom&&!_free&&!noSourceMode()){
+    box.innerHTML=tabs+sourceSetupHTML()+manageFoldHTML(O,host,custom);
+    try{if(scroller)scroller.scrollTop=prevScroll;}catch{}
+    try{restoreSrcDraft();}catch(e){}
+    return;
+  }
+  box.innerHTML=tabs+`
+    <!-- ONE SETTING, SHOWN AS ONE SETTING.
+         There was a banner saying what Watch does, a card directly beneath
+         saying it again, and between the two choices a row of site chips with
+         nothing to say which choice they belonged to — three elements describing
+         one setting, and no filled control anywhere to show which answer was
+         currently true. The mark is the point: a list of options with nothing
+         filled in is a list of suggestions. -->
+    <div class="dt-label">${icon('play')} When you tap Watch</div>
+
+    <div class="src-choice${!_mine&&!noSourceMode()?' on':''}">
+      <button class="src-choice-top" onclick="setSource('')">
+        <span class="src-mark"></span>
+        <span class="src-choice-txt">
+          <span class="src-name">Open a site</span>
+          <span class="src-sub">${_free||custom
+            ? ('Goes to '+escH(_free?_free.name:host(custom))+', '+handoffWord())
+            : 'Pick one below first'}</span>
+        </span>
+      </button>
+      ${chips?`<div class="src-picks src-choice-body">${chips}</div>`:''}
+    </div>
+
+    <!-- THE ANSWER TO "WHY DOES NOTHING OPEN IN WATCHLIST".
+         It always opened a tab, and the screen never said why: the big services
+         send a header that forbids any other page from displaying them, which is
+         the browser refusing, not something this app can code around. The one
+         route that does play in-app is a site you supply yourself — and that was
+         buried in a fold called "Use a site of your own", under a headline
+         telling you there was nothing to set up. It is a choice now, beside the
+         other choices, saying what it gets you. -->
+    <div class="src-choice${_mine?' on':''}">
+      <button class="src-choice-top" onclick="openOwnSource()">
+        <span class="src-mark"></span>
+        <span class="src-choice-txt">
+          <span class="src-name">Play inside WatchList</span>
+          <span class="src-sub">${_mine
+            ? (()=>{const h=host(custom);
+                // Do not promise framing. Whether a site will play in here is the
+                // site's decision, discovered the first time it is tried: the big
+                // services send a header forbidding it. Say what is known, and say
+                // "if it allows it" while that is still an open question -- pasting
+                // netflix.com used to get back "plays in the app", which it never will.
+                try{ if(typeof frameRefuses==='function'&&frameRefuses(h))
+                  return escH(h)+' — opens in your browser; it refused to play in here'; }catch(e){}
+                return escH(h)+' — plays in here if the site allows it';})()
+            : 'Needs a site of your own. Paste one episode link and it works out the rest.'}</span>
+        </span>
+      </button>
+      <!-- The setup lives INSIDE the choice it belongs to. It used to be a
+           separate fold below, headed "Use a site of your own": the same job
+           reachable two ways, one of them presented as a choice and one as a
+           drawer, with nothing to say they were the same thing. One control
+           now, and the thing it asks for sits directly under it. -->
+      <div class="src-choice-body src-own">
+          <p class="ai-desc" style="margin:9px 0 11px;font-size:13px">Open your site, start <b>any</b> episode of <b>any</b> show, and paste that page's address. That one link is the whole setup — WatchList works out the pattern and uses it for every show.</p>
+          <textarea class="ai-prompt-in urlin" rows="2" id="srcQuickIn" placeholder="paste that episode's address" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url" oninput="quickSetup()" onkeydown="if(event.key==='Enter')event.preventDefault();"></textarea>
+          <div id="srcQuickOut" class="src-quick-out" style="display:none"></div>
+          <button class="src-quick-share" id="shareMineBtn" onclick="shareMine()">${icon('send')} Share mine<span>${custom?escH(host(custom)):'anyone can use your setup'}</span></button>
+      </div>
+    </div>
+
+    <button class="src-choice src-choice-solo${noSourceMode()?' on':''}" onclick="setNoSource()">
+      <span class="src-mark"></span>
+      <span class="src-choice-txt">
+        <span class="src-name">Ask me each time</span>
+        <span class="src-sub">Watch brings you here to choose, every time</span>
+      </span>
+    </button>
+
+
+    ${linkPreviewHTML()}
+
+    ${manageFoldHTML(O,host,custom)}
 `;
   // Put the fold you were using back where it was — same scroll, still open.
   try{if(scroller)scroller.scrollTop=prevScroll;}catch{}

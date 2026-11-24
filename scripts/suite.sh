@@ -58,17 +58,27 @@ sweep(){
 # A test whose server cannot bind navigates to a Chrome error page, finds none of
 # the app defined, and reports every "expect 0" check as a pass — 2 passed, 10
 # failed, and not one of them about the app. Refuse to start in that state.
-# Ports on this machine that belong to other projects. OG Game keeps an ssh
-# tunnel up to the Mac mini — `ssh -N -L 9333 -L 9334 -R 8766` — restarted by a
-# wrapper, so these come back even after something kills them. 8766 is OG's own
-# game server coming back the other way, which is exactly the server an earlier
-# version of the sweep here would have killed. A WatchList test must never claim
-# one of these: binding fails or, far worse, a CDP handshake succeeds against
-# the wrong browser and the suite reports confident nonsense.
-RESERVED="9333 9334 8766 8768"
+# Ports on this machine that belong to other projects. Two different projects, which
+# is the part that went wrong: OG Game keeps an ssh tunnel up to the Mac mini --
+# `ssh -N -L 9333 -L 9334 -R 8766` -- restarted by a wrapper, so these come back even
+# after something kills them. 8766 is OG's own game server coming back the other way,
+# which is exactly the server an earlier version of the sweep here would have killed.
+#
+# 8790/8792 are NOT that tunnel. They are TermPhone, the server behind the Terminal
+# app on his phone, and 8770 is the mini's own. That mattered on 2026-11-24: the sweep
+# below killed 8792 for real, and it was read as OG's tunnel because OG's was the
+# collision anybody remembered. OG said it was not theirs, which is the only reason
+# the right thing got protected. A port that comes back after kill -9 has a wrapper
+# behind it and an owner who is not us; find out who before deciding it is a leftover.
+#
+# A WatchList test must never claim one of these: binding fails or, far worse, a CDP
+# handshake succeeds against the wrong browser and the suite reports confident nonsense.
+# A port goes in this list whether or not a test of ours still wants it -- the list is
+# what stops the sweep, and the sweep runs before anybody reads which test asked for what.
+RESERVED="9333 9334 8766 8768 8770 8790 8792"
 for p in $(ports); do
   case " $RESERVED " in *" $p "*)
-    echo "suite: test port $p belongs to another project (OG Game's mini tunnel). Pick another." >&2
+    echo "suite: test port $p belongs to another project (OG Game's mini tunnel, or TermPhone). Pick another." >&2
     exit 2 ;;
   esac
 done

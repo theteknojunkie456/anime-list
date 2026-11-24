@@ -3,7 +3,14 @@
 // rather than waiting on the debounce, so the run stays quick and deterministic;
 // the two timing-dependent properties get real clocks at the end.
 import {spawn} from 'node:child_process';
-const PORT=8792, DIR=process.cwd();   // run from the repo root: node scripts/push-budget-test.mjs
+// 8792 belongs to TermPhone -- the server behind the Terminal app on his phone -- and this
+// test was claiming it. That is worse than a clash: suite.sh sweeps its own test ports with
+// kill -9, so every run of the full suite shot down the phone app's server and relied on its
+// wrapper to restart it. The CDP port below was moved off 9334 years-of-commits ago for the
+// same class of reason (OG Game's tunnel); this one was simply left behind, and the port was
+// blamed on that same tunnel until OG said it was not theirs. Moved above every other port
+// the suite uses, and 8790/8792 are now reserved so nothing of ours can take them back.
+const PORT=9651, DIR=process.cwd();   // run from the repo root: node scripts/push-budget-test.mjs
 const srv=spawn('python3',['-m','http.server',String(PORT)],{cwd:DIR,stdio:'ignore'});
 const CHROME='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const prof=(process.env.TMPDIR||'/tmp')+'/wl-push-budget-profile';

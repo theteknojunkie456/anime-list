@@ -14,7 +14,10 @@ artwork that fills the screen stays a soft frame, and that contrast is the
 system rather than an inconsistency. There were **23 distinct corner values** in this file — 12,
 13, 14 and 15 all doing the same job in different places. A 1px difference is too
 small to read as a decision and just large enough to make everything feel
-slightly misaligned. Add *to* the scale, never *between* it.
+slightly misaligned. Add *to* the scale, never *between* it. The last six **12px** corners went on
+2026-11-24 — the + key in the nav, its rail variant, the kit mark and its two
+buttons, and one scrolling code block. All are 14px now, the radius 135 other
+controls already use, and no corner value sits between two scale members.
 
 **Elevation: three levels**, and since 2026-11-23 they are tokens rather than
 strings you retype: `--elev-raise`, `--elev-float`, `--elev-overlay`.

@@ -66,7 +66,9 @@ function mkClient(ROOM){
   
   // ── the host picks something, everyone follows ────────────────────────────
   A.send({t:'set',title:'Frieren',animeId:'a1',ep:12,img:''});
-  await wait(700);
+  // Positive assertion, so poll: 700ms is a round trip through the real worker and is fine
+  // idle, not fine with thirty browsers up. This failed in the suite and passed alone.
+  await until(()=>B.last('state')?.room?.title==='Frieren');
   t('a pick reaches the other person', B.last('state')?.room?.title, 'Frieren');
   t('and carries the episode', B.last('state')?.room?.ep, 12);
   
@@ -102,7 +104,7 @@ function mkClient(ROOM){
   // ── the queue ─────────────────────────────────────────────────────────────
   A.send({t:'queue-add',title:'Dandadan',animeId:'a2',aniId:171018,ep:1,img:''});
   B.send({t:'queue-add',title:'Monster',animeId:'a3',aniId:19,ep:1,img:''});
-  await wait(900);
+  await until(()=>((A.last('state')?.room?.queue)||[]).length===2);
   const q=A.last('state')?.room?.queue||[];
   t('anyone can add to the queue', q.length, 2);
   if(q.length){
@@ -150,7 +152,8 @@ function mkClient(ROOM){
   console.log('room',ROOM,'\n');
   const H=client('Host','uidH',true); await H.ready(); await wait(500);
   const G=client('Guest','uidG');     await G.ready(); await wait(800);
-  H.send({t:'set',title:'Frieren',animeId:'a1',ep:3,img:''}); await wait(600);
+  H.send({t:'set',title:'Frieren',animeId:'a1',ep:3,img:''});
+  await until(()=>H.room().title==='Frieren'&&G.room().title==='Frieren');
   
   // ── host-only controls, attempted by a guest ──────────────────────────────
   G.send({t:'play'}); await wait(600);

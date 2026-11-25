@@ -1,0 +1,36 @@
+name: Tests
+
+# Nothing ran the tests. Ninety-three of them, and every deploy to production went
+# out on the word of whoever last ran them by hand -- which, by the time anybody
+# checks, is nobody. The repo already knows this failure mode: CONVENTIONS.md says
+# "a test outside the suite reports to nobody", about the cloud tests that were run
+# when somebody remembered and that failed for a whole release with nothing saying
+# so. The suite itself was one level up from that and nobody had noticed.
+#
+# It would not have helped before 2026-11-25 either. suite.sh ended with an echo and
+# so always exited 0, meaning a CI step built on it would have been green no matter
+# what broke. Two bugs that each made the other invisible: no gate, and a gate that
+# could not have failed.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      # --ci is every test that does not drive a real Chrome, chosen by asking each
+      # file rather than by a list kept here. The browser half needs a Mac with
+      # Chrome installed and still runs locally with `sh scripts/suite.sh`; this is
+      # the half that can gate a push, which is better than the nothing it replaces.
+      #
+      # No `continue-on-error`, no `|| true`, and nothing after it on the line: the
+      # status is the point. If this step is ever made advisory, delete it instead --
+      # a gate that cannot fail is worse than none, because it reads as cover.
+      - run: sh scripts/suite.sh --ci

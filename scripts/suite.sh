@@ -10,6 +10,14 @@ cd "$(dirname "$0")/.."
 case "${1:-}" in
   --node) FILES="cloud/*.test.mjs" ;;
   --browser) FILES="scripts/*-test.mjs scripts/*.test.mjs" ;;
+  # Everything that does not need a Mac with Chrome on it, for CI.
+  #
+  # Found by asking each file whether it launches Chrome, not by keeping a list
+  # here. A list would be wrong within a week, and this repo has been bitten twice
+  # in two days by exactly that -- six example fields standing in for a rule in
+  # PUSH_FP_IGNORE, and four example ports standing in for every port another
+  # project owns. A test added tomorrow lands in the right half on its own.
+  --ci) FILES="$(grep -L 'Google Chrome' scripts/*-test.mjs scripts/*.test.mjs cloud/*.test.mjs 2>/dev/null | tr '\n' ' ')" ;;
   *) FILES="scripts/*-test.mjs scripts/*.test.mjs cloud/*.test.mjs" ;;
 esac
 # Each test spawns a throwaway web server and a headless Chrome and kills both on

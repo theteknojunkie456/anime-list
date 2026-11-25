@@ -64,8 +64,10 @@ sweep(){
 # after something kills them. 8766 is OG's own game server coming back the other way,
 # which is exactly the server an earlier version of the sweep here would have killed.
 #
-# 8790/8792 are NOT that tunnel. They are TermPhone, the server behind the Terminal
-# app on his phone, and 8770 is the mini's own. That mattered on 2026-11-24: the sweep
+# 8790/8792 are NOT that tunnel. They were TermPhone, the server behind the Terminal
+# app on his phone -- retired 2026-11-25 with the move to the new Mac, and left in the
+# list anyway: nothing of ours wants them, so reserving them costs nothing and the next
+# thing to claim one would repeat the whole story below. 8770 is the old mini's own. That mattered on 2026-11-24: the sweep
 # below killed 8792 for real, and it was read as OG's tunnel because OG's was the
 # collision anybody remembered. OG said it was not theirs, which is the only reason
 # the right thing got protected. A port that comes back after kill -9 has a wrapper

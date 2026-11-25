@@ -26,8 +26,8 @@ const wait=ms=>new Promise(r=>setTimeout(r,ms));
 // harness, dressed as a failure about the app, which is the worst kind to read
 // at the bottom of a test run.
 let tabs=null;
-for(let i=0;i<120;i++){
-  await wait(500);
+for(let i=0;i<240;i++){
+  await wait(250);
   try{ tabs=await (await fetch('http://127.0.0.1:'+DBG+'/json/list')).json(); if(tabs&&tabs.length)break; }catch(e){ tabs=null; }
 }
 if(!tabs||!tabs.length){
@@ -70,7 +70,18 @@ document.addEventListener('DOMContentLoaded',()=>{
 });
 window.fetch=()=>new Promise(()=>{});`});
 await cmd('Page.navigate',{url:`http://localhost:${PORT}/index.html?cb=`+Math.random()});
-await wait(4200);
+// Poll for the app instead of guessing how long it needs. A flat 4.2s was copied in
+// here with the rest of the harness; it is the exact thing CONVENTIONS bans, and on a
+// machine running thirty browsers it is also the thing that makes a suite cry wolf.
+// What this file needs is the paste box, so wait for what opens it.
+{
+  let up=false;
+  for(let i=0;i<120;i++){
+    await wait(250);
+    if(await ev(`typeof renderSource==='function'&&typeof quickSetup==='function'&&!!document.getElementById('sourceSheet')`)){up=true;break;}
+  }
+  if(!up){console.log('the app never finished booting in 30s');try{ch.kill();}catch(e){}try{srv.kill();}catch(e){}process.exit(1);}
+}
 let pass=0,fail=0;
 
 const t=(n,g,e)=>{const ok=JSON.stringify(g)===JSON.stringify(e);ok?pass++:fail++;

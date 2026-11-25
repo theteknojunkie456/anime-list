@@ -155,3 +155,22 @@ hung: no result after ${SUITE_CAP:-240}s, killed"
   fi
 done
 echo "---- $PASS ok, $FAIL failing${FAILED:+ ·$FAILED}"
+
+# THE STATUS THIS WHOLE FILE IS JUDGED BY.
+#
+# There was no exit line here. The last command was the echo above, so the suite
+# reported success whatever happened -- `sh scripts/suite.sh; echo $?` said 0 with a
+# test failing, and anything judging the run by its status (CI, a wrapper, a person
+# in a hurry) was told everything passed. Caught on 2026-11-25 by the sleep ratchet
+# failing while the suite exited 0 in the same breath.
+#
+# CONVENTIONS.md has warned about exactly this shape since long before: "Never put
+# anything after the command whose status you need... a wrapper that eats it turns
+# every rule in this section into decoration." The rule was written for people
+# CALLING the suite, and the suite was doing it to itself. The ports-busy path above
+# always exited 2 honestly, which is why this was never obvious: the one failure mode
+# anybody had seen reported itself correctly.
+#
+# Hence the last line of CONVENTIONS' own advice, which is the part that matters:
+# once, make something fail ON PURPOSE and confirm the status says so.
+[ "$FAIL" -eq 0 ]

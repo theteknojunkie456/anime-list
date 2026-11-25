@@ -22785,7 +22785,12 @@ function quickSetup(){
     // the person at their word instead of sending them away to find a better link.
     const bareSite=(()=>{try{
       const u=new URL(url);
-      return u.pathname.replace(/\/+$/,'')===''||/^\/(browse|home|search|tv|anime)\/?$/i.test(u.pathname);
+      // A locale is not a destination. Plenty of sites put you on /en-us or /en-gb
+      // before you have chosen anything -- crunchyroll and disneyplus both do -- so
+      // the address someone copies off their own homepage carries one. Read past it:
+      // it says which language they browse in, never which show they want.
+      const p=u.pathname.replace(/\/+$/,'').replace(/^\/[a-z]{2}(-[a-z]{2})?(?=\/|$)/i,'');
+      return p===''||/^\/(browse|home|search|tv|anime)\/?$/i.test(p);
     }catch(e){return false;}})();
     if(bareSite){
       let hostn=''; try{hostn=new URL(url).hostname.replace(/^www\./,'');}catch(e){}

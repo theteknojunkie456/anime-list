@@ -62,6 +62,21 @@ lint runs automatically after every edit; never commit if it fails.
   being forbidden more time to happen. Writing the rule down was not enough on
   its own: `party-live` carried it in a header comment while 42 of its 46
   assertions still slept and hoped.
+- **Check `RESERVED` in `suite.sh` before you pick a port.** The sweep kills
+  whatever is LISTENing on the ports of the tests it is about to run, so a port
+  this machine already uses for something else does not merely clash — it gets
+  killed, on every full run. `push-budget-test` claimed 8792 for months. That is
+  TermPhone, the server behind the Terminal app on his phone; its wrapper
+  restarted it each time, so the only symptom anyone ever saw was the suite
+  refusing to start, and the kill itself was silent. Ports in the 8700s and
+  9300s on this machine belong to other projects. Pick above 9600.
+- **A port that comes back after `kill -9` has an owner, and it is not us.**
+  That is a wrapper restarting it, which is the signal to find out whose it is
+  rather than to sweep harder. 8792 was put down to OG Game's ssh tunnel for the
+  obvious reason — that tunnel is the collision this file already had history
+  with, and this very test had its CDP port moved off 9334 because of it. It was
+  the wrong owner. Asking the other session took one message and was the only
+  reason the right process ended up protected.
 - A test that writes a persisted setting must clear it first, or its second run
   starts where the first left off. Each test gets its own `--user-data-dir`.
 - **Run one suite at a time, and nothing else that opens a browser.** The suite

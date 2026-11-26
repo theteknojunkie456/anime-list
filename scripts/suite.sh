@@ -147,7 +147,13 @@ for f in $FILES; do
   # which is worse than any failure it could have reported. The watchdog is a
   # background sleep that kills the test outright, so the cost of a hang is one
   # result instead of the run. 240s is ~6x the slowest honest test.
-  out_f=$(mktemp -t wl-suite); node "$f" >"$out_f" 2>&1 & np=$!
+  # `mktemp -t wl-suite` is BSD. GNU reads -t as "this is a template" and wants the
+  # X's, so on Linux every test failed identically with "too few X's in template",
+  # an empty $out_f, and "cat: '': No such file or directory". A full template is
+  # the one spelling both accept. The file says #!/bin/sh and has no bashisms; this
+  # was the only thing in it that was not actually portable, and nothing had ever
+  # run it anywhere but a Mac to find out.
+  out_f=$(mktemp "${TMPDIR:-/tmp}/wl-suite.XXXXXX"); node "$f" >"$out_f" 2>&1 & np=$!
   ( sleep ${SUITE_CAP:-240}; kill -9 $np 2>/dev/null ) & wp=$!
   wait $np; rc=$?
   kill $wp 2>/dev/null; wait $wp 2>/dev/null

@@ -4575,7 +4575,13 @@ body.recsel .pcard{position:relative;}
 .pt-jitsi.on .pt-jitsi-tag{background:var(--a);color:#fff;}
 /* The fallbacks read as fallbacks: lighter, under the one that connects anywhere,
    and no longer competing with it for the same full-width accent treatment. */
+/* The two fallbacks sit together. The explanation used to run BETWEEN them, so
+   "Share your screen" and "Join voice chat" read as separate ideas rather than the
+   pair they are; it belongs under both. */
 .pt-av-alt{margin-top:9px;}
+.pt-av-row{display:flex;gap:8px;align-items:stretch;}
+.pt-av-row>*{flex:1;min-width:0;margin-top:0;}
+.pt-av-row .pt-voice{margin-top:0;}
 .pt-av-alt .pt-share{height:42px;font-size:14px;background:transparent;border-color:var(--bn2);color:var(--t2);}
 .pt-av-alt .pt-voicebtn{height:42px;font-size:14px;background:transparent;border-color:var(--bn2);color:var(--t2);}
 .pt-av-alt .pt-voicebtn.on{background:var(--ag);border-color:var(--a);color:var(--a2);}
@@ -19635,7 +19641,7 @@ function renderPartyInner(){
       <div class="pt-now-b"><div class="pt-now-k">Nothing playing yet</div>
       <div class="pt-now-t">${partyIsHost?'Pick something below':'Waiting for the host'}</div>
       <div class="pt-now-s">${r.members.length} ${r.members.length===1?'person':'people'} here</div></div></div>`;
-  let shareCtl='';
+  let shareCtl='',shareHint='';
   let hostCtl='';
   // Shared "Up next" queue — visible to everyone; the host can remove items and pull the head.
   const qlist=r.queue||[];
@@ -19678,8 +19684,8 @@ function renderPartyInner(){
       // One host broadcasts their iPhone screen; everyone in the party watches it live.
       hostCtl=picker; shareCtl=`<button class="pt-share" onclick="nativeBroadcast()">${icon('users')} Broadcast your screen</button><div class="pt-hint">Streams your iPhone screen to everyone in this party. No computer needed.</div>`;
     }else{
-      hostCtl=picker; shareCtl=`<button class="pt-share" onclick="startShare()">${icon('users')} Share your screen</button>`
-        +(canScreenShare()?`<div class="pt-hint">Everyone watches your screen, perfectly in sync. On a Mac, share a <b>Chrome tab</b> and tick “Also share tab audio” to include sound.</div>`
+      hostCtl=picker; shareCtl=`<button class="pt-share" onclick="startShare()">${icon('users')} Share your screen</button>`;
+      shareHint=(canScreenShare()?`<div class="pt-hint">Everyone watches your screen, perfectly in sync. On a Mac, share a <b>Chrome tab</b> and tick “Also share tab audio” to include sound.</div>`
           :`<div class="pt-hint">Screen sharing needs a computer. On a phone, host from the WatchList app’s broadcast.</div>`);
     }
   }else if(sharing){
@@ -19730,7 +19736,7 @@ function renderPartyInner(){
   // for; it used to be printed underneath the screen-share button.
   const avBlock=`<div class="dt-label" style="margin-top:16px">Talk and share</div>
     ${jitsiBtn}
-    <div class="pt-av-alt">${shareCtl}${voiceUI}</div>`;
+    <div class="pt-av-alt"><div class="pt-av-row">${shareCtl}${voiceUI}</div>${shareHint}</div>`;
   const _controls=`${queueBlock}${hostCtl}${avBlock}${inviteBlock}`;
   // In a call: float the chat right under the call panel (no scrolling past the queue).
   // Otherwise: normal order with controls first, chat at the bottom.

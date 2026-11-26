@@ -18699,7 +18699,7 @@ function attachShareStream(stream){
 // cropped. Only when it genuinely helps: a big gain, both orientations, and the
 // viewer can turn it off, because a rotated picture is a trade and not everyone
 // wants it.
-let _shRotOff=false;
+let _shRot=false;   // opt IN to the quarter turn; upright is the default
 function shareGain(){
   const v=document.getElementById('shareVideo'),st=document.querySelector('#shareView .sh-stage');
   if(!v||!st||!v.videoWidth||!v.videoHeight)return null;
@@ -18717,20 +18717,38 @@ function fitShare(){
   const g=shareGain();
   const wrap=document.querySelector('#shareView .sh-stage');
   let btn=document.getElementById('shRotBtn');
-  if(!g||_shRotOff||g.gain<1.35){
-    v.classList.remove('sh-rot'); if(btn)btn.remove(); return;
+  // Upright, at its own aspect, unless you ask otherwise.
+  //
+  // This used to turn the picture a quarter turn on its own whenever the maths said
+  // the area would grow by a third. The maths is right -- rotating the BOX and
+  // fitting the same picture into it really does use more of a portrait screen, and
+  // nothing is stretched or cropped by it. It still arrives on its side. You tilt
+  // your head, or you turn the phone, to watch something that was the right way up
+  // before the app improved it, and the only way back was a pill that faded after
+  // seven seconds.
+  //
+  // So the turn is offered rather than performed. object-fit:contain does the rest,
+  // which is the whole of "proper aspect": the picture keeps its own shape and the
+  // stage takes the letterbox.
+  const worth = !!(g && g.gain >= 1.35);
+  if(!worth){ v.classList.remove('sh-rot'); v.style.removeProperty('--rot-w'); v.style.removeProperty('--rot-h');
+    if(btn)btn.remove(); _shRot=false; return; }
+  if(_shRot){
+    // Rotated, the video's box is the stage with its axes swapped.
+    v.style.setProperty('--rot-w',g.sh+'px');
+    v.style.setProperty('--rot-h',g.sw+'px');
+    v.classList.add('sh-rot');
+  }else{
+    v.classList.remove('sh-rot'); v.style.removeProperty('--rot-w'); v.style.removeProperty('--rot-h');
   }
-  // Rotated, the video's box is the stage with its axes swapped.
-  v.style.setProperty('--rot-w',g.sh+'px');
-  v.style.setProperty('--rot-h',g.sw+'px');
-  v.classList.add('sh-rot');
   if(!btn&&wrap){
     btn=document.createElement('button');btn.id='shRotBtn';btn.className='sh-rot-hint';
-    btn.innerHTML=icon('refresh')+'<span>Turned to fill your screen · tap to undo</span>';
-    btn.onclick=ev=>{ev.stopPropagation();_shRotOff=true;fitShare();};
+    btn.onclick=ev=>{ev.stopPropagation();_shRot=!_shRot;fitShare();};
     wrap.appendChild(btn);
-    setTimeout(()=>{try{btn.style.opacity='0';btn.style.pointerEvents='none';}catch(e){}},7000);
   }
+  // It is a control now, not a notice, so it does not fade out from under the only
+  // way back. One pill, and it says which way it will go.
+  if(btn)btn.innerHTML=icon('refresh')+'<span>'+(_shRot?'Turned · tap to put it upright':'Turn it to fill your screen')+'</span>';
 }
 try{
   window.addEventListener('resize',()=>{

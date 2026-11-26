@@ -176,5 +176,42 @@ const stays=await ev(`(()=>{const sv=document.getElementById('shareView');
   return sv.classList.contains('on');})()`);
 t('a new stream while watching does not drop you out', stays, true);
 
+// ── a shared screen keeps its own shape ────────────────────────────────────
+//
+// fitShare() used to turn the picture a quarter turn by itself whenever the area
+// would grow by a third. Nothing is stretched by that and the arithmetic is right,
+// but the picture arrives on its side and the way back was a pill that faded after
+// seven seconds. Upright and letterboxed is the default; the turn is offered.
+const shaped=await ev(`(async()=>{
+  const c=document.createElement('canvas');c.width=1280;c.height=720;
+  const x=c.getContext('2d');x.fillStyle='#123';x.fillRect(0,0,1280,720);
+  const v=document.getElementById('shareVideo');v.muted=true;v.setAttribute('playsinline','');
+  partyCode='Z1';partyRoom={title:'T',code:'Z1'};
+  attachShareStream(c.captureStream(30));reopenShareView();
+  try{await v.play();}catch(e){}
+  for(let i=0;i<60&&!v.videoWidth;i++)await new Promise(r=>setTimeout(r,50));
+  // The test browser's window is landscape, where a 16:9 picture has no area to
+  // gain and the turn is correctly never offered. The case worth pinning is a
+  // phone held upright, so give the stage that shape.
+  const st=document.querySelector('#shareView .sh-stage');
+  st.style.width='400px';st.style.height='880px';st.style.inset='auto';
+  fitShare();
+  return v.videoWidth+'x'+v.videoHeight+'|rot='+v.classList.contains('sh-rot');})()`);
+t('a 16:9 screen is not turned on its own', shaped, '1280x720|rot=false');
+
+const offered=await ev(`(()=>{const b=document.getElementById('shRotBtn');
+  return b?b.textContent.trim():'(no offer)';})()`);
+t('the turn is offered instead', offered, 'Turn it to fill your screen');
+
+const turned=await ev(`(()=>{document.getElementById('shRotBtn').click();
+  const v=document.getElementById('shareVideo');
+  return v.classList.contains('sh-rot')+'|'+document.getElementById('shRotBtn').textContent.trim();})()`);
+t('tapping it turns the picture, and says how to undo', turned, 'true|Turned · tap to put it upright');
+
+const back=await ev(`(()=>{document.getElementById('shRotBtn').click();
+  const v=document.getElementById('shareVideo');
+  return v.classList.contains('sh-rot')+'|'+(v.style.getPropertyValue('--rot-w')||'(cleared)');})()`);
+t('and tapping again puts it upright', back, 'false|(cleared)');
+
 console.log('\n'+pass+' passed, '+fail+' failed');
 ws.close();ch.kill();srv.kill();process.exit(fail?1:0);

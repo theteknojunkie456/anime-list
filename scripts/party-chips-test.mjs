@@ -241,5 +241,35 @@ t('once somebody is here it goes back below', two, 'chat first');
 const twoQuiet=await ev(`(()=>!!document.querySelector('.pt-alone'))()`);
 t('and stops saying nobody is here', twoQuiet, false);
 
+// ── ending is not leaving ──────────────────────────────────────────────────
+//
+// One button did both, on one tap, from a row styled like any other option. A guest
+// pressing it loses nothing -- the party carries on and the code still works. A host
+// pressing it closes the party for everyone and kills the code.
+const guestOut=await ev(`(()=>{partyCode='Z9';partyIsHost=false;
+  partyRoom={code:'Z9',host:'other',members:[{uid:'other',name:'H'},{uid:partyUid(),name:'Me'}]};
+  partyLeaveOrEnd();
+  const box=document.getElementById('confirmBox');
+  return {asked:!!(box&&box.classList.contains('on')),code:partyCode};})()`);
+t('a guest leaving is not asked to confirm', JSON.parse(JSON.stringify(guestOut)).asked, false);
+t('and is out of the party', JSON.parse(JSON.stringify(guestOut)).code, '');
+
+const hostAsked=await ev(`(()=>{partyCode='Z9';partyIsHost=true;
+  partyRoom={code:'Z9',host:partyUid(),members:[{uid:partyUid(),name:'Me'},{uid:'b',name:'Yasso'},{uid:'c',name:'Huz'}]};
+  partyLeaveOrEnd();
+  const box=document.getElementById('confirmBox');
+  return (box&&box.classList.contains('on'))?document.getElementById('confirmMsg').textContent:'(not asked)';})()`);
+t('a host is told who it ends it for', hostAsked,
+  '2 other people are watching with you. Ending it closes the party for them too, and the code stops working.');
+
+const stillOn=await ev(`partyCode`);
+t('and nothing has ended while the question is open', stillOn, 'Z9');
+
+const alone=await ev(`(()=>{document.getElementById('confirmBox').classList.remove('on');
+  partyCode='Z9';partyIsHost=true;partyRoom={code:'Z9',host:partyUid(),members:[{uid:partyUid(),name:'Me'}]};
+  partyLeaveOrEnd();return document.getElementById('confirmMsg').textContent;})()`);
+t('and told what it costs even with nobody there', alone,
+  'The code stops working, so anyone you have sent it to will not be able to get in.');
+
 console.log('\n'+pass+' passed, '+fail+' failed');
 ws.close();ch.kill();srv.kill();process.exit(fail?1:0);

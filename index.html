@@ -4046,6 +4046,11 @@ textarea.ai-prompt-in{resize:none;line-height:1.45;display:block;}
 .pt-invite-k{font-family:var(--fd);font-size:10px;font-weight:800;letter-spacing:.12em;
   text-transform:uppercase;color:var(--t3);margin-bottom:8px;}
 .pt-alone{margin:14px 2px 9px;font-size:13px;line-height:1.5;color:var(--t2);}
+/* Leaving is reversible and stays quiet. Ending is not, and says so -- the same
+   red the confirm dialog uses for the button you are about to press. */
+.pt-leave .src-name{color:var(--t2);}
+.pt-leave.host .src-name{color:#d73a3f;}
+.pt-leave.host{border-color:rgba(215,58,63,.32);}
 .pt-invite .pt-code{margin-bottom:0;padding:10px 12px;background:var(--bg3);}
 .pt-invite .pt-code-val{font-size:17px;letter-spacing:.14em;}
 .pt-invite .pt-code-cta{width:38px;height:38px;border-radius:10px;}
@@ -18138,6 +18143,24 @@ function partyJoin(codeArg){
   try{localStorage.setItem('party_active',code);}catch{}
   renderParty();
 }
+// Leaving and ENDING are not the same act, and one button did both without asking.
+//
+// A guest pressing it leaves: the party carries on, the code still works, and they
+// can walk straight back in. Nothing is lost, so nothing is asked.
+//
+// A host pressing it ends the party for everyone in it and kills the code. That ran
+// on a single tap from a row styled like any other option -- the one irreversible
+// thing on the screen was also the quietest. DESIGN.md keeps red for "you are about
+// to lose something", and this is the case it is kept for.
+function partyLeaveOrEnd(){
+  if(!partyIsHost){partyEnd();return;}
+  const n=((partyRoom&&partyRoom.members)||[]).length;
+  askConfirm({danger:true,title:'End the party?',
+    msg:n>1
+      ? (n-1)+' other '+(n===2?'person is':'people are')+' watching with you. Ending it closes the party for them too, and the code stops working.'
+      : 'The code stops working, so anyone you have sent it to will not be able to get in.',
+    yes:'End it',onYes:()=>partyEnd()});
+}
 function partyEnd(silent){
   const ws=partyWS;partyWS=null;   // null first so onclose won't reconnect
   if(localStream){localStream.getTracks().forEach(t=>t.stop());localStream=null;}
@@ -19565,7 +19588,7 @@ function renderParty(){ try{ renderPartyInner(); }catch(e){
     <div class="pt-now-k">Party</div>
     <div class="pt-now-t">This panel hit a snag</div>
     <div class="pt-now-s">You're still connected. Reopen it, or leave below.</div></div></div>
-    <button class="src-opt" style="margin-top:14px" onclick="partyEnd()"><div class="src-name" style="color:var(--t2)">${partyIsHost?'End the party':'Leave the party'}</div></button>`;
+    <button class="src-opt" style="margin-top:14px" onclick="partyEnd()"  /* direct on purpose: the panel has already failed, do not make leaving depend on more of it */><div class="src-name" style="color:var(--t2)">${partyIsHost?'End the party':'Leave the party'}</div></button>`;
 }}
 function renderPartyInner(){
   const box=document.getElementById('partyBody');if(!box)return;
@@ -19766,7 +19789,7 @@ function renderPartyInner(){
     <div class="pt-members">${members}</div>
     ${_jitsiApi?_chatBlock+_controls:_controls+_chatBlock}
     ${_alone?'':inviteBlk}
-    <button class="src-opt" style="margin-top:14px" onclick="partyEnd()"><div class="src-name" style="color:var(--t2)">${partyIsHost?'End the party':'Leave the party'}</div></button>`;
+    <button class="src-opt pt-leave${partyIsHost?' host':''}" style="margin-top:14px" onclick="partyLeaveOrEnd()"><div class="src-name">${partyIsHost?'End the party':'Leave the party'}</div></button>`;
   const cc=document.getElementById('ptChat');if(cc)cc.scrollTop=cc.scrollHeight;
   _chatUnread=0;_lastChatLen=((partyRoom&&partyRoom.chat)||[]).length;updatePartyPill();   // viewing the sheet clears the unread badge
   renderTyping();

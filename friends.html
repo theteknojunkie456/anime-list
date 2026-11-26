@@ -18642,7 +18642,7 @@ async function pcHandleOffer(from,offer){              // VIEWER answers the hos
   console.log('[party] offer received from '+from);
   showConnectingShare();setShareStatus('Connecting to the host’s screen…');
   const pc=new RTCPeerConnection(await getRtcConfig());pcs[from]=pc;
-  pc.ontrack=e=>{console.log('[party] video track received');showShareView(e.streams[0]);};
+  pc.ontrack=e=>{console.log('[party] video track received');attachShareStream(e.streams[0]);};
   pc.oniceconnectionstatechange=()=>{const st=pc.iceConnectionState;console.log('[party] ICE '+st);
     if(st==='checking')setShareStatus('Connecting to the host’s screen…');
     else if(st==='connected'||st==='completed')setShareStatus('Connected — starting the video…');
@@ -18657,10 +18657,20 @@ async function pcHandleOffer(from,offer){              // VIEWER answers the hos
 async function pcHandleAnswer(from,answer){            // HOST receives the viewer's answer
   const pc=pcs[from];if(pc&&!pc.currentRemoteDescription)try{await pc.setRemoteDescription(answer);}catch{}
 }
-function showShareView(stream){
+// A stream ARRIVING is not a reason to take the screen.
+//
+// This used to closeAll() and throw the full-screen black overlay up the instant a
+// video track landed. Whatever you were doing -- reading the chat, picking the next
+// episode, anywhere else in the app -- was closed under you, by somebody else's
+// action, on a machine you were not touching. And the party panel has had a "Watch
+// the shared screen" button the whole time, so the takeover was not even the only
+// way in; it just got there first and gave you no say.
+//
+// Now the stream is attached and ready, the panel offers it, and the overlay opens
+// when you ask for it. reopenShareView() is that ask, and it was already written.
+function attachShareStream(stream){
   const v=document.getElementById('shareVideo'),sv=document.getElementById('shareView');
   document.getElementById('shareTitle').textContent=(partyRoom&&partyRoom.title)?partyRoom.title:'Watch party';
-  closeAll();sv.classList.add('on');
   if(v){
     v.srcObject=stream;
     const tryPlay=()=>{const p=v.play&&v.play();if(p&&p.catch)p.catch(()=>{});};
@@ -18670,8 +18680,15 @@ function showShareView(stream){
     v.addEventListener('loadedmetadata',()=>{document.getElementById('shareWait').classList.add('gone');tryPlay();try{fitShare();}catch(e){}},{once:true});
     v.addEventListener('playing',()=>{document.getElementById('shareWait').classList.add('gone');},{once:true});
   }
-  const hint=document.getElementById('shFitHint');if(hint){hint.textContent='Black screen? Tap once. Tap again to fill.';hint.style.opacity='1';setTimeout(()=>{hint.style.opacity='0';},6000);}
-  try{fitShare();}catch(e){}
+  // Say it once, where it does not interrupt, and redraw the panel so the button
+  // that opens it is there when you look.
+  try{toast('Someone is sharing their screen — open the party to watch');}catch(e){}
+  try{renderParty();}catch(e){}
+  // Already watching the overlay when a new stream arrives (the host re-shared, or
+  // reconnected)? Then keep it on screen rather than dropping you out of it.
+  if(sv&&sv.classList.contains('on')){const p=v&&v.play&&v.play();if(p&&p.catch)p.catch(()=>{});}
+  // The fit hint and fitShare() moved to reopenShareView(): both are about the
+  // overlay being on screen, and nothing here puts it there any more.
 }
 // Make the presenter's screen as large as the VIEWER's screen allows.
 //
@@ -18732,6 +18749,11 @@ function leaveShareView(){document.getElementById('shareView').classList.remove(
 function reopenShareView(){
   const v=document.getElementById('shareVideo');
   closeAll();document.getElementById('shareView').classList.add('on');
+  // fitShare() used to run when the stream arrived, because that was also when the
+  // overlay appeared. Those are two different moments now, and it belongs to this
+  // one: it measures the viewer's screen against the stream, which is meaningless
+  // until the overlay is actually on it.
+  try{fitShare();}catch(e){}
   if(v&&v.srcObject){const p=v.play&&v.play();if(p&&p.catch)p.catch(()=>{});document.getElementById('shareWait').classList.add('gone');
     const hint=document.getElementById('shFitHint');if(hint){hint.textContent='Black screen? Tap once.';hint.style.opacity='1';setTimeout(()=>{hint.style.opacity='0';},5000);}}
   else{document.getElementById('shareWait').classList.remove('gone');setShareStatus('Waiting for the host’s video…');}   // no stream yet → show the spinner, not black

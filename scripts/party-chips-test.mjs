@@ -152,5 +152,29 @@ const late=await ev(`(()=>{partySeenPlay=0;
   return ov.classList.contains('on');})()`);
 t('someone arriving late is not counted into a start that is over', late, false);
 
+// ── somebody else sharing must not take your screen ────────────────────────
+//
+// A video track arriving used to closeAll() and raise the full-screen overlay on
+// the spot, so whatever you were doing was closed under you by an action on
+// another person's machine. The panel has had a "Watch the shared screen" button
+// the whole time; the takeover just got there first.
+const tookOver=await ev(`(()=>{
+  const sv=document.getElementById('shareView');sv.classList.remove('on');
+  openSheet('partySheet');
+  attachShareStream(new MediaStream());
+  return {overlay:sv.classList.contains('on'),
+          sheet:document.getElementById('partySheet').classList.contains('on')};})()`);
+t('a stream arriving does not raise the overlay', JSON.parse(JSON.stringify(tookOver)).overlay, false);
+t('and does not close what you were looking at', JSON.parse(JSON.stringify(tookOver)).sheet, true);
+
+const opens=await ev(`(()=>{const sv=document.getElementById('shareView');sv.classList.remove('on');
+  reopenShareView();return sv.classList.contains('on');})()`);
+t('asking for it still opens it', opens, true);
+
+const stays=await ev(`(()=>{const sv=document.getElementById('shareView');
+  sv.classList.add('on');attachShareStream(new MediaStream());
+  return sv.classList.contains('on');})()`);
+t('a new stream while watching does not drop you out', stays, true);
+
 console.log('\n'+pass+' passed, '+fail+' failed');
 ws.close();ch.kill();srv.kill();process.exit(fail?1:0);

@@ -4573,7 +4573,14 @@ body.recsel .pcard{position:relative;}
 .pt-jitsi .ico{width:17px;height:17px;}
 .pt-jitsi-tag{font-size:10px;font-weight:800;padding:2px 7px;border-radius:10px;background:rgba(255,255,255,.22);}
 .pt-jitsi.on .pt-jitsi-tag{background:var(--a);color:#fff;}
-.pt-voice{display:flex;gap:8px;margin-top:12px;}
+/* The fallbacks read as fallbacks: lighter, under the one that connects anywhere,
+   and no longer competing with it for the same full-width accent treatment. */
+.pt-av-alt{margin-top:9px;}
+.pt-av-alt .pt-share{height:42px;font-size:14px;background:transparent;border-color:var(--bn2);color:var(--t2);}
+.pt-av-alt .pt-voicebtn{height:42px;font-size:14px;background:transparent;border-color:var(--bn2);color:var(--t2);}
+.pt-av-alt .pt-voicebtn.on{background:var(--ag);border-color:var(--a);color:var(--a2);}
+.pt-av-alt .pt-hint{margin-top:8px;}
+.pt-voice{display:flex;gap:8px;margin-top:9px;}
 .pt-voicebtn{flex:1;display:flex;align-items:center;justify-content:center;gap:8px;height:46px;border-radius:14px;background:var(--bg3);border:1px solid var(--b2);color:var(--t1);font-family:var(--fd);font-weight:800;font-size:15px;cursor:pointer;transition:transform .1s;}
 .pt-voicebtn:active{transform:scale(.98);}
 .pt-voicebtn.on{background:var(--ag);border-color:var(--a);color:var(--a2);}
@@ -19628,6 +19635,7 @@ function renderPartyInner(){
       <div class="pt-now-b"><div class="pt-now-k">Nothing playing yet</div>
       <div class="pt-now-t">${partyIsHost?'Pick something below':'Waiting for the host'}</div>
       <div class="pt-now-s">${r.members.length} ${r.members.length===1?'person':'people'} here</div></div></div>`;
+  let shareCtl='';
   let hostCtl='';
   // Shared "Up next" queue — visible to everyone; the host can remove items and pull the head.
   const qlist=r.queue||[];
@@ -19668,12 +19676,11 @@ function renderPartyInner(){
       :`<p class="ai-desc" style="margin-top:14px">Add some anime to your watch list to pick from here.</p>`;
     if(IS_NATIVE){
       // One host broadcasts their iPhone screen; everyone in the party watches it live.
-      hostCtl=`${picker}<button class="pt-share" onclick="nativeBroadcast()">${icon('users')} Broadcast your screen</button><div class="pt-hint">Streams your iPhone screen to everyone in this party. No computer needed.</div>`;
+      hostCtl=picker; shareCtl=`<button class="pt-share" onclick="nativeBroadcast()">${icon('users')} Broadcast your screen</button><div class="pt-hint">Streams your iPhone screen to everyone in this party. No computer needed.</div>`;
     }else{
-      hostCtl=`<button class="pt-share" onclick="startShare()">${icon('users')} Share your screen</button>`
+      hostCtl=picker; shareCtl=`<button class="pt-share" onclick="startShare()">${icon('users')} Share your screen</button>`
         +(canScreenShare()?`<div class="pt-hint">Everyone watches your screen, perfectly in sync. On a Mac, share a <b>Chrome tab</b> and tick “Also share tab audio” to include sound.</div>`
-          :`<div class="pt-hint">Screen sharing needs a computer. On a phone, host from the WatchList app’s broadcast.</div>`)
-        +picker;
+          :`<div class="pt-hint">Screen sharing needs a computer. On a phone, host from the WatchList app’s broadcast.</div>`);
     }
   }else if(sharing){
     hostCtl=`<button class="pt-play" onclick="reopenShareView()">${icon('play')} Watch the shared screen</button>
@@ -19708,7 +19715,23 @@ function renderPartyInner(){
       </button>
       <span class="pt-ready-n">${_rdy} of ${_n} ready${_wait.length?` \u00b7 ${schEsc(_wait.map(m=>m.name).join(', '))} needs a moment`:''}</span>
     </div>`;
-  const _controls=`${queueBlock}${hostCtl}${jitsiBtn}${voiceUI}${inviteBlock}`;
+  // ONE WAY TO TALK, AND IT IS THE ONE THAT WORKS.
+  //
+  // These were three full-width buttons of equal weight, stacked: "Share your
+  // screen" (peer-to-peer), "Voice & screen share" (Jitsi) and "Join voice chat"
+  // (peer-to-peer again). The comment above jitsiBtn has always called Jitsi "the
+  // recommended path" and the custom voice "the P2P fallback", and the screen gave
+  // no sign of it -- the recommended one sat in the middle, looking like the second
+  // of three equal choices, while a fallback came first.
+  //
+  // Same three capabilities, said in the right order: the one that connects
+  // anywhere, then the two that are there for when it does not. And the picker is
+  // out in front of all of them, because choosing what to watch is what a party is
+  // for; it used to be printed underneath the screen-share button.
+  const avBlock=`<div class="dt-label" style="margin-top:16px">Talk and share</div>
+    ${jitsiBtn}
+    <div class="pt-av-alt">${shareCtl}${voiceUI}</div>`;
+  const _controls=`${queueBlock}${hostCtl}${avBlock}${inviteBlock}`;
   // In a call: float the chat right under the call panel (no scrolling past the queue).
   // Otherwise: normal order with controls first, chat at the bottom.
   // The room code was the first thing in the panel and the thing being watched

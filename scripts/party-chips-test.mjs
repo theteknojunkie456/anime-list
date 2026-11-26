@@ -84,5 +84,43 @@ const nameMatch=await ev(`(()=>{_callSpeaker='x';_callNames={'x':'  HUZI '};rend
   const c=[...document.querySelectorAll('.pt-chip')].find(c=>/huzi/i.test(c.textContent));
   return !!(c&&c.querySelector('.pt-flag.talk'));})()`);
 t('matching a name survives case and spacing', nameMatch, true);
+// ── the way IN, which is the half nobody could test ────────────────────────
+//
+// partyJoin() has always required a name, and the only name field on this screen
+// lived inside the "Start a party" panel. So on a device that had never set one --
+// every device somebody has just been sent a code on -- typing the code and
+// pressing Join answered "Enter a name first" with no field on that half to put
+// one in. Three test files covered this screen and all three passed, because none
+// of them ever tried to join.
+const entry=await ev(`(()=>{try{localStorage.removeItem('party_name');}catch(e){}
+  partyCode='';partyJoinErr='';openSheet('partySheet');renderParty();
+  return [!!document.getElementById('ptName'),!!document.getElementById('ptJoin')].join(',');})()`);
+t('the party screen asks for a name once, for both ways in', entry, 'true,true');
+
+const nameInStart=await ev(`(()=>{const n=document.getElementById('ptName');
+  // It must not sit inside something that only belongs to starting a party.
+  return !!(n&&n.closest('.pt-start'));})()`);
+t('and the field is not buried in the start panel', nameInStart, false);
+
+const refused=await ev(`(()=>{partyJoinErr='';partyTriedCode='';
+  document.getElementById('ptName').value='';
+  document.getElementById('ptJoin').value='ABC123';partyJoin();
+  return partyCode;})()`);
+t('a join with no name does not start one either', refused, '');
+
+// A refused join keeps the reason and the code on screen. Both used to go: the
+// toast faded and the field was cleared by the re-render, so a mistyped or expired
+// code left nothing behind that said what had happened.
+const kept=await ev(`(()=>{partyCode='';partyJoinErr='No party with that code.';partyTriedCode='WRONG1';
+  renderParty();
+  const i=document.getElementById('ptJoin'),e=document.getElementById('ptJoinErr');
+  return [i?i.value:'',!!e,!!(i&&i.classList.contains('bad'))].join(',');})()`);
+t('a refused code stays on screen with its reason', kept, 'WRONG1,true,true');
+
+const cleared=await ev(`(()=>{const i=document.getElementById('ptJoin');
+  i.value='W';i.dispatchEvent(new Event('input'));
+  return [i.classList.contains('bad'),!!document.getElementById('ptJoinErr')].join(',');})()`);
+t('and clears the moment you start retyping', cleared, 'false,false');
+
 console.log('\n'+pass+' passed, '+fail+' failed');
 ws.close();ch.kill();srv.kill();process.exit(fail?1:0);

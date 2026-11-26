@@ -3964,11 +3964,15 @@ textarea.ai-prompt-in{resize:none;line-height:1.45;display:block;}
 .pt-host{display:inline-flex;margin-left:4px;}
 .pt-host .ico{width:11px;height:11px;color:var(--a2);}
 /* ── PARTY: the two things you can do, as two things ── */
-.pt-start{padding:16px;border-radius:18px;background:color-mix(in srgb,var(--a) 10%,var(--bg2));
-  border:1px solid color-mix(in srgb,var(--a) 30%,transparent);}
-.pt-start-h{display:flex;align-items:center;gap:8px;font-family:var(--fd);font-size:17px;font-weight:800;
-  letter-spacing:-.02em;color:var(--t1);}
-.pt-start-h .ico{width:17px;height:17px;color:var(--a2);}
+/* The accent wash on this panel, and the second panel under an OR rule, were
+   doing the job that order and a single accented button do. Both gone; what is
+   left is a field, a sentence, the action, and the way in for somebody who was
+   sent a code. */
+.pt-field{display:block;margin-bottom:4px;}
+.pt-field-h{display:block;font-size:12px;font-weight:700;letter-spacing:.02em;
+  color:var(--t2);margin-bottom:7px;}
+
+
 .pt-start-p{margin:7px 0 14px;font-size:13px;line-height:1.5;color:var(--t2);}
 .pt-name{width:100%;padding:12px 14px;border-radius:14px;font-size:15px;font-family:inherit;
   background:var(--bg);border:1px solid var(--bn);color:var(--t1);outline:none;}
@@ -3982,16 +3986,26 @@ textarea.ai-prompt-in{resize:none;line-height:1.45;display:block;}
 .pt-or{display:flex;align-items:center;gap:12px;margin:18px 0;color:var(--t3);font-size:12px;font-weight:800;
   letter-spacing:.1em;text-transform:uppercase;}
 .pt-or::before,.pt-or::after{content:'';flex:1;height:1px;background:var(--bn2);}
-.pt-join{padding:15px 16px;border-radius:18px;background:var(--bg2);border:1px solid var(--bn2);}
-.pt-join-h{font-size:13px;font-weight:700;color:var(--t2);margin-bottom:11px;}
+
+
 .pt-join-row{display:flex;gap:9px;}
 /* A code is characters, not prose — spaced out and monospaced so it can be read
    back over a call without anyone spelling it twice. */
-.pt-code{flex:1;min-width:0;padding:12px 14px;border-radius:14px;background:var(--bg);border:1px solid var(--bn);
+/* Named apart from .pt-code, which is the invite-code DISPLAY in a live party.
+   One class for two unrelated things meant this field was quietly picking up
+   display:flex and an accent background from that one, and whichever rule came
+   last won per property. */
+.pt-joincode{flex:1;min-width:0;padding:12px 14px;border-radius:14px;background:var(--bg);border:1px solid var(--bn);
   color:var(--t1);outline:none;text-transform:uppercase;
   font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:17px;font-weight:700;letter-spacing:.24em;}
-.pt-code::placeholder{color:var(--t3);letter-spacing:.24em;}
-.pt-code:focus{border-color:var(--a);box-shadow:0 0 0 3px var(--ag);}
+.pt-joincode::placeholder{color:var(--t3);letter-spacing:.14em;}
+.pt-joincode:focus{border-color:var(--a);box-shadow:0 0 0 3px var(--ag);}
+/* Amber, not red. DESIGN.md keeps red for "you are about to lose something", and
+   a code that does not match a party is not that -- nothing of yours is at stake,
+   you have simply been handed one that has expired. --wat is the palette's existing
+   "look here" and sits legibly on this ground. */
+.pt-joincode.bad{border-color:var(--wat);}
+.pt-joinerr{margin:9px 2px 0;font-size:13px;line-height:1.45;color:var(--wat);}
 .pt-joinbtn{flex:none;padding:0 20px;border-radius:14px;border:1px solid var(--bn2);background:var(--bg3);
   color:var(--t1);font-family:var(--fd);font-size:15px;font-weight:800;}
 .pt-joinbtn:active{transform:scale(.97);}
@@ -17872,7 +17886,9 @@ function setPartyName(n){try{localStorage.setItem('party_name',n);}catch{}}
 let partyWS=null,partyReconn=0,partyReconnecting=false,_partyPrevMembers=null,_chatUnread=0,_lastChatLen=0;
 function wsUrl(code,create){const base=(window.SYNC_URL||SYNC_URL).replace(/^http/,'ws');return `${base}/party/${code}?uid=${encodeURIComponent(partyUid())}&name=${encodeURIComponent(partyName()||'Guest')}${create?'&create=1':''}`;}
 function wsSend(obj){if(partyWS&&partyWS.readyState===1){partyWS.send(JSON.stringify(obj));return true;}return false;}
+let partyJoinErr='',partyTriedCode='';
 function partyConnect(code,create){
+  if(!create)partyTriedCode=code;
   partyCode=code;partySeenPlay=0;partySeenReact=new Set();nativeNotifyCode();
   let ws;try{ws=new WebSocket(wsUrl(code,create));}catch{toast('Couldn’t connect to the party');return;}
   partyWS=ws;
@@ -17884,7 +17900,17 @@ function partyConnect(code,create){
     else if(m.t==='psync')applyPlaybackSync(m);                 // …and on real sites, in the app
     else if(m.t==='typing')partyShowTyping(m.name,m.uid);
     else if(m.t==='signal')handleSignalMsg(m);
-    else if(m.t==='error'){toast(m.msg||'Party error');partyEnd(true);}
+    else if(m.t==='error'){
+      // A code that is wrong, or whose party has ended, used to flash a toast and
+      // drop you back on the form with the code you typed wiped out. Three seconds
+      // later there was nothing on screen that said anything had happened, and the
+      // thing you would want to check -- what you typed -- had been cleared for you.
+      // Keep both: the reason, and the code, until the next attempt replaces them.
+      partyJoinErr=(m.msg==='no such party')
+        ?'No party with that code. A code stops working once the host leaves, so ask them for the one they have now.'
+        :(m.msg||'The party refused that.');
+      partyEnd(true);renderParty();
+    }
   };
   ws.onclose=()=>{ if(partyWS!==ws)return;   // a newer socket superseded this one
     if(partyCode&&partyReconn<14){
@@ -18050,7 +18076,11 @@ function partyUntellFriends(){
 }
 function partyCreate(){
   const n=(document.getElementById('ptName')?document.getElementById('ptName').value.trim():'')||partyName();
-  if(!n){toast('Enter a name first');return;}
+  // Say which name, and put the cursor in it. The old message named no field, and
+  // until this screen was rebuilt there was no field on this half of it to name.
+  if(!n){toast('Add your name first \u2014 everyone in the party sees it');
+    try{const el=document.getElementById('ptName');if(el){el.focus();el.scrollIntoView({block:'center'});}}catch(e){}
+    return;}
   setPartyName(n);
   const CH='ABCDEFGHJKMNPQRSTUVWXYZ23456789';let code='';for(let i=0;i<6;i++)code+=CH[Math.floor(Math.random()*CH.length)];
   partyConnect(code,true);
@@ -18060,9 +18090,14 @@ function partyCreate(){
 function partyJoin(codeArg){
   const n=(document.getElementById('ptName')?document.getElementById('ptName').value.trim():'')||partyName();
   const code=(codeArg||(document.getElementById('ptJoin')?document.getElementById('ptJoin').value:'')||'').trim().toUpperCase();
-  if(!n){toast('Enter a name first');return;}
+  // Say which name, and put the cursor in it. The old message named no field, and
+  // until this screen was rebuilt there was no field on this half of it to name.
+  if(!n){toast('Add your name first \u2014 everyone in the party sees it');
+    try{const el=document.getElementById('ptName');if(el){el.focus();el.scrollIntoView({block:'center'});}}catch(e){}
+    return;}
   if(!/^[A-Z0-9]{5,8}$/.test(code)){toast('That doesn’t look like a party code');return;}
   setPartyName(n);
+  partyJoinErr='';
   partyConnect(code,false);
   try{localStorage.setItem('party_active',code);}catch{}
   renderParty();
@@ -19460,28 +19495,39 @@ function renderPartyInner(){
   const box=document.getElementById('partyBody');if(!box)return;
   if(!partyActive()){
     const nm=partyName();
-    // There are exactly two things you can do here, and the old screen buried
-    // both under a paragraph and a pair of field labels: it read as a form to be
-    // completed rather than a choice to be made. Two panels, the one you're more
-    // likely to want first, and each says what will happen when you press it.
+    // Two things you can do, and ONE fact both of them need.
+    //
+    // The name field used to live inside the "Start a party" panel, and partyJoin()
+    // read it anyway. So on a device that had never set a name -- which is every
+    // device somebody has just been sent a code on -- typing the code and pressing
+    // Join answered "Enter a name first", with the only name box sitting in the
+    // other panel under a heading about starting. The code was right, the party was
+    // up, and there was no way to get in that the screen admitted to. Asking once,
+    // above both, is the fix and there is no second place to look.
+    //
+    // The panels went with it. They were two cards of different weight for two
+    // choices of equal standing, one of them washed in 10% accent, separated by an
+    // OR rule -- decoration doing the work that order and one accented button
+    // should do. Start is the accented thing because it is the action; joining sits
+    // under it with its own field, and nothing is tinted to say so.
     box.innerHTML=`
-      <div class="pt-start">
-        <div class="pt-start-h">${icon('users')} Start a party</div>
-        <p class="pt-start-p">${IS_NATIVE
-          ?'Broadcast your screen so everyone sees exactly what you see, and talk it through as it plays.'
-          :'You share your screen, everyone watches in sync, and the chat runs alongside it.'}</p>
-        <input class="pt-name" id="ptName" placeholder="What should everyone call you?" value="${nm?nm.replace(/"/g,'&quot;'):''}" maxlength="24" autocomplete="off">
-        <button class="pt-go" onclick="partyCreate()">${icon('play')} Start a party</button>
+      <label class="pt-field">
+        <span class="pt-field-h">Your name</span>
+        <input class="pt-name" id="ptName" placeholder="What should everyone call you?" value="${nm?nm.replace(/"/g,'&quot;'):''}" maxlength="24" autocomplete="off" spellcheck="false">
+      </label>
+      <p class="pt-start-p">${IS_NATIVE
+        ?'Broadcast your screen so everyone sees exactly what you see, and talk it through as it plays.'
+        :'You share your screen, everyone watches in sync, and the chat runs alongside it.'}</p>
+      <button class="pt-go" onclick="partyCreate()">${icon('play')} Start a party</button>
+      <div class="pt-or"><span>or join one</span></div>
+      <div class="pt-join-row">
+        <input class="pt-joincode${partyJoinErr?' bad':''}" id="ptJoin" placeholder="Party code" maxlength="8" autocomplete="off" autocapitalize="characters" spellcheck="false" inputmode="text"
+               value="${partyJoinErr?escH(partyTriedCode):''}"
+               onkeydown="if(event.key==='Enter')partyJoin()"
+               oninput="this.value=this.value.toUpperCase();if(this.classList.contains('bad')){this.classList.remove('bad');const w=document.getElementById('ptJoinErr');if(w)w.remove();}">
+        <button class="pt-joinbtn" onclick="partyJoin()">Join</button>
       </div>
-      <div class="pt-or"><span>or</span></div>
-      <div class="pt-join">
-        <div class="pt-join-h">Got a code from a friend?</div>
-        <div class="pt-join-row">
-          <input class="pt-code" id="ptJoin" placeholder="XXXXXX" maxlength="8" autocomplete="off" autocapitalize="characters" spellcheck="false" inputmode="text"
-                 oninput="this.value=this.value.toUpperCase()">
-          <button class="pt-joinbtn" onclick="partyJoin()">Join</button>
-        </div>
-      </div>`;
+      ${partyJoinErr?`<p class="pt-joinerr" id="ptJoinErr">${escH(partyJoinErr)}</p>`:''}`;
     return;
   }
   // The fallback only covered partyRoom being missing entirely. A room that

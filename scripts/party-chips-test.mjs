@@ -271,5 +271,57 @@ const alone=await ev(`(()=>{document.getElementById('confirmBox').classList.remo
 t('and told what it costs even with nobody there', alone,
   'The code stops working, so anyone you have sent it to will not be able to get in.');
 
+// ── following the host, which nothing called ───────────────────────────────
+//
+// followHost() is the whole of what a host does AFTER the first play: switching
+// episode, pausing, resuming. Nothing called it, and showPauseOverlay() had exactly
+// two mentions in the file -- its own definition and the line inside this dead
+// function -- so a host pausing reached nobody at all.
+const pauseRun=await ev(`(()=>{
+  window.__pz=[];
+  showPauseOverlay=()=>window.__pz.push('show');
+  hidePauseOverlay=()=>window.__pz.push('hide');
+  partyCode='Z9';partyIsHost=false;partyInSession=true;partyCurEp=3;_followPaused=null;
+  const room=p=>({code:'Z9',host:'other',title:'Frieren',ep:3,paused:p,playAt:0,
+    members:[{uid:'other',name:'H'},{uid:partyUid(),name:'Me'}],chat:[],queue:[],reacts:[]});
+  applyRoom(room(true));
+  applyRoom(room(true));   // a chat line, an emoji, somebody joining
+  applyRoom(room(true));
+  applyRoom(room(false));
+  applyRoom(room(false));
+  return window.__pz.join(',');})()`);
+t('a host pausing reaches the guest, once per change', pauseRun, 'show,hide');
+
+const hostIgnores=await ev(`(()=>{window.__pz=[];
+  partyIsHost=true;partyInSession=true;_followPaused=null;
+  applyRoom({code:'Z9',host:partyUid(),title:'F',ep:3,paused:true,playAt:0,
+    members:[{uid:partyUid(),name:'Me'}],chat:[],queue:[],reacts:[]});
+  return window.__pz.length;})()`);
+t('the host is not made to follow themselves', hostIgnores, 0);
+
+const notWatching=await ev(`(()=>{window.__pz=[];
+  partyIsHost=false;partyInSession=false;_followPaused=null;
+  applyRoom({code:'Z9',host:'other',title:'F',ep:3,paused:true,playAt:0,
+    members:[{uid:'other',name:'H'},{uid:partyUid(),name:'Me'}],chat:[],queue:[],reacts:[]});
+  return window.__pz.length;})()`);
+t('and somebody who is not watching is left alone', notWatching, 0);
+
+// setPartyFollow() existed with nothing able to call it, so partyFollow() answered
+// true for everybody for good.
+const toggle=await ev(`(()=>{partyCode='Z9';partyIsHost=false;
+  partyRoom={code:'Z9',host:'other',title:'F',ep:3,members:[{uid:'other',name:'H'},{uid:partyUid(),name:'Me'}],chat:[],queue:[],reacts:[],voice:[]};
+  renderParty();
+  const el=document.querySelector('.pt-follow input');
+  if(!el)return '(no switch)';
+  const before=partyFollow();el.checked=false;el.dispatchEvent(new Event('change'));
+  const after=partyFollow();setPartyFollow(true);
+  return before+'->'+after;})()`);
+t('the follow switch is reachable and changes the setting', toggle, 'true->false');
+
+const hostNoSwitch=await ev(`(()=>{partyIsHost=true;
+  partyRoom={code:'Z9',host:partyUid(),title:'F',ep:3,members:[{uid:partyUid(),name:'Me'}],chat:[],queue:[],reacts:[],voice:[]};
+  renderParty();return !!document.querySelector('.pt-follow');})()`);
+t('and is not shown to the host, who follows nobody', hostNoSwitch, false);
+
 console.log('\n'+pass+' passed, '+fail+' failed');
 ws.close();ch.kill();srv.kill();process.exit(fail?1:0);

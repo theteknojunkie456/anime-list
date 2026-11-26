@@ -4045,6 +4045,7 @@ textarea.ai-prompt-in{resize:none;line-height:1.45;display:block;}
 .pt-invite{margin-top:16px;padding-top:14px;border-top:1px solid var(--b1);}
 .pt-invite-k{font-family:var(--fd);font-size:10px;font-weight:800;letter-spacing:.12em;
   text-transform:uppercase;color:var(--t3);margin-bottom:8px;}
+.pt-alone{margin:14px 2px 9px;font-size:13px;line-height:1.5;color:var(--t2);}
 .pt-invite .pt-code{margin-bottom:0;padding:10px 12px;background:var(--bg3);}
 .pt-invite .pt-code-val{font-size:17px;letter-spacing:.14em;}
 .pt-invite .pt-code-cta{width:38px;height:38px;border-radius:10px;}
@@ -19744,15 +19745,27 @@ function renderPartyInner(){
   // was the fourth. A watch party is not an administrative record — the show is
   // the subject, and the code is plumbing you need once, at the start. So: what
   // is on, who is here, then the controls, and the code down with the actions.
+  // THE CODE COMES FIRST WHILE THERE IS NOBODY TO TALK TO.
+  //
+  // Order was hero, ready, members, controls, chat, invite, leave -- so the moment
+  // you started a party, the one thing you needed was at the bottom of a long
+  // scroll, underneath a chat with nobody in it and a row of controls for things
+  // you cannot do alone. A party of one has exactly one job.
+  //
+  // Once somebody else is here it goes back where it was, because then the screen
+  // is about watching rather than about getting in.
+  const _alone=(r.members||[]).length<=1;
+  const inviteBlk=`<div class="pt-invite">
+      <div class="pt-invite-k">Invite</div>
+          <div class="pt-code"><div class="pt-code-val">${schEsc(r.code||partyCode)}</div><button class="pt-code-cta" onclick="sharePartyLink()" aria-label="Share invite link">${icon('send')}</button><button class="pt-code-cta" onclick="partyCopyCode()" aria-label="Copy code">${icon('copy')}</button></div>
+    </div>`;
   box.innerHTML=`
     ${hero}
+    ${_alone?`<p class="pt-alone">Nobody else is here yet. Send them this code and they are in.</p>`+inviteBlk:''}
     ${readyBar}
     <div class="pt-members">${members}</div>
     ${_jitsiApi?_chatBlock+_controls:_controls+_chatBlock}
-    <div class="pt-invite">
-      <div class="pt-invite-k">Invite</div>
-          <div class="pt-code"><div class="pt-code-val">${schEsc(r.code||partyCode)}</div><button class="pt-code-cta" onclick="sharePartyLink()" aria-label="Share invite link">${icon('send')}</button><button class="pt-code-cta" onclick="partyCopyCode()" aria-label="Copy code">${icon('copy')}</button></div>
-    </div>
+    ${_alone?'':inviteBlk}
     <button class="src-opt" style="margin-top:14px" onclick="partyEnd()"><div class="src-name" style="color:var(--t2)">${partyIsHost?'End the party':'Leave the party'}</div></button>`;
   const cc=document.getElementById('ptChat');if(cc)cc.scrollTop=cc.scrollHeight;
   _chatUnread=0;_lastChatLen=((partyRoom&&partyRoom.chat)||[]).length;updatePartyPill();   // viewing the sheet clears the unread badge

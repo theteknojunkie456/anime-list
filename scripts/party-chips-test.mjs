@@ -213,5 +213,33 @@ const back=await ev(`(()=>{document.getElementById('shRotBtn').click();
   return v.classList.contains('sh-rot')+'|'+(v.style.getPropertyValue('--rot-w')||'(cleared)');})()`);
 t('and tapping again puts it upright', back, 'false|(cleared)');
 
+// ── a party of one has exactly one job ─────────────────────────────────────
+//
+// The invite code used to be second from the bottom: under the chat nobody is in
+// yet and under a row of controls for things you cannot do alone. The moment you
+// start a party, the code is the only thing that matters.
+// Built by concatenation, not a nested template: a `${p}` inside a template that is
+// itself inside a template reaches the page as the literal characters and the browser
+// answers with a SyntaxError that looks like a bug in the app.
+const order=p=>"(()=>{partyCode='Z9';partyIsHost=true;"+
+  "applyRoom({code:'Z9',host:partyUid(),title:'',ep:0,members:"+p+",chat:[],queue:[],reacts:[]});"+
+  "renderParty();"+
+  "const box=document.getElementById('partyBody');"+
+  "const inv=box.querySelector('.pt-invite'),chat=document.getElementById('ptChat');"+
+  "if(!inv||!chat)return 'missing';"+
+  "return (inv.compareDocumentPosition(chat)&Node.DOCUMENT_POSITION_FOLLOWING)?'invite first':'chat first';})()";
+
+const solo=await ev(order("[{uid:partyUid(),name:'Me'}]"));
+t('on your own, the code comes before the chat', solo, 'invite first');
+
+const soloSays=await ev(`(()=>!!document.querySelector('.pt-alone'))()`);
+t('and says why it is there', soloSays, true);
+
+const two=await ev(order("[{uid:partyUid(),name:'Me'},{uid:'b',name:'Yasso'}]"));
+t('once somebody is here it goes back below', two, 'chat first');
+
+const twoQuiet=await ev(`(()=>!!document.querySelector('.pt-alone'))()`);
+t('and stops saying nobody is here', twoQuiet, false);
+
 console.log('\n'+pass+' passed, '+fail+' failed');
 ws.close();ch.kill();srv.kill();process.exit(fail?1:0);

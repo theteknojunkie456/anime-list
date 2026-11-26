@@ -122,5 +122,35 @@ const cleared=await ev(`(()=>{const i=document.getElementById('ptJoin');
   return [i.classList.contains('bad'),!!document.getElementById('ptJoinErr')].join(',');})()`);
 t('and clears the moment you start retyping', cleared, 'false,false');
 
+// ── the host pressing Play has to reach everyone ───────────────────────────
+//
+// playAt is the instant the room starts, set a few seconds ahead so every device
+// counts down to the same moment. On the web it is the only thing holding a party
+// together, because a page cannot read or move a video on another origin. It was
+// being ignored: partyCue() was defined and never called, partySeenPlay was set
+// once and never read, and partyFollowHost is only reachable through partyCue.
+const cued=await ev(`(()=>{partyCode='Z1';partyIsHost=false;partySeenPlay=0;
+  const ov=document.getElementById('partyCount');if(ov)ov.classList.remove('on');
+  applyRoom({code:'Z1',host:'someone-else',title:'Frieren',ep:3,animeId:'154587',
+    playAt:Date.now()+3600,members:[],chat:[],queue:[]});
+  return !!(ov&&ov.classList.contains('on'));})()`);
+t('the host pressing play counts everyone in', cued, true);
+
+const once=await ev(`(()=>{const at=partySeenPlay;
+  const ov=document.getElementById('partyCount');ov.classList.remove('on');
+  // the same room arriving again (a reconnect, a member joining) must not re-cue
+  applyRoom({code:'Z1',host:'someone-else',title:'Frieren',ep:3,animeId:'154587',
+    playAt:at,members:[{uid:'x',name:'New'}],chat:[],queue:[]});
+  return ov.classList.contains('on');})()`);
+t('and does not count them in again on the next message', once, false);
+
+const late=await ev(`(()=>{partySeenPlay=0;
+  const ov=document.getElementById('partyCount');ov.classList.remove('on');
+  // arriving ten minutes into something: the room's playAt is long past
+  applyRoom({code:'Z1',host:'someone-else',title:'Frieren',ep:3,animeId:'154587',
+    playAt:Date.now()-600000,members:[],chat:[],queue:[]});
+  return ov.classList.contains('on');})()`);
+t('someone arriving late is not counted into a start that is over', late, false);
+
 console.log('\n'+pass+' passed, '+fail+' failed');
 ws.close();ch.kill();srv.kill();process.exit(fail?1:0);

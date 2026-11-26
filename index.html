@@ -17964,6 +17964,28 @@ function applyRoom(room){
     _lastChatLen=chatLen;
   }catch(e){}
   partyRoom=room; partyIsHost=(room.host===partyUid());
+  // THE HOST PRESSED PLAY.
+  //
+  // playAt is the instant the ROOM starts, set a few seconds ahead precisely so
+  // every device can count down to the same moment -- it is the only thing holding
+  // a party together on the web, where a page cannot read, let alone move, a video
+  // on another origin. Nothing was reading it. partyCue() was defined and never
+  // called, partySeenPlay was initialised and never read again, and partyFollowHost
+  // is only reachable through partyCue, so "Following the host" never fired either.
+  // The host pressed Play, the room recorded it, the message arrived, and every
+  // guest ignored it. That is the whole of party playback on the web.
+  //
+  // A start that has already happened is not cued: somebody arriving ten minutes in
+  // receives the room's state with that old playAt, and counting them into a
+  // beginning that is long past would throw them at the top of an episode everybody
+  // else is halfway through. They join where they are, which is the honest answer
+  // when there is no way to seek another site's player.
+  try{
+    if(room.playAt && room.playAt!==partySeenPlay){
+      partySeenPlay=room.playAt;
+      if(room.playAt-partyNow() > -2000) partyCue(room);
+    }
+  }catch(e){}
   updatePartyPill();
   if(document.getElementById('partySheet').classList.contains('on')){
     const sig=_partyRenderSig(room);

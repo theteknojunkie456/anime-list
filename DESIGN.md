@@ -194,6 +194,13 @@ shows a handful of them; the count across the file is what settles it.
 I moved six things off 15px once, believing I was tidying them onto the scale, and had to put
 them back. The outliers are the short column: a lone 11.5px, three 14px, three 24px.
 
+**And the inputs stay at 15px.** iOS Safari is documented to zoom the page when you focus an
+input smaller than 16px, which is a standing argument for bumping them — and 16 is not on this
+scale, it sits between 15 and 17, so taking it would mean adding a size the scale does not have.
+Checked on his own iPhone on 2026-11-26, tapping the search field: **it does not zoom.** So the
+trade never has to be made. Don't raise them on the strength of the general rule; the specific
+case was tested and the answer was no.
+
 **The hero's ladder, and why it is not drift.** Below that clamp the hero title
 steps down five times, and an audit counting sizes on screen will report two
 values — 24 and 27 — that are on no scale:

@@ -31,3 +31,24 @@ new_sqlite_classes = ["PartyRoom"]
 [[migrations]]
 tag = "v2"
 new_sqlite_classes = ["UserChannel"]
+
+# LISTBOX = one Durable Object per sync code, holding that code's record.
+#
+# The list used to live in the KV namespace above, which allows a thousand writes
+# a DAY across every user on the free plan -- and every push spends one, so the
+# quota ran out while people were still using the app. KV is also eventually
+# consistent, so a device that pushed and another that pulled a moment later
+# could disagree, which is what "sync is glitching" looks like from outside.
+# A Durable Object is strongly consistent and its SQLite storage allows a hundred
+# thousand writes a day on the same free plan.
+#
+# Nothing has to be migrated by hand: a code whose record is still in KV is read
+# from there and copied across the first time it is touched. KV stays bound, both
+# as that source and as the fallback if this binding is ever removed.
+[[durable_objects.bindings]]
+name = "LISTBOX"
+class_name = "ListBox"
+
+[[migrations]]
+tag = "v3"
+new_sqlite_classes = ["ListBox"]

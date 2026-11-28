@@ -16,6 +16,50 @@
 const CHAT_CAP = 60;
 const QUEUE_CAP = 30;
 
+// ── WHERE THE LIST LIVES ────────────────────────────────────────────────────
+//
+// The per-code record used to sit in KV, and KV is the wrong shape for it twice
+// over. The free namespace allows a THOUSAND writes a day across everybody, and
+// every push spends one; and KV is eventually consistent, so a device that
+// pushes and another that pulls a second later can disagree for a while, which
+// is what "sync is glitching" looks like from the outside.
+//
+// A Durable Object per code fixes both. Its storage is strongly consistent --
+// the pull after a push sees that push, always -- and the free plan's SQLite
+// storage allows a hundred thousand writes a day rather than a thousand.
+//
+// Nothing is migrated up front: a code is read from its Durable Object, and if
+// that is empty the old KV value is read instead AND copied in, so a list moves
+// across the first time its owner opens the app, and a rollback to the old code
+// still finds every list where it left it. With no LISTBOX binding at all (the
+// tests, or a deploy that has not added it yet) everything falls back to KV.
+const CHUNK = 96_000;   // Durable Object storage holds 128 KiB per value; a list can be far bigger
+
+async function listRead(env, key) {
+  if (env.LISTBOX) {
+    const box = env.LISTBOX.get(env.LISTBOX.idFromName(key));
+    const r = await box.fetch('https://box/get');
+    if (r.ok) { const t = await r.text(); if (t) return t; }
+    const old = await env.LISTS.get(key);                  // first time for this code: bring it across
+    if (old) { try { await listWrite(env, key, old); } catch {} }
+    return old;
+  }
+  return env.LISTS.get(key);
+}
+async function listWrite(env, key, payload) {
+  if (env.LISTBOX) {
+    const box = env.LISTBOX.get(env.LISTBOX.idFromName(key));
+    const r = await box.fetch('https://box/put', { method: 'POST', body: payload });
+    if (r.ok) return;
+    // the Durable Object refused it (too big, or a bad day): the backup still has to land
+  }
+  return env.LISTS.put(key, payload);
+}
+async function listDrop(env, key) {
+  if (env.LISTBOX) { try { await env.LISTBOX.get(env.LISTBOX.idFromName(key)).fetch('https://box/drop', { method: 'POST' }); } catch {} }
+  try { await env.LISTS.delete(key); } catch {}
+}
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -127,7 +171,7 @@ export default {
       if (!/^[A-Za-z0-9]{10,64}$/.test(code)) return json({ error: 'bad code' }, 400, cors);
       const key = 'list:' + code;
       let prev = null;
-      try { const s = await env.LISTS.get(key); if (s) prev = JSON.parse(s); } catch {}
+      try { const s = await listRead(env, key); if (s) prev = JSON.parse(s); } catch {}
       if (op === 'pull') {
         if (!prev) return json({ data: null, updatedAt: 0 }, 200, cors);
         // Snapshots are for the picker only. Shipping them on an ordinary pull
@@ -192,7 +236,7 @@ export default {
       if (payload.length > 20_000_000) { rec.devs = okDev(dev) ? { [dev]: devs[dev] } : {}; payload = JSON.stringify(rec); }
       if (payload.length > 20_000_000) { rec.devs = {}; payload = JSON.stringify(rec); }
       if (payload.length > 20_000_000) return json({ error: 'too big' }, 413, cors);
-      await env.LISTS.put(key, payload);
+      await listWrite(env, key, payload);
       return json({ ok: true, updatedAt: now, adopt }, 200, cors);
     }
 
@@ -216,7 +260,7 @@ export default {
       if (!/^[A-Za-z0-9]{10,64}$/.test(code)) return json({ error: 'bad code' }, 400, cors);
       let existed = false;
       try { existed = !!(await env.LISTS.get('list:' + code)); } catch {}
-      try { await env.LISTS.delete('list:' + code); } catch {}
+      await listDrop(env, 'list:' + code);
       // `existed` is reported so the client can tell "erased" from "there was
       // nothing there" — a device asking twice, or asking about a key that was
       // never used, should not be told it destroyed something.
@@ -1090,4 +1134,35 @@ export class PartyRoom {
 
 function json(obj, status, cors) {
   return new Response(JSON.stringify(obj), { status, headers: { 'Content-Type': 'application/json', ...cors } });
+}
+
+
+// ── ListBox: one per sync code, holding that code's record ──────────────────
+//
+// Split across values because Durable Object storage holds 128 KiB each and a
+// list with several devices' snapshots in it runs to megabytes. `n` is how many
+// pieces there are, written LAST on the way in and read FIRST on the way out,
+// so a write interrupted half way leaves the previous complete record in place
+// rather than a half-new one.
+export class ListBox {
+  constructor(state) { this.state = state; }
+  async fetch(request) {
+    const path = new URL(request.url).pathname;
+    if (path === '/put') {
+      const body = await request.text();
+      const parts = [];
+      for (let i = 0; i < body.length; i += CHUNK) parts.push(body.slice(i, i + CHUNK));
+      const old = (await this.state.storage.get('n')) || 0;
+      for (let i = 0; i < parts.length; i++) await this.state.storage.put('c' + i, parts[i]);
+      await this.state.storage.put('n', parts.length);
+      for (let i = parts.length; i < old; i++) await this.state.storage.delete('c' + i);   // a shorter record than last time
+      return new Response('ok');
+    }
+    if (path === '/drop') { await this.state.storage.deleteAll(); return new Response('ok'); }
+    const n = (await this.state.storage.get('n')) || 0;
+    if (!n) return new Response('', { status: 200 });
+    let out = '';
+    for (let i = 0; i < n; i++) out += (await this.state.storage.get('c' + i)) || '';
+    return new Response(out, { headers: { 'Content-Type': 'application/json' } });
+  }
 }
